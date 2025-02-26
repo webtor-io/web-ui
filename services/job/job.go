@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
@@ -154,7 +155,7 @@ func (s *Job) Run(ctx context.Context) error {
 	}
 
 	if s.runnable != nil {
-		err := s.runnable.Run(s)
+		err := s.runnable.Run(ctx, s)
 		if err != nil {
 			errr := s.Error(err)
 			if errr != nil {
@@ -247,21 +248,29 @@ func (s *Job) Info(message string) *Job {
 	return s
 }
 
-func (s *Job) Warn(err error, message string) *Job {
-	log.WithError(err).Error("got job warning")
+func (s *Job) Warn(err error) *Job {
+	log.WithError(err).Warn("got job warning")
 	_ = s.log(LogItem{
 		Level:   Warn,
-		Message: message,
+		Message: makeErrorMessage(err),
 		Tag:     s.cur,
 	})
 	return s
+}
+
+func makeErrorMessage(err error) string {
+	msg := strings.Split(err.Error(), ":")[0]
+	if errors.Is(err, context.DeadlineExceeded) {
+		return msg + " (deadline exceeded)"
+	}
+	return msg
 }
 
 func (s *Job) Error(err error) error {
 	log.WithError(err).Error("got job error")
 	_ = s.log(LogItem{
 		Level:   Error,
-		Message: strings.Split(err.Error(), ":")[0],
+		Message: makeErrorMessage(err),
 		Tag:     s.cur,
 	})
 	return err
@@ -470,14 +479,14 @@ func (s Queues) GetOrCreate(name string) *Jobs {
 }
 
 type Runnable interface {
-	Run(j *Job) error
+	Run(ctx context.Context, j *Job) error
 }
 
 type Script struct {
 	body func(j *Job) error
 }
 
-func (s *Script) Run(j *Job) error {
+func (s *Script) Run(ctx context.Context, j *Job) error {
 	return s.body(j)
 }
 

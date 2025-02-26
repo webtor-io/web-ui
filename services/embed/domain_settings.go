@@ -1,7 +1,6 @@
 package embed
 
 import (
-	"context"
 	"github.com/pkg/errors"
 	"time"
 
@@ -32,7 +31,7 @@ func NewDomainSettings(pg *cs.PG, claims *claims.Claims) *DomainSettings {
 	}
 }
 
-func (s *DomainSettings) Get(ctx context.Context, domain string) (*DomainSettingsData, error) {
+func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 	return s.LazyMap.Get(domain, func() (*DomainSettingsData, error) {
 		if s.pg == nil || s.pg.Get() == nil || s.claims == nil {
 			return &DomainSettingsData{}, nil
@@ -45,7 +44,7 @@ func (s *DomainSettings) Get(ctx context.Context, domain string) (*DomainSetting
 		} else if err != nil {
 			return nil, err
 		}
-		cl, err := s.claims.Get(ctx, em.Email)
+		cl, err := s.claims.Get(em.Email)
 		if err != nil {
 			return nil, err
 		}

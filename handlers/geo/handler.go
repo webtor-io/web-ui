@@ -46,7 +46,7 @@ func RegisterHandler(api *geoip.Api, r *gin.Engine) error {
 		if ip.To4() == nil {
 			return
 		}
-		data, err := api.Get(c.Request.Context(), ip)
+		data, err := api.Get(ip)
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to fetch geoip data"))
 			return

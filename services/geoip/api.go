@@ -71,8 +71,10 @@ func New(c *cli.Context, cl *http.Client) *Api {
 	}
 }
 
-func (s *Api) get(ctx context.Context, ip net.IP) (*Data, error) {
+func (s *Api) get(ip net.IP) (*Data, error) {
 	requestURL := fmt.Sprintf("%v/%v", s.url, ip.String())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -91,8 +93,8 @@ func (s *Api) get(ctx context.Context, ip net.IP) (*Data, error) {
 	return &data, nil
 }
 
-func (s *Api) Get(ctx context.Context, ip net.IP) (*Data, error) {
+func (s *Api) Get(ip net.IP) (*Data, error) {
 	return s.LazyMap.Get(ip.String(), func() (resp *Data, err error) {
-		return s.get(ctx, ip)
+		return s.get(ip)
 	})
 }

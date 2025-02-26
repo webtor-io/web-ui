@@ -72,7 +72,7 @@ func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, e
 	return la, nil
 }
 
-func (s *EmbedScript) Run(j *job.Job) (err error) {
+func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	args, err := s.makeLoadArgs(s.settings)
 	if err != nil {
 		return
@@ -81,12 +81,12 @@ func (s *EmbedScript) Run(j *job.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ls.Run(j)
+	err = ls.Run(ctx, j)
 	if err != nil {
 		return err
 	}
 	id := j.Context.Value("respID").(string)
-	i, err := s.getBestItem(j, id, s.settings)
+	i, err := s.getBestItem(ctx, j, id, s.settings)
 	if err != nil {
 		return err
 	}
@@ -102,17 +102,17 @@ func (s *EmbedScript) Run(j *job.Job) (err error) {
 	}
 	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
 	as, _ := Action(s.tb, s.api, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud)
-	err = as.Run(j)
+	err = as.Run(ctx, j)
 	if err != nil {
 		return err
 	}
 	return
 }
 
-func (s *EmbedScript) getBestItem(j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {
+func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {
 	j.InProgress("searching for stream content")
-	ctx, cancel := context.WithTimeout(j.Context, 10*time.Second)
-	defer cancel()
+	apiCtx, apiCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer apiCancel()
 	pwd := settings.PWD
 	file := settings.File
 	if settings.Path != "" {
@@ -120,7 +120,7 @@ func (s *EmbedScript) getBestItem(j *job.Job, id string, settings *models.EmbedS
 		file = parts[len(parts)-1]
 		pwd = strings.Join(parts[:len(parts)-1], "/")
 	}
-	l, err := s.api.ListResourceContent(ctx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+	l, err := s.api.ListResourceContent(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 		Path:   pwd,
 		Output: api.OutputTree,
 	})
@@ -128,7 +128,9 @@ func (s *EmbedScript) getBestItem(j *job.Job, id string, settings *models.EmbedS
 		return nil, errors.Wrap(err, "failed to list resource content")
 	}
 	if len(l.Items) == 1 && l.Items[0].Type == ra.ListTypeDirectory {
-		l, err = s.api.ListResourceContent(ctx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+		apiCtx2, apiCancel2 := context.WithTimeout(ctx, 10*time.Second)
+		defer apiCancel2()
+		l, err = s.api.ListResourceContent(apiCtx2, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 			Path:   l.Items[0].PathStr,
 			Output: api.OutputTree,
 		})

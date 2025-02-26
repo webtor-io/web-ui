@@ -42,27 +42,27 @@ type TorrentDownload struct {
 	Size     int
 }
 
-func (s *ActionScript) streamContent(j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
+func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
 	sc := &StreamContent{
 		Settings:       settings,
 		ExternalData:   &m.ExternalData{},
 		DomainSettings: dsd,
 	}
 	j.InProgress("retrieving resource data")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	resourceResponse, err := s.api.GetResource(ctx, c.ApiClaims, resourceID)
+	resCtx, resCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer resCancel()
+	resourceResponse, err := s.api.GetResource(resCtx, c.ApiClaims, resourceID)
 	if err != nil {
-		return errors.Wrap(err, "failed to retrieve for 5 minutes")
+		return errors.Wrap(err, "failed to retrieve resource")
 	}
 	j.Done()
 	sc.Resource = resourceResponse
 	j.InProgress("retrieving stream url")
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel2()
-	exportResponse, err := s.api.ExportResourceContent(ctx2, c.ApiClaims, resourceID, itemID, settings.ImdbID)
+	exportCtx, exportCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer exportCancel()
+	exportResponse, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, settings.ImdbID)
 	if err != nil {
-		return errors.Wrap(err, "failed to retrieve for 5 minutes")
+		return errors.Wrap(err, "failed to retrieve stream url")
 	}
 	j.Done()
 	sc.ExportTag = exportResponse.ExportItems["stream"].Tag
@@ -72,16 +72,18 @@ func (s *ActionScript) streamContent(j *job.Job, c *web.Context, resourceID stri
 	if se.Meta.Transcode {
 		if !se.Meta.TranscodeCache {
 			if !se.ExportMetaItem.Meta.Cache {
-				if err = s.warmUp(j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
+				if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
 					return
 				}
 			}
-			if err = s.warmUp(j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, "stream", false); err != nil {
+			if err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, "stream", false); err != nil {
 				return
 			}
 		}
 		j.InProgress("probing content media info")
-		mp, err := s.api.GetMediaProbe(ctx, exportResponse.ExportItems["media_probe"].URL)
+		mpCtx, mpCancel := context.WithTimeout(ctx, 1*time.Minute)
+		defer mpCancel()
+		mp, err := s.api.GetMediaProbe(mpCtx, exportResponse.ExportItems["media_probe"].URL)
 		if err != nil {
 			return errors.Wrap(err, "failed to get probe data")
 		}
@@ -90,7 +92,7 @@ func (s *ActionScript) streamContent(j *job.Job, c *web.Context, resourceID stri
 		j.Done()
 	} else {
 		if !se.ExportMetaItem.Meta.Cache {
-			if err = s.warmUp(j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
+			if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
 				return
 			}
 		}
@@ -98,13 +100,17 @@ func (s *ActionScript) streamContent(j *job.Job, c *web.Context, resourceID stri
 	if exportResponse.Source.MediaFormat == ra.Video {
 		sc.VideoStreamUserData = vsud
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
-			j.InProgress("loading OpenSubtitles")
-			subs, err := s.api.GetOpenSubtitles(ctx, subtitles.URL)
-			if err != nil {
-				j.Warn(err, "failed to get OpenSubtitles")
-			} else {
-				sc.OpenSubtitles = subs
-				j.Done()
+			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
+				j.InProgress("loading OpenSubtitles")
+				osCtx, osCancel := context.WithTimeout(ctx, 1*time.Minute)
+				defer osCancel()
+				subs, err := s.api.GetOpenSubtitles(osCtx, subtitles.URL)
+				if err != nil {
+					j.Warn(errors.Wrap(err, "failed to get OpenSubtitles"))
+				} else {
+					sc.OpenSubtitles = subs
+					j.Done()
+				}
 			}
 		}
 	}
@@ -127,16 +133,16 @@ func (s *ActionScript) streamContent(j *job.Job, c *web.Context, resourceID stri
 	return
 }
 
-func (s *ActionScript) previewImage(j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
-	return s.streamContent(j, c, resourceID, itemID, "preview_image", settings, vsud, dsd)
+func (s *ActionScript) previewImage(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+	return s.streamContent(ctx, j, c, resourceID, itemID, "preview_image", settings, vsud, dsd)
 }
 
-func (s *ActionScript) streamAudio(j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
-	return s.streamContent(j, c, resourceID, itemID, "stream_audio", settings, vsud, dsd)
+func (s *ActionScript) streamAudio(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+	return s.streamContent(ctx, j, c, resourceID, itemID, "stream_audio", settings, vsud, dsd)
 }
 
-func (s *ActionScript) streamVideo(j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
-	return s.streamContent(j, c, resourceID, itemID, "stream_video", settings, vsud, dsd)
+func (s *ActionScript) streamVideo(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+	return s.streamContent(ctx, j, c, resourceID, itemID, "stream_video", settings, vsud, dsd)
 }
 
 func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, sc *StreamContent, name string) error {
@@ -155,19 +161,19 @@ type FileDownload struct {
 	HasAds bool
 }
 
-func (s *ActionScript) download(j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
+func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
 	j.InProgress("retrieving download link")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	resp, err := s.api.ExportResourceContent(ctx, c.ApiClaims, resourceID, itemID, "")
+	exportCtx, exportCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer exportCancel()
+	resp, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, "")
 	if err != nil {
-		return errors.Wrap(err, "failed to retrieve for 30 seconds")
+		return errors.Wrap(err, "failed to retrieve download link")
 	}
 	j.Done()
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if err := s.warmUp(j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1_000_000, 0, "", true); err != nil {
+		if err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1_000_000, 0, "", true); err != nil {
 			return err
 		}
 	}
@@ -188,11 +194,11 @@ func (s *ActionScript) download(j *job.Job, c *web.Context, resourceID string, i
 	return
 }
 
-func (s *ActionScript) downloadTorrent(j *job.Job, c *web.Context, resourceID string) (err error) {
+func (s *ActionScript) downloadTorrent(ctx context.Context, j *job.Job, c *web.Context, resourceID string) (err error) {
 	j.InProgress("retrieving torrent")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	resp, err := s.api.GetTorrent(ctx, c.ApiClaims, resourceID)
+	apiCtx, apiCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer apiCancel()
+	resp, err := s.api.GetTorrent(apiCtx, c.ApiClaims, resourceID)
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve for 30 seconds")
 	}
@@ -230,7 +236,7 @@ func (s *ActionScript) downloadTorrent(j *job.Job, c *web.Context, resourceID st
 	return nil
 }
 
-func (s *ActionScript) warmUp(j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (err error) {
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (err error) {
 	tag := "download"
 	if tagSuff != "" {
 		tag += "-" + tagSuff
@@ -246,13 +252,13 @@ func (s *ActionScript) warmUp(j *job.Job, m string, u string, su string, size in
 	} else {
 		j.InProgress(m)
 	}
-	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancel2()
+	warmupCtx, warmupCacnel := context.WithTimeout(ctx, time.Minute*5)
+	defer warmupCacnel()
 
 	if useStatus {
 		j.StatusUpdate("waiting for peers")
 		go func() {
-			ch, err := s.api.Stats(ctx2, su)
+			ch, err := s.api.Stats(warmupCtx, su)
 			if err != nil {
 				log.WithError(err).Error("failed to get stats")
 				return
@@ -264,14 +270,14 @@ func (s *ActionScript) warmUp(j *job.Job, m string, u string, su string, size in
 						return
 					}
 					j.StatusUpdate(fmt.Sprintf("%v peers", ev.Peers))
-				case <-ctx2.Done():
+				case <-warmupCtx.Done():
 					return
 				}
 			}
 		}()
 	}
 
-	b, err := s.api.DownloadWithRange(ctx2, u, 0, limitStart)
+	b, err := s.api.DownloadWithRange(warmupCtx, u, 0, limitStart)
 	if err != nil {
 		return errors.Wrap(err, "failed to start download")
 	}
@@ -282,7 +288,7 @@ func (s *ActionScript) warmUp(j *job.Job, m string, u string, su string, size in
 	_, err = io.Copy(io.Discard, b)
 
 	if limitEnd > 0 {
-		b2, err := s.api.DownloadWithRange(ctx2, u, size-limitEnd, -1)
+		b2, err := s.api.DownloadWithRange(warmupCtx, u, size-limitEnd, -1)
 		if err != nil {
 			return errors.Wrap(err, "failed to start download")
 		}
@@ -311,20 +317,20 @@ type ActionScript struct {
 	dsd        *embed.DomainSettingsData
 }
 
-func (s *ActionScript) Run(j *job.Job) (err error) {
+func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 	switch s.action {
 	case "download":
-		return s.download(j, s.c, s.resourceId, s.itemId)
+		return s.download(ctx, j, s.c, s.resourceId, s.itemId)
 	case "download-dir":
-		return s.download(j, s.c, s.resourceId, s.itemId)
+		return s.download(ctx, j, s.c, s.resourceId, s.itemId)
 	case "download-torrent":
-		return s.downloadTorrent(j, s.c, s.resourceId)
+		return s.downloadTorrent(ctx, j, s.c, s.resourceId)
 	case "preview-image":
-		return s.previewImage(j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
+		return s.previewImage(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
 	case "stream-audio":
-		return s.streamAudio(j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
+		return s.streamAudio(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
 	case "stream-video":
-		return s.streamVideo(j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
+		return s.streamVideo(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
 	}
 	return
 }

@@ -35,12 +35,12 @@ func NewLoadScript(api *api.Api, c *web.Context, args *LoadArgs) *LoadScript {
 	}
 }
 
-func (s *LoadScript) Run(j *job.Job) (err error) {
+func (s *LoadScript) Run(ctx context.Context, j *job.Job) (err error) {
 	var res *ra.ResourceResponse
 	if s.args.File != nil {
-		res, err = s.storeFile(j, s.args.File)
+		res, err = s.storeFile(ctx, j, s.args.File)
 	} else if s.args.Query != "" {
-		res, err = s.storeQuery(j, s.args.Query)
+		res, err = s.storeQuery(ctx, j, s.args.Query)
 	}
 	if err != nil {
 		return err
@@ -52,11 +52,11 @@ func (s *LoadScript) Run(j *job.Job) (err error) {
 	return
 }
 
-func (s *LoadScript) storeFile(j *job.Job, file []byte) (res *ra.ResourceResponse, err error) {
+func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (res *ra.ResourceResponse, err error) {
 	j.InProgress("uploading file")
-	ctx, cancel := context.WithTimeout(j.Context, 60*time.Second)
-	defer cancel()
-	res, err = s.api.StoreResource(ctx, s.c.ApiClaims, file)
+	apiCtx, apiCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer apiCancel()
+	res, err = s.api.StoreResource(apiCtx, s.c.ApiClaims, file)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to upload file")
 	}
@@ -64,7 +64,7 @@ func (s *LoadScript) storeFile(j *job.Job, file []byte) (res *ra.ResourceRespons
 	return
 }
 
-func (s *LoadScript) storeQuery(j *job.Job, query string) (res *ra.ResourceResponse, err error) {
+func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (res *ra.ResourceResponse, err error) {
 	j.InProgress("checking magnet")
 	sha1Hash := services.SHA1R.Find([]byte(query))
 	if sha1Hash == nil {
@@ -74,9 +74,9 @@ func (s *LoadScript) storeQuery(j *job.Job, query string) (res *ra.ResourceRespo
 	if !strings.HasPrefix(query, "magnet:") {
 		query = "magnet:?xt=urn:btih:" + hash
 	}
-	ctx, cancel := context.WithTimeout(j.Context, 60*time.Second)
-	defer cancel()
-	res, err = s.api.GetResource(ctx, s.c.ApiClaims, hash)
+	apiCtx, apiCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer apiCancel()
+	res, err = s.api.GetResource(apiCtx, s.c.ApiClaims, hash)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load resource by magnet")
 	}
@@ -87,11 +87,11 @@ func (s *LoadScript) storeQuery(j *job.Job, query string) (res *ra.ResourceRespo
 	j.Done()
 	j.Info("sadly, we don't have torrent, so we have to magnetize it from peers")
 	j.InProgress("magnetizing")
-	ctx, cancel = context.WithTimeout(j.Context, 60*time.Second)
-	defer cancel()
-	res, err = s.api.StoreResource(ctx, s.c.ApiClaims, []byte(query))
+	magnetizeCtx, magnetizeCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer magnetizeCancel()
+	res, err = s.api.StoreResource(magnetizeCtx, s.c.ApiClaims, []byte(query))
 	if err != nil || res == nil {
-		return nil, errors.Wrap(err, "failed to magnetize, there were no peers for 60 seconds, try another magnet")
+		return nil, errors.Wrap(err, "failed to magnetize")
 	}
 	j.Done()
 	return
@@ -102,7 +102,6 @@ func Load(api *api.Api, c *web.Context, args *LoadArgs) (r job.Runnable, hash st
 	h.Write(args.File)
 	h.Write([]byte(args.Query))
 	hash = fmt.Sprintf("%x", h.Sum(nil))
-
 	r = NewLoadScript(api, c, args)
 	return
 }

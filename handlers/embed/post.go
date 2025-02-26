@@ -54,7 +54,7 @@ func (s *Handler) post(c *gin.Context) {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return
 	}
-	dsd, err := s.ds.Get(c.Request.Context(), u.Hostname())
+	dsd, err := s.ds.Get(u.Hostname())
 	if err != nil {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return

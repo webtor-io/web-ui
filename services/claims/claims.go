@@ -48,8 +48,10 @@ func New(c *cli.Context, cl *Client) *Claims {
 	}
 }
 
-func (s *Claims) Get(ctx context.Context, email string) (*Data, error) {
+func (s *Claims) Get(email string) (*Data, error) {
 	return s.LazyMap.Get(email, func() (resp *Data, err error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 		var cl proto.ClaimsProviderClient
 		cl, err = s.cl.Get()
 		if err != nil {
@@ -65,7 +67,7 @@ func (s *Claims) Get(ctx context.Context, email string) (*Data, error) {
 
 func (s *Claims) MakeUserClaimsFromContext(c *gin.Context) (*Data, error) {
 	u := auth.GetUserFromContext(c)
-	r, err := s.Get(c.Request.Context(), u.Email)
+	r, err := s.Get(u.Email)
 	if _, err := c.Cookie("test-ads"); err == nil {
 		r.Claims.Site.NoAds = false
 	} else if c.Query("test-ads") != "" {

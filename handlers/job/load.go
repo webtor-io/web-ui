@@ -16,7 +16,7 @@ func (s *Handler) Load(c *web.Context, args *script.LoadArgs) (j *job.Job, err e
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, hash, job.NewScript(func(j *job.Job) (err error) {
-		err = ls.Run(j)
+		err = ls.Run(ctx, j)
 		if err != nil {
 			return
 		}
