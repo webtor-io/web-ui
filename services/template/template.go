@@ -3,6 +3,7 @@ package template
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"html/template"
@@ -329,7 +330,8 @@ func (s *Template[K]) HTML(code int, ctx K) {
 			if rerr != nil {
 				panic(rerr)
 			}
-			c.Header(name, str)
+			encoded := base64.StdEncoding.EncodeToString([]byte(str))
+			c.Header(name, encoded)
 		}
 
 	} else {

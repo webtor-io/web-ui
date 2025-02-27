@@ -39,7 +39,9 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     for (const [h, val] of res.headers.entries()) {
         if (!h.startsWith('x-update-')) continue;
         const key = h.replace('x-update-', '');
-        params.update(key, val);
+        let decodedBytes = new Uint8Array([...atob(val)].map(c => c.charCodeAt(0)));
+        let decodedHeader = new TextDecoder("utf-8").decode(decodedBytes);
+        params.update(key, decodedHeader);
     }
     return res;
 }
