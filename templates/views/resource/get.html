@@ -15,7 +15,10 @@
   {{ template "file" $ }}
 </div>
 {{ end }}
-{{ if and ($.Claims | hasAds) (not (.Resource.MagnetURI | isDemoMagnet)) }}{{ template "get_ads" $ }}{{ end }}
+{{ if and ($.Claims | hasAds) (not (.Resource.MagnetURI | isDemoMagnet)) }}
+    {{ template "get_ads" $ }}
+    {{ "ads.js" | asset }}
+{{ end }}
 {{ if and .Item .List }}
 <div class="divider h-0"></div>
 {{ end }}

@@ -1,23 +1,41 @@
-import av from '../../lib/av';
-import message from './message';
+import av from '../lib/av';
+import message from './embed/message';
 
 
 av(async function() {
+    if (window._sessionExpired) return;
     if (window._ads === undefined) {
         window._ads = [];
     }
     for (const ad of window._ads) {
-        if (ad.injectScript) {
-            renderInjectAd(ad);
-        } else {
-            renderMediaAd(this, ad);
-        }
+        renderAd(this, ad);
     }
 });
 
+function renderAd(el, ad) {
+    ad = Object.assign({}, {
+        trackPrefix: 'ad-',
+    }, ad);
+    if (ad.script) {
+        renderScriptAd(ad);
+    } else if (ad.injectScript) {
+        renderInjectAd(ad);
+    } else {
+        renderMediaAd(el, ad);
+    }
+}
+
+function  renderScriptAd(ad) {
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.innerHTML = ad.script;
+    document.body.appendChild(script);
+    window.umami.track(`${ad.trackPrefix}${ad.name}-script`)
+}
+
 function  renderInjectAd(ad) {
     message.send('inject', ad.injectScript);
-    window.umami.track(`embed-ad-${ad.name}-inject`)
+    window.umami.track(`${ad.trackPrefix}${ad.name}-inject`)
 }
 
 function generateVideoEl(ad = {}) {
@@ -64,14 +82,14 @@ function renderMediaAd(el, ad = {}) {
     aEl.classList.add('absolute', 'top-0', 'left-0', 'z-50');
     aEl.href = ad.url;
     aEl.target = '_blank';
-    aEl.setAttribute('data-umami-event', `embed-ad-${ad.name}-click`);
+    aEl.setAttribute('data-umami-event', `${ad.trackPrefix}${ad.name}-click`);
     aEl.appendChild(mediaEl);
     el.appendChild(aEl);
     const skipDelay = ad.skipDelay;
     const closeEl = document.createElement('button');
     closeEl.classList.add('absolute', 'top-2', 'right-2', 'btn', 'btn-accent', 'btn-sm', 'z-50');
     closeEl.textContent = 'Close (' + skipDelay + ')';
-    closeEl.setAttribute('data-umami-event', `embed-ad-${ad.name}-close`);
+    closeEl.setAttribute('data-umami-event', `${ad.trackPrefix}${ad.name}-close`);
     closeEl.disabled = true;
     mediaEl.addEventListener('ended', function() {
         aEl.remove();
@@ -81,7 +99,7 @@ function renderMediaAd(el, ad = {}) {
     });
     mediaEl.addEventListener('play', function() {
         if (window.umami) {
-            window.umami.track(`embed-ad-${ad.name}-play`)
+            window.umami.track(`${ad.trackPrefix}${ad.name}-play`)
         }
         el.appendChild(closeEl);
         let cnt = 0;
