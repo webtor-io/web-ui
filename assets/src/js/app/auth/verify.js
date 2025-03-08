@@ -1,5 +1,5 @@
 import av from '../../lib/av';
-av( async function() {
+av(async function() {
     const initProgressLog = (await import('../../lib/progressLog')).initProgressLog;
     const pl = initProgressLog(this.querySelector('.progress-alert'));
     pl.clear();

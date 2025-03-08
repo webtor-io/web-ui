@@ -1,4 +1,4 @@
-import message from './message';
+const message = (await import('../../lib/message')).default;
 import {makeDebug} from '../../lib/debug';
 const debug = await makeDebug('webtor:embed:check');
 const sha1 = require('sha1');

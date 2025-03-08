@@ -1,4 +1,4 @@
-import {makeDebug} from '../../lib/debug';
+import {makeDebug} from './debug';
 const debug = await makeDebug('webtor:embed:message');
 function inIframe() {
   try {

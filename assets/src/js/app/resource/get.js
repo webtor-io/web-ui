@@ -1,5 +1,11 @@
 import av from '../../lib/av';
-av( function() {
+av( async function() {
+    if (window._ads !== undefined && window._sessionExpired !== true) {
+        const renderAd = (await import('../../lib/ads')).default;
+        for (const ad of window._ads) {
+            renderAd(this, ad);
+        }
+    }
     const query = window.location.hash.replace('#', '');
     const urlParams = new URLSearchParams(query);
     const action = urlParams.get('action');

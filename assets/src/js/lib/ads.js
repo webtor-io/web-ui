@@ -1,17 +1,3 @@
-import av from '../lib/av';
-import message from './embed/message';
-
-
-av(async function() {
-    if (window._sessionExpired) return;
-    if (window._ads === undefined) {
-        window._ads = [];
-    }
-    for (const ad of window._ads) {
-        renderAd(this, ad);
-    }
-});
-
 function renderAd(el, ad) {
     ad = Object.assign({}, {
         trackPrefix: 'ad-',
@@ -25,17 +11,23 @@ function renderAd(el, ad) {
     }
 }
 
+function track(msg) {
+    if (window.umami === undefined) return;
+    window.umami.track(msg);
+}
+
 function  renderScriptAd(ad) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.innerHTML = ad.script;
     document.body.appendChild(script);
-    window.umami.track(`${ad.trackPrefix}${ad.name}-script`)
+    track(`${ad.trackPrefix}${ad.name}-script`)
 }
 
-function  renderInjectAd(ad) {
+async function renderInjectAd(ad) {
+    const message = (await import('./message')).default;
     message.send('inject', ad.injectScript);
-    window.umami.track(`${ad.trackPrefix}${ad.name}-inject`)
+    track(`${ad.trackPrefix}${ad.name}-inject`)
 }
 
 function generateVideoEl(ad = {}) {
@@ -98,9 +90,7 @@ function renderMediaAd(el, ad = {}) {
         window.dispatchEvent(event);
     });
     mediaEl.addEventListener('play', function() {
-        if (window.umami) {
-            window.umami.track(`${ad.trackPrefix}${ad.name}-play`)
-        }
+        track(`${ad.trackPrefix}${ad.name}-play`)
         el.appendChild(closeEl);
         let cnt = 0;
         const ip = setInterval(function () {
@@ -121,3 +111,5 @@ function renderMediaAd(el, ad = {}) {
         }, 1000);
     });
 }
+
+export default renderAd;
