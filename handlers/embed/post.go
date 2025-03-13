@@ -54,13 +54,19 @@ func (s *Handler) post(c *gin.Context) {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return
 	}
-	dsd, err := s.ds.Get(u.Hostname())
+	domain := u.Hostname()
+	dsd, err := s.ds.Get(domain)
 	if err != nil {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return
 	}
 	pd.EmbedSettings = args.EmbedSettings
 	pd.DomainSettings = dsd
+	c, err = s.api.SetClaims(c, domain)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd)
 	if err != nil {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))

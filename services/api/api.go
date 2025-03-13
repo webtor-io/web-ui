@@ -252,7 +252,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		url:            u,
 		cl:             cl,
 		prepareRequest: prepareRequest,
-		domain:         apiURL.Host,
+		domain:         apiURL.Hostname(),
 		expire:         expire,
 	}
 }
@@ -574,11 +574,11 @@ func getRemoteAddress(r *http.Request) string {
 
 type ClaimsContext struct{}
 
-func (s *Api) MakeClaimsFromContext(c *gin.Context) (*Claims, error) {
+func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string) (*Claims, error) {
 	sess, _ := c.Cookie("session")
 	cl := &Claims{
 		SessionID:     sess,
-		Domain:        "webtor.io",
+		Domain:        domain,
 		RemoteAddress: getRemoteAddress(c.Request),
 		Agent:         c.Request.Header.Get("User-Agent"),
 		StandardClaims: jwt.StandardClaims{
@@ -609,12 +609,20 @@ func GetClaimsFromContext(c *gin.Context) *Claims {
 
 func (s *Api) RegisterHandler(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
-		ac, err := s.MakeClaimsFromContext(c)
+		c, err := s.SetClaims(c, s.domain)
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ClaimsContext{}, ac))
 		c.Next()
 	})
+}
+
+func (s *Api) SetClaims(c *gin.Context, domain string) (*gin.Context, error) {
+	ac, err := s.MakeClaimsFromContext(c, domain)
+	if err != nil {
+		return nil, err
+	}
+	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ClaimsContext{}, ac))
+	return c, nil
 }

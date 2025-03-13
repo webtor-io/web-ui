@@ -217,7 +217,7 @@ func serve(c *cli.Context) error {
 	wee.RegisterHandler(r, tm)
 
 	// Setting EmbedHandler
-	we.RegisterHandler(cl, r, tm, jobs, ds)
+	we.RegisterHandler(cl, r, tm, jobs, ds, sapi)
 
 	// Setting ExtHandler
 	ext.RegisterHandler(r, tm)
