@@ -71,6 +71,7 @@ type PostData struct {
 }
 
 func (s *Handler) post(c *gin.Context) {
+	c.Header("X-Robots-Tag", "noindex, nofollow")
 	indexTpl := s.tb.Build("index")
 	var (
 		d       PostData
