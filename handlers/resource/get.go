@@ -78,7 +78,7 @@ type GetData struct {
 }
 
 func (s *Handler) get(c *gin.Context) {
-	c.Header("X-Robots-Tag", "noindex, nofollow")
+	//c.Header("X-Robots-Tag", "noindex, nofollow")
 	indexTpl := s.tb.Build("index")
 	getTpl := s.tb.Build("resource/get")
 	var (
