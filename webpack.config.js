@@ -7,8 +7,7 @@ const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 
 const fs = require('fs');
 
-const tailwindConfig = require('./tailwind.config');
-const themes = tailwindConfig.daisyui.themes;
+const themes = ['night', 'lofi'];
 
 function getEntries(path, ext, prefix = '') {
     return new Promise((resolve) => {

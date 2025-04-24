@@ -1,25 +1,162 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-@layer utilities {
-  .loading-elipsis::after {
+@plugin 'daisyui' {
+  themes: night, cupcake;
+}
+
+@config '../../../tailwind.config.js';
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility loading-elipsis {
+  &::after {
     overflow: hidden;
     animation: ellipsis steps(4, end) 1500ms infinite;
-    content: "...";
+    content: '...';
     width: 0;
     display: inline-block;
     vertical-align: bottom;
   }
 
+  @property --bg-angle {
+    inherits: false;
+    initial-value: 0deg;
+    syntax: '<angle>';
+  }
+}
+
+@utility popin {
+  animation: popin 200ms;
+
+  @property --bg-angle {
+    inherits: false;
+    initial-value: 0deg;
+    syntax: '<angle>';
+  }
+}
+
+@utility border-rainbow {
+  @property --bg-angle {
+    inherits: false;
+    initial-value: 0deg;
+    syntax: '<angle>';
+  }
+  animation: spin 2.5s infinite linear;
+  background:
+    linear-gradient(
+        to bottom,
+        oklch(0.1 0.2 240 / 0.95),
+        oklch(0.1 0.2 240 / 0.95)
+      )
+      padding-box,
+    conic-gradient(
+        from var(--bg-angle) in oklch longer hue,
+        oklch(0.85 0.37 0) 0 0
+      )
+      border-box;
+  border-style: solid;
+  border-color: transparent;
+}
+
+@utility progress-alert {
+  @apply bg-base-200 text-accent border-accent border shadow-md py-4 rounded-box popin;
+
+  position: relative;
+
+  pre {
+    @apply px-5 leading-8 whitespace-pre-wrap flex;
+
+    &::before {
+      content: '> ';
+
+      @apply shrink-0;
+    }
+
+    &.error-summary,
+    &.warn-summary {
+      @apply px-5 bg-warning text-warning-content;
+    }
+
+    &.done-summary,
+    &.download-summary,
+    &.redirect-summary {
+      @apply px-5 bg-success text-success-content;
+    }
+
+    &.inprogress,
+    &.statusupdate {
+      span.loader {
+        @apply pl-1;
+        @apply loading-elipsis;
+      }
+    }
+
+    &.statusupdate {
+      span.status {
+        @apply pl-1;
+
+        &::before {
+          content: '(';
+        }
+
+        &::after {
+          content: ')';
+        }
+      }
+    }
+
+    &.done,
+    &.error,
+    &.warn {
+      span.status {
+        @apply pl-1;
+
+        &::before {
+          content: '...[';
+        }
+
+        &::after {
+          content: ']';
+        }
+      }
+    }
+  }
+
+  .close {
+    @apply btn btn-sm btn-accent mr-4;
+  }
+
+  &-oneline {
+    @apply flex;
+
+    pre {
+      @apply flex-grow;
+    }
+  }
+}
+
+@layer utilities {
+
   @keyframes ellipsis {
     to {
       width: 2.25em;
     }
-  }
-
-  .popin {
-    animation: popin 200ms;
   }
 
   @keyframes popin {
@@ -43,99 +180,6 @@
   @keyframes spin {
     to {
       --bg-angle: 360deg;
-    }
-  }
-
-  .border-rainbow {
-    animation: spin 2.5s infinite linear;
-    background:
-            linear-gradient(
-                    to bottom,
-                    oklch(0.1 0.2 240 / 0.95),
-                    oklch(0.1 0.2 240 / 0.95)
-            )
-            padding-box,
-            conic-gradient(
-                    from var(--bg-angle) in oklch longer hue,
-                    oklch(0.85 0.37 0) 0 0
-            )
-            border-box;
-    border-style: solid;
-    border-color: transparent;
-  }
-}
-
-@layer components {
-
-
-  .progress-alert {
-    @apply bg-base-200 text-accent border-accent border shadow-md py-4 rounded-box popin;
-
-    position: relative;
-
-    pre {
-      @apply px-5 leading-8 whitespace-pre-wrap flex;
-
-      &::before {
-        content: "> ";
-
-        @apply shrink-0;
-      }
-
-      &.error-summary, &.warn-summary {
-        @apply px-5 bg-warning text-warning-content;
-      }
-
-      &.done-summary, &.download-summary, &.redirect-summary {
-        @apply px-5 bg-success text-success-content;
-      }
-
-      &.inprogress, &.statusupdate {
-        span.loader {
-          @apply pl-1;
-          @apply loading-elipsis;
-        }
-      }
-
-      &.statusupdate {
-        span.status {
-          @apply pl-1;
-
-          &::before {
-            content: "(";
-          }
-
-          &::after {
-            content: ")";
-          }
-        }
-      }
-
-      &.done, &.error, &.warn {
-        span.status {
-          @apply pl-1;
-
-          &::before {
-            content: "...[";
-          }
-
-          &::after {
-            content: "]";
-          }
-        }
-      }
-    }
-
-    .close {
-      @apply btn btn-sm btn-accent mr-4;
-    }
-
-    &-oneline {
-      @apply flex;
-
-      pre {
-        @apply flex-grow;
-      }
     }
   }
 }
