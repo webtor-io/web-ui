@@ -1,5 +1,12 @@
 {{ define "title" }}Login{{ end }}
 {{ define "main" }}
+<div class="bg-base-200 text-accent border-accent border shadow-md p-4 rounded-box text-center">
+    {{ if eq .Data.Instruction "library" }}
+        <p>Authorization is required to access your library.</p>
+    {{ end }}
+    <p>Enter your email to receive a one-time login link.</p>
+    <p>No password needed — just click the link in your inbox and you’re in!</p>
+</div>
 <form onsubmit="submitLoginForm(this, event)" class="join w-full mt-10">
     <input type="email" name="email" class="input input-bordered w-full join-item" placeholder="Your Email" />
     <button type="submit" class="btn btn-accent btn-outline join-item">Send Magic Link</button>

@@ -120,6 +120,10 @@ func (s *Helper) UseAuth() bool {
 	return s.useAuth
 }
 
+func (s *Helper) HasAuth(u *auth.User) bool {
+	return u.HasAuth()
+}
+
 func (s *Helper) UseAbuseStore() bool {
 	return s.useAbuseStore
 }

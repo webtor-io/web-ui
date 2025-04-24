@@ -1,0 +1,18 @@
+{{ define "title" }}Library{{ end }}
+{{ define "main" }}
+    {{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
+    <div class="flex items-center justify-between pb-3">
+        <h1 class="text-2xl font-bold whitespace-nowrap capitalize"># My library</h1>
+        <form action="/lib" class="ml-auto" data-async-target="#list">
+            <select class="select select-bordered" name="sort" onchange="this.nextElementSibling.click()">
+                <option value="newest" {{if eq .Data.Args.Sort 0}}selected{{end}}>Newest</option>
+                <option value="name" {{if eq .Data.Args.Sort 1}}selected{{end}}>Name (A–Z)</option>
+            </select>
+            <button type="submit" class="hidden">Submit</button>
+        </form>
+    </div>
+    <div class="divider h-0"></div>
+    <div id="list" data-async-layout="{{`{{ template "library/list" .Data.Items }}`}}">
+        {{ template "library/list" .Data.Items }}
+    </div>
+{{ end }}

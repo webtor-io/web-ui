@@ -38,13 +38,16 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		}
 		db := s.pg.Get()
 		em := &models.EmbedDomain{}
-		err := db.Model(em).Where("domain = ?", domain).Select()
+		err := db.Model(&em).
+			Relation("User").
+			Where("embed_domain.ads = ?", true).
+			Select()
 		if errors.Is(err, pg.ErrNoRows) {
 			return &DomainSettingsData{Ads: true}, nil
 		} else if err != nil {
 			return nil, err
 		}
-		cl, err := s.claims.Get(em.Email)
+		cl, err := s.claims.Get(em.User.Email)
 		if err != nil {
 			return nil, err
 		}

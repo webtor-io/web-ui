@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/donate"
@@ -11,6 +13,7 @@ import (
 	wi "github.com/webtor-io/web-ui/handlers/index"
 	wj "github.com/webtor-io/web-ui/handlers/job"
 	"github.com/webtor-io/web-ui/handlers/legal"
+	"github.com/webtor-io/web-ui/handlers/library"
 	wm "github.com/webtor-io/web-ui/handlers/migration"
 	p "github.com/webtor-io/web-ui/handlers/profile"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
@@ -21,7 +24,6 @@ import (
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/geoip"
 	"github.com/webtor-io/web-ui/services/umami"
-	"net/http"
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
@@ -121,7 +123,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting Auth
-	a := auth.New(c)
+	a := auth.New(c, pg)
 
 	if a != nil {
 		err := a.Init()
@@ -202,7 +204,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(r, tm, sapi, jobs)
+	wr.RegisterHandler(r, tm, sapi, jobs, pg)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm)
@@ -224,6 +226,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Donate
 	donate.RegisterHandler(r)
+
+	// Setting Library
+	library.RegisterHandler(r, tm, sapi, pg)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

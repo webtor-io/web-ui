@@ -2,6 +2,9 @@ package resource
 
 import (
 	"context"
+	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/models"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"regexp"
@@ -31,6 +34,7 @@ type GetArgs struct {
 	PWD      string
 	File     string
 	Claims   *api.Claims
+	User     *auth.User
 }
 
 func (s *Handler) bindGetArgs(c *gin.Context) (*GetArgs, error) {
@@ -54,6 +58,7 @@ func (s *Handler) bindGetArgs(c *gin.Context) (*GetArgs, error) {
 		PWD:      c.Query("pwd"),
 		File:     c.Query("file"),
 		Claims:   api.GetClaimsFromContext(c),
+		User:     auth.GetUserFromContext(c),
 	}, nil
 }
 
@@ -71,52 +76,45 @@ func (s *Handler) getList(ctx context.Context, args *GetArgs) (l *ra.ListRespons
 
 type GetData struct {
 	Args        *GetArgs
-	Resource    *ra.ResourceResponse
+	Resource    *ExtendedResource
 	List        *ra.ListResponse
 	Item        *ra.ListItem
 	Instruction string
 }
 
-func (s *Handler) get(c *gin.Context) {
-	//c.Header("X-Robots-Tag", "noindex, nofollow")
-	indexTpl := s.tb.Build("index")
-	getTpl := s.tb.Build("resource/get")
+type ExtendedResource struct {
+	*ra.ResourceResponse
+	InLibrary bool
+}
+
+func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, error) {
 	var (
-		args *GetArgs
 		res  *ra.ResourceResponse
 		list *ra.ListResponse
 		err  error
 	)
-	d := &GetData{}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-	defer cancel()
-	args, err = s.bindGetArgs(c)
-	d.Args = args
-	if err != nil {
-		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "wrong args provided")))
-		return
+	d := &GetData{
+		Args: args,
 	}
 	res, err = s.api.GetResource(ctx, args.Claims, args.ID)
 	if err != nil {
-		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to get resource")))
-		return
+		return nil, errors.Wrap(err, "failed to get resource")
 	}
-	d.Resource = res
+	d.Resource = &ExtendedResource{
+		ResourceResponse: res,
+	}
 	if res == nil {
-		indexTpl.HTML(http.StatusNotFound, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "resource not found")))
-		return
+		return nil, nil
 	}
 	list, err = s.getList(ctx, args)
 	if err != nil {
-		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to list resource")))
-		return
+		return nil, errors.Wrap(err, "failed to list resource")
 	}
 	if len(list.Items) == 1 && list.Items[0].Type == ra.ListTypeDirectory {
 		args.PWD = list.Items[0].PathStr
 		list, err = s.getList(ctx, args)
 		if err != nil {
-			indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to list resource")))
-			return
+			return nil, errors.Wrap(err, "failed to list resource")
 		}
 	}
 	if len(list.Items) > 1 {
@@ -127,7 +125,43 @@ func (s *Handler) get(c *gin.Context) {
 		d.List = list
 	}
 	if err != nil {
-		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to get item")))
+		return nil, errors.Wrap(err, "failed to get item")
+	}
+
+	if args.User.HasAuth() {
+		uID, err := uuid.FromString(args.User.ID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse user id")
+		}
+		db := s.pg.Get()
+		if db == nil {
+			return nil, errors.New("failed to connect to database")
+		}
+		d.Resource.InLibrary, err = models.IsInLibrary(db, uID, d.Resource.ID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check if resource is in-library")
+		}
+	}
+	return d, nil
+}
+
+func (s *Handler) get(c *gin.Context) {
+	indexTpl := s.tb.Build("index")
+	getTpl := s.tb.Build("resource/get")
+	args, err := s.bindGetArgs(c)
+	if err != nil {
+		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(&GetData{}).WithErr(errors.Wrap(err, "wrong args provided")))
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	d, err := s.prepareGetData(ctx, args)
+	if err != nil {
+		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(&GetData{}).WithErr(err))
+		return
+	}
+	if d == nil {
+		indexTpl.HTML(http.StatusNotFound, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "resource not found")))
 		return
 	}
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))

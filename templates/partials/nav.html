@@ -41,9 +41,14 @@
     </div>
 
     <div class="flex-none ml-3">
+        <a class="btn btn-sm btn-accent btn-outline md:mr-10 mr-2 uppercase whitespace-nowrap" href="/lib" data-async-target="main">
+            <span>✨</span>
+            my library
+            <span>✨</span>
+        </a>
         <div class="join">
             {{ if useAuth }}
-            {{ if .User.Email }}
+            {{ if .User | hasAuth }}
             <a class="btn btn-sm btn-accent btn-outline join-item" href="/profile" data-async-target="main">{{ .User.Email }}</a>
             {{ else }}
             <a class="btn btn-sm btn-accent btn-outline join-item" href="/login" data-async-target="main">login</a>

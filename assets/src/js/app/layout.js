@@ -40,7 +40,7 @@ bindAsync({
     },
     fallback: {
         selector: 'main',
-        layout: 'async',
+        layout: '{{ template "main" . }}',
     },
 });
 initAsyncView();
