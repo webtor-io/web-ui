@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/web-ui/services/models"
 	"net/http"
 	"time"
 
@@ -60,9 +63,10 @@ type Auth struct {
 	smtpHost   string
 	smtpPort   int
 	domain     string
+	pg         *cs.PG
 }
 
-func New(c *cli.Context) *Auth {
+func New(c *cli.Context, pg *cs.PG) *Auth {
 	if !c.Bool(UseFlag) {
 		return nil
 	}
@@ -74,6 +78,7 @@ func New(c *cli.Context) *Auth {
 		smtpSecure: c.BoolT(sv.SMTPSecureFlag),
 		smtpPort:   c.Int(sv.SMTPPortFlag),
 		domain:     c.String(sv.DomainFlag),
+		pg:         pg,
 	}
 }
 
@@ -156,14 +161,18 @@ type User struct {
 	Expired bool
 }
 
+func (s *User) HasAuth() bool {
+	return s.Email != ""
+}
+
 func GetUserFromContext(c *gin.Context) *User {
 	u := &User{}
 	if sessionContainer := session.GetSessionFromRequestContext(c.Request.Context()); sessionContainer != nil {
-		userID := sessionContainer.GetUserID()
-		userInfo, err := passwordless.GetUserByID(userID)
-		if err == nil && userInfo != nil {
-			u.ID = userInfo.ID
-			u.Email = *userInfo.Email
+		uc := c.Request.Context().Value(UserContext{})
+		su, ok := uc.(*models.User)
+		if ok {
+			u.ID = su.UserID.String()
+			u.Email = su.Email
 		}
 	}
 	if err := c.Request.Context().Value(ErrorContext{}); err != nil {
@@ -176,7 +185,9 @@ func GetUserFromContext(c *gin.Context) *User {
 
 type ErrorContext struct{}
 
-func myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) http.HandlerFunc {
+type UserContext struct{}
+
+func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := session.GetSession(r, w, options)
 		if err != nil {
@@ -210,12 +221,21 @@ func myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http
 			// handle all of the above errors in the default way
 			err = supertokens.ErrorHandler(err, r, w)
 			if err != nil {
-				// TODO: send a 500 error to the frontend
+				log.WithError(err).Error("failed to handle error")
+				w.WriteHeader(500)
 			}
 			return
 		}
 		if sess != nil {
 			ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
+			u, err := s.createUser(sess)
+			if err != nil {
+				log.WithError(err).Error("failed to create user")
+				w.WriteHeader(500)
+			} else {
+				ctx = context.WithValue(ctx, UserContext{}, u)
+			}
+
 			otherHandler(w, r.WithContext(ctx))
 		} else {
 			otherHandler(w, r)
@@ -223,9 +243,22 @@ func myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http
 	}
 }
 
-func verifySession(options *sessmodels.VerifySessionOptions) gin.HandlerFunc {
+func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err error) {
+	db := s.pg.Get()
+	if db == nil {
+		return
+	}
+	userID := sess.GetUserID()
+	userInfo, err := passwordless.GetUserByID(userID)
+	if err != nil {
+		return
+	}
+	return models.GetOrCreateUser(db, *userInfo.Email)
+}
+
+func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		myVerifySession(options, func(rw http.ResponseWriter, r *http.Request) {
+		s.myVerifySession(options, func(rw http.ResponseWriter, r *http.Request) {
 			c.Request = c.Request.WithContext(r.Context())
 			c.Next()
 		})(c.Writer, c.Request)
@@ -253,7 +286,7 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 		c.Abort()
 	})
 	sessionRequired := false
-	r.Use(verifySession(&sessmodels.VerifySessionOptions{
+	r.Use(s.verifySession(&sessmodels.VerifySessionOptions{
 		SessionRequired: &sessionRequired,
 	}))
 }

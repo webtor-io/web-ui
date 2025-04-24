@@ -8,10 +8,12 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     } else {
         throw `Wrong type of target ${targetSelector}`;
     }
-    let layout = target.getAttribute('data-async-layout');
+    let layout;
     if (!target) {
         target = document.querySelector(params.fallback.selector);
         layout = params.fallback.layout;
+    } else {
+        layout = target.getAttribute('data-async-layout');
     }
     const updateHeaders = {};
     for (const an of target.getAttributeNames()) {
@@ -25,6 +27,7 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     fetchParams.headers = Object.assign(fetchParams.headers, {
         'X-Requested-With': 'XMLHttpRequest',
         'X-Layout': layout,
+        'X-Return-Url': window.location.pathname + window.location.search,
     }, updateHeaders);
     let fetchFunc = fetch;
     if (params.fetch) {
@@ -34,6 +37,7 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
         }
     }
     const res = await fetchFunc(url, fetchParams);
+    console.log(res.url);
     const text = await res.text();
     loadAsyncView(target, text, params);
     for (const [h, val] of res.headers.entries()) {
@@ -123,7 +127,7 @@ function asyncForms(p = {}) {
         fetchParams() {
             let method = 'get';
             if (this.getAttribute('method')) {
-                method = this.getAttribute('method'); 
+                method = this.getAttribute('method').toLowerCase();
             }
             const formData = new FormData(this);
             switch (method) {

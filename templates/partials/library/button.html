@@ -1,0 +1,27 @@
+{{ define "library/button" }}
+    {{ if .User | hasAuth }}
+        {{ with .Data.Resource }}
+            {{ if .InLibrary }}
+                <form class="py-2" method="post" enctype="multipart/form-data" data-async-push-state="false" action="/lib/remove" data-async-target="#library-button">
+                    <input type="hidden" name="resource_id" value="{{ .ID }}" />
+                    <button type="submit" class="btn btn-accent btn-soft capitalize whitespace-nowrap">
+                        Remove from library
+                    </button>
+                </form>
+            {{ else }}
+                <form class="py-2" method="post" enctype="multipart/form-data" data-async-push-state="false" action="/lib/add" data-async-target="#library-button">
+                    <input type="hidden" name="resource_id" value="{{ .ID }}" />
+                    <button type="submit" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="add-to-library">
+                        ✨ Add to library ✨
+                    </button>
+                </form>
+            {{ end }}
+        {{ end }}
+    {{ else }}
+        <div class="py-2">
+            <a href="/login?from=library" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="add-to-library-anonymous" data-async-target="main">
+                ✨ Add to library ✨
+            </a>
+        </div>
+    {{ end }}
+{{ end }}

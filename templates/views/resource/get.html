@@ -24,8 +24,13 @@
 {{ template "list" $ }}
 </div>
 {{ end }}
-<div class="mt-2">
-    {{ template "button" makeTorrentDownload $ . }}
+<div class="inline-flex gap-3">
+    <div id="library-button" data-async-layout="{{`{{ template "library/button" $ }}`}}">
+        {{ template "library/button" $ }}
+    </div>
+    <div>
+        {{ template "button" makeTorrentDownload $ . }}
+    </div>
 </div>
 <div id="log-{{ .Resource.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 {{ end }}

@@ -9,7 +9,9 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 )
 
-type LoginData struct{}
+type LoginData struct {
+	Instruction string
+}
 
 type LogoutData struct{}
 
@@ -32,7 +34,14 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 }
 
 func (s *Handler) login(c *gin.Context) {
-	s.tb.Build("auth/login").HTML(http.StatusOK, web.NewContext(c).WithData(LoginData{}))
+	instruction := "default"
+	if c.Query("from") != "" {
+		instruction = c.Query("from")
+	}
+	ld := LoginData{
+		Instruction: instruction,
+	}
+	s.tb.Build("auth/login").HTML(http.StatusOK, web.NewContext(c).WithData(ld))
 }
 
 func (s *Handler) logout(c *gin.Context) {
