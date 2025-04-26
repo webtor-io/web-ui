@@ -2,7 +2,7 @@
 CREATE TABLE public."user" (
    user_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
    email text NOT NULL UNIQUE,
-   password text NOT NULL,
+   password text,
    created_at timestamptz DEFAULT now() NOT NULL,
    updated_at timestamptz DEFAULT now() NOT NULL
 );
