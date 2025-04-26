@@ -136,7 +136,7 @@ class Renderer {
             pre.setAttribute('task-tag', data.tag);
         }
         const status = document.createElement('span');
-        status.classList.add('status');
+        status.classList.add('task-status');
         line.appendChild(status);
         const loader = document.createElement('span');
         loader.classList.add('loader');
@@ -152,7 +152,7 @@ class Renderer {
         for (const cl of classList) {
             el.classList.add(cl);
         }
-        let span = el.querySelector('span.status');
+        let span = el.querySelector('span.task-status');
 
         if (data.status) {
             span.innerText = `${data.status}`;

@@ -1,25 +1,109 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-@layer utilities {
-  .loading-elipsis::after {
+@plugin 'daisyui' {
+  themes: night --default;
+}
+
+@config '../../../tailwind.config.js';
+
+@utility loading-elipsis {
+  &::after {
     overflow: hidden;
     animation: ellipsis steps(4, end) 1500ms infinite;
-    content: "...";
+    content: '...';
     width: 0;
     display: inline-block;
     vertical-align: bottom;
   }
+}
+
+@utility popin {
+  animation: popin 200ms;
+}
+
+@utility progress-alert {
+  @apply py-4 popin;
+  position: relative;
+  color: white;
+
+  pre {
+    @apply px-5 leading-8 whitespace-pre-wrap flex;
+
+    &::before {
+      content: '> ';
+
+      @apply shrink-0;
+    }
+
+    &.error-summary,
+    &.warn-summary {
+      @apply px-5 bg-warning text-warning-content;
+    }
+
+    &.done-summary,
+    &.download-summary,
+    &.redirect-summary {
+      @apply px-5 bg-success text-success-content;
+    }
+
+    &.inprogress,
+    &.statusupdate {
+      span.loader {
+        @apply pl-1;
+        @apply loading-elipsis;
+      }
+    }
+
+    &.statusupdate {
+      span.task-status {
+        @apply pl-1;
+
+        &::before {
+          content: '(';
+        }
+
+        &::after {
+          content: ')';
+        }
+      }
+    }
+
+    &.done,
+    &.error,
+    &.warn {
+      span.task-status {
+        @apply pl-1;
+
+        &::before {
+          content: '...[';
+        }
+
+        &::after {
+          content: ']';
+        }
+      }
+    }
+  }
+
+  .close {
+    @apply btn btn-sm btn-accent mr-4;
+  }
+
+  &.progress-alert-oneline {
+    @apply flex;
+
+    pre {
+      @apply flex-grow;
+    }
+  }
+}
+
+@layer utilities {
 
   @keyframes ellipsis {
     to {
       width: 2.25em;
     }
-  }
-
-  .popin {
-    animation: popin 200ms;
   }
 
   @keyframes popin {
@@ -31,79 +115,6 @@
     to {
       transform: scaleX(1);
       opacity: 1;
-    }
-  }
-}
-
-@layer components {
-  .progress-alert {
-    @apply py-4 popin;
-    position: relative;
-    color: white;
-
-    pre {
-      @apply px-5 leading-8 whitespace-pre-wrap flex;
-
-      &::before {
-        content: "> ";
-
-        @apply shrink-0;
-      }
-
-      &.error-summary, &.warn-summary {
-        @apply px-5 bg-warning text-warning-content;
-      }
-
-      &.done-summary, &.download-summary, &.redirect-summary {
-        @apply px-5 bg-success text-success-content;
-      }
-
-      &.inprogress, &.statusupdate {
-        span.loader {
-          @apply pl-1;
-          @apply loading-elipsis;
-        }
-      }
-
-      &.statusupdate {
-        span.status {
-          @apply pl-1;
-
-          &::before {
-            content: "(";
-          }
-
-          &::after {
-            content: ")";
-          }
-        }
-      }
-
-      &.done, &.error, &.warn {
-        span.status {
-          @apply pl-1;
-
-          &::before {
-            content: "...[";
-          }
-
-          &::after {
-            content: "]";
-          }
-        }
-      }
-    }
-
-    .close {
-      @apply btn btn-sm btn-accent mr-4;
-    }
-
-    &-oneline {
-      @apply flex;
-
-      pre {
-        @apply flex-grow;
-      }
     }
   }
 }

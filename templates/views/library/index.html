@@ -12,7 +12,14 @@
         </form>
     </div>
     <div class="divider h-0"></div>
+    {{ if .Data.Items }}
     <div id="list" data-async-layout="{{`{{ template "library/list" .Data.Items }}`}}">
         {{ template "library/list" .Data.Items }}
     </div>
+    {{ else }}
+        <div class="text-accent">
+            <p>No torrents yet! Hit “Add to Library” under any loaded torrent to get started.</p>
+        </div>
+    {{ end }}
+    <a class="btn btn-accent btn-outline mt-4 capitalize" href="/" data-async-target="main">Add to library</a>
 {{ end }}

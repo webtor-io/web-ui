@@ -1,4 +1,4 @@
-@import "../../../node_modules/mediaelement/build/mediaelementplayer.css";
+@import '../../../node_modules/mediaelement/build/mediaelementplayer.css';
 
 .mejs__available-progress {
   left: 0;

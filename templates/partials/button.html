@@ -2,7 +2,7 @@
 <form class="py-2 {{ .Action }}" action="{{ .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
     <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .ItemID }}" />
-    <button type="submit" class="btn btn-accent btn-outline" data-umami-event="{{ .Action }}">
+    <button type="submit" class="btn btn-accent btn-outline whitespace-nowrap" data-umami-event="{{ .Action }}">
         {{ template "icons" .Action }}
         {{ .Name }}
     </button>
