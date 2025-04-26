@@ -15,9 +15,6 @@
         {{ template "embed_extra" . }}
         {{ "embed.css" | asset }}
         {{ "embed/index.js" | asset }}
-        {{ if .Data.DomainSettings.Ads }}
-            {{ "baskerville.css" | asset }}
-        {{ end }}
     </head>
     <body data-iframe-height class="relative">
         {{ if .Err }}
@@ -29,13 +26,6 @@
         {{ with .Data }}
         {{ if has . "Job" }}
         <form class="hidden progress-alert progress-alert-block mb-10 closeable bg-black/50" data-async-progress-log="{{ .Job | makeJobLogURL }}">
-            {{ if .DomainSettings.Ads }}
-            <div class="font-baskerville text-4xl sm:text-5xl sm:absolute sm:right-0 sm:top-0 p-2 sm:p-4 sm:pt-4 pt-0 z-50 text-center">
-                <a href="{{ domain }}" target="_blank" data-umami-event="embed-click-logo">
-                    <span>web</span><span class="text-accent">tor</span>
-                </a>
-            </div>
-            {{ end }}
             <div class="log-target"></div>
         </form>
         {{ end }}

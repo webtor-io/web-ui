@@ -1,28 +1,10 @@
 @import 'tailwindcss';
 
 @plugin 'daisyui' {
-  themes: night, cupcake;
+  themes: night, lofi;
 }
 
 @config '../../../tailwind.config.js';
-
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
-}
 
 @utility loading-elipsis {
   &::after {
@@ -33,45 +15,14 @@
     display: inline-block;
     vertical-align: bottom;
   }
-
-  @property --bg-angle {
-    inherits: false;
-    initial-value: 0deg;
-    syntax: '<angle>';
-  }
 }
 
 @utility popin {
   animation: popin 200ms;
-
-  @property --bg-angle {
-    inherits: false;
-    initial-value: 0deg;
-    syntax: '<angle>';
-  }
 }
 
-@utility border-rainbow {
-  @property --bg-angle {
-    inherits: false;
-    initial-value: 0deg;
-    syntax: '<angle>';
-  }
-  animation: spin 2.5s infinite linear;
-  background:
-    linear-gradient(
-        to bottom,
-        oklch(0.1 0.2 240 / 0.95),
-        oklch(0.1 0.2 240 / 0.95)
-      )
-      padding-box,
-    conic-gradient(
-        from var(--bg-angle) in oklch longer hue,
-        oklch(0.85 0.37 0) 0 0
-      )
-      border-box;
-  border-style: solid;
-  border-color: transparent;
+@utility promo {
+  @apply border-4 p-4 mb-8 w-full block text-center text-white rounded-box bg-black;
 }
 
 @utility progress-alert {
@@ -108,7 +59,7 @@
     }
 
     &.statusupdate {
-      span.status {
+      span.task-status {
         @apply pl-1;
 
         &::before {
@@ -124,7 +75,7 @@
     &.done,
     &.error,
     &.warn {
-      span.status {
+      span.task-status {
         @apply pl-1;
 
         &::before {
@@ -142,7 +93,7 @@
     @apply btn btn-sm btn-accent mr-4;
   }
 
-  &-oneline {
+  &.progress-alert-oneline {
     @apply flex;
 
     pre {
@@ -168,18 +119,6 @@
     to {
       transform: scaleX(1);
       opacity: 1;
-    }
-  }
-
-  @property --bg-angle {
-    inherits: false;
-    initial-value: 0deg;
-    syntax: "<angle>";
-  }
-
-  @keyframes spin {
-    to {
-      --bg-angle: 360deg;
     }
   }
 }

@@ -22,9 +22,11 @@
 </form>
 {{ end }}
 <form action="/" method="post" enctype="multipart/form-data" class="join w-full" data-async-target="main">
-    <input type="text" name="resource" value="{{ if has . "Args" }}{{ .Args.Query }}{{ end }}" placeholder="Magnet-uri...?  Infohash...?" class="input input-bordered w-full join-item" />
+    <label class="input join-item w-full">
+        <input type="text" name="resource" value="{{ if has . "Args" }}{{ .Args.Query }}{{ end }}" placeholder="Magnet-uri...?  Infohash...?" required />
+    </label>
     <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-    <button type="submit" class="btn btn-accent btn-outline join-item" data-umami-event="search">Search</button>
+    <button type="submit" class="btn btn-accent join-item" data-umami-event="search">Search</button>
 </form>
 <div class="divider h-12">OR</div>
 <form action="/" method="post" enctype="multipart/form-data" class="dropzone flex justify-center items-center w-full" data-async-target="main">
