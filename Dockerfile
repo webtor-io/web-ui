@@ -39,6 +39,8 @@ WORKDIR /app
 COPY --from=build /app/server .
 # copy templates
 COPY --from=build /app/templates ./templates
+# copy migrations
+COPY --from=build /app/migrations ./migrations
 # copy pub
 COPY --from=build /app/pub ./pub
 # copy assets
