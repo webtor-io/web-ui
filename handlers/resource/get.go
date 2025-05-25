@@ -3,8 +3,8 @@ package resource
 import (
 	"context"
 	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/models"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"regexp"

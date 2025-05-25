@@ -232,3 +232,7 @@ func NewAssetHashes(path string) *AssetHashes {
 func (s *Helper) Now() time.Time {
 	return time.Now()
 }
+
+func (s *Helper) Float1(f float64) string {
+	return fmt.Sprintf("%.1f", f)
+}

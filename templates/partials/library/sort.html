@@ -1,0 +1,10 @@
+{{ define "library/sort"}}
+<form class="ml-auto" data-async-target="#list">
+    <select class="select select-bordered" name="sort" onchange="this.nextElementSibling.click()">
+        {{ range . }}
+            <option class="capitalize" value="{{ .Value }}" {{if .Selected }}selected{{end}}>{{ .Title }}</option>
+        {{ end }}
+    </select>
+    <button type="submit" class="hidden">Submit</button>
+</form>
+{{ end }}

@@ -1,5 +1,4 @@
 const path = require('path');
-const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -96,16 +95,6 @@ module.exports = async (env, options) => {
             minimize: true,
             minimizer: [
                 new TerserPlugin({ parallel: true }),
-                new CssMinimizerPlugin({
-                    minimizerOptions: {
-                        preset: [
-                            "default",
-                            {
-                                discardComments: { removeAll: true },
-                            },
-                        ],
-                    },
-                }),
             ],
         },
         module: {

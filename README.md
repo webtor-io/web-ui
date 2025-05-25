@@ -38,6 +38,12 @@ Some features to mention:
 - [x] Embed support
   - [x] Base version
   - [x] Extended version
+- [x] Library
+  - [x] Torrents
+  - [x] Movies
+  - [x] Series
+- [ ] Integrations 
+  - [ ] Stremio
 
 
 ## Setting up connection to Webtor RestAPI

@@ -3,22 +3,25 @@ package job
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
-	q   *job.Queues
-	tb  template.Builder[*web.Context]
-	api *api.Api
+	q        *job.Queues
+	tb       template.Builder[*web.Context]
+	api      *api.Api
+	enricher *enrich.Enricher
 }
 
-func New(q *job.Queues, tm *template.Manager[*web.Context], api *api.Api) *Handler {
+func New(q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher) *Handler {
 	return &Handler{
-		q:   q,
-		tb:  tm,
-		api: api,
+		q:        q,
+		tb:       tm,
+		api:      api,
+		enricher: enricher,
 	}
 }
 

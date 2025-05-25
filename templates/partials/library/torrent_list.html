@@ -1,0 +1,7 @@
+{{ define "library/torrent_list" }}
+<ul>
+    {{ range . }}
+        <li class="text-accent py-1 hover:text-accent-focus"><a href="/{{ .ResourceID }}" data-async-target="main">{{ .Torrent.Name }}</a></li>
+    {{ end }}
+</ul>
+{{ end }}

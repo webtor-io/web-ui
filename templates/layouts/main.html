@@ -17,9 +17,6 @@
             {{- if useUmami }}
             window._umami = {{ umamiConfig | json }};
             {{- end }}
-            {{- if useAuth }}
-            window._sessionExpired = {{ .User.Expired }};
-            {{- end }}
         </script>
         {{ "baskerville.css" | asset }}
         {{ "style.css" | asset }}

@@ -3,8 +3,8 @@ package job
 import (
 	"context"
 	"github.com/webtor-io/web-ui/handlers/job/script"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
-	"github.com/webtor-io/web-ui/services/models"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"time"

@@ -21,7 +21,7 @@ function preAPIHook(csrf) {
 }
 
 export async function sendMagicLink({email}, csrf) {
-    initSuperTokens(csrf);
+    await initSuperTokens(csrf);
     return await createCode({
         email,
         options: {
@@ -31,7 +31,7 @@ export async function sendMagicLink({email}, csrf) {
 }
 
 export async function handleMagicLinkClicked(csrf) {
-    initSuperTokens(csrf);
+    await initSuperTokens(csrf);
     return await consumeCode({
         options: {
             preAPIHook: preAPIHook(csrf),
@@ -40,7 +40,7 @@ export async function handleMagicLinkClicked(csrf) {
 }
 
 export async function logout(csrf) {
-    initSuperTokens(csrf);
+    await initSuperTokens(csrf);
     return await signOut({
         options: {
             preAPIHook: preAPIHook(csrf),
@@ -48,13 +48,13 @@ export async function logout(csrf) {
     });
 }
 
-export function refresh(csrf) {
-    initSuperTokens(csrf);
+export async function refresh(csrf) {
+    await initSuperTokens(csrf);
     return Session.attemptRefreshingSession();
 }
 
 export async function init(csrf) {
-    initSuperTokens(csrf);
+    await initSuperTokens(csrf);
 }
 
 let inited = false;
