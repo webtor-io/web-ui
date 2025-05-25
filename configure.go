@@ -6,7 +6,8 @@ import (
 )
 
 func configure(app *cli.App) {
-	serveCmd := makeServeCMD()
+	serveCMD := makeServeCMD()
 	migrationCMD := services.MakePGMigrationCMD()
-	app.Commands = []cli.Command{serveCmd, migrationCMD}
+	enrichCMD := makeEnrichCMD()
+	app.Commands = []cli.Command{serveCMD, migrationCMD, enrichCMD}
 }

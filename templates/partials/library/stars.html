@@ -1,0 +1,15 @@
+{{ define "library/stars" }}
+<div class="rating rating-xs rating-half flex items-center">
+    {{ range . }}
+        {{ if eq .Value 0.0 }}
+            <div class="rating-hidden"></div>
+        {{ else }}
+            {{ if .HalfStep }}
+                <div class="mask mask-star-2 mask-half-1" aria-label="{{ .Title }} star"{{ if .Selected }} aria-current="true"{{ end }}></div>
+            {{ else }}
+                <div class="mask mask-star-2 mask-half-2" aria-label="{{ .Title }} star"{{ if .Selected }} aria-current="true"{{ end }}></div>
+            {{ end }}
+        {{ end }}
+    {{ end }}
+</div>
+{{ end }}

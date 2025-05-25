@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/models"
 	"net/http"
 )
 

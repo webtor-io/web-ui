@@ -3,11 +3,11 @@ package action
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/models"
 	"strconv"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
-	m "github.com/webtor-io/web-ui/services/models"
 	"golang.org/x/text/language"
 )
 
@@ -33,7 +33,7 @@ func (s *Helper) GetDurationSec(mp *api.MediaProbe) string {
 	return mp.Format.Duration
 }
 
-func (s *Helper) HasControls(settings *m.StreamSettings) bool {
+func (s *Helper) HasControls(settings *models.StreamSettings) bool {
 	if settings.Controls == nil {
 		return true
 	}
@@ -41,7 +41,7 @@ func (s *Helper) HasControls(settings *m.StreamSettings) bool {
 	return controls
 }
 
-func (s *Helper) GetAudioTracks(ud *m.VideoStreamUserData, mp *api.MediaProbe) []ListItem {
+func (s *Helper) GetAudioTracks(ud *models.VideoStreamUserData, mp *api.MediaProbe) []ListItem {
 	var res []ListItem
 	if mp == nil {
 		res = append(res, ListItem{
@@ -75,12 +75,12 @@ func (s *Helper) GetAudioTracks(ud *m.VideoStreamUserData, mp *api.MediaProbe) [
 			}
 		}
 	}
-	return s.selectListItem(s.canoninizeSrcLangs(res), ud.AudioID, ud)
+	return s.selectListItem(s.canonizeSrcLangs(res), ud.AudioID, ud)
 }
 
 type langIndex map[language.Tag]int
 
-func (s *Helper) selectListItem(lis []ListItem, id string, ud *m.VideoStreamUserData) []ListItem {
+func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStreamUserData) []ListItem {
 	if len(lis) == 0 {
 		return lis
 	}
@@ -105,7 +105,7 @@ func (s *Helper) selectListItem(lis []ListItem, id string, ud *m.VideoStreamUser
 	return lis
 }
 
-func (s *Helper) matchLang(lis []ListItem, ud *m.VideoStreamUserData) (lIndex int, err error) {
+func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lIndex int, err error) {
 	lx := langIndex{}
 	for i, li := range lis {
 		if t, err := language.Parse(li.SrcLang); err == nil {
@@ -133,11 +133,11 @@ func (s *Helper) matchLang(lis []ListItem, ud *m.VideoStreamUserData) (lIndex in
 	return
 }
 
-func (s *Helper) canoninizeSrcLangs(lis []ListItem) []ListItem {
+func (s *Helper) canonizeSrcLangs(lis []ListItem) []ListItem {
 	for i, li := range lis {
 		if t, err := language.Parse(li.SrcLang); err == nil {
 			lis[i].SrcLang = t.String()
-			//lis[i].Label = display.English.Tags().Name(t)
+			//lis[i].Label = display.English.Tags().FieldType(t)
 		}
 	}
 	return lis
@@ -155,7 +155,7 @@ func (s *Helper) FilterSubtitlesByProvider(subs []ListItem, provider string, exc
 	return res
 }
 
-func (s *Helper) GetSubtitles(ud *m.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *m.ExternalData) []ListItem {
+func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
 		ID:    "none",
@@ -217,5 +217,5 @@ func (s *Helper) GetSubtitles(ud *m.VideoStreamUserData, mp *api.MediaProbe, tag
 			Provider: "External",
 		})
 	}
-	return s.selectListItem(s.canoninizeSrcLangs(res), ud.SubtitleID, ud)
+	return s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud)
 }

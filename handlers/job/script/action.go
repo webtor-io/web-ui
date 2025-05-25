@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
-	m "github.com/webtor-io/web-ui/services/models"
 	"github.com/webtor-io/web-ui/services/template"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -29,9 +29,9 @@ type StreamContent struct {
 	Item                *ra.ListItem
 	MediaProbe          *api.MediaProbe
 	OpenSubtitles       []api.OpenSubtitleTrack
-	VideoStreamUserData *m.VideoStreamUserData
-	Settings            *m.StreamSettings
-	ExternalData        *m.ExternalData
+	VideoStreamUserData *models.VideoStreamUserData
+	Settings            *models.StreamSettings
+	ExternalData        *models.ExternalData
 	DomainSettings      *embed.DomainSettingsData
 }
 
@@ -42,10 +42,10 @@ type TorrentDownload struct {
 	Size     int
 }
 
-func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
+func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
 	sc := &StreamContent{
 		Settings:       settings,
-		ExternalData:   &m.ExternalData{},
+		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
 	}
 	j.InProgress("retrieving resource data")
@@ -118,7 +118,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		sc.ExternalData.Poster = s.api.AttachExternalFile(se, settings.Poster)
 	}
 	for _, v := range settings.Subtitles {
-		sc.ExternalData.Tracks = append(sc.ExternalData.Tracks, m.ExternalTrack{
+		sc.ExternalData.Tracks = append(sc.ExternalData.Tracks, models.ExternalTrack{
 			Src:     s.api.AttachExternalSubtitle(se, v.Src),
 			Label:   v.Label,
 			SrcLang: v.SrcLang,
@@ -133,15 +133,15 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	return
 }
 
-func (s *ActionScript) previewImage(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+func (s *ActionScript) previewImage(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
 	return s.streamContent(ctx, j, c, resourceID, itemID, "preview_image", settings, vsud, dsd)
 }
 
-func (s *ActionScript) streamAudio(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+func (s *ActionScript) streamAudio(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
 	return s.streamContent(ctx, j, c, resourceID, itemID, "stream_audio", settings, vsud, dsd)
 }
 
-func (s *ActionScript) streamVideo(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *m.StreamSettings, vsud *m.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
+func (s *ActionScript) streamVideo(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
 	return s.streamContent(ctx, j, c, resourceID, itemID, "stream_video", settings, vsud, dsd)
 }
 
@@ -312,8 +312,8 @@ type ActionScript struct {
 	itemId     string
 	action     string
 	tb         template.Builder[*web.Context]
-	settings   *m.StreamSettings
-	vsud       *m.VideoStreamUserData
+	settings   *models.StreamSettings
+	vsud       *models.VideoStreamUserData
 	dsd        *embed.DomainSettingsData
 }
 
@@ -335,7 +335,7 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *m.StreamSettings, dsd *embed.DomainSettingsData, vsud *m.VideoStreamUserData) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID)))

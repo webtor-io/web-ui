@@ -2,13 +2,13 @@ package embed
 
 import (
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/models"
 	"time"
 
 	"github.com/go-pg/pg/v10"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/models"
 )
 
 type DomainSettings struct {

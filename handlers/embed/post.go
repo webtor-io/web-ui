@@ -2,7 +2,7 @@ package embed
 
 import (
 	"encoding/json"
-	"github.com/webtor-io/web-ui/services/models"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"net/url"

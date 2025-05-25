@@ -1,0 +1,38 @@
+package parsetorrentname
+
+type FieldType string
+
+const (
+	FieldTypeTitle       FieldType = "title"
+	FieldTypeExtraTitle  FieldType = "extra_title"
+	FieldTypeSeason      FieldType = "season"
+	FieldTypeEpisode     FieldType = "episode"
+	FieldTypeYear        FieldType = "year"
+	FieldTypeResolution  FieldType = "resolution"
+	FieldTypeBitrate     FieldType = "bitrate"
+	FieldTypeColorDepth  FieldType = "color_depth"
+	FieldTypeQuality     FieldType = "quality"
+	FieldTypeCodec       FieldType = "codec"
+	FieldTypeAudio       FieldType = "audio"
+	FieldTypeRegion      FieldType = "region"
+	FieldTypeSize        FieldType = "size"
+	FieldTypeWebsite     FieldType = "website"
+	FieldTypeLanguage    FieldType = "language"
+	FieldTypeSBS         FieldType = "sbs"
+	FieldTypeContainer   FieldType = "container"
+	FieldTypeGroup       FieldType = "group"
+	FieldTypeStudio      FieldType = "studio"
+	FieldTypeExtended    FieldType = "extended"
+	FieldTypeHardcoded   FieldType = "hardcoded"
+	FieldTypeProper      FieldType = "proper"
+	FieldTypeRepack      FieldType = "repack"
+	FieldTypeWidescreen  FieldType = "widescreen"
+	FieldTypeUnrated     FieldType = "unrated"
+	FieldType3D          FieldType = "threed"
+	FieldTypeAVC         FieldType = "avc"
+	FieldTypePorn        FieldType = "porn"
+	FieldTypeSplitScenes FieldType = "split_scenes"
+	FieldTypeScene       FieldType = "scene"
+	FieldTypeDubbing     FieldType = "dubbing"
+	FieldTypeUnknown     FieldType = "unknown"
+)

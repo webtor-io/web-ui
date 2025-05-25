@@ -1,0 +1,7 @@
+{{ define "library/menu" }}
+<div class="flex gap-4 mr-4">
+    {{ range . }}
+        <a class="btn btn-accent capitalize{{ if not .Active }} btn-outline{{ end }}" href="{{ .TargetURL }}" data-async-target="main">{{ .Title }}</a>
+    {{ end }}
+</div>
+{{ end }}

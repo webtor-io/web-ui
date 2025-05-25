@@ -1,7 +1,11 @@
-{{ define "library/list" }}
-<ul>
-    {{ range . }}
-        <li class="text-accent py-1 hover:text-accent-focus"><a href="/{{ .ResourceID }}" data-async-target="main">{{ .Torrent.Name }}</a></li>
+{{ define "library/list"}}
+    {{ if eq .Data.Args.Section "torrents" }}
+    <div id="list" data-async-layout="{{`{{ template "library/torrent_list" .Data.Items }}`}}">
+        {{ template "library/torrent_list" .Data.Items }}
+    </div>
+    {{ else }}
+        <div id="list" data-async-layout="{{`{{ template "library/video_list" .Data.Items }}`}}">
+            {{ template "library/video_list" .Data.Items }}
+        </div>
     {{ end }}
-</ul>
 {{ end }}

@@ -2,8 +2,8 @@ package action
 
 import (
 	wj "github.com/webtor-io/web-ui/handlers/job"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
-	m "github.com/webtor-io/web-ui/services/models"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 
@@ -20,7 +20,7 @@ type PostArgs struct {
 	ApiClaims           *api.Claims
 	UserClaims          *claims.Data
 	Purge               bool
-	VideoStreamUserData *m.VideoStreamUserData
+	VideoStreamUserData *models.VideoStreamUserData
 }
 
 type TrackPutArgs struct {
@@ -68,7 +68,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *wj
 			_ = c.Error(err)
 			return
 		}
-		vsud := m.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
+		vsud := models.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
 		vsud.SubtitleID = a.ID
 		if err := vsud.UpdateSessionData(c); err != nil {
 			_ = c.Error(err)
@@ -80,7 +80,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *wj
 			_ = c.Error(err)
 			return
 		}
-		vsud := m.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
+		vsud := models.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
 		vsud.AudioID = a.ID
 		if err := vsud.UpdateSessionData(c); err != nil {
 			_ = c.Error(err)
@@ -103,7 +103,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		purge = true
 	}
 
-	vsud := m.NewVideoStreamUserData(rID[0], iID[0], &m.StreamSettings{})
+	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 
 	return &PostArgs{
@@ -136,7 +136,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		args.ResourceID,
 		args.ItemID,
 		action,
-		&m.StreamSettings{},
+		&models.StreamSettings{},
 		args.Purge,
 		args.VideoStreamUserData,
 	)

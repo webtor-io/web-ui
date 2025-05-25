@@ -5,9 +5,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/models"
+	"github.com/webtor-io/web-ui/services/web"
 	"io"
 	"net/http"
 )
@@ -18,15 +19,16 @@ func (s *Handler) add(c *gin.Context) {
 		c.Status(http.StatusForbidden)
 		return
 	}
-	err := s.addTorrentToLibrary(c, u)
+	err, rID := s.addTorrentToLibrary(c, u)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+	_, _ = s.jobs.Enrich(web.NewContext(c), rID)
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error) {
+func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, id string) {
 	uID, err := uuid.FromString(u.ID)
 	if err != nil {
 		return
@@ -48,7 +50,7 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error) 
 	}
 	db := s.pg.Get()
 	if db == nil {
-		return errors.New("no db")
+		return errors.New("no db"), id
 	}
 	err = models.AddTorrentToLibrary(db, uID, rID, info)
 	if err != nil {
@@ -57,5 +59,5 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error) 
 	defer func(body io.ReadCloser) {
 		_ = body.Close()
 	}(body)
-	return nil
+	return nil, rID
 }

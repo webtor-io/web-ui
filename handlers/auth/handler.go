@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 
@@ -28,9 +29,23 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 		tb: tm.MustRegisterViews("auth/*").WithLayout("main"),
 	}
 
+	r.Use(func(c *gin.Context) {
+		u := auth.GetUserFromContext(c)
+		if u != nil && u.Expired {
+			h.refresh(c)
+			c.Abort()
+			return
+		}
+	})
+
 	r.GET("/login", h.login)
+	r.GET("/refresh", h.refresh)
 	r.GET("/logout", h.logout)
 	r.GET("/auth/verify", h.verify)
+}
+
+func (s *Handler) refresh(c *gin.Context) {
+	s.tb.Build("auth/refresh").HTML(http.StatusOK, web.NewContext(c))
 }
 
 func (s *Handler) login(c *gin.Context) {

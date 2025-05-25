@@ -1,0 +1,31 @@
+{{ define "library/video_list" }}
+    <div class="flex flex-wrap gap-5">
+    {{ range . }}
+        <a href="/{{ .ResourceID }}" data-async-target="main">
+            <div class="card w-60 bg-base-200 shadow-sm h-full">
+                <figure>
+                {{ if . | hasPoster }}
+                <img class="w-full h-90 object-cover" src="{{ . | getCachedPoster240}}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}" />
+                {{ else }}
+                    <div class="w-full h-90 bg-accent/20 text-accent/50 flex items-center"><div class="m-auto text-center font-bold text-2xl">{{ . | getTitle }}</div></div>
+                {{ end }}
+                </figure>
+                <div class="card-body p-3">
+                    <h2 class="card-title line-clamp-1">{{ . | getTitle }}</h2>
+                    <div class="flex justify-between items-center">
+                    <div>{{ if . | hasYear }}{{ . | getYear }}{{ end }}</div>
+                    {{ if . | hasRating }}
+                        <div class="relative group inline-block cursor-pointer">
+                            {{ template "library/stars" . | getRating | makeStars }}
+                            <div class="absolute bottom-full left-1/2 mb-2 w-max -translate-x-1/2 scale-95 transform rounded bg-gray-800 px-3 py-1 text-sm text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                                {{ . | getRating | float1 }}
+                            </div>
+                        </div>
+                    {{ end }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    {{ end }}
+    </div>
+{{ end }}

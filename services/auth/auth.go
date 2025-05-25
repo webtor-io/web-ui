@@ -6,7 +6,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
-	"github.com/webtor-io/web-ui/services/models"
+	"github.com/webtor-io/web-ui/models"
 	"net/http"
 	"time"
 
@@ -190,6 +190,7 @@ type UserContext struct{}
 func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := session.GetSession(r, w, options)
+		//err = errors.TryRefreshTokenError{}
 		if err != nil {
 			ctx := context.WithValue(r.Context(), ErrorContext{}, err)
 			r := r.WithContext(ctx)
