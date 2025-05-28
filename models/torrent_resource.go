@@ -45,6 +45,24 @@ func GetAllResources(ctx context.Context, db *pg.DB) ([]*TorrentResource, error)
 	return resources, nil
 }
 
+func GetErrorResources(ctx context.Context, db *pg.DB) ([]*TorrentResource, error) {
+	var resources []*TorrentResource
+
+	err := db.Model(&resources).
+		Context(ctx).
+		Join("JOIN media_info ON media_info.resource_id = torrent_resource.resource_id").
+		Where("media_info.status in (?)", pg.In([]int16{
+			int16(MediaInfoStatusProcessing),
+			int16(MediaInfoStatusError),
+		})).
+		Select()
+
+	if err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
 func GetResourceByID(ctx context.Context, db *pg.DB, id string) (*TorrentResource, error) {
 	var resource TorrentResource
 	err := db.Model(&resource).Context(ctx).Where("resource_id = ?", id).Limit(1).Select()

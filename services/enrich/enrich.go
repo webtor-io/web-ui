@@ -3,6 +3,7 @@ package enrich
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -79,6 +80,129 @@ func parseItem(item *ra.ListItem) (ti *ptn.TorrentInfo, err error) {
 	return ti, nil
 }
 
+func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool) (*models.MediaInfoMediaType, error) {
+
+	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+
+	if err != nil {
+		return nil, err
+	}
+
+	//series := map[string]*models.Series{}
+	//var movies []*models.Movie
+	var torrentInfos []*TorrentInfo
+
+	for _, item := range items {
+		if item.MediaFormat != ra.Video {
+			continue
+		}
+		ti, err := MakeTorrentInfo(&item)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to make torrent info for hash %v", hash)
+		}
+		torrentInfos = append(torrentInfos, ti)
+	}
+
+	if len(torrentInfos) == 0 {
+		log.Infof("no media info acquired for hash %s", hash)
+		return nil, nil
+	}
+
+	log.Infof("got %v media items", len(torrentInfos))
+
+	mt := s.getMediaType(torrentInfos)
+
+	log.Infof("got media type %v for hash %v", mt, hash)
+
+	var series *models.Series
+	var movie *models.Movie
+
+	if mt == models.MediaInfoMediaTypeMovieSingle {
+		movie, err = s.makeMovie(torrentInfos, hash)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to make movie for hash %s", hash)
+		}
+	} else {
+		series, err = s.makeSeriesWithEpisodes(torrentInfos, hash, mt)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to make series for hash %s", hash)
+		}
+	}
+	var movies []*models.Movie
+	if movie != nil {
+		movies = append(movies, movie)
+	}
+
+	err = models.ReplaceMoviesForResource(ctx, db, hash, movies)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to replace movie for hash %s", hash)
+	}
+
+	var seriesSlice []*models.Series
+	if series != nil {
+		seriesSlice = append(seriesSlice, series)
+	}
+	err = models.ReplaceSeriesForResource(ctx, db, hash, seriesSlice)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to replace series for hash %s", hash)
+	}
+
+	movies, err = models.GetMoviesByResourceID(ctx, db, hash)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get movies for hash %s", hash)
+	}
+
+	for _, m := range movies {
+		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to map metadata for movie %+v hash %s", m, hash)
+		}
+		if md == nil {
+			log.Warnf("no metadata for %v", m.VideoContent)
+			continue
+		}
+		log.Infof("processing movie metadata %+v", md)
+		metadataID, err := models.UpsertMovieMetadata(ctx, db, md)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to upsert metadata for movie %+v hash %s", md, hash)
+		}
+		err = models.LinkMovieToMetadata(ctx, db, m.MovieID, metadataID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to link movie %+v with metadata for hash %s", m, hash)
+		}
+	}
+
+	seriesSlice, err = models.GetSeriesByResourceID(ctx, db, hash)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get series for hash %s", hash)
+	}
+
+	for _, ser := range seriesSlice {
+		var md *models.VideoMetadata
+		if mt != models.MediaInfoMediaTypeSeriesCompilation && mt != models.MediaInfoMediaTypeSeriesSplitScenes {
+			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force)
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to map metadata for hash %s", hash)
+		}
+		if md == nil {
+			log.Warnf("no metadata for %v", ser.VideoContent)
+			continue
+		}
+		log.Infof("processing series %+v", md)
+		metadataID, err := models.UpsertSeriesMetadata(ctx, db, md)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to upsert series metadata for hash %s", hash)
+		}
+		err = models.LinkSeriesToMetadata(ctx, db, ser.SeriesID, metadataID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to link series %+v with metadata for hash %s", ser, hash)
+		}
+	}
+	return &mt, nil
+}
+
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool) error {
 	log.Infof("enriching media info for hash %s", hash)
 	db := s.pg.Get()
@@ -95,133 +219,23 @@ func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, 
 	}
 	log.Infof("start processing media info %+v", mi)
 
-	items, err := s.retrieveTorrentItems(ctx, hash, claims)
-
+	mt, err := s.enrichMediaInfo(ctx, db, hash, claims, force)
 	if err != nil {
-		return err
-	}
-
-	//series := map[string]*models.Series{}
-	//var movies []*models.Movie
-	var torrentInfos []*TorrentInfo
-
-	for _, item := range items {
-		if item.MediaFormat != ra.Video {
-			continue
+		if strings.Contains(err.Error(), "PermissionDenied") {
+			mi.Status = int16(models.MediaInfoStatusForbidden)
+		} else {
+			errStr := err.Error()
+			mi.Error = &errStr
+			mi.Status = int16(models.MediaInfoStatusError)
 		}
-		ti, err := MakeTorrentInfo(&item)
-		if err != nil {
-			return err
-		}
-		torrentInfos = append(torrentInfos, ti)
-	}
-
-	if len(torrentInfos) == 0 {
-		log.Infof("no media info acquired for hash %s", hash)
+		log.WithError(err).Error("failed to enrich media info")
+	} else if mt == nil {
 		mi.Status = int16(models.MediaInfoStatusNoMedia)
-		err = models.UpdateMediaInfo(ctx, db, mi)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	log.Infof("got %v media items", len(torrentInfos))
-
-	mt := s.getMediaType(torrentInfos)
-
-	log.Infof("got media type %v for hash %v", mt, hash)
-
-	var series *models.Series
-	var movie *models.Movie
-
-	if mt == models.MediaInfoMediaTypeMovieSingle {
-		movie, err = s.makeMovie(torrentInfos, hash)
-		if err != nil {
-			return errors.Wrapf(err, "failed to make movie for hash %s", hash)
-		}
 	} else {
-		series, err = s.makeSeriesWithEpisodes(torrentInfos, hash, mt)
-		if err != nil {
-			return errors.Wrapf(err, "failed to make series for hash %s", hash)
-		}
+		mi.Status = int16(models.MediaInfoStatusDone)
+		mtInt16 := int16(*mt)
+		mi.MediaType = &mtInt16
 	}
-	var movies []*models.Movie
-	if movie != nil {
-		movies = append(movies, movie)
-	}
-
-	err = models.ReplaceMoviesForResource(ctx, db, hash, movies)
-	if err != nil {
-		return errors.Wrapf(err, "failed to replace movie for hash %s", hash)
-	}
-
-	var seriesSlice []*models.Series
-	if series != nil {
-		seriesSlice = append(seriesSlice, series)
-	}
-	err = models.ReplaceSeriesForResource(ctx, db, hash, seriesSlice)
-	if err != nil {
-		return errors.Wrapf(err, "failed to replace series for hash %s", hash)
-	}
-
-	movies, err = models.GetMoviesByResourceID(ctx, db, hash)
-
-	if err != nil {
-		return errors.Wrapf(err, "failed to get movies for hash %s", hash)
-	}
-
-	for _, m := range movies {
-		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force)
-		if err != nil {
-			return errors.Wrapf(err, "failed to map metadata for movie %+v hash %s", m, hash)
-		}
-		if md == nil {
-			log.Warnf("no metadata for %v", m.VideoContent)
-			continue
-		}
-		log.Infof("processing movie metadata %+v", md)
-		metadataID, err := models.UpsertMovieMetadata(ctx, db, md)
-		if err != nil {
-			return errors.Wrapf(err, "failed to upsert metadata for movie %+v hash %s", md, hash)
-		}
-		err = models.LinkMovieToMetadata(ctx, db, m.MovieID, metadataID)
-		if err != nil {
-			return errors.Wrapf(err, "failed to link movie %+v with metadata for hash %s", m, hash)
-		}
-	}
-
-	seriesSlice, err = models.GetSeriesByResourceID(ctx, db, hash)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get series for hash %s", hash)
-	}
-
-	for _, ser := range seriesSlice {
-		var md *models.VideoMetadata
-		if mt != models.MediaInfoMediaTypeSeriesCompilation && mt != models.MediaInfoMediaTypeSeriesSplitScenes {
-			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force)
-		}
-		if err != nil {
-			return errors.Wrapf(err, "failed to map metadata for hash %s", hash)
-		}
-		if md == nil {
-			log.Warnf("no metadata for %v", ser.VideoContent)
-			continue
-		}
-		log.Infof("processing series %+v", md)
-		metadataID, err := models.UpsertSeriesMetadata(ctx, db, md)
-		if err != nil {
-			return errors.Wrapf(err, "failed to upsert series metadata for hash %s", hash)
-		}
-		err = models.LinkSeriesToMetadata(ctx, db, ser.SeriesID, metadataID)
-		if err != nil {
-			return errors.Wrapf(err, "failed to link series %+v with metadata for hash %s", ser, hash)
-		}
-	}
-
-	mi.Status = int16(models.MediaInfoStatusDone)
-	mtInt16 := int16(mt)
-	mi.MediaType = &mtInt16
 	err = models.UpdateMediaInfo(ctx, db, mi)
 	if err != nil {
 		return err
@@ -289,7 +303,7 @@ func (s *Enricher) getMediaType(infos []*TorrentInfo) models.MediaInfoMediaType 
 		}
 		title = info.Title
 	}
-	if len(infos) < 4 && sameTitle && !hasEpisodes && !hasScenes && !hasSeasones {
+	if len(infos) < 3 && sameTitle && !hasEpisodes && !hasScenes && !hasSeasones {
 		return models.MediaInfoMediaTypeMovieSingle
 	} else if hasSeasones && hasEpisodes && hasDifferentSeasones {
 		return models.MediaInfoMediaTypeSeriesMultipleSeasons
@@ -338,7 +352,11 @@ func (s *Enricher) makeSeriesWithEpisodes(infos []*TorrentInfo, hash string, mt 
 		SeriesID:     uuid.NewV4(),
 		ResourceID:   hash,
 	}
-	ser.Title = ti.Title
+	title := ti.Title
+	if ti.Title == "" {
+		title = ti.Website
+	}
+	ser.Title = title
 	if ti.Year != 0 {
 		year := int16(ti.Year)
 		ser.Year = &year

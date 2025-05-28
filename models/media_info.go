@@ -32,6 +32,7 @@ const (
 	MediaInfoStatusDone
 	MediaInfoStatusNoMedia
 	MediaInfoStatusError
+	MediaInfoStatusForbidden
 )
 
 type MediaInfoMediaType int16
@@ -99,6 +100,7 @@ func TryInsertOrLockMediaInfo(ctx context.Context, db *pg.DB, resourceID string,
 			int16(MediaInfoStatusProcessing),
 			int16(MediaInfoStatusNoMedia),
 			int16(MediaInfoStatusError),
+			int16(MediaInfoStatusForbidden),
 		})).
 		Where("updated_at < now() - INTERVAL ?", fmt.Sprintf("%d seconds", int(expire.Seconds()))).
 		For("UPDATE SKIP LOCKED").
@@ -131,7 +133,7 @@ func TryInsertOrLockMediaInfo(ctx context.Context, db *pg.DB, resourceID string,
 func UpdateMediaInfo(ctx context.Context, db *pg.DB, info *MediaInfo) error {
 	_, err := db.Model(info).
 		Context(ctx).
-		Column("status", "media_type").
+		Column("status", "media_type", "error").
 		WherePK().
 		Update()
 	return err

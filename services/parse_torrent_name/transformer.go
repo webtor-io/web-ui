@@ -41,8 +41,12 @@ var titleTransformer = NewReplaceTransformer(map[string]string{
 	"(",
 	"[",
 	"-",
+	"--",
+	"---",
 }, []string{
 	")",
 	"]",
 	"-",
+	"--",
+	"---",
 })

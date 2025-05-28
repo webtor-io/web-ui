@@ -27,6 +27,10 @@ func configureEnrich(c *cli.Command) {
 			Name:  "force",
 			Usage: "force enrichment",
 		},
+		cli.BoolFlag{
+			Name:  "force-error",
+			Usage: "force error enrichment",
+		},
 	)
 	c.Flags = append(c.Flags,
 		cli.StringFlag{
@@ -41,6 +45,10 @@ func configureEnrich(c *cli.Command) {
 
 func enrich(c *cli.Context) error {
 	force := c.Bool("force")
+	forceError := c.Bool("force-error")
+	if forceError {
+		force = true
+	}
 	id := c.String("id")
 	// Setting DB
 	pg := cs.NewPG(c)
@@ -76,12 +84,13 @@ func enrich(c *cli.Context) error {
 			resources = append(resources, r)
 		}
 	} else {
-		if force {
+		if forceError {
+			resources, err = models.GetErrorResources(ctx, db)
+		} else if force {
 			resources, err = models.GetAllResources(ctx, db)
 		} else {
 			resources, err = models.GetResourcesWithoutMediaInfo(ctx, db)
 		}
-
 	}
 	if err != nil {
 		return err

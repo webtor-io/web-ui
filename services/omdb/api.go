@@ -134,7 +134,8 @@ func (api *Api) SearchByTitleAndYear(ctx context.Context, title string, year *in
 
 	var raw map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, errors.Wrap(err, "decode response")
+		data, _ := io.ReadAll(resp.Body)
+		return nil, errors.Wrapf(err, "decode response with title %v body %v", title, string(data))
 	}
 
 	if r, ok := raw["Response"].(string); !ok || r != "True" {
