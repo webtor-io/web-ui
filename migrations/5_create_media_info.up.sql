@@ -1,9 +1,7 @@
 CREATE TABLE media_info (
     resource_id TEXT PRIMARY KEY,
     status SMALLINT NOT NULL,
-    has_movie BOOLEAN NOT NULL DEFAULT FALSE,
-    has_series BOOLEAN NOT NULL DEFAULT FALSE,
-    media_count SMALLINT NOT NULL DEFAULT 0,
+    media_type SMALLINT,
     error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

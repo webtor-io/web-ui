@@ -9,9 +9,10 @@ import (
 type Episode struct {
 	tableName struct{} `pg:"episode"`
 
-	SeriesID   uuid.UUID      `pg:"series_id,pk"`
-	Season     int16          `pg:"season,pk"`
-	Episode    int16          `pg:"episode,pk"`
+	EpisodeID  uuid.UUID      `pg:"episode_id,pk,type:uuid,default:uuid_generate_v4()"`
+	SeriesID   uuid.UUID      `pg:"series_id"`
+	Season     *int16         `pg:"season"`
+	Episode    *int16         `pg:"episode"`
 	ResourceID string         `pg:"resource_id"`
 	Title      *string        `pg:"title"`
 	Path       *string        `pg:"path"`

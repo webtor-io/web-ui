@@ -124,16 +124,16 @@ EXECUTE FUNCTION update_series_updated_at_column();
 -- Table: episode
 CREATE TABLE episode
 (
+    episode_id  UUID PRIMARY KEY     DEFAULT uuid_generate_v4(),
     series_id   UUID        NOT NULL REFERENCES series (series_id) ON DELETE CASCADE,
-    season      SMALLINT    NOT NULL DEFAULT 1,
-    episode     SMALLINT    NOT NULL,
+    season      SMALLINT,
+    episode     SMALLINT,
     resource_id TEXT        NOT NULL REFERENCES media_info (resource_id) ON DELETE CASCADE,
     title       TEXT,
     path        TEXT,
     metadata    JSONB,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (series_id, season, episode)
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Auto-update updated_at on change

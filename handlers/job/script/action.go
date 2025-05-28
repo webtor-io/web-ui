@@ -102,7 +102,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
 			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
 				j.InProgress("loading OpenSubtitles")
-				osCtx, osCancel := context.WithTimeout(ctx, 1*time.Minute)
+				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
 				subs, err := s.api.GetOpenSubtitles(osCtx, subtitles.URL)
 				if err != nil {

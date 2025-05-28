@@ -21,7 +21,7 @@ var fieldParsers = FieldParsers{
 	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?))`), nil},
 	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|[hx]\.?26[45]))\b`), nil},
 	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((MP3|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?))\b`), nil},
-	{FieldTypeSeason, NewRegexpMatcher(`(?i)(s?([0-9]{1,2}))[ex]`), nil},
+	{FieldTypeSeason, NewRegexpMatcher(`(?i)(s?([0-9]{1,2}))[\sex]`), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
 	{FieldTypeEpisode, NewRegexpMatcher(`(-\s+([0-9]{1,})(?:[^0-9]|$))`, `(?i)([ex]([0-9]{2})(?:[^0-9]|$))`), nil},
 	{FieldTypeYear, NewRegexpMatcherLast(`\b(((?:19[0-9]|20[0-9])[0-9]))\b`), nil},

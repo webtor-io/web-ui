@@ -16,6 +16,10 @@ type KinopoiskUnofficial struct {
 	api *ku.Api
 }
 
+func (s *KinopoiskUnofficial) GetName() string {
+	return "Kinopoisk Unofficial"
+}
+
 func NewKinopoiskUnofficial(pg *cs.PG, api *ku.Api) *KinopoiskUnofficial {
 	return &KinopoiskUnofficial{
 		pg:  pg,

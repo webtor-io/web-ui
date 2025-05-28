@@ -65,10 +65,6 @@ func ReplaceSeriesForResource(ctx context.Context, db *pg.DB, resourceID string,
 	}
 
 	for _, series := range seriesList {
-		if series == nil {
-			continue
-		}
-
 		// Insert series
 		_, err := tx.Model(series).
 			Context(ctx).

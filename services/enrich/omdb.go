@@ -16,6 +16,10 @@ type OMDB struct {
 	pg  *cs.PG
 }
 
+func (s *OMDB) GetName() string {
+	return "OMDB"
+}
+
 func NewOMDB(pg *cs.PG, api *omdb.Api) *OMDB {
 	if api == nil {
 		return nil

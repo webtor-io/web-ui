@@ -14,9 +14,7 @@ type MediaInfo struct {
 
 	ResourceID string    `pg:"resource_id,pk"`
 	Status     int16     `pg:"status,use_zero"`
-	HasMovie   bool      `pg:"has_movie,use_zero"`
-	HasSeries  bool      `pg:"has_series,use_zero"`
-	MediaCount int16     `pg:"media_count,use_zero"`
+	MediaType  *int16    `pg:"media_type"`
 	Error      *string   `pg:"error"`
 	CreatedAt  time.Time `pg:"created_at,default:now()"`
 	UpdatedAt  time.Time `pg:"updated_at,default:now()"`
@@ -35,6 +33,33 @@ const (
 	MediaInfoStatusNoMedia
 	MediaInfoStatusError
 )
+
+type MediaInfoMediaType int16
+
+const (
+	MediaInfoMediaTypeMovieSingle MediaInfoMediaType = iota
+	MediaInfoMediaTypeSeriesSplitScenes
+	MediaInfoMediaTypeSeriesSingleSeason
+	MediaInfoMediaTypeSeriesMultipleSeasons
+	MediaInfoMediaTypeSeriesCompilation
+)
+
+func (s MediaInfoMediaType) String() string {
+	switch s {
+	case MediaInfoMediaTypeMovieSingle:
+		return "MovieSingle"
+	case MediaInfoMediaTypeSeriesSplitScenes:
+		return "SeriesSplitScenes"
+	case MediaInfoMediaTypeSeriesSingleSeason:
+		return "SeriesSingleSeason"
+	case MediaInfoMediaTypeSeriesMultipleSeasons:
+		return "SeriesMultipleSeasons"
+	case MediaInfoMediaTypeSeriesCompilation:
+		return "SeriesCompilation"
+	default:
+		return "Unknown"
+	}
+}
 
 func TryInsertOrLockMediaInfo(ctx context.Context, db *pg.DB, resourceID string, expire time.Duration, force bool) (*MediaInfo, error) {
 	// Attempt to insert a new media_info with "processing" status
@@ -106,7 +131,7 @@ func TryInsertOrLockMediaInfo(ctx context.Context, db *pg.DB, resourceID string,
 func UpdateMediaInfo(ctx context.Context, db *pg.DB, info *MediaInfo) error {
 	_, err := db.Model(info).
 		Context(ctx).
-		Column("status", "has_movie", "has_series", "media_count").
+		Column("status", "media_type").
 		WherePK().
 		Update()
 	return err

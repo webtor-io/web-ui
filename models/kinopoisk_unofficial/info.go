@@ -41,7 +41,13 @@ func GetInfoByID(ctx context.Context, db *pg.DB, kpID int) (*Info, error) {
 func UpsertInfo(ctx context.Context, db *pg.DB, kpID int, metadata map[string]any) (*Info, error) {
 	title, ok := metadata["nameEn"].(string)
 	if !ok {
-		title = metadata["nameOriginal"].(string)
+		title, ok = metadata["nameOriginal"].(string)
+		if !ok {
+			title, ok = metadata["nameRu"].(string)
+			if !ok {
+				return nil, errors.Errorf("metadata.name is missing")
+			}
+		}
 	}
 	year, ok := metadata["startYear"].(float64)
 	if !ok {

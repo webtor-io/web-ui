@@ -101,11 +101,12 @@ var testData = []string{
 	"Delicious.2025.MVO.WEB-DLRip.NF.x264.p3rr3nt.mkv",
 	"Bolshaya.dvadcatka.2025.AMZN.WEB-DLRip.AVC.mkv",
 	"How to Lose a Guy in 10 Days [Как отделаться от парня за 10 дней] (2003) BDRip RusEngSubsChpt.mkv",
+	"Этернавт - The Eternaut S01 E01 (Ночь игры в труко) WEB-DL 1080p (2025).mkv",
 }
 
 func TestParser(t *testing.T) {
 	for i, fname := range testData {
-		//if i != 87 {
+		//if i != 88 {
 		//	continue
 		//}
 		t.Run(fmt.Sprintf("golden_file_%03d", i), func(t *testing.T) {
