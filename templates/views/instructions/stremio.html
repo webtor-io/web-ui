@@ -1,0 +1,27 @@
+{{ define "title" }}
+    Stremio Integration
+{{ end }}
+{{ define "main" }}
+    <div class="prose mx-auto max-w-2xl mt-10 px-4">
+        <h1 class="text-accent text-3xl font-bold mb-6">How to connect Webtor to Stremio</h1>
+
+        <p>You can stream your personal torrent library from Webtor directly in Stremio. Here's how to do it:</p>
+
+        <ol class="list-decimal list-inside mt-4 space-y-2">
+            <li>Copy your personal addon link from your <a href="/profile" class="link">Webtor profile</a>.</li>
+            <li>Open <a href="https://www.stremio.com/" class="link" target="_blank">Stremio</a> and go to the <strong>Add-ons</strong> section.</li>
+            <li>Click the <strong>Add Addon</strong> button in the top-right corner.</li>
+            <li>Paste the addon link and press Enter. Done!</li>
+        </ol>
+
+        <p class="mt-6">Once installed, your library will appear in Stremio under the <strong>Webtor.io</strong> addon – ready to stream.</p>
+
+        <div class="alert mt-6">
+            <span>⚠️ Note: This feature is available only for <strong>paid users</strong>.</span>
+        </div>
+
+        <div class="alert mt-4">
+            ⏳ Streaming via Webtor may differ from regular Stremio addons. It can take some time to warm up the torrent before playback starts.
+        </div>
+    </div>
+{{ end }}

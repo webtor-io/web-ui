@@ -59,21 +59,17 @@ func (s *Handler) index(c *gin.Context) {
 }
 
 func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared.IndexArgs) (items []any, err error) {
-	uID, err := uuid.FromString(u.ID)
-	if err != nil {
-		return
-	}
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("no db")
 	}
 	switch args.Section {
 	case shared.SectionTypeTorrents:
-		return s.getTorrentList(ctx, uID, db, args.Sort)
+		return s.getTorrentList(ctx, u.ID, db, args.Sort)
 	case shared.SectionTypeMovies:
-		return s.getMovieList(ctx, uID, db, args.Sort)
+		return s.getMovieList(ctx, u.ID, db, args.Sort)
 	case shared.SectionTypeSeries:
-		return s.getSeriesList(ctx, uID, db, args.Sort)
+		return s.getSeriesList(ctx, u.ID, db, args.Sort)
 	}
 	return
 }

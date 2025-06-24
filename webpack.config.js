@@ -43,7 +43,7 @@ module.exports = async (env, options) => {
             prefix: `${t}/`,
             favicons: {
                 icons: {
-                    android: false,
+                    android: true,
                     appleIcon: false,
                     appleStartup: false,
                     favicons: true,
@@ -77,7 +77,7 @@ module.exports = async (env, options) => {
                 webSocketURL: 'auto://0.0.0.0:0/ws',
             },
             static: './assets/dist',
-            allowedHosts: ['all'],
+            allowedHosts: 'all',
             devMiddleware: {
                 publicPath: '/assets',
                 index: false,
@@ -85,7 +85,9 @@ module.exports = async (env, options) => {
             proxy: [
                 {
                     context: () => true,
-                    target: 'http://localhost:8080',
+                    target: 'http://127.0.0.1:8080',
+                    changeOrigin: true,
+                    secure: false,
                 },
             ],
             watchFiles: ['templates/*.html', 'assets/src/*'],

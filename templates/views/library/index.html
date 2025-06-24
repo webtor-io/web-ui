@@ -1,6 +1,9 @@
 {{ define "title" }}Library{{ end }}
 {{ define "main" }}
     {{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
+    <div class="text-sm pb-4 text-right">
+        <a class="link" data-async-target="main" data-umami-event="stremio-lib-link" href="/profile">Stream you library to TV with Stremio integration</a> 🎬
+    </div>
     <div class="flex items-center justify-between pb-3">
         {{ template "library/menu" .Data.Args | makeMenu }}
         {{ template "library/sort" .Data.Args | makeSort }}

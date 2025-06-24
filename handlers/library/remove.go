@@ -3,7 +3,6 @@ package library
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"net/http"
@@ -24,14 +23,10 @@ func (s *Handler) remove(c *gin.Context) {
 }
 
 func (s *Handler) removeFromLibrary(c *gin.Context, u *auth.User) (err error) {
-	uID, err := uuid.FromString(u.ID)
-	if err != nil {
-		return
-	}
 	rID, _ := c.GetPostForm("resource_id")
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no db")
 	}
-	return models.RemoveFromLibrary(db, uID, rID)
+	return models.RemoveFromLibrary(db, u.ID, rID)
 }

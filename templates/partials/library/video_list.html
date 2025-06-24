@@ -5,7 +5,7 @@
             <div class="card w-60 bg-base-200 shadow-sm h-full">
                 <figure>
                 {{ if . | hasPoster }}
-                <img class="w-full h-90 object-cover" src="{{ . | getCachedPoster240}}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}" />
+                <img class="w-full h-90 object-cover" src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}" />
                 {{ else }}
                     <div class="w-full h-90 bg-accent/20 text-accent/50 flex items-center"><div class="m-auto text-center font-bold text-2xl">{{ . | getTitle }}</div></div>
                 {{ end }}

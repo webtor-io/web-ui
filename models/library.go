@@ -130,12 +130,48 @@ func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort 
 	return list, nil
 }
 
-func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Movie, error) {
+func GetMovieByID(ctx context.Context, db *pg.DB, uID uuid.UUID, movieID string) (*Movie, error) {
+	var m Movie
+
+	query := db.Model(&m).
+		Context(ctx).
+		Join("join library as l").
+		JoinOn("movie.resource_id = l.resource_id").
+		Where("movie.movie_id = ?", movieID).
+		Where("l.user_id = ?", uID).
+		Limit(1)
+
+	err := query.Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch movie")
+	}
+
+	return &m, nil
+}
+
+func GetMoviesByVideoID(ctx context.Context, db *pg.DB, uID uuid.UUID, videoID string) ([]*Movie, error) {
 	var list []*Movie
 
-	//db.AddQueryHook(pgdebug.DebugHook{
-	//	Verbose: true,
-	//})
+	query := db.Model(&list).
+		Context(ctx).
+		Join("left join movie_metadata as mmd").
+		JoinOn("movie.movie_metadata_id = mmd.movie_metadata_id").
+		Join("join library as l").
+		JoinOn("movie.resource_id = l.resource_id").
+		Where("l.user_id = ?", uID).
+		Where("mmd.video_id = ?", videoID).
+		Relation("MovieMetadata")
+
+	err := query.Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch movie list")
+	}
+
+	return list, nil
+}
+
+func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Movie, error) {
+	var list []*Movie
 
 	query := db.Model(&list).
 		Context(ctx).

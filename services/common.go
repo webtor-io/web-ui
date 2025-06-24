@@ -69,3 +69,5 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 
 	return f
 }
+
+const AccessTokenParamName = "token"

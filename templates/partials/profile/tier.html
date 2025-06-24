@@ -1,0 +1,19 @@
+{{ define "profile/tier" }}
+    <div class="hero bg-base-200 mt-12">
+        <div class="hero-content text-center">
+            <div>
+                <h2 class="text-2xl font-bold text-accent mb-2">Your tier is <strong class="capitalize">{{ .Claims.Context.Tier.Name }}</strong></h2>
+                {{ if eq .Claims.Claims.Connection.Rate 0 }}
+                    <p>You have no bandwidth limits!</p>
+                {{ else }}
+                    <p>Your bandwidth is {{ .Claims.Claims.Connection.Rate }}Mbps!</p>
+                {{ end }}
+                {{ if .Claims | hasAds }}
+                    <p>You have ADS</p>
+                {{ else }}
+                    <p>You have no ADS!</p>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+{{ end }}

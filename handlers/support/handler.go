@@ -26,7 +26,8 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abu
 		tb:  tm.MustRegisterViews("support/*").WithLayout("main"),
 		asc: asc,
 	}
-	r.Any("/support", h.process)
+	r.GET("/support", h.process)
+	r.POST("/support", h.process)
 }
 
 type Cause int

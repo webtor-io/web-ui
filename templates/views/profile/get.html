@@ -1,6 +1,15 @@
 {{ define "title" }}Profile{{ end }}
 {{ define "main" }}
+{{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
+<div id="tier">
+    {{ template "profile/tier" $ }}
+</div>
+<div class="divider"></div>
+<div id="stremio" data-async-layout="{{`{{ template "profile/stremio" $ }}`}}">
+    {{ template "profile/stremio" $ }}
+</div>
+<div class="divider"></div>
 <div class="flex flex-col justify-center items-center mt-10">
-    <a href="/logout" class="btn btn-accent btn-outline" data-async-target="main">logout</a>
+    <a href="/logout" class="btn btn-accent btn-soft btn-outline capitalize" data-async-target="main" data-umami-event="logout">logout</a>
 </div>
 {{ end }}

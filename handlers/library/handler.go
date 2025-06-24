@@ -1,6 +1,7 @@
 package library
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -51,9 +52,15 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		s3Cl:                s3Cl,
 		posterCacheS3Bucket: c.String(awsPosterCacheBucket),
 	}
-	r.GET("/lib", h.index)
-	r.GET("/lib/:type", h.index)
-	r.GET("/lib/:type/poster/:imdb_id/:file", h.poster)
-	r.POST("/lib/add", h.add)
-	r.POST("/lib/remove", h.remove)
+	lg := r.Group("/lib")
+	lg.GET("/", h.index)
+	lg.GET("/:type", h.index)
+	plg := lg.Group("")
+	plg.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET"},
+	}))
+	plg.GET("/:type/poster/:imdb_id/:file", h.poster)
+	lg.POST("/add", h.add)
+	lg.POST("/remove", h.remove)
 }

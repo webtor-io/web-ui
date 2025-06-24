@@ -87,6 +87,9 @@ func (s *Api) get(ip net.IP) (*Data, error) {
 		_ = Body.Close()
 	}(resp.Body)
 	var data Data
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}

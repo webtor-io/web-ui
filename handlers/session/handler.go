@@ -69,7 +69,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) (err error) {
 	}
 	r.Use(sessions.Sessions("session", store))
 	r.Use(func(ctx *gin.Context) {
-		id := ctx.GetHeader("X-Session-Id")
+		id := ctx.GetHeader("X-Session-ID")
 		if id == "" {
 			id, _ = ctx.GetPostForm("_sessionID")
 		}

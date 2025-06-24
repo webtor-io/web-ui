@@ -319,8 +319,9 @@ func (s *Enricher) getMediaType(infos []*TorrentInfo) models.MediaInfoMediaType 
 func (s *Enricher) makeMovie(infos []*TorrentInfo, hash string) (*models.Movie, error) {
 	ti := infos[0]
 	movie := &models.Movie{
-		VideoContent: &models.VideoContent{},
-		ResourceID:   hash,
+		VideoContent: &models.VideoContent{
+			ResourceID: hash,
+		},
 	}
 	movie.Title = ti.Title
 	if ti.Year != 0 {
@@ -348,9 +349,10 @@ func (s *Enricher) makeSeriesWithEpisodes(infos []*TorrentInfo, hash string, mt 
 		return nil, err
 	}
 	ser := &models.Series{
-		VideoContent: &models.VideoContent{},
-		SeriesID:     uuid.NewV4(),
-		ResourceID:   hash,
+		VideoContent: &models.VideoContent{
+			ResourceID: hash,
+		},
+		SeriesID: uuid.NewV4(),
 	}
 	title := ti.Title
 	if ti.Title == "" {

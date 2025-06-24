@@ -14,7 +14,6 @@ type Movie struct {
 	tableName struct{} `pg:"movie"`
 
 	MovieID         uuid.UUID  `pg:"movie_id,pk,type:uuid,default:uuid_generate_v4()"`
-	ResourceID      string     `pg:"resource_id"`
 	MovieMetadataID *uuid.UUID `pg:"movie_metadata_id"`
 	Path            *string    `pg:"path"`
 	CreatedAt       time.Time  `pg:"created_at,default:now()"`
@@ -40,11 +39,23 @@ func (s *Movie) GetContentType() ContentType {
 	return ContentTypeMovie
 }
 
+func (s *Movie) GetID() uuid.UUID {
+	return s.MovieID
+}
+
+func (s *Movie) GetPath() *string {
+	return s.Path
+}
+
 func (s *Movie) GetIntYear() int {
 	if s.Year == nil {
 		return 0
 	}
 	return int(*s.Year)
+}
+
+func (s *Movie) GetEpisode(season int, episode int) *Episode {
+	return nil
 }
 
 func ReplaceMoviesForResource(ctx context.Context, db *pg.DB, resourceID string, movies []*Movie) error {

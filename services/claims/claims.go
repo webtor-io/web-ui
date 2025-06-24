@@ -90,12 +90,25 @@ func GetFromContext(c *gin.Context) *Data {
 
 func (s *Claims) RegisterHandler(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
-		r, err := s.MakeUserClaimsFromContext(c)
+		ucl, err := s.MakeUserClaimsFromContext(c)
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), Context{}, r))
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), Context{}, ucl))
 		c.Next()
 	})
+}
+
+func IsPaid(c *gin.Context) {
+	d := GetFromContext(c)
+	if d == nil {
+		c.Next()
+		return
+	}
+	if d.Context.Tier.Id == 0 {
+		c.AbortWithStatus(http.StatusPaymentRequired)
+	} else {
+		c.Next()
+	}
 }

@@ -101,7 +101,6 @@ func (s *Handler) poster(c *gin.Context) {
 		c.Status(http.StatusNotModified)
 		return
 	}
-
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Content-Length", strconv.Itoa(b.Len()))
 	c.Header("ETag", etag)

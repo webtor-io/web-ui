@@ -4,7 +4,6 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -29,10 +28,6 @@ func (s *Handler) add(c *gin.Context) {
 }
 
 func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, id string) {
-	uID, err := uuid.FromString(u.ID)
-	if err != nil {
-		return
-	}
 	clms := api.GetClaimsFromContext(c)
 	ctx := c.Request.Context()
 	rID, _ := c.GetPostForm("resource_id")
@@ -52,7 +47,7 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, 
 	if db == nil {
 		return errors.New("no db"), id
 	}
-	err = models.AddTorrentToLibrary(db, uID, rID, info)
+	err = models.AddTorrentToLibrary(db, u.ID, rID, info)
 	if err != nil {
 		return
 	}

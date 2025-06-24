@@ -37,7 +37,6 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
         }
     }
     const res = await fetchFunc(url, fetchParams);
-    console.log(res.url);
     const text = await res.text();
     loadAsyncView(target, text, params);
     for (const [h, val] of res.headers.entries()) {

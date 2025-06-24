@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
@@ -156,9 +157,10 @@ func (s *Auth) Init() error {
 }
 
 type User struct {
-	ID      string
-	Email   string
-	Expired bool
+	ID       uuid.UUID
+	Email    string
+	Expired  bool
+	HasToken bool
 }
 
 func (s *User) HasAuth() bool {
@@ -167,11 +169,21 @@ func (s *User) HasAuth() bool {
 
 func GetUserFromContext(c *gin.Context) *User {
 	u := &User{}
+	// TODO: Make something better
+	if c.Query(sv.AccessTokenParamName) != "" {
+		uc := c.Request.Context().Value(UserContext{})
+		su, ok := uc.(*models.User)
+		if ok {
+			u.ID = su.UserID
+			u.Email = su.Email
+		}
+		return u
+	}
 	if sessionContainer := session.GetSessionFromRequestContext(c.Request.Context()); sessionContainer != nil {
 		uc := c.Request.Context().Value(UserContext{})
 		su, ok := uc.(*models.User)
 		if ok {
-			u.ID = su.UserID.String()
+			u.ID = su.UserID
 			u.Email = su.Email
 		}
 	}
@@ -290,4 +302,13 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 	r.Use(s.verifySession(&sessmodels.VerifySessionOptions{
 		SessionRequired: &sessionRequired,
 	}))
+}
+
+func HasAuth(c *gin.Context) {
+	u := GetUserFromContext(c)
+	if !u.HasAuth() {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+	c.Next()
 }

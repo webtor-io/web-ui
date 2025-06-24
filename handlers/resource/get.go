@@ -2,7 +2,6 @@ package resource
 
 import (
 	"context"
-	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
@@ -129,15 +128,11 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	}
 
 	if args.User.HasAuth() {
-		uID, err := uuid.FromString(args.User.ID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse user id")
-		}
 		db := s.pg.Get()
 		if db == nil {
 			return nil, errors.New("failed to connect to database")
 		}
-		d.Resource.InLibrary, err = models.IsInLibrary(db, uID, d.Resource.ID)
+		d.Resource.InLibrary, err = models.IsInLibrary(db, args.User.ID, d.Resource.ID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if resource is in-library")
 		}

@@ -2,6 +2,9 @@ package main
 
 import (
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	"github.com/webtor-io/web-ui/handlers/instructions"
+	"github.com/webtor-io/web-ui/handlers/stremio"
+	at "github.com/webtor-io/web-ui/services/access_token"
 	"net/http"
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
@@ -24,6 +27,7 @@ import (
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/geoip"
 	"github.com/webtor-io/web-ui/services/umami"
+	ua "github.com/webtor-io/web-ui/services/url_alias"
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
@@ -74,6 +78,9 @@ func configureServe(c *cli.Command) {
 }
 
 func serve(c *cli.Context) error {
+	// Setting HTTP Client
+	cl := http.DefaultClient
+
 	// Setting DB
 	pg := cs.NewPG(c)
 	defer pg.Close()
@@ -120,6 +127,10 @@ func serve(c *cli.Context) error {
 	servers = append(servers, web)
 	defer web.Close()
 
+	// Setting URL Alias
+	ual := ua.New(pg)
+	ual.RegisterHandler(r)
+
 	err = sess.RegisterHandler(c, r)
 	if err != nil {
 		return err
@@ -136,6 +147,10 @@ func serve(c *cli.Context) error {
 		a.RegisterHandler(r)
 	}
 
+	// Setting Access Token
+	ats := at.New(pg)
+	ats.RegisterHandler(r)
+
 	// Setting Claims Client
 	cpCl := claims.NewClient(c)
 	defer cpCl.Close()
@@ -146,9 +161,6 @@ func serve(c *cli.Context) error {
 		// Setting UserClaimsHandler
 		uc.RegisterHandler(r)
 	}
-
-	// Setting HTTP Client
-	cl := http.DefaultClient
 
 	// Setting S3 Client
 	s3Cl := cs.NewS3Client(c, cl)
@@ -169,6 +181,7 @@ func serve(c *cli.Context) error {
 	// Setting ApiClaimsHandler
 	sapi.RegisterHandler(r)
 
+	// Setting Static
 	err = sta.RegisterHandler(c, r)
 	if err != nil {
 		return err
@@ -222,7 +235,7 @@ func serve(c *cli.Context) error {
 	wa.RegisterHandler(r, tm, jobs)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(r, tm)
+	p.RegisterHandler(r, tm, ats, ual)
 
 	// Setting EmbedExamplesHandler
 	wee.RegisterHandler(r, tm)
@@ -239,8 +252,14 @@ func serve(c *cli.Context) error {
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
 
+	// Setting Stremio
+	stremio.RegisterHandler(c, r, pg, ats, sapi)
+
 	// Setting Tests
 	tests.RegisterHandler(r, tm)
+
+	// Setting Instructions
+	instructions.RegisterHandler(r, tm)
 
 	// Render templates
 	err = tm.Init()

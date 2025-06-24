@@ -109,6 +109,13 @@ func (s *Helper) HasAds(c *claims.Data) bool {
 	return !c.Claims.Site.NoAds
 }
 
+func (s *Helper) IsPaid(c *claims.Data) bool {
+	if c == nil {
+		return true
+	}
+	return c.Context.Tier.Id != 0
+}
+
 func (s *Helper) TierName(c *claims.Data) string {
 	if c == nil {
 		return "free"
