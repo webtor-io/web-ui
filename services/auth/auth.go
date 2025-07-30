@@ -95,7 +95,7 @@ func (s *Auth) Init() error {
 		Password: s.smtpPass,
 		Secure:   s.smtpSecure,
 		TLSConfig: &tls.Config{
-			InsecureSkipVerify: false,
+			InsecureSkipVerify: true,
 			ServerName:         s.smtpHost,
 		},
 	}

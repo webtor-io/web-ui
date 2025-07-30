@@ -1,6 +1,6 @@
 module github.com/webtor-io/web-ui
 
-go 1.24.2
+go 1.24.5
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
