@@ -1,6 +1,7 @@
 import SuperTokens from 'supertokens-web-js';
 import Session from 'supertokens-web-js/recipe/session';
 import Passwordless, { createCode, consumeCode, signOut } from "supertokens-web-js/recipe/passwordless";
+import ThirdParty, { redirectToThirdPartyLogin } from "supertokens-web-js/recipe/thirdparty";
 
 function preAPIHook(csrf) {
     return function(context) {
@@ -57,6 +58,16 @@ export async function init(csrf) {
     await initSuperTokens(csrf);
 }
 
+export async function signInWithGoogle(csrf) {
+    await initSuperTokens(csrf);
+    return await redirectToThirdPartyLogin({
+        thirdPartyId: "google",
+        options: {
+            preAPIHook: preAPIHook(csrf),
+        },
+    });
+}
+
 let inited = false;
 async function initSuperTokens(csrf) {
     if (inited) {
@@ -74,6 +85,7 @@ async function initSuperTokens(csrf) {
                 preAPIHook: preAPIHook(csrf),
             }),
             Passwordless.init(),
+            ThirdParty.init(),
         ],
     });
 
