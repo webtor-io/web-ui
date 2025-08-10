@@ -3,6 +3,7 @@ package webdav
 import (
 	"context"
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -29,7 +31,7 @@ func (s *Handler) buildAllContentResponse(c *gin.Context, requestPath string, de
 		return responses, nil
 	}
 
-	// Get user's complete library
+	// Get user's complete library - ALL torrents, not just movies/series
 	ctx := c.Request.Context()
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
@@ -37,33 +39,23 @@ func (s *Handler) buildAllContentResponse(c *gin.Context, requestPath string, de
 		return nil, errors.New("database not initialized")
 	}
 
-	// Get all movies and series
-	movies, err := models.GetLibraryMovieList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
+	// Get ALL torrents from library
+	libraryEntries, err := models.GetLibraryTorrentsList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
 	if err != nil {
 		return nil, err
 	}
 
-	series, err := models.GetLibrarySeriesList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add movie content
-	for _, movie := range movies {
-		movieResponses, err := s.buildMovieContentResponses(requestPath, movie)
+	// Add content for each torrent
+	for _, entry := range libraryEntries {
+		if entry.Torrent == nil {
+			continue // Skip entries without torrent data
+		}
+		
+		torrentResponses, err := s.buildTorrentContentResponses(ctx, requestPath, entry)
 		if err != nil {
 			continue // Skip on error
 		}
-		responses = append(responses, movieResponses...)
-	}
-
-	// Add series content
-	for _, serie := range series {
-		seriesResponses, err := s.buildSeriesContentResponses(requestPath, serie)
-		if err != nil {
-			continue // Skip on error
-		}
-		responses = append(responses, seriesResponses...)
+		responses = append(responses, torrentResponses...)
 	}
 
 	return responses, nil
@@ -81,7 +73,7 @@ func (s *Handler) buildMoviesResponse(c *gin.Context, requestPath string, depth 
 		return responses, nil
 	}
 
-	// Get user's movie library
+	// Get user's complete library and filter for movies
 	ctx := c.Request.Context()
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
@@ -89,18 +81,27 @@ func (s *Handler) buildMoviesResponse(c *gin.Context, requestPath string, depth 
 		return nil, errors.New("database not initialized")
 	}
 
-	movies, err := models.GetLibraryMovieList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
+	libraryEntries, err := models.GetLibraryTorrentsList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add movie content
-	for _, movie := range movies {
-		movieResponses, err := s.buildMovieContentResponses(requestPath, movie)
+	// Add content for movie torrents only
+	for _, entry := range libraryEntries {
+		if entry.Torrent == nil || entry.MediaInfo == nil {
+			continue
+		}
+		
+		// Filter for movies only
+		if entry.MediaInfo.MediaType == nil || *entry.MediaInfo.MediaType != 1 { // Assuming 1 = movie
+			continue
+		}
+		
+		torrentResponses, err := s.buildTorrentContentResponses(ctx, requestPath, entry)
 		if err != nil {
 			continue // Skip on error
 		}
-		responses = append(responses, movieResponses...)
+		responses = append(responses, torrentResponses...)
 	}
 
 	return responses, nil
@@ -118,7 +119,7 @@ func (s *Handler) buildSeriesResponse(c *gin.Context, requestPath string, depth 
 		return responses, nil
 	}
 
-	// Get user's series library
+	// Get user's complete library and filter for series
 	ctx := c.Request.Context()
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
@@ -126,89 +127,70 @@ func (s *Handler) buildSeriesResponse(c *gin.Context, requestPath string, depth 
 		return nil, errors.New("database not initialized")
 	}
 
-	series, err := models.GetLibrarySeriesList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
+	libraryEntries, err := models.GetLibraryTorrentsList(ctx, db, u.ID, models.SortTypeRecentlyAdded)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add series content
-	for _, serie := range series {
-		seriesResponses, err := s.buildSeriesContentResponses(requestPath, serie)
+	// Add content for series torrents only
+	for _, entry := range libraryEntries {
+		if entry.Torrent == nil || entry.MediaInfo == nil {
+			continue
+		}
+		
+		// Filter for series only
+		if entry.MediaInfo.MediaType == nil || *entry.MediaInfo.MediaType != 2 { // Assuming 2 = series
+			continue
+		}
+		
+		torrentResponses, err := s.buildTorrentContentResponses(ctx, requestPath, entry)
 		if err != nil {
 			continue // Skip on error
 		}
-		responses = append(responses, seriesResponses...)
+		responses = append(responses, torrentResponses...)
 	}
 
 	return responses, nil
 }
 
-// buildMovieContentResponses builds WebDAV responses for a movie's content
-func (s *Handler) buildMovieContentResponses(requestPath string, movie models.VideoContentWithMetadata) ([]Response, error) {
+// buildTorrentContentResponses builds WebDAV responses for a torrent's content using generic approach
+func (s *Handler) buildTorrentContentResponses(ctx context.Context, requestPath string, entry *models.Library) ([]Response, error) {
 	var responses []Response
 	
-	// Create a directory for the movie
-	movieTitle := sanitizeFilename(movie.GetContent().Title)
-	movieDir := fmt.Sprintf("/%s/%s/", requestPath, movieTitle)
-	response := s.createDirectoryResponse(movieDir, movieTitle)
+	if entry.Torrent == nil {
+		return responses, nil
+	}
+	
+	// Create a directory for the torrent
+	torrentName := sanitizeFilename(entry.Torrent.Name)
+	torrentDir := fmt.Sprintf("/%s/%s/", requestPath, torrentName)
+	response := s.createDirectoryResponse(torrentDir, torrentName)
 	responses = append(responses, response)
 
-	// Add the movie file
-	if movie.GetPath() != nil {
-		path := *movie.GetPath()
-		filename := filepath.Base(path)
-		if filename == "" || filename == "." {
-			filename = movieTitle + getFileExtension(path)
+	// Get torrent files using the API
+	torrentItems, err := s.retrieveTorrentItems(ctx, entry.ResourceID)
+	if err != nil {
+		return responses, err // Return directory only if we can't get files
+	}
+
+	// Add each file in the torrent
+	for _, item := range torrentItems {
+		if item.Type != "file" {
+			continue // Skip directories
 		}
 		
-		href := fmt.Sprintf("/%s/%s/%s", requestPath, movieTitle, filename)
-		size := int64(0) // We don't have size info readily available
+		filename := filepath.Base(item.PathStr)
+		if filename == "" || filename == "." {
+			filename = sanitizeFilename(item.Name)
+		}
+		
+		href := fmt.Sprintf("/%s/%s/%s", requestPath, torrentName, filename)
+		size := item.Size
 		modTime := time.Now().Format(time.RFC1123)
-		contentType := getContentType(filename)
+		contentType := detectContentType(filename)
 		
 		response := s.createFileResponse(href, filename, size, contentType, modTime)
 		responses = append(responses, response)
-	}
-
-	return responses, nil
-}
-
-// buildSeriesContentResponses builds WebDAV responses for a series' content
-func (s *Handler) buildSeriesContentResponses(requestPath string, serie models.VideoContentWithMetadata) ([]Response, error) {
-	var responses []Response
-	
-	// Create a directory for the series
-	seriesTitle := sanitizeFilename(serie.GetContent().Title)
-	seriesDir := fmt.Sprintf("/%s/%s/", requestPath, seriesTitle)
-	response := s.createDirectoryResponse(seriesDir, seriesTitle)
-	responses = append(responses, response)
-
-	// Add episodes
-	if series, ok := serie.(*models.Series); ok {
-		for _, episode := range series.Episodes {
-			if episode.Path == nil {
-				continue
-			}
-			
-			path := *episode.Path
-			filename := filepath.Base(path)
-			if filename == "" || filename == "." {
-				// Generate filename from episode info
-				if episode.Season != nil && episode.Episode != nil {
-					filename = fmt.Sprintf("S%02dE%02d%s", *episode.Season, *episode.Episode, getFileExtension(path))
-				} else {
-					filename = seriesTitle + getFileExtension(path)
-				}
-			}
-			
-			href := fmt.Sprintf("/%s/%s/%s", requestPath, seriesTitle, filename)
-			size := int64(0) // We don't have size info readily available
-			modTime := time.Now().Format(time.RFC1123)
-			contentType := getContentType(filename)
-			
-			response := s.createFileResponse(href, filename, size, contentType, modTime)
-			responses = append(responses, response)
-		}
 	}
 
 	return responses, nil
@@ -223,10 +205,10 @@ func (s *Handler) handleContentFileDownload(c *gin.Context, folderType FolderTyp
 		return
 	}
 
-	contentTitle := parts[0]
+	torrentName := parts[0]
 	filename := parts[1]
 
-	// Find the content in the user's library
+	// Find the torrent in the user's library using generic approach
 	ctx := c.Request.Context()
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
@@ -235,20 +217,7 @@ func (s *Handler) handleContentFileDownload(c *gin.Context, folderType FolderTyp
 		return
 	}
 
-	var resourceID string
-	var itemPath string
-	var err error
-
-	switch folderType {
-	case FolderTypeMovies, FolderTypeAll:
-		resourceID, itemPath, err = s.findMovieFile(ctx, db, u.ID.String(), contentTitle, filename)
-	case FolderTypeSeries:
-		resourceID, itemPath, err = s.findSeriesFile(ctx, db, u.ID.String(), contentTitle, filename)
-	default:
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
+	resourceID, itemPath, err := s.findTorrentFile(ctx, db, u.ID, torrentName, filename, folderType)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -270,31 +239,53 @@ func (s *Handler) handleContentFileDownload(c *gin.Context, folderType FolderTyp
 	c.Redirect(http.StatusFound, streamURL)
 }
 
-// findMovieFile finds a movie file in the user's library
-func (s *Handler) findMovieFile(ctx context.Context, db interface{}, userID string, contentTitle, filename string) (string, string, error) {
+// findTorrentFile finds a file in the user's torrent library using generic approach
+func (s *Handler) findTorrentFile(ctx context.Context, db interface{}, userID uuid.UUID, torrentName, filename string, folderType FolderType) (string, string, error) {
 	pgDB, ok := db.(*pg.DB)
 	if !ok {
 		return "", "", errors.New("invalid database type")
 	}
 	
-	userUUID, err := uuid.FromString(userID)
-	if err != nil {
-		return "", "", err
-	}
-	
-	movies, err := models.GetLibraryMovieList(ctx, pgDB, userUUID, models.SortTypeRecentlyAdded)
+	// Get all torrents from library
+	libraryEntries, err := models.GetLibraryTorrentsList(ctx, pgDB, userID, models.SortTypeRecentlyAdded)
 	if err != nil {
 		return "", "", err
 	}
 
-	for _, movie := range movies {
-		if sanitizeFilename(movie.GetContent().Title) == contentTitle {
-			if movie.GetPath() != nil {
-				path := *movie.GetPath()
-				if filepath.Base(path) == filename || 
-				   sanitizeFilename(movie.GetContent().Title)+getFileExtension(path) == filename {
-					return movie.GetContent().ResourceID, path, nil
-				}
+	// Find the matching torrent
+	for _, entry := range libraryEntries {
+		if entry.Torrent == nil {
+			continue
+		}
+		
+		// Check if torrent name matches
+		if sanitizeFilename(entry.Torrent.Name) != torrentName {
+			continue
+		}
+		
+		// Apply folder type filtering if needed
+		if folderType == FolderTypeMovies && entry.MediaInfo != nil && (entry.MediaInfo.MediaType == nil || *entry.MediaInfo.MediaType != 1) {
+			continue
+		}
+		if folderType == FolderTypeSeries && entry.MediaInfo != nil && (entry.MediaInfo.MediaType == nil || *entry.MediaInfo.MediaType != 2) {
+			continue
+		}
+		
+		// Get torrent items to find the specific file
+		torrentItems, err := s.retrieveTorrentItems(ctx, entry.ResourceID)
+		if err != nil {
+			continue // Skip on error
+		}
+		
+		// Find the matching file
+		for _, item := range torrentItems {
+			if item.Type != "file" {
+				continue
+			}
+			
+			itemFilename := filepath.Base(item.PathStr)
+			if itemFilename == filename || sanitizeFilename(item.Name) == filename {
+				return entry.ResourceID, item.PathStr, nil
 			}
 		}
 	}
@@ -302,50 +293,35 @@ func (s *Handler) findMovieFile(ctx context.Context, db interface{}, userID stri
 	return "", "", nil
 }
 
-// findSeriesFile finds a series episode file in the user's library
-func (s *Handler) findSeriesFile(ctx context.Context, db interface{}, userID string, contentTitle, filename string) (string, string, error) {
-	pgDB, ok := db.(*pg.DB)
-	if !ok {
-		return "", "", errors.New("invalid database type")
+// retrieveTorrentItems retrieves all items from a torrent
+func (s *Handler) retrieveTorrentItems(ctx context.Context, hash string) ([]ra.ListItem, error) {
+	// Get API claims from context - we need this for API calls
+	// For now, we'll create a basic claims object
+	// TODO: This should be properly integrated with the authentication system
+	claims := &api.Claims{
+		SessionID: "", // This will need to be set properly
 	}
 	
-	userUUID, err := uuid.FromString(userID)
-	if err != nil {
-		return "", "", err
-	}
-	
-	series, err := models.GetLibrarySeriesList(ctx, pgDB, userUUID, models.SortTypeRecentlyAdded)
-	if err != nil {
-		return "", "", err
-	}
-
-	for _, serie := range series {
-		if sanitizeFilename(serie.GetContent().Title) == contentTitle {
-			for _, episode := range serie.Episodes {
-				if episode.Path == nil {
-					continue
-				}
-				
-				path := *episode.Path
-				episodeFilename := filepath.Base(path)
-				
-				// Check if filename matches
-				if episodeFilename == filename {
-					return serie.GetContent().ResourceID, path, nil
-				}
-				
-				// Check generated filename
-				if episode.Season != nil && episode.Episode != nil {
-					generatedName := fmt.Sprintf("S%02dE%02d%s", *episode.Season, *episode.Episode, getFileExtension(path))
-					if generatedName == filename {
-						return serie.GetContent().ResourceID, path, nil
-					}
-				}
-			}
+	limit := uint(100)
+	offset := uint(0)
+	var items []ra.ListItem
+	for {
+		resp, err := s.sapi.ListResourceContent(ctx, claims, hash, &api.ListResourceContentArgs{
+			Limit:  limit,
+			Offset: offset,
+		})
+		if err != nil {
+			return nil, err
 		}
+		for _, item := range resp.Items {
+			items = append(items, item)
+		}
+		if (resp.Count - int(offset)) == len(resp.Items) {
+			break
+		}
+		offset += limit
 	}
-
-	return "", "", nil
+	return items, nil
 }
 
 // getStreamingURL gets a streaming URL using the Webtor API
@@ -406,26 +382,18 @@ func getFileExtension(path string) string {
 	return ext
 }
 
-func getContentType(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".mp4":
-		return "video/mp4"
-	case ".mkv":
-		return "video/x-matroska"
-	case ".avi":
-		return "video/x-msvideo"
-	case ".mov":
-		return "video/quicktime"
-	case ".wmv":
-		return "video/x-ms-wmv"
-	case ".flv":
-		return "video/x-flv"
-	case ".webm":
-		return "video/webm"
-	case ".m4v":
-		return "video/x-m4v"
-	default:
+// detectContentType detects MIME type using Go's standard library
+func detectContentType(filename string) string {
+	ext := filepath.Ext(filename)
+	if ext == "" {
 		return "application/octet-stream"
 	}
+	
+	// Use Go's standard MIME type detection
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType == "" {
+		return "application/octet-stream"
+	}
+	
+	return mimeType
 }

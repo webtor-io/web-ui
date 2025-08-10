@@ -33,33 +33,27 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], at *at.A
 	r.GET("/profile", h.get)
 }
 
-func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
-	at, err := s.at.GetTokenByName(c, "stremio")
+// getServiceURL generates a URL for a specific service with token authentication
+func (s *Handler) getServiceURL(c *gin.Context, serviceName, pathSuffix string) (string, error) {
+	at, err := s.at.GetTokenByName(c, serviceName)
 	if at == nil {
 		return "", err
 	}
-	url := fmt.Sprintf("/%s/%s/stremio/", services.AccessTokenParamName, at.Token)
+	url := fmt.Sprintf("/%s/%s/%s/", services.AccessTokenParamName, at.Token, serviceName)
 
 	al, err := s.ual.Get(url)
 	if err != nil {
 		return "", err
 	}
-	return al + "/manifest.json", nil
+	return al + pathSuffix, nil
+}
 
+func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
+	return s.getServiceURL(c, "stremio", "/manifest.json")
 }
 
 func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
-	at, err := s.at.GetTokenByName(c, "webdav")
-	if at == nil {
-		return "", err
-	}
-	url := fmt.Sprintf("/%s/%s/webdav/", services.AccessTokenParamName, at.Token)
-
-	al, err := s.ual.Get(url)
-	if err != nil {
-		return "", err
-	}
-	return al, nil
+	return s.getServiceURL(c, "webdav", "")
 }
 
 func (s *Handler) get(c *gin.Context) {
