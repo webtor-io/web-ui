@@ -1,0 +1,122 @@
+{{ define "title" }}
+WebDAV Integration
+{{ end }}
+{{ define "main" }}
+<div class="prose max-w-4xl mx-auto">
+  <h1 class="text-accent text-3xl font-bold mb-6">How to connect WebDAV clients to Webtor</h1>
+  
+  <p>You can access your personal torrent library from Webtor through WebDAV protocol. This allows you to manage torrents and stream content using standard file managers and WebDAV clients.</p>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">📁 Folder Structure</h2>
+  <ul>
+    <li><strong>torrents/</strong> - Manage your torrent library (add/remove .torrent files)</li>
+    <li><strong>all/</strong> - Browse all your content (read-only)</li>
+    <li><strong>movies/</strong> - Browse movies only (read-only)</li>
+    <li><strong>series/</strong> - Browse TV series only (read-only)</li>
+  </ul>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">🖥️ Windows Explorer</h2>
+  <ol>
+    <li>Open <strong>File Explorer</strong></li>
+    <li>Right-click on <strong>This PC</strong> and select <strong>Map network drive...</strong></li>
+    <li>Choose a drive letter and enter your WebDAV URL in the folder field</li>
+    <li>Check <strong>Connect using different credentials</strong> if prompted</li>
+    <li>Click <strong>Finish</strong> and your WebDAV folder will appear as a network drive</li>
+  </ol>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">🍎 macOS Finder</h2>
+  <ol>
+    <li>Open <strong>Finder</strong></li>
+    <li>Press <strong>Cmd+K</strong> or go to <strong>Go → Connect to Server</strong></li>
+    <li>Enter your WebDAV URL in the server address field</li>
+    <li>Click <strong>Connect</strong></li>
+    <li>The WebDAV folder will appear in the sidebar under <strong>Shared</strong></li>
+  </ol>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">🐧 Linux (using rclone)</h2>
+  <div class="mockup-code">
+    <pre><code># Install rclone if not already installed
+sudo apt install rclone  # Ubuntu/Debian
+# or
+brew install rclone      # macOS with Homebrew
+
+# Configure WebDAV remote
+rclone config
+
+# Choose: n) New remote
+# Name: webtor
+# Storage: webdav
+# URL: [Your WebDAV URL]
+# Vendor: other
+# User: [leave empty]
+# Password: [leave empty]
+
+# Mount the WebDAV folder
+mkdir ~/webtor
+rclone mount webtor: ~/webtor --daemon
+
+# Or sync files
+rclone sync webtor:torrents ~/local-torrents</code></pre>
+  </div>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">📱 Mobile Apps</h2>
+  <p>You can also access your WebDAV library using mobile apps:</p>
+  <ul>
+    <li><strong>iOS:</strong> Files app (built-in), Documents by Readdle, or FileBrowser</li>
+    <li><strong>Android:</strong> Solid Explorer, FX File Explorer, or Total Commander</li>
+  </ul>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">⚡ Usage Tips</h2>
+  <div class="alert alert-info">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <div>
+      <h3 class="font-bold">Important Notes:</h3>
+      <ul class="mt-2">
+        <li>⏳ Streaming via WebDAV may take time to warm up torrents before playback starts</li>
+        <li>📁 Only the <strong>torrents/</strong> folder supports file uploads and deletions</li>
+        <li>🎬 Content folders (<strong>all/</strong>, <strong>movies/</strong>, <strong>series/</strong>) are read-only</li>
+        <li>🔒 Your WebDAV URL contains authentication tokens - keep it secure</li>
+        <li>📱 Large files may take time to load depending on your connection</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="text-2xl font-bold mt-8 mb-4">🔧 Troubleshooting</h2>
+  <div class="collapse collapse-arrow bg-base-200 mb-4">
+    <input type="checkbox" />
+    <div class="collapse-title text-xl font-medium">
+      Connection refused or timeout errors
+    </div>
+    <div class="collapse-content">
+      <p>Make sure you're using the correct WebDAV URL from your profile page. Check your internet connection and firewall settings.</p>
+    </div>
+  </div>
+
+  <div class="collapse collapse-arrow bg-base-200 mb-4">
+    <input type="checkbox" />
+    <div class="collapse-title text-xl font-medium">
+      Authentication errors
+    </div>
+    <div class="collapse-content">
+      <p>WebDAV uses token-based authentication embedded in the URL. Make sure you're using the complete URL from your profile page without modifications.</p>
+    </div>
+  </div>
+
+  <div class="collapse collapse-arrow bg-base-200 mb-4">
+    <input type="checkbox" />
+    <div class="collapse-title text-xl font-medium">
+      Files not appearing or slow loading
+    </div>
+    <div class="collapse-content">
+      <p>Large libraries may take time to load. Try refreshing the folder or accessing specific subfolders. Some WebDAV clients cache directory listings.</p>
+    </div>
+  </div>
+
+  <div class="mt-8 p-4 bg-base-200 rounded-lg">
+    <p class="text-center">
+      <strong>Need more help?</strong> Contact us at 
+      <a href="mailto:support@webtor.io" class="link">support@webtor.io</a>
+    </p>
+  </div>
+</div>
+{{ end }}

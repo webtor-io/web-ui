@@ -1,0 +1,37 @@
+{{ define "profile/webdav" }}
+<div class="card bg-base-100 shadow-xl mb-6">
+  <div class="card-body">
+    <h2 class="text-2xl font-bold text-accent">WebDAV integration</h2>
+    <p class="mb-4">Access your torrent library through WebDAV protocol. Compatible with Windows Explorer, macOS Finder, rclone, and other WebDAV clients.</p>
+    
+    {{ if .Claims | isPaid }}
+    {{ if eq .Data.WebDAVURL "" }}
+    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/webdav/url/generate" data-async-target="#webdav">
+      <button type="submit" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="webdav-generate-url">
+        generate webdav url
+      </button>
+    </form>
+    {{ else }}
+    <script>
+      var webdavUrl = "{{ domain }}{{ .Data.WebDAVURL }}";
+      function copyWebDAVUrl(form, e) {
+        e.preventDefault();
+        navigator.clipboard.writeText(webdavUrl);
+        form.querySelector('button').textContent = 'copied!';
+        setTimeout(() => form.querySelector('button').textContent = 'copy webdav url', 2000);
+      }
+    </script>
+    <form onsubmit="copyWebDAVUrl(this, event)" class="join w-full">
+      <input name="token" readonly class="input input-bordered w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
+      <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="webdav-copy-url">copy webdav url</button>
+    </form>
+    <div class="mt-4">
+      <a href="/instructions/webdav" class="hover:underline" data-umami-event="instruction-webdav" target="_blank">How to connect WebDAV clients?</a>
+    </div>
+    {{ end }}
+    {{ else }}
+    <p class="mb-6">WebDAV integration is available for premium users. <a href="/donate" class="btn-link" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a></p>
+    {{ end }}
+  </div>
+</div>
+{{ end }}

@@ -15,6 +15,7 @@ import (
 
 type Data struct {
 	StremioAddonURL string
+	WebDAVURL       string
 }
 
 type Handler struct {
@@ -47,6 +48,20 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 
 }
 
+func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
+	at, err := s.at.GetTokenByName(c, "webdav")
+	if at == nil {
+		return "", err
+	}
+	url := fmt.Sprintf("/%s/%s/webdav/", services.AccessTokenParamName, at.Token)
+
+	al, err := s.ual.Get(url)
+	if err != nil {
+		return "", err
+	}
+	return al, nil
+}
+
 func (s *Handler) get(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	if !u.HasAuth() {
@@ -58,7 +73,13 @@ func (s *Handler) get(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+	webdavURL, err := s.getWebDAVURL(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL: at,
+		WebDAVURL:       webdavURL,
 	}))
 }

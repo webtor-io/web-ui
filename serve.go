@@ -4,6 +4,7 @@ import (
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/instructions"
 	"github.com/webtor-io/web-ui/handlers/stremio"
+	"github.com/webtor-io/web-ui/handlers/webdav"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"net/http"
 
@@ -254,6 +255,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Stremio
 	stremio.RegisterHandler(c, r, pg, ats, sapi)
+
+	// Setting WebDAV
+	webdav.RegisterHandler(c, r, pg, ats, sapi)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)
