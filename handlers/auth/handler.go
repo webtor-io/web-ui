@@ -1,9 +1,10 @@
 package auth
 
 import (
+	"net/http"
+
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -42,6 +43,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 	r.GET("/refresh", h.refresh)
 	r.GET("/logout", h.logout)
 	r.GET("/auth/verify", h.verify)
+	r.GET("/auth/callback/google", h.callback)
 }
 
 func (s *Handler) refresh(c *gin.Context) {
@@ -67,4 +69,8 @@ func (s *Handler) verify(c *gin.Context) {
 	s.tb.Build("auth/verify").HTML(http.StatusOK, web.NewContext(c).WithData(&VerifyData{
 		PreAuthSessionId: c.Query("preAuthSessionId"),
 	}))
+}
+
+func (s *Handler) callback(c *gin.Context) {
+	s.tb.Build("auth/callback").HTML(http.StatusOK, web.NewContext(c))
 }

@@ -1,7 +1,7 @@
 import SuperTokens from 'supertokens-web-js';
 import Session from 'supertokens-web-js/recipe/session';
 import Passwordless, { createCode, consumeCode, signOut } from "supertokens-web-js/recipe/passwordless";
-import ThirdParty, { redirectToThirdPartyLogin } from "supertokens-web-js/recipe/thirdparty";
+import ThirdParty, { getAuthorisationURLWithQueryParamsAndSetState, signInAndUp } from "supertokens-web-js/recipe/thirdparty";
 
 function preAPIHook(csrf) {
     return function(context) {
@@ -40,6 +40,15 @@ export async function handleMagicLinkClicked(csrf) {
     });
 }
 
+export async function handleCallback(csrf) {
+    await initSuperTokens(csrf);
+    return await signInAndUp({
+        options: {
+            preAPIHook: preAPIHook(csrf),
+        },
+    });
+}
+
 export async function logout(csrf) {
     await initSuperTokens(csrf);
     return await signOut({
@@ -58,14 +67,17 @@ export async function init(csrf) {
     await initSuperTokens(csrf);
 }
 
-export async function signInWithGoogle(csrf) {
+export async function signInWith(csrf, provider) {
     await initSuperTokens(csrf);
-    return await redirectToThirdPartyLogin({
-        thirdPartyId: "google",
+    const redirectUrl = window._domain + "/auth/callback/" + provider;
+    const authUrl = await getAuthorisationURLWithQueryParamsAndSetState({
+        thirdPartyId: provider,
+        frontendRedirectURI: redirectUrl,
         options: {
             preAPIHook: preAPIHook(csrf),
         },
     });
+    window.location.assign(authUrl);
 }
 
 let inited = false;
