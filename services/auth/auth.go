@@ -307,7 +307,7 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err
 
 	// If not found in passwordless, try third-party
 	tpUserInfo, err := thirdparty.GetUserByID(userID)
-	if err != nil && tpUserInfo != nil && tpUserInfo.Email != "" {
+	if err == nil && tpUserInfo != nil && tpUserInfo.Email != "" {
 		return models.GetOrCreateUser(db, tpUserInfo.Email)
 	}
 	return
