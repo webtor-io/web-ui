@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
-	"net/http"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -32,10 +33,10 @@ import (
 )
 
 const (
-	supertokensHostFlag   = "supertokens-host"
-	supertokensPortFlag   = "supertokens-port"
-	UseFlag               = "use-auth"
-	googleClientIDFlag    = "google-client-id"
+	supertokensHostFlag    = "supertokens-host"
+	supertokensPortFlag    = "supertokens-port"
+	UseFlag                = "use-auth"
+	googleClientIDFlag     = "google-client-id"
 	googleClientSecretFlag = "google-client-secret"
 )
 
@@ -297,19 +298,19 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err
 		return
 	}
 	userID := sess.GetUserID()
-	
+
 	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)
-	if err == nil && userInfo.Email != nil {
+	if err == nil && userInfo != nil && userInfo.Email != nil {
 		return models.GetOrCreateUser(db, *userInfo.Email)
 	}
-	
+
 	// If not found in passwordless, try third-party
 	tpUserInfo, err := thirdparty.GetUserByID(userID)
-	if err != nil {
-		return
+	if err != nil && tpUserInfo != nil && tpUserInfo.Email != "" {
+		return models.GetOrCreateUser(db, tpUserInfo.Email)
 	}
-	return models.GetOrCreateUser(db, tpUserInfo.Email)
+	return
 }
 
 func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.HandlerFunc {
