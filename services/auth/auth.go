@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
-	"net/http"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,8 @@ import (
 	"github.com/supertokens/supertokens-golang/recipe/session"
 	"github.com/supertokens/supertokens-golang/recipe/session/errors"
 	"github.com/supertokens/supertokens-golang/recipe/session/sessmodels"
+	"github.com/supertokens/supertokens-golang/recipe/thirdparty"
+	"github.com/supertokens/supertokens-golang/recipe/thirdparty/tpmodels"
 	"github.com/supertokens/supertokens-golang/recipe/usermetadata"
 	"github.com/supertokens/supertokens-golang/recipe/userroles"
 	"github.com/supertokens/supertokens-golang/supertokens"
@@ -30,9 +33,11 @@ import (
 )
 
 const (
-	supertokensHostFlag = "supertokens-host"
-	supertokensPortFlag = "supertokens-port"
-	UseFlag             = "use-auth"
+	supertokensHostFlag    = "supertokens-host"
+	supertokensPortFlag    = "supertokens-port"
+	UseFlag                = "use-auth"
+	googleClientIDFlag     = "google-client-id"
+	googleClientSecretFlag = "google-client-secret"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -53,18 +58,30 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "use auth",
 			EnvVar: "USE_AUTH",
 		},
+		cli.StringFlag{
+			Name:   googleClientIDFlag,
+			Usage:  "google oauth client id",
+			EnvVar: "GOOGLE_CLIENT_ID",
+		},
+		cli.StringFlag{
+			Name:   googleClientSecretFlag,
+			Usage:  "google oauth client secret",
+			EnvVar: "GOOGLE_CLIENT_SECRET",
+		},
 	)
 }
 
 type Auth struct {
-	url        string
-	smtpUser   string
-	smtpPass   string
-	smtpSecure bool
-	smtpHost   string
-	smtpPort   int
-	domain     string
-	pg         *cs.PG
+	url                string
+	smtpUser           string
+	smtpPass           string
+	smtpSecure         bool
+	smtpHost           string
+	smtpPort           int
+	domain             string
+	pg                 *cs.PG
+	googleClientID     string
+	googleClientSecret string
 }
 
 func New(c *cli.Context, pg *cs.PG) *Auth {
@@ -72,14 +89,16 @@ func New(c *cli.Context, pg *cs.PG) *Auth {
 		return nil
 	}
 	return &Auth{
-		url:        c.String(supertokensHostFlag) + ":" + c.String(supertokensPortFlag),
-		smtpUser:   c.String(sv.SMTPUserFlag),
-		smtpPass:   c.String(sv.SMTPPassFlag),
-		smtpHost:   c.String(sv.SMTPHostFlag),
-		smtpSecure: c.BoolT(sv.SMTPSecureFlag),
-		smtpPort:   c.Int(sv.SMTPPortFlag),
-		domain:     c.String(sv.DomainFlag),
-		pg:         pg,
+		url:                c.String(supertokensHostFlag) + ":" + c.String(supertokensPortFlag),
+		smtpUser:           c.String(sv.SMTPUserFlag),
+		smtpPass:           c.String(sv.SMTPPassFlag),
+		smtpHost:           c.String(sv.SMTPHostFlag),
+		smtpSecure:         c.BoolT(sv.SMTPSecureFlag),
+		smtpPort:           c.Int(sv.SMTPPortFlag),
+		domain:             c.String(sv.DomainFlag),
+		pg:                 pg,
+		googleClientID:     c.String(googleClientIDFlag),
+		googleClientSecret: c.String(googleClientSecretFlag),
 	}
 }
 
@@ -146,6 +165,23 @@ func (s *Auth) Init() error {
 							return originalImplementation
 						},
 					}),
+				},
+			}),
+			thirdparty.Init(&tpmodels.TypeInput{
+				SignInAndUpFeature: tpmodels.TypeInputSignInAndUp{
+					Providers: []tpmodels.ProviderInput{
+						{
+							Config: tpmodels.ProviderConfig{
+								ThirdPartyId: "google",
+								Clients: []tpmodels.ProviderClientConfig{
+									{
+										ClientID:     s.googleClientID,
+										ClientSecret: s.googleClientSecret,
+									},
+								},
+							},
+						},
+					},
 				},
 			}),
 			session.Init(nil), // initializes session features
@@ -262,11 +298,19 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err
 		return
 	}
 	userID := sess.GetUserID()
+
+	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)
-	if err != nil {
-		return
+	if err == nil && userInfo != nil && userInfo.Email != nil {
+		return models.GetOrCreateUser(db, *userInfo.Email)
 	}
-	return models.GetOrCreateUser(db, *userInfo.Email)
+
+	// If not found in passwordless, try third-party
+	tpUserInfo, err := thirdparty.GetUserByID(userID)
+	if err != nil && tpUserInfo != nil && tpUserInfo.Email != "" {
+		return models.GetOrCreateUser(db, tpUserInfo.Email)
+	}
+	return
 }
 
 func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.HandlerFunc {
