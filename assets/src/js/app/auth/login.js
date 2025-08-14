@@ -31,7 +31,7 @@ window.signInWith = function(e, provider) {
         const initProgressLog = (await import('../../lib/progressLog')).initProgressLog;
         const pl = initProgressLog(document.querySelector('.progress-alert'));
         pl.clear();
-        const progressEntry = pl.inProgress('login',`redirecting to ${provider}...`);
+        const progressEntry = pl.inProgress('login',`redirecting to ${provider}`);
         const supertokens = (await import('../../lib/supertokens'));
         try {
             await supertokens.signInWith(window._CSRF, provider);

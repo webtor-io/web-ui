@@ -1,34 +1,70 @@
 package models
 
 import (
+	"time"
+
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
-	"time"
 
 	uuid "github.com/satori/go.uuid"
 )
 
 type User struct {
-	tableName struct{}  `pg:"user"`
-	UserID    uuid.UUID `pg:"user_id,pk"`
-	Email     string
-	Password  string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	tableName     struct{}  `pg:"user"`
+	UserID        uuid.UUID `pg:"user_id,pk"`
+	Email         string
+	Password      string
+	PatreonUserID *string `pg:"patreon_user_id"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
-func GetOrCreateUser(db *pg.DB, email string) (*User, error) {
+// GetOrCreateUser finds or creates a user.
+// If patreonID is provided (non-nil), it first looks up by patreon_member_id.
+// - If found, it updates the email if different and returns the user.
+// If not found (or patreonID is nil), it falls back to lookup by email.
+// - If an email user is found and patreonID is provided but missing on the record, it links it.
+// - Otherwise, it creates a new user with provided email (and patreonID if given).
+func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, error) {
 	user := &User{}
+
+	// 1) If patreonUserID provided, try to find by patreon_member_id
+	if patreonUserID != nil {
+		err := db.Model(user).Where("patreon_user_id = ?", patreonUserID).Limit(1).Select()
+		if err == nil {
+			// Update email if it differs
+			if user.Email != email && email != "" {
+				user.Email = email
+				if _, uerr := db.Model(user).Column("email").WherePK().Update(); uerr != nil {
+					return nil, uerr
+				}
+			}
+			return user, nil
+		}
+		if !errors.Is(err, pg.ErrNoRows) {
+			return nil, err
+		}
+	}
+
+	// 2) Fallback: find by email
 	err := db.Model(user).Where("email = ?", email).Limit(1).Select()
 	if err == nil {
-		return user, nil // Found
+		// Link patreonUserID if provided and not already set
+		if patreonUserID != nil && (user.PatreonUserID == nil || *user.PatreonUserID != *patreonUserID) {
+			user.PatreonUserID = patreonUserID
+			if _, uerr := db.Model(user).Column("patreon_user_id").WherePK().Update(); uerr != nil {
+				return nil, uerr
+			}
+		}
+		return user, nil
 	}
 	if !errors.Is(err, pg.ErrNoRows) {
 		return nil, err // DB error
 	}
 
-	// Create new user
+	// 3) Create new user
 	user.Email = email
+	user.PatreonUserID = patreonUserID
 	_, err = db.Model(user).Insert()
 	if err != nil {
 		return nil, err

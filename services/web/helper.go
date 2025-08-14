@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/webtor-io/web-ui/handlers/static"
-	"github.com/webtor-io/web-ui/services/abuse_store"
 	"html/template"
 	"io"
 	"math/rand/v2"
@@ -15,6 +13,9 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/webtor-io/web-ui/handlers/static"
+	"github.com/webtor-io/web-ui/services/abuse_store"
 
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
@@ -242,4 +243,14 @@ func (s *Helper) Now() time.Time {
 
 func (s *Helper) Float1(f float64) string {
 	return fmt.Sprintf("%.1f", f)
+}
+
+func (s *Helper) ProfileName(u *auth.User) string {
+	if u == nil ||
+		strings.HasSuffix(u.Email, "@privaterelay.appleid.com") ||
+		u.Email == "" {
+		return "your profile"
+	}
+	return u.Email
+
 }

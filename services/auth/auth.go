@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -33,11 +35,13 @@ import (
 )
 
 const (
-	supertokensHostFlag    = "supertokens-host"
-	supertokensPortFlag    = "supertokens-port"
-	UseFlag                = "use-auth"
-	googleClientIDFlag     = "google-client-id"
-	googleClientSecretFlag = "google-client-secret"
+	supertokensHostFlag     = "supertokens-host"
+	supertokensPortFlag     = "supertokens-port"
+	UseFlag                 = "use-auth"
+	googleClientIDFlag      = "google-client-id"
+	googleClientSecretFlag  = "google-client-secret"
+	patreonClientIDFlag     = "patreon-client-id"
+	patreonClientSecretFlag = "patreon-client-secret"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -68,37 +72,53 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "google oauth client secret",
 			EnvVar: "GOOGLE_CLIENT_SECRET",
 		},
+		cli.StringFlag{
+			Name:   patreonClientIDFlag,
+			Usage:  "patreon oauth client id",
+			EnvVar: "PATREON_CLIENT_ID",
+		},
+		cli.StringFlag{
+			Name:   patreonClientSecretFlag,
+			Usage:  "patreon oauth client secret",
+			EnvVar: "PATREON_CLIENT_SECRET",
+		},
 	)
 }
 
 type Auth struct {
-	url                string
-	smtpUser           string
-	smtpPass           string
-	smtpSecure         bool
-	smtpHost           string
-	smtpPort           int
-	domain             string
-	pg                 *cs.PG
-	googleClientID     string
-	googleClientSecret string
+	url                 string
+	smtpUser            string
+	smtpPass            string
+	smtpSecure          bool
+	smtpHost            string
+	smtpPort            int
+	domain              string
+	cl                  *http.Client
+	pg                  *cs.PG
+	googleClientID      string
+	googleClientSecret  string
+	patreonClientID     string
+	patreonClientSecret string
 }
 
-func New(c *cli.Context, pg *cs.PG) *Auth {
+func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 	if !c.Bool(UseFlag) {
 		return nil
 	}
 	return &Auth{
-		url:                c.String(supertokensHostFlag) + ":" + c.String(supertokensPortFlag),
-		smtpUser:           c.String(sv.SMTPUserFlag),
-		smtpPass:           c.String(sv.SMTPPassFlag),
-		smtpHost:           c.String(sv.SMTPHostFlag),
-		smtpSecure:         c.BoolT(sv.SMTPSecureFlag),
-		smtpPort:           c.Int(sv.SMTPPortFlag),
-		domain:             c.String(sv.DomainFlag),
-		pg:                 pg,
-		googleClientID:     c.String(googleClientIDFlag),
-		googleClientSecret: c.String(googleClientSecretFlag),
+		url:                 c.String(supertokensHostFlag) + ":" + c.String(supertokensPortFlag),
+		smtpUser:            c.String(sv.SMTPUserFlag),
+		smtpPass:            c.String(sv.SMTPPassFlag),
+		smtpHost:            c.String(sv.SMTPHostFlag),
+		smtpSecure:          c.BoolT(sv.SMTPSecureFlag),
+		smtpPort:            c.Int(sv.SMTPPortFlag),
+		domain:              c.String(sv.DomainFlag),
+		cl:                  cl,
+		pg:                  pg,
+		googleClientID:      c.String(googleClientIDFlag),
+		googleClientSecret:  c.String(googleClientSecretFlag),
+		patreonClientID:     c.String(patreonClientIDFlag),
+		patreonClientSecret: c.String(patreonClientSecretFlag),
 	}
 }
 
@@ -181,6 +201,64 @@ func (s *Auth) Init() error {
 								},
 							},
 						},
+						{
+							Config: tpmodels.ProviderConfig{
+								ThirdPartyId:          "patreon",
+								AuthorizationEndpoint: "https://www.patreon.com/oauth2/authorize",
+								TokenEndpoint:         "https://www.patreon.com/api/oauth2/token",
+								TokenEndpointBodyParams: map[string]interface{}{
+									"grant_type":    "authorization_code",
+									"client_id":     s.patreonClientID,
+									"client_secret": s.patreonClientSecret,
+								},
+								Clients: []tpmodels.ProviderClientConfig{
+									{
+										ClientID:     s.patreonClientID,
+										ClientSecret: s.patreonClientSecret,
+										Scope:        []string{"identity", "identity[email]"},
+									},
+								},
+							},
+							Override: func(originalImplementation *tpmodels.TypeProvider) *tpmodels.TypeProvider {
+								originalImplementation.GetUserInfo = func(oAuthTokens map[string]interface{}, userContext *map[string]interface{}) (tpmodels.TypeUserInfo, error) {
+									accessToken := oAuthTokens["access_token"].(string)
+									identityURL := "https://www.patreon.com/api/oauth2/v2/identity?fields[user]=email"
+									req, err := http.NewRequest("GET", identityURL, nil)
+									req.Header.Set("Authorization", "Bearer "+accessToken)
+									req.Header.Set("Content-Type", "application/json")
+									if err != nil {
+										return tpmodels.TypeUserInfo{}, err
+									}
+									res, err := s.cl.Do(req)
+									if err != nil {
+										return tpmodels.TypeUserInfo{}, err
+									}
+									defer func(Body io.ReadCloser) {
+										_ = Body.Close()
+									}(res.Body)
+									body, err := io.ReadAll(res.Body)
+									if err != nil {
+										return tpmodels.TypeUserInfo{}, err
+									}
+									var data PatreonIdentityResponse
+									err = json.Unmarshal(body, &data)
+									if err != nil {
+										return tpmodels.TypeUserInfo{}, err
+									}
+									return tpmodels.TypeUserInfo{
+										ThirdPartyUserId: data.Data.ID,
+										Email: &tpmodels.EmailStruct{
+											ID:         data.Data.Attributes.Email,
+											IsVerified: true,
+										},
+										RawUserInfoFromProvider: tpmodels.TypeRawUserInfoFromProvider{
+											FromUserInfoAPI: map[string]interface{}{},
+										},
+									}, nil
+								}
+								return originalImplementation
+							},
+						},
 					},
 				},
 			}),
@@ -193,10 +271,11 @@ func (s *Auth) Init() error {
 }
 
 type User struct {
-	ID       uuid.UUID
-	Email    string
-	Expired  bool
-	HasToken bool
+	ID            uuid.UUID
+	Email         string
+	Expired       bool
+	HasToken      bool
+	PatreonUserID *string
 }
 
 func (s *User) HasAuth() bool {
@@ -212,6 +291,7 @@ func GetUserFromContext(c *gin.Context) *User {
 		if ok {
 			u.ID = su.UserID
 			u.Email = su.Email
+			u.PatreonUserID = su.PatreonUserID
 		}
 		return u
 	}
@@ -221,6 +301,7 @@ func GetUserFromContext(c *gin.Context) *User {
 		if ok {
 			u.ID = su.UserID
 			u.Email = su.Email
+			u.PatreonUserID = su.PatreonUserID
 		}
 	}
 	if err := c.Request.Context().Value(ErrorContext{}); err != nil {
@@ -302,13 +383,17 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err
 	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)
 	if err == nil && userInfo != nil && userInfo.Email != nil {
-		return models.GetOrCreateUser(db, *userInfo.Email)
+		return models.GetOrCreateUser(db, *userInfo.Email, nil)
 	}
 
 	// If not found in passwordless, try third-party
 	tpUserInfo, err := thirdparty.GetUserByID(userID)
 	if err == nil && tpUserInfo != nil && tpUserInfo.Email != "" {
-		return models.GetOrCreateUser(db, tpUserInfo.Email)
+		var patreonUserID *string = nil
+		if tpUserInfo.ThirdParty.ID == "patreon" {
+			patreonUserID = &tpUserInfo.ThirdParty.UserID
+		}
+		return models.GetOrCreateUser(db, tpUserInfo.Email, patreonUserID)
 	}
 	return
 }

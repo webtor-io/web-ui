@@ -1,11 +1,12 @@
 package main
 
 import (
+	"net/http"
+
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/instructions"
 	"github.com/webtor-io/web-ui/handlers/stremio"
 	at "github.com/webtor-io/web-ui/services/access_token"
-	"net/http"
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	"github.com/webtor-io/web-ui/handlers/donate"
@@ -137,7 +138,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting Auth
-	a := auth.New(c, pg)
+	a := auth.New(c, cl, pg)
 
 	if a != nil {
 		err := a.Init()
