@@ -1,9 +1,10 @@
 package embed
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
-	"time"
 
 	"github.com/go-pg/pg/v10"
 	cs "github.com/webtor-io/common-services"
@@ -47,7 +48,10 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		cl, err := s.claims.Get(em.User.Email)
+		cl, err := s.claims.Get(&claims.Request{
+			Email:         em.User.Email,
+			PatreonUserID: em.User.PatreonUserID,
+		})
 		if err != nil {
 			return nil, err
 		}

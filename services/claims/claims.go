@@ -2,11 +2,12 @@ package claims
 
 import (
 	"context"
-	"github.com/pkg/errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/lazymap"
 
@@ -48,8 +49,15 @@ func New(c *cli.Context, cl *Client) *Claims {
 	}
 }
 
-func (s *Claims) Get(email string) (*Data, error) {
-	return s.LazyMap.Get(email, func() (resp *Data, err error) {
+type Request struct {
+	Email         string
+	PatreonUserID *string
+}
+
+func (s *Claims) Get(r *Request) (*Data, error) {
+	// prefer cache key by patreonID if available, otherwise by email
+	key := fmt.Sprintf("email:%v;patreonid:%v", r.Email, r.PatreonUserID)
+	return s.LazyMap.Get(key, func() (resp *Data, err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		var cl proto.ClaimsProviderClient
@@ -57,7 +65,11 @@ func (s *Claims) Get(email string) (*Data, error) {
 		if err != nil {
 			return nil, err
 		}
-		resp, err = cl.Get(ctx, &proto.GetRequest{Email: email})
+		var patreonUserID string
+		if r.PatreonUserID != nil {
+			patreonUserID = *r.PatreonUserID
+		}
+		resp, err = cl.Get(ctx, &proto.GetRequest{Email: r.Email, PatreonUserId: patreonUserID})
 		if err != nil {
 			return nil, errors.WithMessage(err, "failed to get claims")
 		}
@@ -67,7 +79,10 @@ func (s *Claims) Get(email string) (*Data, error) {
 
 func (s *Claims) MakeUserClaimsFromContext(c *gin.Context) (*Data, error) {
 	u := auth.GetUserFromContext(c)
-	r, err := s.Get(u.Email)
+	r, err := s.Get(&Request{
+		Email:         u.Email,
+		PatreonUserID: u.PatreonUserID,
+	})
 	if _, err := c.Cookie("test-ads"); err == nil {
 		r.Claims.Site.NoAds = false
 	} else if c.Query("test-ads") != "" {

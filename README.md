@@ -24,6 +24,8 @@ Some features to mention:
 - [x] Authentication
   - [x] Passwordless authentication
   - [x] Patreon account linking
+  - [x] Google authentication
+  - [x] Patreon authentication
 - [x] Ads and statistic integration support
 - [x] Tools
   - [x] Torrent => DDL
@@ -42,9 +44,14 @@ Some features to mention:
   - [x] Torrents
   - [x] Movies
   - [x] Series
-- [ ] Integrations 
-  - [ ] Stremio
-
+- [x] Content enrichment
+    - [x] OMDB
+    - [x] Kinopoisk unofficial
+    - [ ] AI-powered
+- [x] Integrations 
+  - [x] Stremio
+  - [ ] WebDAV
+  - [ ] Torznab
 
 ## Setting up connection to Webtor RestAPI
 
