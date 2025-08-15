@@ -249,7 +249,7 @@ func (s *Helper) ProfileName(u *auth.User) string {
 	if u == nil ||
 		strings.HasSuffix(u.Email, "@privaterelay.appleid.com") ||
 		u.Email == "" {
-		return "your profile"
+		return "profile"
 	}
 	return u.Email
 
