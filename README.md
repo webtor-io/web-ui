@@ -50,7 +50,7 @@ Some features to mention:
     - [ ] AI-powered
 - [x] Integrations 
   - [x] Stremio
-  - [ ] WebDAV
+  - [x] WebDAV
   - [ ] Torznab
 
 ## Setting up connection to Webtor RestAPI
