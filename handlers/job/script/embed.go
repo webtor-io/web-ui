@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"github.com/pkg/errors"
-	models2 "github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/embed"
-	"github.com/webtor-io/web-ui/services/web"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	models2 "github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/embed"
+	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
@@ -120,7 +121,7 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 		file = parts[len(parts)-1]
 		pwd = strings.Join(parts[:len(parts)-1], "/")
 	}
-	l, err := s.api.ListResourceContent(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+	l, err := s.api.ListResourceContentCached(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 		Path:   pwd,
 		Output: api.OutputTree,
 	})
@@ -130,7 +131,7 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 	if len(l.Items) == 1 && l.Items[0].Type == ra.ListTypeDirectory {
 		apiCtx2, apiCancel2 := context.WithTimeout(ctx, 10*time.Second)
 		defer apiCancel2()
-		l, err = s.api.ListResourceContent(apiCtx2, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+		l, err = s.api.ListResourceContentCached(apiCtx2, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 			Path:   l.Items[0].PathStr,
 			Output: api.OutputTree,
 		})

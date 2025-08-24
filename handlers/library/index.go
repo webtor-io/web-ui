@@ -2,6 +2,9 @@ package library
 
 import (
 	"context"
+	"net/http"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
@@ -10,8 +13,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
-	"net/http"
-	"strconv"
 )
 
 type IndexData struct {

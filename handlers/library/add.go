@@ -1,6 +1,10 @@
 package library
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -8,8 +12,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
-	"io"
-	"net/http"
 )
 
 func (s *Handler) add(c *gin.Context) {
@@ -31,10 +33,14 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, 
 	clms := api.GetClaimsFromContext(c)
 	ctx := c.Request.Context()
 	rID, _ := c.GetPostForm("resource_id")
-	body, err := s.api.GetTorrent(ctx, clms, rID)
+	t, err := s.api.GetTorrentCached(ctx, clms, rID)
 	if err != nil {
 		return
 	}
+	body := io.NopCloser(bytes.NewReader(t))
+	defer func(body io.ReadCloser) {
+		_ = body.Close()
+	}(body)
 	mi, err := metainfo.Load(body)
 	if err != nil {
 		return
@@ -47,12 +53,10 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, 
 	if db == nil {
 		return errors.New("no db"), id
 	}
-	err = models.AddTorrentToLibrary(db, u.ID, rID, info)
+	_, err = models.AddTorrentToLibrary(ctx, db, u.ID, rID, &info, "", int64(len(t)))
 	if err != nil {
 		return
 	}
-	defer func(body io.ReadCloser) {
-		_ = body.Close()
-	}(body)
+
 	return nil, rID
 }

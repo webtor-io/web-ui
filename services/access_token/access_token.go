@@ -3,15 +3,17 @@ package access_token
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/auth"
-	"net/http"
-	"strings"
+	common2 "github.com/webtor-io/web-ui/services/common"
 )
 
 type AccessToken struct {
@@ -51,14 +53,9 @@ func (s *AccessToken) GetTokenByName(c *gin.Context, name string) (*models.Acces
 type TokenScope struct{}
 
 func (s *AccessToken) RegisterHandler(r *gin.Engine) {
-	prefix := fmt.Sprintf("/%s/", services.AccessTokenParamName)
-	r.Use(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if !strings.HasPrefix(path, prefix) {
-			c.Next()
-			return
-		}
-		parts := strings.SplitN(strings.TrimPrefix(path, prefix), "/", 2)
+	prefix := fmt.Sprintf("/%s/", common2.AccessTokenParamName)
+	r.Match(common.AnyMethods, prefix+"*rest", func(c *gin.Context) {
+		parts := strings.SplitN(strings.TrimPrefix(c.Param("rest"), "/"), "/", 2)
 		if len(parts) < 2 {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
@@ -68,18 +65,19 @@ func (s *AccessToken) RegisterHandler(r *gin.Engine) {
 		rest := "/" + parts[1]
 
 		query := c.Request.URL.Query()
-		query.Set(services.AccessTokenParamName, token)
+		query.Set(common2.AccessTokenParamName, token)
 		c.Request.URL.RawQuery = query.Encode()
 		c.Request.URL.Path = rest
+		c.Request.URL.RawPath = common2.EscapePath(rest)
 		c.Abort()
 		r.HandleContext(c)
 	})
 	r.Use(func(c *gin.Context) {
-		if c.Query(services.AccessTokenParamName) == "" {
+		if c.Query(common2.AccessTokenParamName) == "" {
 			c.Next()
 			return
 		}
-		at, err := s.getToken(c.Query(services.AccessTokenParamName))
+		at, err := s.getToken(c.Query(common2.AccessTokenParamName))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -107,11 +105,11 @@ func (s *AccessToken) getToken(tokenStr string) (*models.AccessToken, error) {
 
 func (s *AccessToken) HasScope(scopes ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Query(services.AccessTokenParamName) == "" {
+		if c.Query(common2.AccessTokenParamName) == "" {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
-		at, err := s.getToken(c.Query(services.AccessTokenParamName))
+		at, err := s.getToken(c.Query(common2.AccessTokenParamName))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return

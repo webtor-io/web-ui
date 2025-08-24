@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/web"
 	"strings"
 	"time"
 
-	"github.com/webtor-io/web-ui/services"
+	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/web"
+
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
 
@@ -66,7 +67,7 @@ func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (re
 
 func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (res *ra.ResourceResponse, err error) {
 	j.InProgress("checking magnet")
-	sha1Hash := services.SHA1R.Find([]byte(query))
+	sha1Hash := common.SHA1R.Find([]byte(query))
 	if sha1Hash == nil {
 		return nil, errors.Wrap(err, "wrong resource provided")
 	}

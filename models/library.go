@@ -2,11 +2,12 @@ package models
 
 import (
 	"context"
+	"time"
+
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
-	"time"
 )
 
 type SortType int
@@ -42,10 +43,12 @@ type Library struct {
 
 	Torrent   *TorrentResource `pg:"rel:has-one,fk:resource_id"`
 	MediaInfo *MediaInfo       `pg:"rel:has-one,fk:resource_id"`
+	Name      string
 }
 
-func IsInLibrary(db *pg.DB, uID uuid.UUID, resourceID string) (bool, error) {
+func IsInLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, resourceID string) (bool, error) {
 	exists, err := db.Model((*Library)(nil)).
+		Context(ctx).
 		Where("user_id = ? AND resource_id = ?", uID, resourceID).
 		Exists()
 	if err != nil {
@@ -54,7 +57,44 @@ func IsInLibrary(db *pg.DB, uID uuid.UUID, resourceID string) (bool, error) {
 	return exists, nil
 }
 
-func AddTorrentToLibrary(db *pg.DB, uID uuid.UUID, resourceID string, info metainfo.Info) error {
+func GetLibraryByName(ctx context.Context, db *pg.DB, uID uuid.UUID, name string) (*Library, error) {
+	var lib Library
+	err := db.Model(&lib).
+		Context(ctx).
+		Where("library.user_id = ?", uID).
+		Where("library.name = ?", name).
+		Relation("Torrent").
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch library torrent by name")
+	}
+	return &lib, nil
+}
+
+func GetLibraryByTorrentName(ctx context.Context, db *pg.DB, uID uuid.UUID, name string) (*Library, error) {
+	var lib Library
+	err := db.Model(&lib).
+		Context(ctx).
+		Join("join torrent_resource as t on t.resource_id = library.resource_id").
+		Where("library.user_id = ?", uID).
+		Where("t.name = ?", name).
+		Relation("Torrent").
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch library torrent by name")
+	}
+	return &lib, nil
+}
+
+func AddTorrentToLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, resourceID string, info *metainfo.Info, displayName string, torrentSize int64) (*Library, error) {
 	name := info.NameUtf8
 	if name == "" {
 		name = info.Name
@@ -66,43 +106,57 @@ func AddTorrentToLibrary(db *pg.DB, uID uuid.UUID, resourceID string, info metai
 	}
 
 	torrent := &TorrentResource{
-		ResourceID: resourceID,
-		Name:       name,
-		FileCount:  filesCount,
-		SizeBytes:  info.TotalLength(),
+		ResourceID:       resourceID,
+		Name:             name,
+		FileCount:        filesCount,
+		SizeBytes:        info.TotalLength(),
+		TorrentSizeBytes: torrentSize,
 	}
 
 	_, err := db.Model(torrent).
+		Context(ctx).
 		OnConflict("DO NOTHING").
 		Insert()
 	if err != nil {
-		return errors.Wrap(err, "failed to insert torrent resource")
+		return nil, errors.Wrap(err, "failed to insert torrent resource")
+	}
+
+	if displayName == "" {
+		displayName = name
 	}
 
 	lib := &Library{
 		UserID:     uID,
 		ResourceID: resourceID,
 		CreatedAt:  time.Now(),
+		Name:       displayName,
 	}
 
 	_, err = db.Model(lib).
+		Context(ctx).
 		OnConflict("DO NOTHING").
 		Insert()
 	if err != nil {
-		return errors.Wrap(err, "failed to insert library entry")
+		return nil, errors.Wrap(err, "failed to insert library entry")
 	}
 
-	return nil
+	return lib, nil
 }
 
-func RemoveFromLibrary(db *pg.DB, uID uuid.UUID, rID string) error {
+func RemoveFromLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, rID string) error {
 	_, err := db.Model((*Library)(nil)).
+		Context(ctx).
 		Where("user_id = ? AND resource_id = ?", uID, rID).
 		Delete()
 	if err != nil {
 		return errors.Wrap(err, "failed to remove from library")
 	}
 	return nil
+}
+
+func UpdateLibraryName(ctx context.Context, db *pg.DB, l *Library) error {
+	_, err := db.Model(l).Context(ctx).WherePK().Column("name").Update()
+	return err
 }
 
 func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
@@ -165,6 +219,60 @@ func GetMoviesByVideoID(ctx context.Context, db *pg.DB, uID uuid.UUID, videoID s
 	err := query.Select()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch movie list")
+	}
+
+	return list, nil
+}
+
+func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
+	var list []*Library
+
+	query := db.Model(&list).
+		Context(ctx).
+		Join("join movie as m").
+		JoinOn("m.resource_id = library.resource_id").
+		Where("library.user_id = ?", uID).
+		Relation("Torrent")
+
+	switch sort {
+	case SortTypeName:
+		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
+	case SortTypeRecentlyAdded:
+		fallthrough
+	default:
+		query.OrderExpr("library.created_at DESC")
+	}
+
+	err := query.Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch movie torrent list")
+	}
+
+	return list, nil
+}
+
+func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
+	var list []*Library
+
+	query := db.Model(&list).
+		Context(ctx).
+		Join("join series as s").
+		JoinOn("s.resource_id = library.resource_id").
+		Where("library.user_id = ?", uID).
+		Relation("Torrent")
+
+	switch sort {
+	case SortTypeName:
+		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
+	case SortTypeRecentlyAdded:
+		fallthrough
+	default:
+		query.OrderExpr("library.created_at DESC")
+	}
+
+	err := query.Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch movie torrent list")
 	}
 
 	return list, nil

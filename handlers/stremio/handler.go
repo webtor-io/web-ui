@@ -3,6 +3,10 @@ package stremio
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -14,9 +18,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 const catalogID = "Webtor.io"
@@ -393,7 +394,7 @@ func (s *Handler) retrieveTorrentItem(ctx context.Context, hash string, claims *
 	limit := uint(100)
 	offset := uint(0)
 	for {
-		resp, err := s.sapi.ListResourceContent(ctx, claims, hash, &api.ListResourceContentArgs{
+		resp, err := s.sapi.ListResourceContentCached(ctx, claims, hash, &api.ListResourceContentArgs{
 			Limit:  limit,
 			Offset: offset,
 		})

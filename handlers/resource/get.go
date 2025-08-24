@@ -2,18 +2,19 @@ package resource
 
 import (
 	"context"
-	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
 
+	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
+	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/web"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	ra "github.com/webtor-io/rest-api/services"
-	sv "github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/api"
 )
 
@@ -64,7 +65,7 @@ func (s *Handler) bindGetArgs(c *gin.Context) (*GetArgs, error) {
 func (s *Handler) getList(ctx context.Context, args *GetArgs) (l *ra.ListResponse, err error) {
 	limit := args.PageSize
 	offset := (args.Page - 1) * args.PageSize
-	l, err = s.api.ListResourceContent(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
+	l, err = s.api.ListResourceContentCached(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
 		Output: api.OutputTree,
 		Path:   args.PWD,
 		Limit:  limit,
@@ -132,7 +133,7 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		if db == nil {
 			return nil, errors.New("failed to connect to database")
 		}
-		d.Resource.InLibrary, err = models.IsInLibrary(db, args.User.ID, d.Resource.ID)
+		d.Resource.InLibrary, err = models.IsInLibrary(ctx, db, args.User.ID, d.Resource.ID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if resource is in-library")
 		}
@@ -170,7 +171,7 @@ func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *Get
 				return
 			}
 		}
-		l, err = s.api.ListResourceContent(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
+		l, err = s.api.ListResourceContentCached(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
 			Path: args.File,
 		})
 		if err != nil {
