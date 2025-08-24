@@ -1,0 +1,1 @@
+ALTER TABLE url_alias ADD COLUMN proxy BOOLEAN NOT NULL DEFAULT false;

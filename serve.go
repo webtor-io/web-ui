@@ -3,18 +3,15 @@ package main
 import (
 	"net/http"
 
-	wau "github.com/webtor-io/web-ui/handlers/auth"
-	"github.com/webtor-io/web-ui/handlers/instructions"
-	"github.com/webtor-io/web-ui/handlers/stremio"
-	at "github.com/webtor-io/web-ui/services/access_token"
-
 	wa "github.com/webtor-io/web-ui/handlers/action"
+	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
 	"github.com/webtor-io/web-ui/handlers/ext"
 	"github.com/webtor-io/web-ui/handlers/geo"
 	wi "github.com/webtor-io/web-ui/handlers/index"
+	"github.com/webtor-io/web-ui/handlers/instructions"
 	wj "github.com/webtor-io/web-ui/handlers/job"
 	"github.com/webtor-io/web-ui/handlers/legal"
 	"github.com/webtor-io/web-ui/handlers/library"
@@ -23,9 +20,13 @@ import (
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	sta "github.com/webtor-io/web-ui/handlers/static"
+	"github.com/webtor-io/web-ui/handlers/stremio"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	"github.com/webtor-io/web-ui/handlers/webdav"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
+	at "github.com/webtor-io/web-ui/services/access_token"
+	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -39,7 +40,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
-	"github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
@@ -63,7 +63,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterS3ClientFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
 	c.Flags = w.RegisterFlags(c.Flags)
-	c.Flags = services.RegisterFlags(c.Flags)
+	c.Flags = common.RegisterFlags(c.Flags)
 	c.Flags = auth.RegisterFlags(c.Flags)
 	c.Flags = claims.RegisterFlags(c.Flags)
 	c.Flags = claims.RegisterClientFlags(c.Flags)
@@ -87,8 +87,7 @@ func serve(c *cli.Context) error {
 	defer pg.Close()
 
 	// Setting Migrations
-	m := cs.NewPGMigration(pg)
-	err := m.Run()
+	err := pgMigrate(c)
 	if err != nil {
 		return err
 	}
@@ -118,6 +117,7 @@ func serve(c *cli.Context) error {
 	}
 	// Setting Gin
 	r := gin.Default()
+	r.RedirectTrailingSlash = false
 	r.HTMLRender = re
 
 	// Setting Web
@@ -129,10 +129,15 @@ func serve(c *cli.Context) error {
 	defer web.Close()
 
 	// Setting URL Alias
-	ual := ua.New(pg)
+	ual := ua.New(pg, r)
 	ual.RegisterHandler(r)
 
-	err = sess.RegisterHandler(c, r)
+	err = sess.RegisterHandler(c, r, []string{
+		"/auth/dashboard",
+		"/s/",
+		"/token/",
+		"/webdav/",
+	})
 	if err != nil {
 		return err
 	}
@@ -255,6 +260,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Stremio
 	stremio.RegisterHandler(c, r, pg, ats, sapi)
+
+	// Setting WebDAV
+	webdav.RegisterHandler(r, pg, ats, sapi, jobs)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

@@ -1,16 +1,17 @@
 package resource
 
 import (
-	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/handlers/job/script"
-	"github.com/webtor-io/web-ui/services/web"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/handlers/job/script"
+	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/web"
+
 	"github.com/gin-gonic/gin"
-	sv "github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
 )

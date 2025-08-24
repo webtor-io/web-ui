@@ -1,0 +1,38 @@
+{{ define "title" }}
+    WebDAV Integration
+{{ end }}
+{{ define "main" }}
+    <div class="prose mx-auto max-w-2xl mt-10 px-4">
+        <h1 class="text-accent text-3xl font-bold mb-6">How to connect Webtor via WebDAV</h1>
+
+        <p>Access your torrent library just like a regular folder. With WebDAV, you can browse, stream, and manage your files directly from your favorite apps.</p>
+
+        <ol class="list-decimal list-inside mt-4 space-y-2">
+            <li>Copy your personal WebDAV URL from your <a href="/profile" class="link">Webtor profile</a>.</li>
+            <li>Install a WebDAV client on your device (see recommendations below).</li>
+            <li>Connect using your WebDAV URL and start browsing your library.</li>
+        </ol>
+
+        <p class="mt-6">Choose the best client for your platform:</p>
+
+        <ul class="list-none mt-4 space-y-3">
+            <li><strong>💻 Windows:</strong> <a href="https://www.raidrive.com/" class="link" target="_blank">RaiDrive</a> (free for personal use) /  <a href="https://mountainduck.io/" class="link" target="_blank">Mountain Duck</a></li>
+            <li><strong>🍏 macOS:</strong> <a href="https://mountainduck.io/" class="link" target="_blank">Mountain Duck</a></li>
+            <li><strong>📱 Mobile:</strong> Owlfiles <a href="https://apps.apple.com/ru/app/owlfiles-file-manager/id510282524" class="link" target="_blank">iOS</a> / <a href="https://play.google.com/store/apps/details?id=com.skyjos.apps.fileexplorerfree" class="link" target="_blank">Android</a></li>
+            <li><strong>🖥️ Advanced:</strong> <a href="https://rclone.org/" class="link" target="_blank">rclone</a> CLI tool with VFS caching support</li>
+        </ul>
+
+        <p class="mt-6">Your WebDAV folders:</p>
+
+        <ul class="list-none mt-4 space-y-3">
+            <li><strong>torrents/</strong> – Add or remove torrents (writable)</li>
+            <li><strong>all/</strong> – Full content browsing (read-only)</li>
+            <li><strong>movies/</strong> – All recognized movies (read-only)</li>
+            <li><strong>series/</strong> – TV shows and episodes (read-only)</li>
+        </ul>
+
+        <div class="alert mt-6">
+            <span>⚠️ Note: WebDAV access is only available for <strong>paid users</strong>.</span>
+        </div>
+    </div>
+{{ end }}

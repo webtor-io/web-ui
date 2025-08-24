@@ -2,12 +2,13 @@ package profile
 
 import (
 	"fmt"
-	"github.com/webtor-io/web-ui/services"
+	"net/http"
+
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/common"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	"github.com/webtor-io/web-ui/services/web"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/services/template"
@@ -15,6 +16,7 @@ import (
 
 type Data struct {
 	StremioAddonURL string
+	WebDAVURL       string
 }
 
 type Handler struct {
@@ -37,14 +39,28 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	if at == nil {
 		return "", err
 	}
-	url := fmt.Sprintf("/%s/%s/stremio/", services.AccessTokenParamName, at.Token)
+	url := fmt.Sprintf("/%s/%s/stremio/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(url)
+	al, err := s.ual.Get(url, false)
 	if err != nil {
 		return "", err
 	}
 	return al + "/manifest.json", nil
 
+}
+
+func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
+	at, err := s.at.GetTokenByName(c, "webdav")
+	if at == nil {
+		return "", err
+	}
+	url := fmt.Sprintf("/%s/%s/webdav/fs/", common.AccessTokenParamName, at.Token)
+
+	al, err := s.ual.Get(url, true)
+	if err != nil {
+		return "", err
+	}
+	return al + "/webtor/", nil
 }
 
 func (s *Handler) get(c *gin.Context) {
@@ -53,12 +69,18 @@ func (s *Handler) get(c *gin.Context) {
 		c.Redirect(http.StatusTemporaryRedirect, "/login")
 		return
 	}
-	at, err := s.getStremioAddonURL(c)
+	stremioURL, err := s.getStremioAddonURL(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	webdavURL, err := s.getWebDAVURL(c)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
-		StremioAddonURL: at,
+		StremioAddonURL: stremioURL,
+		WebDAVURL:       webdavURL,
 	}))
 }

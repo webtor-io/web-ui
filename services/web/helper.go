@@ -16,6 +16,7 @@ import (
 
 	"github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/services/abuse_store"
+	"github.com/webtor-io/web-ui/services/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
@@ -23,7 +24,6 @@ import (
 	h "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
-	"github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/job"
@@ -70,13 +70,13 @@ type Helper struct {
 
 func NewHelper(c *cli.Context) *Helper {
 	return &Helper{
-		demoMagnet:    c.String(services.DemoMagnetFlag),
-		demoTorrent:   c.String(services.DemoTorrentFlag),
+		demoMagnet:    c.String(common.DemoMagnetFlag),
+		demoTorrent:   c.String(common.DemoTorrentFlag),
 		assetsHost:    c.String(static.AssetsHostFlag),
 		assetsPath:    c.String(static.AssetsPathFlag),
 		useAuth:       c.Bool(auth.UseFlag),
 		useAbuseStore: c.Bool(abuse_store.UseFlag),
-		domain:        c.String(services.DomainFlag),
+		domain:        c.String(common.DomainFlag),
 		ah:            NewAssetHashes(c.String(static.AssetsPathFlag)),
 	}
 }

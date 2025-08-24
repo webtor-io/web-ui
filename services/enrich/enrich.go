@@ -3,6 +3,9 @@ package enrich
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"time"
+
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -12,8 +15,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
-	"strings"
-	"time"
 )
 
 type Enricher struct {
@@ -261,7 +262,7 @@ func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string, claims
 	offset := uint(0)
 	var items []ra.ListItem
 	for {
-		resp, err := s.api.ListResourceContent(ctx, claims, hash, &api.ListResourceContentArgs{
+		resp, err := s.api.ListResourceContentCached(ctx, claims, hash, &api.ListResourceContentArgs{
 			Limit:  limit,
 			Offset: offset,
 		})

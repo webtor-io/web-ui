@@ -11,10 +11,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	csrf "github.com/utrack/gin-csrf"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -55,7 +54,7 @@ type Session struct {
 	CSRF string
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine) (err error) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string) (err error) {
 	var store sessions.Store
 	if c.String(redisHostFlag) != "" && c.Int(redisPortFlag) != 0 {
 		url := fmt.Sprintf("%v:%v", c.String(redisHostFlag), c.Int(redisPortFlag))
@@ -84,9 +83,11 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) (err error) {
 	r.Use(csrf.Middleware(csrf.Options{
 		Secret: c.String(sessionSecretFlag),
 		ErrorFunc: func(c *gin.Context) {
-			if strings.HasPrefix(c.Request.URL.Path, "/auth/dashboard") {
-				c.Next()
-				return
+			for _, r := range csrfIgnorePrefixes {
+				if strings.HasPrefix(c.Request.URL.Path, r) {
+					c.Next()
+					return
+				}
 			}
 			c.String(400, "CSRF token mismatch")
 			c.Abort()

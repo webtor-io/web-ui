@@ -13,6 +13,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	sv "github.com/webtor-io/web-ui/services/common"
+
+	defaultErrors "errors"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -29,9 +32,6 @@ import (
 	"github.com/supertokens/supertokens-golang/recipe/userroles"
 	"github.com/supertokens/supertokens-golang/supertokens"
 	"github.com/urfave/cli"
-	sv "github.com/webtor-io/web-ui/services"
-
-	defaultErrors "errors"
 )
 
 const (

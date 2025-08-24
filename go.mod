@@ -1,6 +1,6 @@
 module github.com/webtor-io/web-ui
 
-go 1.24.6
+go 1.25
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -64,7 +64,7 @@ require (
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/go-pg/migrations/v8 v8.1.0 // indirect
+	github.com/go-pg/migrations/v8 v8.1.0
 	github.com/go-pg/pg/v10 v10.15.0
 	github.com/go-pg/zerochecker v0.2.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

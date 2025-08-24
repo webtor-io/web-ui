@@ -1,7 +1,9 @@
-package services
+package common
 
 import (
+	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/urfave/cli"
 )
@@ -71,3 +73,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 const AccessTokenParamName = "token"
+
+func EscapePath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
+}

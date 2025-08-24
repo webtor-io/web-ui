@@ -3,16 +3,17 @@ package models
 import (
 	"errors"
 	"fmt"
-	"github.com/go-pg/pg/v10"
 	"math/rand"
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
 
 type URLAlias struct {
-	tableName struct{} `pg:"url_alias"`
-
+	tableName struct{}  `pg:"url_alias"`
 	Code      string    `pg:"code,pk"`
 	URL       string    `pg:"url,notnull"`
+	Proxy     bool      `pg:"proxy,notnull,default:false"`
 	CreatedAt time.Time `pg:"created_at,notnull"`
 }
 
@@ -43,7 +44,7 @@ func GetURLAliasByCode(db *pg.DB, code string) (*URLAlias, error) {
 	return alias, nil
 }
 
-func CreateOrGetURLAlias(db *pg.DB, url string) (*URLAlias, error) {
+func CreateOrGetURLAlias(db *pg.DB, url string, proxy bool) (*URLAlias, error) {
 	// поиск по URL
 	alias := new(URLAlias)
 	err := db.Model(alias).
@@ -77,6 +78,7 @@ func CreateOrGetURLAlias(db *pg.DB, url string) (*URLAlias, error) {
 	alias = &URLAlias{
 		Code:      code,
 		URL:       url,
+		Proxy:     proxy,
 		CreatedAt: time.Now(),
 	}
 

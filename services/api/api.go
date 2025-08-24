@@ -19,6 +19,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"github.com/webtor-io/lazymap"
+	"github.com/webtor-io/web-ui/services/common"
 
 	"github.com/pkg/errors"
 
@@ -28,7 +30,6 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 
-	"github.com/webtor-io/web-ui/services"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 )
@@ -166,11 +167,13 @@ type Claims struct {
 }
 
 type Api struct {
-	url            string
-	prepareRequest func(r *http.Request, c *Claims) (*http.Request, error)
-	cl             *http.Client
-	domain         string
-	expire         int
+	url               string
+	prepareRequest    func(r *http.Request, c *Claims) (*http.Request, error)
+	cl                *http.Client
+	domain            string
+	expire            int
+	torrentCache      lazymap.LazyMap[[]byte]
+	listResponseCache lazymap.LazyMap[*ra.ListResponse]
 }
 
 type ListResourceContentOutputType string
@@ -247,13 +250,19 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		}
 	}
 	log.Infof("api endpoint %v", u)
-	apiURL, _ := url.Parse(c.String(services.DomainFlag))
+	apiURL, _ := url.Parse(c.String(common.DomainFlag))
 	return &Api{
 		url:            u,
 		cl:             cl,
 		prepareRequest: prepareRequest,
 		domain:         apiURL.Hostname(),
 		expire:         expire,
+		torrentCache: lazymap.New[[]byte](&lazymap.Config{
+			Expire: time.Minute,
+		}),
+		listResponseCache: lazymap.New[*ra.ListResponse](&lazymap.Config{
+			Expire: time.Minute,
+		}),
 	}
 }
 
@@ -276,6 +285,24 @@ func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (close
 	return res.Body, nil
 }
 
+func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) ([]byte, error) {
+	return s.torrentCache.Get(infohash, func() ([]byte, error) {
+		resp, err := s.GetTorrent(ctx, c, infohash)
+		if err != nil {
+			return nil, err
+		}
+		defer func(Body io.ReadCloser) {
+			_ = Body.Close()
+		}(resp)
+		data, err := io.ReadAll(resp)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	})
+
+}
+
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {
 	u := s.url + "/resource"
 	e = &ra.ResourceResponse{}
@@ -291,6 +318,13 @@ func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash strin
 	e = &ra.ListResponse{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
 	return
+}
+
+func (s *Api) ListResourceContentCached(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (*ra.ListResponse, error) {
+	key := infohash + fmt.Sprintf("%+v", args)
+	return s.listResponseCache.Get(key, func() (*ra.ListResponse, error) {
+		return s.ListResourceContent(ctx, c, infohash, args)
+	})
 }
 
 func (s *Api) doRequestRaw(ctx context.Context, c *Claims, url string, method string, data []byte) (res *http.Response, err error) {

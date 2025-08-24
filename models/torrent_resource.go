@@ -2,18 +2,20 @@ package models
 
 import (
 	"context"
-	"github.com/go-pg/pg/v10"
 	"time"
+
+	"github.com/go-pg/pg/v10"
 )
 
 type TorrentResource struct {
 	tableName struct{} `pg:"torrent_resource"`
 
-	ResourceID string    `pg:"resource_id,pk"`
-	Name       string    `pg:"name"`
-	FileCount  int       `pg:"file_count"`
-	SizeBytes  int64     `pg:"size_bytes"`
-	CreatedAt  time.Time `pg:"created_at"`
+	ResourceID       string    `pg:"resource_id,pk"`
+	Name             string    `pg:"name"`
+	FileCount        int       `pg:"file_count"`
+	SizeBytes        int64     `pg:"size_bytes"`
+	CreatedAt        time.Time `pg:"created_at"`
+	TorrentSizeBytes int64     `pg:"torrent_size_bytes"`
 
 	LibraryEntries []*Library `pg:"rel:has-many,fk:resource_id"`
 	MediaInfo      *MediaInfo `pg:"rel:has-one,fk:resource_id"`
