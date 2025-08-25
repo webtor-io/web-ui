@@ -2,12 +2,13 @@ package migrations
 
 import (
 	"github.com/go-pg/migrations/v8"
+	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 )
 
 func PopulateTorrentSizeBytes(col *migrations.Collection, a *api.Api) {
-	col.MustRegisterTx(func(db migrations.DB) error {
+	col.MustRegister(func(db migrations.DB) error {
 		ctx := db.Context()
 		var resources []*models.TorrentResource
 
@@ -25,7 +26,9 @@ func PopulateTorrentSizeBytes(col *migrations.Collection, a *api.Api) {
 			}
 			size := int64(len(t))
 			r.TorrentSizeBytes = size
-			_, err = db.Model(r).WherePK().Column("torrent_size_bytes").Update()
+			log.Infof("Updating torrent size for %s: %d", r.ResourceID, size)
+			res, err := db.Model(r).WherePK().Column("torrent_size_bytes").Update()
+			log.Infof("Updated %d rows", res.RowsAffected())
 			if err != nil {
 				return err
 			}
