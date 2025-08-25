@@ -56,6 +56,6 @@ func (s *Handler) generateUrl(c *gin.Context) {
 
 func (s *Handler) handleWebDAV(c *gin.Context) {
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), web.Context{}, web.NewContext(c)))
-	c.Request.URL.Path = strings.TrimPrefix(c.Param("rest"), "/webtor")
+	c.Request.URL.Path = strings.TrimPrefix(c.Param("rest"), "/webdav")
 	s.wh.ServeHTTP(c.Writer, c.Request)
 }

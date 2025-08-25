@@ -60,7 +60,7 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return al + "/webtor/", nil
+	return al + "/webdav/", nil
 }
 
 func (s *Handler) get(c *gin.Context) {
