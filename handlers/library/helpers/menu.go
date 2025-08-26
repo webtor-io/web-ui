@@ -11,7 +11,7 @@ type MenuItem struct {
 type Menu []MenuItem
 
 var baseMenu Menu = Menu{
-	{shared.SectionTypeTorrents, "/lib", false},
+	{shared.SectionTypeTorrents, "/lib/", false},
 	{shared.SectionTypeMovies, "/lib/movies", false},
 	{shared.SectionTypeSeries, "/lib/series", false},
 }
