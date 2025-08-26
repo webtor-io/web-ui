@@ -38,7 +38,11 @@ func (s *RootDirectory) ReadDir(ctx context.Context, path string, recursive bool
 	if c == nil {
 		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
 	}
-	return c.Child.ReadDir(ctx, c.NewPath, recursive)
+	fis, err := c.Child.ReadDir(ctx, c.NewPath, recursive)
+	if err != nil {
+		return nil, err
+	}
+	return addPrefixes(fis, c.Root), nil
 }
 
 func (s *RootDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo, error) {
@@ -54,7 +58,11 @@ func (s *RootDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo
 		fi := newDirectoryFileInfo(c.Name)
 		return &fi, nil
 	}
-	return c.Child.Stat(ctx, c.NewPath)
+	fi, err := c.Child.Stat(ctx, c.NewPath)
+	if err != nil {
+		return nil, err
+	}
+	return addPrefix(fi, c.Root), nil
 }
 
 func (s *RootDirectory) RemoveAll(ctx context.Context, path string, opts *webdav.RemoveAllOptions) error {
@@ -78,7 +86,11 @@ func (s *RootDirectory) Create(ctx context.Context, path string, body io.ReadClo
 	if c.Root == path {
 		return nil, false, webdav.NewHTTPError(403, errors.New("operation not permitted"))
 	}
-	return c.Child.Create(ctx, c.NewPath, body, opts)
+	fi, ok, err := c.Child.Create(ctx, c.NewPath, body, opts)
+	if err != nil {
+		return nil, false, err
+	}
+	return addPrefix(fi, c.Root), ok, nil
 }
 func (s *RootDirectory) Move(ctx context.Context, path, dest string, options *webdav.MoveOptions) (bool, error) {
 	c := s.getChild(path)

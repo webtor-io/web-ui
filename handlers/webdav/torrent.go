@@ -63,7 +63,7 @@ func (s *TorrentDirectory) Open(ctx context.Context, tr *models.TorrentResource,
 func (s *TorrentDirectory) listItemToFileInfo(i *ra.ListItem, tr *models.TorrentResource) webdav.FileInfo {
 	if i.Type == ra.ListTypeDirectory {
 		return webdav.FileInfo{
-			Path:    i.PathStr,
+			Path:    i.PathStr + "/",
 			ModTime: tr.CreatedAt,
 			IsDir:   true,
 			Size:    i.Size,

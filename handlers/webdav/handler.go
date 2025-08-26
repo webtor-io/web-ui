@@ -3,7 +3,7 @@ package webdav
 import (
 	"context"
 	"net/http"
-	"strings"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	cs "github.com/webtor-io/common-services"
@@ -25,7 +25,7 @@ type Handler struct {
 }
 
 func RegisterHandler(r *gin.Engine, pg *cs.PG, at *at.AccessToken, sapi *api.Api, jobs *job.Handler) {
-	fs := NewFileSystem(pg, sapi, jobs)
+	fs := NewFileSystem(pg, sapi, jobs, "webdav")
 	wh := &webdav.Handler{FileSystem: fs}
 	h := &Handler{
 		pg:   pg,
@@ -56,6 +56,11 @@ func (s *Handler) generateUrl(c *gin.Context) {
 
 func (s *Handler) handleWebDAV(c *gin.Context) {
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), web.Context{}, web.NewContext(c)))
-	c.Request.URL.Path = strings.TrimPrefix(c.Param("rest"), "/webdav")
+	u, err := url.Parse(c.Request.RequestURI)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	c.Request.URL.Path = u.Path
 	s.wh.ServeHTTP(c.Writer, c.Request)
 }

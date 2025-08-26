@@ -9,12 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func ServeError(w http.ResponseWriter, err error) {
-	log.WithError(err).Error("webdav: server error")
 	code := http.StatusInternalServerError
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {

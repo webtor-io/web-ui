@@ -40,12 +40,16 @@ func (s *ContentDirectory) Stat(ctx context.Context, path string) (*webdav.FileI
 	}
 	if isRoot(lr.NewPath) {
 		return &webdav.FileInfo{
-			Path:    lr.Item.Torrent.Name,
+			Path:    lr.Item.Torrent.Name + "/",
 			ModTime: lr.Item.Torrent.CreatedAt,
 			IsDir:   true,
 		}, nil
 	}
-	return s.TorrentDirectory.Stat(ctx, lr.Item.Torrent, lr.NewPath)
+	fi, err := s.TorrentDirectory.Stat(ctx, lr.Item.Torrent, lr.NewPath)
+	if err != nil {
+		return nil, err
+	}
+	return addPrefix(fi, lr.Root), nil
 }
 
 func (s *ContentDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]webdav.FileInfo, error) {
@@ -67,7 +71,11 @@ func (s *ContentDirectory) ReadDir(ctx context.Context, path string, recursive b
 	if lr == nil {
 		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
 	}
-	return s.TorrentDirectory.ReadDir(ctx, lr.Item.Torrent, lr.NewPath, recursive)
+	fis, err := s.TorrentDirectory.ReadDir(ctx, lr.Item.Torrent, lr.NewPath, recursive)
+	if err != nil {
+		return nil, err
+	}
+	return addPrefixes(fis, lr.Root), nil
 }
 
 func (s *ContentDirectory) getContentWithContext(ctx context.Context) ([]*models.Library, error) {
@@ -104,17 +112,19 @@ func (s *ContentDirectory) getContentItem(ctx context.Context, path string) (*Co
 	return &ContentItemResponse{
 		Item:    l,
 		NewPath: np,
+		Root:    "/" + name + "/",
 	}, nil
 }
 
 type ContentItemResponse struct {
 	Item    *models.Library
 	NewPath string
+	Root    string
 }
 
 func (s *ContentDirectory) libraryToFileInfo(l *models.Library) webdav.FileInfo {
 	return webdav.FileInfo{
-		Path:    l.Torrent.Name,
+		Path:    l.Torrent.Name + "/",
 		ModTime: l.Torrent.CreatedAt,
 		IsDir:   true,
 	}
