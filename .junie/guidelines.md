@@ -43,6 +43,19 @@ Build and configuration
   - PostgreSQL configuration flags are registered by github.com/webtor-io/common-services (RegisterPGFlags). On server start (serve.go), migrations in migrations/ are applied automatically. Ensure DB connectivity is configured via the common services environment variables (see common-services docs; typical PG_HOST/PG_PORT/PG_USER/PG_PASSWORD/PG_DATABASE and SSL flags).
   - A Redis client is also configured via common-services and used by the Job queues.
 
+- Database operations architecture
+  - **ALL database operations must be placed in the models/ directory**. This includes CRUD operations, queries, and any database-related business logic.
+  - Handlers should NEVER contain direct database queries. Instead, they should call model methods that encapsulate the database operations.
+  - Model files should be named after the primary entity they manage (e.g., models/embed_domain.go for EmbedDomain operations).
+  - Each model should provide methods for common operations:
+    - Get/List methods for retrieval (e.g., GetUserDomains, GetByID)
+    - Create methods for insertion (e.g., CreateDomain)
+    - Update methods for modifications (e.g., UpdateDomain)
+    - Delete methods for removal (e.g., DeleteUserDomain)
+    - Count/Exists methods for validation (e.g., CountUserDomains, DomainExists)
+  - Model methods should accept a *pg.DB instance as their first parameter and return appropriate types with error handling.
+  - This separation ensures better testability, maintainability, and follows the single responsibility principle.
+
 Running the server locally
 - With local REST API or RapidAPI configured:
   1) npm install
@@ -82,6 +95,42 @@ Testing
 
 - JavaScript tests
   - No JS test runner is configured. package.json defines "test" as a failing placeholder. Frontend is built via webpack; stylelint is present but not wired to npm scripts. If you add JS tests, introduce a runner (e.g., vitest/jest) and wire scripts, but keep bundle size constraints in mind (project favors lightweight frontend).
+
+Frontend Development Philosophy
+- Server-side rendering priority
+  - **ALWAYS prioritize server-side rendering over client-side JavaScript**. This project follows a server-side rendering approach for better performance, SEO, and user experience.
+  - Use Go templates with Gin to render HTML on the server. Templates are located in templates/ directory and managed via TemplateManager.
+  - JavaScript should only be used for essential interactive features that cannot be achieved with server-side rendering.
+
+- Successful patterns to follow
+  - **Stremio integration** (templates/partials/profile/stremio.html): Uses server-side forms with POST requests and redirects. Minimal JavaScript only for clipboard functionality.
+  - **WebDAV integration** (templates/partials/profile/webdav.html): Similar pattern with form submissions and server-side processing.
+  - **Embed domains** (templates/partials/profile/embed_domains.html): Refactored from JavaScript-heavy AJAX to server-side forms with data-async attributes for progressive enhancement.
+
+- Implementation guidelines
+  - Use HTML forms with method="post" for data mutations (create, update, delete operations).
+  - Leverage data-async attributes for progressive enhancement without breaking core functionality.
+  - Use `data-async-target` and `data-async-push-state="false"` for partial page updates when needed.
+  - Include `X-Return-Url` header handling in handlers to redirect back to the originating page after form submissions.
+  - Handlers should use `c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))` pattern for form processing.
+
+- Anti-patterns to avoid
+  - **Heavy JavaScript frameworks**: Avoid React, Vue, Angular, or similar client-side frameworks.
+  - **AJAX-heavy interfaces**: Don't build interfaces that depend entirely on JavaScript for basic functionality.
+  - **JSON APIs for simple CRUD**: Use server-side form processing instead of JSON APIs for basic create/read/update/delete operations.
+  - **Client-side state management**: Keep application state on the server, not in JavaScript variables.
+
+- When JavaScript is acceptable
+  - Clipboard functionality (copying URLs, tokens) - see Stremio/WebDAV examples.
+  - Progressive enhancement of existing server-side functionality.
+  - Interactive features that genuinely improve UX without breaking core functionality.
+  - Analytics tracking (Umami integration).
+
+- Template organization
+  - Place reusable components in templates/partials/
+  - Use the existing template helper system for common functionality (web, umami, geoip helpers).
+  - Follow the established pattern of data-async-layout for progressive enhancement.
+  - Ensure templates work without JavaScript for core functionality.
 
 Additional development notes
 - HTTP API client (services/api)

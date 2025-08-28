@@ -117,6 +117,13 @@ func (s *Helper) IsPaid(c *claims.Data) bool {
 	return c.Context.Tier.Id != 0
 }
 
+func (s *Helper) CanManageEmbedDomains(c *claims.Data) bool {
+	if c == nil {
+		return false
+	}
+	return c.Claims != nil && c.Claims.Embed.NoAds
+}
+
 func (s *Helper) TierName(c *claims.Data) string {
 	if c == nil {
 		return "free"

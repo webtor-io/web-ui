@@ -8,6 +8,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
+	"github.com/webtor-io/web-ui/handlers/embed_domain"
 	"github.com/webtor-io/web-ui/handlers/ext"
 	"github.com/webtor-io/web-ui/handlers/geo"
 	wi "github.com/webtor-io/web-ui/handlers/index"
@@ -241,7 +242,10 @@ func serve(c *cli.Context) error {
 	wa.RegisterHandler(r, tm, jobs)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(r, tm, ats, ual)
+	p.RegisterHandler(r, tm, ats, ual, pg, uc)
+
+	// Setting EmbedDomainHandler
+	embed_domain.RegisterHandler(r, pg)
 
 	// Setting EmbedExamplesHandler
 	wee.RegisterHandler(r, tm)
