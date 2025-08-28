@@ -5,6 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 
 	"github.com/go-pg/pg/v10"
 	cs "github.com/webtor-io/common-services"
@@ -18,7 +20,10 @@ type DomainSettings struct {
 	claims *claims.Claims
 }
 type DomainSettingsData struct {
-	Ads bool `json:"ads"`
+	Ads       bool         `json:"ads"`
+	Rate      string       `json:"rate"`
+	Claims    *claims.Data `json:"-"`
+	SessionID string       `json:"-"`
 }
 
 func NewDomainSettings(pg *cs.PG, claims *claims.Claims) *DomainSettings {
@@ -55,6 +60,13 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &DomainSettingsData{Ads: em.Ads || !cl.Claims.Embed.NoAds}, nil
+		ads := *em.Ads
+		return &DomainSettingsData{
+			Ads:    ads || !cl.Claims.Embed.NoAds,
+			Claims: cl,
+			SessionID: api.GenerateSessionIDFromUser(&auth.User{
+				Email: em.User.Email,
+			}),
+		}, nil
 	})
 }

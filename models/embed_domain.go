@@ -11,8 +11,8 @@ import (
 type EmbedDomain struct {
 	tableName struct{}  `pg:"embed_domain"`
 	ID        uuid.UUID `pg:"embed_domain_id,pk,type:uuid,default:uuid_generate_v4()"`
-	Domain    string
-	Ads       bool
+	Domain    string    `pg:"domain,notnull"`
+	Ads       *bool     `pg:"ads,notnull,default:true"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -54,10 +54,11 @@ func DomainExists(db *pg.DB, domain string) (bool, error) {
 
 // CreateDomain creates a new embed domain for a user
 func CreateDomain(db *pg.DB, userID uuid.UUID, domain string) error {
+	ads := false
 	embedDomain := &EmbedDomain{
 		Domain: domain,
 		UserID: userID,
-		Ads:    false, // Disable ads for registered domains
+		Ads:    &ads, // Disable ads for registered domains
 	}
 
 	_, err := db.Model(embedDomain).Insert()

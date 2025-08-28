@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	models2 "github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -28,7 +28,7 @@ var (
 
 type EmbedScript struct {
 	api      *api.Api
-	settings *models2.EmbedSettings
+	settings *models.EmbedSettings
 	file     string
 	tb       template.Builder[*web.Context]
 	c        *web.Context
@@ -40,7 +40,7 @@ type EmbedAdsData struct {
 	DomainSettings *embed.DomainSettingsData
 }
 
-func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models2.EmbedSettings, file string, dsd *embed.DomainSettingsData) *EmbedScript {
+func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData) *EmbedScript {
 	return &EmbedScript{
 		c:        c,
 		api:      api,
@@ -52,7 +52,7 @@ func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.C
 	}
 }
 
-func (s *EmbedScript) makeLoadArgs(settings *models2.EmbedSettings) (*LoadArgs, error) {
+func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, error) {
 	la := &LoadArgs{}
 	if settings.TorrentURL != "" {
 		resp, err := s.cl.Get(settings.TorrentURL)
@@ -101,7 +101,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	vsud := models2.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
+	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
 	as, _ := Action(s.tb, s.api, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud)
 	err = as.Run(ctx, j)
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return
 }
 
-func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models2.EmbedSettings) (i *ra.ListItem, err error) {
+func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {
 	j.InProgress("searching for stream content")
 	apiCtx, apiCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer apiCancel()
@@ -191,7 +191,7 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 	return
 }
 
-func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models2.EmbedSettings, file string, dsd *embed.DomainSettingsData) (r job.Runnable, hash string, err error) {
+func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData) (r job.Runnable, hash string, err error) {
 	geoHash := ""
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
