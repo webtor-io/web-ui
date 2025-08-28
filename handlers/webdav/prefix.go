@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/webdav"
 )
 
@@ -16,12 +17,18 @@ type PrefixDirectory struct {
 }
 
 func (s *PrefixDirectory) Open(ctx context.Context, path string) (io.ReadCloser, *url.URL, error) {
-	_, newPath := s.splitPath(path)
+	_, newPath, err := s.splitPath(path)
+	if err != nil {
+		return nil, nil, err
+	}
 	return s.Inner.Open(ctx, newPath)
 }
 
 func (s *PrefixDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]webdav.FileInfo, error) {
-	prefix, newPath := s.splitPath(path)
+	prefix, newPath, err := s.splitPath(path)
+	if err != nil {
+		return nil, err
+	}
 	fis, err := s.Inner.ReadDir(ctx, newPath, recursive)
 	if err != nil {
 		return nil, err
@@ -30,7 +37,10 @@ func (s *PrefixDirectory) ReadDir(ctx context.Context, path string, recursive bo
 }
 
 func (s *PrefixDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo, error) {
-	prefix, newPath := s.splitPath(path)
+	prefix, newPath, err := s.splitPath(path)
+	if err != nil {
+		return nil, err
+	}
 	fi, err := s.Inner.Stat(ctx, newPath)
 	if err != nil {
 		return nil, err
@@ -39,12 +49,18 @@ func (s *PrefixDirectory) Stat(ctx context.Context, path string) (*webdav.FileIn
 }
 
 func (s *PrefixDirectory) RemoveAll(ctx context.Context, path string, opts *webdav.RemoveAllOptions) error {
-	_, newPath := s.splitPath(path)
+	_, newPath, err := s.splitPath(path)
+	if err != nil {
+		return err
+	}
 	return s.Inner.RemoveAll(ctx, newPath, opts)
 }
 
 func (s *PrefixDirectory) Create(ctx context.Context, path string, body io.ReadCloser, opts *webdav.CreateOptions) (*webdav.FileInfo, bool, error) {
-	prefix, newPath := s.splitPath(path)
+	prefix, newPath, err := s.splitPath(path)
+	if err != nil {
+		return nil, false, err
+	}
 	fi, ok, err := s.Inner.Create(ctx, newPath, body, opts)
 	if err != nil {
 		return nil, false, err
@@ -53,15 +69,22 @@ func (s *PrefixDirectory) Create(ctx context.Context, path string, body io.ReadC
 }
 
 func (s *PrefixDirectory) Move(ctx context.Context, path, dest string, options *webdav.MoveOptions) (bool, error) {
-	_, newPath := s.splitPath(path)
+	_, newPath, err := s.splitPath(path)
+	if err != nil {
+		return false, err
+	}
 	return s.Inner.Move(ctx, newPath, dest, options)
 }
 
-func (s *PrefixDirectory) splitPath(path string) (string, string) {
+func (s *PrefixDirectory) splitPath(path string) (string, string, error) {
+	if strings.Contains(path, s.Separator) == false {
+		return "", "", errors.Errorf("invalid path: %s", path)
+	}
+	path = strings.TrimPrefix(path, s.Separator)
 	parts := strings.SplitN(path, s.Separator, 2)
 	prefix := parts[0] + s.Separator
 	newPath := parts[1]
-	return prefix, newPath
+	return prefix, newPath, nil
 }
 
 var _ webdav.FileSystem = (*PrefixDirectory)(nil)

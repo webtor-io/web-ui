@@ -127,3 +127,24 @@ func IsPaid(c *gin.Context) {
 		c.Next()
 	}
 }
+
+func HasEmbedDomains(c *gin.Context) {
+	d := GetFromContext(c)
+	if d == nil {
+		c.AbortWithStatus(http.StatusPaymentRequired)
+		return
+	}
+	if d.Claims == nil || !d.Claims.Embed.NoAds {
+		c.AbortWithStatus(http.StatusPaymentRequired)
+	} else {
+		c.Next()
+	}
+}
+
+func CanManageEmbedDomains(c *gin.Context) bool {
+	d := GetFromContext(c)
+	if d == nil {
+		return false
+	}
+	return d.Claims != nil && d.Claims.Embed.NoAds
+}

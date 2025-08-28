@@ -13,6 +13,10 @@
     {{ template "profile/webdav" $ }}
 </div>
 <div class="divider"></div>
+<div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" $ }}`}}">
+    {{ template "profile/embed_domains" $ }}
+</div>
+<div class="divider"></div>
 <div class="flex flex-col justify-center items-center mt-10">
     <a href="/logout" class="btn btn-accent btn-soft btn-outline capitalize" data-async-target="main" data-umami-event="logout">logout</a>
 </div>
