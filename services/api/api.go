@@ -608,10 +608,9 @@ func getRemoteAddress(r *http.Request) string {
 
 type ClaimsContext struct{}
 
-func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string) (*Claims, error) {
-	sess, _ := c.Cookie("session")
+func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Data, sessionID string) (*Claims, error) {
 	cl := &Claims{
-		SessionID:     sess,
+		SessionID:     sessionID,
 		Domain:        domain,
 		RemoteAddress: getRemoteAddress(c.Request),
 		Agent:         c.Request.Header.Get("User-Agent"),
@@ -619,8 +618,6 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string) (*Claims, err
 			ExpiresAt: time.Now().Add(time.Duration(s.expire) * 24 * time.Hour).Unix(),
 		},
 	}
-	u := auth.GetUserFromContext(c)
-	uc := claims.GetFromContext(c)
 	if uc != nil {
 		cl.Role = uc.Context.Tier.Name
 		rate := uc.Claims.Connection.Rate
@@ -628,12 +625,7 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string) (*Claims, err
 			cl.Rate = fmt.Sprintf("%dM", rate)
 		}
 	}
-	if u.Email != "" {
-		h := sha1.New()
-		h.Write([]byte(u.Email))
-		hashEmail := hex.EncodeToString(h.Sum(nil))
-		cl.SessionID = hashEmail
-	}
+
 	return cl, nil
 }
 
@@ -641,9 +633,26 @@ func GetClaimsFromContext(c *gin.Context) *Claims {
 	return c.Request.Context().Value(ClaimsContext{}).(*Claims)
 }
 
+func generateSessionID(c *gin.Context) string {
+	sess, _ := c.Cookie("session")
+	u := auth.GetUserFromContext(c)
+	if u.Email != "" {
+		sess = GenerateSessionIDFromUser(u)
+	}
+	return sess
+}
+
+func GenerateSessionIDFromUser(u *auth.User) string {
+	h := sha1.New()
+	h.Write([]byte(u.Email))
+	hashEmail := hex.EncodeToString(h.Sum(nil))
+	return hashEmail
+}
+
 func (s *Api) RegisterHandler(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
-		c, err := s.SetClaims(c, s.domain)
+		uc := claims.GetFromContext(c)
+		c, err := s.SetClaims(c, s.domain, uc, generateSessionID(c))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -652,8 +661,8 @@ func (s *Api) RegisterHandler(r *gin.Engine) {
 	})
 }
 
-func (s *Api) SetClaims(c *gin.Context, domain string) (*gin.Context, error) {
-	ac, err := s.MakeClaimsFromContext(c, domain)
+func (s *Api) SetClaims(c *gin.Context, domain string, uc *claims.Data, sessionID string) (*gin.Context, error) {
+	ac, err := s.MakeClaimsFromContext(c, domain, uc, sessionID)
 	if err != nil {
 		return nil, err
 	}

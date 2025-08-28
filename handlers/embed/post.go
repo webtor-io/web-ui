@@ -2,10 +2,11 @@ package embed
 
 import (
 	"encoding/json"
-	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"net/url"
+
+	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/services/embed"
@@ -62,7 +63,7 @@ func (s *Handler) post(c *gin.Context) {
 	}
 	pd.EmbedSettings = args.EmbedSettings
 	pd.DomainSettings = dsd
-	c, err = s.api.SetClaims(c, domain)
+	c, err = s.api.SetClaims(c, domain, dsd.Claims, dsd.SessionID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
