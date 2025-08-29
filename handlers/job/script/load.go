@@ -1,12 +1,13 @@
 package script
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha1"
-	"fmt"
+	"io"
 	"strings"
 	"time"
 
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
@@ -99,10 +100,20 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 }
 
 func Load(api *api.Api, c *web.Context, args *LoadArgs) (r job.Runnable, hash string, err error) {
-	h := sha1.New()
-	h.Write(args.File)
-	h.Write([]byte(args.Query))
-	hash = fmt.Sprintf("%x", h.Sum(nil))
+	if args.Query != "" {
+		sha1Hash := common.SHA1R.Find([]byte(args.Query))
+		if sha1Hash == nil {
+			return nil, "", errors.Errorf("wrong resource provided query=%v", args.Query)
+		}
+		hash = strings.ToLower(string(sha1Hash))
+	} else if args.File != nil {
+		b := io.NopCloser(bytes.NewReader(args.File))
+		mi, err := metainfo.Load(b)
+		if err != nil {
+			return nil, "", err
+		}
+		hash = mi.HashInfoBytes().HexString()
+	}
 	r = NewLoadScript(api, c, args)
 	return
 }
