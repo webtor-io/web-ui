@@ -74,6 +74,9 @@ func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, e
 }
 
 func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
+	if s.dsd.Found == false {
+		return errors.New("403 Forbidden, please contact site owner")
+	}
 	args, err := s.makeLoadArgs(s.settings)
 	if err != nil {
 		return

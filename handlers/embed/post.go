@@ -42,6 +42,8 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 }
 
 func (s *Handler) post(c *gin.Context) {
+	c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 	tpl := s.tb.Build("embed/post")
 	pd := PostData{}
 	args, err := s.bindPostArgs(c)

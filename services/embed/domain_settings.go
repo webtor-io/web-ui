@@ -22,6 +22,7 @@ type DomainSettings struct {
 type DomainSettingsData struct {
 	Ads       bool         `json:"ads"`
 	Rate      string       `json:"rate"`
+	Found     bool         `json:"found"`
 	Claims    *claims.Data `json:"-"`
 	SessionID string       `json:"-"`
 }
@@ -31,8 +32,7 @@ func NewDomainSettings(pg *cs.PG, claims *claims.Claims) *DomainSettings {
 		pg:     pg,
 		claims: claims,
 		LazyMap: lazymap.New[*DomainSettingsData](&lazymap.Config{
-			Expire:      time.Minute,
-			ErrorExpire: 10 * time.Second,
+			Expire: time.Minute,
 		}),
 	}
 }
@@ -42,6 +42,12 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		if s.pg == nil || s.pg.Get() == nil || s.claims == nil {
 			return &DomainSettingsData{}, nil
 		}
+		if domain == "localhost" || domain == "127.0.0.1" || domain == "webtor.io" {
+			return &DomainSettingsData{
+				Ads:   true,
+				Found: true,
+			}, nil
+		}
 		db := s.pg.Get()
 		em := &models.EmbedDomain{}
 		err := db.Model(em).
@@ -49,7 +55,10 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 			Where("embed_domain.domain = ?", domain).
 			Select()
 		if errors.Is(err, pg.ErrNoRows) {
-			return &DomainSettingsData{Ads: true}, nil
+			return &DomainSettingsData{
+				Ads:   true,
+				Found: false,
+			}, nil
 		} else if err != nil {
 			return nil, err
 		}
@@ -65,7 +74,7 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 			Ads:    ads || !cl.Claims.Embed.NoAds,
 			Claims: cl,
 			SessionID: api.GenerateSessionIDFromUser(&auth.User{
-				Email: em.User.Email,
+				ID: em.User.UserID,
 			}),
 		}, nil
 	})
