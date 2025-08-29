@@ -644,9 +644,9 @@ func generateSessionID(c *gin.Context) string {
 
 func GenerateSessionIDFromUser(u *auth.User) string {
 	h := sha1.New()
-	h.Write([]byte(u.Email))
-	hashEmail := hex.EncodeToString(h.Sum(nil))
-	return hashEmail
+	h.Write([]byte(u.ID.String()))
+	hash := hex.EncodeToString(h.Sum(nil))
+	return hash
 }
 
 func (s *Api) RegisterHandler(r *gin.Engine) {
