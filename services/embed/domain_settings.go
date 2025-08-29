@@ -85,6 +85,7 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		ads := *em.Ads
 		return &DomainSettingsData{
 			Ads:    ads || !cl.Claims.Embed.NoAds,
+			Found:  true,
 			Claims: cl,
 			SessionID: api.GenerateSessionIDFromUser(&auth.User{
 				ID: em.User.UserID,
