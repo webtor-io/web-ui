@@ -2,36 +2,51 @@ package embed_domain
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/common"
 )
 
 type Handler struct {
-	pg *cs.PG
+	pg     *cs.PG
+	domain string
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
+	d := c.String(common.DomainFlag)
+	if d != "" {
+		u, err := url.Parse(d)
+		if err != nil {
+			return err
+		}
+		d = u.Hostname()
+	}
+
 	h := &Handler{
-		pg: pg,
+		pg:     pg,
+		domain: d,
 	}
 
 	gr := r.Group("/embed-domain")
 	gr.Use(auth.HasAuth)
 	gr.POST("/add", h.add)
 	gr.POST("/delete/:id", h.delete)
+	return nil
 }
 
-func (h *Handler) add(c *gin.Context) {
+func (s *Handler) add(c *gin.Context) {
 	domain := strings.TrimSpace(strings.ToLower(c.PostForm("domain")))
 	user := auth.GetUserFromContext(c)
-	err := h.addDomain(domain, user)
+	err := s.addDomain(domain, user)
 	if err != nil {
 		log.WithError(err).Error("failed to add domain")
 		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
@@ -40,10 +55,10 @@ func (h *Handler) add(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (h *Handler) delete(c *gin.Context) {
+func (s *Handler) delete(c *gin.Context) {
 	id := c.Param("id")
 	user := auth.GetUserFromContext(c)
-	err := h.deleteDomain(id, user)
+	err := s.deleteDomain(id, user)
 	if err != nil {
 		log.WithError(err).Error("failed to delete domain")
 		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
@@ -52,21 +67,23 @@ func (h *Handler) delete(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (h *Handler) addDomain(domain string, user *auth.User) (err error) {
+func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
 	// Get domain from form data
 	if domain == "" {
 		return errors.New("no domain provided")
 	}
-	if domain == "localhost" || domain == "127.0.0.1" || domain == "webtor.io" {
-		return errors.New("localhost is not allowed")
-	}
+
 	// Remove protocol if present
 	domain = strings.TrimPrefix(strings.TrimPrefix(domain, "http://"), "https://")
 
 	// Remove trailing slash
 	domain = strings.TrimSuffix(domain, "/")
 
-	db := h.pg.Get()
+	if domain == "localhost" || domain == "127.0.0.1" || domain == s.domain {
+		return errors.New("localhost is not allowed")
+	}
+
+	db := s.pg.Get()
 
 	if db == nil {
 		return errors.New("no db")
@@ -96,13 +113,13 @@ func (h *Handler) addDomain(domain string, user *auth.User) (err error) {
 	return models.CreateDomain(db, user.ID, domain)
 }
 
-func (h *Handler) deleteDomain(idStr string, user *auth.User) (err error) {
+func (s *Handler) deleteDomain(idStr string, user *auth.User) (err error) {
 	id, err := uuid.FromString(idStr)
 	if err != nil {
 		return
 	}
 
-	db := h.pg.Get()
+	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no db")
 	}
