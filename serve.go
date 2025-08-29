@@ -230,7 +230,10 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting DomainSettings
-	ds := embed.NewDomainSettings(pg, uc)
+	ds, err := embed.NewDomainSettings(c, pg, uc)
+	if err != nil {
+		return err
+	}
 
 	// Setting ResourceHandler
 	wr.RegisterHandler(r, tm, sapi, jobs, pg)
@@ -245,7 +248,10 @@ func serve(c *cli.Context) error {
 	p.RegisterHandler(r, tm, ats, ual, pg, uc)
 
 	// Setting EmbedDomainHandler
-	embed_domain.RegisterHandler(r, pg)
+	err = embed_domain.RegisterHandler(c, r, pg)
+	if err != nil {
+		return err
+	}
 
 	// Setting EmbedExamplesHandler
 	wee.RegisterHandler(r, tm)

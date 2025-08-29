@@ -2,113 +2,128 @@ package embed_domain
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/common"
 )
 
 type Handler struct {
-	pg *cs.PG
+	pg     *cs.PG
+	domain string
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
+	d := c.String(common.DomainFlag)
+	if d != "" {
+		u, err := url.Parse(d)
+		if err != nil {
+			return err
+		}
+		d = u.Hostname()
+	}
+
 	h := &Handler{
-		pg: pg,
+		pg:     pg,
+		domain: d,
 	}
 
 	gr := r.Group("/embed-domain")
 	gr.Use(auth.HasAuth)
-	gr.Use(claims.HasEmbedDomains) // Require embed domains access (Claims.Embed.NoAds == true)
-	gr.POST("/add", h.addDomain)
-	gr.POST("/delete/:id", h.deleteDomain)
+	gr.POST("/add", h.add)
+	gr.POST("/delete/:id", h.delete)
+	return nil
 }
 
-func (h *Handler) addDomain(c *gin.Context) {
-	// Get domain from form data
+func (s *Handler) add(c *gin.Context) {
 	domain := strings.TrimSpace(strings.ToLower(c.PostForm("domain")))
-	if domain == "" {
+	user := auth.GetUserFromContext(c)
+	err := s.addDomain(domain, user)
+	if err != nil {
+		log.WithError(err).Error("failed to add domain")
 		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 		return
 	}
+	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+}
+
+func (s *Handler) delete(c *gin.Context) {
+	id := c.Param("id")
+	user := auth.GetUserFromContext(c)
+	err := s.deleteDomain(id, user)
+	if err != nil {
+		log.WithError(err).Error("failed to delete domain")
+		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		return
+	}
+	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+}
+
+func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
+	// Get domain from form data
+	if domain == "" {
+		return errors.New("no domain provided")
+	}
 
 	// Remove protocol if present
-	if strings.HasPrefix(domain, "http://") {
-		domain = strings.TrimPrefix(domain, "http://")
-	}
-	if strings.HasPrefix(domain, "https://") {
-		domain = strings.TrimPrefix(domain, "https://")
-	}
+	domain = strings.TrimPrefix(strings.TrimPrefix(domain, "http://"), "https://")
 
 	// Remove trailing slash
 	domain = strings.TrimSuffix(domain, "/")
 
-	user := auth.GetUserFromContext(c)
-	db := h.pg.Get()
+	if domain == "localhost" || domain == "127.0.0.1" || domain == s.domain {
+		return errors.New("localhost is not allowed")
+	}
+
+	db := s.pg.Get()
+
+	if db == nil {
+		return errors.New("no db")
+	}
 
 	// Check current domain count for user
 	currentCount, err := models.CountUserDomains(db, user.ID)
 	if err != nil {
-		// Database error, redirect back
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 		return
 	}
 
 	// Restrict to maximum 3 domains
 	if currentCount >= 3 {
-		// User already has 3 domains, redirect back without adding
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
-		return
+		return errors.New("maximum 3 domains allowed")
 	}
 
 	// Check if domain already exists
 	domainExists, err := models.DomainExists(db, domain)
 	if err != nil {
-		// Database error, redirect back
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 		return
 	}
 	if domainExists {
-		// Domain already exists, just redirect back
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
-		return
+		return errors.New("domain already exists")
 	}
 
 	// Create new domain
-	err = models.CreateDomain(db, user.ID, domain)
-	if err != nil {
-		// Failed to create, redirect back
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
-		return
-	}
-
-	// Success, redirect back to profile
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	return models.CreateDomain(db, user.ID, domain)
 }
 
-func (h *Handler) deleteDomain(c *gin.Context) {
-	idStr := c.Param("id")
+func (s *Handler) deleteDomain(idStr string, user *auth.User) (err error) {
 	id, err := uuid.FromString(idStr)
 	if err != nil {
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 		return
 	}
 
-	user := auth.GetUserFromContext(c)
-	db := h.pg.Get()
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("no db")
+	}
 
 	// Delete domain owned by the current user
-	err = models.DeleteUserDomain(db, id, user.ID)
-	if err != nil {
-		// Failed to delete, redirect back
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
-		return
-	}
-
-	// Success, redirect back to profile
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	return models.DeleteUserDomain(db, id, user.ID)
 }
