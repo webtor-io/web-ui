@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -142,6 +143,10 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 }
 
 func (s *Handler) get(c *gin.Context) {
+	// Add meta tags and headers to block search engine indexing
+	c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+
 	indexTpl := s.tb.Build("index")
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
@@ -149,6 +154,14 @@ func (s *Handler) get(c *gin.Context) {
 		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(&GetData{}).WithErr(errors.Wrap(err, "wrong args provided")))
 		return
 	}
+
+	// Check access permissions based on WEB-15 requirements
+	if !s.hasAccessPermission(c, args) {
+		// Redirect to homepage instead of showing error
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 	d, err := s.prepareGetData(ctx, args)
@@ -161,6 +174,44 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
+}
+
+// hasAccessPermission checks if user has permission to access the resource
+// based on WEB-15 requirements: library access for auth users, session access for guests
+func (s *Handler) hasAccessPermission(c *gin.Context, args *GetArgs) bool {
+	// For guests, check if resource was added in current session
+	session := sessions.Default(c)
+	sessionResources := session.Get("resources")
+	if sessionResources == nil {
+		return false
+	}
+
+	resources, ok := sessionResources.([]string)
+	if !ok {
+		return false
+	}
+
+	// Check if resource ID is in session
+	for _, resourceID := range resources {
+		if resourceID == args.ID {
+			return true
+		}
+	}
+
+	// For authenticated users, check if resource is in their library
+	if args.User.HasAuth() {
+		db := s.pg.Get()
+		if db == nil {
+			return false
+		}
+		inLibrary, err := models.IsInLibrary(c.Request.Context(), db, args.User.ID, args.ID)
+		if err != nil {
+			return false
+		}
+		return inLibrary
+	}
+
+	return false
 }
 
 func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *GetArgs) (i *ra.ListItem, err error) {
