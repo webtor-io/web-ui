@@ -9,9 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
-	"github.com/webtor-io/lazymap"
-
 	proto "github.com/webtor-io/claims-provider/proto"
+	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/lazymap"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 )
 
@@ -32,16 +33,18 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 type Claims struct {
 	lazymap.LazyMap[*Data]
 	cl *Client
+	pg *cs.PG
 }
 
 type Data = proto.GetResponse
 
-func New(c *cli.Context, cl *Client) *Claims {
-	if !c.Bool(UseFlag) {
+func New(c *cli.Context, cl *Client, pg *cs.PG) *Claims {
+	if !c.Bool(UseFlag) || cl == nil {
 		return nil
 	}
 	return &Claims{
 		cl: cl,
+		pg: pg,
 		LazyMap: lazymap.New[*Data](&lazymap.Config{
 			Expire:      time.Minute,
 			ErrorExpire: 10 * time.Second,
@@ -96,11 +99,20 @@ func (s *Claims) MakeUserClaimsFromContext(c *gin.Context) (*Data, error) {
 
 type Context struct{}
 
+type TierUpdatedContext struct{}
+
 func GetFromContext(c *gin.Context) *Data {
 	if r := c.Request.Context().Value(Context{}); r != nil {
 		return r.(*Data)
 	}
 	return nil
+}
+
+func GetTierUpdateFromContext(c *gin.Context) bool {
+	if r := c.Request.Context().Value(TierUpdatedContext{}); r != nil {
+		return r.(bool)
+	}
+	return false
 }
 
 func (s *Claims) RegisterHandler(r *gin.Engine) {
@@ -110,8 +122,32 @@ func (s *Claims) RegisterHandler(r *gin.Engine) {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
+
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), Context{}, ucl))
+		db := s.pg.Get()
+		if db == nil {
+			return
+		}
+		uc := c.Request.Context().Value(auth.UserContext{})
+		u, ok := uc.(*models.User)
+		if !ok {
+			return
+		}
+		updated := false
+		if u.Tier != ucl.Context.Tier.Name {
+			u.Tier = ucl.Context.Tier.Name
+			err = models.UpdateUserTier(db, u)
+			if err != nil {
+				_ = c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), auth.UserContext{}, u))
+			updated = true
+		}
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), TierUpdatedContext{}, updated))
 		c.Next()
+	})
+	r.Use(func(c *gin.Context) {
 	})
 }
 
@@ -126,25 +162,4 @@ func IsPaid(c *gin.Context) {
 	} else {
 		c.Next()
 	}
-}
-
-func HasEmbedDomains(c *gin.Context) {
-	d := GetFromContext(c)
-	if d == nil {
-		c.AbortWithStatus(http.StatusPaymentRequired)
-		return
-	}
-	if d.Claims == nil || !d.Claims.Embed.NoAds {
-		c.AbortWithStatus(http.StatusPaymentRequired)
-	} else {
-		c.Next()
-	}
-}
-
-func CanManageEmbedDomains(c *gin.Context) bool {
-	d := GetFromContext(c)
-	if d == nil {
-		return false
-	}
-	return d.Claims != nil && d.Claims.Embed.NoAds
 }

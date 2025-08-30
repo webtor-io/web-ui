@@ -274,36 +274,41 @@ type User struct {
 	ID            uuid.UUID
 	Email         string
 	Expired       bool
-	HasToken      bool
 	PatreonUserID *string
+	IsNew         bool
+	Tier          string
 }
 
 func (s *User) HasAuth() bool {
-	return s.Email != ""
+	return s.ID != uuid.Nil
+}
+
+func makeUserFromContext(c *gin.Context) *User {
+	u := &User{}
+	uc := c.Request.Context().Value(UserContext{})
+	su, ok := uc.(*models.User)
+	if ok {
+		u.ID = su.UserID
+		u.Email = su.Email
+		u.PatreonUserID = su.PatreonUserID
+		u.Tier = su.Tier
+	}
+	inc := c.Request.Context().Value(IsNewContext{})
+	isNew, ok := inc.(bool)
+	if ok {
+		u.IsNew = isNew
+	}
+	return u
 }
 
 func GetUserFromContext(c *gin.Context) *User {
-	u := &User{}
-	// TODO: Make something better
 	if c.Query(sv.AccessTokenParamName) != "" {
-		uc := c.Request.Context().Value(UserContext{})
-		su, ok := uc.(*models.User)
-		if ok {
-			u.ID = su.UserID
-			u.Email = su.Email
-			u.PatreonUserID = su.PatreonUserID
-		}
-		return u
+		return makeUserFromContext(c)
 	}
 	if sessionContainer := session.GetSessionFromRequestContext(c.Request.Context()); sessionContainer != nil {
-		uc := c.Request.Context().Value(UserContext{})
-		su, ok := uc.(*models.User)
-		if ok {
-			u.ID = su.UserID
-			u.Email = su.Email
-			u.PatreonUserID = su.PatreonUserID
-		}
+		return makeUserFromContext(c)
 	}
+	u := &User{}
 	if err := c.Request.Context().Value(ErrorContext{}); err != nil {
 		if defaultErrors.As(err.(error), &errors.TryRefreshTokenError{}) {
 			u.Expired = true
@@ -315,6 +320,7 @@ func GetUserFromContext(c *gin.Context) *User {
 type ErrorContext struct{}
 
 type UserContext struct{}
+type IsNewContext struct{}
 
 func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -358,12 +364,13 @@ func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHa
 		}
 		if sess != nil {
 			ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
-			u, err := s.createUser(sess)
+			u, isNew, err := s.createUser(sess)
 			if err != nil {
 				log.WithError(err).Error("failed to create user")
 				w.WriteHeader(500)
 			} else {
 				ctx = context.WithValue(ctx, UserContext{}, u)
+				ctx = context.WithValue(ctx, IsNewContext{}, isNew)
 			}
 
 			otherHandler(w, r.WithContext(ctx))
@@ -373,7 +380,7 @@ func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHa
 	}
 }
 
-func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, err error) {
+func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
 		return

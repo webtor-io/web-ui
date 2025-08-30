@@ -160,10 +160,12 @@ func serve(c *cli.Context) error {
 
 	// Setting Claims Client
 	cpCl := claims.NewClient(c)
-	defer cpCl.Close()
+	if cpCl != nil {
+		defer cpCl.Close()
+	}
 
 	// Setting UserClaims
-	uc := claims.New(c, cpCl)
+	uc := claims.New(c, cpCl, pg)
 	if uc != nil {
 		// Setting UserClaimsHandler
 		uc.RegisterHandler(r)

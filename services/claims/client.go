@@ -2,8 +2,9 @@ package claims
 
 import (
 	"fmt"
-	"google.golang.org/grpc/credentials/insecure"
 	"sync"
+
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/urfave/cli"
 	proto "github.com/webtor-io/claims-provider/proto"
@@ -42,6 +43,9 @@ type Client struct {
 }
 
 func NewClient(c *cli.Context) *Client {
+	if !c.Bool(UseFlag) {
+		return nil
+	}
 	return &Client{
 		host: c.String(claimsProviderHostFlag),
 		port: c.Int(claimsProviderPortFlag),

@@ -11,15 +11,16 @@ import (
 )
 
 type Context struct {
-	Data      any
-	CSRF      string
-	SessionID string
-	Err       error
-	User      *auth.User
-	Claims    *claims.Data
-	Geo       *geoip.Data
-	ApiClaims *api.Claims
-	ginCtx    *gin.Context
+	Data        any
+	CSRF        string
+	SessionID   string
+	Err         error
+	User        *auth.User
+	Claims      *claims.Data
+	TierUpdated bool
+	Geo         *geoip.Data
+	ApiClaims   *api.Claims
+	ginCtx      *gin.Context
 }
 
 func (c *Context) WithData(obj any) *Context {
@@ -44,14 +45,16 @@ func NewContext(c *gin.Context) *Context {
 	sess := session.GetFromContext(c)
 	geoData := geo.GetFromContext(c)
 	aCl := api.GetClaimsFromContext(c)
+	tu := claims.GetTierUpdateFromContext(c)
 
 	return &Context{
-		CSRF:      sess.CSRF,
-		User:      user,
-		Claims:    cl,
-		ApiClaims: aCl,
-		SessionID: sess.ID,
-		Geo:       geoData,
-		ginCtx:    c,
+		CSRF:        sess.CSRF,
+		User:        user,
+		Claims:      cl,
+		ApiClaims:   aCl,
+		SessionID:   sess.ID,
+		Geo:         geoData,
+		TierUpdated: tu,
+		ginCtx:      c,
 	}
 }

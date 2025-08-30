@@ -1,6 +1,13 @@
 {{ define "nav" }}
 <script>
-    window._tier = "{{ .Claims | tierName }}"
+    window._tier = "{{ .Claims | tierName }}";
+    window._isNewUser = {{ .User.IsNew }};
+    {{- if .User | hasAuth }}
+    window._userId = "{{ .User.ID }}";
+    {{- else }}
+    window._userId = null;
+    {{- end }}
+    window._tierUpdated = {{ .TierUpdated }};
 </script>
 <div class="navbar sticky top-0">
     <div class="flex-1 whitespace-nowrap">

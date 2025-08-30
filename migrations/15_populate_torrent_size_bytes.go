@@ -28,10 +28,10 @@ func PopulateTorrentSizeBytes(col *migrations.Collection, a *api.Api) {
 			r.TorrentSizeBytes = size
 			log.Infof("Updating torrent size for %s: %d", r.ResourceID, size)
 			res, err := db.Model(r).WherePK().Column("torrent_size_bytes").Update()
-			log.Infof("Updated %d rows", res.RowsAffected())
 			if err != nil {
 				return err
 			}
+			log.Infof("Updated %d rows", res.RowsAffected())
 		}
 		return nil
 	}, func(db migrations.DB) error {
