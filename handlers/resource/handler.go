@@ -7,7 +7,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
-	"strings"
 )
 
 type Handler struct {
@@ -26,11 +25,5 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], api *api
 		pg:   pg,
 	}
 	r.POST("/", h.post)
-	r.GET("/:resource_id", func(c *gin.Context) {
-		if strings.HasPrefix(c.Param("resource_id"), "magnet") {
-			h.post(c)
-			return
-		}
-		h.get(c)
-	})
+	r.GET("/:resource_id", h.get)
 }
