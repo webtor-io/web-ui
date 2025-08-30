@@ -8,12 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
@@ -48,8 +48,7 @@ func (s *Handler) add(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	err := s.addDomain(domain, user)
 	if err != nil {
-		log.WithError(err).Error("failed to add domain")
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		web.RedirectWithError(c, err)
 		return
 	}
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
@@ -60,8 +59,7 @@ func (s *Handler) delete(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	err := s.deleteDomain(id, user)
 	if err != nil {
-		log.WithError(err).Error("failed to delete domain")
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		web.RedirectWithError(c, err)
 		return
 	}
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
@@ -80,7 +78,7 @@ func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
 	domain = strings.TrimSuffix(domain, "/")
 
 	if domain == "localhost" || domain == "127.0.0.1" || domain == s.domain {
-		return errors.New("localhost is not allowed")
+		return errors.New("localhost and current domain are not allowed")
 	}
 
 	db := s.pg.Get()

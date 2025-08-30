@@ -9,6 +9,8 @@ import (
 	"html/template"
 	"io"
 	"math/rand/v2"
+	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -39,8 +41,23 @@ func (s *Helper) Log(err error) error {
 	return err
 }
 
-func (s *Helper) ShortErr(err error) string {
+func ShortErr(err error) string {
 	return strings.Split(err.Error(), ":")[0]
+}
+
+func RedirectWithError(c *gin.Context, serr error) {
+	u, err := url.Parse(c.GetHeader("X-Return-Url"))
+	if err != nil || u == nil {
+		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	}
+	q := u.Query()
+	q.Set("error", ShortErr(serr))
+	u.RawQuery = q.Encode()
+	c.Redirect(http.StatusFound, u.String())
+}
+
+func (s *Helper) ShortErr(err error) string {
+	return ShortErr(err)
 }
 
 func (s *Helper) BitsForHumans(b int64) string {

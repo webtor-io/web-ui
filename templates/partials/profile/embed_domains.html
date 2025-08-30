@@ -14,7 +14,7 @@
                                     name="domain"
                                     placeholder="Enter domain (e.g., example.com)"
                                     class="input input-bordered w-full join-item"
-                                    pattern="[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                                    pattern="[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)+"
                                     title="Please enter a valid domain name"
                                     {{ if $canAddDomain }}required{{ else }}disabled{{ end }}
                                 />
@@ -25,6 +25,11 @@
                             {{ if not $canAddDomain }}
                                 <div class="text-center text-sm text-accent mt-5">
                                     You have reached the maximum of 3 domains. Delete a domain to add a new one.
+                                </div>
+                            {{ end }}
+                            {{ if ne .Data.Error "" }}
+                                <div class="text-center text-sm text-accent mt-5">
+                                    {{ .Data.Error }}
                                 </div>
                             {{ end }}
                         </div>

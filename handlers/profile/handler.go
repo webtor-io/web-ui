@@ -21,6 +21,7 @@ type Data struct {
 	StremioAddonURL string
 	WebDAVURL       string
 	EmbedDomains    []models.EmbedDomain
+	Error           string
 }
 
 type Handler struct {
@@ -100,5 +101,6 @@ func (s *Handler) get(c *gin.Context) {
 		StremioAddonURL: stremioURL,
 		WebDAVURL:       webdavURL,
 		EmbedDomains:    domains,
+		Error:           c.Query("error"),
 	}))
 }
