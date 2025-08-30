@@ -17,6 +17,7 @@ type User struct {
 	PatreonUserID *string `pg:"patreon_user_id"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Tier          string
 }
 
 // GetOrCreateUser finds or creates a user.
@@ -25,7 +26,7 @@ type User struct {
 // If not found (or patreonID is nil), it falls back to lookup by email.
 // - If an email user is found and patreonID is provided but missing on the record, it links it.
 // - Otherwise, it creates a new user with provided email (and patreonID if given).
-func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, error) {
+func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, bool, error) {
 	user := &User{}
 
 	// 1) If patreonUserID provided, try to find by patreon_member_id
@@ -36,13 +37,13 @@ func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, err
 			if user.Email != email && email != "" {
 				user.Email = email
 				if _, uerr := db.Model(user).Column("email").WherePK().Update(); uerr != nil {
-					return nil, uerr
+					return nil, false, uerr
 				}
 			}
-			return user, nil
+			return user, false, nil
 		}
 		if !errors.Is(err, pg.ErrNoRows) {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -53,13 +54,13 @@ func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, err
 		if patreonUserID != nil && (user.PatreonUserID == nil || *user.PatreonUserID != *patreonUserID) {
 			user.PatreonUserID = patreonUserID
 			if _, uerr := db.Model(user).Column("patreon_user_id").WherePK().Update(); uerr != nil {
-				return nil, uerr
+				return nil, false, uerr
 			}
 		}
-		return user, nil
+		return user, false, nil
 	}
 	if !errors.Is(err, pg.ErrNoRows) {
-		return nil, err // DB error
+		return nil, false, err // DB error
 	}
 
 	// 3) Create new user
@@ -67,7 +68,12 @@ func GetOrCreateUser(db *pg.DB, email string, patreonUserID *string) (*User, err
 	user.PatreonUserID = patreonUserID
 	_, err = db.Model(user).Insert()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return user, nil
+	return user, true, nil
+}
+
+func UpdateUserTier(db *pg.DB, u *User) error {
+	_, err := db.Model(u).WherePK().Column("tier").Update()
+	return err
 }

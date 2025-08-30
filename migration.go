@@ -8,6 +8,7 @@ import (
 	services "github.com/webtor-io/common-services"
 	m "github.com/webtor-io/web-ui/migrations"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/migration"
 )
 
@@ -79,8 +80,15 @@ func pgMigrate(c *cli.Context, a ...string) error {
 	// Setting Api
 	sapi := api.New(c, cl)
 
+	// Setting Claims Client
+	cpCl := claims.NewClient(c)
+	if cpCl != nil {
+		defer cpCl.Close()
+	}
+
 	// Setting custom migrations
 	m.PopulateTorrentSizeBytes(col, sapi)
+	m.PopulateUserTiers(col, cpCl)
 
 	// Run
 	return mgr.Run(a...)
