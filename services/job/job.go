@@ -2,11 +2,12 @@ package job
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -130,7 +131,7 @@ func (s *Job) Run(ctx context.Context) error {
 	defer s.close()
 	s.open()
 	if !s.purge {
-		items, err := s.storage.Sub(ctx, s.ID)
+		items, err := s.storage.Sub(ctx, s.Queue, s.ID)
 		if err != nil {
 			return err
 		}
@@ -148,7 +149,7 @@ func (s *Job) Run(ctx context.Context) error {
 			return nil
 		}
 	} else {
-		err := s.storage.Drop(ctx, s.ID)
+		err := s.storage.Drop(ctx, s.Queue, s.ID)
 		if err != nil {
 			return err
 		}
@@ -189,7 +190,7 @@ func (s *Job) pubToStorage(l LogItem) (err error) {
 	if l.Level == Open {
 		return
 	}
-	return s.storage.Pub(s.Context, s.ID, l)
+	return s.storage.Pub(s.Context, s.Queue, s.ID, l)
 }
 
 func (s *Job) logToLogger(l LogItem) {
@@ -392,7 +393,7 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 		err := j.Run(ctx)
 		<-time.After(60 * time.Second)
 		if err != nil {
-			_ = s.storage.Drop(context.Background(), id)
+			_ = s.storage.Drop(context.Background(), s.queue, id)
 			log.WithError(err).Error("got job error")
 		}
 		s.mux.Lock()
@@ -408,7 +409,7 @@ func (s *Jobs) Log(ctx context.Context, id string) (c chan LogItem, ok bool, err
 	if !ok {
 		log.Infof("unable to find local job with id=%v", id)
 		var state *State
-		state, ok, err = s.storage.GetState(ctx, id)
+		state, ok, err = s.storage.GetState(ctx, s.queue, id)
 		log.Infof("got storage state=%+v for id=%+v err=%+v", state, id, err)
 		if err != nil {
 			close(c)

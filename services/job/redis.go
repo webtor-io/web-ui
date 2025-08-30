@@ -16,8 +16,8 @@ type Redis struct {
 	prefix string
 }
 
-func (s *Redis) Drop(ctx context.Context, id string) (err error) {
-	key := s.makeKey(id)
+func (s *Redis) Drop(ctx context.Context, queue, id string) (err error) {
+	key := s.makeKey(queue, id)
 	cmd := s.cl.Del(ctx, key)
 	if cmd.Err() != nil {
 		return cmd.Err()
@@ -32,8 +32,8 @@ func NewRedis(cl redis.UniversalClient, prefix string) *Redis {
 	}
 }
 
-func (s *Redis) Pub(ctx context.Context, id string, l LogItem) (err error) {
-	key := s.makeKey(id)
+func (s *Redis) Pub(ctx context.Context, queue string, id string, l LogItem) (err error) {
+	key := s.makeKey(queue, id)
 	j, err := json.Marshal(l)
 	if err != nil {
 		return err
@@ -50,8 +50,8 @@ func (s *Redis) Pub(ctx context.Context, id string, l LogItem) (err error) {
 	return
 }
 
-func (s *Redis) GetState(ctx context.Context, id string) (state *State, ok bool, err error) {
-	key := s.makeKey(id)
+func (s *Redis) GetState(ctx context.Context, queue string, id string) (state *State, ok bool, err error) {
+	key := s.makeKey(queue, id)
 	ttlCmd := s.cl.TTL(ctx, key)
 	if ttlCmd.Err() != nil {
 		return nil, false, ttlCmd.Err()
@@ -70,9 +70,9 @@ func (s *Redis) GetState(ctx context.Context, id string) (state *State, ok bool,
 	}, true, nil
 }
 
-func (s *Redis) Sub(ctx context.Context, id string) (res chan LogItem, err error) {
+func (s *Redis) Sub(ctx context.Context, queue string, id string) (res chan LogItem, err error) {
 	cctx, cancel := context.WithCancel(ctx)
-	ch, err := s.subRaw(cctx, id)
+	ch, err := s.subRaw(cctx, queue, id)
 	if err != nil || ch == nil {
 		cancel()
 		return
@@ -108,8 +108,8 @@ func (s *Redis) Sub(ctx context.Context, id string) (res chan LogItem, err error
 	}()
 	return
 }
-func (s *Redis) subRaw(ctx context.Context, id string) (res chan string, err error) {
-	key := s.makeKey(id)
+func (s *Redis) subRaw(ctx context.Context, queue string, id string) (res chan string, err error) {
+	key := s.makeKey(queue, id)
 	exCmd := s.cl.Exists(ctx, key)
 	ex, err := exCmd.Result()
 	if err != nil {
@@ -165,8 +165,8 @@ func (s *Redis) subRaw(ctx context.Context, id string) (res chan string, err err
 	return
 }
 
-func (s *Redis) makeKey(id string) string {
-	hash := md5.Sum([]byte(fmt.Sprintf("%s%s", s.prefix, id)))
+func (s *Redis) makeKey(queue, id string) string {
+	hash := md5.Sum([]byte(fmt.Sprintf("%s-%s-%s", s.prefix, queue, id)))
 	return hex.EncodeToString(hash[:])
 }
 
