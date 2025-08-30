@@ -42,6 +42,11 @@ window.addEventListener('load', async () => {
             document.body.appendChild(player);
             ev.render(player);
         }
+        if (ev.tag === 'rendering forbid') {
+            const forbid = document.createElement('div');
+            document.body.appendChild(forbid);
+            ev.render(forbid);
+        }
         if (ev.tag === 'rendering ads' && !adsPlayed) {
             window.addEventListener('ads_play', function() {
                 playingAds = true;
