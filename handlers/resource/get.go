@@ -144,8 +144,8 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 
 func (s *Handler) get(c *gin.Context) {
 	// Add meta tags and headers to block search engine indexing
-	c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
-	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	//c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
+	//c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 
 	indexTpl := s.tb.Build("index")
 	getTpl := s.tb.Build("resource/get")
@@ -156,11 +156,11 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	// Check access permissions based on WEB-15 requirements
-	if !s.hasAccessPermission(c, args) {
-		// Redirect to homepage instead of showing error
-		c.Redirect(http.StatusFound, "/")
-		return
-	}
+	//if !s.hasAccessPermission(c, args) {
+	//	// Redirect to homepage instead of showing error
+	//	c.Redirect(http.StatusFound, "/")
+	//	return
+	//}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
