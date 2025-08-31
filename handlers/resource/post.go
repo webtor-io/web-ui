@@ -74,7 +74,7 @@ type PostData struct {
 
 func (s *Handler) post(c *gin.Context) {
 	// Enable search engine blocking for POST as well
-	c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
+	//c.Header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
 	indexTpl := s.tb.Build("index")
 	var (
 		d       PostData
