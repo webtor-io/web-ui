@@ -1,6 +1,8 @@
 package resource
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	cs "github.com/webtor-io/common-services"
 	j "github.com/webtor-io/web-ui/handlers/job"
@@ -25,5 +27,11 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], api *api
 		pg:   pg,
 	}
 	r.POST("/", h.post)
-	r.GET("/:resource_id", h.get)
+	r.GET("/:resource_id", func(c *gin.Context) {
+		if strings.HasPrefix(c.Param("resource_id"), "magnet") {
+			h.post(c)
+			return
+		}
+		h.get(c)
+	})
 }
