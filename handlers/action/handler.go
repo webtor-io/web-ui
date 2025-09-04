@@ -1,11 +1,12 @@
 package action
 
 import (
+	"net/http"
+
 	wj "github.com/webtor-io/web-ui/handlers/job"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/web"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -41,7 +42,7 @@ type Handler struct {
 
 func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *wj.Handler) {
 	h := &Handler{
-		tb:   tm.MustRegisterViews("action/*").WithHelper(NewHelper()),
+		tb:   tm.MustRegisterViews("action/**/*").WithHelper(NewHelper()),
 		jobs: jobs,
 	}
 	r.POST("/download-file", func(c *gin.Context) {

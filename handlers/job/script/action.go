@@ -5,14 +5,15 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
-	"io"
-	"strings"
-	"time"
 
 	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
@@ -335,19 +336,44 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return
 }
 
+type ErrorWrapperScript struct {
+	tb     template.Builder[*web.Context]
+	Script job.Runnable
+	c      *web.Context
+}
+
+func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
+	err = s.Script.Run(ctx, j)
+	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+		tpl := s.tb.Build("action/errors/no_peers").WithLayoutBody(`{{ template "main" . }}`)
+		str, terr := tpl.ToString(s.c)
+		if terr != nil {
+			return terr
+		}
+		_ = j.Error(err)
+		j.Custom("action/errors/no_peers", strings.TrimSpace(str))
+		return nil
+	}
+	return err
+}
+
 func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID)))
-	return &ActionScript{
-		tb:         tb,
-		api:        api,
-		c:          c,
-		resourceId: resourceID,
-		itemId:     itemID,
-		action:     action,
-		settings:   settings,
-		vsud:       vsud,
-		dsd:        dsd,
+	return &ErrorWrapperScript{
+		tb: tb,
+		c:  c,
+		Script: &ActionScript{
+			tb:         tb,
+			api:        api,
+			c:          c,
+			resourceId: resourceID,
+			itemId:     itemID,
+			action:     action,
+			settings:   settings,
+			vsud:       vsud,
+			dsd:        dsd,
+		},
 	}, id
 }

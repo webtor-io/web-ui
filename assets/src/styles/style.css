@@ -35,8 +35,13 @@
 
     &::before {
       content: '> ';
-
       @apply shrink-0;
+    }
+
+    &.continue {
+      &::before {
+        content: '  ';
+      }
     }
 
     &.error-summary,
