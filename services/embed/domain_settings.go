@@ -120,7 +120,7 @@ func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
 		}
 		ads := *em.Ads
 		return &DomainSettingsData{
-			Ads:    s.useAds || ads || !cl.Claims.Embed.NoAds,
+			Ads:    s.useAds && (ads || !cl.Claims.Embed.NoAds),
 			Claims: cl,
 			SessionID: api.GenerateSessionIDFromUser(&auth.User{
 				ID: em.User.UserID,
