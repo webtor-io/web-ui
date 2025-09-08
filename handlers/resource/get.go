@@ -149,6 +149,11 @@ func (s *Handler) get(c *gin.Context) {
 		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(&GetData{}).WithErr(errors.Wrap(err, "wrong args provided")))
 		return
 	}
+	if !s.useDirectLinks && !s.hasAccessPermission(c, args) {
+		// Redirect to homepage instead of showing error
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()

@@ -100,8 +100,9 @@ func (s *Handler) post(c *gin.Context) {
 
 	d.Job = loadJob
 
-	// Track resource in session for guest access (WEB-15 requirement)
-	//s.addResourceToSession(c, loadJob.ID)
+	if !s.useDirectLinks {
+		s.addResourceToSession(c, loadJob.ID)
+	}
 
 	indexTpl.HTML(http.StatusAccepted, web.NewContext(c).WithData(d))
 }

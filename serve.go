@@ -239,7 +239,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(r, tm, sapi, jobs, pg)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm)

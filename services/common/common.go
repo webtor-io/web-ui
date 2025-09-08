@@ -19,6 +19,7 @@ var (
 	SMTPPassFlag    = "smtp-pass"
 	SMTPPortFlag    = "smtp-port"
 	SMTPSecureFlag  = "smtp-secure"
+	UseDirectLinks  = "use-direct-links"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -66,6 +67,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   SMTPSecureFlag,
 			Usage:  "smtp secure",
 			EnvVar: "SMTP_SECURE",
+		},
+		cli.BoolTFlag{
+			Name:   UseDirectLinks,
+			Usage:  "use direct links",
+			EnvVar: "USE_DIRECT_LINKS",
 		},
 	)
 

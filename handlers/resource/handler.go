@@ -4,27 +4,31 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	j "github.com/webtor-io/web-ui/handlers/job"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
-	api  *api.Api
-	jobs *j.Handler
-	tb   template.Builder[*web.Context]
-	pg   *cs.PG
+	api            *api.Api
+	jobs           *j.Handler
+	tb             template.Builder[*web.Context]
+	pg             *cs.PG
+	useDirectLinks bool
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Handler, pg *cs.PG) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Handler, pg *cs.PG) {
 	helper := NewHelper()
 	h := &Handler{
-		api:  api,
-		jobs: jobs,
-		tb:   tm.MustRegisterViews("resource/*").WithHelper(helper).WithLayout("main"),
-		pg:   pg,
+		api:            api,
+		jobs:           jobs,
+		tb:             tm.MustRegisterViews("resource/*").WithHelper(helper).WithLayout("main"),
+		pg:             pg,
+		useDirectLinks: c.BoolT(common.UseDirectLinks),
 	}
 	r.POST("/", h.post)
 	r.GET("/:resource_id", func(c *gin.Context) {
