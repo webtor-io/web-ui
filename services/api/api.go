@@ -633,7 +633,7 @@ func GetClaimsFromContext(c *gin.Context) *Claims {
 	return c.Request.Context().Value(ClaimsContext{}).(*Claims)
 }
 
-func generateSessionID(c *gin.Context) string {
+func GenerateSessionID(c *gin.Context) string {
 	sess, _ := c.Cookie("session")
 	u := auth.GetUserFromContext(c)
 	if u.Email != "" {
@@ -652,7 +652,7 @@ func GenerateSessionIDFromUser(u *auth.User) string {
 func (s *Api) RegisterHandler(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
 		uc := claims.GetFromContext(c)
-		c, err := s.SetClaims(c, s.domain, uc, generateSessionID(c))
+		c, err := s.SetClaims(c, s.domain, uc, GenerateSessionID(c))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return

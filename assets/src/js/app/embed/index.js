@@ -42,7 +42,7 @@ window.addEventListener('load', async () => {
             document.body.appendChild(player);
             ev.render(player);
         }
-        if (ev.tag === 'rendering forbid') {
+        if (ev.tag === 'rendering forbidden' || ev.tag === 'rendering not authorized') {
             const forbid = document.createElement('div');
             document.body.appendChild(forbid);
             ev.render(forbid);

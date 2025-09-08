@@ -76,6 +76,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = umami.RegisterFlags(c.Flags)
 	c.Flags = geoip.RegisterFlags(c.Flags)
 	c.Flags = library.RegisterFlags(c.Flags)
+	c.Flags = embed.RegisterFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 }
 

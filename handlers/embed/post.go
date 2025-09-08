@@ -6,6 +6,8 @@ import (
 	"net/url"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -65,7 +67,13 @@ func (s *Handler) post(c *gin.Context) {
 	}
 	pd.EmbedSettings = args.EmbedSettings
 	pd.DomainSettings = dsd
-	c, err = s.api.SetClaims(c, domain, dsd.Claims, dsd.SessionID)
+	uClaims := claims.GetFromContext(c)
+	uSessionID := api.GenerateSessionID(c)
+	if dsd.Claims != nil {
+		uClaims = dsd.Claims
+		uSessionID = dsd.SessionID
+	}
+	c, err = s.api.SetClaims(c, domain, uClaims, uSessionID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return

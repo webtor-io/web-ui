@@ -74,14 +74,24 @@ func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, e
 }
 
 func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
-	if s.dsd.Found == false {
-		forbidTemplate := "embed/forbid"
-		tpl := s.tb.Build(forbidTemplate)
+	if s.dsd.Forbidden {
+		forbiddenTemplate := "embed/forbidden"
+		tpl := s.tb.Build(forbiddenTemplate)
 		str, err := tpl.ToString(s.c)
 		if err != nil {
 			return err
 		}
-		j.RenderTemplate("rendering forbid", forbidTemplate, strings.TrimSpace(str))
+		j.RenderTemplate("rendering forbidden", forbiddenTemplate, strings.TrimSpace(str))
+		return err
+	}
+	if s.dsd.Unauthorized {
+		unauthorizedTemplate := "embed/unauthorized"
+		tpl := s.tb.Build(unauthorizedTemplate)
+		str, err := tpl.ToString(s.c)
+		if err != nil {
+			return err
+		}
+		j.RenderTemplate("rendering not authorized", unauthorizedTemplate, strings.TrimSpace(str))
 		return err
 	}
 	args, err := s.makeLoadArgs(s.settings)
