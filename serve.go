@@ -262,7 +262,7 @@ func serve(c *cli.Context) error {
 	av := stremios.NewAddonValidator(cl)
 
 	// Setting AddonUrlHandler
-	err = addon_url.RegisterHandler(av, r, pg)
+	err = addon_url.RegisterHandler(c, av, r, pg)
 	if err != nil {
 		return err
 	}

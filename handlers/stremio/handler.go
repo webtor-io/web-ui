@@ -18,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 const catalogID = "Webtor.io"
@@ -69,13 +70,13 @@ func (s *Handler) generateUrl(c *gin.Context) {
 }
 
 func (s *Handler) manifest(c *gin.Context) {
-	m := Manifest{
+	m := stremio.Manifest{
 		Id:          "org.stremio.webtor.io",
 		Version:     "0.0.1",
 		Name:        "Webtor.io",
 		Description: "Stream your personal torrent library from Webtor directly in Stremio. Add torrents to your Webtor account and watch them instantly — no downloading, no setup, just click and play.",
 		Types:       []string{"movie", "series"},
-		Catalogs: []CatalogItem{
+		Catalogs: []stremio.CatalogItem{
 			{"movie", catalogID},
 			{"series", catalogID},
 		},
@@ -91,12 +92,12 @@ func (s *Handler) catalog(c *gin.Context, ct models.ContentType) {
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 	}
-	var metas []MetaItem
+	var metas []stremio.MetaItem
 	for _, vc := range vcs {
 		metas = append(metas, s.makeMeta(vc))
 	}
 
-	c.JSON(http.StatusOK, &MetasResponse{Metas: metas})
+	c.JSON(http.StatusOK, &stremio.MetasResponse{Metas: metas})
 }
 func (s *Handler) getCatalogData(c *gin.Context, t models.ContentType) ([]models.VideoContentWithMetadata, error) {
 	ctx := c.Request.Context()
@@ -206,7 +207,7 @@ func (s *Handler) bindArgs(c *gin.Context, ct models.ContentType) (args *Args, e
 	return
 }
 
-func (s *Handler) getStreamItem(c *gin.Context, vc models.VideoContentWithMetadata, ct models.ContentType, args *Args) (*StreamItem, error) {
+func (s *Handler) getStreamItem(c *gin.Context, vc models.VideoContentWithMetadata, ct models.ContentType, args *Args) (*stremio.StreamItem, error) {
 	var su, title string
 	var err error
 	if ct == models.ContentTypeMovie {
@@ -230,7 +231,7 @@ func (s *Handler) getStreamItem(c *gin.Context, vc models.VideoContentWithMetada
 
 		title = s.makeStreamTitle(fmt.Sprintf("%v.S%vE%v", vc.GetContent().Title, args.Season, args.Episode), ep.Metadata)
 	}
-	return &StreamItem{
+	return &stremio.StreamItem{
 		Title: title,
 		Url:   su,
 	}, nil
@@ -249,7 +250,7 @@ func (s *Handler) stream(c *gin.Context, ct models.ContentType) {
 		return
 	}
 
-	var streams []StreamItem
+	var streams []stremio.StreamItem
 	for _, vc := range vcs {
 		si, err := s.getStreamItem(c, vc, ct, args)
 
@@ -263,7 +264,7 @@ func (s *Handler) stream(c *gin.Context, ct models.ContentType) {
 		}
 
 	}
-	c.JSON(http.StatusOK, &StreamsResponse{
+	c.JSON(http.StatusOK, &stremio.StreamsResponse{
 		Streams: streams,
 	})
 }
@@ -319,7 +320,7 @@ func (s *Handler) makePoster(vc models.VideoContentWithMetadata) string {
 	return fmt.Sprintf("%v/lib/%v/poster/%v/240.jpg", s.domain, vc.GetContentType(), vc.GetMetadata().VideoID)
 }
 
-func (s *Handler) makeMeta(vc models.VideoContentWithMetadata) MetaItem {
+func (s *Handler) makeMeta(vc models.VideoContentWithMetadata) stremio.MetaItem {
 	if vc.GetMetadata() != nil {
 		return s.makeMetaWithMetadata(vc)
 	} else {
@@ -327,8 +328,8 @@ func (s *Handler) makeMeta(vc models.VideoContentWithMetadata) MetaItem {
 	}
 
 }
-func (s *Handler) makeMetaWithMetadata(vc models.VideoContentWithMetadata) MetaItem {
-	meta := MetaItem{
+func (s *Handler) makeMetaWithMetadata(vc models.VideoContentWithMetadata) stremio.MetaItem {
+	meta := stremio.MetaItem{
 		ID:          vc.GetMetadata().VideoID,
 		Type:        string(vc.GetContentType()),
 		Name:        vc.GetMetadata().Title,
@@ -344,8 +345,8 @@ func (s *Handler) makeMetaWithMetadata(vc models.VideoContentWithMetadata) MetaI
 	return meta
 }
 
-func (s *Handler) makeMetaWithoutMetadata(vc models.VideoContentWithMetadata) MetaItem {
-	meta := MetaItem{
+func (s *Handler) makeMetaWithoutMetadata(vc models.VideoContentWithMetadata) stremio.MetaItem {
+	meta := stremio.MetaItem{
 		ID:          idPrefix + vc.GetID().String(),
 		Type:        string(vc.GetContentType()),
 		Name:        vc.GetContent().Title,
@@ -379,7 +380,7 @@ func (s *Handler) meta(c *gin.Context, ct models.ContentType) {
 	if ct == models.ContentTypeSeries {
 		meta.Videos, err = s.makeVideos(vc)
 	}
-	c.JSON(http.StatusOK, &MetaResponse{Meta: meta})
+	c.JSON(http.StatusOK, &stremio.MetaResponse{Meta: meta})
 }
 
 func (s *Handler) metaMovie(c *gin.Context) {
@@ -414,9 +415,9 @@ func (s *Handler) retrieveTorrentItem(ctx context.Context, hash string, claims *
 	return nil, nil
 }
 
-func (s *Handler) makeVideos(vc models.VideoContentWithMetadata) ([]VideoItem, error) {
+func (s *Handler) makeVideos(vc models.VideoContentWithMetadata) ([]stremio.VideoItem, error) {
 	se, _ := vc.(*models.Series)
-	var vis []VideoItem
+	var vis []stremio.VideoItem
 	for _, e := range se.Episodes {
 		var ep, sea int
 		if e.Episode != nil {
@@ -433,7 +434,7 @@ func (s *Handler) makeVideos(vc models.VideoContentWithMetadata) ([]VideoItem, e
 		} else {
 			id = fmt.Sprintf("%v%v", idPrefix, vc.GetID().String())
 		}
-		vi := VideoItem{
+		vi := stremio.VideoItem{
 			Name:    fmt.Sprintf("Episode %d", ep),
 			ID:      fmt.Sprintf("%v:%v:%v", id, sea, ep),
 			Season:  sea,
