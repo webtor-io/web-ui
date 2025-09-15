@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
+	"github.com/webtor-io/web-ui/handlers/addon_url"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
@@ -45,6 +46,8 @@ import (
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
 	w "github.com/webtor-io/web-ui/services/web"
+
+	stremios "github.com/webtor-io/web-ui/services/stremio"
 )
 
 func makeServeCMD() cli.Command {
@@ -252,6 +255,14 @@ func serve(c *cli.Context) error {
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
+	if err != nil {
+		return err
+	}
+
+	av := stremios.NewAddonValidator(cl)
+
+	// Setting AddonUrlHandler
+	err = addon_url.RegisterHandler(av, r, pg)
 	if err != nil {
 		return err
 	}
