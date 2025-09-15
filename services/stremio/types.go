@@ -1,12 +1,21 @@
 package stremio
 
+// StreamBehaviorHints represents behavior hints specific to stream items
+type StreamBehaviorHints struct {
+	BingeGroup string `json:"bingeGroup,omitempty"`
+	Filename   string `json:"filename,omitempty"`
+}
+
 type StreamItem struct {
-	Title       string `json:"title"`
-	InfoHash    string `json:"infoHash,omitempty"`
-	FileIdx     uint8  `json:"fileIdx,omitempty"`
-	Url         string `json:"url,omitempty"`
-	YtId        string `json:"ytId,omitempty"`
-	ExternalUrl string `json:"externalUrl,omitempty"`
+	Name          string               `json:"name,omitempty"`
+	Title         string               `json:"title"`
+	InfoHash      string               `json:"infoHash,omitempty"`
+	FileIdx       uint8                `json:"fileIdx,omitempty"`
+	Url           string               `json:"url,omitempty"`
+	YtId          string               `json:"ytId,omitempty"`
+	ExternalUrl   string               `json:"externalUrl,omitempty"`
+	BehaviorHints *StreamBehaviorHints `json:"behaviorHints,omitempty"`
+	Sources       []string             `json:"sources,omitempty"`
 }
 
 type StreamsResponse struct {

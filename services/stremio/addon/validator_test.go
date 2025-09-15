@@ -1,4 +1,4 @@
-package stremio
+package addon
 
 import (
 	"net/http"
@@ -178,22 +178,22 @@ func TestAddonValidator_ValidateAddonURL(t *testing.T) {
 
 			// Create validator with test HTTP client
 			client := &http.Client{Timeout: 5 * time.Second}
-			validator := NewAddonValidator(client)
+			validator := NewValidator(client)
 
 			// Test validation
-			err := validator.ValidateAddonURL(server.URL + "/manifest.json")
+			err := validator.ValidateURL(server.URL + "/manifest.json")
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("ValidateAddonURL() expected error but got none")
+					t.Errorf("ValidateURL() expected error but got none")
 					return
 				}
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateAddonURL() error = %v, expected to contain %v", err, tt.errContains)
+					t.Errorf("ValidateURL() error = %v, expected to contain %v", err, tt.errContains)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("ValidateAddonURL() unexpected error = %v", err)
+					t.Errorf("ValidateURL() unexpected error = %v", err)
 				}
 			}
 		})
@@ -211,23 +211,23 @@ func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 
 	// Create validator with short timeout
 	client := &http.Client{Timeout: 500 * time.Millisecond}
-	validator := NewAddonValidator(client)
+	validator := NewValidator(client)
 
-	err := validator.ValidateAddonURL(server.URL + "/manifest.json")
+	err := validator.ValidateURL(server.URL + "/manifest.json")
 
 	if err == nil {
-		t.Error("ValidateAddonURL() expected timeout error but got none")
+		t.Error("ValidateURL() expected timeout error but got none")
 		return
 	}
 
 	if !strings.Contains(err.Error(), "addon URL is not accessible") {
-		t.Errorf("ValidateAddonURL() expected timeout error, got: %v", err)
+		t.Errorf("ValidateURL() expected timeout error, got: %v", err)
 	}
 }
 
 func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewValidator(client)
 
 	tests := []struct {
 		name string
@@ -245,14 +245,14 @@ func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateAddonURL(tt.url)
+			err := validator.ValidateURL(tt.url)
 			if err == nil {
-				t.Error("ValidateAddonURL() expected error for invalid URL but got none")
+				t.Error("ValidateURL() expected error for invalid URL but got none")
 				return
 			}
 
 			if !strings.Contains(err.Error(), "failed to create request") && !strings.Contains(err.Error(), "addon URL is not accessible") {
-				t.Errorf("ValidateAddonURL() expected fetch or create request error, got: %v", err)
+				t.Errorf("ValidateURL() expected fetch or create request error, got: %v", err)
 			}
 		})
 	}
@@ -260,7 +260,7 @@ func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 
 func TestAddonValidator_ValidateManifest_EdgeCases(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewValidator(client)
 
 	tests := []struct {
 		name        string
@@ -342,19 +342,19 @@ func TestAddonValidator_ValidateManifest_EdgeCases(t *testing.T) {
 			}))
 			defer server.Close()
 
-			err := validator.ValidateAddonURL(server.URL + "/manifest.json")
+			err := validator.ValidateURL(server.URL + "/manifest.json")
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("ValidateAddonURL() expected error but got none")
+					t.Error("ValidateURL() expected error but got none")
 					return
 				}
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateAddonURL() error = %v, expected to contain %v", err, tt.errContains)
+					t.Errorf("ValidateURL() error = %v, expected to contain %v", err, tt.errContains)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("ValidateAddonURL() unexpected error = %v", err)
+					t.Errorf("ValidateURL() unexpected error = %v", err)
 				}
 			}
 		})
@@ -410,11 +410,11 @@ func TestAddonValidator_RealWorldExample(t *testing.T) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewValidator(client)
 
-	err := validator.ValidateAddonURL(server.URL + "/manifest.json")
+	err := validator.ValidateURL(server.URL + "/manifest.json")
 	if err != nil {
-		t.Errorf("ValidateAddonURL() failed with Torrentio example: %v", err)
+		t.Errorf("ValidateURL() failed with Torrentio example: %v", err)
 	}
 }
 
@@ -437,13 +437,13 @@ func BenchmarkAddonValidator_ValidateAddonURL(b *testing.B) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewValidator(client)
 
 	url := server.URL + "/manifest.json"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		err := validator.ValidateAddonURL(url)
+		err := validator.ValidateURL(url)
 		if err != nil {
 			b.Fatalf("Unexpected error: %v", err)
 		}

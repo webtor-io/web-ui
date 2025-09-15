@@ -14,17 +14,17 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
-	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/stremio/addon"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
 	pg        *cs.PG
-	validator *stremio.AddonValidator
+	validator *addon.Validator
 	domain    string
 }
 
-func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, pg *cs.PG) error {
+func RegisterHandler(c *cli.Context, av *addon.Validator, r *gin.Engine, pg *cs.PG) error {
 	d := c.String(common.DomainFlag)
 	if d != "" {
 		u, err := url.Parse(d)
@@ -99,7 +99,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Validate addon URL availability and manifest structure
-	if err := s.validator.ValidateAddonURL(addonUrl); err != nil {
+	if err := s.validator.ValidateURL(addonUrl); err != nil {
 		return err
 	}
 

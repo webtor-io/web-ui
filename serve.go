@@ -47,7 +47,7 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 	w "github.com/webtor-io/web-ui/services/web"
 
-	stremios "github.com/webtor-io/web-ui/services/stremio"
+	stremioAddon "github.com/webtor-io/web-ui/services/stremio/addon"
 )
 
 func makeServeCMD() cli.Command {
@@ -259,7 +259,7 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
-	av := stremios.NewAddonValidator(cl)
+	av := stremioAddon.NewValidator(cl)
 
 	// Setting AddonUrlHandler
 	err = addon_url.RegisterHandler(c, av, r, pg)
