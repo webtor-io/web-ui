@@ -3,7 +3,9 @@ package stremio
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
@@ -347,4 +349,120 @@ func TestEnrichStream_Timeout(t *testing.T) {
 	if len(result.Streams) != 0 {
 		t.Errorf("Expected no streams (dropped due to timeout), got %d streams", len(result.Streams))
 	}
+}
+
+func TestEnrichStream_ConcurrentAccess(t *testing.T) {
+	// Test for race conditions with multiple concurrent streams
+	streams := make([]StreamItem, 50)
+	for i := 0; i < 50; i++ {
+		streams[i] = StreamItem{
+			Title:    fmt.Sprintf("Test Stream %d", i),
+			Url:      "", // No URL, requires enrichment
+			InfoHash: fmt.Sprintf("testhash%d", i),
+			FileIdx:  uint8(i % 10),
+			Sources:  []string{"tracker1", "tracker2"},
+		}
+	}
+
+	wrapped := &mockWrappedService{
+		response: &StreamsResponse{Streams: streams},
+	}
+
+	mockAPI := &mockAPI{
+		// Resource exists for all streams
+		getResourceResponse: &ra.ResourceResponse{},
+		listContentResponse: &ra.ListResponse{
+			Items: []ra.ListItem{
+				{ID: "file0", Type: ra.ListTypeFile},
+				{ID: "file1", Type: ra.ListTypeFile},
+				{ID: "file2", Type: ra.ListTypeFile},
+				{ID: "file3", Type: ra.ListTypeFile},
+				{ID: "file4", Type: ra.ListTypeFile},
+				{ID: "file5", Type: ra.ListTypeFile},
+				{ID: "file6", Type: ra.ListTypeFile},
+				{ID: "file7", Type: ra.ListTypeFile},
+				{ID: "file8", Type: ra.ListTypeFile},
+				{ID: "file9", Type: ra.ListTypeFile},
+			},
+			Count: 10,
+		},
+		exportContentResponse: &ra.ExportResponse{
+			ExportItems: map[string]ra.ExportItem{
+				"download": {
+					URL: "http://generated.url",
+				},
+			},
+		},
+	}
+
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+
+	// Run the test multiple times to increase chance of detecting race conditions
+	for run := 0; run < 10; run++ {
+		ctx := context.Background()
+		result, err := service.GetStreams(ctx, "movie", "test")
+
+		if err != nil {
+			t.Errorf("Run %d: Expected no error, got %v", run, err)
+		}
+		if len(result.Streams) != 50 {
+			t.Errorf("Run %d: Expected 50 streams, got %d", run, len(result.Streams))
+		}
+
+		// Verify all streams have URLs
+		for i, stream := range result.Streams {
+			if stream.Url == "" {
+				t.Errorf("Run %d: Stream %d missing URL", run, i)
+			}
+		}
+	}
+}
+
+func TestEnrichStream_BackgroundRetry(t *testing.T) {
+	// Test that background retry is triggered when StoreResource fails due to context deadline
+	wrapped := &mockWrappedService{
+		response: &StreamsResponse{
+			Streams: []StreamItem{
+				{
+					Title:    "Test Stream",
+					Url:      "", // No URL, requires enrichment
+					InfoHash: "testhash",
+					FileIdx:  0,
+					Sources:  []string{"tracker1", "tracker2"},
+				},
+			},
+		},
+	}
+
+	mockAPI := &mockAPI{
+		getResourceResponse:   nil, // Resource doesn't exist, will trigger StoreResource
+		storeResourceResponse: nil,
+		storeResourceError:    context.DeadlineExceeded, // Simulate deadline exceeded
+	}
+
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+
+	// Create a context with very short timeout to trigger deadline exceeded
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	// Allow some time for context to timeout
+	time.Sleep(2 * time.Millisecond)
+
+	result, err := service.GetStreams(ctx, "movie", "test")
+
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Stream should be dropped from immediate result due to StoreResource failure
+	if len(result.Streams) != 0 {
+		t.Errorf("Expected no streams (dropped due to StoreResource timeout), got %d streams", len(result.Streams))
+	}
+
+	// Wait a bit for background goroutine to complete
+	// Note: This test verifies that the background retry is triggered,
+	// but with the current mock structure we can't easily verify the actual retry call.
+	// The important part is that the stream is dropped and the background retry logic is invoked.
+	time.Sleep(100 * time.Millisecond)
 }

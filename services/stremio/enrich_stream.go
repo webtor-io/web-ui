@@ -55,21 +55,23 @@ func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 	}
 
 	// Enrich streams in parallel while preserving order
-	enrichedStreams := make([]StreamItem, len(response.Streams))
+	enrichedStreams := make([]*StreamItem, len(response.Streams))
 	var wg sync.WaitGroup
 
 	for i, stream := range response.Streams {
 		wg.Add(1)
-		go func(index int, s StreamItem) {
+		go func(index int, s *StreamItem) {
 			defer wg.Done()
 
-			// Create context with 15-second timeout
-			streamCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			// Create context with 10-second timeout
+			streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 
-			enriched := e.enrichStream(streamCtx, s)
+			// Create a copy of the stream to avoid potential shared memory issues
+			streamCopy := *s
+			enriched := e.enrichStream(streamCtx, &streamCopy)
 			enrichedStreams[index] = enriched
-		}(i, stream)
+		}(i, &stream)
 	}
 
 	wg.Wait()
@@ -78,8 +80,8 @@ func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 	var finalStreams []StreamItem
 	for _, stream := range enrichedStreams {
 		// Check if stream was dropped (empty InfoHash indicates dropped stream)
-		if stream.InfoHash != "" {
-			finalStreams = append(finalStreams, stream)
+		if stream != nil {
+			finalStreams = append(finalStreams, *stream)
 		}
 	}
 
@@ -87,7 +89,7 @@ func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 }
 
 // enrichStream enriches a single stream with URL if needed
-func (e *EnrichStream) enrichStream(ctx context.Context, stream StreamItem) StreamItem {
+func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *StreamItem {
 	// Step 1: Check if there is URL in stream
 	if stream.Url != "" {
 		return stream
@@ -96,8 +98,8 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream StreamItem) Stre
 	// Check if we have InfoHash
 	if stream.InfoHash == "" {
 		log.WithField("stream_title", stream.Title).
-			Warn("Stream has no InfoHash, dropping stream")
-		return StreamItem{} // Return empty stream to indicate it should be dropped
+			Warn("stream has no InfoHash, dropping stream")
+		return nil
 	}
 
 	// Step 2: Check with webtor API if it has resource with infohash
@@ -106,8 +108,8 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream StreamItem) Stre
 		log.WithError(err).
 			WithField("infohash", stream.InfoHash).
 			WithField("stream_title", stream.Title).
-			Warn("Failed to check resource, dropping stream")
-		return StreamItem{}
+			Warn("failed to check resource, dropping stream")
+		return nil
 	}
 
 	// If resource doesn't exist, store it
@@ -117,15 +119,27 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream StreamItem) Stre
 
 		log.WithField("infohash", stream.InfoHash).
 			WithField("magnet_url", magnetURL).
-			Debug("Storing resource for stream")
+			Debug("storing resource for stream")
 
 		_, err := e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
 		if err != nil {
-			log.WithError(err).
-				WithField("infohash", stream.InfoHash).
-				WithField("magnet_url", magnetURL).
-				Warn("Failed to store resource, dropping stream")
-			return StreamItem{}
+			// Check if the error is due to context deadline
+			if ctx.Err() == context.DeadlineExceeded {
+				log.WithField("infohash", stream.InfoHash).
+					WithField("magnet_url", magnetURL).
+					Info("storeResource failed due to timeout, scheduling background retry")
+
+				// Start background goroutine to retry with longer timeout
+				go e.backgroundStoreResource(stream.InfoHash, magnetURL)
+			} else {
+				log.WithError(err).
+					WithField("infohash", stream.InfoHash).
+					WithField("magnet_url", magnetURL).
+					Warn("failed to store resource")
+			}
+
+			// Drop stream for current request but allow background retry
+			return nil
 		}
 	}
 
@@ -135,13 +149,35 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream StreamItem) Stre
 		log.WithError(err).
 			WithField("infohash", stream.InfoHash).
 			WithField("file_idx", stream.FileIdx).
-			Warn("Failed to generate stream URL, dropping stream")
-		return StreamItem{}
+			Warn("failed to generate stream URL, dropping stream")
+		return nil
 	}
 
 	// Step 5: Add generated URL to Stream
 	stream.Url = url
 	return stream
+}
+
+// backgroundStoreResource attempts to store a resource in the background with extended timeout
+func (e *EnrichStream) backgroundStoreResource(infohash, magnetURL string) {
+	// Create a background context with 60-second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	log.WithField("infohash", infohash).
+		WithField("magnet_url", magnetURL).
+		Debug("starting background resource storage with extended timeout")
+
+	_, err := e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+	if err != nil {
+		log.WithError(err).
+			WithField("infohash", infohash).
+			WithField("magnet_url", magnetURL).
+			Warn("background resource storage failed")
+	} else {
+		log.WithField("infohash", infohash).
+			Info("background resource storage completed successfully")
+	}
 }
 
 // makeMagnetURL creates a magnet URL from InfoHash and Sources
