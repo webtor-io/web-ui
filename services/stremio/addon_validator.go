@@ -1,4 +1,4 @@
-package addon
+package stremio
 
 import (
 	"context"
@@ -9,21 +9,20 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/stremio"
 )
 
-type Validator struct {
+type AddonValidator struct {
 	client *http.Client
 }
 
-func NewValidator(client *http.Client) *Validator {
-	return &Validator{
+func NewAddonValidator(client *http.Client) *AddonValidator {
+	return &AddonValidator{
 		client: client,
 	}
 }
 
 // ValidateURL checks if the addon URL is available and has valid manifest structure
-func (av *Validator) ValidateURL(url string) error {
+func (av *AddonValidator) ValidateURL(url string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -55,7 +54,7 @@ func (av *Validator) ValidateURL(url string) error {
 	}
 
 	// Parse JSON response
-	var manifest stremio.Manifest
+	var manifest Manifest
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&manifest); err != nil {
 		return errors.Wrap(err, "invalid JSON response from addon URL")
@@ -70,7 +69,7 @@ func (av *Validator) ValidateURL(url string) error {
 }
 
 // validateManifest validates the structure and required fields of a Stremio addon manifest
-func (av *Validator) validateManifest(manifest *stremio.Manifest) error {
+func (av *AddonValidator) validateManifest(manifest *Manifest) error {
 	if strings.TrimSpace(manifest.Id) == "" {
 		return errors.New("manifest missing required field: id")
 	}

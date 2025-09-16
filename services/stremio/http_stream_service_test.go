@@ -1,4 +1,4 @@
-package addon
+package stremio
 
 import (
 	"context"
@@ -9,26 +9,25 @@ import (
 	"time"
 
 	"github.com/webtor-io/lazymap"
-	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 func TestNewStreamService(t *testing.T) {
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, "http://test.com")
 	if service == nil {
-		t.Fatal("NewStreamService returned nil")
+		t.Fatal("NewHTTPStreamService returned nil")
 	}
 }
 
 func TestStreamService_GetStreams_Success(t *testing.T) {
 	// Create mock response
-	mockResponse := &stremio.StreamsResponse{
-		Streams: []stremio.StreamItem{
+	mockResponse := &StreamsResponse{
+		Streams: []StreamItem{
 			{
 				Name:     "Torrentio\n4k HDR",
 				Title:    "Test Movie 2024 4K HDR",
 				InfoHash: "7355891df49ef0720e5cc5bc3517d21357b0a8d6",
 				FileIdx:  0,
-				BehaviorHints: &stremio.StreamBehaviorHints{
+				BehaviorHints: &StreamBehaviorHints{
 					BingeGroup: "torrentio|4k|WEB-DL|hevc|HDR",
 					Filename:   "Test.Movie.2024.4K.HDR.mkv",
 				},
@@ -42,7 +41,7 @@ func TestStreamService_GetStreams_Success(t *testing.T) {
 				Title:    "Test Movie 2024 1080p",
 				InfoHash: "aad47fa09a7597f4ed2a4ca8857c3e554694deee",
 				FileIdx:  4,
-				BehaviorHints: &stremio.StreamBehaviorHints{
+				BehaviorHints: &StreamBehaviorHints{
 					BingeGroup: "torrentio|1080p|h264",
 					Filename:   "Test.Movie.2024.1080p.mkv",
 				},
@@ -65,10 +64,10 @@ func TestStreamService_GetStreams_Success(t *testing.T) {
 	defer server.Close()
 
 	// Test the service
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, server.URL)
 	ctx := context.Background()
 
-	response, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	response, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err != nil {
 		t.Fatalf("GetStreams failed: %v", err)
 	}
@@ -107,10 +106,10 @@ func TestStreamService_GetStreams_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, server.URL)
 	ctx := context.Background()
 
-	_, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err == nil {
 		t.Error("Expected error for HTTP 500, got nil")
 	}
@@ -124,10 +123,10 @@ func TestStreamService_GetStreams_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, server.URL)
 	ctx := context.Background()
 
-	_, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err == nil {
 		t.Error("Expected error for invalid JSON, got nil")
 	}
@@ -139,8 +138,8 @@ func TestStreamService_GetStreams_Caching(t *testing.T) {
 	// Create mock server that counts requests
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		mockResponse := &stremio.StreamsResponse{
-			Streams: []stremio.StreamItem{
+		mockResponse := &StreamsResponse{
+			Streams: []StreamItem{
 				{
 					Title:    "Test Movie 2024",
 					InfoHash: "test-hash",
@@ -152,17 +151,17 @@ func TestStreamService_GetStreams_Caching(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, server.URL)
 	ctx := context.Background()
 
 	// First request
-	_, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err != nil {
 		t.Fatalf("First request failed: %v", err)
 	}
 
 	// Second request (should be cached)
-	_, err = service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err = service.GetStreams(ctx, "movie", "tt12001534")
 	if err != nil {
 		t.Fatalf("Second request failed: %v", err)
 	}
@@ -173,7 +172,7 @@ func TestStreamService_GetStreams_Caching(t *testing.T) {
 	}
 
 	// Different content should not be cached
-	_, err = service.GetStreams(ctx, server.URL, "movie", "tt99999999")
+	_, err = service.GetStreams(ctx, "movie", "tt99999999")
 	if err != nil {
 		t.Fatalf("Different content request failed: %v", err)
 	}
@@ -188,19 +187,19 @@ func TestStreamService_GetStreams_ContextTimeout(t *testing.T) {
 	// Create mock server with delay
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
-		mockResponse := &stremio.StreamsResponse{
-			Streams: []stremio.StreamItem{},
+		mockResponse := &StreamsResponse{
+			Streams: []StreamItem{},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(mockResponse)
 	}))
 	defer server.Close()
 
-	service := NewStreamService(&http.Client{})
+	service := NewHTTPStreamService(&http.Client{}, server.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	_, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err == nil {
 		t.Error("Expected context timeout error, got nil")
 	}
@@ -212,8 +211,8 @@ func TestStreamService_CacheExpiration(t *testing.T) {
 	// Create mock server that counts requests
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		mockResponse := &stremio.StreamsResponse{
-			Streams: []stremio.StreamItem{
+		mockResponse := &StreamsResponse{
+			Streams: []StreamItem{
 				{
 					Title:    "Test Movie 2024",
 					InfoHash: "test-hash",
@@ -226,9 +225,10 @@ func TestStreamService_CacheExpiration(t *testing.T) {
 	defer server.Close()
 
 	// Create service with shorter cache time for testing
-	service := &StreamService{
-		client: &http.Client{},
-		cache: lazymap.New[*stremio.StreamsResponse](&lazymap.Config{
+	service := &HTTPStreamService{
+		client:   &http.Client{},
+		addonURL: server.URL,
+		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
 			Expire:      100 * time.Millisecond, // Short cache for testing
 			ErrorExpire: 10 * time.Second,
 		}),
@@ -237,7 +237,7 @@ func TestStreamService_CacheExpiration(t *testing.T) {
 	ctx := context.Background()
 
 	// First request
-	_, err := service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err := service.GetStreams(ctx, "movie", "tt12001534")
 	if err != nil {
 		t.Fatalf("First request failed: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestStreamService_CacheExpiration(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 
 	// Second request (cache should have expired)
-	_, err = service.GetStreams(ctx, server.URL, "movie", "tt12001534")
+	_, err = service.GetStreams(ctx, "movie", "tt12001534")
 	if err != nil {
 		t.Fatalf("Second request failed: %v", err)
 	}

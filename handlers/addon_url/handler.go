@@ -14,17 +14,17 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
-	"github.com/webtor-io/web-ui/services/stremio/addon"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
 	pg        *cs.PG
-	validator *addon.Validator
+	validator *stremio.AddonValidator
 	domain    string
 }
 
-func RegisterHandler(c *cli.Context, av *addon.Validator, r *gin.Engine, pg *cs.PG) error {
+func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, pg *cs.PG) error {
 	d := c.String(common.DomainFlag)
 	if d != "" {
 		u, err := url.Parse(d)

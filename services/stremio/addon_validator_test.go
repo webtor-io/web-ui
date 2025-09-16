@@ -1,4 +1,4 @@
-package addon
+package stremio
 
 import (
 	"net/http"
@@ -178,7 +178,7 @@ func TestAddonValidator_ValidateAddonURL(t *testing.T) {
 
 			// Create validator with test HTTP client
 			client := &http.Client{Timeout: 5 * time.Second}
-			validator := NewValidator(client)
+			validator := NewAddonValidator(client)
 
 			// Test validation
 			err := validator.ValidateURL(server.URL + "/manifest.json")
@@ -211,7 +211,7 @@ func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 
 	// Create validator with short timeout
 	client := &http.Client{Timeout: 500 * time.Millisecond}
-	validator := NewValidator(client)
+	validator := NewAddonValidator(client)
 
 	err := validator.ValidateURL(server.URL + "/manifest.json")
 
@@ -227,7 +227,7 @@ func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 
 func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewValidator(client)
+	validator := NewAddonValidator(client)
 
 	tests := []struct {
 		name string
@@ -260,7 +260,7 @@ func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 
 func TestAddonValidator_ValidateManifest_EdgeCases(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewValidator(client)
+	validator := NewAddonValidator(client)
 
 	tests := []struct {
 		name        string
@@ -410,7 +410,7 @@ func TestAddonValidator_RealWorldExample(t *testing.T) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewValidator(client)
+	validator := NewAddonValidator(client)
 
 	err := validator.ValidateURL(server.URL + "/manifest.json")
 	if err != nil {
@@ -437,7 +437,7 @@ func BenchmarkAddonValidator_ValidateAddonURL(b *testing.B) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewValidator(client)
+	validator := NewAddonValidator(client)
 
 	url := server.URL + "/manifest.json"
 
