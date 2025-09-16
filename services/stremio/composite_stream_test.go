@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// mockStreamService implements StreamService for testing
+// mockStreamService implements StreamsService for testing
 type mockStreamService struct {
 	response *StreamsResponse
 	err      error
@@ -30,11 +30,11 @@ func (m *mockStreamService) GetStreams(ctx context.Context, contentType, content
 }
 
 func TestNewCompositeStreamService(t *testing.T) {
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	if composite == nil {
 		t.Fatal("expected composite service to be created")
@@ -46,11 +46,11 @@ func TestNewCompositeStreamService(t *testing.T) {
 }
 
 func TestNewCompositeStreamService_NilLogger(t *testing.T) {
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	if composite == nil {
 		t.Fatal("expected composite service to be created")
@@ -58,7 +58,7 @@ func TestNewCompositeStreamService_NilLogger(t *testing.T) {
 }
 
 func TestCompositeStreamService_GetStreams_EmptyServices(t *testing.T) {
-	composite := NewCompositeStreamService([]StreamService{})
+	composite := NewCompositeStream([]StreamsService{})
 
 	result, err := composite.GetStreams(context.Background(), "movie", "123")
 
@@ -76,7 +76,7 @@ func TestCompositeStreamService_GetStreams_EmptyServices(t *testing.T) {
 }
 
 func TestCompositeStreamService_GetStreams_Success(t *testing.T) {
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{
 			response: &StreamsResponse{
 				Streams: []StreamItem{
@@ -94,7 +94,7 @@ func TestCompositeStreamService_GetStreams_Success(t *testing.T) {
 		},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	result, err := composite.GetStreams(context.Background(), "movie", "123")
 
@@ -124,7 +124,7 @@ func TestCompositeStreamService_GetStreams_Success(t *testing.T) {
 }
 
 func TestCompositeStreamService_GetStreams_WithErrors(t *testing.T) {
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{
 			response: &StreamsResponse{
 				Streams: []StreamItem{
@@ -144,7 +144,7 @@ func TestCompositeStreamService_GetStreams_WithErrors(t *testing.T) {
 		},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	result, err := composite.GetStreams(context.Background(), "movie", "123")
 
@@ -159,7 +159,7 @@ func TestCompositeStreamService_GetStreams_WithErrors(t *testing.T) {
 }
 
 func TestCompositeStreamService_GetStreams_WithTimeout(t *testing.T) {
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{
 			response: &StreamsResponse{
 				Streams: []StreamItem{
@@ -172,7 +172,7 @@ func TestCompositeStreamService_GetStreams_WithTimeout(t *testing.T) {
 		},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	// Create context with short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -192,7 +192,7 @@ func TestCompositeStreamService_GetStreams_WithTimeout(t *testing.T) {
 
 func TestCompositeStreamService_GetStreams_OrderPreservation(t *testing.T) {
 	// Create services with different response times to test order preservation
-	services := []StreamService{
+	services := []StreamsService{
 		&mockStreamService{
 			response: &StreamsResponse{
 				Streams: []StreamItem{
@@ -219,7 +219,7 @@ func TestCompositeStreamService_GetStreams_OrderPreservation(t *testing.T) {
 		},
 	}
 
-	composite := NewCompositeStreamService(services)
+	composite := NewCompositeStream(services)
 
 	result, err := composite.GetStreams(context.Background(), "movie", "123")
 
@@ -240,5 +240,43 @@ func TestCompositeStreamService_GetStreams_OrderPreservation(t *testing.T) {
 	}
 	if result.Streams[2].Title != "Third Service" {
 		t.Errorf("expected third stream to be 'Third Service', got '%s'", result.Streams[2].Title)
+	}
+}
+
+func TestConvertManifestURLToBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "URL with manifest.json suffix",
+			input:    "https://example.com/addon/manifest.json",
+			expected: "https://example.com/addon",
+		},
+		{
+			name:     "URL without manifest.json suffix",
+			input:    "https://example.com/addon",
+			expected: "https://example.com/addon",
+		},
+		{
+			name:     "URL with manifest.json in middle",
+			input:    "https://example.com/manifest.json/addon",
+			expected: "https://example.com/manifest.json/addon",
+		},
+		{
+			name:     "Complex URL with manifest.json suffix",
+			input:    "https://api.example.com/v1/stremio/addon/manifest.json",
+			expected: "https://api.example.com/v1/stremio/addon",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertManifestURLToBaseURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("convertManifestURLToBaseURL(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }

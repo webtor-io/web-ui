@@ -53,7 +53,7 @@ type CatalogItem struct {
 	Id   string `json:"id"`
 }
 
-type Manifest struct {
+type ManifestResponse struct {
 	Id            string         `json:"id"`
 	Version       string         `json:"version"`
 	Name          string         `json:"name"`

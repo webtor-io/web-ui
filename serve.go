@@ -282,8 +282,11 @@ func serve(c *cli.Context) error {
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
 
+	// Setting StremioBuilder
+	sb := stremios.NewBuilder(c, pg, cl, sapi)
+
 	// Setting Stremio
-	stremio.RegisterHandler(c, r, pg, ats, sapi)
+	stremio.RegisterHandler(r, ats, sb)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

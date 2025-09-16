@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// dedupMockStreamService implements StreamService for testing
+// dedupMockStreamService implements StreamsService for testing
 type dedupMockStreamService struct {
 	name    string
 	streams []StreamItem
@@ -26,10 +26,10 @@ func (m *dedupMockStreamService) GetStreams(ctx context.Context, contentType, co
 
 func TestDedupStreamService_GetName(t *testing.T) {
 	inner := &dedupMockStreamService{name: "MockService"}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
-	if got := dedup.GetName(); got != "DedupStreamService" {
-		t.Errorf("GetName() = %v, want %v", got, "DedupStreamService")
+	if got := dedup.GetName(); got != "DedupStream" {
+		t.Errorf("GetName() = %v, want %v", got, "DedupStream")
 	}
 }
 
@@ -41,7 +41,7 @@ func TestDedupStreamService_GetStreams_NoDuplicates(t *testing.T) {
 	}
 
 	inner := &dedupMockStreamService{streams: streams}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 
@@ -73,7 +73,7 @@ func TestDedupStreamService_GetStreams_WithDuplicates(t *testing.T) {
 	}
 
 	inner := &dedupMockStreamService{streams: streams}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 
@@ -111,7 +111,7 @@ func TestDedupStreamService_GetStreams_WithDuplicates(t *testing.T) {
 
 func TestDedupStreamService_GetStreams_EmptyResponse(t *testing.T) {
 	inner := &dedupMockStreamService{streams: []StreamItem{}}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 
@@ -126,7 +126,7 @@ func TestDedupStreamService_GetStreams_EmptyResponse(t *testing.T) {
 
 func TestDedupStreamService_GetStreams_NilResponse(t *testing.T) {
 	inner := &dedupMockStreamService{streams: nil}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 
@@ -142,7 +142,7 @@ func TestDedupStreamService_GetStreams_NilResponse(t *testing.T) {
 func TestDedupStreamService_GetStreams_InnerServiceError(t *testing.T) {
 	expectedErr := errors.New("inner service error")
 	inner := &dedupMockStreamService{err: expectedErr}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 
@@ -163,7 +163,7 @@ func TestDedupStreamService_GetStreams_EmptyInfoHashAndFileIdx(t *testing.T) {
 	}
 
 	inner := &dedupMockStreamService{streams: streams}
-	dedup := NewDedupStreamService(inner)
+	dedup := NewDedupStream(inner)
 
 	result, err := dedup.GetStreams(context.Background(), "movie", "test")
 

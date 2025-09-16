@@ -54,7 +54,7 @@ func (av *AddonValidator) ValidateURL(url string) error {
 	}
 
 	// Parse JSON response
-	var manifest Manifest
+	var manifest ManifestResponse
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&manifest); err != nil {
 		return errors.Wrap(err, "invalid JSON response from addon URL")
@@ -69,7 +69,7 @@ func (av *AddonValidator) ValidateURL(url string) error {
 }
 
 // validateManifest validates the structure and required fields of a Stremio addon manifest
-func (av *AddonValidator) validateManifest(manifest *Manifest) error {
+func (av *AddonValidator) validateManifest(manifest *ManifestResponse) error {
 	if strings.TrimSpace(manifest.Id) == "" {
 		return errors.New("manifest missing required field: id")
 	}

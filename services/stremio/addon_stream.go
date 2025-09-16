@@ -5,41 +5,38 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
 )
 
-// HTTPStreamService handles requests to Stremio addon stream endpoints
-type HTTPStreamService struct {
+// AddonStream handles requests to Stremio addon stream endpoints
+type AddonStream struct {
 	client   *http.Client
 	addonURL string
 	cache    lazymap.LazyMap[*StreamsResponse]
 }
 
-// Ensure HTTPStreamService implements StreamService
-var _ StreamService = (*HTTPStreamService)(nil)
+// Ensure AddonStream implements StreamsService
+var _ StreamsService = (*AddonStream)(nil)
 
-// NewHTTPStreamService creates a new HTTP stream service instance
-func NewHTTPStreamService(cl *http.Client, addonURL string) *HTTPStreamService {
-	return &HTTPStreamService{
+// NewAddonStream creates a new addon stream service instance
+func NewAddonStream(cl *http.Client, addonURL string, cache lazymap.LazyMap[*StreamsResponse]) *AddonStream {
+	return &AddonStream{
 		client:   cl,
 		addonURL: addonURL,
-		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
-			Expire:      1 * time.Minute,  // Cache for 1 minute as required
-			ErrorExpire: 10 * time.Second, // Cache errors for 10 seconds
-		}),
+		cache:    cache,
 	}
 }
 
 // GetName returns the name of this stream service for logging purposes
-func (s *HTTPStreamService) GetName() string {
-	return fmt.Sprintf("HTTPStreamService (%v)", s.addonURL)
+func (s *AddonStream) GetName() string {
+	return fmt.Sprintf("AddonStream (%v)", s.addonURL)
 }
 
 // GetStreams fetches streams from a Stremio addon endpoint with caching
-func (s *HTTPStreamService) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
+func (s *AddonStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
 	// Create cache key from URL components
 	cacheKey := fmt.Sprintf("%s_%s_%s", s.addonURL, contentType, contentID)
 
@@ -49,7 +46,7 @@ func (s *HTTPStreamService) GetStreams(ctx context.Context, contentType, content
 }
 
 // fetchStreams performs the actual HTTP request to the addon endpoint
-func (s *HTTPStreamService) fetchStreams(ctx context.Context, addonURL, contentType, contentID string) (*StreamsResponse, error) {
+func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, contentID string) (*StreamsResponse, error) {
 	// Construct the stream endpoint URL
 	// Format: {addonURL}/stream/{contentType}/{contentID}.json
 	streamURL := fmt.Sprintf("%s/stream/%s/%s.json", addonURL, contentType, contentID)
@@ -62,16 +59,25 @@ func (s *HTTPStreamService) fetchStreams(ctx context.Context, addonURL, contentT
 
 	// Set appropriate headers
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
 
 	// Execute the request
 	resp, err := s.client.Do(req)
 	if err != nil {
+		log.WithError(err).
+			WithField("service_name", s.GetName()).
+			WithField("request_url", streamURL).
+			Warn("failed to execute addon stream request")
 		return nil, errors.Wrap(err, "failed to execute request")
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
+		log.WithField("service_name", s.GetName()).
+			WithField("request_url", streamURL).
+			WithField("status_code", resp.StatusCode).
+			Warn("addon returned non-200 status code")
 		return nil, errors.Errorf("addon returned status %d", resp.StatusCode)
 	}
 

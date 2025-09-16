@@ -165,12 +165,13 @@ Additional development notes
   - **Include contextual information in logs**: Always log relevant context such as request URLs, service names, and other identifying information.
   - **Structured logging fields**: Use `WithField()` and `WithFields()` to add structured data to log entries for better searchability.
   - **Error handling**: Log errors with appropriate levels (Warn for recoverable errors, Error for serious issues) and include the original error using `WithError()`.
+  - **All log messages should start with a small letter**
   - Example pattern for service logging:
     ```go
     log.WithError(err).
         WithField("service_name", serviceName).
         WithField("request_url", requestURL).
-        Warn("Service request failed, dropping results")
+        Warn("service request failed, dropping results")
     ```
 
 Debugging tips

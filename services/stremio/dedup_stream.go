@@ -4,25 +4,25 @@ import (
 	"context"
 )
 
-// DedupStreamService wraps another StreamService and removes duplicate streams
+// DedupStream wraps another StreamsService and removes duplicate streams
 // based on infohash and file index while preserving order
-type DedupStreamService struct {
-	inner StreamService
+type DedupStream struct {
+	inner StreamsService
 }
 
-// Ensure DedupStreamService implements StreamService
-var _ StreamService = (*DedupStreamService)(nil)
+// Ensure DedupStream implements StreamsService
+var _ StreamsService = (*DedupStream)(nil)
 
-// NewDedupStreamService creates a new deduplication stream service that wraps the given service
-func NewDedupStreamService(inner StreamService) *DedupStreamService {
-	return &DedupStreamService{
+// NewDedupStream creates a new deduplication stream service that wraps the given service
+func NewDedupStream(inner StreamsService) *DedupStream {
+	return &DedupStream{
 		inner: inner,
 	}
 }
 
 // GetName returns the name of this dedup stream service for logging purposes
-func (d *DedupStreamService) GetName() string {
-	return "DedupStreamService"
+func (d *DedupStream) GetName() string {
+	return "DedupStream"
 }
 
 // dedupKey represents the unique key used for deduplication
@@ -33,7 +33,7 @@ type dedupKey struct {
 
 // GetStreams fetches streams from the inner service and removes duplicates
 // based on infohash and file index while maintaining original order
-func (d *DedupStreamService) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
+func (d *DedupStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
 	// Get streams from inner service
 	response, err := d.inner.GetStreams(ctx, contentType, contentID)
 	if err != nil {
@@ -58,6 +58,8 @@ func (d *DedupStreamService) GetStreams(ctx context.Context, contentType, conten
 		// Only add the stream if we haven't seen this combination before
 		if !seen[key] {
 			seen[key] = true
+			dedupedStreams = append(dedupedStreams, stream)
+		} else if stream.Url != "" {
 			dedupedStreams = append(dedupedStreams, stream)
 		}
 	}
