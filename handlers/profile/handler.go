@@ -21,6 +21,7 @@ type Data struct {
 	StremioAddonURL string
 	WebDAVURL       string
 	EmbedDomains    []models.EmbedDomain
+	AddonUrls       []models.AddonUrl
 	Error           string
 }
 
@@ -97,10 +98,18 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	// Get user addon URLs
+	addonUrls, err := models.GetUserAddonUrls(db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL: stremioURL,
 		WebDAVURL:       webdavURL,
 		EmbedDomains:    domains,
+		AddonUrls:       addonUrls,
 		Error:           c.Query("error"),
 	}))
 }

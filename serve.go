@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
+	"github.com/webtor-io/web-ui/handlers/addon_url"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
@@ -45,6 +46,8 @@ import (
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
 	w "github.com/webtor-io/web-ui/services/web"
+
+	stremios "github.com/webtor-io/web-ui/services/stremio"
 )
 
 func makeServeCMD() cli.Command {
@@ -256,6 +259,14 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
+	av := stremios.NewAddonValidator(cl)
+
+	// Setting AddonUrlHandler
+	err = addon_url.RegisterHandler(c, av, r, pg)
+	if err != nil {
+		return err
+	}
+
 	// Setting EmbedExamplesHandler
 	wee.RegisterHandler(r, tm)
 
@@ -271,8 +282,11 @@ func serve(c *cli.Context) error {
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
 
+	// Setting StremioBuilder
+	sb := stremios.NewBuilder(c, pg, cl, sapi)
+
 	// Setting Stremio
-	stremio.RegisterHandler(c, r, pg, ats, sapi)
+	stremio.RegisterHandler(r, ats, sb)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

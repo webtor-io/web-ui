@@ -1,12 +1,22 @@
 package stremio
 
+// StreamBehaviorHints represents behavior hints specific to stream items
+type StreamBehaviorHints struct {
+	BingeGroup string `json:"bingeGroup,omitempty"`
+	Filename   string `json:"filename,omitempty"`
+}
+
 type StreamItem struct {
-	Title       string `json:"title"`
-	InfoHash    string `json:"infoHash,omitempty"`
-	FileIdx     uint8  `json:"fileIdx,omitempty"`
-	Url         string `json:"url,omitempty"`
-	YtId        string `json:"ytId,omitempty"`
-	ExternalUrl string `json:"externalUrl,omitempty"`
+	Name          string               `json:"name,omitempty"`
+	Title         string               `json:"title,omitempty"`
+	InfoHash      string               `json:"infoHash,omitempty"`
+	FileIdx       int                  `json:"fileIdx,omitempty"`
+	Description   string               `json:"description,omitempty"`
+	Url           string               `json:"url,omitempty"`
+	YtId          string               `json:"ytId,omitempty"`
+	ExternalUrl   string               `json:"externalUrl,omitempty"`
+	BehaviorHints *StreamBehaviorHints `json:"behaviorHints,omitempty"`
+	Sources       []string             `json:"sources,omitempty"`
 }
 
 type StreamsResponse struct {
@@ -44,14 +54,14 @@ type CatalogItem struct {
 	Id   string `json:"id"`
 }
 
-type Manifest struct {
+type ManifestResponse struct {
 	Id            string         `json:"id"`
 	Version       string         `json:"version"`
 	Name          string         `json:"name"`
 	Description   string         `json:"description"`
 	Types         []string       `json:"types"`
 	Catalogs      []CatalogItem  `json:"catalogs"`
-	Resources     []string       `json:"resources"`
+	Resources     interface{}    `json:"resources"`
 	Logo          string         `json:"logo,omitempty"`
 	Background    string         `json:"background,omitempty"`
 	ContactEmail  string         `json:"contactEmail,omitempty"`

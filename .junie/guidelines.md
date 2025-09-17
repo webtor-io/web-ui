@@ -155,6 +155,25 @@ Additional development notes
   - Keep external calls time-bounded: most external APIs in this repo use context.WithTimeout and lazymap caches; follow the same patterns for new integrations.
   - Frontend: Tailwind v4 and webpack 5 are used. CSS is processed through postcss. Stylelint is available; to use it, add an npm script, e.g., "lint:css": "stylelint 'assets/src/**/*.css'".
 
+- Interface naming conventions
+  - **Interface names should NOT use "Interface" suffix**. Name interfaces directly, e.g., `StreamService`, not `StreamServiceInterface`.
+  - **Implementation struct names should be descriptive**. Use specific names that describe the implementation type, e.g., `HttpStreamService` for HTTP-based implementations.
+  - All interface methods should be well-documented with clear purpose and parameters.
+
+- Logging practices
+  - **Use global logrus instance** instead of injecting loggers into service constructors. Import `log "github.com/sirupsen/logrus"` and use `log.WithError()`, `log.WithField()`, etc.
+  - **Include contextual information in logs**: Always log relevant context such as request URLs, service names, and other identifying information.
+  - **Structured logging fields**: Use `WithField()` and `WithFields()` to add structured data to log entries for better searchability.
+  - **Error handling**: Log errors with appropriate levels (Warn for recoverable errors, Error for serious issues) and include the original error using `WithError()`.
+  - **All log messages should start with a small letter**
+  - Example pattern for service logging:
+    ```go
+    log.WithError(err).
+        WithField("service_name", serviceName).
+        WithField("request_url", requestURL).
+        Warn("service request failed, dropping results")
+    ```
+
 Debugging tips
 - Enable pprof/probe: serve.go registers common-services Pprof and Probe servers if corresponding flags/envs are set. Consult github.com/webtor-io/common-services for flag names and endpoints; typical pprof binding is on a secondary port.
 - To test API connectivity without RapidAPI, port-forward rest-api from Kubernetes or set REST_API_SERVICE_HOST/PORT to a reachable instance. README shows kubectl and kubefwd examples.

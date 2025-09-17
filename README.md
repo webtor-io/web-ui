@@ -50,6 +50,7 @@ Some features to mention:
     - [ ] AI-powered
 - [x] Integrations 
   - [x] Stremio
+  - [x] Stremio Addons
   - [x] WebDAV
   - [ ] Torznab
 
