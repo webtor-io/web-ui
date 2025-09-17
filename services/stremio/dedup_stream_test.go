@@ -66,10 +66,10 @@ func TestDedupStreamService_GetStreams_WithDuplicates(t *testing.T) {
 	streams := []StreamItem{
 		{Title: "Stream 1", InfoHash: "hash1", FileIdx: 0},
 		{Title: "Stream 2", InfoHash: "hash2", FileIdx: 1},
-		{Title: "Stream 3 (duplicate)", InfoHash: "hash1", FileIdx: 0}, // Duplicate by infohash+fileIdx
+		{Title: "Stream 3 (duplicate)", InfoHash: "hash1", FileIdx: 0}, // Duplicate by infohash - should be removed
 		{Title: "Stream 4", InfoHash: "hash3", FileIdx: 0},
-		{Title: "Stream 5 (duplicate)", InfoHash: "hash2", FileIdx: 1}, // Another duplicate
-		{Title: "Stream 6", InfoHash: "hash1", FileIdx: 1},             // Same infohash, different fileIdx - should keep
+		{Title: "Stream 5 (duplicate)", InfoHash: "hash2", FileIdx: 1},                                             // Another duplicate - should be removed
+		{Title: "Stream 6 (duplicate with URL)", InfoHash: "hash1", FileIdx: 1, Url: "http://example.com/stream6"}, // Same infohash but has URL - should keep
 	}
 
 	inner := &dedupMockStreamService{streams: streams}
@@ -86,23 +86,23 @@ func TestDedupStreamService_GetStreams_WithDuplicates(t *testing.T) {
 	}
 
 	// Verify order is preserved and correct streams are kept
-	expected := []string{"Stream 1", "Stream 2", "Stream 4", "Stream 6"}
+	expected := []string{"Stream 1", "Stream 2", "Stream 4", "Stream 6 (duplicate with URL)"}
 	for i, stream := range result.Streams {
 		if stream.Title != expected[i] {
 			t.Errorf("Stream %d title = %v, want %v", i, stream.Title, expected[i])
 		}
 	}
 
-	// Verify the unique combinations
+	// Verify the unique combinations (now only InfoHash matters, except when URL is present)
 	expectedCombos := []dedupKey{
-		{"hash1", 0},
-		{"hash2", 1},
-		{"hash3", 0},
-		{"hash1", 1},
+		{"hash1"},
+		{"hash2"},
+		{"hash3"},
+		{"hash1"}, // This one is kept because it has a URL
 	}
 
 	for i, stream := range result.Streams {
-		key := dedupKey{InfoHash: stream.InfoHash, FileIdx: stream.FileIdx}
+		key := dedupKey{InfoHash: stream.InfoHash}
 		if key != expectedCombos[i] {
 			t.Errorf("Stream %d key = %v, want %v", i, key, expectedCombos[i])
 		}

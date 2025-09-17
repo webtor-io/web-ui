@@ -28,7 +28,8 @@ func (d *DedupStream) GetName() string {
 // dedupKey represents the unique key used for deduplication
 type dedupKey struct {
 	InfoHash string
-	FileIdx  uint8
+	//FileIdx  uint8
+	//Filename string
 }
 
 // GetStreams fetches streams from the inner service and removes duplicates
@@ -52,7 +53,8 @@ func (d *DedupStream) GetStreams(ctx context.Context, contentType, contentID str
 	for _, stream := range response.Streams {
 		key := dedupKey{
 			InfoHash: stream.InfoHash,
-			FileIdx:  stream.FileIdx,
+			//Filename: stream.BehaviorHints.Filename,
+			//FileIdx:  stream.FileIdx,
 		}
 
 		// Only add the stream if we haven't seen this combination before

@@ -121,6 +121,9 @@ func TestEnrichStream_GetStreams_NoInfoHash(t *testing.T) {
 					Url:   "", // No URL
 					// No InfoHash
 					FileIdx: 0,
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},
@@ -150,6 +153,9 @@ func TestEnrichStream_GetStreams_ResourceExists(t *testing.T) {
 					InfoHash: "testhash",
 					FileIdx:  0,
 					Sources:  []string{"tracker1", "tracker2"},
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},
@@ -163,6 +169,7 @@ func TestEnrichStream_GetStreams_ResourceExists(t *testing.T) {
 			Items: []ra.ListItem{
 				{
 					ID:   "file1",
+					Name: "test_file.mp4",
 					Type: ra.ListTypeFile,
 				},
 			},
@@ -204,6 +211,9 @@ func TestEnrichStream_GetStreams_ResourceDoesNotExist(t *testing.T) {
 					InfoHash: "testhash",
 					FileIdx:  0,
 					Sources:  []string{"tracker1", "tracker2"},
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},
@@ -219,6 +229,7 @@ func TestEnrichStream_GetStreams_ResourceDoesNotExist(t *testing.T) {
 			Items: []ra.ListItem{
 				{
 					ID:   "file1",
+					Name: "test_file.mp4",
 					Type: ra.ListTypeFile,
 				},
 			},
@@ -259,6 +270,9 @@ func TestEnrichStream_GetStreams_APIError(t *testing.T) {
 					Url:      "", // No URL
 					InfoHash: "testhash",
 					FileIdx:  0,
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},
@@ -325,6 +339,9 @@ func TestEnrichStream_Timeout(t *testing.T) {
 					Url:      "", // No URL
 					InfoHash: "testhash",
 					FileIdx:  0,
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},
@@ -361,6 +378,9 @@ func TestEnrichStream_ConcurrentAccess(t *testing.T) {
 			InfoHash: fmt.Sprintf("testhash%d", i),
 			FileIdx:  uint8(i % 10),
 			Sources:  []string{"tracker1", "tracker2"},
+			BehaviorHints: &StreamBehaviorHints{
+				Filename: fmt.Sprintf("test_file_%d.mp4", i),
+			},
 		}
 	}
 
@@ -373,16 +393,16 @@ func TestEnrichStream_ConcurrentAccess(t *testing.T) {
 		getResourceResponse: &ra.ResourceResponse{},
 		listContentResponse: &ra.ListResponse{
 			Items: []ra.ListItem{
-				{ID: "file0", Type: ra.ListTypeFile},
-				{ID: "file1", Type: ra.ListTypeFile},
-				{ID: "file2", Type: ra.ListTypeFile},
-				{ID: "file3", Type: ra.ListTypeFile},
-				{ID: "file4", Type: ra.ListTypeFile},
-				{ID: "file5", Type: ra.ListTypeFile},
-				{ID: "file6", Type: ra.ListTypeFile},
-				{ID: "file7", Type: ra.ListTypeFile},
-				{ID: "file8", Type: ra.ListTypeFile},
-				{ID: "file9", Type: ra.ListTypeFile},
+				{ID: "file0", Name: "test_file_0.mp4", Type: ra.ListTypeFile},
+				{ID: "file1", Name: "test_file_1.mp4", Type: ra.ListTypeFile},
+				{ID: "file2", Name: "test_file_2.mp4", Type: ra.ListTypeFile},
+				{ID: "file3", Name: "test_file_3.mp4", Type: ra.ListTypeFile},
+				{ID: "file4", Name: "test_file_4.mp4", Type: ra.ListTypeFile},
+				{ID: "file5", Name: "test_file_5.mp4", Type: ra.ListTypeFile},
+				{ID: "file6", Name: "test_file_6.mp4", Type: ra.ListTypeFile},
+				{ID: "file7", Name: "test_file_7.mp4", Type: ra.ListTypeFile},
+				{ID: "file8", Name: "test_file_8.mp4", Type: ra.ListTypeFile},
+				{ID: "file9", Name: "test_file_9.mp4", Type: ra.ListTypeFile},
 			},
 			Count: 10,
 		},
@@ -429,6 +449,9 @@ func TestEnrichStream_BackgroundRetry(t *testing.T) {
 					InfoHash: "testhash",
 					FileIdx:  0,
 					Sources:  []string{"tracker1", "tracker2"},
+					BehaviorHints: &StreamBehaviorHints{
+						Filename: "test_file.mp4",
+					},
 				},
 			},
 		},

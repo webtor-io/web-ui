@@ -144,11 +144,11 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *St
 	}
 
 	// Step 4: Generate URL with webtor's API using FileIdx
-	url, err := e.generateStreamURL(ctx, stream.InfoHash, stream.FileIdx)
+	url, err := e.generateStreamURL(ctx, stream.InfoHash, stream)
 	if err != nil {
 		log.WithError(err).
 			WithField("infohash", stream.InfoHash).
-			WithField("file_idx", stream.FileIdx).
+			WithField("filename", stream.BehaviorHints.Filename).
 			Warn("failed to generate stream URL, dropping stream")
 		return nil
 	}
@@ -197,7 +197,7 @@ func (e *EnrichStream) makeMagnetURL(infohash string, sources []string) string {
 }
 
 // generateStreamURL generates a URL for the stream using the API
-func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, fileIdx uint8) (string, error) {
+func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, si *StreamItem) (string, error) {
 	// List resource content to find the file at the given index
 	listArgs := &api.ListResourceContentArgs{
 		Limit:  100,
@@ -205,7 +205,8 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, f
 	}
 
 	var targetItem *ra.ListItem
-	currentIdx := uint8(0)
+
+	var idx int
 
 	// Paginate through results to find the file at the specified index
 	for {
@@ -216,11 +217,11 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, f
 
 		for _, item := range resp.Items {
 			if item.Type == ra.ListTypeFile {
-				if currentIdx == fileIdx {
+				if (si.BehaviorHints.Filename != "" && item.Name == si.BehaviorHints.Filename) || (si.BehaviorHints.Filename == "" && idx == int(si.FileIdx)) {
 					targetItem = &item
 					break
 				}
-				currentIdx++
+				idx++
 			}
 		}
 
@@ -237,7 +238,7 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, f
 	}
 
 	if targetItem == nil {
-		return "", fmt.Errorf("file at index %d not found", fileIdx)
+		return "", fmt.Errorf("file %v with idx %v not found", si.BehaviorHints.Filename, si.FileIdx)
 	}
 
 	// Export the resource content to get the download URL

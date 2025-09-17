@@ -129,16 +129,12 @@ func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoC
 	return items, nil
 }
 
-func (s *Library) makeStreamURL(ctx context.Context, cla *api.Claims, resourceID string, p string) (string, int, error) {
-	ti, idx, err := s.retrieveTorrentItem(ctx, resourceID, cla, p)
+func (s *Library) makeStreamURL(ctx context.Context, cla *api.Claims, resourceID string, id string) (string, error) {
+	er, err := s.sapi.ExportResourceContent(ctx, cla, resourceID, id, "")
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
-	er, err := s.sapi.ExportResourceContent(ctx, cla, resourceID, ti.ID, "")
-	if err != nil {
-		return "", 0, err
-	}
-	return er.ExportItems["download"].URL, idx, nil
+	return er.ExportItems["download"].URL, nil
 }
 
 func (s *Library) makeStreamTitle(title string, md map[string]any) string {
@@ -189,15 +185,11 @@ func (s *Library) bindArgs(ct, id string) (args *Args, err error) {
 }
 
 func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithMetadata, ct string, args *Args) (*StreamItem, error) {
-	var su, title string
+	var su, title, p string
 	var err error
 	var idx int
 	if ct == "movie" {
-		p := *vc.GetPath()
-		su, idx, err = s.makeStreamURL(ctx, s.cla, vc.GetContent().ResourceID, p)
-		if err != nil {
-			return nil, err
-		}
+		p = *vc.GetPath()
 		title = s.makeStreamTitle(vc.GetContent().Title, vc.GetContent().Metadata)
 
 	} else if ct == "series" {
@@ -205,19 +197,25 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 		if ep == nil {
 			return nil, nil
 		}
-		p := *ep.Path
-		su, idx, err = s.makeStreamURL(ctx, s.cla, vc.GetContent().ResourceID, p)
-		if err != nil {
-			return nil, err
-		}
-
+		p = *ep.Path
 		title = s.makeStreamTitle(fmt.Sprintf("%v.S%vE%v", vc.GetContent().Title, args.Season, args.Episode), ep.Metadata)
+	}
+	ti, idx, err := s.retrieveTorrentItem(ctx, vc.GetContent().ResourceID, s.cla, p)
+	if err != nil {
+		return nil, err
+	}
+	su, err = s.makeStreamURL(ctx, s.cla, vc.GetContent().ResourceID, ti.ID)
+	if err != nil {
+		return nil, err
 	}
 	return &StreamItem{
 		Title:    title,
 		Url:      su,
 		InfoHash: vc.GetContent().ResourceID,
 		FileIdx:  uint8(idx),
+		BehaviorHints: &StreamBehaviorHints{
+			Filename: ti.Name,
+		},
 	}, nil
 
 }
