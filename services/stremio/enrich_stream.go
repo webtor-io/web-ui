@@ -160,8 +160,8 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *St
 
 // backgroundStoreResource attempts to store a resource in the background with extended timeout
 func (e *EnrichStream) backgroundStoreResource(infohash, magnetURL string) {
-	// Create a background context with 60-second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// Create a background context with 5-minutes timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	log.WithField("infohash", infohash).
