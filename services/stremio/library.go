@@ -212,7 +212,7 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 		Title:    title,
 		Url:      su,
 		InfoHash: vc.GetContent().ResourceID,
-		FileIdx:  uint8(idx),
+		FileIdx:  idx,
 		BehaviorHints: &StreamBehaviorHints{
 			Filename: ti.Name,
 		},

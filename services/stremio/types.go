@@ -10,7 +10,7 @@ type StreamItem struct {
 	Name          string               `json:"name,omitempty"`
 	Title         string               `json:"title,omitempty"`
 	InfoHash      string               `json:"infoHash,omitempty"`
-	FileIdx       uint8                `json:"fileIdx,omitempty"`
+	FileIdx       int                  `json:"fileIdx,omitempty"`
 	Description   string               `json:"description,omitempty"`
 	Url           string               `json:"url,omitempty"`
 	YtId          string               `json:"ytId,omitempty"`
