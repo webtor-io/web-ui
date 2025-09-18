@@ -14,11 +14,12 @@ import (
 )
 
 type Builder struct {
-	pg     *cs.PG
-	cache  lazymap.LazyMap[*StreamsResponse]
-	domain string
-	rapi   *api.Api
-	cl     *http.Client
+	pg        *cs.PG
+	cache     lazymap.LazyMap[*StreamsResponse]
+	domain    string
+	rapi      *api.Api
+	cl        *http.Client
+	userAgent string
 }
 
 func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api) *Builder {
@@ -28,9 +29,10 @@ func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api) *Buil
 			Expire:      1 * time.Minute,
 			ErrorExpire: 10 * time.Second,
 		}),
-		domain: c.String(common.DomainFlag),
-		rapi:   rapi,
-		cl:     cl,
+		domain:    c.String(common.DomainFlag),
+		rapi:      rapi,
+		cl:        cl,
+		userAgent: GetUserAgent(c),
 	}
 }
 
@@ -63,7 +65,7 @@ func (s *Builder) BuildStreamsService(uID uuid.UUID, cla *api.Claims) (StreamsSe
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	acs, err := NewAddonCompositeStreamsByUserID(db, s.cl, uID, s.cache)
+	acs, err := NewAddonCompositeStreamsByUserID(db, s.cl, uID, s.cache, s.userAgent)
 	if err != nil {
 		return nil, err
 	}

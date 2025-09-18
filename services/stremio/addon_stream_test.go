@@ -16,7 +16,7 @@ func TestNewStreamService(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, "http://test.com", cache)
+	service := NewAddonStream(&http.Client{}, "http://test.com", cache, "")
 	if service == nil {
 		t.Fatal("NewAddonStream returned nil")
 	}
@@ -72,7 +72,7 @@ func TestStreamService_GetStreams_Success(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, server.URL, cache)
+	service := NewAddonStream(&http.Client{}, server.URL, cache, "")
 	ctx := context.Background()
 
 	response, err := service.GetStreams(ctx, "movie", "tt12001534")
@@ -118,7 +118,7 @@ func TestStreamService_GetStreams_HTTPError(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, server.URL, cache)
+	service := NewAddonStream(&http.Client{}, server.URL, cache, "")
 	ctx := context.Background()
 
 	_, err := service.GetStreams(ctx, "movie", "tt12001534")
@@ -139,7 +139,7 @@ func TestStreamService_GetStreams_InvalidJSON(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, server.URL, cache)
+	service := NewAddonStream(&http.Client{}, server.URL, cache, "")
 	ctx := context.Background()
 
 	_, err := service.GetStreams(ctx, "movie", "tt12001534")
@@ -171,7 +171,7 @@ func TestStreamService_GetStreams_Caching(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, server.URL, cache)
+	service := NewAddonStream(&http.Client{}, server.URL, cache, "")
 	ctx := context.Background()
 
 	// First request
@@ -219,7 +219,7 @@ func TestStreamService_GetStreams_ContextTimeout(t *testing.T) {
 		Expire:      1 * time.Minute,
 		ErrorExpire: 10 * time.Second,
 	})
-	service := NewAddonStream(&http.Client{}, server.URL, cache)
+	service := NewAddonStream(&http.Client{}, server.URL, cache, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 

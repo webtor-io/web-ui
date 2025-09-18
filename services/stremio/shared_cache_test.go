@@ -37,8 +37,8 @@ func TestHTTPStreamService_SharedCache(t *testing.T) {
 	})
 
 	// Create two different AddonStream instances with the same shared cache
-	service1 := NewAddonStream(&http.Client{}, server.URL, sharedCache)
-	service2 := NewAddonStream(&http.Client{}, server.URL, sharedCache)
+	service1 := NewAddonStream(&http.Client{}, server.URL, sharedCache, "")
+	service2 := NewAddonStream(&http.Client{}, server.URL, sharedCache, "")
 
 	ctx := context.Background()
 
@@ -104,8 +104,8 @@ func TestHTTPStreamService_NonSharedCache(t *testing.T) {
 	})
 
 	// Create two different AddonStream instances with separate caches
-	service1 := NewAddonStream(&http.Client{}, server.URL, cache1)
-	service2 := NewAddonStream(&http.Client{}, server.URL, cache2)
+	service1 := NewAddonStream(&http.Client{}, server.URL, cache1, "")
+	service2 := NewAddonStream(&http.Client{}, server.URL, cache2, "")
 
 	ctx := context.Background()
 

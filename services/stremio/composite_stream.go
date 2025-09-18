@@ -124,7 +124,7 @@ func convertManifestURLToBaseURL(manifestURL string) string {
 }
 
 // NewAddonCompositeStreamsByUserID creates a CompositeStream by fetching all addon URLs for a user
-func NewAddonCompositeStreamsByUserID(db *pg.DB, client *http.Client, userID uuid.UUID, cache lazymap.LazyMap[*StreamsResponse]) (*CompositeStream, error) {
+func NewAddonCompositeStreamsByUserID(db *pg.DB, client *http.Client, userID uuid.UUID, cache lazymap.LazyMap[*StreamsResponse], userAgent string) (*CompositeStream, error) {
 	// Get all addon URLs for the user
 	addonUrls, err := models.GetUserAddonUrls(db, userID)
 	if err != nil {
@@ -138,7 +138,7 @@ func NewAddonCompositeStreamsByUserID(db *pg.DB, client *http.Client, userID uui
 		baseURL := convertManifestURLToBaseURL(addonUrl.Url)
 
 		// Create addon stream service with provided cache
-		addonService := NewAddonStream(client, baseURL, cache)
+		addonService := NewAddonStream(client, baseURL, cache, userAgent)
 		services = append(services, addonService)
 	}
 

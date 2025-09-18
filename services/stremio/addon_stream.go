@@ -13,20 +13,22 @@ import (
 
 // AddonStream handles requests to Stremio addon stream endpoints
 type AddonStream struct {
-	client   *http.Client
-	addonURL string
-	cache    lazymap.LazyMap[*StreamsResponse]
+	client    *http.Client
+	addonURL  string
+	cache     lazymap.LazyMap[*StreamsResponse]
+	userAgent string
 }
 
 // Ensure AddonStream implements StreamsService
 var _ StreamsService = (*AddonStream)(nil)
 
 // NewAddonStream creates a new addon stream service instance
-func NewAddonStream(cl *http.Client, addonURL string, cache lazymap.LazyMap[*StreamsResponse]) *AddonStream {
+func NewAddonStream(cl *http.Client, addonURL string, cache lazymap.LazyMap[*StreamsResponse], userAgent string) *AddonStream {
 	return &AddonStream{
-		client:   cl,
-		addonURL: addonURL,
-		cache:    cache,
+		client:    cl,
+		addonURL:  addonURL,
+		cache:     cache,
+		userAgent: userAgent,
 	}
 }
 
@@ -59,7 +61,9 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 
 	// Set appropriate headers
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
+	if s.userAgent != "" {
+		req.Header.Set("User-Agent", s.userAgent)
+	}
 
 	// Execute the request
 	resp, err := s.client.Do(req)

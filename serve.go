@@ -80,6 +80,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = geoip.RegisterFlags(c.Flags)
 	c.Flags = library.RegisterFlags(c.Flags)
 	c.Flags = embed.RegisterFlags(c.Flags)
+	c.Flags = stremios.RegisterClientFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 }
 
@@ -283,7 +284,8 @@ func serve(c *cli.Context) error {
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
 
 	// Setting StremioBuilder
-	sb := stremios.NewBuilder(c, pg, cl, sapi)
+	stremioAddonCl := stremios.NewClient(c)
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi)
 
 	// Setting Stremio
 	stremio.RegisterHandler(r, ats, sb)
