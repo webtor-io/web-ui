@@ -1,12 +1,27 @@
 package stremio
 
 import (
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/urfave/cli"
 )
+
+// createMockContext creates a mock cli.Context for testing
+func createMockContext() *cli.Context {
+	app := cli.NewApp()
+	flagSet := flag.NewFlagSet("test", flag.ContinueOnError)
+
+	// Add the stremio flags
+	flagSet.String("stremio-addon-user-agent", "", "user agent for stremio addon http client")
+	flagSet.String("stremio-addon-proxy", "", "proxy URL for stremio addon http client")
+
+	return cli.NewContext(app, flagSet, nil)
+}
 
 func TestAddonValidator_ValidateAddonURL(t *testing.T) {
 	// Valid Torrentio manifest.json response
@@ -178,7 +193,7 @@ func TestAddonValidator_ValidateAddonURL(t *testing.T) {
 
 			// Create validator with test HTTP client
 			client := &http.Client{Timeout: 5 * time.Second}
-			validator := NewAddonValidator(client)
+			validator := NewAddonValidator(createMockContext(), client)
 
 			// Test validation
 			err := validator.ValidateURL(server.URL + "/manifest.json")
@@ -211,7 +226,7 @@ func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 
 	// Create validator with short timeout
 	client := &http.Client{Timeout: 500 * time.Millisecond}
-	validator := NewAddonValidator(client)
+	validator := NewAddonValidator(createMockContext(), client)
 
 	err := validator.ValidateURL(server.URL + "/manifest.json")
 
@@ -227,7 +242,7 @@ func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 
 func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewAddonValidator(createMockContext(), client)
 
 	tests := []struct {
 		name string
@@ -260,7 +275,7 @@ func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 
 func TestAddonValidator_ValidateManifest_EdgeCases(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewAddonValidator(createMockContext(), client)
 
 	tests := []struct {
 		name        string
@@ -410,7 +425,7 @@ func TestAddonValidator_RealWorldExample(t *testing.T) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewAddonValidator(createMockContext(), client)
 
 	err := validator.ValidateURL(server.URL + "/manifest.json")
 	if err != nil {
@@ -437,7 +452,7 @@ func BenchmarkAddonValidator_ValidateAddonURL(b *testing.B) {
 	defer server.Close()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	validator := NewAddonValidator(client)
+	validator := NewAddonValidator(createMockContext(), client)
 
 	url := server.URL + "/manifest.json"
 

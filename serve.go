@@ -260,14 +260,6 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
-	av := stremios.NewAddonValidator(cl)
-
-	// Setting AddonUrlHandler
-	err = addon_url.RegisterHandler(c, av, r, pg)
-	if err != nil {
-		return err
-	}
-
 	// Setting EmbedExamplesHandler
 	wee.RegisterHandler(r, tm)
 
@@ -286,6 +278,15 @@ func serve(c *cli.Context) error {
 	// Setting StremioBuilder
 	stremioAddonCl := stremios.NewClient(c)
 	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi)
+
+	// Setting AddonValidator with custom client and cli context
+	av := stremios.NewAddonValidator(c, stremioAddonCl)
+
+	// Setting AddonUrlHandler
+	err = addon_url.RegisterHandler(c, av, r, pg)
+	if err != nil {
+		return err
+	}
 
 	// Setting Stremio
 	stremio.RegisterHandler(r, ats, sb)

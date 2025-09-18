@@ -38,6 +38,7 @@ Build and configuration
     - Umami analytics: USE_UMAMI, UMAMI_WEBSITE_ID, UMAMI_HOST_URL (services/umami).
     - GeoIP API cache: USE_GEOIP_API, GEOIP_API_SERVICE_HOST, GEOIP_API_SERVICE_PORT (services/geoip).
     - Claims-provider (user tiers/limits): USE_CLAIMS, CLAIMS_PROVIDER_SERVICE_HOST, CLAIMS_PROVIDER_SERVICE_PORT (services/claims). When enabled, claims are fetched via gRPC and cached with lazymap (1m success TTL, 10s error TTL).
+    - Stremio addon HTTP client: STREMIO_ADDON_USER_AGENT (custom user agent for addon requests), STREMIO_ADDON_PROXY (proxy URL for addon HTTP client, supports http:// and socks5:// schemes). Flags: --stremio-addon-user-agent, --stremio-addon-proxy (services/stremio).
 
 - Database and migrations
   - PostgreSQL configuration flags are registered by github.com/webtor-io/common-services (RegisterPGFlags). On server start (serve.go), migrations in migrations/ are applied automatically. Ensure DB connectivity is configured via the common services environment variables (see common-services docs; typical PG_HOST/PG_PORT/PG_USER/PG_PASSWORD/PG_DATABASE and SSL flags).

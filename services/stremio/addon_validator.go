@@ -9,15 +9,18 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 type AddonValidator struct {
-	client *http.Client
+	client    *http.Client
+	userAgent string
 }
 
-func NewAddonValidator(client *http.Client) *AddonValidator {
+func NewAddonValidator(c *cli.Context, client *http.Client) *AddonValidator {
 	return &AddonValidator{
-		client: client,
+		client:    client,
+		userAgent: GetUserAgent(c),
 	}
 }
 
@@ -32,8 +35,11 @@ func (av *AddonValidator) ValidateURL(url string) error {
 		return errors.Wrap(err, "failed to create request")
 	}
 
-	// Set User-Agent to identify as a Stremio client
+	// Set appropriate headers
 	req.Header.Set("Accept", "application/json")
+	if av.userAgent != "" {
+		req.Header.Set("User-Agent", av.userAgent)
+	}
 
 	// Make HTTP request
 	resp, err := av.client.Do(req)
