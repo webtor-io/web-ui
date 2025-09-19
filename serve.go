@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
-	"github.com/webtor-io/web-ui/handlers/addon_url"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
@@ -23,6 +22,8 @@ import (
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	sta "github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/handlers/stremio"
+	"github.com/webtor-io/web-ui/handlers/stremio/settings"
+	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
 	"github.com/webtor-io/web-ui/handlers/webdav"
@@ -282,14 +283,17 @@ func serve(c *cli.Context) error {
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
 
-	// Setting AddonUrlHandler
-	err = addon_url.RegisterHandler(c, av, r, pg)
+	// Setting Stremio
+	stremio.RegisterHandler(r, ats, sb, pg)
+
+	// Setting Handler
+	err = stremio_addon_url.RegisterHandler(c, av, r, pg)
 	if err != nil {
 		return err
 	}
 
-	// Setting Stremio
-	stremio.RegisterHandler(r, ats, sb)
+	// Setting Stremio Settings
+	settings.RegisterHandler(r, ats, pg)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

@@ -1,4 +1,4 @@
-package addon_url
+package stremio_addon_url
 
 import (
 	"net/http"
@@ -40,7 +40,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 		domain:    d,
 	}
 
-	gr := r.Group("/addon-url")
+	gr := r.Group("/stremio/addon-url")
 	gr.Use(auth.HasAuth)
 	gr.POST("/add", h.add)
 	gr.POST("/delete/:id", h.delete)
@@ -109,7 +109,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Check current addon URL count for user
-	currentCount, err := models.CountUserAddonUrls(db, user.ID)
+	currentCount, err := models.CountUserStremioAddonUrls(db, user.ID)
 	if err != nil {
 		return
 	}
@@ -120,7 +120,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Check if URL already exists
-	urlExists, err := models.AddonUrlExists(db, addonUrl)
+	urlExists, err := models.StremioAddonUrlExists(db, addonUrl)
 	if err != nil {
 		return
 	}
@@ -129,7 +129,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Create new addon URL
-	return models.CreateAddonUrl(db, user.ID, addonUrl)
+	return models.CreateStremioAddonUrl(db, user.ID, addonUrl)
 }
 
 func (s *Handler) deleteAddonUrl(idStr string, user *auth.User) (err error) {
@@ -144,5 +144,5 @@ func (s *Handler) deleteAddonUrl(idStr string, user *auth.User) (err error) {
 	}
 
 	// Delete addon URL owned by the current user
-	return models.DeleteUserAddonUrl(db, id, user.ID)
+	return models.DeleteUserStremioAddonUrl(db, id, user.ID)
 }

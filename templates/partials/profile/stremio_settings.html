@@ -1,0 +1,74 @@
+{{ define "profile/stremio_settings" }}
+    <div class="bg-base-200 py-8">
+        <div class="container mx-auto px-4">
+            <div class="w-full">
+                <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio settings</h2>
+                <div class="w-full max-w-4xl mx-auto">
+                    <div class="w-full">
+                        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
+                            {{/* current qualities provided by server with sane defaults */}}
+                            {{ $qualities := .Data.StremioSettings.PreferredQualities }}
+
+                            <input type="hidden" name="quality_order" id="quality_order" value="{{ range $i, $q := $qualities }}{{ if $i }},{{ end }}{{ $q.Quality }}{{ end }}">
+
+                            <ul id="quality-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
+                                {{ range $i, $q := $qualities }}
+                                <li class="p-4 cursor-move select-none flex items-center gap-4 quality-item hover:bg-base-50 transition-colors" draggable="true" data-quality="{{ $q.Quality }}">
+                                    <span class="drag-handle" aria-label="drag" title="drag to sort">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                                        </svg>
+                                    </span>
+                                    <div class="flex-1 text-left capitalize text-lg font-medium">{{ $q.Quality }}</div>
+                                    <label class="cursor-pointer">
+                                        <input type="checkbox" name="quality_{{ $q.Quality }}" class="toggle toggle-accent" {{ if $q.Enabled }}checked{{ end }} />
+                                    </label>
+                                </li>
+                                {{ end }}
+                            </ul>
+
+                            <div class="mt-5 flex justify-center">
+                                <button type="submit" class="btn btn-accent capitalize" data-umami-event="stremio-settings-save">save</button>
+                            </div>
+                        </form>
+
+                        <script>
+                        (function(){
+                            var list = document.getElementById('quality-list');
+                            if (!list) return;
+                            var orderInput = document.getElementById('quality_order');
+                            var dragEl = null;
+                            function updateOrder(){
+                                var items = list.querySelectorAll('.quality-item');
+                                var vals = [];
+                                items.forEach(function(it){ vals.push(it.getAttribute('data-quality')); });
+                                orderInput.value = vals.join(',');
+                            }
+                            list.addEventListener('dragstart', function(e){
+                                var target = e.target.closest('.quality-item');
+                                if (!target) return;
+                                dragEl = target;
+                                e.dataTransfer.effectAllowed = 'move';
+                            });
+                            list.addEventListener('dragover', function(e){
+                                if (!dragEl) return;
+                                e.preventDefault();
+                                var target = e.target.closest('.quality-item');
+                                if (!target || target === dragEl) return;
+                                var rect = target.getBoundingClientRect();
+                                var next = (e.clientY - rect.top)/(rect.height) > 0.5;
+                                list.insertBefore(dragEl, next ? target.nextSibling : target);
+                            });
+                            list.addEventListener('dragend', function(){
+                                if (!dragEl) return;
+                                dragEl = null;
+                                updateOrder();
+                            });
+                        })();
+                        </script>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{{ end }}

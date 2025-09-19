@@ -9,7 +9,7 @@
                         <div class="mb-6">
                             {{ $addonCount := len .Data.AddonUrls }}
                             {{ $canAddAddon := lt $addonCount 5 }}
-                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/addon-url/add" data-async-target="#addon-urls" class="join w-full{{ if not $canAddAddon }} opacity-50{{ end }}">
+                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/add" data-async-target="#addon-urls" class="join w-full{{ if not $canAddAddon }} opacity-50{{ end }}">
                                 <input
                                     name="url"
                                     placeholder="Enter Stremio addon manifest URL (e.g., https://example.com/manifest.json)"
@@ -44,7 +44,7 @@
                                             <div class="flex items-center">
                                                 <span class="font-medium text-sm break-all">{{ .Url }}</span>
                                             </div>
-                                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/addon-url/delete/{{ .ID }}" data-async-target="#addon-urls" class="inline">
+                                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/delete/{{ .ID }}" data-async-target="#addon-urls" class="inline">
                                                 <button
                                                     type="submit"
                                                     class="btn btn-soft btn-sm capitalize btn-accent"

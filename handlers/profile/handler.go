@@ -21,7 +21,8 @@ type Data struct {
 	StremioAddonURL string
 	WebDAVURL       string
 	EmbedDomains    []models.EmbedDomain
-	AddonUrls       []models.AddonUrl
+	AddonUrls       []models.StremioAddonUrl
+	StremioSettings *models.StremioSettingsData
 	Error           string
 }
 
@@ -99,7 +100,14 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	// Get user addon URLs
-	addonUrls, err := models.GetUserAddonUrls(db, u.ID)
+	addonUrls, err := models.GetUserStremioAddonUrls(db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// Get Stremio settings
+	ss, err := models.GetUserStremioSettingsData(db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -110,6 +118,7 @@ func (s *Handler) get(c *gin.Context) {
 		WebDAVURL:       webdavURL,
 		EmbedDomains:    domains,
 		AddonUrls:       addonUrls,
+		StremioSettings: ss,
 		Error:           c.Query("error"),
 	}))
 }

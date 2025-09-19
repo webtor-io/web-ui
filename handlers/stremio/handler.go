@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	cs "github.com/webtor-io/common-services"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -17,12 +18,14 @@ import (
 type Handler struct {
 	at *at.AccessToken
 	b  *stremio.Builder
+	pg *cs.PG
 }
 
-func RegisterHandler(r *gin.Engine, at *at.AccessToken, b *stremio.Builder) {
+func RegisterHandler(r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *cs.PG) {
 	h := &Handler{
 		at: at,
 		b:  b,
+		pg: pg,
 	}
 
 	gr := r.Group("/stremio")
@@ -31,7 +34,7 @@ func RegisterHandler(r *gin.Engine, at *at.AccessToken, b *stremio.Builder) {
 	gr.Use(claims.IsPaid)
 	gr.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET"},
+		AllowMethods: []string{"GET", "POST"},
 	}))
 	gr.POST("/url/generate", h.generateUrl)
 	grapi := gr.Group("")

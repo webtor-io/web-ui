@@ -126,7 +126,7 @@ func convertManifestURLToBaseURL(manifestURL string) string {
 // NewAddonCompositeStreamsByUserID creates a CompositeStream by fetching all addon URLs for a user
 func NewAddonCompositeStreamsByUserID(db *pg.DB, client *http.Client, userID uuid.UUID, cache lazymap.LazyMap[*StreamsResponse], userAgent string) (*CompositeStream, error) {
 	// Get all addon URLs for the user
-	addonUrls, err := models.GetUserAddonUrls(db, userID)
+	addonUrls, err := models.GetUserStremioAddonUrls(db, userID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user addon URLs")
 	}
