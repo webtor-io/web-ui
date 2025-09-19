@@ -95,7 +95,7 @@ func CreateOrUpdateStremioSettings(db *pg.DB, userID uuid.UUID, settings *Stremi
 func GetDefaultStremioSettings() *StremioSettingsData {
 	return &StremioSettingsData{
 		PreferredQualities: []QualitySetting{
-			{Quality: "4k", Enabled: true},
+			{Quality: "4k", Enabled: false},
 			{Quality: "1080p", Enabled: true},
 			{Quality: "720p", Enabled: true},
 			{Quality: "other", Enabled: true},

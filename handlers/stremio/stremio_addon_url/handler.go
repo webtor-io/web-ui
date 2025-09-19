@@ -13,6 +13,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
@@ -42,6 +43,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 
 	gr := r.Group("/stremio/addon-url")
 	gr.Use(auth.HasAuth)
+	gr.Use(claims.IsPaid)
 	gr.POST("/add", h.add)
 	gr.POST("/delete/:id", h.delete)
 	return nil

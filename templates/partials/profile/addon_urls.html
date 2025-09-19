@@ -4,11 +4,12 @@
             <div class="w-full">
                 <h2 class="text-2xl font-bold text-accent">Stremio Addons</h2>
                 <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
+                    {{ if .Claims | isPaid }}
                     <div class="w-full sm:px-5">
                         <!-- Add Addon URL Form -->
                         <div class="mb-6">
                             {{ $addonCount := len .Data.AddonUrls }}
-                            {{ $canAddAddon := lt $addonCount 5 }}
+                            {{ $canAddAddon := lt $addonCount 3 }}
                             <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/add" data-async-target="#addon-urls" class="join w-full{{ if not $canAddAddon }} opacity-50{{ end }}">
                                 <input
                                     name="url"
@@ -25,7 +26,7 @@
                             </form>
                             {{ if not $canAddAddon }}
                                 <div class="text-center text-sm text-accent mt-5">
-                                    You have reached the maximum of 5 addon URLs. Delete an addon to add a new one.
+                                    You have reached the maximum of 3 addon URLs. Delete an addon to add a new one.
                                 </div>
                             {{ end }}
                             {{ if ne .Data.Error "" }}
@@ -67,10 +68,25 @@
                             {{ end }}
                         </div>
                     </div>
-                </div>
-                <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
-                    <span class="text-accent">ⓘ</span>
-                    <a href="/instructions/stremio_addon" class="hover:underline" data-umami-event="instruction-stremio-addon" target="_blank">How to connect Stremio Addon?</a>
+                    <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
+                        <span class="text-accent">ⓘ</span>
+                        <a href="/instructions/stremio_addon" class="hover:underline" data-umami-event="instruction-stremio-addon" target="_blank">How to connect Stremio Addon?</a>
+                    </div>
+                    {{ else }}
+                        <p class="mb-6">Stremio addons are available for premium users. <a href="/donate" class="btn-link" data-umami-event="donate-stremio-addons">Upgrade your tier to unlock it!</a></p>
+                        <div class="w-full sm:px-5">
+                            <form class="join w-full opacity-50">
+                                <input
+                                    placeholder="Enter Stremio addon manifest URL (e.g., https://example.com/manifest.json)"
+                                    class="input input-bordered w-full join-item"
+                                    disabled
+                                />
+                                <button type="button" class="btn btn-accent join-item capitalize" disabled>
+                                    Add Addon
+                                </button>
+                            </form>
+                        </div>
+                    {{ end }}
                 </div>
             </div>
         </div>

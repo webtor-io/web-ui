@@ -10,6 +10,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -18,12 +19,14 @@ import (
 )
 
 type Data struct {
-	StremioAddonURL string
-	WebDAVURL       string
-	EmbedDomains    []models.EmbedDomain
-	AddonUrls       []models.StremioAddonUrl
-	StremioSettings *models.StremioSettingsData
-	Error           string
+	StremioAddonURL     string
+	WebDAVURL           string
+	EmbedDomains        []models.EmbedDomain
+	AddonUrls           []models.StremioAddonUrl
+	StremioSettings     *models.StremioSettingsData
+	Is4KAvailable       bool
+	MinBitrateFor4KMbps int64
+	Error               string
 }
 
 type Handler struct {
@@ -76,6 +79,7 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 
 func (s *Handler) get(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
+	cla := claims.GetFromContext(c)
 	if !u.HasAuth() {
 		c.Redirect(http.StatusTemporaryRedirect, "/login")
 		return
@@ -107,18 +111,20 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	// Get Stremio settings
-	ss, err := models.GetUserStremioSettingsData(db, u.ID)
+	ss, err := stremio.GetUserSettingsDataByClaims(db, u.ID, cla)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
-		StremioAddonURL: stremioURL,
-		WebDAVURL:       webdavURL,
-		EmbedDomains:    domains,
-		AddonUrls:       addonUrls,
-		StremioSettings: ss,
-		Error:           c.Query("error"),
+		StremioAddonURL:     stremioURL,
+		WebDAVURL:           webdavURL,
+		EmbedDomains:        domains,
+		AddonUrls:           addonUrls,
+		StremioSettings:     ss,
+		Is4KAvailable:       stremio.Is4KAvailable(cla),
+		MinBitrateFor4KMbps: stremio.MinBitrateMBpsFor4K,
+		Error:               c.Query("error"),
 	}))
 }
