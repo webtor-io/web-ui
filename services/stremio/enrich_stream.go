@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
 )
@@ -23,29 +24,38 @@ type APIService interface {
 
 // EnrichStream wraps another StreamsService to enrich streams with URLs
 type EnrichStream struct {
-	wrapped StreamsService
-	api     APIService
-	claims  *api.Claims
+	inner                      StreamsService
+	api                        APIService
+	claims                     *api.Claims
+	storeResourceMap           lazymap.LazyMap[*ra.ResourceResponse]
+	backgroundStoreResourceMap lazymap.LazyMap[*ra.ResourceResponse]
 }
 
 // NewEnrichStream creates a new EnrichStream service
-func NewEnrichStream(wrapped StreamsService, api APIService, claims *api.Claims) *EnrichStream {
+func NewEnrichStream(inner StreamsService, api APIService, claims *api.Claims) *EnrichStream {
 	return &EnrichStream{
-		wrapped: wrapped,
-		api:     api,
-		claims:  claims,
+		inner:  inner,
+		api:    api,
+		claims: claims,
+		storeResourceMap: lazymap.New[*ra.ResourceResponse](&lazymap.Config{
+			Concurrency: 20,
+			ErrorExpire: time.Minute,
+		}),
+		backgroundStoreResourceMap: lazymap.New[*ra.ResourceResponse](&lazymap.Config{
+			Concurrency: 20,
+		}),
 	}
 }
 
-// GetName returns the name of the wrapped service with "Enrich" prefix
+// GetName returns the name of the inner service with "Enrich" prefix
 func (e *EnrichStream) GetName() string {
-	return "Enrich" + e.wrapped.GetName()
+	return "Enrich" + e.inner.GetName()
 }
 
-// GetStreams gets streams from the wrapped service and enriches them with URLs
+// GetStreams gets streams from the inner service and enriches them with URLs
 func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
-	// Get streams from wrapped service
-	response, err := e.wrapped.GetStreams(ctx, contentType, contentID)
+	// Get streams from inner service
+	response, err := e.inner.GetStreams(ctx, contentType, contentID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,14 +124,16 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *St
 
 	// If resource doesn't exist, store it
 	if resource == nil {
-		// Step 3: Make magnet URL and store it in API
+		// Step 3: Make magnet URL and store it in API using lazymap
 		magnetURL := e.makeMagnetURL(stream.InfoHash, stream.Sources)
 
 		log.WithField("infohash", stream.InfoHash).
 			WithField("magnet_url", magnetURL).
 			Debug("storing resource for stream")
 
-		_, err := e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+		_, err := e.storeResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
+			return e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+		})
 		if err != nil {
 			// Check if the error is due to context deadline
 			if ctx.Err() == context.DeadlineExceeded {
@@ -168,7 +180,9 @@ func (e *EnrichStream) backgroundStoreResource(infohash, magnetURL string) {
 		WithField("magnet_url", magnetURL).
 		Debug("starting background resource storage with extended timeout")
 
-	_, err := e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+	_, err := e.backgroundStoreResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
+		return e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+	})
 	if err != nil {
 		log.WithError(err).
 			WithField("infohash", infohash).

@@ -376,7 +376,7 @@ func TestEnrichStream_ConcurrentAccess(t *testing.T) {
 			Title:    fmt.Sprintf("Test Stream %d", i),
 			Url:      "", // No URL, requires enrichment
 			InfoHash: fmt.Sprintf("testhash%d", i),
-			FileIdx:  uint8(i % 10),
+			FileIdx:  int(i % 10),
 			Sources:  []string{"tracker1", "tracker2"},
 			BehaviorHints: &StreamBehaviorHints{
 				Filename: fmt.Sprintf("test_file_%d.mp4", i),

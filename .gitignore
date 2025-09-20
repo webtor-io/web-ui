@@ -29,3 +29,4 @@ assets/dist/*
 templates/partials/extend.html
 .idea
 .vscode
+.output.txt

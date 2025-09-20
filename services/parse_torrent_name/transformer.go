@@ -50,3 +50,13 @@ var titleTransformer = NewReplaceTransformer(map[string]string{
 	"--",
 	"---",
 })
+
+type LowercaseTransformer struct{}
+
+func (t *LowercaseTransformer) Transform(val string) (string, error) {
+	return strings.ToLower(val), nil
+}
+
+func NewLowercaseTransformer() *LowercaseTransformer {
+	return &LowercaseTransformer{}
+}

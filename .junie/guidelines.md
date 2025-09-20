@@ -44,6 +44,39 @@ Build and configuration
   - PostgreSQL configuration flags are registered by github.com/webtor-io/common-services (RegisterPGFlags). On server start (serve.go), migrations in migrations/ are applied automatically. Ensure DB connectivity is configured via the common services environment variables (see common-services docs; typical PG_HOST/PG_PORT/PG_USER/PG_PASSWORD/PG_DATABASE and SSL flags).
   - A Redis client is also configured via common-services and used by the Job queues.
 
+- Migration file conventions and style
+  - **File naming**: Use sequential numbering format: `{number}_{description}.{up|down}.sql` (e.g., `19_create_stremio_settings.up.sql`).
+  - **Schema qualification**: Always use explicit `public.` schema prefix for all table references.
+  - **Indentation**: Use tab characters for indentation, not spaces.
+  - **Data types**: Use lowercase PostgreSQL data types (`uuid`, `text`, `jsonb`, `timestamptz`).
+  - **Column definitions**: Each column on its own line with consistent formatting:
+    ```sql
+    CREATE TABLE public.table_name (
+    	column_id uuid DEFAULT uuid_generate_v4() NOT NULL,
+    	user_id uuid NOT NULL,
+    	data jsonb NOT NULL,
+    	created_at timestamptz DEFAULT now() NOT NULL,
+    	updated_at timestamptz DEFAULT now() NOT NULL,
+    ```
+  - **Constraint naming**: Use explicit constraint names following the pattern:
+    - Primary key: `{table}_pk`
+    - Unique constraints: `{table}_{column}_unique`
+    - Foreign keys: `{table}_{reference}_fk`
+  - **Foreign key references**: Format foreign key constraints with line breaks for readability:
+    ```sql
+    CONSTRAINT table_user_fk FOREIGN KEY (user_id)
+    	REFERENCES public."user" (user_id) ON DELETE CASCADE
+    ```
+  - **Automatic timestamps**: Include `update_updated_at` trigger for tables with `updated_at` columns:
+    ```sql
+    create trigger update_updated_at before
+    update
+        on
+        public.table_name for each row execute function update_updated_at();
+    ```
+  - **Down migrations**: Keep down migrations simple, typically just `DROP TABLE IF EXISTS table_name;`
+  - **Consistency**: Follow the established patterns from existing migrations like `18_addon_url.up.sql` for consistent formatting across the project.
+
 - Database operations architecture
   - **ALL database operations must be placed in the models/ directory**. This includes CRUD operations, queries, and any database-related business logic.
   - Handlers should NEVER contain direct database queries. Instead, they should call model methods that encapsulate the database operations.

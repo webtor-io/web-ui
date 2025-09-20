@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 )
 
@@ -145,9 +146,10 @@ func TestBuilder_BuildStreamsService_Success(t *testing.T) {
 
 	builder := NewBuilder(c, mockPG, &http.Client{}, &api.Api{})
 	userID := uuid.NewV4()
-	claims := &api.Claims{}
+	apiClaims := &api.Claims{}
+	claimsData := &claims.Data{}
 
-	_, err := builder.BuildStreamsService(userID, claims)
+	_, err := builder.BuildStreamsService(userID, apiClaims, claimsData)
 
 	// We expect this to fail with "database not initialized" error
 	if err == nil {

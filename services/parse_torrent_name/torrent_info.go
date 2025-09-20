@@ -41,9 +41,9 @@ type TorrentInfo struct {
 	Dubbing     string `json:"dubbing,omitempty"`
 }
 
-func (s *TorrentInfo) mapField(tor *TorrentInfo, fieldType FieldType, val string) {
-	ttor := reflect.TypeOf(tor)
-	torV := reflect.ValueOf(tor)
+func (s *TorrentInfo) MapField(fieldType FieldType, val string) {
+	ttor := reflect.TypeOf(s)
+	torV := reflect.ValueOf(s)
 	field := strings.Replace(strings.Title(strings.Replace(string(fieldType), "_", " ", -1)), " ", "", -1)
 	v, ok := ttor.Elem().FieldByName(field)
 	if !ok {
@@ -61,5 +61,11 @@ func (s *TorrentInfo) mapField(tor *TorrentInfo, fieldType FieldType, val string
 		torV.Elem().FieldByName(field).SetUint(clean)
 	case reflect.String:
 		torV.Elem().FieldByName(field).SetString(val)
+	}
+}
+
+func (s *TorrentInfo) Map(ms Matches) {
+	for _, m := range ms {
+		s.MapField(m.FieldType, m.Content)
 	}
 }
