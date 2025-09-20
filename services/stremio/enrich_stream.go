@@ -156,7 +156,7 @@ func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *St
 	}
 
 	// Step 4: Generate URL with webtor's API using FileIdx
-	url, err := e.generateStreamURL(ctx, stream.InfoHash, stream)
+	url, err := e.generateStreamURL(ctx, stream)
 	if err != nil {
 		log.WithError(err).
 			WithField("infohash", stream.InfoHash).
@@ -211,7 +211,7 @@ func (e *EnrichStream) makeMagnetURL(infohash string, sources []string) string {
 }
 
 // generateStreamURL generates a URL for the stream using the API
-func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, si *StreamItem) (string, error) {
+func (e *EnrichStream) generateStreamURL(ctx context.Context, si *StreamItem) (string, error) {
 	// List resource content to find the file at the given index
 	listArgs := &api.ListResourceContentArgs{
 		Limit:  100,
@@ -224,14 +224,15 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, s
 
 	// Paginate through results to find the file at the specified index
 	for {
-		resp, err := e.api.ListResourceContentCached(ctx, e.claims, infohash, listArgs)
+		resp, err := e.api.ListResourceContentCached(ctx, e.claims, si.InfoHash, listArgs)
 		if err != nil {
 			return "", err
 		}
 
 		for _, item := range resp.Items {
 			if item.Type == ra.ListTypeFile {
-				if (si.BehaviorHints.Filename != "" && item.Name == si.BehaviorHints.Filename) || (si.BehaviorHints.Filename == "" && idx == int(si.FileIdx)) {
+				if (si.BehaviorHints != nil && si.BehaviorHints.Filename != "" && item.Name == si.BehaviorHints.Filename) ||
+					((si.BehaviorHints == nil || si.BehaviorHints.Filename == "") && idx == int(si.FileIdx)) {
 					targetItem = &item
 					break
 				}
@@ -256,7 +257,7 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, infohash string, s
 	}
 
 	// Export the resource content to get the download URL
-	exportResp, err := e.api.ExportResourceContent(ctx, e.claims, infohash, targetItem.ID, "")
+	exportResp, err := e.api.ExportResourceContent(ctx, e.claims, si.InfoHash, targetItem.ID, "")
 	if err != nil {
 		return "", err
 	}
