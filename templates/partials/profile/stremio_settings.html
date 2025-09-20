@@ -12,7 +12,7 @@
 
                             <input type="hidden" name="resolution_order" id="resolution_order" value="{{ range $i, $r := $resolutions }}{{ if $i }},{{ end }}{{ $r.Resolution }}{{ end }}">
 
-                            <h3 class="text-lg font-semibold mb-2">Preferred qualities</h3>
+                            <h3 class="text-lg font-semibold mb-2">Preferred resolutions</h3>
                             <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
 
                             <ul id="resolution-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
