@@ -371,8 +371,13 @@ func (s *Library) makeVideos(vc models.VideoContentWithMetadata) ([]VideoItem, e
 }
 
 func (s *Library) makeStreamName(name string, md map[string]any) string {
+	if resolution, ok := md["resolution"]; ok && strings.TrimSpace(resolution.(string)) != "" {
+		name = name + "\n" + resolution.(string)
+		return name
+	}
 	if quality, ok := md["quality"]; ok && strings.TrimSpace(quality.(string)) != "" {
 		name = name + "\n" + quality.(string)
+		return name
 	}
 	return name
 }
