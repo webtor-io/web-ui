@@ -1,18 +1,18 @@
 import av from '../../lib/av';
 
 av(async function(){
-    const list = this.querySelector('#quality-list');
+    const list = this.querySelector('#resolution-list');
     if (!list) return;
-    const orderInput = this.querySelector('#quality_order');
+    const orderInput = this.querySelector('#resolution_order');
     let dragEl = null;
     let touchStartY = 0;
     let touchCurrentY = 0;
     let isDragging = false;
     
     function updateOrder(){
-        const items = list.querySelectorAll('.quality-item');
+        const items = list.querySelectorAll('.resolution-item');
         const vals = [];
-        items.forEach(function(it){ vals.push(it.getAttribute('data-quality')); });
+        items.forEach(function(it){ vals.push(it.getAttribute('data-resolution')); });
         orderInput.value = vals.join(',');
     }
     
@@ -34,7 +34,7 @@ av(async function(){
     
     function handleMove(clientY) {
         if (!dragEl || !isDragging) return;
-        const target = document.elementFromPoint(list.getBoundingClientRect().left + 10, clientY)?.closest('.quality-item');
+        const target = document.elementFromPoint(list.getBoundingClientRect().left + 10, clientY)?.closest('.resolution-item');
         if (!target || target === dragEl) return;
         const rect = target.getBoundingClientRect();
         const next = (clientY - rect.top)/(rect.height) > 0.5;
@@ -43,7 +43,7 @@ av(async function(){
     
     // Desktop drag and drop events
     list.addEventListener('dragstart', function(e){
-        const target = e.target.closest('.quality-item');
+        const target = e.target.closest('.resolution-item');
         if (!target) return;
         startDrag(target);
         e.dataTransfer.effectAllowed = 'move';
@@ -61,7 +61,7 @@ av(async function(){
     
     // Mobile touch events
     list.addEventListener('touchstart', function(e){
-        const target = e.target.closest('.quality-item');
+        const target = e.target.closest('.resolution-item');
         if (!target) return;
         touchStartY = e.touches[0].clientY;
         touchCurrentY = touchStartY;

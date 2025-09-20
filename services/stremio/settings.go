@@ -26,9 +26,9 @@ func GetUserSettingsDataByClaims(db *pg.DB, userID uuid.UUID, cla *claims.Data) 
 	if Is4KAvailable(cla) {
 		return s, nil
 	}
-	for i, quality := range s.PreferredQualities {
-		if quality.Quality == "4k" {
-			s.PreferredQualities[i].Enabled = false
+	for i, quality := range s.PreferredResolutions {
+		if quality.Resolution == "4k" {
+			s.PreferredResolutions[i].Enabled = false
 			break
 		}
 	}

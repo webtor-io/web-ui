@@ -39,9 +39,9 @@ func (s *PreferredStream) GetStreams(ctx context.Context, contentType, contentID
 		return nil, err
 	}
 	groups := make(map[string][]StreamItem)
-	for _, quality := range us.PreferredQualities {
-		if quality.Enabled {
-			groups[quality.Quality] = []StreamItem{}
+	for _, resolution := range us.PreferredResolutions {
+		if resolution.Enabled {
+			groups[resolution.Resolution] = []StreamItem{}
 		}
 	}
 	resp, err := s.inner.GetStreams(ctx, contentType, contentID)
@@ -69,11 +69,13 @@ func (s *PreferredStream) GetStreams(ctx context.Context, contentType, contentID
 			groups[res] = append(groups[res], st)
 		}
 	}
-	fresp := &StreamsResponse{Streams: []StreamItem{}}
-
-	for _, group := range groups {
-		fresp.Streams = append(fresp.Streams, group...)
+	var streams []StreamItem
+	for _, resolution := range us.PreferredResolutions {
+		if _, ok := groups[resolution.Resolution]; ok {
+			streams = append(streams, groups[resolution.Resolution]...)
+		}
 	}
+	fresp := &StreamsResponse{Streams: streams}
 
 	return fresp, nil
 }

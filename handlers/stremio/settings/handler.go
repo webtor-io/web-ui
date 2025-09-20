@@ -39,54 +39,54 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	// Parse form data
 	settingsData := &models.StremioSettingsData{}
 
-	// Get preferred qualities from form
-	qualities4k := c.PostForm("quality_4k") == "on"
-	qualities1080p := c.PostForm("quality_1080p") == "on"
-	qualities720p := c.PostForm("quality_720p") == "on"
-	qualitiesOther := c.PostForm("quality_other") == "on"
+	// Get preferred resolutions from form
+	resolution4k := c.PostForm("resolution_4k") == "on"
+	resolution1080p := c.PostForm("resolution_1080p") == "on"
+	resolution720p := c.PostForm("resolution_720p") == "on"
+	resolutionOther := c.PostForm("resolution_other") == "on"
 
 	if !stremio.Is4KAvailable(cla) {
-		qualities4k = false
+		resolution4k = false
 	}
 
-	// Parse quality_order field to determine ordering
-	qualityOrder := c.PostForm("quality_order")
+	// Parse resolution_order field to determine ordering
+	resolutionOrder := c.PostForm("resolution_order")
 
-	// Create map of quality settings for easy lookup
-	qualitySettings := map[string]bool{
-		"4k":    qualities4k,
-		"1080p": qualities1080p,
-		"720p":  qualities720p,
-		"other": qualitiesOther,
+	// Create map of resolution settings for easy lookup
+	resolutionSettings := map[string]bool{
+		"4k":    resolution4k,
+		"1080p": resolution1080p,
+		"720p":  resolution720p,
+		"other": resolutionOther,
 	}
 
-	// Build PreferredQualities array according to quality_order
-	var orderedQualities []models.QualitySetting
-	orderSlice := strings.Split(qualityOrder, ",")
+	// Build PreferredResolutions array according to resolution_order
+	var orderedQualities []models.ResolutionSetting
+	orderSlice := strings.Split(resolutionOrder, ",")
 	if len(orderSlice) == 0 {
 		orderSlice = []string{"4k", "1080p", "720p", "other"}
 	}
 	// Split the order string (assuming comma-separated values)
-	for _, quality := range orderSlice {
-		quality = strings.TrimSpace(quality)
-		if enabled, exists := qualitySettings[quality]; exists {
-			orderedQualities = append(orderedQualities, models.QualitySetting{
-				Quality: quality,
-				Enabled: enabled,
+	for _, resolution := range orderSlice {
+		resolution = strings.TrimSpace(resolution)
+		if enabled, exists := resolutionSettings[resolution]; exists {
+			orderedQualities = append(orderedQualities, models.ResolutionSetting{
+				Resolution: resolution,
+				Enabled:    enabled,
 			})
 			// Remove from map to avoid duplicates
-			delete(qualitySettings, quality)
+			delete(resolutionSettings, resolution)
 		}
 	}
-	// Add any remaining qualities that weren't in the order
-	for quality, enabled := range qualitySettings {
-		orderedQualities = append(orderedQualities, models.QualitySetting{
-			Quality: quality,
-			Enabled: enabled,
+	// Add any remaining resolutions that weren't in the order
+	for resolution, enabled := range resolutionSettings {
+		orderedQualities = append(orderedQualities, models.ResolutionSetting{
+			Resolution: resolution,
+			Enabled:    enabled,
 		})
 	}
 
-	settingsData.PreferredQualities = orderedQualities
+	settingsData.PreferredResolutions = orderedQualities
 
 	// Get database connection
 	db := s.pg.Get()

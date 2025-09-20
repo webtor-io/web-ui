@@ -1,9 +1,6 @@
 package models
 
 import (
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -11,39 +8,15 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-// QualitySetting represents a single quality preference
-type QualitySetting struct {
-	Quality string `json:"quality"`
-	Enabled bool   `json:"enabled"`
+// ResolutionSetting represents a single quality preference
+type ResolutionSetting struct {
+	Resolution string `json:"resolution"`
+	Enabled    bool   `json:"enabled"`
 }
 
 // StremioSettingsData represents the structure of the JSONB settings field
 type StremioSettingsData struct {
-	PreferredQualities []QualitySetting `json:"preferred_qualities"`
-}
-
-// Value implements the driver.Valuer interface for database serialization
-func (s StremioSettingsData) Value() (driver.Value, error) {
-	return json.Marshal(s)
-}
-
-// Scan implements the sql.Scanner interface for database deserialization
-func (s *StremioSettingsData) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-
-	var data []byte
-	switch v := value.(type) {
-	case string:
-		data = []byte(v)
-	case []byte:
-		data = v
-	default:
-		return fmt.Errorf("cannot scan StremioSettingsData from non-string/non-bytes value: %T", value)
-	}
-
-	return json.Unmarshal(data, s)
+	PreferredResolutions []ResolutionSetting `json:"preferred_resolutions"`
 }
 
 type StremioSettings struct {
@@ -121,11 +94,11 @@ func CreateOrUpdateStremioSettings(db *pg.DB, userID uuid.UUID, settings *Stremi
 // GetDefaultStremioSettings returns the default Stremio settings
 func GetDefaultStremioSettings() *StremioSettingsData {
 	return &StremioSettingsData{
-		PreferredQualities: []QualitySetting{
-			{Quality: "4k", Enabled: false},
-			{Quality: "1080p", Enabled: true},
-			{Quality: "720p", Enabled: true},
-			{Quality: "other", Enabled: true},
+		PreferredResolutions: []ResolutionSetting{
+			{Resolution: "4k", Enabled: false},
+			{Resolution: "1080p", Enabled: true},
+			{Resolution: "720p", Enabled: true},
+			{Resolution: "other", Enabled: true},
 		},
 	}
 }
