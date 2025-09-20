@@ -1,6 +1,9 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -17,6 +20,30 @@ type QualitySetting struct {
 // StremioSettingsData represents the structure of the JSONB settings field
 type StremioSettingsData struct {
 	PreferredQualities []QualitySetting `json:"preferred_qualities"`
+}
+
+// Value implements the driver.Valuer interface for database serialization
+func (s StremioSettingsData) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+// Scan implements the sql.Scanner interface for database deserialization
+func (s *StremioSettingsData) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	var data []byte
+	switch v := value.(type) {
+	case string:
+		data = []byte(v)
+	case []byte:
+		data = v
+	default:
+		return fmt.Errorf("cannot scan StremioSettingsData from non-string/non-bytes value: %T", value)
+	}
+
+	return json.Unmarshal(data, s)
 }
 
 type StremioSettings struct {

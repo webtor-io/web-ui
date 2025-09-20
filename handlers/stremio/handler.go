@@ -107,8 +107,9 @@ func (s *Handler) stream(c *gin.Context) {
 	ct := c.Param("type")
 	id := s.cleanResourceID(c.Param("id"))
 	user := auth.GetUserFromContext(c)
-	cla := api.GetClaimsFromContext(c)
-	sts, err := s.b.BuildStreamsService(user.ID, cla)
+	apiClaims := api.GetClaimsFromContext(c)
+	cla := claims.GetFromContext(c)
+	sts, err := s.b.BuildStreamsService(user.ID, apiClaims, cla)
 	if err != nil {
 		log.WithError(err).Error("failed to build streams service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)

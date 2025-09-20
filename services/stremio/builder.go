@@ -10,6 +10,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 )
 
@@ -60,7 +61,7 @@ func (s *Builder) BuildMetaService(uID uuid.UUID) (MetaService, error) {
 	return mes, nil
 }
 
-func (s *Builder) BuildStreamsService(uID uuid.UUID, cla *api.Claims) (StreamsService, error) {
+func (s *Builder) BuildStreamsService(uID uuid.UUID, apiClaims *api.Claims, cla *claims.Data) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("database not initialized")
@@ -69,10 +70,11 @@ func (s *Builder) BuildStreamsService(uID uuid.UUID, cla *api.Claims) (StreamsSe
 	if err != nil {
 		return nil, err
 	}
-	sts := NewLibrary(s.domain, db, uID, s.rapi, cla)
+	sts := NewLibrary(s.domain, db, uID, s.rapi, apiClaims)
 	cs := NewCompositeStream([]StreamsService{sts, acs})
 	ds := NewDedupStream(cs)
-	es := NewEnrichStream(ds, s.rapi, cla)
+	ps := NewPreferredStream(ds, db, uID, cla)
+	es := NewEnrichStream(ps, s.rapi, apiClaims)
 
 	return es, nil
 }

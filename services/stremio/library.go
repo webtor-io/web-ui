@@ -188,9 +188,11 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 	var su, title, p string
 	var err error
 	var idx int
+	var md map[string]any
 	if ct == "movie" {
 		p = *vc.GetPath()
-		title = s.makeStreamTitle(vc.GetContent().Title, vc.GetContent().Metadata)
+		title = vc.GetContent().Title
+		md = vc.GetContent().Metadata
 
 	} else if ct == "series" {
 		ep := vc.GetEpisode(args.Season, args.Episode)
@@ -198,7 +200,8 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 			return nil, nil
 		}
 		p = *ep.Path
-		title = s.makeStreamTitle(fmt.Sprintf("%v.S%vE%v", vc.GetContent().Title, args.Season, args.Episode), ep.Metadata)
+		title = fmt.Sprintf("%v.S%vE%v", vc.GetContent().Title, args.Season, args.Episode)
+		md = ep.Metadata
 	}
 	ti, idx, err := s.retrieveTorrentItem(ctx, vc.GetContent().ResourceID, s.cla, p)
 	if err != nil {
@@ -209,12 +212,14 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 		return nil, err
 	}
 	return &StreamItem{
-		Title:    title,
+		Name:     s.makeStreamName("Webtor.io", md),
+		Title:    s.makeStreamTitle(title, md),
 		Url:      su,
 		InfoHash: vc.GetContent().ResourceID,
 		FileIdx:  idx,
 		BehaviorHints: &StreamBehaviorHints{
-			Filename: ti.Name,
+			Filename:   ti.Name,
+			BingeGroup: fmt.Sprintf("webtorio|%v", vc.GetContent().ResourceID),
 		},
 	}, nil
 
@@ -363,4 +368,11 @@ func (s *Library) makeVideos(vc models.VideoContentWithMetadata) ([]VideoItem, e
 		vis = append(vis, vi)
 	}
 	return vis, nil
+}
+
+func (s *Library) makeStreamName(name string, md map[string]any) string {
+	if quality, ok := md["quality"]; ok && strings.TrimSpace(quality.(string)) != "" {
+		name = name + "\n" + quality.(string)
+	}
+	return name
 }

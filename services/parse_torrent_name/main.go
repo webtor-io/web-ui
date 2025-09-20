@@ -16,7 +16,7 @@ var fieldParsers = FieldParsers{
 	{FieldTypePorn, NewRegexpMatcher(`(?i)\b((X{3}))\b`), nil},
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b(((?:PPV\.)?[HP]DTV|(?:HD)?CAM|B[DR]Rip|(?:HD-?)?TS|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|DVDRip|DVDRIP|CamRip|W[EB]BRip|BluRay|DvDScr|telesync))\b`), nil},
-	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248]K))\b`), nil},
+	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},
 	{FieldTypeBitrate, NewRegexpMatcher(`(?i)\b(([0-9]+[KMGT]bps))\b`), nil},
 	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?))`), nil},
 	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|[hx]\.?26[45]))\b`), nil},
@@ -51,9 +51,16 @@ func Parse(tor *TorrentInfo, filename string) (*TorrentInfo, error) {
 		return nil, err
 	}
 
-	for _, m := range ms {
-		tor.mapField(tor, m.FieldType, m.Content)
-	}
+	tor.Map(ms)
 
 	return tor, nil
+}
+
+func GetFieldParser(fielType FieldType) *FieldParser {
+	for _, p := range fieldParsers {
+		if p.FieldType == fielType {
+			return p
+		}
+	}
+	return nil
 }
