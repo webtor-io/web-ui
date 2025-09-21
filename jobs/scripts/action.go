@@ -50,7 +50,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		DomainSettings: dsd,
 	}
 	j.InProgress("retrieving resource data")
-	resCtx, resCancel := context.WithTimeout(ctx, 10*time.Second)
+	resCtx, resCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer resCancel()
 	resourceResponse, err := s.api.GetResource(resCtx, c.ApiClaims, resourceID)
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	j.Done()
 	sc.Resource = resourceResponse
 	j.InProgress("retrieving stream url")
-	exportCtx, exportCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	exportCtx, exportCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer exportCancel()
 	exportResponse, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, settings.ImdbID)
 	if err != nil {
@@ -164,7 +164,7 @@ type FileDownload struct {
 
 func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
 	j.InProgress("retrieving download link")
-	exportCtx, exportCancel := context.WithTimeout(ctx, 10*time.Second)
+	exportCtx, exportCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer exportCancel()
 	resp, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, "")
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 
 func (s *ActionScript) downloadTorrent(ctx context.Context, j *job.Job, c *web.Context, resourceID string) (err error) {
 	j.InProgress("retrieving torrent")
-	apiCtx, apiCancel := context.WithTimeout(ctx, 10*time.Second)
+	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer apiCancel()
 	resp, err := s.api.GetTorrent(apiCtx, c.ApiClaims, resourceID)
 	if err != nil {

@@ -134,7 +134,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 
 func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {
 	j.InProgress("searching for stream content")
-	apiCtx, apiCancel := context.WithTimeout(ctx, 10*time.Second)
+	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer apiCancel()
 	pwd := settings.PWD
 	file := settings.File
@@ -151,7 +151,7 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 		return nil, errors.Wrap(err, "failed to list resource content")
 	}
 	if len(l.Items) == 1 && l.Items[0].Type == ra.ListTypeDirectory {
-		apiCtx2, apiCancel2 := context.WithTimeout(ctx, 10*time.Second)
+		apiCtx2, apiCancel2 := context.WithTimeout(ctx, 30*time.Second)
 		defer apiCancel2()
 		l, err = s.api.ListResourceContentCached(apiCtx2, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 			Path:   l.Items[0].PathStr,
