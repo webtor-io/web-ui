@@ -1,4 +1,4 @@
-package script
+package scripts
 
 import (
 	"context"
@@ -27,28 +27,30 @@ var (
 )
 
 type EmbedScript struct {
-	api      *api.Api
-	settings *models.EmbedSettings
-	file     string
-	tb       template.Builder[*web.Context]
-	c        *web.Context
-	cl       *http.Client
-	dsd      *embed.DomainSettingsData
+	api              *api.Api
+	settings         *models.EmbedSettings
+	file             string
+	tb               template.Builder[*web.Context]
+	c                *web.Context
+	cl               *http.Client
+	dsd              *embed.DomainSettingsData
+	warmupTimeoutMin int
 }
 
 type EmbedAdsData struct {
 	DomainSettings *embed.DomainSettingsData
 }
 
-func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData) *EmbedScript {
+func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmupTimeoutMin int) *EmbedScript {
 	return &EmbedScript{
-		c:        c,
-		api:      api,
-		settings: settings,
-		file:     file,
-		tb:       tb,
-		cl:       cl,
-		dsd:      dsd,
+		c:                c,
+		api:              api,
+		settings:         settings,
+		file:             file,
+		tb:               tb,
+		cl:               cl,
+		dsd:              dsd,
+		warmupTimeoutMin: warmupTimeoutMin,
 	}
 }
 
@@ -122,7 +124,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return err
 	}
 	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
-	as, _ := Action(s.tb, s.api, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud)
+	as, _ := Action(s.tb, s.api, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err
@@ -211,12 +213,12 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 	return
 }
 
-func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData) (r job.Runnable, hash string, err error) {
+func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmTimeoutMin int) (r job.Runnable, hash string, err error) {
 	geoHash := ""
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
 	}
 	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings))))
-	r = NewEmbedScript(tb, cl, c, api, settings, file, dsd)
+	r = NewEmbedScript(tb, cl, c, api, settings, file, dsd, warmTimeoutMin)
 	return
 }

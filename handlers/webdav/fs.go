@@ -2,12 +2,12 @@ package webdav
 
 import (
 	services "github.com/webtor-io/common-services"
-	"github.com/webtor-io/web-ui/handlers/job"
+	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/webdav"
 )
 
-func NewFileSystem(pg *services.PG, sapi *api.Api, jobs *job.Handler, sep string) webdav.FileSystem {
+func NewFileSystem(pg *services.PG, sapi *api.Api, jobs *j.Jobs, sep string) webdav.FileSystem {
 	td := &TorrentDirectory{
 		api: sapi,
 	}

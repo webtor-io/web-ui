@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	services "github.com/webtor-io/common-services"
 	ra "github.com/webtor-io/rest-api/services"
-	"github.com/webtor-io/web-ui/handlers/job"
+	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/webdav"
@@ -22,7 +22,7 @@ type TorrentLibraryDirectory struct {
 	*BaseDirectory
 	pg   *services.PG
 	api  *api.Api
-	jobs *job.Handler
+	jobs *j.Jobs
 }
 
 func (s *TorrentLibraryDirectory) Open(ctx context.Context, name string) (io.ReadCloser, *url.URL, error) {

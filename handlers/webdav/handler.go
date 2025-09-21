@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/common"
-	"github.com/webtor-io/web-ui/handlers/job"
+	j "github.com/webtor-io/web-ui/jobs"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -24,7 +24,7 @@ type Handler struct {
 	wh   *webdav.Handler
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG, at *at.AccessToken, sapi *api.Api, jobs *job.Handler) {
+func RegisterHandler(r *gin.Engine, pg *cs.PG, at *at.AccessToken, sapi *api.Api, jobs *j.Jobs) {
 	fs := NewFileSystem(pg, sapi, jobs, "webdav")
 	wh := &webdav.Handler{FileSystem: fs}
 	h := &Handler{

@@ -3,7 +3,7 @@ package action
 import (
 	"net/http"
 
-	wj "github.com/webtor-io/web-ui/handlers/job"
+	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/web"
@@ -36,11 +36,11 @@ type PostData struct {
 }
 
 type Handler struct {
-	jobs *wj.Handler
+	jobs *j.Jobs
 	tb   template.Builder[*web.Context]
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *wj.Handler) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs) {
 	h := &Handler{
 		tb:   tm.MustRegisterViews("action/**/*").WithHelper(NewHelper()),
 		jobs: jobs,

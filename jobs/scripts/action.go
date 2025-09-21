@@ -1,4 +1,4 @@
-package script
+package scripts
 
 import (
 	"bytes"
@@ -253,8 +253,8 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	} else {
 		j.InProgress(m)
 	}
-	warmupCtx, warmupCacnel := context.WithTimeout(ctx, time.Minute*5)
-	defer warmupCacnel()
+	warmupCtx, warmupCancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
+	defer warmupCancel()
 
 	if useStatus {
 		j.StatusUpdate("waiting for peers")
@@ -298,8 +298,10 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		}(b2)
 		_, err = io.Copy(io.Discard, b2)
 	}
-	if err != nil {
-		return errors.Wrap(err, "failed to download within 5 minutes")
+	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+		return errors.Wrap(err, fmt.Sprintf("failed to download within %v minutes", s.warmupTimeoutMin))
+	} else if err != nil {
+		return errors.Wrap(err, "failed to download")
 	}
 
 	j.Done()
@@ -307,15 +309,16 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 }
 
 type ActionScript struct {
-	api        *api.Api
-	c          *web.Context
-	resourceId string
-	itemId     string
-	action     string
-	tb         template.Builder[*web.Context]
-	settings   *models.StreamSettings
-	vsud       *models.VideoStreamUserData
-	dsd        *embed.DomainSettingsData
+	api              *api.Api
+	c                *web.Context
+	resourceId       string
+	itemId           string
+	action           string
+	tb               template.Builder[*web.Context]
+	settings         *models.StreamSettings
+	vsud             *models.VideoStreamUserData
+	dsd              *embed.DomainSettingsData
+	warmupTimeoutMin int
 }
 
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -357,7 +360,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID)))
@@ -365,15 +368,16 @@ func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, res
 		tb: tb,
 		c:  c,
 		Script: &ActionScript{
-			tb:         tb,
-			api:        api,
-			c:          c,
-			resourceId: resourceID,
-			itemId:     itemID,
-			action:     action,
-			settings:   settings,
-			vsud:       vsud,
-			dsd:        dsd,
+			tb:               tb,
+			api:              api,
+			c:                c,
+			resourceId:       resourceID,
+			itemId:           itemID,
+			action:           action,
+			settings:         settings,
+			vsud:             vsud,
+			dsd:              dsd,
+			warmupTimeoutMin: warmupTimeoutMin,
 		},
 	}, id
 }

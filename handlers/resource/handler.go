@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
-	j "github.com/webtor-io/web-ui/handlers/job"
+	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/template"
@@ -15,13 +15,13 @@ import (
 
 type Handler struct {
 	api            *api.Api
-	jobs           *j.Handler
+	jobs           *j.Jobs
 	tb             template.Builder[*web.Context]
 	pg             *cs.PG
 	useDirectLinks bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Handler, pg *cs.PG) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG) {
 	helper := NewHelper()
 	h := &Handler{
 		api:            api,

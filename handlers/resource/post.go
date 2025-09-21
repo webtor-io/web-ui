@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/handlers/job/script"
+	"github.com/webtor-io/web-ui/jobs/scripts"
 	sv "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -89,7 +89,7 @@ func (s *Handler) post(c *gin.Context) {
 		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "wrong args provided")))
 		return
 	}
-	loadJob, err = s.jobs.Load(web.NewContext(c), &script.LoadArgs{
+	loadJob, err = s.jobs.Load(web.NewContext(c), &scripts.LoadArgs{
 		Query: args.Query,
 		File:  args.File,
 	})

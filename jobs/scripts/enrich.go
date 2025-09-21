@@ -1,7 +1,8 @@
-package script
+package scripts
 
 import (
 	"context"
+
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/web"

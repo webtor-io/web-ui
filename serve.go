@@ -27,6 +27,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
 	"github.com/webtor-io/web-ui/handlers/webdav"
+	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/common"
@@ -83,6 +84,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = embed.RegisterFlags(c.Flags)
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
+	c.Flags = jj.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -220,10 +222,10 @@ func serve(c *cli.Context) error {
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	// Setting JobHandler
-	jobs := wj.New(queues, tm, sapi, en)
+	jobs := jj.New(c, queues, tm, sapi, en)
 
-	jobs.RegisterHandler(r)
+	// Setting JobHandler
+	wj.RegisterHandler(r, queues)
 
 	// Setting AbuseStore
 	asc := as.New(c)
