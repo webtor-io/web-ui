@@ -5,7 +5,7 @@ CREATE TABLE public.addon_url (
 	created_at timestamptz DEFAULT now() NOT NULL,
 	updated_at timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT addon_url_pk PRIMARY KEY (addon_url_id),
-	CONSTRAINT addon_url_unique UNIQUE (url),
+	CONSTRAINT addon_url_unique UNIQUE (url, user_id),
 	CONSTRAINT addon_url_user_fk FOREIGN KEY (user_id)
 		REFERENCES public."user" (user_id) ON DELETE CASCADE
 );
