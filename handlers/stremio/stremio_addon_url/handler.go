@@ -122,7 +122,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Check if URL already exists
-	urlExists, err := models.StremioAddonUrlExists(db, addonUrl)
+	urlExists, err := models.StremioAddonUrlExists(db, user.ID, addonUrl)
 	if err != nil {
 		return
 	}

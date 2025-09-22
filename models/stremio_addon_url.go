@@ -40,9 +40,9 @@ func CountUserStremioAddonUrls(db *pg.DB, userID uuid.UUID) (int, error) {
 }
 
 // StremioAddonUrlExists checks if a stremio addon URL already exists in the system
-func StremioAddonUrlExists(db *pg.DB, url string) (bool, error) {
+func StremioAddonUrlExists(db *pg.DB, userID uuid.UUID, url string) (bool, error) {
 	existing := &StremioAddonUrl{}
-	err := db.Model(existing).Where("url = ?", url).Select()
+	err := db.Model(existing).Where("url = ? AND user_id = ?", url, userID).Select()
 	if err == nil {
 		return true, nil
 	} else if errors.Is(err, pg.ErrNoRows) {
