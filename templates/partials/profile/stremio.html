@@ -4,38 +4,31 @@
             <div class="w-full">
                 <h2 class="text-2xl font-bold text-accent">Stremio integration</h2>
                 <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                    {{ if .Claims | isPaid }}
-                        {{ if eq .Data.StremioAddonURL "" }}
-                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/url/generate" data-async-target="#stremio">
-                                <button type="submit" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="stremio-generate-addon-url">
-                                    Generate addon url
-                                </button>
-                            </form>
-                        {{ else }}
-                            <script>
-                                var stremioAddonUrl = "{{ domain }}{{ .Data.StremioAddonURL }}";
-                                function copyStremioAddonUrl(form, e) {
-                                    e.preventDefault();
-                                    navigator.clipboard.writeText(stremioAddonUrl);
-                                    return false;
-                                }
-                            </script>
-                            <div class="w-full sm:px-5">
-                                <form onsubmit="copyStremioAddonUrl(this, event)" class="join w-full">
-                                    <input name="token" readonly class="input input-bordered w-full join-item" value="{{ domain }}{{ .Data.StremioAddonURL }}" />
-                                    <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="stremio-copy-addon-url">copy addon url</button>
-                                </form>
-                                <div class="text-left w-full text-sm text-accent mt-2">
-                                    <span class="text-accent">ⓘ</span>
-                                    <a href="/instructions/stremio" class="hover:underline" data-umami-event="instruction-stremio" target="_blank">How to connect to Stremio?</a>
-                                </div>
-                            </div>
-                        {{ end }}
+                    {{ if eq .Data.StremioAddonURL "" }}
+                        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/url/generate" data-async-target="#stremio">
+                            <button type="submit" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="stremio-generate-addon-url">
+                                Generate addon url
+                            </button>
+                        </form>
                     {{ else }}
-                        <p class="mb-6">Stremio integration is available for premium users. <a href="/donate" class="btn-link" data-umami-event="donate-stremio">Upgrade your tier to unlock it!</a></p>
-                        <button disabled class="btn btn-accent btn-outline capitalize whitespace-nowrap">
-                            Generate addon url
-                        </button>
+                        <script>
+                            var stremioAddonUrl = "{{ domain }}{{ .Data.StremioAddonURL }}";
+                            function copyStremioAddonUrl(form, e) {
+                                e.preventDefault();
+                                navigator.clipboard.writeText(stremioAddonUrl);
+                                return false;
+                            }
+                        </script>
+                        <div class="w-full sm:px-5">
+                            <form onsubmit="copyStremioAddonUrl(this, event)" class="join w-full">
+                                <input name="token" readonly class="input input-bordered w-full join-item" value="{{ domain }}{{ .Data.StremioAddonURL }}" />
+                                <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="stremio-copy-addon-url">copy addon url</button>
+                            </form>
+                            <div class="text-left w-full text-sm text-accent mt-2">
+                                <span class="text-accent">ⓘ</span>
+                                <a href="/instructions/stremio" class="hover:underline" data-umami-event="instruction-stremio" target="_blank">How to connect to Stremio?</a>
+                            </div>
+                        </div>
                     {{ end }}
                 </div>
             </div>

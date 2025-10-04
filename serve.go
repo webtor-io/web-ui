@@ -21,6 +21,7 @@ import (
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	sta "github.com/webtor-io/web-ui/handlers/static"
+	"github.com/webtor-io/web-ui/handlers/streaming/backends"
 	"github.com/webtor-io/web-ui/handlers/stremio"
 	"github.com/webtor-io/web-ui/handlers/stremio/settings"
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
@@ -296,6 +297,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Stremio Settings
 	settings.RegisterHandler(r, ats, pg)
+
+	// Setting Streaming Backends
+	backends.RegisterHandler(r, ats, pg)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

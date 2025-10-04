@@ -11,8 +11,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 type Handler struct {
@@ -28,13 +26,11 @@ func RegisterHandler(r *gin.Engine, at *at.AccessToken, pg *cs.PG) {
 	h := NewHandler(at, pg)
 	gr := r.Group("/stremio/settings")
 	gr.Use(auth.HasAuth)
-	gr.Use(claims.IsPaid)
 	gr.POST("/update", h.updateSettings)
 }
 
 func (s *Handler) updateSettings(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
-	cla := claims.GetFromContext(c)
 
 	// Parse form data
 	settingsData := &models.StremioSettingsData{}
@@ -44,10 +40,6 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	resolution1080p := c.PostForm("resolution_1080p") == "on"
 	resolution720p := c.PostForm("resolution_720p") == "on"
 	resolutionOther := c.PostForm("resolution_other") == "on"
-
-	if !stremio.Is4KAvailable(cla) {
-		resolution4k = false
-	}
 
 	// Parse resolution_order field to determine ordering
 	resolutionOrder := c.PostForm("resolution_order")

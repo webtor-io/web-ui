@@ -18,15 +18,23 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 )
 
+// BackendTypeInfo represents information about a streaming backend type
+type BackendTypeInfo struct {
+	Type        string
+	DisplayName string
+}
+
 type Data struct {
-	StremioAddonURL     string
-	WebDAVURL           string
-	EmbedDomains        []models.EmbedDomain
-	AddonUrls           []models.StremioAddonUrl
-	StremioSettings     *models.StremioSettingsData
-	Is4KAvailable       bool
-	MinBitrateFor4KMbps int64
-	Error               string
+	StremioAddonURL       string
+	WebDAVURL             string
+	EmbedDomains          []models.EmbedDomain
+	AddonUrls             []models.StremioAddonUrl
+	StremioSettings       *models.StremioSettingsData
+	StreamingBackends     []*models.StreamingBackend
+	AvailableBackendTypes []BackendTypeInfo
+	Is4KAvailable         bool
+	MinBitrateFor4KMbps   int64
+	Error                 string
 }
 
 type Handler struct {
@@ -46,6 +54,14 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], at *at.A
 		claims: cl,
 	}
 	r.GET("/profile", h.get)
+}
+
+// getAvailableBackendTypes returns the list of available streaming backend types
+func getAvailableBackendTypes() []BackendTypeInfo {
+	return []BackendTypeInfo{
+		{Type: string(models.StreamingBackendTypeRealDebrid), DisplayName: "Real-Debrid"},
+		{Type: string(models.StreamingBackendTypeTorbox), DisplayName: "Torbox"},
+	}
 }
 
 func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
@@ -117,14 +133,21 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	// Get user streaming backends
+	streamingBackends, err := models.GetUserStreamingBackends(db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
-		StremioAddonURL:     stremioURL,
-		WebDAVURL:           webdavURL,
-		EmbedDomains:        domains,
-		AddonUrls:           addonUrls,
-		StremioSettings:     ss,
-		Is4KAvailable:       stremio.Is4KAvailable(cla),
-		MinBitrateFor4KMbps: stremio.MinBitrateMBpsFor4K,
-		Error:               c.Query("error"),
+		StremioAddonURL:       stremioURL,
+		WebDAVURL:             webdavURL,
+		EmbedDomains:          domains,
+		AddonUrls:             addonUrls,
+		StremioSettings:       ss,
+		StreamingBackends:     streamingBackends,
+		AvailableBackendTypes: getAvailableBackendTypes(),
+		Error:                 c.Query("error"),
 	}))
 }
