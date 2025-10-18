@@ -35,7 +35,7 @@ type StreamingBackend struct {
 	ID            uuid.UUID               `pg:"streaming_backend_id,pk,type:uuid,default:uuid_generate_v4()"`
 	UserID        uuid.UUID               `pg:"user_id,notnull"`
 	Type          StreamingBackendType    `pg:"type,notnull"`
-	AccessToken   *string                 `pg:"access_token"`
+	AccessToken   string                  `pg:"access_token"`
 	Config        StreamingBackendConfig  `pg:"config,type:jsonb,notnull,default:'{}'"`
 	Priority      int16                   `pg:"priority,notnull"`
 	Proxied       bool                    `pg:"proxied,notnull,default:false,use_zero"`

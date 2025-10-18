@@ -4,34 +4,42 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	sv "github.com/webtor-io/web-ui/services/common"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 type Handler struct {
-	at *at.AccessToken
-	b  *stremio.Builder
-	pg *cs.PG
+	at     *at.AccessToken
+	b      *stremio.Builder
+	pg     *cs.PG
+	lr     *lr.LinkResolver
+	secret string
 }
 
-func RegisterHandler(r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *cs.PG) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *cs.PG, lr *lr.LinkResolver) {
 	h := &Handler{
-		at: at,
-		b:  b,
-		pg: pg,
+		at:     at,
+		b:      b,
+		pg:     pg,
+		lr:     lr,
+		secret: c.String(sv.SessionSecretFlag),
 	}
 
 	gr := r.Group("/stremio")
 	gr.GET("/manifest.json", h.manifest)
 	gr.Use(auth.HasAuth)
-	gr.Use(claims.IsPaid)
 	gr.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST"},
@@ -42,6 +50,7 @@ func RegisterHandler(r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *
 	grapi.GET("/catalog/:type/*id", h.catalog)
 	grapi.GET("/stream/:type/*id", h.stream)
 	grapi.GET("/meta/:type/*id", h.meta)
+	grapi.GET("/redirect/*data", h.redirect)
 }
 
 func (s *Handler) generateUrl(c *gin.Context) {
@@ -109,7 +118,7 @@ func (s *Handler) stream(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	apiClaims := api.GetClaimsFromContext(c)
 	cla := claims.GetFromContext(c)
-	sts, err := s.b.BuildStreamsService(user.ID, apiClaims, cla)
+	sts, err := s.b.BuildStreamsService(user.ID, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
 	if err != nil {
 		log.WithError(err).Error("failed to build streams service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -125,4 +134,79 @@ func (s *Handler) stream(c *gin.Context) {
 
 func (s *Handler) cleanResourceID(rawID string) string {
 	return strings.TrimPrefix(strings.TrimSuffix(rawID, ".json"), "/")
+}
+
+func (s *Handler) redirect(c *gin.Context) {
+	// Step 1: Extract JWT token from URL path
+	data := strings.TrimPrefix(c.Param("data"), "/")
+	if data == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// Step 2: Parse and validate JWT token
+	token, err := jwt.Parse(data, func(token *jwt.Token) (interface{}, error) {
+		// Validate signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(s.secret), nil
+	})
+
+	if err != nil {
+		log.WithError(err).Warn("failed to parse JWT token")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// Step 3: Extract claims
+	jwtClaims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		log.Warn("invalid JWT token claims")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// Step 4: Extract hash and path from claims
+	hash, ok := jwtClaims["hash"].(string)
+	if !ok || hash == "" {
+		log.Warn("missing or invalid hash in JWT claims")
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	path, ok := jwtClaims["path"].(string)
+	if !ok || path == "" {
+		log.Warn("missing or invalid path in JWT claims")
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// Step 5: Get user context
+	user := auth.GetUserFromContext(c)
+	apiClaims := api.GetClaimsFromContext(c)
+	userClaims := claims.GetFromContext(c)
+
+	// Step 6: Resolve link using LinkResolver
+	linkResult, err := s.lr.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, path, true)
+	if err != nil {
+		log.WithError(err).
+			WithField("hash", hash).
+			WithField("path", path).
+			Error("failed to resolve link")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	// Step 7: Check if URL was generated
+	if linkResult == nil || linkResult.URL == "" {
+		log.WithField("hash", hash).
+			WithField("path", path).
+			Warn("no URL generated for redirect")
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Step 8: Redirect to destination URL
+	c.Redirect(http.StatusFound, linkResult.URL)
 }

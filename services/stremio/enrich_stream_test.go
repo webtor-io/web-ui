@@ -56,7 +56,7 @@ func (m *mockAPI) ExportResourceContent(ctx context.Context, c *api.Claims, info
 func TestEnrichStream_GetName(t *testing.T) {
 	wrapped := &mockWrappedService{}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	expected := "EnrichMockService"
 	if service.GetName() != expected {
@@ -69,7 +69,7 @@ func TestEnrichStream_GetStreams_EmptyResponse(t *testing.T) {
 		response: &StreamsResponse{Streams: []StreamItem{}},
 	}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -96,7 +96,7 @@ func TestEnrichStream_GetStreams_WithExistingURL(t *testing.T) {
 		},
 	}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -129,7 +129,7 @@ func TestEnrichStream_GetStreams_NoInfoHash(t *testing.T) {
 		},
 	}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -185,7 +185,7 @@ func TestEnrichStream_GetStreams_ResourceExists(t *testing.T) {
 		},
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -245,7 +245,7 @@ func TestEnrichStream_GetStreams_ResourceDoesNotExist(t *testing.T) {
 		},
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -282,7 +282,7 @@ func TestEnrichStream_GetStreams_APIError(t *testing.T) {
 		getResourceError: errors.New("API error"),
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	ctx := context.Background()
 	result, err := service.GetStreams(ctx, "movie", "test")
@@ -299,7 +299,7 @@ func TestEnrichStream_GetStreams_APIError(t *testing.T) {
 func TestEnrichStream_MakeMagnetURL(t *testing.T) {
 	wrapped := &mockWrappedService{}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	infohash := "testhash123"
 	sources := []string{"tracker1", "tracker2"}
@@ -315,7 +315,7 @@ func TestEnrichStream_MakeMagnetURL(t *testing.T) {
 func TestEnrichStream_MakeMagnetURL_EmptySources(t *testing.T) {
 	wrapped := &mockWrappedService{}
 	mockAPI := &mockAPI{}
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	infohash := "testhash123"
 	sources := []string{}
@@ -355,7 +355,7 @@ func TestEnrichStream_Timeout(t *testing.T) {
 		getResourceError: context.Canceled,
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	result, err := service.GetStreams(ctx, "movie", "test")
 
@@ -415,7 +415,7 @@ func TestEnrichStream_ConcurrentAccess(t *testing.T) {
 		},
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	// Run the test multiple times to increase chance of detecting race conditions
 	for run := 0; run < 10; run++ {
@@ -463,7 +463,7 @@ func TestEnrichStream_BackgroundRetry(t *testing.T) {
 		storeResourceError:    context.DeadlineExceeded, // Simulate deadline exceeded
 	}
 
-	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{})
+	service := NewEnrichStream(wrapped, mockAPI, &api.Claims{}, nil, "", "")
 
 	// Create a context with very short timeout to trigger deadline exceeded
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)

@@ -8,10 +8,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/claims"
+	sv "github.com/webtor-io/web-ui/services/common"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	"github.com/webtor-io/web-ui/services/link_resolver/common"
 )
 
 // APIService defines the interface for API operations needed by EnrichStream
@@ -29,10 +37,16 @@ type EnrichStream struct {
 	claims                     *api.Claims
 	storeResourceMap           lazymap.LazyMap[*ra.ResourceResponse]
 	backgroundStoreResourceMap lazymap.LazyMap[*ra.ResourceResponse]
+	linkResolver               *lr.LinkResolver
+	uID                        uuid.UUID
+	cla                        *claims.Data
+	domain                     string
+	token                      string
+	secret                     string
 }
 
 // NewEnrichStream creates a new EnrichStream service
-func NewEnrichStream(inner StreamsService, api APIService, claims *api.Claims) *EnrichStream {
+func NewEnrichStream(inner StreamsService, api APIService, lr *lr.LinkResolver, uID uuid.UUID, claims *api.Claims, cla *claims.Data, domain, token, secret string) *EnrichStream {
 	return &EnrichStream{
 		inner:  inner,
 		api:    api,
@@ -44,18 +58,24 @@ func NewEnrichStream(inner StreamsService, api APIService, claims *api.Claims) *
 		backgroundStoreResourceMap: lazymap.New[*ra.ResourceResponse](&lazymap.Config{
 			Concurrency: 20,
 		}),
+		linkResolver: lr,
+		uID:          uID,
+		cla:          cla,
+		domain:       domain,
+		token:        token,
+		secret:       secret,
 	}
 }
 
 // GetName returns the name of the inner service with "Enrich" prefix
-func (e *EnrichStream) GetName() string {
-	return "Enrich" + e.inner.GetName()
+func (s *EnrichStream) GetName() string {
+	return "Enrich" + s.inner.GetName()
 }
 
 // GetStreams gets streams from the inner service and enriches them with URLs
-func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
+func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
 	// Get streams from inner service
-	response, err := e.inner.GetStreams(ctx, contentType, contentID)
+	response, err := s.inner.GetStreams(ctx, contentType, contentID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,16 +90,27 @@ func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 
 	for i, stream := range response.Streams {
 		wg.Add(1)
-		go func(index int, s *StreamItem) {
+		go func(index int, si *StreamItem) {
 			defer wg.Done()
 
 			// Create context with 10-second timeout
-			streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
+			//streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			//defer cancel()
+			streamCtx := ctx
 
 			// Create a copy of the stream to avoid potential shared memory issues
-			streamCopy := *s
-			enriched := e.enrichStream(streamCtx, &streamCopy)
+			streamCopy := *si
+			enriched, err := s.enrichStream(streamCtx, &streamCopy)
+			if err != nil {
+				log.WithError(err).
+					WithField("infohash", streamCopy.InfoHash).
+					Warn("failed to enrich stream")
+				return
+			}
+			if enriched == nil {
+				return
+			}
+			enriched = &streamCopy
 			enrichedStreams[index] = enriched
 		}(i, &stream)
 	}
@@ -99,103 +130,84 @@ func (e *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 }
 
 // enrichStream enriches a single stream with URL if needed
-func (e *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) *StreamItem {
+func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*StreamItem, error) {
 	// Step 1: Check if there is URL in stream
 	if stream.Url != "" {
-		return stream
+		return stream, nil
 	}
 
 	// Check if we have InfoHash
 	if stream.InfoHash == "" {
-		log.WithField("stream_title", stream.Title).
-			Warn("stream has no InfoHash, dropping stream")
-		return nil
+		return nil, errors.New("stream has no InfoHash")
 	}
 
 	// Step 2: Check with webtor API if it has resource with infohash
-	resource, err := e.api.GetResource(ctx, e.claims, stream.InfoHash)
+	resource, err := s.api.GetResource(ctx, s.claims, stream.InfoHash)
 	if err != nil {
-		log.WithError(err).
-			WithField("infohash", stream.InfoHash).
-			WithField("stream_title", stream.Title).
-			Warn("failed to check resource, dropping stream")
-		return nil
+		return nil, errors.Wrap(err, "failed to get resource from API")
 	}
 
 	// If resource doesn't exist, store it
 	if resource == nil {
 		// Step 3: Make magnet URL and store it in API using lazymap
-		magnetURL := e.makeMagnetURL(stream.InfoHash, stream.Sources)
+		magnetURL := s.makeMagnetURL(stream.InfoHash, stream.Sources)
 
-		log.WithField("infohash", stream.InfoHash).
-			WithField("magnet_url", magnetURL).
-			Debug("storing resource for stream")
-
-		_, err := e.storeResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
-			return e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+		_, err := s.storeResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
+			return s.api.StoreResource(ctx, s.claims, []byte(magnetURL))
 		})
 		if err != nil {
 			// Check if the error is due to context deadline
-			if ctx.Err() == context.DeadlineExceeded {
-				log.WithField("infohash", stream.InfoHash).
-					WithField("magnet_url", magnetURL).
-					Info("storeResource failed due to timeout, scheduling background retry")
-
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				// Start background goroutine to retry with longer timeout
-				go e.backgroundStoreResource(stream.InfoHash, magnetURL)
-			} else {
-				log.WithError(err).
-					WithField("infohash", stream.InfoHash).
-					WithField("magnet_url", magnetURL).
-					Warn("failed to store resource")
+				go func() {
+					log.WithField("infohash", stream.InfoHash).
+						Info("started resource store in background")
+					err := s.backgroundStoreResource(stream.InfoHash, magnetURL)
+					if err != nil {
+						log.WithError(err).
+							WithField("infohash", stream.InfoHash).
+							Warn("failed to store resource in background")
+						return
+					}
+					log.WithField("infohash", stream.InfoHash).
+						Info("resource stored in background")
+				}()
 			}
-
-			// Drop stream for current request but allow background retry
-			return nil
+			return nil, errors.Wrap(ctx.Err(), "failed to store resource")
 		}
 	}
 
-	// Step 4: Generate URL with webtor's API using FileIdx
-	url, err := e.generateStreamURL(ctx, stream)
+	p, err := s.getFilePathFromStream(ctx, stream)
 	if err != nil {
-		log.WithError(err).
-			WithField("infohash", stream.InfoHash).
-			WithField("filename", stream.BehaviorHints.Filename).
-			Warn("failed to generate stream URL, dropping stream")
-		return nil
+		return nil, errors.Wrap(err, "failed to convert idx to path")
 	}
+	availability, err := s.linkResolver.CheckAvailability(ctx, s.uID, s.claims, s.cla, stream.InfoHash, p, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check availability")
+	}
+	stream.Name = s.updateStreamName(stream.Name, availability)
 
 	// Step 5: Add generated URL to Stream
-	stream.Url = url
-	return stream
+	if availability != nil {
+		stream.Url = s.generateRedirectURL(stream.InfoHash, p)
+	}
+	return stream, nil
 }
 
 // backgroundStoreResource attempts to store a resource in the background with extended timeout
-func (e *EnrichStream) backgroundStoreResource(infohash, magnetURL string) {
+func (s *EnrichStream) backgroundStoreResource(infohash, magnetURL string) error {
 	// Create a background context with 5-minutes timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.WithField("infohash", infohash).
-		WithField("magnet_url", magnetURL).
-		Debug("starting background resource storage with extended timeout")
-
-	_, err := e.backgroundStoreResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
-		return e.api.StoreResource(ctx, e.claims, []byte(magnetURL))
+	_, err := s.backgroundStoreResourceMap.Get(magnetURL, func() (*ra.ResourceResponse, error) {
+		return s.api.StoreResource(ctx, s.claims, []byte(magnetURL))
 	})
-	if err != nil {
-		log.WithError(err).
-			WithField("infohash", infohash).
-			WithField("magnet_url", magnetURL).
-			Warn("background resource storage failed")
-	} else {
-		log.WithField("infohash", infohash).
-			Info("background resource storage completed successfully")
-	}
+	return err
 }
 
 // makeMagnetURL creates a magnet URL from InfoHash and Sources
-func (e *EnrichStream) makeMagnetURL(infohash string, sources []string) string {
+func (s *EnrichStream) makeMagnetURL(infohash string, sources []string) string {
 	magnetURL := fmt.Sprintf("magnet:?xt=urn:btih:%s", infohash)
 
 	// Add trackers from sources
@@ -210,29 +222,26 @@ func (e *EnrichStream) makeMagnetURL(infohash string, sources []string) string {
 	return magnetURL
 }
 
-// generateStreamURL generates a URL for the stream using the API
-func (e *EnrichStream) generateStreamURL(ctx context.Context, si *StreamItem) (string, error) {
-	// List resource content to find the file at the given index
+func (s *EnrichStream) getFilePathFromStream(ctx context.Context, stream *StreamItem) (string, error) {
 	listArgs := &api.ListResourceContentArgs{
 		Limit:  100,
 		Offset: 0,
 	}
 
 	var targetItem *ra.ListItem
-
 	var idx int
 
 	// Paginate through results to find the file at the specified index
 	for {
-		resp, err := e.api.ListResourceContentCached(ctx, e.claims, si.InfoHash, listArgs)
+		resp, err := s.api.ListResourceContentCached(ctx, s.claims, stream.InfoHash, listArgs)
 		if err != nil {
 			return "", err
 		}
 
 		for _, item := range resp.Items {
 			if item.Type == ra.ListTypeFile {
-				if (si.BehaviorHints != nil && si.BehaviorHints.Filename != "" && item.Name == si.BehaviorHints.Filename) ||
-					((si.BehaviorHints == nil || si.BehaviorHints.Filename == "") && idx == int(si.FileIdx)) {
+				if (stream.BehaviorHints != nil && stream.BehaviorHints.Filename != "" && item.Name == stream.BehaviorHints.Filename) ||
+					((stream.BehaviorHints == nil || stream.BehaviorHints.Filename == "") && idx == int(stream.FileIdx)) {
 					targetItem = &item
 					break
 				}
@@ -253,23 +262,40 @@ func (e *EnrichStream) generateStreamURL(ctx context.Context, si *StreamItem) (s
 	}
 
 	if targetItem == nil {
-		return "", fmt.Errorf("file %v with idx %v not found", si.BehaviorHints.Filename, si.FileIdx)
+		return "", fmt.Errorf("file at index %d not found", stream.FileIdx)
 	}
 
-	// Export the resource content to get the download URL
-	exportResp, err := e.api.ExportResourceContent(ctx, e.claims, si.InfoHash, targetItem.ID, "")
-	if err != nil {
-		return "", err
-	}
+	return targetItem.PathStr, nil
+}
 
-	if exportResp.ExportItems == nil {
-		return "", fmt.Errorf("no export items returned")
+func (s *EnrichStream) generateRedirectURL(hash string, p string) string {
+	clms := jwt.MapClaims{
+		"hash": hash,
+		"path": p,
+		"exp":  time.Now().Add(10 * time.Minute).Unix(),
 	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, clms)
+	tokenString, _ := token.SignedString([]byte(s.secret))
+	return fmt.Sprintf("%s/%s/%s/stremio/redirect/%s", s.domain, sv.AccessTokenParamName, s.token, tokenString)
+}
 
-	downloadItem, exists := exportResp.ExportItems["download"]
-	if !exists {
-		return "", fmt.Errorf("download export item not found")
+func (s *EnrichStream) updateStreamName(name string, availability *common.CheckAvailabilityResult) string {
+	var prefix string
+	if availability != nil {
+		if availability.Cached {
+			prefix = "⚡"
+		}
+		if pn, ok := servicesNames[availability.ServiceType]; ok {
+			prefix += pn
+		}
+	} else {
+		prefix = "P2P"
 	}
+	return fmt.Sprintf("[%s]\n%s", prefix, name)
+}
 
-	return downloadItem.URL, nil
+var servicesNames = map[models.StreamingBackendType]string{
+	models.StreamingBackendTypeWebtor:     "WT",
+	models.StreamingBackendTypeRealDebrid: "RD",
+	models.StreamingBackendTypeTorbox:     "TB",
 }

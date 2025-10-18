@@ -14,23 +14,17 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	csrf "github.com/utrack/gin-csrf"
+	"github.com/webtor-io/web-ui/services/common"
 )
 
 const (
-	sessionSecretFlag = "secret"
-	redisHostFlag     = "session-redis-host"
-	redisPortFlag     = "session-redis-port"
-	redisPassFlag     = "session-redis-pass"
+	redisHostFlag = "session-redis-host"
+	redisPortFlag = "session-redis-port"
+	redisPassFlag = "session-redis-pass"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
-		cli.StringFlag{
-			Name:   sessionSecretFlag,
-			Usage:  "session secret",
-			Value:  "secret123",
-			EnvVar: "SESSION_SECRET",
-		},
 		cli.StringFlag{
 			Name:   redisHostFlag,
 			Usage:  "session redis host",
@@ -58,13 +52,13 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 	var store sessions.Store
 	if c.String(redisHostFlag) != "" && c.Int(redisPortFlag) != 0 {
 		url := fmt.Sprintf("%v:%v", c.String(redisHostFlag), c.Int(redisPortFlag))
-		store, err = redis.NewStore(10, "tcp", url, c.String(redisPassFlag), []byte(sessionSecretFlag))
+		store, err = redis.NewStore(10, "tcp", url, c.String(redisPassFlag), []byte(common.SessionSecretFlag))
 		if err != nil {
 			return err
 		}
 		log.Infof("using redis store %v", url)
 	} else {
-		store = cookie.NewStore([]byte(sessionSecretFlag))
+		store = cookie.NewStore([]byte(common.SessionSecretFlag))
 	}
 	r.Use(sessions.Sessions("session", store))
 	r.Use(func(ctx *gin.Context) {
@@ -81,7 +75,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 
 	})
 	r.Use(csrf.Middleware(csrf.Options{
-		Secret: c.String(sessionSecretFlag),
+		Secret: c.String(common.SessionSecretFlag),
 		ErrorFunc: func(c *gin.Context) {
 			for _, r := range csrfIgnorePrefixes {
 				if strings.HasPrefix(c.Request.URL.Path, r) {

@@ -89,7 +89,7 @@ func (s *Handler) addStreamingBackend(backendType models.StreamingBackendType, a
 
 	// Set access token if provided
 	if accessToken != "" {
-		backend.AccessToken = &accessToken
+		backend.AccessToken = accessToken
 	}
 
 	err = models.CreateStreamingBackend(db, backend)

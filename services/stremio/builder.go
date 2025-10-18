@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
 )
 
 type Builder struct {
@@ -21,6 +22,7 @@ type Builder struct {
 	rapi      *api.Api
 	cl        *http.Client
 	userAgent string
+	secret    string
 }
 
 func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api) *Builder {
@@ -31,6 +33,7 @@ func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api) *Buil
 			ErrorExpire: 10 * time.Second,
 		}),
 		domain:    c.String(common.DomainFlag),
+		secret:    c.String(common.SessionSecretFlag),
 		rapi:      rapi,
 		cl:        cl,
 		userAgent: GetUserAgent(c),
@@ -61,7 +64,7 @@ func (s *Builder) BuildMetaService(uID uuid.UUID) (MetaService, error) {
 	return mes, nil
 }
 
-func (s *Builder) BuildStreamsService(uID uuid.UUID, apiClaims *api.Claims, cla *claims.Data) (StreamsService, error) {
+func (s *Builder) BuildStreamsService(uID uuid.UUID, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("database not initialized")
@@ -74,7 +77,7 @@ func (s *Builder) BuildStreamsService(uID uuid.UUID, apiClaims *api.Claims, cla 
 	cs := NewCompositeStream([]StreamsService{sts, acs})
 	ds := NewDedupStream(cs)
 	ps := NewPreferredStream(ds, db, uID, cla)
-	es := NewEnrichStream(ps, s.rapi, apiClaims)
+	es := NewEnrichStream(ps, s.rapi, lr, uID, apiClaims, cla, s.domain, token, s.secret)
 
 	return es, nil
 }

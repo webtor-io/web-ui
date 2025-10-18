@@ -33,6 +33,7 @@ import (
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 
@@ -286,8 +287,11 @@ func serve(c *cli.Context) error {
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
 
+	// Setting LinkResolver
+	linkResolver := lr.New(cl, pg, sapi)
+
 	// Setting Stremio
-	stremio.RegisterHandler(r, ats, sb, pg)
+	stremio.RegisterHandler(c, r, ats, sb, pg, linkResolver)
 
 	// Setting Handler
 	err = stremio_addon_url.RegisterHandler(c, av, r, pg)
