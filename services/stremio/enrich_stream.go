@@ -93,10 +93,10 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 		go func(index int, si *StreamItem) {
 			defer wg.Done()
 
-			// Create context with 10-second timeout
-			//streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			//defer cancel()
-			streamCtx := ctx
+			// Create context with 5-second timeout
+			streamCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			//streamCtx := ctx
 
 			// Create a copy of the stream to avoid potential shared memory issues
 			streamCopy := *si
@@ -181,16 +181,16 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert idx to path")
 	}
-	availability, err := s.linkResolver.CheckAvailability(ctx, s.uID, s.claims, s.cla, stream.InfoHash, p, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check availability")
-	}
-	stream.Name = s.updateStreamName(stream.Name, availability)
+	//availability, err := s.linkResolver.CheckAvailability(ctx, s.uID, s.claims, s.cla, stream.InfoHash, p, true)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to check availability")
+	//}
+	//stream.Name = s.updateStreamName(stream.Name, availability)
 
 	// Step 5: Add generated URL to Stream
-	if availability != nil {
-		stream.Url = s.generateRedirectURL(stream.InfoHash, p)
-	}
+	//if availability != nil {
+	stream.Url = s.generateRedirectURL(stream.InfoHash, p)
+	//}
 	return stream, nil
 }
 
@@ -272,7 +272,7 @@ func (s *EnrichStream) generateRedirectURL(hash string, p string) string {
 	clms := jwt.MapClaims{
 		"hash": hash,
 		"path": p,
-		"exp":  time.Now().Add(10 * time.Minute).Unix(),
+		"exp":  time.Now().Add(12 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, clms)
 	tokenString, _ := token.SignedString([]byte(s.secret))

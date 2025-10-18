@@ -3,29 +3,22 @@ package backends
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
 )
 
 // Webtor implements Backend interface for Webtor
 type Webtor struct {
-	api               *api.Api
-	availabilityCache lazymap.LazyMap[bool]
+	api *api.Api
 }
 
 // NewWebtor creates a new Webtor backend
 func NewWebtor(apiService *api.Api) *Webtor {
 	return &Webtor{
 		api: apiService,
-		availabilityCache: lazymap.New[bool](&lazymap.Config{
-			Expire:      5 * time.Minute,
-			ErrorExpire: 30 * time.Second,
-		}),
 	}
 }
 
@@ -84,47 +77,6 @@ func (s *Webtor) getExportItem(ctx context.Context, apiClaims *api.Claims, hash,
 		return nil, fmt.Errorf("%s export item not found", exportType)
 	}
 	return &item, nil
-}
-
-// checkAvailabilityCached is a cached variant that uses LazyMap to cache availability check results
-func (s *Webtor) checkAvailabilityCached(ctx context.Context, apiClaims *api.Claims, hash, path string) (bool, error) {
-	cacheKey := fmt.Sprintf("%s:%s", hash, path)
-
-	log.WithFields(log.Fields{
-		"hash":      hash,
-		"path":      path,
-		"cache_key": cacheKey,
-	}).Debug("checking webtor availability with cache")
-
-	return s.availabilityCache.Get(cacheKey, func() (bool, error) {
-		log.WithFields(log.Fields{
-			"hash": hash,
-			"path": path,
-		}).Debug("cache miss, performing actual availability check")
-
-		item, err := s.getExportItem(ctx, apiClaims, hash, path, "download")
-		if err != nil {
-			return false, errors.Wrap(err, "failed to get download export item")
-		}
-		// Extract cached state from meta
-		cached := false
-		if item.Meta != nil {
-			cached = item.Meta.Cache
-		}
-
-		log.WithFields(log.Fields{
-			"hash":   hash,
-			"path":   path,
-			"cached": cached,
-		}).Debug("availability check completed, caching result")
-
-		return cached, nil
-	})
-}
-
-// CheckAvailability checks if content is available in Webtor
-func (s *Webtor) CheckAvailability(ctx context.Context, apiClaims *api.Claims, hash, path string) (bool, error) {
-	return s.checkAvailabilityCached(ctx, apiClaims, hash, path)
 }
 
 // ResolveLink generates a webtor streaming link with cached status
