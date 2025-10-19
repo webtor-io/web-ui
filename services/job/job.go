@@ -169,15 +169,25 @@ func (s *Job) Run(ctx context.Context) error {
 }
 
 func (s *Job) ObserveLog() *Observer {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	o := NewObserver()
 	s.observers[o.ID] = o
 	return o
 }
 
 func (s *Job) pushToObservers(ctx context.Context, l LogItem) {
-	wg := sync.WaitGroup{}
-	wg.Add(len(s.observers))
+	s.mux.Lock()
+	// Create a snapshot of observers to avoid race conditions
+	observers := make([]*Observer, 0, len(s.observers))
 	for _, o := range s.observers {
+		observers = append(observers, o)
+	}
+	s.mux.Unlock()
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(observers))
+	for _, o := range observers {
 		go func(o *Observer) {
 			o.Push(ctx, l)
 			wg.Done()

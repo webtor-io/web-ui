@@ -166,7 +166,7 @@ func (s *Library) bindArgs(ct, id string) (args *Args, err error) {
 	parts := strings.Split(id, ":")
 	id = parts[0]
 	var season, episode int
-	if len(parts) > 1 {
+	if len(parts) > 2 {
 		season, err = strconv.Atoi(parts[1])
 		if err != nil {
 			return
