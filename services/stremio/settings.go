@@ -1,15 +1,16 @@
 package stremio
 
 import (
+	"context"
+
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/claims"
 )
 
 // GetUserStremioSettings returns Stremio settings for a specific user
-func GetUserSettingsDataByClaims(db *pg.DB, userID uuid.UUID, cla *claims.Data) (*models.StremioSettingsData, error) {
-	s, err := models.GetUserStremioSettingsData(db, userID)
+func GetUserSettingsDataByClaims(ctx context.Context, db *pg.DB, userID uuid.UUID) (*models.StremioSettingsData, error) {
+	s, err := models.GetUserStremioSettingsData(ctx, db, userID)
 	if err != nil {
 		return nil, err
 	}

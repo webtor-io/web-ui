@@ -34,7 +34,7 @@ func (s *PreferredStream) GetName() string {
 }
 
 func (s *PreferredStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
-	us, err := GetUserSettingsDataByClaims(s.db, s.userID, s.cla)
+	us, err := GetUserSettingsDataByClaims(ctx, s.db, s.userID)
 	if err != nil {
 		return nil, err
 	}

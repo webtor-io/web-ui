@@ -71,7 +71,7 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	}
 	url := fmt.Sprintf("/%s/%s/stremio/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(url, false)
+	al, err := s.ual.Get(c.Request.Context(), url, false)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +86,7 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 	}
 	url := fmt.Sprintf("/%s/%s/webdav/fs/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(url, true)
+	al, err := s.ual.Get(c.Request.Context(), url, true)
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +95,6 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 
 func (s *Handler) get(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
-	cla := claims.GetFromContext(c)
 	if !u.HasAuth() {
 		c.Redirect(http.StatusTemporaryRedirect, "/login")
 		return
@@ -113,28 +112,28 @@ func (s *Handler) get(c *gin.Context) {
 
 	// Get user domains
 	db := s.pg.Get()
-	domains, err := models.GetUserDomains(db, u.ID)
+	domains, err := models.GetUserDomains(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	// Get user addon URLs
-	addonUrls, err := models.GetUserStremioAddonUrls(db, u.ID)
+	addonUrls, err := models.GetUserStremioAddonUrls(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	// Get Stremio settings
-	ss, err := stremio.GetUserSettingsDataByClaims(db, u.ID, cla)
+	ss, err := stremio.GetUserSettingsDataByClaims(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	// Get user streaming backends
-	streamingBackends, err := models.GetUserStreamingBackends(db, u.ID)
+	streamingBackends, err := models.GetUserStreamingBackends(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -20,9 +21,10 @@ type StremioAddonUrl struct {
 }
 
 // GetUserStremioAddonUrls returns all stremio addon URLs for a specific user
-func GetUserStremioAddonUrls(db *pg.DB, userID uuid.UUID) ([]StremioAddonUrl, error) {
+func GetUserStremioAddonUrls(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]StremioAddonUrl, error) {
 	var stremioAddonUrls []StremioAddonUrl
 	err := db.Model(&stremioAddonUrls).
+		Context(ctx).
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Select()
@@ -33,16 +35,20 @@ func GetUserStremioAddonUrls(db *pg.DB, userID uuid.UUID) ([]StremioAddonUrl, er
 }
 
 // CountUserStremioAddonUrls returns the number of stremio addon URLs for a specific user
-func CountUserStremioAddonUrls(db *pg.DB, userID uuid.UUID) (int, error) {
+func CountUserStremioAddonUrls(ctx context.Context, db *pg.DB, userID uuid.UUID) (int, error) {
 	return db.Model(&StremioAddonUrl{}).
+		Context(ctx).
 		Where("user_id = ?", userID).
 		Count()
 }
 
 // StremioAddonUrlExists checks if a stremio addon URL already exists in the system
-func StremioAddonUrlExists(db *pg.DB, userID uuid.UUID, url string) (bool, error) {
+func StremioAddonUrlExists(ctx context.Context, db *pg.DB, userID uuid.UUID, url string) (bool, error) {
 	existing := &StremioAddonUrl{}
-	err := db.Model(existing).Where("url = ? AND user_id = ?", url, userID).Select()
+	err := db.Model(existing).
+		Context(ctx).
+		Where("url = ? AND user_id = ?", url, userID).
+		Select()
 	if err == nil {
 		return true, nil
 	} else if errors.Is(err, pg.ErrNoRows) {
@@ -52,19 +58,22 @@ func StremioAddonUrlExists(db *pg.DB, userID uuid.UUID, url string) (bool, error
 }
 
 // CreateStremioAddonUrl creates a new stremio addon URL for a user
-func CreateStremioAddonUrl(db *pg.DB, userID uuid.UUID, url string) error {
+func CreateStremioAddonUrl(ctx context.Context, db *pg.DB, userID uuid.UUID, url string) error {
 	stremioAddonUrl := &StremioAddonUrl{
 		Url:    url,
 		UserID: userID,
 	}
 
-	_, err := db.Model(stremioAddonUrl).Insert()
+	_, err := db.Model(stremioAddonUrl).
+		Context(ctx).
+		Insert()
 	return err
 }
 
 // DeleteUserStremioAddonUrl deletes a stremio addon URL owned by a specific user
-func DeleteUserStremioAddonUrl(db *pg.DB, stremioAddonUrlID uuid.UUID, userID uuid.UUID) error {
+func DeleteUserStremioAddonUrl(ctx context.Context, db *pg.DB, stremioAddonUrlID uuid.UUID, userID uuid.UUID) error {
 	_, err := db.Model(&StremioAddonUrl{}).
+		Context(ctx).
 		Where("stremio_addon_url_id = ? AND user_id = ?", stremioAddonUrlID, userID).
 		Delete()
 	return err

@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -38,10 +39,9 @@ func (s *Handler) createBackend(c *gin.Context) {
 	// Parse form data
 	backendType := models.StreamingBackendType(c.PostForm("type"))
 	accessToken := strings.TrimSpace(c.PostForm("access_token"))
-	proxied := c.PostForm("proxied") == "on"
 	enabled := c.PostForm("enabled") == "on"
 
-	err := s.addStreamingBackend(backendType, accessToken, proxied, enabled, user)
+	err := s.addStreamingBackend(c.Request.Context(), backendType, accessToken, enabled, user)
 	if err != nil {
 		log.WithError(err).Error("failed to add streaming backend")
 		web.RedirectWithError(c, err)
@@ -50,7 +50,7 @@ func (s *Handler) createBackend(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (s *Handler) addStreamingBackend(backendType models.StreamingBackendType, accessToken string, proxied, enabled bool, user *auth.User) error {
+func (s *Handler) addStreamingBackend(ctx context.Context, backendType models.StreamingBackendType, accessToken string, enabled bool, user *auth.User) error {
 	// Validate backend type
 	if backendType != models.StreamingBackendTypeWebtor &&
 		backendType != models.StreamingBackendTypeRealDebrid &&
@@ -65,7 +65,7 @@ func (s *Handler) addStreamingBackend(backendType models.StreamingBackendType, a
 	}
 
 	// Check if backend already exists
-	exists, err := models.StreamingBackendExists(db, user.ID, backendType)
+	exists, err := models.StreamingBackendExists(ctx, db, user.ID, backendType)
 	if err != nil {
 		return errors.Wrap(err, "failed to check if streaming backend exists")
 	}
@@ -82,7 +82,6 @@ func (s *Handler) addStreamingBackend(backendType models.StreamingBackendType, a
 		UserID:   user.ID,
 		Type:     backendType,
 		Priority: int16(priority),
-		Proxied:  proxied,
 		Enabled:  enabled,
 		Config:   make(models.StreamingBackendConfig),
 	}
@@ -92,7 +91,7 @@ func (s *Handler) addStreamingBackend(backendType models.StreamingBackendType, a
 		backend.AccessToken = accessToken
 	}
 
-	err = models.CreateStreamingBackend(db, backend)
+	err = models.CreateStreamingBackend(ctx, db, backend)
 	if err != nil {
 		return errors.Wrap(err, "failed to create streaming backend")
 	}
@@ -145,7 +144,7 @@ func (s *Handler) updateStreamingBackends(deletedBackendsStr, backendOrder strin
 				continue
 			}
 
-			err = s.deleteStreamingBackend(backendID, user)
+			err = s.deleteStreamingBackend(c.Request.Context(), backendID, user)
 			if err != nil {
 				log.WithError(err).
 					WithField("user_id", user.ID).
@@ -156,23 +155,19 @@ func (s *Handler) updateStreamingBackends(deletedBackendsStr, backendOrder strin
 	}
 
 	// Get user's remaining backends
-	backends, err := models.GetUserStreamingBackends(db, user.ID)
+	backends, err := models.GetUserStreamingBackends(c.Request.Context(), db, user.ID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user streaming backends")
 	}
 
-	// Update enabled and proxied status for each backend based on form data
+	// Update enabled status for each backend based on form data
 	for _, backend := range backends {
 		enabledFieldName := "backend_" + backend.ID.String() + "_enabled"
 		enabled := c.PostForm(enabledFieldName) == "on"
 
-		proxiedFieldName := "backend_" + backend.ID.String() + "_proxied"
-		proxied := c.PostForm(proxiedFieldName) == "on"
-
-		if backend.Enabled != enabled || backend.Proxied != proxied {
+		if backend.Enabled != enabled {
 			backend.Enabled = enabled
-			backend.Proxied = proxied
-			err = models.UpdateStreamingBackend(db, backend)
+			err = models.UpdateStreamingBackend(c.Request.Context(), db, backend)
 			if err != nil {
 				return errors.Wrap(err, "failed to update streaming backend")
 			}
@@ -199,7 +194,7 @@ func (s *Handler) updateStreamingBackends(deletedBackendsStr, backendOrder strin
 					newPriority := int16(len(orderSlice) - i) // Higher index = lower priority
 					if backend.Priority != newPriority {
 						backend.Priority = newPriority
-						err = models.UpdateStreamingBackend(db, backend)
+						err = models.UpdateStreamingBackend(c.Request.Context(), db, backend)
 						if err != nil {
 							log.WithError(err).
 								WithField("user_id", user.ID).
@@ -217,14 +212,14 @@ func (s *Handler) updateStreamingBackends(deletedBackendsStr, backendOrder strin
 	return nil
 }
 
-func (s *Handler) deleteStreamingBackend(backendID uuid.UUID, user *auth.User) error {
+func (s *Handler) deleteStreamingBackend(ctx context.Context, backendID uuid.UUID, user *auth.User) error {
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no database connection available")
 	}
 
 	// Get backend to verify ownership before deletion
-	backend, err := models.GetStreamingBackendByID(db, backendID)
+	backend, err := models.GetStreamingBackendByID(ctx, db, backendID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get streaming backend")
 	}
@@ -240,7 +235,7 @@ func (s *Handler) deleteStreamingBackend(backendID uuid.UUID, user *auth.User) e
 		return errors.New("cannot delete webtor streaming backend")
 	}
 
-	err = models.DeleteStreamingBackend(db, backendID)
+	err = models.DeleteStreamingBackend(ctx, db, backendID)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete streaming backend")
 	}

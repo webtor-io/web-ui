@@ -1,6 +1,7 @@
 package url_alias
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -39,20 +40,20 @@ func New(pg *cs.PG, r *gin.Engine) *UrlAlias {
 		}),
 	}
 }
-func (s *UrlAlias) get(url string, proxy bool) (string, error) {
+func (s *UrlAlias) get(ctx context.Context, url string, proxy bool) (string, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return "", errors.New("db not initialized")
 	}
-	au, err := models.CreateOrGetURLAlias(db, url, proxy)
+	au, err := models.CreateOrGetURLAlias(ctx, db, url, proxy)
 	if err != nil {
 		return "", err
 	}
 	return au.Code, nil
 }
-func (s *UrlAlias) Get(url string, proxy bool) (string, error) {
+func (s *UrlAlias) Get(ctx context.Context, url string, proxy bool) (string, error) {
 	code, err := s.urls.Get(url, func() (string, error) {
-		return s.get(url, proxy)
+		return s.get(ctx, url, proxy)
 	})
 	if err != nil {
 		return "", err
@@ -60,21 +61,21 @@ func (s *UrlAlias) Get(url string, proxy bool) (string, error) {
 	return fmt.Sprintf("/s/%v", code), nil
 }
 
-func (s *UrlAlias) resolve(url string) (*models.URLAlias, error) {
+func (s *UrlAlias) resolve(ctx context.Context, url string) (*models.URLAlias, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("db not initialized")
 	}
-	au, err := models.GetURLAliasByCode(db, url)
+	au, err := models.GetURLAliasByCode(ctx, db, url)
 	if err != nil {
 		return nil, err
 	}
 	return au, nil
 }
 
-func (s *UrlAlias) Resolve(url string) (*models.URLAlias, error) {
+func (s *UrlAlias) Resolve(ctx context.Context, url string) (*models.URLAlias, error) {
 	target, err := s.codes.Get(url, func() (*models.URLAlias, error) {
-		return s.resolve(url)
+		return s.resolve(ctx, url)
 	})
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (s *UrlAlias) handle(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 	}
 
-	u, err := s.resolve(code)
+	u, err := s.resolve(c.Request.Context(), code)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return

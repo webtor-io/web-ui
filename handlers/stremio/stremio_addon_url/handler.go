@@ -1,6 +1,7 @@
 package stremio_addon_url
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -50,7 +51,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 func (s *Handler) add(c *gin.Context) {
 	addonUrl := strings.TrimSpace(c.PostForm("url"))
 	user := auth.GetUserFromContext(c)
-	err := s.addAddonUrl(addonUrl, user)
+	err := s.addAddonUrl(c.Request.Context(), addonUrl, user)
 	if err != nil {
 		log.WithError(err).Error("failed to add addon URL")
 		web.RedirectWithError(c, err)
@@ -62,7 +63,7 @@ func (s *Handler) add(c *gin.Context) {
 func (s *Handler) delete(c *gin.Context) {
 	id := c.Param("id")
 	user := auth.GetUserFromContext(c)
-	err := s.deleteAddonUrl(id, user)
+	err := s.deleteAddonUrl(c.Request.Context(), id, user)
 	if err != nil {
 		log.WithError(err).Error("failed to delete addon URL")
 		web.RedirectWithError(c, err)
@@ -71,7 +72,7 @@ func (s *Handler) delete(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
+func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.User) (err error) {
 	// Get URL from form data
 	if addonUrl == "" {
 		return errors.New("no addon URL provided")
@@ -109,7 +110,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Check current addon URL count for user
-	currentCount, err := models.CountUserStremioAddonUrls(db, user.ID)
+	currentCount, err := models.CountUserStremioAddonUrls(ctx, db, user.ID)
 	if err != nil {
 		return
 	}
@@ -120,7 +121,7 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Check if URL already exists
-	urlExists, err := models.StremioAddonUrlExists(db, user.ID, addonUrl)
+	urlExists, err := models.StremioAddonUrlExists(ctx, db, user.ID, addonUrl)
 	if err != nil {
 		return
 	}
@@ -129,10 +130,10 @@ func (s *Handler) addAddonUrl(addonUrl string, user *auth.User) (err error) {
 	}
 
 	// Create new addon URL
-	return models.CreateStremioAddonUrl(db, user.ID, addonUrl)
+	return models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl)
 }
 
-func (s *Handler) deleteAddonUrl(idStr string, user *auth.User) (err error) {
+func (s *Handler) deleteAddonUrl(ctx context.Context, idStr string, user *auth.User) (err error) {
 	id, err := uuid.FromString(idStr)
 	if err != nil {
 		return
@@ -144,5 +145,5 @@ func (s *Handler) deleteAddonUrl(idStr string, user *auth.User) (err error) {
 	}
 
 	// Delete addon URL owned by the current user
-	return models.DeleteUserStremioAddonUrl(db, id, user.ID)
+	return models.DeleteUserStremioAddonUrl(ctx, db, id, user.ID)
 }

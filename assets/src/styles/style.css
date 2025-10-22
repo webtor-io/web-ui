@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 @plugin 'daisyui' {
+  exclude: properties;
   themes: night, lofi;
 }
 

@@ -89,7 +89,7 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	}
 
 	// Save to database
-	err := models.CreateOrUpdateStremioSettings(db, user.ID, settingsData)
+	err := models.CreateOrUpdateStremioSettings(c.Request.Context(), db, user.ID, settingsData)
 	if err != nil {
 		log.WithError(err).
 			WithField("user_id", user.ID).

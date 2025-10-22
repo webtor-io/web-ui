@@ -20,7 +20,7 @@ type AddonValidator struct {
 func NewAddonValidator(c *cli.Context, client *http.Client) *AddonValidator {
 	return &AddonValidator{
 		client:    client,
-		userAgent: GetUserAgent(c),
+		userAgent: c.String(StremioUserAgentFlag),
 	}
 }
 

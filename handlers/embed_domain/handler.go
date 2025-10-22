@@ -1,6 +1,7 @@
 package embed_domain
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,7 +47,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
 func (s *Handler) add(c *gin.Context) {
 	domain := strings.TrimSpace(strings.ToLower(c.PostForm("domain")))
 	user := auth.GetUserFromContext(c)
-	err := s.addDomain(domain, user)
+	err := s.addDomain(c.Request.Context(), domain, user)
 	if err != nil {
 		web.RedirectWithError(c, err)
 		return
@@ -57,7 +58,7 @@ func (s *Handler) add(c *gin.Context) {
 func (s *Handler) delete(c *gin.Context) {
 	id := c.Param("id")
 	user := auth.GetUserFromContext(c)
-	err := s.deleteDomain(id, user)
+	err := s.deleteDomain(c.Request.Context(), id, user)
 	if err != nil {
 		web.RedirectWithError(c, err)
 		return
@@ -65,7 +66,7 @@ func (s *Handler) delete(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
+func (s *Handler) addDomain(ctx context.Context, domain string, user *auth.User) (err error) {
 	// Get domain from form data
 	if domain == "" {
 		return errors.New("no domain provided")
@@ -88,7 +89,7 @@ func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
 	}
 
 	// Check current domain count for user
-	currentCount, err := models.CountUserDomains(db, user.ID)
+	currentCount, err := models.CountUserDomains(ctx, db, user.ID)
 	if err != nil {
 		return
 	}
@@ -99,7 +100,7 @@ func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
 	}
 
 	// Check if domain already exists
-	domainExists, err := models.DomainExists(db, domain)
+	domainExists, err := models.DomainExists(ctx, db, domain)
 	if err != nil {
 		return
 	}
@@ -108,10 +109,10 @@ func (s *Handler) addDomain(domain string, user *auth.User) (err error) {
 	}
 
 	// Create new domain
-	return models.CreateDomain(db, user.ID, domain)
+	return models.CreateDomain(ctx, db, user.ID, domain)
 }
 
-func (s *Handler) deleteDomain(idStr string, user *auth.User) (err error) {
+func (s *Handler) deleteDomain(ctx context.Context, idStr string, user *auth.User) (err error) {
 	id, err := uuid.FromString(idStr)
 	if err != nil {
 		return
@@ -123,5 +124,5 @@ func (s *Handler) deleteDomain(idStr string, user *auth.User) (err error) {
 	}
 
 	// Delete domain owned by the current user
-	return models.DeleteUserDomain(db, id, user.ID)
+	return models.DeleteUserDomain(ctx, db, id, user.ID)
 }

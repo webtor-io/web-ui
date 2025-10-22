@@ -17,8 +17,8 @@ func createMockContext() *cli.Context {
 	flagSet := flag.NewFlagSet("test", flag.ContinueOnError)
 
 	// Add the stremio flags
-	flagSet.String("stremio-addon-user-agent", "", "user agent for stremio addon http client")
-	flagSet.String("stremio-addon-proxy", "", "proxy URL for stremio addon http client")
+	flagSet.String(StremioUserAgentFlag, "", "user agent for stremio addon http client")
+	flagSet.String(StremioProxyFlag, "", "proxy URL for stremio addon http client")
 
 	return cli.NewContext(app, flagSet, nil)
 }

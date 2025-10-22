@@ -50,7 +50,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	grapi.GET("/catalog/:type/*id", h.catalog)
 	grapi.GET("/stream/:type/*id", h.stream)
 	grapi.GET("/meta/:type/*id", h.meta)
-	grapi.GET("/redirect/*data", h.redirect)
+	grapi.GET("/resolve/*data", h.resolve)
 }
 
 func (s *Handler) generateUrl(c *gin.Context) {
@@ -118,7 +118,7 @@ func (s *Handler) stream(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	apiClaims := api.GetClaimsFromContext(c)
 	cla := claims.GetFromContext(c)
-	sts, err := s.b.BuildStreamsService(user.ID, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
+	sts, err := s.b.BuildStreamsService(c.Request.Context(), user.ID, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
 	if err != nil {
 		log.WithError(err).Error("failed to build streams service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -136,7 +136,7 @@ func (s *Handler) cleanResourceID(rawID string) string {
 	return strings.TrimPrefix(strings.TrimSuffix(rawID, ".json"), "/")
 }
 
-func (s *Handler) redirect(c *gin.Context) {
+func (s *Handler) resolve(c *gin.Context) {
 	// Step 1: Extract JWT token from URL path
 	data := strings.TrimPrefix(c.Param("data"), "/")
 	if data == "" {
@@ -202,7 +202,7 @@ func (s *Handler) redirect(c *gin.Context) {
 	if linkResult == nil || linkResult.URL == "" {
 		log.WithField("hash", hash).
 			WithField("path", path).
-			Warn("no URL generated for redirect")
+			Warn("no URL generated for resolve")
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}

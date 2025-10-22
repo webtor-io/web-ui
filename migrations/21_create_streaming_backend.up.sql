@@ -5,7 +5,6 @@ CREATE TABLE public.streaming_backend (
 	access_token text,
 	config jsonb DEFAULT '{}' NOT NULL,
 	priority smallint NOT NULL,
-	proxied boolean DEFAULT false NOT NULL,
 	enabled boolean DEFAULT true NOT NULL,
 	last_status text,
 	last_checked_at timestamptz,

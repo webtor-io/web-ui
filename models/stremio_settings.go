@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -31,9 +32,10 @@ type StremioSettings struct {
 }
 
 // GetUserStremioSettings returns Stremio settings for a specific user
-func GetUserStremioSettings(db *pg.DB, userID uuid.UUID) (*StremioSettings, error) {
+func GetUserStremioSettings(ctx context.Context, db *pg.DB, userID uuid.UUID) (*StremioSettings, error) {
 	settings := &StremioSettings{}
 	err := db.Model(settings).
+		Context(ctx).
 		Where("user_id = ?", userID).
 		Select()
 	if err != nil {
@@ -46,8 +48,8 @@ func GetUserStremioSettings(db *pg.DB, userID uuid.UUID) (*StremioSettings, erro
 }
 
 // GetUserStremioSettings returns Stremio settings for a specific user
-func GetUserStremioSettingsData(db *pg.DB, userID uuid.UUID) (*StremioSettingsData, error) {
-	s, err := GetUserStremioSettings(db, userID)
+func GetUserStremioSettingsData(ctx context.Context, db *pg.DB, userID uuid.UUID) (*StremioSettingsData, error) {
+	s, err := GetUserStremioSettings(ctx, db, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,19 +60,22 @@ func GetUserStremioSettingsData(db *pg.DB, userID uuid.UUID) (*StremioSettingsDa
 }
 
 // CreateStremioSettings creates new Stremio settings for a user
-func CreateStremioSettings(db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
+func CreateStremioSettings(ctx context.Context, db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
 	stremioSettings := &StremioSettings{
 		UserID:   userID,
 		Settings: settings,
 	}
 
-	_, err := db.Model(stremioSettings).Insert()
+	_, err := db.Model(stremioSettings).
+		Context(ctx).
+		Insert()
 	return err
 }
 
 // UpdateStremioSettings updates Stremio settings for a user
-func UpdateStremioSettings(db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
+func UpdateStremioSettings(ctx context.Context, db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
 	_, err := db.Model(&StremioSettings{}).
+		Context(ctx).
 		Set("settings = ?", settings).
 		Where("user_id = ?", userID).
 		Update()
@@ -78,17 +83,17 @@ func UpdateStremioSettings(db *pg.DB, userID uuid.UUID, settings *StremioSetting
 }
 
 // CreateOrUpdateStremioSettings creates or updates Stremio settings for a user
-func CreateOrUpdateStremioSettings(db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
-	existing, err := GetUserStremioSettings(db, userID)
+func CreateOrUpdateStremioSettings(ctx context.Context, db *pg.DB, userID uuid.UUID, settings *StremioSettingsData) error {
+	existing, err := GetUserStremioSettings(ctx, db, userID)
 	if err != nil {
 		return err
 	}
 
 	if existing == nil {
-		return CreateStremioSettings(db, userID, settings)
+		return CreateStremioSettings(ctx, db, userID, settings)
 	}
 
-	return UpdateStremioSettings(db, userID, settings)
+	return UpdateStremioSettings(ctx, db, userID, settings)
 }
 
 // GetDefaultStremioSettings returns the default Stremio settings

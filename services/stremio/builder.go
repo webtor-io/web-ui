@@ -1,6 +1,7 @@
 package stremio
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -10,33 +11,38 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/api"
+	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 )
 
 type Builder struct {
-	pg        *cs.PG
-	cache     lazymap.LazyMap[*StreamsResponse]
-	domain    string
-	rapi      *api.Api
-	cl        *http.Client
-	userAgent string
-	secret    string
+	pg            *cs.PG
+	cache         lazymap.LazyMap[*StreamsResponse]
+	domain        string
+	rapi          *api.Api
+	cl            *http.Client
+	userAgent     string
+	secret        string
+	cacheIndex    *ci.CacheIndex
+	cacheAddonURL string
 }
 
-func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api) *Builder {
+func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, cacheIndex *ci.CacheIndex) *Builder {
 	return &Builder{
 		pg: pg,
 		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
 			Expire:      1 * time.Minute,
 			ErrorExpire: 10 * time.Second,
 		}),
-		domain:    c.String(common.DomainFlag),
-		secret:    c.String(common.SessionSecretFlag),
-		rapi:      rapi,
-		cl:        cl,
-		userAgent: GetUserAgent(c),
+		domain:        c.String(common.DomainFlag),
+		secret:        c.String(common.SessionSecretFlag),
+		rapi:          rapi,
+		cl:            cl,
+		userAgent:     c.String(StremioUserAgentFlag),
+		cacheIndex:    cacheIndex,
+		cacheAddonURL: c.String(StremioCacheAddonURLFlag),
 	}
 }
 
@@ -64,12 +70,12 @@ func (s *Builder) BuildMetaService(uID uuid.UUID) (MetaService, error) {
 	return mes, nil
 }
 
-func (s *Builder) BuildStreamsService(uID uuid.UUID, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {
+func (s *Builder) BuildStreamsService(ctx context.Context, uID uuid.UUID, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	acs, err := NewAddonCompositeStreamsByUserID(db, s.cl, uID, s.cache, s.userAgent)
+	acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, uID, s.cache, s.userAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +83,9 @@ func (s *Builder) BuildStreamsService(uID uuid.UUID, lr *lr.LinkResolver, apiCla
 	cs := NewCompositeStream([]StreamsService{sts, acs})
 	ds := NewDedupStream(cs)
 	ps := NewPreferredStream(ds, db, uID, cla)
-	es := NewEnrichStream(ps, s.rapi, lr, uID, apiClaims, cla, s.domain, token, s.secret)
+	prs := NewPrefetchResourceStream(ps, s.rapi, apiClaims)
+	pcs := NewPrefetchCacheStream(prs, s.cl, s.pg, uID, s.cacheIndex, s.cacheAddonURL, s.userAgent, s.rapi, apiClaims)
+	es := NewEnrichStream(pcs, s.rapi, lr, uID, apiClaims, cla, s.domain, token, s.secret)
 
 	return es, nil
 }
