@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -594,16 +593,11 @@ func (s *Api) AttachExternalFile(ei ra.ExportItem, u string) string {
 	return src.String()
 }
 
-func getRemoteAddress(r *http.Request) string {
-	forwarded := r.Header.Get("X-FORWARDED-FOR")
-	if forwarded != "" {
-		return strings.Split(forwarded, ",")[0]
+func getRemoteAddress(c *gin.Context) string {
+	if addr := c.Request.Header.Get(gin.PlatformCloudflare); addr != "" {
+		return addr
 	}
-	ip, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err != nil {
-		return ""
-	}
-	return ip
+	return c.ClientIP()
 }
 
 type ClaimsContext struct{}
@@ -612,7 +606,7 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Da
 	cl := &Claims{
 		SessionID:     sessionID,
 		Domain:        domain,
-		RemoteAddress: getRemoteAddress(c.Request),
+		RemoteAddress: getRemoteAddress(c),
 		Agent:         c.Request.Header.Get("User-Agent"),
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Duration(s.expire) * 24 * time.Hour).Unix(),
