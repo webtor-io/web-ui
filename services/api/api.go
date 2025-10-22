@@ -593,13 +593,20 @@ func (s *Api) AttachExternalFile(ei ra.ExportItem, u string) string {
 	return src.String()
 }
 
+func getRemoteAddress(c *gin.Context) string {
+	if addr := c.Request.Header.Get(gin.PlatformCloudflare); addr != "" {
+		return addr
+	}
+	return c.ClientIP()
+}
+
 type ClaimsContext struct{}
 
 func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Data, sessionID string) (*Claims, error) {
 	cl := &Claims{
 		SessionID:     sessionID,
 		Domain:        domain,
-		RemoteAddress: c.ClientIP(),
+		RemoteAddress: getRemoteAddress(c),
 		Agent:         c.Request.Header.Get("User-Agent"),
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Duration(s.expire) * 24 * time.Hour).Unix(),
