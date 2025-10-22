@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -594,25 +593,13 @@ func (s *Api) AttachExternalFile(ei ra.ExportItem, u string) string {
 	return src.String()
 }
 
-func getRemoteAddress(r *http.Request) string {
-	forwarded := r.Header.Get("X-FORWARDED-FOR")
-	if forwarded != "" {
-		return strings.Split(forwarded, ",")[0]
-	}
-	ip, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err != nil {
-		return ""
-	}
-	return ip
-}
-
 type ClaimsContext struct{}
 
 func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Data, sessionID string) (*Claims, error) {
 	cl := &Claims{
 		SessionID:     sessionID,
 		Domain:        domain,
-		RemoteAddress: getRemoteAddress(c.Request),
+		RemoteAddress: c.ClientIP(),
 		Agent:         c.Request.Header.Get("User-Agent"),
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Duration(s.expire) * 24 * time.Hour).Unix(),
