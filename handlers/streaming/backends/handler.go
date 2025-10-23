@@ -39,9 +39,8 @@ func (s *Handler) createBackend(c *gin.Context) {
 	// Parse form data
 	backendType := models.StreamingBackendType(c.PostForm("type"))
 	accessToken := strings.TrimSpace(c.PostForm("access_token"))
-	enabled := c.PostForm("enabled") == "on"
 
-	err := s.addStreamingBackend(c.Request.Context(), backendType, accessToken, enabled, user)
+	err := s.addStreamingBackend(c.Request.Context(), backendType, accessToken, true, user)
 	if err != nil {
 		log.WithError(err).Error("failed to add streaming backend")
 		web.RedirectWithError(c, err)

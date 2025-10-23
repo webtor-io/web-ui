@@ -1,9 +1,9 @@
 {{ define "profile/addon_urls" }}
-    <div class="hero bg-base-200">
-        <div class="hero-content text-center w-full">
+    <div class="bg-base-200 py-8">
+        <div class="container mx-auto px-4">
             <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent">Stremio Addons</h2>
-                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
+                <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio Addons</h2>
+                <div class="flex flex-col mt-6 mb-3 w-full">
                     <div class="w-full sm:px-5">
                         <!-- Add Addon URL Form -->
                         <div class="mb-6">
@@ -36,36 +36,56 @@
                         </div>
 
                         <!-- Addon URL List -->
-                        <div id="addon-list" class="w-full">
-                            {{ if .Data.AddonUrls }}
-                                <div class="space-y-2">
-                                    {{ range .Data.AddonUrls }}
-                                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg shadow-sm addon-item" data-addon-id="{{ .ID }}">
-                                            <div class="flex items-center">
-                                                <span class="font-medium text-sm break-all">{{ .Url }}</span>
-                                            </div>
-                                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/delete/{{ .ID }}" data-async-target="#addon-urls" class="inline">
-                                                <button
-                                                    type="submit"
-                                                    class="btn btn-soft btn-sm capitalize btn-accent"
-                                                    data-umami-event="addon-url-delete"
-                                                    onclick="return confirm('Are you sure you want to delete this addon URL?')"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                    </svg>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    {{ end }}
-                                </div>
-                            {{ else }}
-                                <div class="text-center py-8 text-base-content/60" id="empty-state">
-                                    <p class="mt-2">No addon URLs added yet</p>
-                                    <p class="text-sm">Add Stremio addon URLs to extend your content library</p>
-                                </div>
-                            {{ end }}
-                        </div>
+                        <form method="post" data-async-push-state="false" action="/stremio/addon-url/update" data-async-target="#addon-urls">
+                            <h3 class="text-lg font-semibold mb-2">Your Stremio Addons</h3>
+                            <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
+
+                            <ul id="addon-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
+                                {{ $addons := .Data.AddonUrls }}
+                                {{ range $i, $addon := $addons }}
+                                <li class="p-4 cursor-move select-none flex items-center gap-4 addon-item hover:bg-base-50 transition-colors"
+                                    data-addon-id="{{ $addon.ID }}" draggable="true">
+
+                                    <span class="drag-handle" aria-label="drag" title="drag to sort">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                                        </svg>
+                                    </span>
+
+                                    <div class="flex-1">
+                                        <div class="font-medium text-sm break-all">{{ $addon.Url }}</div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2">
+                                        <label class="label cursor-pointer gap-2">
+                                            <input type="checkbox" name="addon_{{ $addon.ID }}_enabled" class="toggle toggle-accent" {{ if $addon.Enabled }}checked{{ end }}>
+                                            <span class="label-text">Enabled</span>
+                                        </label>
+
+                                        <!-- Delete Button -->
+                                        <button type="button" class="btn btn-soft btn-sm capitalize btn-accent delete-addon" data-addon-id="{{ $addon.ID }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </li>
+                                {{ end }}
+
+                                <!-- Empty state message -->
+                                <li class="p-8 text-center empty-state {{ if $addons }}hidden{{ end }}" id="addon-empty-state">
+                                    <p class="text-base-content opacity-70">No addon URLs added yet</p>
+                                    <p class="text-sm text-base-content opacity-50 mt-2">Add Stremio addon URLs to extend your content library</p>
+                                </li>
+                            </ul>
+
+                            <input type="hidden" name="addon_order" id="addon_order" value="{{ range $i, $a := $addons }}{{ if $i }},{{ end }}{{ $a.ID }}{{ end }}">
+                            <input type="hidden" name="deleted_addons" id="deleted_addons" value="">
+
+                            <div class="mt-5 flex justify-center">
+                                <button type="submit" class="btn btn-accent" data-umami-event="addon-url-save">Save</button>
+                            </div>
+                        </form>
                     </div>
                     <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
                         <span class="text-accent">ⓘ</span>
@@ -75,5 +95,6 @@
             </div>
         </div>
     </div>
-
+    
+    {{ "profile/addon_urls.js" | asset }}
 {{ end }}

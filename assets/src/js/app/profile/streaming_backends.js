@@ -46,7 +46,7 @@ av(async function(){
             const backendList = document.getElementById('backend-list');
             const remainingBackends = backendList.querySelectorAll('.backend-item[data-backend-id]');
             if (remainingBackends.length === 0) {
-                const emptyState = document.getElementById('empty-state');
+                const emptyState = document.getElementById('backend-empty-state');
                 if (emptyState) {
                     emptyState.classList.remove('hidden');
                 }

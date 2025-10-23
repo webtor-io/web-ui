@@ -3,8 +3,8 @@
         <div class="container mx-auto px-4">
             <div class="w-full">
                 <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio settings</h2>
-                <div class="w-full max-w-4xl mx-auto">
-                    <div class="w-full">
+                <div class="flex flex-col mt-6 mb-3 w-full">
+                    <div class="w-full sm:px-5">
                         <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
                             {{ $resolutions := .Data.StremioSettings.PreferredResolutions }}
 

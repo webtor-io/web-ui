@@ -119,7 +119,7 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	// Get user addon URLs
-	addonUrls, err := models.GetUserStremioAddonUrls(c.Request.Context(), db, u.ID)
+	addonUrls, err := models.GetAllUserStremioAddonUrls(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return

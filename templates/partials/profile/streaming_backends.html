@@ -3,8 +3,8 @@
         <div class="container mx-auto px-4">
             <div class="w-full">
                 <h2 class="text-2xl font-bold text-accent text-center mb-6">Streaming Backends</h2>
-                <div class="w-full max-w-4xl mx-auto">
-                    <div class="w-full">
+                <div class="flex flex-col mt-6 mb-3 w-full">
+                    <div class="w-full sm:px-5">
                         <!-- Add New Backend Form -->
                         <div class="mb-6 bg-base-100 rounded-lg shadow p-6">
                             <h3 class="text-lg font-semibold mb-4">Add New Backend</h3>
@@ -27,14 +27,8 @@
                                         </label>
                                         <input type="password" name="access_token" class="input input-bordered w-full" placeholder="Enter API token">
                                     </div>
-                                    <div class="flex items-center gap-4 pt-8">
-                                        <label class="label cursor-pointer gap-2">
-                                            <input type="checkbox" name="enabled" class="toggle toggle-accent" checked>
-                                            <span class="label-text">Enabled</span>
-                                        </label>
-                                    </div>
                                 </div>
-                                <div class="mt-4 flex justify-end">
+                                <div class="mt-5 flex justify-center">
                                     <button type="submit" class="btn btn-accent" data-umami-event="streaming-backend-add">Add Backend</button>
                                 </div>
                             </form>
@@ -135,7 +129,7 @@
 
 
                                 <!-- Empty state message - always present, hidden with CSS when backends exist -->
-                                <li class="p-8 text-center empty-state {{ if $backends }}hidden{{ end }}" id="empty-state">
+                                <li class="p-8 text-center empty-state {{ if $backends }}hidden{{ end }}" id="backends-empty-state">
                                     <p class="text-base-content opacity-70">No additional streaming backends configured.</p>
                                     <p class="text-sm text-base-content opacity-50 mt-2">Add Real-Debrid or Torbox accounts above to get started.</p>
                                 </li>

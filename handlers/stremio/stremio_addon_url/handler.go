@@ -45,6 +45,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 	gr.Use(auth.HasAuth)
 	gr.POST("/add", h.add)
 	gr.POST("/delete/:id", h.delete)
+	gr.POST("/update", h.update)
 	return nil
 }
 
@@ -131,6 +132,114 @@ func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.U
 
 	// Create new addon URL
 	return models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl)
+}
+
+func (s *Handler) update(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+
+	// Parse form data
+	deletedAddonsStr := c.PostForm("deleted_addons")
+	addonOrder := c.PostForm("addon_order")
+
+	err := s.updateAddonUrls(deletedAddonsStr, addonOrder, c, user)
+	if err != nil {
+		log.WithError(err).Error("failed to update addon URLs")
+		web.RedirectWithError(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+}
+
+func (s *Handler) updateAddonUrls(deletedAddonsStr, addonOrder string, c *gin.Context, user *auth.User) error {
+	// Get database connection
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("no database connection available")
+	}
+
+	// Process deleted addons first
+	if deletedAddonsStr != "" {
+		deletedAddonIDs := strings.Split(deletedAddonsStr, ",")
+		for _, idStr := range deletedAddonIDs {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+
+			addonID, err := uuid.FromString(idStr)
+			if err != nil {
+				log.WithField("user_id", user.ID).
+					WithField("addon_id", idStr).
+					Warn("invalid addon ID in deleted list")
+				continue
+			}
+
+			err = s.deleteAddonUrl(c.Request.Context(), idStr, user)
+			if err != nil {
+				log.WithError(err).
+					WithField("user_id", user.ID).
+					WithField("addon_id", addonID).
+					Error("failed to delete addon URL")
+			}
+		}
+	}
+
+	// Get user's remaining addons
+	addons, err := models.GetAllUserStremioAddonUrls(c.Request.Context(), db, user.ID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get user addon URLs")
+	}
+
+	// Update enabled status for each addon based on form data
+	for _, addon := range addons {
+		enabledFieldName := "addon_" + addon.ID.String() + "_enabled"
+		enabled := c.PostForm(enabledFieldName) == "on"
+
+		if addon.Enabled != enabled {
+			addon.Enabled = enabled
+			err = models.UpdateStremioAddonUrl(c.Request.Context(), db, &addon)
+			if err != nil {
+				return errors.Wrap(err, "failed to update addon URL")
+			}
+		}
+	}
+
+	// Handle addon reordering if order is provided
+	if addonOrder != "" {
+		orderSlice := strings.Split(addonOrder, ",")
+		for i, idStr := range orderSlice {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+
+			addonID, err := uuid.FromString(idStr)
+			if err != nil {
+				continue // skip invalid IDs
+			}
+
+			// Find addon and update priority
+			for _, addon := range addons {
+				if addon.ID == addonID {
+					newPriority := int16(len(orderSlice) - i) // Higher index = lower priority
+					if addon.Priority != newPriority {
+						addon.Priority = newPriority
+						err = models.UpdateStremioAddonUrl(c.Request.Context(), db, &addon)
+						if err != nil {
+							log.WithError(err).
+								WithField("user_id", user.ID).
+								WithField("addon_id", addon.ID).
+								Error("failed to update addon URL priority")
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	log.WithField("user_id", user.ID).Info("addon URLs updated successfully")
+	return nil
 }
 
 func (s *Handler) deleteAddonUrl(ctx context.Context, idStr string, user *auth.User) (err error) {
