@@ -42,6 +42,18 @@ func NewRealDebrid(cl *http.Client) *RealDebrid {
 	}
 }
 
+func (s *RealDebrid) Validate(ctx context.Context, token string) error {
+	cl, err := s.getClient(token)
+	if err != nil {
+		return err
+	}
+	_, err = cl.GetUser(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // getClient creates a RealDebrid API client with the provided access token
 func (s *RealDebrid) getClient(token string) (*rd.Client, error) {
 	if token == "" {

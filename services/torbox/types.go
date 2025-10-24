@@ -33,10 +33,12 @@ type Torrent struct {
 
 // File represents a file within a torrent
 type File struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Size      int64  `json:"size"`
-	ShortName string `json:"short_name"`
+	ID                int     `json:"id"`
+	Name              string  `json:"name"`
+	Size              int64   `json:"size"`
+	ShortName         string  `json:"short_name"`
+	Mimetype          string  `json:"mimetype,omitempty"`
+	OpensubtitlesHash *string `json:"opensubtitles_hash,omitempty"`
 }
 
 // TorrentInfo represents torrent information
@@ -49,11 +51,18 @@ type TorrentInfo struct {
 	Files    []File `json:"files"`
 }
 
+// CreateTorrentData represents the data returned when creating a torrent
+type CreateTorrentData struct {
+	TorrentID int    `json:"torrent_id"`
+	AuthID    string `json:"auth_id"`
+	Hash      string `json:"hash"`
+}
+
 // CreateTorrentResponse represents the response from creating a torrent
 type CreateTorrentResponse struct {
-	Success bool    `json:"success"`
-	Detail  string  `json:"detail"`
-	Data    Torrent `json:"data"`
+	Success bool              `json:"success"`
+	Detail  string            `json:"detail"`
+	Data    CreateTorrentData `json:"data"`
 }
 
 // GetUserResponse represents the response from getting user info
@@ -68,6 +77,12 @@ type ListTorrentsResponse struct {
 	Success bool      `json:"success"`
 	Detail  string    `json:"detail"`
 	Data    []Torrent `json:"data"`
+}
+
+type ListTorrentResponse struct {
+	Success bool    `json:"success"`
+	Detail  string  `json:"detail"`
+	Data    Torrent `json:"data"`
 }
 
 // TorrentInfoResponse represents the response from getting torrent info
@@ -87,7 +102,7 @@ type CachedTorrent struct {
 
 // CheckCachedResponse represents the response from checking cached torrents
 type CheckCachedResponse struct {
-	Success bool            `json:"success"`
-	Detail  string          `json:"detail"`
-	Data    []CachedTorrent `json:"data"`
+	Success bool                     `json:"success"`
+	Detail  string                   `json:"detail"`
+	Data    map[string]CachedTorrent `json:"data"`
 }

@@ -122,7 +122,7 @@ func (s *PrefetchResourceStream) makeMagnetURL(infohash string, sources []string
 }
 
 func (s *PrefetchResourceStream) prefetchResource(ctx context.Context, stream StreamItem) error {
-	resource, err := s.api.GetResource(ctx, s.cla, stream.InfoHash)
+	resource, err := s.api.GetResourceCached(ctx, s.cla, stream.InfoHash)
 	if err != nil {
 		return errors.Wrap(err, "failed to get resource from API")
 	}

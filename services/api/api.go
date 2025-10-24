@@ -173,6 +173,7 @@ type Api struct {
 	expire            int
 	torrentCache      lazymap.LazyMap[[]byte]
 	listResponseCache lazymap.LazyMap[*ra.ListResponse]
+	resourcesCache    lazymap.LazyMap[*ra.ResourceResponse]
 }
 
 type ListResourceContentOutputType string
@@ -259,6 +260,9 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		torrentCache: lazymap.New[[]byte](&lazymap.Config{
 			Expire: time.Minute,
 		}),
+		resourcesCache: lazymap.New[*ra.ResourceResponse](&lazymap.Config{
+			Expire: time.Minute,
+		}),
 		listResponseCache: lazymap.New[*ra.ListResponse](&lazymap.Config{
 			Expire: time.Minute,
 		}),
@@ -273,6 +277,12 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *r
 		e = nil
 	}
 	return
+}
+
+func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
+	return s.resourcesCache.Get(infohash, func() (*ra.ResourceResponse, error) {
+		return s.GetResource(ctx, c, infohash)
+	})
 }
 
 func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (closer io.ReadCloser, err error) {

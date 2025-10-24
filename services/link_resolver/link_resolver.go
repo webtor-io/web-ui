@@ -3,11 +3,13 @@ package link_resolver
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
@@ -19,10 +21,11 @@ import (
 // LinkResolver resolves streaming links across multiple backends (RealDebrid, Torbox, Webtor)
 // by checking content availability and generating direct download URLs
 type LinkResolver struct {
-	pg            *cs.PG
-	cacheIndex    *ci.CacheIndex
-	userBackends  map[models.StreamingBackendType]co.Backend
-	webtorBackend *backends.Webtor
+	pg                   *cs.PG
+	cacheIndex           *ci.CacheIndex
+	userBackends         map[models.StreamingBackendType]co.Backend
+	webtorBackend        *backends.Webtor
+	enabledBackendsCache lazymap.LazyMap[[]*models.StreamingBackend]
 }
 
 // New creates a new LinkResolver with configured backends
@@ -35,10 +38,20 @@ func New(cl *http.Client, pg *cs.PG, apiService *api.Api, cacheIndex *ci.CacheIn
 			models.StreamingBackendTypeTorbox:     backends.NewTorbox(cl),
 		},
 		webtorBackend: backends.NewWebtor(apiService),
+		enabledBackendsCache: lazymap.New[[]*models.StreamingBackend](&lazymap.Config{
+			Expire:      1 * time.Minute,
+			ErrorExpire: 30 * time.Second,
+		}),
 	}
 }
 
 func (s *LinkResolver) GetUserEnabledBackends(ctx context.Context, userID uuid.UUID) ([]*models.StreamingBackend, error) {
+	return s.enabledBackendsCache.Get(userID.String(), func() ([]*models.StreamingBackend, error) {
+		return s.getUserEnabledBackends(ctx, userID)
+	})
+}
+
+func (s *LinkResolver) getUserEnabledBackends(ctx context.Context, userID uuid.UUID) ([]*models.StreamingBackend, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("database not initialized")
@@ -193,4 +206,11 @@ func (s *LinkResolver) CheckAvailability(ctx context.Context, id uuid.UUID, cla 
 		Cached:      cached,
 		ServiceType: models.StreamingBackendTypeWebtor,
 	}, nil
+}
+
+func (s *LinkResolver) Validate(ctx context.Context, backend *models.StreamingBackend) error {
+	if _, ok := s.userBackends[backend.Type]; !ok {
+		return errors.New("backend implementation not found")
+	}
+	return s.userBackends[backend.Type].Validate(ctx, backend.AccessToken)
 }

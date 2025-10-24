@@ -25,17 +25,16 @@ import (
 // PrefetchCacheStream wraps PreferredStream and populates cache index
 // by checking external addons (like Torrentio) for cached content
 type PrefetchCacheStream struct {
-	inner            StreamsService
-	client           *http.Client
-	pg               *cs.PG
-	userID           uuid.UUID
-	cacheIndex       *ci.CacheIndex
-	addonBaseURL     string
-	userAgent        string
-	addonCache       lazymap.LazyMap[*StreamsResponse]
-	api              *api.Api
-	claims           *api.Claims
-	storeResourceMap lazymap.LazyMap[*ra.ResourceResponse]
+	inner        StreamsService
+	client       *http.Client
+	pg           *cs.PG
+	userID       uuid.UUID
+	cacheIndex   *ci.CacheIndex
+	addonBaseURL string
+	userAgent    string
+	addonCache   lazymap.LazyMap[*StreamsResponse]
+	api          *api.Api
+	claims       *api.Claims
 }
 
 // Ensure PrefetchCacheStream implements StreamsService
@@ -53,10 +52,6 @@ func NewPrefetchCacheStream(inner StreamsService, client *http.Client, pg *cs.PG
 		userAgent:    userAgent,
 		api:          api,
 		claims:       claims,
-		storeResourceMap: lazymap.New[*ra.ResourceResponse](&lazymap.Config{
-			Expire:      5 * time.Minute,
-			ErrorExpire: 10 * time.Second,
-		}),
 		addonCache: lazymap.New[*StreamsResponse](&lazymap.Config{
 			Expire:      5 * time.Minute,
 			ErrorExpire: 10 * time.Second,
@@ -312,20 +307,12 @@ func (s *PrefetchCacheStream) makeMagnetURL(infohash string) string {
 
 // getFilePathFromInfoHash converts fileIdx to file path by querying the API
 func (s *PrefetchCacheStream) getFilePathFromInfoHash(ctx context.Context, infoHash string, fileIdx int) (string, error) {
-	resource, err := s.api.GetResource(ctx, s.claims, infoHash)
+	resource, err := s.api.GetResourceCached(ctx, s.claims, infoHash)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get resource from API")
 	}
 	if resource == nil {
-		// Make magnet URL and store it in API using lazymap
-		magnetURL := s.makeMagnetURL(infoHash)
-
-		_, err = s.storeResourceMap.Get(infoHash, func() (*ra.ResourceResponse, error) {
-			return s.api.StoreResource(ctx, s.claims, []byte(magnetURL))
-		})
-		if err != nil {
-			return "", errors.Wrap(err, "failed to store magnet URL in API")
-		}
+		return "", errors.New("resource not found")
 	}
 	listArgs := &api.ListResourceContentArgs{
 		Limit:  100,

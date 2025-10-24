@@ -1,6 +1,7 @@
 package torbox
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,8 +30,8 @@ func NewClient(httpClient *http.Client, baseURL, apiToken string) *Client {
 }
 
 // GetUser retrieves the current user's information
-func (c *Client) GetUser(ctx context.Context) (*User, error) {
-	body, err := c.get(ctx, "/v1/api/user/me", nil)
+func (s *Client) GetUser(ctx context.Context) (*User, error) {
+	body, err := s.get(ctx, "/v1/api/user/me", nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user")
 	}
@@ -48,11 +49,12 @@ func (c *Client) GetUser(ctx context.Context) (*User, error) {
 }
 
 // CreateTorrent creates a new torrent from a magnet link or torrent file
-func (c *Client) CreateTorrent(ctx context.Context, magnet string) (*Torrent, error) {
+func (s *Client) CreateTorrent(ctx context.Context, magnet string) (*CreateTorrentData, error) {
 	params := url.Values{}
 	params.Set("magnet", magnet)
+	params.Set("add_only_if_cached", "true")
 
-	body, err := c.post(ctx, "/v1/api/torrents/createtorrent", params)
+	body, err := s.post(ctx, "/v1/api/torrents/createtorrent", params)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create torrent")
 	}
@@ -70,53 +72,52 @@ func (c *Client) CreateTorrent(ctx context.Context, magnet string) (*Torrent, er
 }
 
 // ListTorrents retrieves the list of user's torrents
-func (c *Client) ListTorrents(ctx context.Context) ([]Torrent, error) {
-	body, err := c.get(ctx, "/v1/api/torrents/mylist", nil)
+func (s *Client) ListTorrents(ctx context.Context, id int) ([]Torrent, error) {
+	params := url.Values{}
+	params.Set("bypass_cache", "true")
+	if id > 0 {
+		params.Set("id", fmt.Sprintf("%d", id))
+	}
+	body, err := s.get(ctx, "/v1/api/torrents/mylist", params)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list torrents")
 	}
 
-	var resp ListTorrentsResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, errors.Wrap(err, "failed to parse list torrents response")
+	if id == 0 {
+		var resp ListTorrentsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, errors.Wrap(err, "failed to parse list torrents response")
+		}
+
+		if !resp.Success {
+			return nil, fmt.Errorf("API error: %s", resp.Detail)
+		}
+
+		return resp.Data, nil
+	} else {
+		var resp ListTorrentResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, errors.Wrap(err, "failed to parse list torrents response")
+		}
+
+		if !resp.Success {
+			return nil, fmt.Errorf("API error: %s", resp.Detail)
+		}
+
+		return []Torrent{resp.Data}, nil
 	}
-
-	if !resp.Success {
-		return nil, fmt.Errorf("API error: %s", resp.Detail)
-	}
-
-	return resp.Data, nil
-}
-
-// GetTorrentInfo retrieves information about a specific torrent by hash
-func (c *Client) GetTorrentInfo(ctx context.Context, hash string) (*TorrentInfo, error) {
-	params := url.Values{}
-	params.Set("hash", hash)
-
-	body, err := c.get(ctx, "/v1/api/torrents/torrentinfo", params)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get torrent info")
-	}
-
-	var resp TorrentInfoResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, errors.Wrap(err, "failed to parse torrent info response")
-	}
-
-	if !resp.Success {
-		return nil, fmt.Errorf("API error: %s", resp.Detail)
-	}
-
-	return &resp.Data, nil
 }
 
 // ControlTorrent controls a torrent (pause, resume, delete, etc.)
-func (c *Client) ControlTorrent(ctx context.Context, torrentID int, operation string) error {
-	params := url.Values{}
-	params.Set("torrent_id", fmt.Sprintf("%d", torrentID))
-	params.Set("operation", operation)
+func (s *Client) ControlTorrent(ctx context.Context, torrentID int, operation string) error {
+	// per API docs, this endpoint expects a JSON body
+	payload := map[string]any{
+		"operation":  operation,
+		"torrent_id": torrentID,
+		"all":        false,
+	}
 
-	body, err := c.post(ctx, "/v1/api/torrents/controltorrent", params)
+	body, err := s.postJSON(ctx, "/v1/api/torrents/controltorrent", payload)
 	if err != nil {
 		return errors.Wrap(err, "failed to control torrent")
 	}
@@ -137,14 +138,15 @@ func (c *Client) ControlTorrent(ctx context.Context, torrentID int, operation st
 }
 
 // RequestDownloadLink requests a download link for a specific file
-func (c *Client) RequestDownloadLink(ctx context.Context, torrentID, fileID int) (string, error) {
+func (s *Client) RequestDownloadLink(ctx context.Context, torrentID, fileID int) (string, error) {
 	params := url.Values{}
 	params.Set("torrent_id", fmt.Sprintf("%d", torrentID))
 	params.Set("file_id", fmt.Sprintf("%d", fileID))
+	params.Set("token", s.apiToken)
 
-	body, err := c.get(ctx, "/v1/api/torrents/requestdl", params)
+	body, err := s.get(ctx, "/v1/api/torrents/requestdl", params)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to request download link")
+		return "", errors.Wrap(err, "failed to request download link for cached torrent")
 	}
 
 	var resp struct {
@@ -164,7 +166,7 @@ func (c *Client) RequestDownloadLink(ctx context.Context, torrentID, fileID int)
 }
 
 // CheckCached checks if torrents are cached by their hashes
-func (c *Client) CheckCached(ctx context.Context, hashes []string, format string, listFiles bool) ([]CachedTorrent, error) {
+func (s *Client) CheckCached(ctx context.Context, hashes []string, format string, listFiles bool) ([]CachedTorrent, error) {
 	if len(hashes) == 0 {
 		return nil, fmt.Errorf("at least one hash is required")
 	}
@@ -178,7 +180,7 @@ func (c *Client) CheckCached(ctx context.Context, hashes []string, format string
 	}
 	params.Set("list_files", fmt.Sprintf("%t", listFiles))
 
-	body, err := c.get(ctx, "/v1/api/torrents/checkcached", params)
+	body, err := s.get(ctx, "/v1/api/torrents/checkcached", params)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check cached torrents")
 	}
@@ -192,12 +194,19 @@ func (c *Client) CheckCached(ctx context.Context, hashes []string, format string
 		return nil, fmt.Errorf("API error: %s", resp.Detail)
 	}
 
-	return resp.Data, nil
+	// Convert map to array and populate hash field from map keys
+	result := make([]CachedTorrent, 0, len(resp.Data))
+	for hash, torrent := range resp.Data {
+		torrent.Hash = hash
+		result = append(result, torrent)
+	}
+
+	return result, nil
 }
 
 // get performs a GET request
-func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	urlStr := c.baseURL + path
+func (s *Client) get(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	urlStr := s.baseURL + path
 	if params != nil && len(params) > 0 {
 		urlStr += "?" + params.Encode()
 	}
@@ -207,12 +216,12 @@ func (c *Client) get(ctx context.Context, path string, params url.Values) ([]byt
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return c.doRequest(req)
+	return s.doRequest(req)
 }
 
 // post performs a POST request
-func (c *Client) post(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	urlStr := c.baseURL + path
+func (s *Client) post(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	urlStr := s.baseURL + path
 
 	var body io.Reader
 	if params != nil {
@@ -228,12 +237,31 @@ func (c *Client) post(ctx context.Context, path string, params url.Values) ([]by
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	return c.doRequest(req)
+	return s.doRequest(req)
+}
+
+// postJSON performs a POST request with a JSON body
+func (s *Client) postJSON(ctx context.Context, path string, payload any) ([]byte, error) {
+	urlStr := s.baseURL + path
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal json payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", urlStr, bytes.NewBuffer(b))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	return s.doRequest(req)
 }
 
 // put performs a PUT request
-func (c *Client) put(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	urlStr := c.baseURL + path
+func (s *Client) put(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	urlStr := s.baseURL + path
 
 	var body io.Reader
 	if params != nil {
@@ -249,12 +277,12 @@ func (c *Client) put(ctx context.Context, path string, params url.Values) ([]byt
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	return c.doRequest(req)
+	return s.doRequest(req)
 }
 
 // delete performs a DELETE request
-func (c *Client) delete(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	urlStr := c.baseURL + path
+func (s *Client) delete(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	urlStr := s.baseURL + path
 	if params != nil && len(params) > 0 {
 		urlStr += "?" + params.Encode()
 	}
@@ -264,17 +292,17 @@ func (c *Client) delete(ctx context.Context, path string, params url.Values) ([]
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return c.doRequest(req)
+	return s.doRequest(req)
 }
 
 // doRequest executes an HTTP request
-func (c *Client) doRequest(req *http.Request) ([]byte, error) {
+func (s *Client) doRequest(req *http.Request) ([]byte, error) {
 	// Set authorization header if token is present
-	if c.apiToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	if s.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+s.apiToken)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}

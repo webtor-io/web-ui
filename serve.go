@@ -308,7 +308,7 @@ func serve(c *cli.Context) error {
 	settings.RegisterHandler(r, ats, pg)
 
 	// Setting Streaming Backends
-	backends.RegisterHandler(r, ats, pg)
+	backends.RegisterHandler(r, ats, pg, linkResolver)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

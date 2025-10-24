@@ -13,20 +13,26 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/auth"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
 	at *at.AccessToken
 	pg *cs.PG
+	lr *lr.LinkResolver
 }
 
-func NewHandler(at *at.AccessToken, pg *cs.PG) *Handler {
-	return &Handler{at: at, pg: pg}
+func NewHandler(at *at.AccessToken, pg *cs.PG, resolver *lr.LinkResolver) *Handler {
+	return &Handler{
+		at: at,
+		pg: pg,
+		lr: resolver,
+	}
 }
 
-func RegisterHandler(r *gin.Engine, at *at.AccessToken, pg *cs.PG) {
-	h := NewHandler(at, pg)
+func RegisterHandler(r *gin.Engine, at *at.AccessToken, pg *cs.PG, resolver *lr.LinkResolver) {
+	h := NewHandler(at, pg, resolver)
 	gr := r.Group("/streaming/backends")
 	gr.Use(auth.HasAuth)
 	gr.POST("/create", h.createBackend)
@@ -50,13 +56,6 @@ func (s *Handler) createBackend(c *gin.Context) {
 }
 
 func (s *Handler) addStreamingBackend(ctx context.Context, backendType models.StreamingBackendType, accessToken string, enabled bool, user *auth.User) error {
-	// Validate backend type
-	if backendType != models.StreamingBackendTypeWebtor &&
-		backendType != models.StreamingBackendTypeRealDebrid &&
-		backendType != models.StreamingBackendTypeTorbox {
-		return errors.New("invalid backend type")
-	}
-
 	// Get database connection
 	db := s.pg.Get()
 	if db == nil {
@@ -78,16 +77,17 @@ func (s *Handler) addStreamingBackend(ctx context.Context, backendType models.St
 
 	// Create backend
 	backend := &models.StreamingBackend{
-		UserID:   user.ID,
-		Type:     backendType,
-		Priority: int16(priority),
-		Enabled:  enabled,
-		Config:   make(models.StreamingBackendConfig),
+		UserID:      user.ID,
+		Type:        backendType,
+		Priority:    int16(priority),
+		Enabled:     enabled,
+		Config:      make(models.StreamingBackendConfig),
+		AccessToken: accessToken,
 	}
 
-	// Set access token if provided
-	if accessToken != "" {
-		backend.AccessToken = accessToken
+	err = s.lr.Validate(ctx, backend)
+	if err != nil {
+		return errors.Wrap(err, "failed to validate streaming backend")
 	}
 
 	err = models.CreateStreamingBackend(ctx, db, backend)
@@ -243,22 +243,5 @@ func (s *Handler) deleteStreamingBackend(ctx context.Context, backendID uuid.UUI
 		WithField("backend_id", backendID).
 		Info("streaming backend deleted successfully")
 
-	return nil
-}
-
-// BackendValidator interface for validating streaming backends
-type BackendValidator interface {
-	ValidateBackend(backendType models.StreamingBackendType, accessToken string) error
-}
-
-// StubValidator is a placeholder validator
-type StubValidator struct{}
-
-func (sv *StubValidator) ValidateBackend(backendType models.StreamingBackendType, accessToken string) error {
-	// TODO: Implement actual validation logic for each backend type
-	// This is a stub as mentioned in the issue description
-	log.WithField("backend_type", backendType).
-		WithField("has_token", accessToken != "").
-		Info("stub validation called - not yet implemented")
 	return nil
 }

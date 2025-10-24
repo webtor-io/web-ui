@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -34,7 +35,8 @@ type Data struct {
 	AvailableBackendTypes []BackendTypeInfo
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
-	Error                 string
+	Error                 error
+	ErrorLong             error
 }
 
 type Handler struct {
@@ -139,6 +141,11 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	var qErr error
+	if c.Query("err") != "" {
+		qErr = errors.New(c.Query("err"))
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
@@ -147,6 +154,6 @@ func (s *Handler) get(c *gin.Context) {
 		StremioSettings:       ss,
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
-		Error:                 c.Query("error"),
+		Error:                 qErr,
 	}))
 }

@@ -28,9 +28,9 @@
                                     You have reached the maximum of 3 addon URLs. Delete an addon to add a new one.
                                 </div>
                             {{ end }}
-                            {{ if ne .Data.Error "" }}
+                            {{ if ne .Data.Error nil }}
                                 <div class="text-center text-sm text-accent mt-5">
-                                    {{ .Data.Error }}
+                                    {{ .Data.Error | longErr }}
                                 </div>
                             {{ end }}
                         </div>

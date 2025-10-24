@@ -25,7 +25,7 @@
                                         <label class="label">
                                             <span class="label-text">Access Token</span>
                                         </label>
-                                        <input type="password" name="access_token" class="input input-bordered w-full" placeholder="Enter API token">
+                                        <input type="password" required name="access_token" class="input input-bordered w-full" placeholder="Enter API token">
                                     </div>
                                 </div>
                                 <div class="mt-5 flex justify-center">
@@ -33,9 +33,9 @@
                                 </div>
                             </form>
                         
-                            {{ if ne .Data.Error "" }}
+                            {{ if ne .Data.Error nil }}
                                 <div class="text-center text-sm text-accent mt-5">
-                                    {{ .Data.Error }}
+                                    {{ .Data.Error | longErr }}
                                 </div>
                             {{ end }}
                         </div>

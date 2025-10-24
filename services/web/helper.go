@@ -44,6 +44,11 @@ func (s *Helper) Log(err error) error {
 func ShortErr(err error) string {
 	return strings.Split(err.Error(), ":")[0]
 }
+func LongErr(err error) template.HTML {
+	parts := strings.Split(err.Error(), ": ")
+	parts[0] = "<strong>" + parts[0] + "</strong>"
+	return template.HTML(strings.Join(parts, "<br />"))
+}
 
 func RedirectWithError(c *gin.Context, serr error) {
 	u, err := url.Parse(c.GetHeader("X-Return-Url"))
@@ -51,13 +56,17 @@ func RedirectWithError(c *gin.Context, serr error) {
 		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 	}
 	q := u.Query()
-	q.Set("error", ShortErr(serr))
+	q.Set("err", serr.Error())
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
 }
 
 func (s *Helper) ShortErr(err error) string {
 	return ShortErr(err)
+}
+
+func (s *Helper) LongErr(err error) template.HTML {
+	return LongErr(err)
 }
 
 func (s *Helper) BitsForHumans(b int64) string {
