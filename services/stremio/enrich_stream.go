@@ -130,8 +130,6 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 	stream.Name = s.updateStreamName(stream.Name, availability)
 
 	stream.Url = s.generateRedirectURL(stream.InfoHash, p)
-	stream.InfoHash = ""
-	stream.FileIdx = 0
 	return stream, nil
 }
 

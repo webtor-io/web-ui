@@ -121,7 +121,7 @@
                                     <div class="flex items-center gap-2">
                                         <label class="label cursor-pointer gap-2">
                                             <input type="checkbox" name="webtor_enabled" class="toggle toggle-accent"
-                                                   checked disabled>
+                                            {{ if .Claims | isPaid }}checked{{ end }} disabled>
                                             <span class="label-text">Enabled</span>
                                         </label>
                                     </div>
