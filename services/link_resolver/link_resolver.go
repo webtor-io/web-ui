@@ -93,6 +93,9 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 		"requires_payment": requiresPayment,
 	}).Debug("resolving link")
 	enabledBackends, err = s.GetUserEnabledBackends(ctx, userID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load user enabled backends")
+	}
 	for _, userBackend := range enabledBackends {
 		backend, ok := s.userBackends[userBackend.Type]
 		if !ok {

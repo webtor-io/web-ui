@@ -53,7 +53,9 @@ func LongErr(err error) template.HTML {
 func RedirectWithError(c *gin.Context, serr error) {
 	u, err := url.Parse(c.GetHeader("X-Return-Url"))
 	if err != nil || u == nil {
+		// if return url is invalid, attempt a plain redirect without query mutation
 		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		return
 	}
 	q := u.Query()
 	q.Set("err", serr.Error())
