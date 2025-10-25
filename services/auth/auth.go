@@ -364,7 +364,7 @@ func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHa
 		}
 		if sess != nil {
 			ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
-			u, isNew, err := s.createUser(sess)
+			u, isNew, err := s.createUser(r.Context(), sess)
 			if err != nil {
 				log.WithError(err).Error("failed to create user")
 				w.WriteHeader(500)
@@ -380,7 +380,7 @@ func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHa
 	}
 }
 
-func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
+func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
 		return
@@ -390,7 +390,7 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, isN
 	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)
 	if err == nil && userInfo != nil && userInfo.Email != nil {
-		return models.GetOrCreateUser(db, *userInfo.Email, nil)
+		return models.GetOrCreateUser(ctx, db, *userInfo.Email, nil)
 	}
 
 	// If not found in passwordless, try third-party
@@ -400,7 +400,7 @@ func (s *Auth) createUser(sess sessmodels.SessionContainer) (u *models.User, isN
 		if tpUserInfo.ThirdParty.ID == "patreon" {
 			patreonUserID = &tpUserInfo.ThirdParty.UserID
 		}
-		return models.GetOrCreateUser(db, tpUserInfo.Email, patreonUserID)
+		return models.GetOrCreateUser(ctx, db, tpUserInfo.Email, patreonUserID)
 	}
 	return
 }

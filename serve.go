@@ -21,6 +21,7 @@ import (
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	sta "github.com/webtor-io/web-ui/handlers/static"
+	"github.com/webtor-io/web-ui/handlers/streaming/backends"
 	"github.com/webtor-io/web-ui/handlers/stremio"
 	"github.com/webtor-io/web-ui/handlers/stremio/settings"
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
@@ -30,8 +31,10 @@ import (
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	at "github.com/webtor-io/web-ui/services/access_token"
+	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
+	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 
@@ -85,6 +88,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
+	c.Flags = ci.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -278,15 +282,21 @@ func serve(c *cli.Context) error {
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
 
+	// Setting CacheIndex
+	cacheIndex := ci.New(c, pg)
+
 	// Setting StremioBuilder
 	stremioAddonCl := stremios.NewClient(c)
-	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi)
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, cacheIndex)
 
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
 
+	// Setting LinkResolver
+	linkResolver := lr.New(cl, pg, sapi, cacheIndex)
+
 	// Setting Stremio
-	stremio.RegisterHandler(r, ats, sb, pg)
+	stremio.RegisterHandler(c, r, ats, sb, pg, linkResolver)
 
 	// Setting Handler
 	err = stremio_addon_url.RegisterHandler(c, av, r, pg)
@@ -296,6 +306,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Stremio Settings
 	settings.RegisterHandler(r, ats, pg)
+
+	// Setting Streaming Backends
+	backends.RegisterHandler(r, ats, pg, linkResolver)
 
 	// Setting WebDAV
 	webdav.RegisterHandler(r, pg, ats, sapi, jobs)

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -21,9 +22,10 @@ type EmbedDomain struct {
 }
 
 // GetUserDomains returns all domains for a specific user
-func GetUserDomains(db *pg.DB, userID uuid.UUID) ([]EmbedDomain, error) {
+func GetUserDomains(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]EmbedDomain, error) {
 	var domains []EmbedDomain
 	err := db.Model(&domains).
+		Context(ctx).
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Select()
@@ -34,16 +36,20 @@ func GetUserDomains(db *pg.DB, userID uuid.UUID) ([]EmbedDomain, error) {
 }
 
 // CountUserDomains returns the number of domains for a specific user
-func CountUserDomains(db *pg.DB, userID uuid.UUID) (int, error) {
+func CountUserDomains(ctx context.Context, db *pg.DB, userID uuid.UUID) (int, error) {
 	return db.Model(&EmbedDomain{}).
+		Context(ctx).
 		Where("user_id = ?", userID).
 		Count()
 }
 
 // DomainExists checks if a domain already exists in the system
-func DomainExists(db *pg.DB, domain string) (bool, error) {
+func DomainExists(ctx context.Context, db *pg.DB, domain string) (bool, error) {
 	existing := &EmbedDomain{}
-	err := db.Model(existing).Where("domain = ?", domain).Select()
+	err := db.Model(existing).
+		Context(ctx).
+		Where("domain = ?", domain).
+		Select()
 	if err == nil {
 		return true, nil
 	} else if errors.Is(err, pg.ErrNoRows) {
@@ -53,7 +59,7 @@ func DomainExists(db *pg.DB, domain string) (bool, error) {
 }
 
 // CreateDomain creates a new embed domain for a user
-func CreateDomain(db *pg.DB, userID uuid.UUID, domain string) error {
+func CreateDomain(ctx context.Context, db *pg.DB, userID uuid.UUID, domain string) error {
 	ads := false
 	embedDomain := &EmbedDomain{
 		Domain: domain,
@@ -61,13 +67,16 @@ func CreateDomain(db *pg.DB, userID uuid.UUID, domain string) error {
 		Ads:    &ads, // Disable ads for registered domains
 	}
 
-	_, err := db.Model(embedDomain).Insert()
+	_, err := db.Model(embedDomain).
+		Context(ctx).
+		Insert()
 	return err
 }
 
 // DeleteUserDomain deletes a domain owned by a specific user
-func DeleteUserDomain(db *pg.DB, domainID uuid.UUID, userID uuid.UUID) error {
+func DeleteUserDomain(ctx context.Context, db *pg.DB, domainID uuid.UUID, userID uuid.UUID) error {
 	_, err := db.Model(&EmbedDomain{}).
+		Context(ctx).
 		Where("embed_domain_id = ? AND user_id = ?", domainID, userID).
 		Delete()
 	return err

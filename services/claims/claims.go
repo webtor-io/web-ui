@@ -136,7 +136,7 @@ func (s *Claims) RegisterHandler(r *gin.Engine) {
 		updated := false
 		if u.Tier != ucl.Context.Tier.Name {
 			u.Tier = ucl.Context.Tier.Name
-			err = models.UpdateUserTier(db, u)
+			err = models.UpdateUserTier(c.Request.Context(), db, u)
 			if err != nil {
 				_ = c.AbortWithError(http.StatusInternalServerError, err)
 				return

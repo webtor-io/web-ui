@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -18,15 +19,24 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 )
 
+// BackendTypeInfo represents information about a streaming backend type
+type BackendTypeInfo struct {
+	Type        string
+	DisplayName string
+}
+
 type Data struct {
-	StremioAddonURL     string
-	WebDAVURL           string
-	EmbedDomains        []models.EmbedDomain
-	AddonUrls           []models.StremioAddonUrl
-	StremioSettings     *models.StremioSettingsData
-	Is4KAvailable       bool
-	MinBitrateFor4KMbps int64
-	Error               string
+	StremioAddonURL       string
+	WebDAVURL             string
+	EmbedDomains          []models.EmbedDomain
+	AddonUrls             []models.StremioAddonUrl
+	StremioSettings       *models.StremioSettingsData
+	StreamingBackends     []*models.StreamingBackend
+	AvailableBackendTypes []BackendTypeInfo
+	Is4KAvailable         bool
+	MinBitrateFor4KMbps   int64
+	Error                 error
+	ErrorLong             error
 }
 
 type Handler struct {
@@ -48,6 +58,14 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], at *at.A
 	r.GET("/profile", h.get)
 }
 
+// getAvailableBackendTypes returns the list of available streaming backend types
+func getAvailableBackendTypes() []BackendTypeInfo {
+	return []BackendTypeInfo{
+		{Type: string(models.StreamingBackendTypeRealDebrid), DisplayName: "Real-Debrid"},
+		{Type: string(models.StreamingBackendTypeTorbox), DisplayName: "Torbox"},
+	}
+}
+
 func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	at, err := s.at.GetTokenByName(c, "stremio")
 	if at == nil {
@@ -55,7 +73,7 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	}
 	url := fmt.Sprintf("/%s/%s/stremio/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(url, false)
+	al, err := s.ual.Get(c.Request.Context(), url, false)
 	if err != nil {
 		return "", err
 	}
@@ -70,7 +88,7 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 	}
 	url := fmt.Sprintf("/%s/%s/webdav/fs/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(url, true)
+	al, err := s.ual.Get(c.Request.Context(), url, true)
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +97,6 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 
 func (s *Handler) get(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
-	cla := claims.GetFromContext(c)
 	if !u.HasAuth() {
 		c.Redirect(http.StatusTemporaryRedirect, "/login")
 		return
@@ -97,34 +114,46 @@ func (s *Handler) get(c *gin.Context) {
 
 	// Get user domains
 	db := s.pg.Get()
-	domains, err := models.GetUserDomains(db, u.ID)
+	domains, err := models.GetUserDomains(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	// Get user addon URLs
-	addonUrls, err := models.GetUserStremioAddonUrls(db, u.ID)
+	addonUrls, err := models.GetAllUserStremioAddonUrls(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	// Get Stremio settings
-	ss, err := stremio.GetUserSettingsDataByClaims(db, u.ID, cla)
+	ss, err := stremio.GetUserSettingsDataByClaims(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
+	// Get user streaming backends
+	streamingBackends, err := models.GetUserStreamingBackends(c.Request.Context(), db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	var qErr error
+	if c.Query("err") != "" {
+		qErr = errors.New(c.Query("err"))
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
-		StremioAddonURL:     stremioURL,
-		WebDAVURL:           webdavURL,
-		EmbedDomains:        domains,
-		AddonUrls:           addonUrls,
-		StremioSettings:     ss,
-		Is4KAvailable:       stremio.Is4KAvailable(cla),
-		MinBitrateFor4KMbps: stremio.MinBitrateMBpsFor4K,
-		Error:               c.Query("error"),
+		StremioAddonURL:       stremioURL,
+		WebDAVURL:             webdavURL,
+		EmbedDomains:          domains,
+		AddonUrls:             addonUrls,
+		StremioSettings:       ss,
+		StreamingBackends:     streamingBackends,
+		AvailableBackendTypes: getAvailableBackendTypes(),
+		Error:                 qErr,
 	}))
 }

@@ -11,15 +11,16 @@ import (
 var SHA1R = regexp.MustCompile("(?i)[0-9a-f]{5,40}")
 
 var (
-	DomainFlag      = "domain"
-	DemoMagnetFlag  = "demo-magnet"
-	DemoTorrentFlag = "demo-torrent"
-	SMTPHostFlag    = "smtp-host"
-	SMTPUserFlag    = "smtp-user"
-	SMTPPassFlag    = "smtp-pass"
-	SMTPPortFlag    = "smtp-port"
-	SMTPSecureFlag  = "smtp-secure"
-	UseDirectLinks  = "use-direct-links"
+	DomainFlag        = "domain"
+	DemoMagnetFlag    = "demo-magnet"
+	DemoTorrentFlag   = "demo-torrent"
+	SMTPHostFlag      = "smtp-host"
+	SMTPUserFlag      = "smtp-user"
+	SMTPPassFlag      = "smtp-pass"
+	SMTPPortFlag      = "smtp-port"
+	SMTPSecureFlag    = "smtp-secure"
+	UseDirectLinks    = "use-direct-links"
+	SessionSecretFlag = "secret"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -72,6 +73,12 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   UseDirectLinks,
 			Usage:  "use direct links",
 			EnvVar: "USE_DIRECT_LINKS",
+		},
+		cli.StringFlag{
+			Name:   SessionSecretFlag,
+			Usage:  "session secret",
+			Value:  "secret123",
+			EnvVar: "SESSION_SECRET",
 		},
 	)
 

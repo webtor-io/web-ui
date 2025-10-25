@@ -208,6 +208,32 @@ Additional development notes
         Warn("service request failed, dropping results")
     ```
 
+- Error handling and propagation
+  - **Log errors only at the highest possible level**: Errors should be logged only once, at the point where they are finally handled (typically in HTTP handlers or main service entry points). This prevents log spam and makes debugging easier.
+  - **Propagate errors up the call stack**: Lower-level functions (services, models, utilities) should return errors without logging them. Use `errors.Wrap()` from `github.com/pkg/errors` to add context as errors bubble up.
+  - **Wrap errors with context at each level**: When returning an error from a function, wrap it with additional context about what operation failed:
+    ```go
+    result, err := someOperation()
+    if err != nil {
+        return errors.Wrap(err, "failed to perform some operation")
+    }
+    ```
+  - **Log at the handler level**: HTTP handlers and main service entry points should log errors before returning responses:
+    ```go
+    result, err := service.DoSomething(ctx)
+    if err != nil {
+        log.WithError(err).
+            WithField("operation", "do_something").
+            Error("operation failed")
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+        return
+    }
+    ```
+  - **Avoid intermediate logging**: Don't log the same error multiple times as it propagates up. Each layer should either:
+    1. Wrap the error and return it (most common)
+    2. Log the error and handle it (only at the top level)
+  - **Exception for non-fatal errors**: If an error is caught and handled without propagating (e.g., optional feature failures, graceful degradation), it may be appropriate to log it at that level with Warn level.
+
 Debugging tips
 - Enable pprof/probe: serve.go registers common-services Pprof and Probe servers if corresponding flags/envs are set. Consult github.com/webtor-io/common-services for flag names and endpoints; typical pprof binding is on a secondary port.
 - To test API connectivity without RapidAPI, port-forward rest-api from Kubernetes or set REST_API_SERVICE_HOST/PORT to a reachable instance. README shows kubectl and kubefwd examples.

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -27,10 +28,11 @@ func randomAlphaNum(n int) string {
 	return string(b)
 }
 
-func GetURLAliasByCode(db *pg.DB, code string) (*URLAlias, error) {
+func GetURLAliasByCode(ctx context.Context, db *pg.DB, code string) (*URLAlias, error) {
 	alias := new(URLAlias)
 
 	err := db.Model(alias).
+		Context(ctx).
 		Where("code = ?", code).
 		Select()
 
@@ -44,10 +46,11 @@ func GetURLAliasByCode(db *pg.DB, code string) (*URLAlias, error) {
 	return alias, nil
 }
 
-func CreateOrGetURLAlias(db *pg.DB, url string, proxy bool) (*URLAlias, error) {
+func CreateOrGetURLAlias(ctx context.Context, db *pg.DB, url string, proxy bool) (*URLAlias, error) {
 	// поиск по URL
 	alias := new(URLAlias)
 	err := db.Model(alias).
+		Context(ctx).
 		Where("url = ?", url).
 		Select()
 	if err == nil {
@@ -62,6 +65,7 @@ func CreateOrGetURLAlias(db *pg.DB, url string, proxy bool) (*URLAlias, error) {
 	for i := 0; i < 10; i++ {
 		code = randomAlphaNum(6)
 		exists, err := db.Model((*URLAlias)(nil)).
+			Context(ctx).
 			Where("code = ?", code).
 			Exists()
 		if err != nil {
@@ -82,7 +86,9 @@ func CreateOrGetURLAlias(db *pg.DB, url string, proxy bool) (*URLAlias, error) {
 		CreatedAt: time.Now(),
 	}
 
-	_, err = db.Model(alias).Insert()
+	_, err = db.Model(alias).
+		Context(ctx).
+		Insert()
 	if err != nil {
 		return nil, err
 	}

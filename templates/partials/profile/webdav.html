@@ -32,10 +32,15 @@
                             </div>
                         {{ end }}
                     {{ else }}
-                        <p class="mb-6">WebDAV integration is available for premium users. <a href="/donate" class="btn-link" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a></p>
                         <button disabled class="btn btn-accent btn-outline capitalize whitespace-nowrap">
                             Generate WebDAV URL
                         </button>
+                        <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
+                            <p class="mb-6 text-center text-sm text-base-content opacity-70">
+                                WebDAV integration is available for premium users.<br />
+                                <a href="/donate" class="btn-link" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a>
+                            </p>
+                        </div>
                     {{ end }}
                 </div>
             </div>

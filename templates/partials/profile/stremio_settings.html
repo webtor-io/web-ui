@@ -3,11 +3,9 @@
         <div class="container mx-auto px-4">
             <div class="w-full">
                 <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio settings</h2>
-                <div class="w-full max-w-4xl mx-auto">
-                    {{ if .Claims | isPaid }}
-                    <div class="w-full">
+                <div class="flex flex-col mt-6 mb-3 w-full">
+                    <div class="w-full sm:px-5">
                         <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
-                            {{/* current qualities provided by server with sane defaults */}}
                             {{ $resolutions := .Data.StremioSettings.PreferredResolutions }}
 
                             <input type="hidden" name="resolution_order" id="resolution_order" value="{{ range $i, $r := $resolutions }}{{ if $i }},{{ end }}{{ $r.Resolution }}{{ end }}">
@@ -16,26 +14,7 @@
                             <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
 
                             <ul id="resolution-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
-                                {{/* Handle 4K specially when not available - put it at the top */}}
                                 {{ range $i, $r := $resolutions }}
-                                    {{ if and (eq $r.Resolution "4k") (not $.Data.Is4KAvailable) }}
-                                <li class="p-4 select-none flex items-center gap-4 resolution-item transition-colors opacity-50" data-resolution="{{ $r.Resolution }}">
-                                    <span class="drag-handle opacity-30" aria-label="drag disabled" title="dragging disabled">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5">
-                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
-                                        </svg>
-                                    </span>
-                                    <div class="flex-1 text-left capitalize text-lg font-medium text-base-content/40">{{ $r.Resolution }} <span class="text-sm font-normal">(not available)</span></div>
-                                    <label class="cursor-not-allowed">
-                                        <input type="checkbox" name="resolution_{{ $r.Resolution }}" class="toggle toggle-accent" disabled />
-                                    </label>
-                                </li>
-                                    {{ end }}
-                                {{ end }}
-                                
-                                {{/* Handle all other qualities normally */}}
-                                {{ range $i, $r := $resolutions }}
-                                    {{ if not (and (eq $r.Resolution "4k") (not $.Data.Is4KAvailable)) }}
                                 <li class="p-4 cursor-move select-none flex items-center gap-4 resolution-item hover:bg-base-50 transition-colors" draggable="true" data-resolution="{{ $r.Resolution }}">
                                     <span class="drag-handle" aria-label="drag" title="drag to sort">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
@@ -47,44 +26,13 @@
                                         <input type="checkbox" name="resolution_{{ $r.Resolution }}" class="toggle toggle-accent" {{ if $r.Enabled }}checked{{ end }} />
                                     </label>
                                 </li>
-                                    {{ end }}
                                 {{ end }}
                             </ul>
-
-                            {{ if not .Data.Is4KAvailable }}
-                            <div class="mt-4 p-3 border border-accent rounded-lg text-accent">
-                                <div class="flex items-start gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 mt-0.5 flex-shrink-0">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                                    </svg>
-                                    <div>
-                                        <p class="text-sm font-medium">Your download rate is lower than minimum for 4K playback</p>
-                                        <p class="text-xs mt-1">Minimum required: {{ .Data.MinBitrateFor4KMbps }}Mbps</p>
-                                    </div>
-                                </div>
-                            </div>
-                            {{ end }}
-
                             <div class="mt-5 flex justify-center">
                                 <button type="submit" class="btn btn-accent capitalize" data-umami-event="stremio-settings-save">save</button>
                             </div>
                         </form>
                     </div>
-                    {{ else }}
-                        <div class="text-center">
-                            <p class="mb-6">Stremio settings are available for premium users. <a href="/donate" class="btn-link" data-umami-event="donate-stremio-settings">Upgrade your tier to unlock it!</a></p>
-                            <div class="opacity-50">
-                                <h3 class="text-lg font-semibold mb-2">Preferred qualities</h3>
-                                <p class="text-sm text-base-content opacity-70 mb-4">Resolution settings for video streaming</p>
-                                <div class="w-full bg-base-100 rounded-lg shadow p-4">
-                                    <div class="text-base-content/40">Settings locked for non-premium users</div>
-                                </div>
-                                <div class="mt-5">
-                                    <button type="button" class="btn btn-accent capitalize" disabled>save</button>
-                                </div>
-                            </div>
-                        </div>
-                    {{ end }}
                 </div>
             </div>
         </div>

@@ -129,14 +129,6 @@ func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoC
 	return items, nil
 }
 
-func (s *Library) makeStreamURL(ctx context.Context, cla *api.Claims, resourceID string, id string) (string, error) {
-	er, err := s.sapi.ExportResourceContent(ctx, cla, resourceID, id, "")
-	if err != nil {
-		return "", err
-	}
-	return er.ExportItems["download"].URL, nil
-}
-
 func (s *Library) makeStreamTitle(title string, md map[string]any) string {
 	if quality, ok := md["quality"]; ok && strings.TrimSpace(quality.(string)) != "" {
 		title = title + "." + quality.(string)
@@ -185,7 +177,7 @@ func (s *Library) bindArgs(ct, id string) (args *Args, err error) {
 }
 
 func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithMetadata, ct string, args *Args) (*StreamItem, error) {
-	var su, title, p string
+	var title, p string
 	var err error
 	var idx int
 	var md map[string]any
@@ -207,14 +199,9 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 	if err != nil {
 		return nil, err
 	}
-	su, err = s.makeStreamURL(ctx, s.cla, vc.GetContent().ResourceID, ti.ID)
-	if err != nil {
-		return nil, err
-	}
 	return &StreamItem{
 		Name:     s.makeStreamName("Webtor.io", md),
 		Title:    s.makeStreamTitle(title, md),
-		Url:      su,
 		InfoHash: vc.GetContent().ResourceID,
 		FileIdx:  idx,
 		BehaviorHints: &StreamBehaviorHints{

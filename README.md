@@ -46,13 +46,13 @@ Some features to mention:
   - [x] Series
 - [x] Content enrichment
     - [x] OMDB
-    - [x] Kinopoisk unofficial
-    - [ ] AI-powered
+    - [x] Kinopoisk Unofficial
 - [x] Integrations 
   - [x] Stremio
   - [x] Stremio Addons
   - [x] WebDAV
-  - [ ] Torznab
+  - [x] RealDebrid
+  - [x] TorBox
 
 ## Setting up connection to Webtor RestAPI
 

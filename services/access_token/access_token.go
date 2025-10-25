@@ -35,7 +35,7 @@ func (s *AccessToken) Generate(c *gin.Context, name string, scope []string) (*mo
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	return models.MakeAccessToken(db, u.ID, name, scope)
+	return models.MakeAccessToken(c.Request.Context(), db, u.ID, name, scope)
 }
 
 func (s *AccessToken) GetTokenByName(c *gin.Context, name string) (*models.AccessToken, error) {
@@ -47,7 +47,7 @@ func (s *AccessToken) GetTokenByName(c *gin.Context, name string) (*models.Acces
 	if !u.HasAuth() {
 		return nil, fmt.Errorf("no auth")
 	}
-	return models.GetAccessTokenByName(db, u.ID, name)
+	return models.GetAccessTokenByName(c.Request.Context(), db, u.ID, name)
 }
 
 type TokenScope struct{}
@@ -77,7 +77,7 @@ func (s *AccessToken) RegisterHandler(r *gin.Engine) {
 			c.Next()
 			return
 		}
-		at, err := s.getToken(c.Query(common2.AccessTokenParamName))
+		at, err := s.getToken(c.Request.Context(), c.Query(common2.AccessTokenParamName))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -90,7 +90,7 @@ func (s *AccessToken) RegisterHandler(r *gin.Engine) {
 	})
 }
 
-func (s *AccessToken) getToken(tokenStr string) (*models.AccessToken, error) {
+func (s *AccessToken) getToken(ctx context.Context, tokenStr string) (*models.AccessToken, error) {
 	token, err := uuid.FromString(tokenStr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid token (token: %s)", tokenStr)
@@ -100,7 +100,7 @@ func (s *AccessToken) getToken(tokenStr string) (*models.AccessToken, error) {
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	return models.GetUserByAccessTokenWithUser(db, token)
+	return models.GetUserByAccessTokenWithUser(ctx, db, token)
 }
 
 func (s *AccessToken) HasScope(scopes ...string) gin.HandlerFunc {
@@ -109,7 +109,7 @@ func (s *AccessToken) HasScope(scopes ...string) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
-		at, err := s.getToken(c.Query(common2.AccessTokenParamName))
+		at, err := s.getToken(c.Request.Context(), c.Query(common2.AccessTokenParamName))
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
