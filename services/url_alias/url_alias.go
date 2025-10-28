@@ -19,11 +19,10 @@ import (
 )
 
 type UrlAlias struct {
-	domain string
-	pg     *cs.PG
-	urls   lazymap.LazyMap[string]
-	codes  lazymap.LazyMap[*models.URLAlias]
-	r      *gin.Engine
+	pg    *cs.PG
+	urls  lazymap.LazyMap[string]
+	codes lazymap.LazyMap[*models.URLAlias]
+	r     *gin.Engine
 }
 
 func New(pg *cs.PG, r *gin.Engine) *UrlAlias {

@@ -1,0 +1,16 @@
+{{ define "auth/form" }}
+    <form class="progress-alert progress-alert-block mt-10 hidden closeable">
+        <div class="log-target"></div>
+        <div class="pt-3 flex justify-end hidden alert-close-wrapper">
+            <div class="error hidden">
+                <a data-async-target="main" class="close" href="/login">login again</a>
+            </div>
+            {{ if eq .Data.ReturnURL "" }}
+                <a data-async-target="main" class="close closeable-close" href="/lib/">library</a>
+                <a data-async-target="main" class="close closeable-close" href="/profile">profile</a>
+            {{ else }}
+                <a data-async-target="main" id="return-url" class="close closeable-close" href="{{ .Data.ReturnURL }}">Next</a>
+            {{ end }}
+        </div>
+    </form>
+{{ end }}

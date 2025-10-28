@@ -8,11 +8,11 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	sv "github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
@@ -25,7 +25,7 @@ type EnrichStream struct {
 	api          *api.Api
 	claims       *api.Claims
 	linkResolver *lr.LinkResolver
-	uID          uuid.UUID
+	u            *auth.User
 	cla          *claims.Data
 	domain       string
 	token        string
@@ -33,13 +33,13 @@ type EnrichStream struct {
 }
 
 // NewEnrichStream creates a new EnrichStream service
-func NewEnrichStream(inner StreamsService, api *api.Api, lr *lr.LinkResolver, uID uuid.UUID, claims *api.Claims, cla *claims.Data, domain, token, secret string) *EnrichStream {
+func NewEnrichStream(inner StreamsService, api *api.Api, lr *lr.LinkResolver, u *auth.User, claims *api.Claims, cla *claims.Data, domain, token, secret string) *EnrichStream {
 	return &EnrichStream{
 		inner:        inner,
 		api:          api,
 		claims:       claims,
 		linkResolver: lr,
-		uID:          uID,
+		u:            u,
 		cla:          cla,
 		domain:       domain,
 		token:        token,
@@ -123,7 +123,7 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert idx to path")
 	}
-	availability, err := s.linkResolver.CheckAvailability(ctx, s.uID, s.cla, stream.InfoHash, p, true)
+	availability, err := s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, p, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check availability")
 	}

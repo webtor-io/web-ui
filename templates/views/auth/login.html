@@ -5,6 +5,11 @@
             <p>Authorization is required to access your library.</p>
     </div>
 {{ end }}
+{{ if eq .Data.Instruction "stremio-configure" }}
+    <div class="bg-base-200 text-accent border-accent border shadow-md p-4 rounded-box text-center">
+        <p>Authorization is required to access stremio addon.</p>
+    </div>
+{{ end }}
 
 <!-- Patreon OAuth Login -->
 <div class="mt-6">

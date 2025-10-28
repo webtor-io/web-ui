@@ -8,7 +8,7 @@ import (
 func TestNewManifest(t *testing.T) {
 	domain := "https://test.example.com"
 
-	manifest := NewManifest(domain)
+	manifest := NewManifest(domain, nil, false)
 
 	if manifest == nil {
 		t.Fatal("NewManifest returned nil")
@@ -21,7 +21,7 @@ func TestNewManifest(t *testing.T) {
 
 func TestManifest_GetManifest(t *testing.T) {
 	domain := "https://webtor.io"
-	manifest := NewManifest(domain)
+	manifest := NewManifest(domain, nil, false)
 
 	ctx := context.Background()
 	response, err := manifest.GetManifest(ctx)
@@ -115,7 +115,7 @@ func TestManifest_GetManifest(t *testing.T) {
 
 func TestManifest_GetManifest_WithDifferentDomain(t *testing.T) {
 	domain := "https://custom.domain.com"
-	manifest := NewManifest(domain)
+	manifest := NewManifest(domain, nil, false)
 
 	ctx := context.Background()
 	response, err := manifest.GetManifest(ctx)
@@ -140,7 +140,7 @@ func TestManifest_GetManifest_WithDifferentDomain(t *testing.T) {
 }
 
 func TestManifest_ImplementsInterface(t *testing.T) {
-	manifest := NewManifest("https://test.com")
+	manifest := NewManifest("https://test.com", nil, false)
 
 	// Verify it implements ManifestService interface
 	_, ok := interface{}(manifest).(ManifestService)
@@ -152,7 +152,7 @@ func TestManifest_ImplementsInterface(t *testing.T) {
 func TestManifest_CatalogIDConstant(t *testing.T) {
 	// Test that the catalogID constant is used correctly
 	domain := "https://test.com"
-	manifest := NewManifest(domain)
+	manifest := NewManifest(domain, nil, false)
 
 	ctx := context.Background()
 	response, err := manifest.GetManifest(ctx)

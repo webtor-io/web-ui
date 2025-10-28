@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,11 @@ func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
 func (s *Handler) index(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	if !u.HasAuth() {
-		c.Redirect(http.StatusFound, "/login?from=library")
+		v := url.Values{
+			"from":       []string{"library"},
+			"return-url": []string{"/lib/"},
+		}
+		c.Redirect(http.StatusFound, "/login?"+v.Encode())
 		return
 	}
 	args := s.bindIndexArgs(c)

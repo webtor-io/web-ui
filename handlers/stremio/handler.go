@@ -2,6 +2,7 @@ package stremio
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -38,14 +39,17 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	}
 
 	gr := r.Group("/stremio")
-	gr.GET("/manifest.json", h.manifest)
-	gr.Use(auth.HasAuth)
 	gr.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST"},
 	}))
-	gr.POST("/url/generate", h.generateUrl)
-	grapi := gr.Group("")
+	gr.GET("/manifest.json", h.manifest)
+	// Public configure endpoint to satisfy stremio-addons directory requirements
+	gr.GET("/configure", h.configure)
+	gra := gr.Group("")
+	gra.Use(auth.HasAuth)
+	gra.POST("/url/generate", h.generateUrl)
+	grapi := gra.Group("")
 	grapi.Use(at.HasScope("stremio:read"))
 	grapi.GET("/catalog/:type/*id", h.catalog)
 	grapi.GET("/stream/:type/*id", h.stream)
@@ -63,7 +67,9 @@ func (s *Handler) generateUrl(c *gin.Context) {
 }
 
 func (s *Handler) manifest(c *gin.Context) {
-	mas, err := s.b.BuildManifestService()
+	user := auth.GetUserFromContext(c)
+	hasToken := c.Query(sv.AccessTokenParamName) != ""
+	mas, err := s.b.BuildManifestService(user, hasToken)
 	if err != nil {
 		log.WithError(err).Error("failed to build manifest service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -80,7 +86,7 @@ func (s *Handler) manifest(c *gin.Context) {
 func (s *Handler) catalog(c *gin.Context) {
 	ct := c.Param("type")
 	user := auth.GetUserFromContext(c)
-	cas, err := s.b.BuildCatalogService(user.ID)
+	cas, err := s.b.BuildCatalogService(user)
 	if err != nil {
 		log.WithError(err).Error("failed to build catalog service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -98,7 +104,7 @@ func (s *Handler) meta(c *gin.Context) {
 	ct := c.Param("type")
 	id := s.cleanResourceID(c.Param("id"))
 	user := auth.GetUserFromContext(c)
-	mes, err := s.b.BuildMetaService(user.ID)
+	mes, err := s.b.BuildMetaService(user)
 	if err != nil {
 		log.WithError(err).Error("failed to build meta service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -118,7 +124,7 @@ func (s *Handler) stream(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	apiClaims := api.GetClaimsFromContext(c)
 	cla := claims.GetFromContext(c)
-	sts, err := s.b.BuildStreamsService(c.Request.Context(), user.ID, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
+	sts, err := s.b.BuildStreamsService(c.Request.Context(), user, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
 	if err != nil {
 		log.WithError(err).Error("failed to build streams service")
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
@@ -134,6 +140,20 @@ func (s *Handler) stream(c *gin.Context) {
 
 func (s *Handler) cleanResourceID(rawID string) string {
 	return strings.TrimPrefix(strings.TrimSuffix(rawID, ".json"), "/")
+}
+
+func (s *Handler) configure(c *gin.Context) {
+	u := auth.GetUserFromContext(c)
+	if !u.HasAuth() {
+		v := url.Values{
+			"from":       []string{"stremio-configure"},
+			"return-url": []string{"/stremio/configure"},
+		}
+		c.Redirect(http.StatusFound, "/login?"+v.Encode())
+		return
+	}
+	// For now, redirect authenticated users to their profile where the personalized addon URL and install link are shown
+	c.Redirect(http.StatusFound, "/profile")
 }
 
 func (s *Handler) resolve(c *gin.Context) {

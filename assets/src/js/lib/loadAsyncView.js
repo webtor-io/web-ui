@@ -31,10 +31,10 @@ function renderBody(target, body) {
     }
 
     // Process async views
-    const yOffset = -100;
-    const y = target.getBoundingClientRect().top + window.scrollY + yOffset;
-
-    window.scrollTo({ top: y });
+    // const yOffset = -100;
+    // const y = target.getBoundingClientRect().top + window.scrollY + yOffset;
+    //
+    // window.scrollTo({ top: y });
 }
 
 export default loadAsyncView;

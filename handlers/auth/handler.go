@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -17,8 +18,8 @@ type LoginData struct {
 
 type LogoutData struct{}
 
-type VerifyData struct {
-	PreAuthSessionId string
+type ProcessAuthData struct {
+	ReturnURL string
 }
 
 type Handler struct {
@@ -59,6 +60,11 @@ func (s *Handler) login(c *gin.Context) {
 	ld := LoginData{
 		Instruction: instruction,
 	}
+	if c.Query("return-url") != "" {
+		session := sessions.Default(c)
+		session.Set("return-url", c.Query("return-url"))
+		_ = session.Save()
+	}
 	s.tb.Build("auth/login").HTML(http.StatusOK, web.NewContext(c).WithData(ld))
 }
 
@@ -67,11 +73,22 @@ func (s *Handler) logout(c *gin.Context) {
 }
 
 func (s *Handler) verify(c *gin.Context) {
-	s.tb.Build("auth/verify").HTML(http.StatusOK, web.NewContext(c).WithData(&VerifyData{
-		PreAuthSessionId: c.Query("preAuthSessionId"),
-	}))
+	s.processAuth(c, "auth/verify")
 }
 
 func (s *Handler) callback(c *gin.Context) {
-	s.tb.Build("auth/callback").HTML(http.StatusOK, web.NewContext(c))
+	s.processAuth(c, "auth/callback")
+}
+
+func (s *Handler) processAuth(c *gin.Context, t string) {
+	session := sessions.Default(c)
+	var returnURL string
+	if session.Get("return-url") != nil {
+		returnURL = session.Get("return-url").(string)
+		session.Delete("return-url")
+		_ = session.Save()
+	}
+	s.tb.Build(t).HTML(http.StatusOK, web.NewContext(c).WithData(&ProcessAuthData{
+		ReturnURL: returnURL,
+	}))
 }

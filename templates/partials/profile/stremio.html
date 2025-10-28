@@ -24,10 +24,12 @@
                                 <input name="token" readonly class="input input-bordered w-full join-item" value="{{ domain }}{{ .Data.StremioAddonURL }}" />
                                 <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="stremio-copy-addon-url">copy addon url</button>
                             </form>
+                            {{ if not (eq .Data.StremioAddonURL "") }}
+                                <a class="btn btn-accent btn-outline capitalize mt-6 btn-lg" href="stremio://{{ domainWithoutProtocol }}{{ .Data.StremioAddonURL }}" data-umami-event="stremio-install-addon" target="_blank">Install in Stremio</a>
+                            {{ end }}
                             <div class="text-left w-full text-sm text-accent mt-2">
                                 <span class="text-accent">ⓘ</span>
                                 <a href="/instructions/stremio" class="hover:underline" data-umami-event="instruction-stremio" target="_blank">How to connect to Stremio?</a>
-                            </div>
                         </div>
                     {{ end }}
                 </div>
