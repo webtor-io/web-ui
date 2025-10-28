@@ -173,7 +173,7 @@ export function init(window, config) {
                                     e.preventDefault();
                                 }
                                 return trackElement(parentElement).then(() => {
-                                    if (!external) location.href = href;
+                                    // if (!external) location.href = href;
                                 });
                             }
                         } else if (parentElement.tagName === 'BUTTON') {

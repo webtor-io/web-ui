@@ -1,14 +1,5 @@
 {{ define "title" }}Callback{{ end }}
 {{ define "main" }}
-    <form class="progress-alert progress-alert-block mt-10 hidden closeable">
-        <div class="log-target"></div>
-        <div class="pt-3 flex justify-end hidden alert-close-wrapper">
-            <div class="error hidden">
-                <a data-async-target="main" class="close" href="/login">login again</a>
-            </div>
-            <a data-async-target="main" class="close closeable-close" href="/lib/">library</a>
-            <a data-async-target="main" class="close closeable-close" href="/profile">profile</a>
-        </div>
-    </form>
-    {{ "auth/callback.js" | asset }}
+{{ template "auth/form" . }}
+{{ "auth/callback.js" | asset }}
 {{ end }}

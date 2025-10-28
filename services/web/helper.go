@@ -175,6 +175,10 @@ func (s *Helper) Domain() string {
 	return s.domain
 }
 
+func (s *Helper) DomainWithoutProtocol() string {
+	return strings.TrimPrefix(strings.TrimPrefix(s.domain, "https://"), "http://")
+}
+
 func (s *Helper) DemoMagnet() template.URL {
 	return template.URL(s.demoMagnet)
 }

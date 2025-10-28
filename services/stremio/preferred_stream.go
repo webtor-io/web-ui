@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/go-pg/pg/v10"
-	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
@@ -12,17 +12,17 @@ import (
 type PreferredStream struct {
 	inner  StreamsService
 	db     *pg.DB
-	userID uuid.UUID
+	u      *auth.User
 	cla    *claims.Data
 	parser ptn.Parser
 }
 
-func NewPreferredStream(inner StreamsService, db *pg.DB, userID uuid.UUID, cla *claims.Data) *PreferredStream {
+func NewPreferredStream(inner StreamsService, db *pg.DB, u *auth.User, cla *claims.Data) *PreferredStream {
 	return &PreferredStream{
-		inner:  inner,
-		db:     db,
-		userID: userID,
-		cla:    cla,
+		inner: inner,
+		db:    db,
+		u:     u,
+		cla:   cla,
 		parser: ptn.NewCompoundParser([]ptn.Parser{
 			ptn.GetFieldParser(ptn.FieldTypeResolution),
 		}),
@@ -34,7 +34,7 @@ func (s *PreferredStream) GetName() string {
 }
 
 func (s *PreferredStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
-	us, err := GetUserSettingsDataByClaims(ctx, s.db, s.userID)
+	us, err := GetUserSettingsDataByClaims(ctx, s.db, s.u.ID)
 	if err != nil {
 		return nil, err
 	}

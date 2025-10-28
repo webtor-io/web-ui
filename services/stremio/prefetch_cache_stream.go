@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 )
 
@@ -28,7 +28,7 @@ type PrefetchCacheStream struct {
 	inner        StreamsService
 	client       *http.Client
 	pg           *cs.PG
-	userID       uuid.UUID
+	u            *auth.User
 	cacheIndex   *ci.CacheIndex
 	addonBaseURL string
 	userAgent    string
@@ -41,12 +41,12 @@ type PrefetchCacheStream struct {
 var _ StreamsService = (*PrefetchCacheStream)(nil)
 
 // NewPrefetchCacheStream creates a new populate cache stream service
-func NewPrefetchCacheStream(inner StreamsService, client *http.Client, pg *cs.PG, userID uuid.UUID, cacheIndex *ci.CacheIndex, addonBaseURL string, userAgent string, api *api.Api, claims *api.Claims) *PrefetchCacheStream {
+func NewPrefetchCacheStream(inner StreamsService, client *http.Client, pg *cs.PG, u *auth.User, cacheIndex *ci.CacheIndex, addonBaseURL string, userAgent string, api *api.Api, claims *api.Claims) *PrefetchCacheStream {
 	return &PrefetchCacheStream{
 		inner:        inner,
 		client:       client,
 		pg:           pg,
-		userID:       userID,
+		u:            u,
 		cacheIndex:   cacheIndex,
 		addonBaseURL: addonBaseURL,
 		userAgent:    userAgent,
@@ -74,7 +74,7 @@ func (s *PrefetchCacheStream) GetStreams(ctx context.Context, contentType, conte
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	addonUrls, err := models.GetUserStremioAddonUrls(ctx, db, s.userID)
+	addonUrls, err := models.GetUserStremioAddonUrls(ctx, db, s.u.ID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user stremio addon urls")
 	}
@@ -109,7 +109,7 @@ func (s *PrefetchCacheStream) prefetchCacheIndex(ctx context.Context, contentTyp
 	}
 
 	// Get user's enabled streaming backends
-	backends, err := models.GetUserStreamingBackends(ctx, db, s.userID)
+	backends, err := models.GetUserStreamingBackends(ctx, db, s.u.ID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user streaming backends")
 	}

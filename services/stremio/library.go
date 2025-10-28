@@ -8,26 +8,26 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 )
 
 const idPrefix = "wt-"
 
 type Library struct {
 	db     *pg.DB
-	uID    uuid.UUID
+	u      *auth.User
 	domain string
 	sapi   *api.Api
 	cla    *api.Claims
 }
 
-func NewLibrary(domain string, db *pg.DB, uID uuid.UUID, sapi *api.Api, cla *api.Claims) *Library {
+func NewLibrary(domain string, db *pg.DB, u *auth.User, sapi *api.Api, cla *api.Claims) *Library {
 	return &Library{
 		db:     db,
-		uID:    uID,
+		u:      u,
 		domain: domain,
 		sapi:   sapi,
 		cla:    cla,
@@ -108,7 +108,7 @@ var _ StreamsService = (*Library)(nil)
 func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoContentWithMetadata, error) {
 	var items []models.VideoContentWithMetadata
 	if t == "movie" {
-		ls, err := models.GetLibraryMovieList(ctx, s.db, s.uID, models.SortTypeRecentlyAdded)
+		ls, err := models.GetLibraryMovieList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoC
 			items[i] = v
 		}
 	} else if t == "series" {
-		ls, err := models.GetLibrarySeriesList(ctx, s.db, s.uID, models.SortTypeRecentlyAdded)
+		ls, err := models.GetLibrarySeriesList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded)
 		if err != nil {
 			return nil, err
 		}
@@ -225,9 +225,9 @@ func (s *Library) getMetaDataByID(ctx context.Context, ct, id string) ([]models.
 		var vc models.VideoContentWithMetadata
 		var err error
 		if ct == "movie" {
-			vc, err = models.GetMovieByID(ctx, s.db, s.uID, id)
+			vc, err = models.GetMovieByID(ctx, s.db, s.u.ID, id)
 		} else if ct == "series" {
-			vc, err = models.GetSeriesByID(ctx, s.db, s.uID, id)
+			vc, err = models.GetSeriesByID(ctx, s.db, s.u.ID, id)
 		}
 		if err != nil {
 			return nil, err
@@ -236,7 +236,7 @@ func (s *Library) getMetaDataByID(ctx context.Context, ct, id string) ([]models.
 	} else {
 		var vcs []models.VideoContentWithMetadata
 		if ct == "movie" {
-			ls, err := models.GetMoviesByVideoID(ctx, s.db, s.uID, id)
+			ls, err := models.GetMoviesByVideoID(ctx, s.db, s.u.ID, id)
 			if err != nil {
 				return nil, err
 			}
@@ -244,7 +244,7 @@ func (s *Library) getMetaDataByID(ctx context.Context, ct, id string) ([]models.
 				vcs = append(vcs, l)
 			}
 		} else if ct == "series" {
-			ls, err := models.GetSeriesByVideoID(ctx, s.db, s.uID, id)
+			ls, err := models.GetSeriesByVideoID(ctx, s.db, s.u.ID, id)
 			if err != nil {
 				return nil, err
 			}

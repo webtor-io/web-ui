@@ -73,7 +73,7 @@ func (s *PrefetchResourceStream) GetStreams(ctx context.Context, contentType, co
 			if err != nil {
 				log.WithError(err).
 					WithField("infohash", stream.InfoHash).
-					Warn("failed to populate resource")
+					Warn("failed to prefetch resource")
 			} else {
 				prefetchedStreams[index] = &streamCopy
 			}
@@ -122,6 +122,9 @@ func (s *PrefetchResourceStream) makeMagnetURL(infohash string, sources []string
 }
 
 func (s *PrefetchResourceStream) prefetchResource(ctx context.Context, stream StreamItem) error {
+	if stream.InfoHash == "" {
+		return nil
+	}
 	resource, err := s.api.GetResourceCached(ctx, s.cla, stream.InfoHash)
 	if err != nil {
 		return errors.Wrap(err, "failed to get resource from API")
