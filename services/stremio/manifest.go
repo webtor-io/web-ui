@@ -37,6 +37,10 @@ func (s *Manifest) GetManifest(c context.Context) (*ManifestResponse, error) {
 		Resources:    []string{"stream", "catalog", "meta"},
 		Logo:         fmt.Sprintf("%v/assets/night/android-chrome-256x256.png", s.domain),
 		ContactEmail: "support@webtor.io",
+		AddonsConfig: &AddonsConfig{
+			Issuer:    "https://stremio-addons.net",
+			Signature: "eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..jgHUY1gMFbTnCL4khCAsCA.DUQP0jZs-KpFEpL6aC4FVV08q97uhZ1RnMm4vEfbpRI0OSd1NhQaN18MxsHf5Md6gUnnzjwwprX2IoX0iF4TtG-5mPRKx2z91964sa6NqsFX_QWx3sdn6HGllbTJG_-t.RVNoutseK8lRM7QapFttQg",
+		},
 	}
 	if s.u == nil || !s.ht {
 		m.BehaviorHints = &BehaviorHints{

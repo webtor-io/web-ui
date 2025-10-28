@@ -67,6 +67,12 @@ type ManifestResponse struct {
 	ContactEmail  string         `json:"contactEmail,omitempty"`
 	BehaviorHints *BehaviorHints `json:"behaviorHints,omitempty"`
 	Config        []ConfigOption `json:"config,omitempty"`
+	AddonsConfig  *AddonsConfig  `json:"stremioAddonsConfig"`
+}
+
+type AddonsConfig struct {
+	Issuer    string `json:"issuer"`
+	Signature string `json:"signature"`
 }
 
 type BehaviorHints struct {
