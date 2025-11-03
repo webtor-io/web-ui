@@ -35,9 +35,8 @@ import (
 )
 
 const (
-	supertokensHostFlag     = "supertokens-host"
-	supertokensPortFlag     = "supertokens-port"
-	UseFlag                 = "use-auth"
+	SupertokensHostFlag     = "supertokens-host"
+	SupertokensPortFlag     = "supertokens-port"
 	googleClientIDFlag      = "google-client-id"
 	googleClientSecretFlag  = "google-client-secret"
 	patreonClientIDFlag     = "patreon-client-id"
@@ -47,20 +46,15 @@ const (
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.StringFlag{
-			Name:   supertokensHostFlag,
+			Name:   SupertokensHostFlag,
 			Usage:  "supertokens host",
 			Value:  "",
 			EnvVar: "SUPERTOKENS_SERVICE_HOST",
 		},
 		cli.IntFlag{
-			Name:   supertokensPortFlag,
+			Name:   SupertokensPortFlag,
 			Usage:  "supertokens port",
 			EnvVar: "SUPERTOKENS_SERVICE_PORT",
-		},
-		cli.BoolFlag{
-			Name:   UseFlag,
-			Usage:  "use auth",
-			EnvVar: "USE_AUTH",
 		},
 		cli.StringFlag{
 			Name:   googleClientIDFlag,
@@ -99,14 +93,13 @@ type Auth struct {
 	googleClientSecret  string
 	patreonClientID     string
 	patreonClientSecret string
+	hasSupetokens       bool
 }
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
-	if !c.Bool(UseFlag) {
-		return nil
-	}
 	return &Auth{
-		url:                 c.String(supertokensHostFlag) + ":" + c.String(supertokensPortFlag),
+		url:                 c.String(SupertokensHostFlag) + ":" + c.String(SupertokensPortFlag),
+		hasSupetokens:       c.String(SupertokensHostFlag) != "" && c.String(SupertokensPortFlag) != "",
 		smtpUser:            c.String(sv.SMTPUserFlag),
 		smtpPass:            c.String(sv.SMTPPassFlag),
 		smtpHost:            c.String(sv.SMTPHostFlag),
@@ -123,6 +116,9 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 }
 
 func (s *Auth) Init() error {
+	if !s.hasSupetokens {
+		return nil
+	}
 	smtpSettings := emaildelivery.SMTPSettings{
 		Host: s.smtpHost,
 		From: emaildelivery.SMTPFrom{
@@ -302,6 +298,9 @@ func makeUserFromContext(c *gin.Context) *User {
 }
 
 func GetUserFromContext(c *gin.Context) *User {
+	if IsAdmin(c) {
+		return makeUserFromContext(c)
+	}
 	if c.Query(sv.AccessTokenParamName) != "" {
 		return makeUserFromContext(c)
 	}
@@ -417,6 +416,14 @@ func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.Handl
 }
 
 func (s *Auth) RegisterHandler(r *gin.Engine) {
+	if !s.hasSupetokens {
+		r.Use(func(c *gin.Context) {
+			s.registerAdminUser(c)
+
+			c.Next()
+		})
+		return
+	}
 	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -438,6 +445,34 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 	r.Use(s.verifySession(&sessmodels.VerifySessionOptions{
 		SessionRequired: &sessionRequired,
 	}))
+}
+
+type IsAdminContext struct{}
+
+func (s *Auth) registerAdminUser(c *gin.Context) {
+	db := s.pg.Get()
+	if db == nil {
+		return
+	}
+	u, isNew, err := models.GetOrCreateUser(c.Request.Context(), db, "admin", nil)
+	if err != nil {
+		log.WithError(err).Error("failed to create admin user")
+		return
+	}
+	ctx := c.Request.Context()
+	ctx = context.WithValue(ctx, UserContext{}, u)
+	ctx = context.WithValue(ctx, IsNewContext{}, isNew)
+	ctx = context.WithValue(ctx, IsAdminContext{}, true)
+	c.Request = c.Request.WithContext(ctx)
+}
+
+func IsAdmin(c *gin.Context) bool {
+	v := c.Request.Context().Value(IsAdminContext{})
+	isAdmin, ok := v.(bool)
+	if !ok {
+		return false
+	}
+	return isAdmin
 }
 
 func HasAuth(c *gin.Context) {

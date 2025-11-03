@@ -16,20 +16,6 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 )
 
-const (
-	UseFlag = "use-claims"
-)
-
-func RegisterFlags(f []cli.Flag) []cli.Flag {
-	return append(f,
-		cli.BoolFlag{
-			Name:   UseFlag,
-			Usage:  "use claims",
-			EnvVar: "USE_CLAIMS",
-		},
-	)
-}
-
 type Claims struct {
 	lazymap.LazyMap[*Data]
 	cl *Client
@@ -39,9 +25,6 @@ type Claims struct {
 type Data = proto.GetResponse
 
 func New(c *cli.Context, cl *Client, pg *cs.PG) *Claims {
-	if !c.Bool(UseFlag) || cl == nil {
-		return nil
-	}
 	return &Claims{
 		cl: cl,
 		pg: pg,
@@ -80,8 +63,32 @@ func (s *Claims) Get(r *Request) (*Data, error) {
 	})
 }
 
+func (s *Claims) makeAdminClaims() *Data {
+	return &Data{Context: &proto.Context{
+		Tier: &proto.Tier{
+			Id:   1,
+			Name: "free",
+		},
+	},
+		Claims: &proto.Claims{
+			Connection: &proto.Connection{
+				Rate: 0,
+			},
+			Embed: &proto.Embed{
+				NoAds: true,
+			},
+			Site: &proto.Site{
+				NoAds: true,
+			},
+		},
+	}
+}
+
 func (s *Claims) MakeUserClaimsFromContext(c *gin.Context) (*Data, error) {
 	u := auth.GetUserFromContext(c)
+	if auth.IsAdmin(c) {
+		return s.makeAdminClaims(), nil
+	}
 	r, err := s.Get(&Request{
 		Email:         u.Email,
 		PatreonUserID: u.PatreonUserID,

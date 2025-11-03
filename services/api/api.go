@@ -34,14 +34,17 @@ import (
 )
 
 const (
-	apiKeyFlag       = "webtor-key"
-	apiSecretFlag    = "webtor-secret"
-	apiSecureFlag    = "webtor-rest-api-secure"
-	apiHostFlag      = "webtor-rest-api-host"
-	apiPortFlag      = "webtor-rest-api-port"
-	apiExpireFlag    = "webtor-rest-api-expire"
-	rapidApiKeyFlag  = "rapidapi-key"
-	rapidApiHostFlag = "rapidapi-host"
+	apiKeyFlag                      = "webtor-key"
+	apiSecretFlag                   = "webtor-secret"
+	apiSecureFlag                   = "webtor-rest-api-secure"
+	apiHostFlag                     = "webtor-rest-api-host"
+	apiPortFlag                     = "webtor-rest-api-port"
+	apiExpireFlag                   = "webtor-rest-api-expire"
+	rapidApiKeyFlag                 = "rapidapi-key"
+	rapidApiHostFlag                = "rapidapi-host"
+	useInternalTorrentHTTPProxyFlag = "use-internal-torrent-http-proxy"
+	torrentHTTPProxyHostFlag        = "torrent-http-proxy-host"
+	torrentHTTPProxyPortFlag        = "torrent-http-proxy-port"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -91,6 +94,22 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "RapidAPI key",
 			Value:  "",
 			EnvVar: "RAPIDAPI_KEY",
+		},
+		cli.BoolFlag{
+			Name:   useInternalTorrentHTTPProxyFlag,
+			Usage:  "use internal torrent http proxy",
+			EnvVar: "USE_INTERNAL_TORRENT_HTTP_PROXY",
+		},
+		cli.StringFlag{
+			Name:   torrentHTTPProxyHostFlag,
+			Usage:  "torrent http proxy host",
+			EnvVar: "TORRENT_HTTP_PROXY_SERVICE_HOST",
+		},
+		cli.IntFlag{
+			Name:   torrentHTTPProxyPortFlag,
+			Usage:  "torrent http proxy port",
+			EnvVar: "TORRENT_HTTP_PROXY_SERVICE_PORT",
+			Value:  80,
 		},
 	)
 }
@@ -166,14 +185,17 @@ type Claims struct {
 }
 
 type Api struct {
-	url               string
-	prepareRequest    func(r *http.Request, c *Claims) (*http.Request, error)
-	cl                *http.Client
-	domain            string
-	expire            int
-	torrentCache      lazymap.LazyMap[[]byte]
-	listResponseCache lazymap.LazyMap[*ra.ListResponse]
-	resourcesCache    lazymap.LazyMap[*ra.ResourceResponse]
+	url                         string
+	prepareRequest              func(r *http.Request, c *Claims) (*http.Request, error)
+	cl                          *http.Client
+	domain                      string
+	expire                      int
+	torrentCache                lazymap.LazyMap[[]byte]
+	listResponseCache           lazymap.LazyMap[*ra.ListResponse]
+	resourcesCache              lazymap.LazyMap[*ra.ResourceResponse]
+	useInternalTorrentHTTPProxy bool
+	torrentHTTPProxyHost        string
+	torrentHTTPProxyPort        int
 }
 
 type ListResourceContentOutputType string
@@ -266,6 +288,9 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		listResponseCache: lazymap.New[*ra.ListResponse](&lazymap.Config{
 			Expire: time.Minute,
 		}),
+		useInternalTorrentHTTPProxy: c.Bool(useInternalTorrentHTTPProxyFlag),
+		torrentHTTPProxyHost:        c.String(torrentHTTPProxyHostFlag),
+		torrentHTTPProxyPort:        c.Int(torrentHTTPProxyPortFlag),
 	}
 }
 
@@ -415,6 +440,16 @@ func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, error) {
 }
 
 func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, error) {
+	if s.useInternalTorrentHTTPProxy {
+		internal := fmt.Sprintf("%v:%v", s.torrentHTTPProxyHost, s.torrentHTTPProxyPort)
+		ur, err := url.Parse(u)
+		if err != nil {
+			return nil, err
+		}
+		ur.Host = internal
+		ur.Scheme = "http"
+		u = ur.String()
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		log.WithError(err).Error("failed to make new request")
