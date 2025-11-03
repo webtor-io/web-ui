@@ -14,6 +14,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
@@ -52,7 +53,8 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 func (s *Handler) add(c *gin.Context) {
 	addonUrl := strings.TrimSpace(c.PostForm("url"))
 	user := auth.GetUserFromContext(c)
-	err := s.addAddonUrl(c.Request.Context(), addonUrl, user)
+	cla := claims.GetFromContext(c)
+	err := s.addAddonUrl(c.Request.Context(), addonUrl, user, cla)
 	if err != nil {
 		log.WithError(err).Error("failed to add addon URL")
 		web.RedirectWithError(c, err)
@@ -73,7 +75,7 @@ func (s *Handler) delete(c *gin.Context) {
 	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
 }
 
-func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.User) (err error) {
+func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.User, cla *claims.Data) (err error) {
 	// Get URL from form data
 	if addonUrl == "" {
 		return errors.New("no addon URL provided")
@@ -110,15 +112,17 @@ func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.U
 		return errors.New("no db")
 	}
 
-	// Check current addon URL count for user
-	currentCount, err := models.CountUserStremioAddonUrls(ctx, db, user.ID)
-	if err != nil {
-		return
-	}
+	if cla.Context.Tier.Id == 0 {
+		// Check current addon URL count for user
+		currentCount, err := models.CountUserStremioAddonUrls(ctx, db, user.ID)
+		if err != nil {
+			return err
+		}
 
-	// Restrict to maximum 3 addon URLs (more than domains since they're just URLs)
-	if currentCount >= 3 {
-		return errors.New("maximum 3 addon URLs allowed")
+		// Restrict to maximum 3 addon URLs for free tier (more than domains since they're just URLs)
+		if currentCount >= 3 {
+			return errors.New("maximum 3 addon URLs allowed for free tier")
+		}
 	}
 
 	// Check if URL already exists
