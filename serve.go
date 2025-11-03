@@ -74,7 +74,6 @@ func configureServe(c *cli.Command) {
 	c.Flags = w.RegisterFlags(c.Flags)
 	c.Flags = common.RegisterFlags(c.Flags)
 	c.Flags = auth.RegisterFlags(c.Flags)
-	c.Flags = claims.RegisterFlags(c.Flags)
 	c.Flags = claims.RegisterClientFlags(c.Flags)
 	c.Flags = sess.RegisterFlags(c.Flags)
 	c.Flags = sta.RegisterFlags(c.Flags)

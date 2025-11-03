@@ -43,8 +43,8 @@
             </div>
         </div>
         {{ "layout.js" | asset }}
-        {{- if useAuth }}
+        {{- if useSuperTokens }}
         {{ "auth.js" | asset }}
-        {{- end }}
+        {{ end }}
     </body>
 </html>

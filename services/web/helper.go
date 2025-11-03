@@ -86,26 +86,27 @@ func (s *Helper) Has(obj any, fieldName string) bool {
 }
 
 type Helper struct {
-	assetsHost    string
-	assetsPath    string
-	useAuth       bool
-	domain        string
-	demoMagnet    string
-	demoTorrent   string
-	ah            *AssetHashes
-	useAbuseStore bool
+	assetsHost     string
+	assetsPath     string
+	useAuth        bool
+	domain         string
+	demoMagnet     string
+	demoTorrent    string
+	ah             *AssetHashes
+	useAbuseStore  bool
+	useSuperTokens bool
 }
 
 func NewHelper(c *cli.Context) *Helper {
 	return &Helper{
-		demoMagnet:    c.String(common.DemoMagnetFlag),
-		demoTorrent:   c.String(common.DemoTorrentFlag),
-		assetsHost:    c.String(static.AssetsHostFlag),
-		assetsPath:    c.String(static.AssetsPathFlag),
-		useAuth:       c.Bool(auth.UseFlag),
-		useAbuseStore: c.Bool(abuse_store.UseFlag),
-		domain:        c.String(common.DomainFlag),
-		ah:            NewAssetHashes(c.String(static.AssetsPathFlag)),
+		demoMagnet:     c.String(common.DemoMagnetFlag),
+		demoTorrent:    c.String(common.DemoTorrentFlag),
+		assetsHost:     c.String(static.AssetsHostFlag),
+		assetsPath:     c.String(static.AssetsPathFlag),
+		useAbuseStore:  c.Bool(abuse_store.UseFlag),
+		domain:         c.String(common.DomainFlag),
+		ah:             NewAssetHashes(c.String(static.AssetsPathFlag)),
+		useSuperTokens: c.String(auth.SupertokensHostFlag) != "",
 	}
 }
 
@@ -159,8 +160,8 @@ func (s *Helper) TierName(c *claims.Data) string {
 	return c.Context.Tier.Name
 }
 
-func (s *Helper) UseAuth() bool {
-	return s.useAuth
+func (s *Helper) UseSuperTokens() bool {
+	return s.useSuperTokens
 }
 
 func (s *Helper) HasAuth(u *auth.User) bool {
@@ -291,5 +292,4 @@ func (s *Helper) ProfileName(u *auth.User) string {
 		return "profile"
 	}
 	return u.Email
-
 }

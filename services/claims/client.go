@@ -43,7 +43,7 @@ type Client struct {
 }
 
 func NewClient(c *cli.Context) *Client {
-	if !c.Bool(UseFlag) {
+	if c.String(claimsProviderHostFlag) == "" {
 		return nil
 	}
 	return &Client{
