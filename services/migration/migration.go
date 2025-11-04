@@ -32,7 +32,7 @@ func (s *PGMigration) Run(a ...string) error {
 	}
 	oldVersion, newVersion, err := s.col.Run(db, a...)
 	if err != nil {
-		return errors.Wrap(err, "failed to perform PGMigration")
+		return errors.Wrapf(err, "failed to perform PGMigration from %v to %v", oldVersion, newVersion)
 	}
 	if newVersion != oldVersion {
 		log.Infof("DB migrated from version %d to %d", oldVersion, newVersion)

@@ -29,7 +29,9 @@ ALTER TABLE public.embed_domain
 
 -- 4. Insert distinct emails into user table with empty passwords
 INSERT INTO public."user" (email, password)
-SELECT DISTINCT email FROM public.embed_domain;
+SELECT email, '' FROM (SELECT DISTINCT email
+    FROM public.embed_domain
+);
 
 -- 5. Populate user_id in embed_domain based on matching email
 UPDATE public.embed_domain ed
