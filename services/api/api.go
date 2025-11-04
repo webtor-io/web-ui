@@ -439,7 +439,7 @@ func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, error) {
 	return s.DownloadWithRange(ctx, u, 0, -1)
 }
 
-func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, error) {
+func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
 	if s.useInternalTorrentHTTPProxy {
 		internal := fmt.Sprintf("%v:%v", s.torrentHTTPProxyHost, s.torrentHTTPProxyPort)
 		ur, err := url.Parse(u)
@@ -450,7 +450,11 @@ func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end in
 		ur.Scheme = "http"
 		u = ur.String()
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	return http.NewRequestWithContext(ctx, "GET", u, nil)
+}
+
+func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, error) {
+	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
 		log.WithError(err).Error("failed to make new request")
 		return nil, err
@@ -478,7 +482,7 @@ type OpenSubtitleTrack struct {
 }
 
 func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTrack, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
@@ -515,7 +519,7 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 }
 
 func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
@@ -540,7 +544,7 @@ func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) 
 }
 
 func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
