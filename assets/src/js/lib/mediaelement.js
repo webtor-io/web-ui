@@ -1,5 +1,5 @@
 import '../../styles/mediaelement.css';
-import 'mediaelement';
+import 'mediaelement/full';
 import './mediaelement-plugins/availableprogress';
 import './mediaelement-plugins/advancedtracks';
 import './mediaelement-plugins/chromecast';
@@ -14,7 +14,10 @@ let video;
 
 export function initPlayer(target) {
     video = target.querySelector('.player');
-    const settings = JSON.parse(video.dataset.settings);
+    let settings = {};
+    if (video.dataset.settings) {
+        settings = JSON.parse(video.dataset.settings);
+    }
     const height = video.height;
     const controls = video.controls;
     const stretching = height ? 'auto' : 'responsive';
@@ -46,6 +49,7 @@ export function initPlayer(target) {
         features.push('logo');
     }
     player = new MediaElementPlayer(video, {
+        renderers: ['native_hls', 'html5'],
         autoRewind: false,
         defaultSeekBackwardInterval: (media) => 15,
         defaultSeekForwardInterval: (media) => 15,
@@ -67,7 +71,7 @@ export function initPlayer(target) {
             destroyPlayer();
             initPlayer(target);
         },
-        async success(media) {
+        async success(media, node, player) {
             if (duration > 0) {
                 const oldGetDuration = media.getDuration;
                 media.oldGetDuration = function() {
@@ -163,6 +167,7 @@ export function initPlayer(target) {
 export function destroyPlayer() {
     if (player) {
         player.options.stretching = 'none';
+        player.pause();
         player.remove();
         player = null;
     }
