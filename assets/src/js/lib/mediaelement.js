@@ -165,14 +165,21 @@ export function initPlayer(target) {
 }
 
 export function destroyPlayer() {
+    console.log(player, hlsPlayer, video);
     if (player) {
         player.options.stretching = 'none';
         player.pause();
-        player.remove();
+        // this generates autoloading when switching to another location
+        // player.remove();
         player = null;
     }
     if (hlsPlayer) {
+        hlsPlayer.stopLoad();
         hlsPlayer.destroy();
         hlsPlayer = null;
+    }
+    if (video) {
+        video.remove();
+        video = null;
     }
 }
