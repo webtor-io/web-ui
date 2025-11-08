@@ -7,6 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -15,13 +22,8 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
-	"image"
-	"image/jpeg"
-	"io"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 type PosterFormat string
@@ -85,9 +87,7 @@ func (s *Handler) poster(c *gin.Context) {
 		return
 	}
 
-	s3Cl := s.s3Cl.Get()
-
-	b, err := s.getResizedJPEGPosterWithCache(ctx, db, s3Cl, pa)
+	b, err := s.getResizedJPEGPosterWithCache(ctx, db, s.s3Cl, pa)
 
 	if err != nil {
 		log.WithError(err).Error("failed to get resized image")
@@ -145,11 +145,12 @@ func (s *Handler) getResizedPoster(ctx context.Context, db *pg.DB, args *PosterA
 	return resized, nil
 }
 
-func (s *Handler) getResizedJPEGPosterWithCache(ctx context.Context, db *pg.DB, s3Cl *s3.S3, args *PosterArgs) (*bytes.Buffer, error) {
+func (s *Handler) getResizedJPEGPosterWithCache(ctx context.Context, db *pg.DB, s3Cl *cs.S3Client, args *PosterArgs) (*bytes.Buffer, error) {
 	if s3Cl == nil {
 		return s.getResizedJPEGPoster(ctx, db, args)
 	}
-	b, err := s.getPosterFromCache(ctx, s3Cl, args)
+	cl := s3Cl.Get()
+	b, err := s.getPosterFromCache(ctx, cl, args)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +161,7 @@ func (s *Handler) getResizedJPEGPosterWithCache(ctx context.Context, db *pg.DB, 
 	if err != nil {
 		return nil, err
 	}
-	err = s.putPosterToCache(ctx, s3Cl, args, b)
+	err = s.putPosterToCache(ctx, cl, args, b)
 	if err != nil {
 		return nil, err
 	}
