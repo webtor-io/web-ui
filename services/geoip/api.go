@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/urfave/cli"
-	"github.com/webtor-io/lazymap"
 	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/urfave/cli"
+	"github.com/webtor-io/lazymap"
 )
 
 const (
@@ -52,7 +53,7 @@ type Data struct {
 }
 
 type Api struct {
-	lazymap.LazyMap[*Data]
+	*lazymap.LazyMap[*Data]
 	url string
 	cl  *http.Client
 }

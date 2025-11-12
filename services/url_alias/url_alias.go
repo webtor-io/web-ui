@@ -20,8 +20,8 @@ import (
 
 type UrlAlias struct {
 	pg    *cs.PG
-	urls  lazymap.LazyMap[string]
-	codes lazymap.LazyMap[*models.URLAlias]
+	urls  *lazymap.LazyMap[string]
+	codes *lazymap.LazyMap[*models.URLAlias]
 	r     *gin.Engine
 }
 

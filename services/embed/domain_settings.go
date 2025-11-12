@@ -44,7 +44,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type DomainSettings struct {
-	lazymap.LazyMap[*DomainSettingsData]
+	*lazymap.LazyMap[*DomainSettingsData]
 	pg             *cs.PG
 	claims         *claims.Claims
 	domain         string

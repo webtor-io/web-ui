@@ -41,6 +41,7 @@ const (
 	googleClientSecretFlag  = "google-client-secret"
 	patreonClientIDFlag     = "patreon-client-id"
 	patreonClientSecretFlag = "patreon-client-secret"
+	overrideUserEmail       = "override-user-email"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -76,6 +77,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "patreon oauth client secret",
 			EnvVar: "PATREON_CLIENT_SECRET",
 		},
+		cli.StringFlag{
+			Name:   overrideUserEmail,
+			Usage:  "override user email",
+			EnvVar: "OVERRIDE_USER_EMAIL",
+		},
 	)
 }
 
@@ -94,6 +100,7 @@ type Auth struct {
 	patreonClientID     string
 	patreonClientSecret string
 	hasSupetokens       bool
+	overrideUserEmail   string
 }
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
@@ -112,6 +119,7 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 		googleClientSecret:  c.String(googleClientSecretFlag),
 		patreonClientID:     c.String(patreonClientIDFlag),
 		patreonClientSecret: c.String(patreonClientSecretFlag),
+		overrideUserEmail:   c.String(overrideUserEmail),
 	}
 }
 
@@ -385,6 +393,10 @@ func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer)
 		return
 	}
 	userID := sess.GetUserID()
+
+	if s.overrideUserEmail != "" {
+		return models.GetOrCreateUser(ctx, db, s.overrideUserEmail, nil)
+	}
 
 	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)

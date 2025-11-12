@@ -23,7 +23,7 @@ type resolveLinkResult struct {
 
 // RealDebrid implements Backend interface for RealDebrid
 type RealDebrid struct {
-	linkCache lazymap.LazyMap[*resolveLinkResult]
+	linkCache *lazymap.LazyMap[*resolveLinkResult]
 	cl        *http.Client
 }
 

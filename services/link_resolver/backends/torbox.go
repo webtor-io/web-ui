@@ -45,7 +45,7 @@ var _ common.Backend = (*Torbox)(nil)
 // NewTorbox creates a new Torbox backend
 func NewTorbox(cl *http.Client) *Torbox {
 	return &Torbox{
-		linkCache: lazymap.New[*resolveLinkResultTorbox](&lazymap.Config{
+		linkCache: *lazymap.New[*resolveLinkResultTorbox](&lazymap.Config{
 			Expire:      15 * time.Minute,
 			ErrorExpire: 30 * time.Second,
 			Concurrency: 5,

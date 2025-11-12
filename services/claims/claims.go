@@ -17,7 +17,7 @@ import (
 )
 
 type Claims struct {
-	lazymap.LazyMap[*Data]
+	*lazymap.LazyMap[*Data]
 	cl *Client
 	pg *cs.PG
 }

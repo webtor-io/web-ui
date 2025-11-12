@@ -32,8 +32,8 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 type CacheIndex struct {
 	pg            *cs.PG
 	cacheExpire   time.Duration
-	markCachedMap lazymap.LazyMap[bool]
-	isCachedMap   lazymap.LazyMap[[]models.CacheIndexResult]
+	markCachedMap *lazymap.LazyMap[bool]
+	isCachedMap   *lazymap.LazyMap[[]models.CacheIndexResult]
 }
 
 func New(c *cli.Context, pg *cs.PG) *CacheIndex {

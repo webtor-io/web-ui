@@ -25,7 +25,7 @@ type LinkResolver struct {
 	cacheIndex           *ci.CacheIndex
 	userBackends         map[models.StreamingBackendType]co.Backend
 	webtorBackend        *backends.Webtor
-	enabledBackendsCache lazymap.LazyMap[[]*models.StreamingBackend]
+	enabledBackendsCache *lazymap.LazyMap[[]*models.StreamingBackend]
 }
 
 // New creates a new LinkResolver with configured backends

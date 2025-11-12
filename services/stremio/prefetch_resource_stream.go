@@ -19,8 +19,8 @@ import (
 type PrefetchResourceStream struct {
 	inner                 StreamsService
 	api                   *api.Api
-	storeResourceMap      lazymap.LazyMap[*ra.ResourceResponse]
-	backgroundResourceMap lazymap.LazyMap[*ra.ResourceResponse]
+	storeResourceMap      *lazymap.LazyMap[*ra.ResourceResponse]
+	backgroundResourceMap *lazymap.LazyMap[*ra.ResourceResponse]
 	cla                   *api.Claims
 }
 

@@ -7,28 +7,30 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
+	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 )
 
 // AddonStream handles requests to Stremio addon stream endpoints
 type AddonStream struct {
-	client    *http.Client
-	addonURL  string
-	cache     lazymap.LazyMap[*StreamsResponse]
-	userAgent string
+	client           *http.Client
+	addonURL         string
+	cache            *lazymap.LazyMap[*StreamsResponse]
+	userAgent        string
+	requestURLMapper *rum.RequestURLMapper
 }
 
 // Ensure AddonStream implements StreamsService
 var _ StreamsService = (*AddonStream)(nil)
 
 // NewAddonStream creates a new addon stream service instance
-func NewAddonStream(cl *http.Client, addonURL string, cache lazymap.LazyMap[*StreamsResponse], userAgent string) *AddonStream {
+func NewAddonStream(cl *http.Client, addonURL string, cache *lazymap.LazyMap[*StreamsResponse], userAgent string, requestURLMapper *rum.RequestURLMapper) *AddonStream {
 	return &AddonStream{
-		client:    cl,
-		addonURL:  addonURL,
-		cache:     cache,
-		userAgent: userAgent,
+		client:           cl,
+		addonURL:         addonURL,
+		cache:            cache,
+		userAgent:        userAgent,
+		requestURLMapper: requestURLMapper,
 	}
 }
 
@@ -53,6 +55,9 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	// Format: {addonURL}/stream/{contentType}/{contentID}.json
 	streamURL := fmt.Sprintf("%s/stream/%s/%s.json", addonURL, contentType, contentID)
 
+	// Apply URL mapping
+	streamURL = s.requestURLMapper.MapURL(streamURL)
+
 	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", streamURL, nil)
 	if err != nil {
@@ -68,20 +73,12 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	// Execute the request
 	resp, err := s.client.Do(req)
 	if err != nil {
-		log.WithError(err).
-			WithField("service_name", s.GetName()).
-			WithField("request_url", streamURL).
-			Warn("failed to execute addon stream request")
 		return nil, errors.Wrap(err, "failed to execute request")
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		log.WithField("service_name", s.GetName()).
-			WithField("request_url", streamURL).
-			WithField("status_code", resp.StatusCode).
-			Warn("addon returned non-200 status code")
 		return nil, errors.Errorf("addon returned status %d", resp.StatusCode)
 	}
 

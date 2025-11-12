@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
+	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 )
 
 // CompositeStream aggregates multiple stream services and makes parallel requests
@@ -124,7 +125,7 @@ func convertManifestURLToBaseURL(manifestURL string) string {
 }
 
 // NewAddonCompositeStreamsByUserID creates a CompositeStream by fetching all addon URLs for a user
-func NewAddonCompositeStreamsByUserID(ctx context.Context, db *pg.DB, client *http.Client, userID uuid.UUID, cache lazymap.LazyMap[*StreamsResponse], userAgent string) (*CompositeStream, error) {
+func NewAddonCompositeStreamsByUserID(ctx context.Context, db *pg.DB, client *http.Client, userID uuid.UUID, cache *lazymap.LazyMap[*StreamsResponse], userAgent string, requestURLMapper *rum.RequestURLMapper) (*CompositeStream, error) {
 	// Get all addon URLs for the user
 	addonUrls, err := models.GetUserStremioAddonUrls(ctx, db, userID)
 	if err != nil {
@@ -138,7 +139,7 @@ func NewAddonCompositeStreamsByUserID(ctx context.Context, db *pg.DB, client *ht
 		baseURL := convertManifestURLToBaseURL(addonUrl.Url)
 
 		// Create addon stream service with provided cache
-		addonService := NewAddonStream(client, baseURL, cache, userAgent)
+		addonService := NewAddonStream(client, baseURL, cache, userAgent, requestURLMapper)
 		services = append(services, addonService)
 	}
 

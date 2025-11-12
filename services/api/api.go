@@ -190,9 +190,9 @@ type Api struct {
 	cl                          *http.Client
 	domain                      string
 	expire                      int
-	torrentCache                lazymap.LazyMap[[]byte]
-	listResponseCache           lazymap.LazyMap[*ra.ListResponse]
-	resourcesCache              lazymap.LazyMap[*ra.ResourceResponse]
+	torrentCache                *lazymap.LazyMap[[]byte]
+	listResponseCache           *lazymap.LazyMap[*ra.ListResponse]
+	resourcesCache              *lazymap.LazyMap[*ra.ResourceResponse]
 	useInternalTorrentHTTPProxy bool
 	torrentHTTPProxyHost        string
 	torrentHTTPProxyPort        int

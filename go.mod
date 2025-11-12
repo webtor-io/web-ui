@@ -20,8 +20,8 @@ require (
 	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
 	github.com/webtor-io/claims-provider v0.0.0-20250814172004-af14e7f212d8
 	github.com/webtor-io/common-services v0.0.0-20251108105453-635ef47a01ea
-	github.com/webtor-io/lazymap v0.0.0-20251018143542-5573a1d3ca7d
-	github.com/webtor-io/rest-api v1.0.0
+	github.com/webtor-io/lazymap v0.0.0-20251112155450-24fcf0ad4b5d
+	github.com/webtor-io/rest-api v1.0.1-0.20251112155849-4fe937f800f4
 	github.com/yargevad/filepathx v1.0.0
 	golang.org/x/text v0.30.0
 	google.golang.org/grpc v1.76.0

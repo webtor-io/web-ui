@@ -240,7 +240,7 @@ func (s *Helper) Pwd(in string) string {
 }
 
 type AssetHashes struct {
-	lazymap.LazyMap[string]
+	*lazymap.LazyMap[string]
 	path string
 }
 

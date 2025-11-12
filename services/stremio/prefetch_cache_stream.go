@@ -32,7 +32,7 @@ type PrefetchCacheStream struct {
 	cacheIndex   *ci.CacheIndex
 	addonBaseURL string
 	userAgent    string
-	addonCache   lazymap.LazyMap[*StreamsResponse]
+	addonCache   *lazymap.LazyMap[*StreamsResponse]
 	api          *api.Api
 	claims       *api.Claims
 }

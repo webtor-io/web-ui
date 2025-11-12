@@ -15,34 +15,37 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 )
 
 type Builder struct {
-	pg            *cs.PG
-	cache         lazymap.LazyMap[*StreamsResponse]
-	domain        string
-	rapi          *api.Api
-	cl            *http.Client
-	userAgent     string
-	secret        string
-	cacheIndex    *ci.CacheIndex
-	cacheAddonURL string
+	pg               *cs.PG
+	cache            *lazymap.LazyMap[*StreamsResponse]
+	domain           string
+	rapi             *api.Api
+	cl               *http.Client
+	userAgent        string
+	secret           string
+	cacheIndex       *ci.CacheIndex
+	cacheAddonURL    string
+	requestURLMapper *rum.RequestURLMapper
 }
 
-func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, cacheIndex *ci.CacheIndex) *Builder {
+func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, cacheIndex *ci.CacheIndex, requestURLMapper *rum.RequestURLMapper) *Builder {
 	return &Builder{
 		pg: pg,
 		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
 			Expire:      1 * time.Minute,
 			ErrorExpire: 10 * time.Second,
 		}),
-		domain:        c.String(common.DomainFlag),
-		secret:        c.String(common.SessionSecretFlag),
-		rapi:          rapi,
-		cl:            cl,
-		userAgent:     c.String(StremioUserAgentFlag),
-		cacheIndex:    cacheIndex,
-		cacheAddonURL: c.String(StremioCacheAddonURLFlag),
+		domain:           c.String(common.DomainFlag),
+		secret:           c.String(common.SessionSecretFlag),
+		rapi:             rapi,
+		cl:               cl,
+		userAgent:        c.String(StremioUserAgentFlag),
+		cacheIndex:       cacheIndex,
+		cacheAddonURL:    c.String(StremioCacheAddonURLFlag),
+		requestURLMapper: requestURLMapper,
 	}
 }
 
@@ -75,7 +78,7 @@ func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, u.ID, s.cache, s.userAgent)
+	acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, u.ID, s.cache, s.userAgent, s.requestURLMapper)
 	if err != nil {
 		return nil, err
 	}

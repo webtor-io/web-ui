@@ -35,6 +35,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 
@@ -84,6 +85,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = geoip.RegisterFlags(c.Flags)
 	c.Flags = library.RegisterFlags(c.Flags)
 	c.Flags = embed.RegisterFlags(c.Flags)
+	c.Flags = rum.RegisterFlags(c.Flags)
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
@@ -284,9 +286,15 @@ func serve(c *cli.Context) error {
 	// Setting CacheIndex
 	cacheIndex := ci.New(c, pg)
 
+	// Setting RequestURLMapper
+	requestURLMapper, err := rum.NewRequestURLMapper(c)
+	if err != nil {
+		return err
+	}
+
 	// Setting StremioBuilder
 	stremioAddonCl := stremios.NewClient(c)
-	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, cacheIndex)
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, cacheIndex, requestURLMapper)
 
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
