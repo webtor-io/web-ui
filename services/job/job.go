@@ -54,6 +54,7 @@ type Job struct {
 	ID        string
 	Queue     string
 	l         []LogItem
+	lmux      sync.Mutex
 	runnable  Runnable
 	observers map[string]*Observer
 	closed    bool
@@ -223,14 +224,14 @@ func (s *Job) log(l LogItem) error {
 	l.Timestamp = time.Now()
 
 	// Protect access to s.cur and s.l with mutex
-	s.mux.Lock()
+	s.lmux.Lock()
 	if l.Level == InProgress {
 		s.cur = l.Tag
 	} else if l.Tag == "" {
 		l.Tag = s.cur
 	}
 	s.l = append(s.l, l)
-	s.mux.Unlock()
+	s.lmux.Unlock()
 
 	if s.main {
 		err := s.pubToStorage(l)
@@ -441,11 +442,11 @@ func (s *Jobs) Log(ctx context.Context, id string) (c chan LogItem, ok bool, err
 	}
 	go func() {
 		// Create a copy of the log items while holding the lock
-		j.mux.Lock()
+		j.lmux.Lock()
 		logItems := make([]LogItem, len(j.l))
 		copy(logItems, j.l)
 		closed := j.closed
-		j.mux.Unlock()
+		j.lmux.Unlock()
 
 		for _, i := range logItems {
 			c <- i
