@@ -221,12 +221,16 @@ func (s *Job) logToLogger(l LogItem) {
 
 func (s *Job) log(l LogItem) error {
 	l.Timestamp = time.Now()
+
+	// Protect access to s.cur and s.l with mutex
+	s.mux.Lock()
 	if l.Level == InProgress {
 		s.cur = l.Tag
 	} else if l.Tag == "" {
 		l.Tag = s.cur
 	}
 	s.l = append(s.l, l)
+	s.mux.Unlock()
 
 	if s.main {
 		err := s.pubToStorage(l)
@@ -436,10 +440,17 @@ func (s *Jobs) Log(ctx context.Context, id string) (c chan LogItem, ok bool, err
 		log.Infof("found local job with id=%+v", id)
 	}
 	go func() {
-		for _, i := range j.l {
+		// Create a copy of the log items while holding the lock
+		j.mux.Lock()
+		logItems := make([]LogItem, len(j.l))
+		copy(logItems, j.l)
+		closed := j.closed
+		j.mux.Unlock()
+
+		for _, i := range logItems {
 			c <- i
 		}
-		if j.closed {
+		if closed {
 			close(c)
 		} else {
 			o := j.ObserveLog()
