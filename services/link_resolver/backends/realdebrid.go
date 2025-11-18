@@ -157,12 +157,105 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 
 	// If torrent exists in library and is downloaded
 	if torrent != nil {
-		if torrent.Status == "downloaded" {
+		torrent, err = client.GetTorrentInfo(ctx, torrent.ID)
+		if err != nil {
+			return "", false, errors.Wrap(err, "failed to get torrent info")
+		}
+		if torrent.Status == "downloaded" || torrent.Status == "waiting_files_selection" {
 			// Find the file matching the path
 			var found bool
 			file, found = s.findMatchingFile(torrent.Files, path, true)
 			if !found {
-				return "", false, nil
+				err = client.DeleteTorrent(ctx, torrent.ID)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to delete torrent")
+				}
+				var host string
+				host, err = s.getAvailableHost(ctx, client)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to get available host")
+				}
+
+				magnetURL := fmt.Sprintf("magnet:?xt=urn:btih:%s", hash)
+				var addResp *rd.TorrentAddResponse
+				addResp, err = client.AddMagnet(ctx, magnetURL, host)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to add magnet")
+				}
+				var prevSelection []int
+				for _, f := range torrent.Files {
+					if f.Selected == 1 {
+						prevSelection = append(prevSelection, f.ID)
+					}
+				}
+				defer func(id string, sel []int) {
+					err = func(id string, sel []int) error {
+						err = client.DeleteTorrent(ctx, id)
+						if err != nil {
+							return errors.Wrap(err, "failed to delete torrent")
+						}
+						if len(sel) == 0 {
+							return nil
+						}
+						addResp, err = client.AddMagnet(ctx, magnetURL, host)
+						if err != nil {
+							return errors.Wrap(err, "failed to add magnet")
+						}
+						err = client.SelectTorrentFiles(ctx, addResp.ID, sel)
+						if err != nil {
+							return errors.Wrap(err, "failed to select file")
+						}
+						return nil
+					}(id, sel)
+					if err != nil {
+						log.WithError(err).
+							WithField("torrent_id", addResp.ID).
+							Warn("failed to delete unavailable torrent")
+					}
+					log.WithField("torrent_id", id).Debug("deleted torrent and added it back with previous selection")
+				}(addResp.ID, prevSelection)
+
+				// Get torrent info to find the file to select
+				addedTorrent, err := client.GetTorrentInfo(ctx, addResp.ID)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to get torrent info")
+				}
+
+				var found bool
+				file, found = s.findMatchingFile(addedTorrent.Files, path, false)
+
+				if !found {
+					return "", false, nil
+				}
+
+				selection := []int{file.ID}
+				// Append all previous files to the selection
+				for _, f := range prevSelection {
+					if f != file.ID {
+						selection = append(selection, f)
+					}
+				}
+				torrent = addedTorrent
+				// Select the file
+				err = client.SelectTorrentFiles(ctx, torrent.ID, selection)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to select file")
+				}
+
+				// Get updated torrent info to check status after selection
+				torrent, err = client.GetTorrentInfo(ctx, torrent.ID)
+				if err != nil {
+					return "", false, errors.Wrap(err, "failed to get torrent info after selection")
+				}
+
+				// If torrent is not downloaded, it's not available
+				if torrent.Status != "downloaded" {
+					log.WithFields(log.Fields{
+						"hash":   hash,
+						"status": torrent.Status,
+					}).Debug("torrent in library but not downloaded")
+					return "", false, nil
+				}
 			}
 			log.WithFields(log.Fields{
 				"hash":    hash,
@@ -179,7 +272,6 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 			return "", false, nil
 		}
 	} else {
-		// Step 2: Torrent not in library, add it by magnet
 		var host string
 		host, err = s.getAvailableHost(ctx, client)
 		if err != nil {
@@ -200,7 +292,6 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 					WithField("torrent_id", addResp.ID).
 					Warn("failed to delete unavailable torrent")
 			}
-
 		}()
 
 		// Get torrent info to find the file to select
@@ -237,12 +328,6 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 			return "", false, nil
 		}
 
-		// Verify the file is selected
-		file, found = s.findMatchingFile(torrent.Files, path, true)
-		if !found {
-			return "", false, nil
-		}
-
 		log.WithFields(log.Fields{
 			"hash":    hash,
 			"path":    path,
@@ -258,12 +343,22 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 		return "", false, errors.Wrap(err, "failed to get torrent info")
 	}
 
+	// Verify the file is selected
+	file, found := s.findMatchingFile(torrent.Files, path, true)
+	if !found {
+		return "", false, nil
+	}
+
 	// Find the target link by fileID
 	var targetLink string
-	for idx, f := range torrentInfo.Files {
-		if f.ID == file.ID && file.Selected == 1 && idx < len(torrentInfo.Links) {
-			targetLink = torrentInfo.Links[idx]
+	sidx := 0
+	for _, f := range torrentInfo.Files {
+		if f.ID == file.ID && f.Selected == 1 && sidx < len(torrentInfo.Links) {
+			targetLink = torrentInfo.Links[sidx]
 			break
+		}
+		if f.Selected == 1 {
+			sidx++
 		}
 	}
 
