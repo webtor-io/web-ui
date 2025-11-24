@@ -48,7 +48,7 @@ type Handler struct {
 	at            *at.AccessToken
 	pg            *cs.PG
 	claims        *claims.Claims
-	disableWebDav bool
+	disableWebDAV bool
 	disableEmbed  bool
 }
 
@@ -59,7 +59,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		ual:           ual,
 		pg:            pg,
 		claims:        cl,
-		disableWebDav: c.Bool(common.DisableWebDAVFlag),
+		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
 	r.GET("/profile", h.get)
@@ -162,7 +162,7 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		Error:                 qErr,
-		DisableWebDAV:         s.disableWebDav,
+		DisableWebDAV:         s.disableWebDAV,
 		DisableEmbed:          s.disableEmbed,
 	}))
 }
