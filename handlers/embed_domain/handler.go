@@ -23,6 +23,9 @@ type Handler struct {
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
+	if c.Bool(common.DisableEmbedFlag) {
+		return nil
+	}
 	d := c.String(common.DomainFlag)
 	if d != "" {
 		u, err := url.Parse(d)

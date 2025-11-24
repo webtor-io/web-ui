@@ -260,7 +260,7 @@ func serve(c *cli.Context) error {
 	wa.RegisterHandler(r, tm, jobs)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(r, tm, ats, ual, pg, uc)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
@@ -272,7 +272,7 @@ func serve(c *cli.Context) error {
 	wee.RegisterHandler(r, tm)
 
 	// Setting EmbedHandler
-	we.RegisterHandler(cl, r, tm, jobs, ds, sapi)
+	we.RegisterHandler(c, cl, r, tm, jobs, ds, sapi)
 
 	// Setting ExtHandler
 	ext.RegisterHandler(r, tm)
@@ -318,7 +318,7 @@ func serve(c *cli.Context) error {
 	backends.RegisterHandler(r, ats, pg, linkResolver)
 
 	// Setting WebDAV
-	webdav.RegisterHandler(r, pg, ats, sapi, jobs)
+	webdav.RegisterHandler(c, r, pg, ats, sapi, jobs)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/common"
 	j "github.com/webtor-io/web-ui/jobs"
@@ -13,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	co "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 	webdav "github.com/webtor-io/web-ui/services/webdav"
 )
@@ -24,7 +26,10 @@ type Handler struct {
 	wh   *webdav.Handler
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG, at *at.AccessToken, sapi *api.Api, jobs *j.Jobs) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, at *at.AccessToken, sapi *api.Api, jobs *j.Jobs) {
+	if c.Bool(co.DisableWebDAVFlag) {
+		return
+	}
 	fs := NewFileSystem(pg, sapi, jobs, "webdav")
 	wh := &webdav.Handler{FileSystem: fs}
 	h := &Handler{

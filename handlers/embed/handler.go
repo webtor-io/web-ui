@@ -3,8 +3,10 @@ package embed
 import (
 	"net/http"
 
+	"github.com/urfave/cli"
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +22,10 @@ type Handler struct {
 	api  *api.Api
 }
 
-func RegisterHandler(cl *http.Client, r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, ds *embed.DomainSettings, sapi *api.Api) {
+func RegisterHandler(c *cli.Context, cl *http.Client, r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, ds *embed.DomainSettings, sapi *api.Api) {
+	if c.Bool(common.DisableEmbedFlag) {
+		return
+	}
 	h := &Handler{
 		tb:   tm.MustRegisterViews("embed/*"),
 		jobs: jobs,

@@ -21,6 +21,8 @@ var (
 	SMTPSecureFlag    = "smtp-secure"
 	UseDirectLinks    = "use-direct-links"
 	SessionSecretFlag = "secret"
+	DisableWebDAVFlag = "disable-webdav"
+	DisableEmbedFlag  = "disable-embed"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -79,6 +81,16 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "session secret",
 			Value:  "secret123",
 			EnvVar: "SESSION_SECRET",
+		},
+		cli.BoolFlag{
+			Name:   DisableWebDAVFlag,
+			Usage:  "disable webdav",
+			EnvVar: "DISABLE_WEBDAV",
+		},
+		cli.BoolFlag{
+			Name:   DisableEmbedFlag,
+			Usage:  "disable embed",
+			EnvVar: "DISABLE_EMBED",
 		},
 	)
 

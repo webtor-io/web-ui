@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
@@ -37,23 +38,29 @@ type Data struct {
 	MinBitrateFor4KMbps   int64
 	Error                 error
 	ErrorLong             error
+	DisableWebDAV         bool
+	DisableEmbed          bool
 }
 
 type Handler struct {
-	tb     template.Builder[*web.Context]
-	ual    *ua.UrlAlias
-	at     *at.AccessToken
-	pg     *cs.PG
-	claims *claims.Claims
+	tb            template.Builder[*web.Context]
+	ual           *ua.UrlAlias
+	at            *at.AccessToken
+	pg            *cs.PG
+	claims        *claims.Claims
+	disableWebDav bool
+	disableEmbed  bool
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims) {
 	h := &Handler{
-		tb:     tm.MustRegisterViews("profile/*").WithLayout("main"),
-		at:     at,
-		ual:    ual,
-		pg:     pg,
-		claims: cl,
+		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
+		at:            at,
+		ual:           ual,
+		pg:            pg,
+		claims:        cl,
+		disableWebDav: c.Bool(common.DisableWebDAVFlag),
+		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
 	r.GET("/profile", h.get)
 }
@@ -155,5 +162,7 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		Error:                 qErr,
+		DisableWebDAV:         s.disableWebDav,
+		DisableEmbed:          s.disableEmbed,
 	}))
 }
