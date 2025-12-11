@@ -71,9 +71,7 @@ func (s *Claims) makeAdminClaims() *Data {
 		},
 	},
 		Claims: &proto.Claims{
-			Connection: &proto.Connection{
-				Rate: 0,
-			},
+			Connection: &proto.Connection{},
 			Embed: &proto.Embed{
 				NoAds: true,
 			},

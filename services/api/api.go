@@ -664,8 +664,8 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Da
 	if uc != nil {
 		cl.Role = uc.Context.Tier.Name
 		rate := uc.Claims.Connection.Rate
-		if rate > 0 {
-			cl.Rate = fmt.Sprintf("%dM", rate)
+		if rate != nil {
+			cl.Rate = fmt.Sprintf("%dM", *rate)
 		}
 	}
 
