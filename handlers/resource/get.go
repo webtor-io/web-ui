@@ -166,6 +166,7 @@ func (s *Handler) get(c *gin.Context) {
 		indexTpl.HTML(http.StatusNotFound, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "resource not found")))
 		return
 	}
+	c.Header("X-Robots-Tag", "noindex, follow")
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
 }
 
