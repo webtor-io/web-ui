@@ -357,8 +357,6 @@ func (s *Job) RenderTemplate(tag string, name string, body string) *Job {
 }
 
 func (s *Job) close() {
-	s.mux.Lock()
-	defer s.mux.Unlock()
 	if s.closed {
 		return
 	}
@@ -408,7 +406,9 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 		err := j.Run(ctx)
 		<-time.After(60 * time.Second)
 		if err != nil {
-			_ = s.storage.Drop(context.Background(), s.queue, id)
+			dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer dCancel()
+			_ = s.storage.Drop(dCtx, s.queue, id)
 			log.WithError(err).Error("got job error")
 		}
 		s.mux.Lock()
