@@ -118,7 +118,7 @@ export function init(window, config) {
         document.addEventListener(
             'click',
             async e => {
-                const isSpecialTag = tagName => ['BUTTON', 'A'].includes(tagName);
+                const isSpecialTag = tagName => ['BUTTON', 'A', 'LABEL'].includes(tagName);
 
                 const trackElement = async el => {
                     const attr = el.getAttribute.bind(el);
@@ -177,6 +177,8 @@ export function init(window, config) {
                                 });
                             }
                         } else if (parentElement.tagName === 'BUTTON') {
+                            return trackElement(parentElement);
+                        } else if (parentElement.tagName === 'LABEL') {
                             return trackElement(parentElement);
                         }
                     }
