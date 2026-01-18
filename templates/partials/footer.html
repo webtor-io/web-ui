@@ -2,10 +2,9 @@
     <footer class="footer sm:footer-horizontal text-base-content p-5 mt-5">
         <nav>
             <h6 class="footer-title">Tools</h6>
-            <a class="link link-hover" href="/torrent-to-ddl" data-async-target="main">Torrent → DDL</a>
-            <a class="link link-hover" href="/torrent-to-zip" data-async-target="main">Torrent → ZIP</a>
-            <a class="link link-hover" href="/magnet-to-ddl" data-async-target="main">Magnet → DDL</a>
-            <a class="link link-hover" href="/magnet-to-torrent" data-async-target="main">Magnet → Torrent</a>
+            {{ range tools }}
+                <a class="link link-hover" href="/{{ .Url }}" data-async-target="main">{{ .Title }}</a>
+            {{ end }}
         </nav>
         <nav>
             <h6 class="footer-title">Resources</h6>

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	hc "github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/common"
@@ -292,4 +293,19 @@ func (s *Helper) ProfileName(u *auth.User) string {
 		return "profile"
 	}
 	return u.Email
+}
+
+// KebabToSnake converts kebab-case strings to snake_case
+func (s *Helper) KebabToSnake(str string) string {
+	return strings.ReplaceAll(str, "-", "_")
+}
+
+// Printf formats a string using fmt.Sprintf
+func (s *Helper) Printf(format string, args ...any) string {
+	return fmt.Sprintf(format, args...)
+}
+
+// Tools returns the list of all available tool pages
+func (s *Helper) Tools() []hc.Tool {
+	return hc.Tools
 }

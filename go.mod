@@ -48,7 +48,6 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/snowdreamtech/redistore v0.0.0-20231007100540-6364ca2c97b4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/image v0.32.0 // indirect

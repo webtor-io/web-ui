@@ -55,7 +55,28 @@ func (s *View) makeTemplate() (t *template.Template, err error) {
 	}
 	templates = append(templates, s.Path)
 	templates = append(templates, s.Partials...)
-	return t.Funcs(s.Funcs).ParseFiles(templates...)
+
+	// Create a pointer to hold the parsed template for the dynamicTemplate function
+	var parsedTemplate *template.Template
+
+	// Add the "dynamicTemplate" function that dynamically executes templates by name
+	funcs := make(FuncMap)
+	for k, v := range s.Funcs {
+		funcs[k] = v
+	}
+	funcs["dynamicTemplate"] = func(name string, data any) (template.HTML, error) {
+		if parsedTemplate == nil {
+			return "", errors.New("template not yet parsed")
+		}
+		var buf bytes.Buffer
+		if err := parsedTemplate.ExecuteTemplate(&buf, name, data); err != nil {
+			return "", err
+		}
+		return template.HTML(buf.String()), nil
+	}
+
+	parsedTemplate, err = t.Funcs(funcs).ParseFiles(templates...)
+	return parsedTemplate, err
 }
 
 func (s *View) makeTemplateName() string {

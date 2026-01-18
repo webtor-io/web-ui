@@ -5,6 +5,7 @@
         <span>web</span><span class="text-accent">tor</span>
     </a>
 </div>
+{{ template "about_header" .Data }}
 {{ if .Err }}
 <div class="progress-alert progress-alert-oneline mb-10 closeable">
     <pre>{{ .Err | log | shortErr }}</pre>
