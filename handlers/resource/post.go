@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	sv "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
@@ -69,6 +70,7 @@ type PostData struct {
 	Job         *job.Job
 	Args        *PostArgs
 	Instruction string
+	Tool        *common.Tool
 }
 
 func (s *Handler) post(c *gin.Context) {

@@ -1,4 +1,4 @@
-{{ define "title" }}Download and play torrents{{ end }}
+{{ define "title" }}{{ with .Data }}{{ if .Tool }}{{ .Tool.Title }} – {{ .Tool.Benefit }}{{ else }}Download and play torrents{{ end }}{{ end }}{{ end }}
 {{ define "main" }}
 <div class="text-center py-12 font-baskerville text-7xl">
     <a href="/" data-async-target="main">
