@@ -20,6 +20,7 @@ import (
 	p "github.com/webtor-io/web-ui/handlers/profile"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	sess "github.com/webtor-io/web-ui/handlers/session"
+	"github.com/webtor-io/web-ui/handlers/sitemap"
 	sta "github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/handlers/streaming/backends"
 	"github.com/webtor-io/web-ui/handlers/stremio"
@@ -255,6 +256,9 @@ func serve(c *cli.Context) error {
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm)
+
+	// Setting SitemapHandler
+	sitemap.RegisterHandler(c, r)
 
 	// Setting ActionHandler
 	wa.RegisterHandler(r, tm, jobs)

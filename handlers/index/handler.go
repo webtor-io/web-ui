@@ -1,9 +1,11 @@
 package index
 
 import (
-	"github.com/webtor-io/web-ui/services/web"
 	"net/http"
 	"strings"
+
+	"github.com/webtor-io/web-ui/handlers/common"
+	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/services/template"
@@ -22,10 +24,9 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 		tb: tm.MustRegisterViews("*").WithLayout("main"),
 	}
 	r.GET("/", h.index)
-	r.GET("/torrent-to-ddl", h.index)
-	r.GET("/torrent-to-zip", h.index)
-	r.GET("/magnet-to-ddl", h.index)
-	r.GET("/magnet-to-torrent", h.index)
+	for _, tool := range common.Tools {
+		r.GET("/"+tool.Url, h.index)
+	}
 }
 
 func (s *Handler) index(c *gin.Context) {

@@ -1,62 +1,18 @@
+{{ define "about_header" }}
+{{ $instruction := .Instruction | kebabToSnake }}
+{{ if eq $instruction "" }}{{ $instruction = "default" }}{{ end }}
+{{ dynamicTemplate (printf "about_instruction_%s_header" $instruction ) . }}
+{{ end }}
+
 {{ define "about" }}
-<div class="hero bg-base-200 mt-12">
-    <div class="hero-content text-center">
-        <div>
-            {{ if or (eq .Instruction "torrent-to-ddl") (eq .Instruction "") }}
-            <h2 class="text-2xl font-bold text-accent">How to download torrents with <strong>Webtor.io</strong></h2>
-            <p class="py-6 text-justify">
-                With <strong>Webtor.io</strong> it is easy to convert your torrent-file or magnet-url into direct download link
-                in 3&nbsp;simple steps without need to use torrent-client:
-            </p>
-            <ol class="list-decimal text-justify pl-8">
-                <li>Locate the torrent file on your computer</li>
-                <li>Upload it to <strong>Webtor.io</strong></li>
-                <li>Click on the file link to download</li>
-            </ol>
-            {{ end }}
-            {{ if eq .Instruction "torrent-to-zip" }}
-                <h2 class="text-2xl font-bold text-accent">How to download torrents with <strong>Webtor.io</strong> as ZIP-archive</h2>
-                <p class="py-6 text-justify">
-                    With <strong>Webtor.io</strong> it is easy to download content of your torrent-file or magnet-url
-                    as ZIP-archive in 3&nbsp;simple steps without need to use torrent-client:
-                </p>
-                <ol class="list-decimal text-justify pl-8">
-                    <li>Locate the torrent file on your computer</li>
-                    <li>Upload it to <strong>Webtor.io</strong></li>
-                    <li>Scroll down to the bottom and click <strong>Download Directory As ZIP</strong></li>
-                </ol>
-            {{ end }}
-            {{ if eq .Instruction "magnet-to-ddl" }}
-                <h2 class="text-2xl font-bold text-accent">How to download magnets with <strong>Webtor.io</strong></h2>
-                <p class="py-6 text-justify">
-                    With <strong>Webtor.io</strong> it is easy to convert your torrent-file or magnet-url into direct download link
-                    in 3&nbsp;simple steps without need to use torrent-client:
-                </p>
-                <ol class="list-decimal text-justify pl-8">
-                    <li>Paste your magnet-url into text-field</li>
-                    <li>Click <strong>Search</strong> button</li>
-                    <li>Click on the file link to download</li>
-                </ol>
-            {{ end }}
-            {{ if eq .Instruction "magnet-to-torrent" }}
-                <h2 class="text-2xl font-bold text-accent">How to convert magnets to torrents with <strong>Webtor.io</strong></h2>
-                <p class="py-6 text-justify">
-                    With <strong>Webtor.io</strong> it is easy to convert your magnet-url into torrent file
-                    in 3&nbsp;simple steps without need to use torrent-client:
-                </p>
-                <ol class="list-decimal text-justify pl-8">
-                    <li>Paste your magnet-url into text-field</li>
-                    <li>Click <strong>Search</strong> button</li>
-                    <li>Scroll bottom and click <strong>Download Torrent File</strong> button</li>
-                </ol>
-            {{ end }}
-        </div>
-    </div>
-</div>
+{{ $instruction := .Instruction | kebabToSnake }}
+{{ if eq $instruction "" }}{{ $instruction = "default" }}{{ end }}
+{{ dynamicTemplate (printf "about_instruction_%s_description" $instruction ) . }}
+{{ dynamicTemplate (printf "about_instruction_%s_how_to" $instruction) . }}
 <div class="hero bg-base-200 mt-10">
     <div class="hero-content text-center">
         <div>
-            <h2 class="text-2xl font-bold text-accent">Feature list</h2>
+            <h2 class="text-2xl font-bold text-accent">Full feature list</h2>
             <p class="pt-6 text-justify">
                 <strong class="text-accent">Direct Download Link (DDL)</strong> - select any file inside torrent and download it without VPN and torrent-client.
             </p>
