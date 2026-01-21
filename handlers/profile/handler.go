@@ -14,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,7 @@ type Data struct {
 	AvailableBackendTypes []BackendTypeInfo
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
+	VaultStats            *vault.UserStats
 	Error                 error
 	ErrorLong             error
 	DisableWebDAV         bool
@@ -48,17 +50,19 @@ type Handler struct {
 	at            *at.AccessToken
 	pg            *cs.PG
 	claims        *claims.Claims
+	vault         *vault.Vault
 	disableWebDAV bool
 	disableEmbed  bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault) {
 	h := &Handler{
 		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:            at,
 		ual:           ual,
 		pg:            pg,
 		claims:        cl,
+		vault:         v,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
@@ -148,6 +152,16 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	// Get vault statistics if vault service is available
+	var vaultStats *vault.UserStats
+	if s.vault != nil {
+		vaultStats, err = s.vault.GetUserStats(c.Request.Context(), u)
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+	}
+
 	var qErr error
 	if c.Query("err") != "" {
 		qErr = errors.New(c.Query("err"))
@@ -161,6 +175,7 @@ func (s *Handler) get(c *gin.Context) {
 		StremioSettings:       ss,
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
+		VaultStats:            vaultStats,
 		Error:                 qErr,
 		DisableWebDAV:         s.disableWebDAV,
 		DisableEmbed:          s.disableEmbed,

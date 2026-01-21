@@ -39,6 +39,7 @@ import (
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	"github.com/webtor-io/web-ui/services/vault"
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
@@ -91,6 +92,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
 	c.Flags = ci.RegisterFlags(c.Flags)
+	c.Flags = vault.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -263,8 +265,11 @@ func serve(c *cli.Context) error {
 	// Setting ActionHandler
 	wa.RegisterHandler(r, tm, jobs)
 
+	// Setting Vault
+	v := vault.New(c, uc, cl, pg)
+
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
