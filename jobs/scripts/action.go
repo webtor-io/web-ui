@@ -11,11 +11,11 @@ import (
 
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
 
-	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/template"
@@ -249,7 +249,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		limitEnd = size - limitStart
 	}
 	if size > 0 {
-		j.InProgress(fmt.Sprintf("%v, downloading %v", m, humanize.IBytes(uint64(limitStart+limitEnd))))
+		j.InProgress(fmt.Sprintf("%v, downloading %v", m, helpers.Bytes(uint64(limitStart+limitEnd))))
 	} else {
 		j.InProgress(m)
 	}
