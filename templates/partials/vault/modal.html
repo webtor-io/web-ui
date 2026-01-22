@@ -1,0 +1,88 @@
+{{ define "vault/modal" }}
+	{{ if and (.User | hasAuth) .Data.Vault }}
+		{{ with .Data }}
+			<div id="pledge-form" data-async-layout="{{`{{ template "vault/modal" . }}`}}">
+				{{ if .VaultForm }}
+					<dialog class="modal" open>
+						<div class="modal-box">
+							<h3 class="text-2xl font-bold text-accent w-full">Keep This Torrent Available</h3>
+							
+							{{ if .VaultForm.Available }}
+								{{ if ge .VaultForm.Available .VaultForm.Required }}
+									<p class="py-4">
+										You have enough Vault Points to store this torrent in the Vault.
+									</p>
+								{{ else }}
+									<p class="py-4">
+										You don't have enough Vault Points to store this torrent.
+									</p>
+									<p class="pb-4">
+										Try upgrading your subscription to the next tier to get more Vault Points.
+										<a href="/donate" target="_blank" class="link link-accent" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
+									</p>
+								{{ end }}
+							{{ else }}
+								<p class="py-4">
+									You have unlimited Vault Points. You can store this torrent in the Vault.
+								</p>
+							{{ end }}
+
+ 						<div class="py-4">
+ 							<table class="table table-sm">
+ 								<tbody>
+ 									<tr>
+ 										<td class="font-semibold">Torrent Size GB:</td>
+ 										<td>{{ printf "%.2f" .VaultForm.Required }}</td>
+ 									</tr>
+ 									<tr>
+ 										<td class="font-semibold">Required VP:</td>
+ 										<td>{{ printf "%.2f" .VaultForm.Required }}</td>
+ 									</tr>
+ 									<tr>
+ 										<td class="font-semibold">Your Available VP:</td>
+ 										<td>
+ 											{{ if .VaultForm.Available }}
+ 												{{ printf "%.2f" .VaultForm.Available }}
+ 											{{ else }}
+ 												Unlimited
+ 											{{ end }}
+ 										</td>
+ 									</tr>
+ 									<tr>
+ 										<td class="font-semibold">Your Total VP:</td>
+ 										<td>
+ 											{{ if .VaultForm.Total }}
+ 												{{ printf "%.2f" .VaultForm.Total }}
+ 											{{ else }}
+ 												Unlimited
+ 											{{ end }}
+ 										</td>
+ 									</tr>
+ 								</tbody>
+ 							</table>
+ 						</div>
+							<div class="text-left w-full text-sm text-accent mt-2">
+								<span class="text-accent">ⓘ</span>
+								<a href="/instructions/vault" class="hover:underline" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
+							</div>
+
+ 						<div class="modal-action justify-center">
+ 							{{ if or (not .VaultForm.Available) (ge .VaultForm.Available .VaultForm.Required) }}
+ 								<button class="btn btn-accent" id="vault-store-confirm" data-umami-event="vault-store-confirmed">
+ 									Store in Vault
+ 								</button>
+ 							{{ end }}
+ 							<form method="dialog">
+ 								<button class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-cancelled">Cancel</button>
+ 							</form>
+ 						</div>
+						</div>
+						<form method="dialog" class="modal-backdrop">
+							<button>close</button>
+						</form>
+					</dialog>
+				{{ end }}
+			</div>
+		{{ end }}
+	{{ end }}
+{{ end }}

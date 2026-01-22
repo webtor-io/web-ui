@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
@@ -268,6 +269,103 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 	}
 
 	return stats, nil
+}
+
+// CreatePledge creates a new pledge for a resource
+func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vaultModels.Resource) (*vaultModels.Pledge, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	// Execute in transaction
+	var result *vaultModels.Pledge
+	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+		// Lock user VP for update
+		userVP := &vaultModels.UserVP{}
+		err := tx.Model(userVP).
+			Where("user_id = ?", user.ID).
+			For("UPDATE").
+			Select()
+
+		if err != nil {
+			if errors.Is(err, pg.ErrNoRows) {
+				return errors.New("user vault points not found")
+			}
+			return errors.Wrap(err, "failed to lock user vault points")
+		}
+
+		// Check if user has unlimited VP (Total = nil)
+		if userVP.Total == nil {
+			// Unlimited VP - allow pledge creation
+		} else {
+			// Calculate available VP
+			// Get all funded pledges for user
+			var pledges []vaultModels.Pledge
+			err := tx.Model(&pledges).
+				Context(ctx).
+				Where("user_id = ?", user.ID).
+				Select()
+			if err != nil {
+				return errors.Wrap(err, "failed to get user pledges")
+			}
+
+			// Sum funded pledges
+			fundedSum := float64(0)
+			for _, pledge := range pledges {
+				if pledge.Funded {
+					fundedSum += pledge.Amount
+				}
+			}
+
+			available := *userVP.Total - fundedSum
+
+			// Check if user has enough available VP
+			if available < resource.RequiredVP {
+				return errors.New("insufficient vault points")
+			}
+		}
+
+		// Create pledge with Funded=true, Frozen=true, FundedAt=now()
+		now := time.Now()
+		pledge := &vaultModels.Pledge{
+			UserID:     user.ID,
+			ResourceID: resource.ResourceID,
+			Amount:     resource.RequiredVP,
+			Funded:     true,
+			Frozen:     true,
+			FrozenAt:   now,
+		}
+
+		_, err = tx.Model(pledge).
+			Context(ctx).
+			Insert()
+		if err != nil {
+			return errors.Wrap(err, "failed to create pledge")
+		}
+
+		// Create tx_log entry with OpTypeFund (negative balance)
+		// OpTypeFund is always negative according to documentation
+		txLog := &vaultModels.TxLog{
+			UserID:     user.ID,
+			ResourceID: &resource.ResourceID,
+			Balance:    -resource.RequiredVP,
+			OpType:     vaultModels.OpTypeFund,
+		}
+		_, err = tx.Model(txLog).Context(ctx).Insert()
+		if err != nil {
+			return errors.Wrap(err, "failed to create fund log")
+		}
+
+		result = pledge
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // pointsEqual compares two *float64 values, treating nil as distinct from any number

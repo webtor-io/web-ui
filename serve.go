@@ -253,8 +253,11 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
+	// Setting Vault
+	v := vault.New(c, uc, cl, pg)
+
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm)
@@ -264,9 +267,6 @@ func serve(c *cli.Context) error {
 
 	// Setting ActionHandler
 	wa.RegisterHandler(r, tm, jobs)
-
-	// Setting Vault
-	v := vault.New(c, uc, cl, pg)
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v)

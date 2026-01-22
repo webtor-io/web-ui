@@ -1,5 +1,22 @@
 Project development guidelines (advanced)
 
+Documentation
+- **Before starting work on any feature or component, always check the docs/ directory first**
+  - The docs/ folder contains comprehensive technical specifications and architecture documentation
+  - Each major feature has its own documentation file (e.g., docs/vault.md for the Vault system)
+  - Documentation includes:
+    - Database schemas and data models
+    - Business logic and workflows
+    - API specifications and integration points
+    - Constraints, rules, and edge cases
+  - Reading the relevant documentation before implementation helps avoid mistakes and ensures consistency with the existing architecture
+  - If documentation is missing or outdated for a feature you're working on, consider updating it as part of your work
+- **After completing any task, always update the relevant documentation in docs/ directory**
+  - When adding new methods, functions, or services, document their signatures, parameters, algorithms, and error handling
+  - When modifying existing functionality, update the corresponding documentation to reflect the changes
+  - When adding new database tables or models, update the schema documentation and model descriptions
+  - Documentation updates are a mandatory part of task completion, not an optional step
+
 Build and configuration
 - Toolchain versions
   - Go: go 1.24.x (module file declares 1.24.5). The project is a single Go module: github.com/webtor-io/web-ui.

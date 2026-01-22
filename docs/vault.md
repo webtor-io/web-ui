@@ -405,6 +405,60 @@ type UserStats struct {
 - Returns error if `UpdateUserVP` fails
 - Returns error if fetching pledges fails
 
+#### Method `CreatePledge`
+
+Creates a new pledge for a resource, deducting the required VP from user's available balance.
+
+**Signature:**
+```go
+func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vaultModels.Resource) (*vaultModels.Pledge, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `user` — authenticated user making the pledge (`*auth.User`)
+- `resource` — resource to pledge to (`*vaultModels.Resource`)
+
+**Algorithm:**
+1. Execute in database transaction with row locking:
+   - **Lock user's VP row** using `SELECT FOR UPDATE` to prevent concurrent modifications
+   - **Check if user has sufficient VP:**
+     - If `user_vp.total = nil` (unlimited) → allow pledge creation
+     - If `user_vp.total != nil` (limited):
+       - Fetch all user's pledges
+       - Calculate `fundedSum` = sum of all pledges where `funded = true`
+       - Calculate `available = total - fundedSum`
+       - If `available < resource.RequiredVP` → return error "insufficient vault points"
+   - **Create pledge record:**
+     - `user_id` = user's ID
+     - `resource_id` = resource's ID
+     - `amount` = `resource.RequiredVP`
+     - `funded` = `true` (pledge is active)
+     - `frozen` = `true` (pledge is frozen, cannot be claimed)
+     - `frozen_at` = `now()` (freeze timestamp)
+   - **Create transaction log entry:**
+     - `user_id` = user's ID
+     - `resource_id` = resource's ID
+     - `balance` = `-resource.RequiredVP` (negative, as VP is deducted)
+     - `op_type` = `OpTypeFund` (2)
+2. Return created pledge or error
+
+**Features:**
+- Uses `SELECT FOR UPDATE` to prevent race conditions during concurrent pledge creation
+- Pledges are created as funded and frozen by default
+- Freeze period is 1 day (enforced by business logic, not in this method)
+- For unlimited accounts (NULL total), no balance check is performed
+- Transaction log entry is always created with negative balance (OpTypeFund)
+- All operations are atomic within a single database transaction
+
+**Error Handling:**
+- Returns error if database connection is unavailable
+- Returns error if user VP record not found
+- Returns error if user has insufficient available VP
+- Returns error if pledge creation fails
+- Returns error if transaction log creation fails
+- Returns error if transaction fails at any step
+
 ## Processes and Use Cases
 
 ### 1. Creating a Pledge (Fund)
@@ -618,6 +672,148 @@ Integration with long-term storage service is planned:
 - When `funded = true` is reached, resource is queued for vaulting
 - After successful vaulting, `vaulted = true` is set
 - Storage notifies vault about the need to unfreeze pledges
+
+## UI Components
+
+The Vault system includes UI components for user interaction with the vault functionality on resource pages.
+
+### Vault Button (`templates/partials/vault/button.html`)
+
+A button component that allows authenticated users to initiate the vault pledge process.
+
+**Location:** Displayed on resource pages (torrents) for authenticated users when vault service is available.
+
+**Behavior:**
+- Renders only if user is authenticated (`hasAuth`) and vault service is available (`.Data.Vault = true`)
+- Submits a GET form asynchronously to the current URL with parameter `pledge-form=true`
+- Uses `data-async-target="#pledge-form"` and `data-async-push-state="false"` for progressive enhancement
+- Includes Umami analytics tracking with `data-umami-event="vault-clicked"`
+
+**Template Structure:**
+```html
+{{ define "vault/button" }}
+	{{ if and (.User | hasAuth) .Data.Vault }}
+		<form method="get" data-async-target="#pledge-form" data-async-push-state="false">
+			<input type="hidden" name="pledge-form" value="true" />
+			<button type="submit" class="btn btn-accent btn-outline" data-umami-event="vault-clicked">
+				Keep This Torrent Available
+			</button>
+		</form>
+	{{ end }}
+{{ end }}
+```
+
+**Associated JavaScript:** `assets/src/js/app/vault/button.js` — handles form submission and modal interaction.
+
+### Vault Modal (`templates/partials/vault/modal.html`)
+
+A modal dialog that displays vault points information and allows users to confirm or cancel the pledge.
+
+**Location:** Rendered on resource pages, opens when user clicks the vault button.
+
+**Behavior:**
+- Renders only if user is authenticated and vault service is available
+- Opens automatically when `VaultForm` data is present (when `pledge-form=true` parameter is processed)
+- Uses DaisyUI modal component with `open` attribute for automatic display
+- Wrapped in `<div id="pledge-form">` with `data-async-layout` for dynamic updates
+
+**Display Logic:**
+
+1. **Sufficient Points (Available >= RequiredVP or Unlimited):**
+   - Message: "You have enough Vault Points to store this torrent in the Vault."
+   - Shows "Store in Vault" button (currently UI-only, action to be implemented)
+   - Shows "Cancel" button to close modal
+
+2. **Insufficient Points (Available < RequiredVP):**
+   - Message: "You don't have enough Vault Points to store this torrent."
+   - Suggests upgrading subscription with link to `/donate` (opens in new tab)
+   - Shows only "Cancel" button (no "Store in Vault" button)
+
+**Information Table:**
+- **Required VP:** Amount of VP needed to vault the resource (calculated from total torrent size)
+- **Your Available VP:** User's available VP (or "Unlimited" if null)
+- **Your Total VP:** User's total VP (or "Unlimited" if null)
+
+**Additional Elements:**
+- Link to `/instructions/vault` with text "What is Vault?" (opens in new tab)
+- Umami analytics tracking:
+  - `data-umami-event="vault-store-confirmed"` on "Store in Vault" button
+  - `data-umami-event="vault-cancelled"` on "Cancel" button
+  - `data-umami-event="vault-upgrade-clicked"` on "Upgrade subscription" link
+  - `data-umami-event="instruction-vault"` on "What is Vault?" link
+
+### Handler Integration (`handlers/resource/get.go`)
+
+The resource GET handler integrates vault functionality to display the modal with calculated VP requirements.
+
+**VaultForm Structure:**
+```go
+type VaultForm struct {
+	Available  *float64 // User's available VP (nil if unlimited)
+	Total      *float64 // User's total VP (nil if unlimited)
+	RequiredVP float64  // Required VP for this resource
+}
+```
+
+**GetData Structure:**
+```go
+type GetData struct {
+	Args        *GetArgs
+	Resource    *ExtendedResource
+	List        *ra.ListResponse
+	Item        *ra.ListItem
+	Instruction string
+	VaultForm   *VaultForm // Present when pledge-form=true
+	Vault       bool       // True if vault service is available
+}
+```
+
+**Handler Logic:**
+
+1. **Vault Availability Check:**
+   - Sets `d.Vault = s.vault != nil` to indicate if vault service is configured
+   - This flag controls visibility of vault button and modal in templates
+
+2. **Pledge Form Processing (when `pledge-form=true`):**
+   - Checks if vault service is available (`s.vault != nil`)
+   - Checks if user is authenticated (`args.User.HasAuth()`)
+   - Calls `prepareVaultForm` to calculate VP requirements:
+     - Gets user vault stats via `s.vault.GetUserStats(ctx, args.User)`
+     - Lists all resource content via REST API to calculate total size
+     - Converts total size to VP (1 VP = 1 GB)
+     - Returns `VaultForm` with Available, Total, and RequiredVP
+   - Sets `d.VaultForm` which triggers modal display in template
+
+**VP Calculation:**
+- Fetches all items in the resource using `api.ListResourceContentCached` with `Output: api.OutputList`
+- Sums up `item.Size` for all items to get total bytes
+- Converts bytes to VP: `requiredVP = totalSize / (1024 * 1024 * 1024)`
+- 1 VP = 1 GB of torrent size
+
+**Error Handling:**
+- Returns 500 error if vault stats cannot be fetched
+- Returns 500 error if resource content cannot be listed
+- Wraps errors with context for debugging
+
+### Template Integration (`templates/views/resource/get.html`)
+
+The resource view template includes both vault components:
+
+```html
+{{ template "vault/button" $ }}
+...
+{{ template "vault/modal" . }}
+```
+
+**Rendering Order:**
+1. Vault button is displayed in the main content area (before file list)
+2. Vault modal is rendered at the end of the template (after all content)
+3. Modal opens automatically when `VaultForm` is present in data
+
+**Progressive Enhancement:**
+- Button works without JavaScript (submits GET form)
+- With JavaScript, form submission is asynchronous and updates only the modal area
+- Modal can be closed by clicking backdrop or Cancel button
 
 ## Future Improvements
 

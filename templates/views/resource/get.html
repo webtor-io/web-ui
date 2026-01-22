@@ -19,7 +19,7 @@
 {{ if and .Item .List }}
 <div class="divider h-0"></div>
 {{ end }}
-{{ template "keep_available/button" $ }}
+{{ template "vault/button" $ }}
 {{ if .List }}
 <div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
 {{ template "list" $ }}
@@ -35,7 +35,7 @@
 </div>
 <div id="log-{{ .Resource.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 {{ end }}
-{{ template "keep_available/modal" . }}
+{{ template "vault/modal" . }}
 {{ template "get_extra" . }}
 {{ "resource/get.js" | asset }}
 {{ end }}
