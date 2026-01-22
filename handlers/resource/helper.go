@@ -71,7 +71,7 @@ func (s *Helper) MakeResourceButton(ctx *w.Context, gd *GetData, name string, ac
 
 func (s *Helper) MakeFileDownload(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeButton(ctx, gd,
-		fmt.Sprintf("Download [%v]", h.Bytes(uint64(gd.Item.Size))),
+		fmt.Sprintf("Download [%v]", h.IBytes(uint64(gd.Item.Size))),
 		"download",
 		"/download-file",
 	)
@@ -102,7 +102,7 @@ func (s *Helper) MakeVideo(ctx *w.Context, gd *GetData) *ButtonItem {
 
 func (s *Helper) MakeDirDownload(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeDirButton(ctx, gd,
-		fmt.Sprintf("Download Directory as ZIP [%v]", h.Bytes(uint64(gd.List.Size))),
+		fmt.Sprintf("Download Directory as ZIP [%v]", h.IBytes(uint64(gd.List.Size))),
 		"download-dir",
 		"/download-dir",
 	)

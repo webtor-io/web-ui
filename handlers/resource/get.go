@@ -164,14 +164,8 @@ func (s *Handler) prepareVaultForm(ctx context.Context, args *GetArgs, res *ra.R
 		return nil, errors.Wrap(err, "failed to list resource content")
 	}
 
-	// Calculate total size from all items
-	var totalSize int64
-	for _, item := range list.Items {
-		totalSize += item.Size
-	}
-
 	// Convert bytes to VP (assuming 1 VP per GB)
-	requiredVP := float64(totalSize) / (1024 * 1024 * 1024)
+	requiredVP := float64(list.Size) / (1024 * 1024 * 1024)
 
 	return &VaultForm{
 		Available: stats.Available,
