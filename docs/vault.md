@@ -307,10 +307,11 @@ Main service for working with the Vault Points system.
 - Claims service (`services/claims`) — for getting user tier and VP information
 - HTTP client — for future API calls to vault service
 - PostgreSQL database (`common-services/PG`) — for database operations
+- REST API service (`services/api`) — for accessing torrent metadata and calculating required VP
 
 **Constructor:**
 ```go
-func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG) *Vault
+func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault
 ```
 
 Returns `nil` if `VAULT_SERVICE_HOST` or `VAULT_SERVICE_PORT` is not configured.
@@ -458,6 +459,40 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 - Returns error if pledge creation fails
 - Returns error if transaction log creation fails
 - Returns error if transaction fails at any step
+
+#### Method `GetRequiredVP`
+
+Calculates the required vault points for a resource based on its total size.
+
+**Signature:**
+```go
+func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceID string) (float64, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `claims` — API claims for authentication (`*api.Claims`)
+- `resourceID` — resource identifier (torrent hash)
+
+**Algorithm:**
+1. Call REST API to list all resource content using `ListResourceContentCached` with `Output: api.OutputList`
+2. Get total size in bytes from the response (`list.Size`)
+3. Convert bytes to VP using formula: `requiredVP = totalSize / (1024 * 1024 * 1024)`
+4. Return calculated VP amount
+
+**Features:**
+- Uses cached REST API call for performance
+- Conversion rate: **1 VP = 1 GB** of torrent size
+- Result is returned as float64 for precision
+- Does not access database, only REST API
+
+**Error Handling:**
+- Returns error if REST API call fails
+- Returns error if resource content cannot be listed
+- Wraps errors with context for debugging
+
+**Usage:**
+This method is used by handlers to calculate VP requirements before displaying vault forms to users. It encapsulates the logic of size calculation within the Vault service, keeping handlers clean and focused on request/response handling.
 
 ## Processes and Use Cases
 
@@ -749,9 +784,10 @@ The resource GET handler integrates vault functionality to display the modal wit
 **VaultForm Structure:**
 ```go
 type VaultForm struct {
-	Available  *float64 // User's available VP (nil if unlimited)
-	Total      *float64 // User's total VP (nil if unlimited)
-	RequiredVP float64  // Required VP for this resource
+	Available     *float64 // User's available VP (nil if unlimited)
+	Total         *float64 // User's total VP (nil if unlimited)
+	Required      float64  // Required VP for this resource
+	TorrentSizeGB float64  // Torrent size in GB
 }
 ```
 
@@ -779,16 +815,16 @@ type GetData struct {
    - Checks if user is authenticated (`args.User.HasAuth()`)
    - Calls `prepareVaultForm` to calculate VP requirements:
      - Gets user vault stats via `s.vault.GetUserStats(ctx, args.User)`
-     - Lists all resource content via REST API to calculate total size
-     - Converts total size to VP (1 VP = 1 GB)
-     - Returns `VaultForm` with Available, Total, and RequiredVP
+     - Gets required VP via `s.vault.GetRequiredVP(ctx, args.Claims, args.ID)` (encapsulated in Vault service)
+     - Gets torrent size separately via REST API `api.ListResourceContentCached` with `Output: api.OutputList`
+     - Converts total size to GB: `torrentSizeGB = totalSize / (1024 * 1024 * 1024)`
+     - Returns `VaultForm` with Available, Total, Required, and TorrentSizeGB
    - Sets `d.VaultForm` which triggers modal display in template
 
-**VP Calculation:**
-- Fetches all items in the resource using `api.ListResourceContentCached` with `Output: api.OutputList`
-- Sums up `item.Size` for all items to get total bytes
-- Converts bytes to VP: `requiredVP = totalSize / (1024 * 1024 * 1024)`
-- 1 VP = 1 GB of torrent size
+**VP and Size Calculation:**
+- **Required VP**: Calculated by Vault service method `GetRequiredVP`, which internally fetches resource content and converts size to VP (1 VP = 1 GB)
+- **Torrent Size GB**: Calculated separately in handler by fetching resource content via REST API and converting bytes to GB
+- Both calculations use the same source data (REST API), but are performed independently for clarity and separation of concerns
 
 **Error Handling:**
 - Returns 500 error if vault stats cannot be fetched

@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 )
@@ -42,9 +43,10 @@ type Vault struct {
 	claims *claims.Claims
 	client *http.Client
 	pg     *cs.PG
+	api    *api.Api
 }
 
-func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG) *Vault {
+func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
 	host := c.String(vaultServiceHostFlag)
 	port := c.Int(vaultServicePortFlag)
 
@@ -59,6 +61,7 @@ func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG) *Vau
 		claims: cl,
 		client: client,
 		pg:     pg,
+		api:    restApi,
 	}
 }
 
@@ -366,6 +369,22 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 	}
 
 	return result, nil
+}
+
+// GetRequiredVP calculates the required vault points for a resource based on its total size
+func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceID string) (float64, error) {
+	// Get list to calculate total size
+	list, err := s.api.ListResourceContentCached(ctx, claims, resourceID, &api.ListResourceContentArgs{
+		Output: api.OutputList,
+	})
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to list resource content")
+	}
+
+	// Convert bytes to VP (1 VP = 1 GB)
+	requiredVP := float64(list.Size) / (1024 * 1024 * 1024)
+
+	return requiredVP, nil
 }
 
 // pointsEqual compares two *float64 values, treating nil as distinct from any number

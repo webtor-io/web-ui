@@ -90,9 +90,10 @@ type ExtendedResource struct {
 }
 
 type VaultForm struct {
-	Available *float64
-	Total     *float64
-	Required  float64
+	Available     *float64
+	Total         *float64
+	Required      float64
+	TorrentSizeGB float64
 }
 
 func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, error) {
@@ -156,21 +157,28 @@ func (s *Handler) prepareVaultForm(ctx context.Context, args *GetArgs, res *ra.R
 		return nil, errors.Wrap(err, "failed to get user vault stats")
 	}
 
-	// Get list to calculate total size
+	// Get required VP using vault service
+	requiredVP, err := s.vault.GetRequiredVP(ctx, args.Claims, args.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get required VP")
+	}
+
+	// Get torrent size separately via REST API
 	list, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
 		Output: api.OutputList,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list resource content")
+		return nil, errors.Wrap(err, "failed to list resource content for size calculation")
 	}
 
-	// Convert bytes to VP (assuming 1 VP per GB)
-	requiredVP := float64(list.Size) / (1024 * 1024 * 1024)
+	// Convert bytes to GB
+	torrentSizeGB := float64(list.Size) / (1024 * 1024 * 1024)
 
 	return &VaultForm{
-		Available: stats.Available,
-		Total:     stats.Total,
-		Required:  requiredVP,
+		Available:     stats.Available,
+		Total:         stats.Total,
+		Required:      requiredVP,
+		TorrentSizeGB: torrentSizeGB,
 	}, nil
 }
 

@@ -11,31 +11,31 @@
                                     <tbody>
                                         <tr>
                                             <td class="text-left font-semibold">Total</td>
-                                            <td class="text-right">
+                                            <td class="text-center">
                                                 {{ if .Data.VaultStats.Total }}
                                                     {{ printf "%.2f" .Data.VaultStats.Total }}
                                                 {{ else }}
-                                                    Unlimited
+                                                    <span class="text-xl">∞</span>
                                                 {{ end }}
                                             </td>
                                         </tr>
                                         <tr>
                                             <td class="text-left font-semibold">Available</td>
-                                            <td class="text-right">
+                                            <td class="text-center">
                                                 {{ if .Data.VaultStats.Available }}
                                                     {{ printf "%.2f" .Data.VaultStats.Available }}
                                                 {{ else }}
-                                                    Unlimited
+                                                    <span class="text-xl">∞</span>
                                                 {{ end }}
                                             </td>
                                         </tr>
                                         <tr>
                                             <td class="text-left font-semibold">Funded</td>
-                                            <td class="text-right">{{ printf "%.2f" .Data.VaultStats.Funded }}</td>
+                                            <td class="text-center">{{ printf "%.2f" .Data.VaultStats.Funded }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-left font-semibold">Frozen</td>
-                                            <td class="text-right">{{ printf "%.2f" .Data.VaultStats.Frozen }}</td>
+                                            <td class="text-center">{{ printf "%.2f" .Data.VaultStats.Frozen }}</td>
                                         </tr>
                                     </tbody>
                                 </table>

@@ -254,7 +254,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting Vault
-	v := vault.New(c, uc, cl, pg)
+	v := vault.New(c, uc, cl, pg, sapi)
 
 	// Setting ResourceHandler
 	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)

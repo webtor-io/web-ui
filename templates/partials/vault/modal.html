@@ -32,29 +32,29 @@
  								<tbody>
  									<tr>
  										<td class="font-semibold">Torrent Size GB:</td>
- 										<td>{{ printf "%.2f" .VaultForm.Required }}</td>
+ 										<td class="text-center">{{ printf "%.2f" .VaultForm.TorrentSizeGB }}</td>
  									</tr>
  									<tr>
  										<td class="font-semibold">Required VP:</td>
- 										<td>{{ printf "%.2f" .VaultForm.Required }}</td>
+ 										<td class="text-center">{{ printf "%.2f" .VaultForm.Required }}</td>
  									</tr>
  									<tr>
  										<td class="font-semibold">Your Available VP:</td>
- 										<td>
+ 										<td class="text-center">
  											{{ if .VaultForm.Available }}
  												{{ printf "%.2f" .VaultForm.Available }}
  											{{ else }}
- 												Unlimited
+												<span class="text-xl">∞</span>
  											{{ end }}
  										</td>
  									</tr>
  									<tr>
  										<td class="font-semibold">Your Total VP:</td>
- 										<td>
+										<td class="text-center">
  											{{ if .VaultForm.Total }}
  												{{ printf "%.2f" .VaultForm.Total }}
  											{{ else }}
- 												Unlimited
+												<span class="text-xl">∞</span>
  											{{ end }}
  										</td>
  									</tr>
