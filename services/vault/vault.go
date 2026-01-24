@@ -360,6 +360,21 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			return errors.Wrap(err, "failed to create fund log")
 		}
 
+		// Update resource: increase funded_vp by pledge amount
+		newFundedVP := resource.FundedVP + resource.RequiredVP
+		err = vaultModels.UpdateResourceFundedVP(ctx, tx, resource.ResourceID, newFundedVP)
+		if err != nil {
+			return errors.Wrap(err, "failed to update resource funded VP")
+		}
+
+		// If funded_vp >= required_vp, mark resource as funded
+		if newFundedVP >= resource.RequiredVP {
+			err = vaultModels.MarkResourceFunded(ctx, tx, resource.ResourceID)
+			if err != nil {
+				return errors.Wrap(err, "failed to mark resource as funded")
+			}
+		}
+
 		result = pledge
 		return nil
 	})
@@ -369,6 +384,39 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 	}
 
 	return result, nil
+}
+
+// GetOrCreateResource retrieves an existing resource or creates a new one if it doesn't exist
+func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	// Check if resource exists
+	resource, err := vaultModels.GetResource(ctx, db, resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get resource")
+	}
+
+	// If resource exists, return it
+	if resource != nil {
+		return resource, nil
+	}
+
+	// Resource doesn't exist, get required VP
+	requiredVP, err := s.GetRequiredVP(ctx, claims, resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get required VP")
+	}
+
+	// Create new resource
+	resource, err = vaultModels.CreateResource(ctx, db, resourceID, requiredVP)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create resource")
+	}
+
+	return resource, nil
 }
 
 // GetRequiredVP calculates the required vault points for a resource based on its total size
@@ -385,6 +433,36 @@ func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceI
 	requiredVP := float64(list.Size) / (1024 * 1024 * 1024)
 
 	return requiredVP, nil
+}
+
+// GetResource retrieves a resource by ID, returns nil if not found
+func (s *Vault) GetResource(ctx context.Context, resourceID string) (*vaultModels.Resource, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	resource, err := vaultModels.GetResource(ctx, db, resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get resource")
+	}
+
+	return resource, nil
+}
+
+// GetPledge retrieves a pledge for a specific user and resource, returns nil if not found
+func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultModels.Resource) (*vaultModels.Pledge, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
+	pledge, err := vaultModels.GetUserResourcePledge(ctx, db, user.ID, resource.ResourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user resource pledge")
+	}
+
+	return pledge, nil
 }
 
 // pointsEqual compares two *float64 values, treating nil as distinct from any number

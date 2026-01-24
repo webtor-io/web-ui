@@ -59,7 +59,23 @@ func RedirectWithError(c *gin.Context, serr error) {
 		return
 	}
 	q := u.Query()
+	q.Set("status", "error")
 	q.Set("err", serr.Error())
+	q.Set("from", c.Request.URL.Path)
+	u.RawQuery = q.Encode()
+	c.Redirect(http.StatusFound, u.String())
+}
+
+func RedirectWithSuccess(c *gin.Context) {
+	u, err := url.Parse(c.GetHeader("X-Return-Url"))
+	if err != nil || u == nil {
+		// if return url is invalid, attempt a plain redirect without query mutation
+		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		return
+	}
+	q := u.Query()
+	q.Set("status", "success")
+	q.Set("from", c.Request.URL.Path)
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
 }

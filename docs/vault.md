@@ -442,6 +442,12 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
      - `resource_id` = resource's ID
      - `balance` = `-resource.RequiredVP` (negative, as VP is deducted)
      - `op_type` = `OpTypeFund` (2)
+   - **Update resource funding:**
+     - Calculate `newFundedVP = resource.FundedVP + resource.RequiredVP`
+     - Update `resource.funded_vp` to `newFundedVP` using `UpdateResourceFundedVP`
+     - If `newFundedVP >= resource.RequiredVP`:
+       - Mark resource as funded using `MarkResourceFunded`
+       - Set `resource.funded = true` and `resource.funded_at = now()`
 2. Return created pledge or error
 
 **Features:**
@@ -459,6 +465,50 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 - Returns error if pledge creation fails
 - Returns error if transaction log creation fails
 - Returns error if transaction fails at any step
+
+#### Method `GetOrCreateResource`
+
+Retrieves an existing resource or creates a new one if it doesn't exist.
+
+**Signature:**
+```go
+func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `claims` — API claims for authentication (`*api.Claims`)
+- `resourceID` — resource identifier (torrent hash)
+
+**Algorithm:**
+1. Check if resource exists in database using `vaultModels.GetResource`
+2. If resource exists, return it immediately
+3. If resource doesn't exist:
+   - Calculate required VP using `GetRequiredVP` method
+   - Create new resource using `vaultModels.CreateResource` with:
+     - `resource_id` = provided resourceID
+     - `required_vp` = calculated VP amount
+     - `funded_vp` = 0
+     - `funded` = false
+     - `vaulted` = false
+     - `expired` = false
+4. Return resource (existing or newly created)
+
+**Features:**
+- Idempotent operation: safe to call multiple times for the same resource
+- Automatically calculates required VP based on torrent size
+- Does not use transactions (resource creation is atomic)
+- Used by handlers before creating pledges
+
+**Error Handling:**
+- Returns error if database connection is unavailable
+- Returns error if resource lookup fails
+- Returns error if VP calculation fails (REST API error)
+- Returns error if resource creation fails
+- Wraps all errors with context for debugging
+
+**Usage:**
+This method is called by the vault handler before creating a pledge. It ensures that a resource record exists in the database with the correct required VP amount calculated from the torrent size.
 
 #### Method `GetRequiredVP`
 
@@ -493,6 +543,69 @@ func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceI
 
 **Usage:**
 This method is used by handlers to calculate VP requirements before displaying vault forms to users. It encapsulates the logic of size calculation within the Vault service, keeping handlers clean and focused on request/response handling.
+
+#### Method `GetResource`
+
+Retrieves a resource by ID, returns nil if not found.
+
+**Signature:**
+```go
+func (s *Vault) GetResource(ctx context.Context, resourceID string) (*vaultModels.Resource, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `resourceID` — resource identifier (torrent hash)
+
+**Algorithm:**
+1. Get database connection from PG service
+2. Call `vaultModels.GetResource` to fetch resource by ID
+3. Return resource or nil if not found
+
+**Features:**
+- Returns `nil` if resource doesn't exist (not an error)
+- Simple wrapper around model method for service layer
+- Does not create resource if it doesn't exist (unlike `GetOrCreateResource`)
+
+**Error Handling:**
+- Returns error if database connection is unavailable
+- Returns error if database query fails (but not for "not found" case)
+- Returns `nil, nil` if resource is not found
+
+**Usage:**
+This method is used when you need to check if a resource exists without creating it. Useful for conditional logic where resource existence determines the flow.
+
+#### Method `GetPledge`
+
+Retrieves a pledge for a specific user and resource, returns nil if not found.
+
+**Signature:**
+```go
+func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultModels.Resource) (*vaultModels.Pledge, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `user` — authenticated user (`*auth.User`)
+- `resource` — vault resource (`*vaultModels.Resource`)
+
+**Algorithm:**
+1. Get database connection from PG service
+2. Call `vaultModels.GetUserResourcePledge` with user ID and resource ID
+3. Return pledge or nil if not found
+
+**Features:**
+- Returns `nil` if pledge doesn't exist (not an error)
+- Finds pledge by combination of user_id and resource_id
+- Simple wrapper around model method for service layer
+
+**Error Handling:**
+- Returns error if database connection is unavailable
+- Returns error if database query fails (but not for "not found" case)
+- Returns `nil, nil` if pledge is not found
+
+**Usage:**
+This method is used to check if a user has already pledged to a specific resource. Useful for displaying pledge status in UI or preventing duplicate pledges.
 
 ## Processes and Use Cases
 
@@ -707,6 +820,89 @@ Integration with long-term storage service is planned:
 - When `funded = true` is reached, resource is queued for vaulting
 - After successful vaulting, `vaulted = true` is set
 - Storage notifies vault about the need to unfreeze pledges
+
+## HTTP API Endpoints
+
+The Vault system provides HTTP endpoints for user interactions with pledges.
+
+### Vault Handler (`handlers/vault/handler.go`)
+
+Handler for managing vault pledges through HTTP requests.
+
+**Registration:**
+```go
+func RegisterHandler(r *gin.Engine, v *vault.Vault)
+```
+
+The handler is registered only if the vault service is not nil. This is checked in `serve.go`:
+```go
+if v != nil {
+    vh.RegisterHandler(r, v)
+}
+```
+
+**Dependencies:**
+- Vault service (`services/vault`) — for business logic operations
+- Auth service (`services/auth`) — for user authentication
+- API service (`services/api`) — for getting API claims
+
+### POST /vault/pledge/add
+
+Creates a new pledge for a resource.
+
+**Authentication:** Required (checks `auth.GetUserFromContext` and `user.HasAuth()`)
+
+**Form Parameters:**
+- `resource_id` (required) — resource identifier (torrent hash)
+
+**Request Headers:**
+- `X-Return-Url` — URL to redirect after operation (required for redirect)
+
+**Algorithm:**
+1. Get current user from context using `auth.GetUserFromContext`
+2. Verify user is authenticated (`user.HasAuth()`)
+3. Get `resource_id` from form data
+4. Get API claims from context using `api.GetClaimsFromContext`
+5. Call `vault.GetOrCreateResource` to ensure resource exists
+6. Call `vault.CreatePledge` to create the pledge
+7. On success: redirect to `X-Return-Url` with query parameters `status=success` and `from=/vault/pledge/add`
+8. On error: redirect to `X-Return-Url` with query parameters `err=<error_message>` and `from=/vault/pledge/add`
+
+**Success Response:**
+- HTTP 302 redirect to `X-Return-Url?status=success&from=/vault/pledge/add`
+
+**Error Responses:**
+- HTTP 302 redirect to `X-Return-Url?err=unauthorized&from=/vault/pledge/add` — user not authenticated
+- HTTP 302 redirect to `X-Return-Url?err=resource_id+is+required&from=/vault/pledge/add` — missing resource_id
+- HTTP 302 redirect to `X-Return-Url?err=failed+to+get+claims&from=/vault/pledge/add` — claims unavailable
+- HTTP 302 redirect to `X-Return-Url?err=<error>&from=/vault/pledge/add` — other errors (insufficient VP, database errors, etc.)
+
+**Usage Example:**
+```html
+<form method="post" action="/vault/pledge/add">
+    <input type="hidden" name="resource_id" value="abc123..." />
+    <button type="submit">Create Pledge</button>
+</form>
+```
+
+**Notes:**
+- Uses `web.RedirectWithSuccess(c)` helper for success redirects
+- Uses `web.RedirectWithError(c, err)` helper for error redirects
+- Both helpers automatically add `from` parameter with current URL path
+- Follows server-side rendering pattern with form submissions
+
+### POST /vault/pledge/remove
+
+Removes a pledge (stub, not yet implemented).
+
+**Authentication:** Required (checks `auth.GetUserFromContext` and `user.HasAuth()`)
+
+**Current Behavior:**
+- Always returns error "not implemented yet"
+- Redirects to `X-Return-Url` with error message
+
+**Future Implementation:**
+Will allow users to claim back their pledges if they are not frozen.
 
 ## UI Components
 

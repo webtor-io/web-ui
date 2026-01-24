@@ -81,19 +81,13 @@ type GetData struct {
 	Item        *ra.ListItem
 	Instruction string
 	VaultForm   *VaultForm
+	VaultButton *VaultButton
 	Vault       bool
 }
 
 type ExtendedResource struct {
 	*ra.ResourceResponse
 	InLibrary bool
-}
-
-type VaultForm struct {
-	Available     *float64
-	Total         *float64
-	Required      float64
-	TorrentSizeGB float64
 }
 
 func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, error) {
@@ -150,38 +144,6 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	return d, nil
 }
 
-func (s *Handler) prepareVaultForm(ctx context.Context, args *GetArgs, res *ra.ResourceResponse) (*VaultForm, error) {
-	// Get user vault stats
-	stats, err := s.vault.GetUserStats(ctx, args.User)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get user vault stats")
-	}
-
-	// Get required VP using vault service
-	requiredVP, err := s.vault.GetRequiredVP(ctx, args.Claims, args.ID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get required VP")
-	}
-
-	// Get torrent size separately via REST API
-	list, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
-		Output: api.OutputList,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to list resource content for size calculation")
-	}
-
-	// Convert bytes to GB
-	torrentSizeGB := float64(list.Size) / (1024 * 1024 * 1024)
-
-	return &VaultForm{
-		Available:     stats.Available,
-		Total:         stats.Total,
-		Required:      requiredVP,
-		TorrentSizeGB: torrentSizeGB,
-	}, nil
-}
-
 func (s *Handler) get(c *gin.Context) {
 	indexTpl := s.tb.Build("index")
 	getTpl := s.tb.Build("resource/get")
@@ -211,15 +173,26 @@ func (s *Handler) get(c *gin.Context) {
 	// Set vault availability
 	d.Vault = s.vault != nil
 
-	// Handle pledge-form parameter
-	if c.Query("pledge-form") == "true" && s.vault != nil && args.User.HasAuth() {
-		vaultForm, err := s.prepareVaultForm(ctx, args, d.Resource.ResourceResponse)
+	// Prepare vault button state
+	if s.vault != nil && args.User.HasAuth() {
+		vaultButton, err := s.prepareVaultButton(ctx, args)
 		if err != nil {
-			indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault form")))
+			indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault button")))
 			return
 		}
-		d.VaultForm = vaultForm
+		d.VaultButton = vaultButton
+		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/pledge/add" {
+			vaultForm, err := s.prepareVaultForm(c, args)
+			if err != nil {
+				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault form")))
+				return
+			}
+
+			d.VaultForm = vaultForm
+		}
 	}
+
+	// Handle pledge-form parameter
 
 	c.Header("X-Robots-Tag", "noindex, follow")
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))

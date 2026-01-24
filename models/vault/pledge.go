@@ -69,6 +69,22 @@ func GetResourcePledges(ctx context.Context, db *pg.DB, resourceID string) ([]Pl
 	return pledges, nil
 }
 
+// GetUserResourcePledge returns a pledge for a specific user and resource
+func GetUserResourcePledge(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID string) (*Pledge, error) {
+	pledge := &Pledge{}
+	err := db.Model(pledge).
+		Context(ctx).
+		Where("user_id = ? AND resource_id = ?", userID, resourceID).
+		Select()
+	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to get user resource pledge")
+	}
+	return pledge, nil
+}
+
 // GetFundedResourcePledges returns all funded pledges for a specific resource
 func GetFundedResourcePledges(ctx context.Context, db *pg.DB, resourceID string) ([]Pledge, error) {
 	var pledges []Pledge

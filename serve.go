@@ -28,6 +28,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	vh "github.com/webtor-io/web-ui/handlers/vault"
 	"github.com/webtor-io/web-ui/handlers/webdav"
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
@@ -255,6 +256,11 @@ func serve(c *cli.Context) error {
 
 	// Setting Vault
 	v := vault.New(c, uc, cl, pg, sapi)
+
+	// Setting VaultHandler
+	if v != nil {
+		vh.RegisterHandler(r, v)
+	}
 
 	// Setting ResourceHandler
 	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)

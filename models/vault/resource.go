@@ -88,7 +88,7 @@ func CreateResource(ctx context.Context, db *pg.DB, resourceID string, requiredV
 }
 
 // UpdateResourceFundedVP updates the funded VP amount for a resource
-func UpdateResourceFundedVP(ctx context.Context, db *pg.DB, resourceID string, fundedVP float64) error {
+func UpdateResourceFundedVP(ctx context.Context, db pg.DBI, resourceID string, fundedVP float64) error {
 	_, err := db.Model(&Resource{}).
 		Context(ctx).
 		Set("funded_vp = ?", fundedVP).
@@ -101,7 +101,7 @@ func UpdateResourceFundedVP(ctx context.Context, db *pg.DB, resourceID string, f
 }
 
 // MarkResourceFunded marks a resource as funded
-func MarkResourceFunded(ctx context.Context, db *pg.DB, resourceID string) error {
+func MarkResourceFunded(ctx context.Context, db pg.DBI, resourceID string) error {
 	now := time.Now()
 	_, err := db.Model(&Resource{}).
 		Context(ctx).
