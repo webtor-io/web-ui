@@ -1,4 +1,5 @@
-{{ define "title" }}{{ with .Data }}{{ if .Tool }}{{ .Tool.Title }} – {{ .Tool.Benefit }}{{ else }}Online Torrent Tool — Stream & Download in Browser {{ end }}{{ end }}{{ end }}
+{{ define "title" }}{{ with .Data }}{{ if .Tool }}{{ .Tool.Title | seoFriendly }} – {{ .Tool.Benefit }}{{ else }}Online Torrent Tool — Stream & Download in Browser {{ end }}{{ end }}{{ end }}
+{{ define "description" }}{{ with .Data }}{{ if .Tool }}{{ .Tool.Description }}{{ else }}Web-based torrent tool to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage.{{ end }}{{ end }}{{ end }}
 {{ define "main" }}
 <div class="text-center py-12 font-baskerville text-7xl">
     <a href="/" data-async-target="main">

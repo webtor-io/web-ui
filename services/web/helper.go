@@ -86,6 +86,10 @@ func (s *Helper) Has(obj any, fieldName string) bool {
 	return field.IsValid() && !field.IsNil()
 }
 
+func (s *Helper) SeoFriendly(text string) string {
+	return strings.ReplaceAll(text, "→", "to")
+}
+
 type Helper struct {
 	assetsHost     string
 	assetsPath     string
