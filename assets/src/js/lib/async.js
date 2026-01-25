@@ -16,9 +16,12 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
         layout = target.getAttribute('data-async-layout');
     }
     const updateHeaders = {};
+    const updateFields = [];
     for (const an of target.getAttributeNames()) {
         if (an.startsWith('data-async-update-')) {
-            const key = 'X-Update-' + an.replace('data-async-update-', '');
+            const f = an.replace('data-async-update-', '');
+            const key = 'X-Update-' + f;
+            updateFields.push(f);
             updateHeaders[key] = target.getAttribute(an);
         }
     }
@@ -39,12 +42,20 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     const res = await fetchFunc(url, fetchParams);
     const text = await res.text();
     loadAsyncView(target, text, params);
-    for (const [h, val] of res.headers.entries()) {
-        if (!h.startsWith('x-update-')) continue;
-        const key = h.replace('x-update-', '');
-        let decodedBytes = new Uint8Array([...atob(val)].map(c => c.charCodeAt(0)));
-        let decodedHeader = new TextDecoder("utf-8").decode(decodedBytes);
-        params.update(key, decodedHeader);
+    for (const f of updateFields) {
+        let updated = false;
+        for (const [h, val] of res.headers.entries()) {
+            if (!h.startsWith('x-update-')) continue;
+            const key = h.replace('x-update-', '');
+            if (key !== f) continue;
+            let decodedBytes = new Uint8Array([...atob(val)].map(c => c.charCodeAt(0)));
+            let decodedHeader = new TextDecoder("utf-8").decode(decodedBytes);
+            params.update(key, decodedHeader);
+            updated = true;
+        }
+        if (!updated) {
+            params.update(f, null);
+        }
     }
     return res;
 }

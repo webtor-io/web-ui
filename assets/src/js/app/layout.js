@@ -6,6 +6,29 @@ function hideProgress() {
     const progress = document.getElementById('progress');
     progress.classList.add('hidden');
 }
+function updateDescription(val) {
+    const existingDesc = document.querySelector('meta[name="description"]');
+    
+    if (!val || val.trim() === '') {
+        if (existingDesc) {
+            existingDesc.remove();
+        }
+        return;
+    }
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = val;
+    const newMeta = tempDiv.querySelector('meta[name="description"]');
+    
+    if (existingDesc && newMeta) {
+        existingDesc.setAttribute('content', newMeta.getAttribute('content'));
+    } else if (newMeta) {
+        const titleTag = document.querySelector('title');
+        if (titleTag) {
+            titleTag.insertAdjacentElement('afterend', newMeta);
+        }
+    }
+}
 
 if (window._umami) {
     const umami = (await import('../lib/umami')).init(window, window._umami);
@@ -37,6 +60,7 @@ bindAsync({
     },
     update(key, val) {
         if (key === 'title') document.querySelector('title').innerText = val;
+        if (key === 'description') updateDescription(val);
     },
     fallback: {
         selector: 'main',
