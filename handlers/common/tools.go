@@ -46,4 +46,10 @@ var Tools = []Tool{
 		Benefit:     "Stream Torrent to on iPhone / iPad – No Apps Needed",
 		Description: "Stream torrents on iPhone and iPad directly in your browser. No apps required. Web-based torrent streaming for iOS with cloud processing.",
 	},
+	{
+		Url:         "online-torrent-downloader",
+		Title:       "Online Torrent Downloader",
+		Benefit:     "Download Torrents Online – No Torrent Client Needed",
+		Description: "Download torrent files and magnet links directly in your browser. No torrent client required. Web-based torrent downloading with server-side processing.",
+	},
 }

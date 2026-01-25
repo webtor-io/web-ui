@@ -37,6 +37,11 @@ bindAsync({
     },
     update(key, val) {
         if (key === 'title') document.querySelector('title').innerText = val;
+        if (key === 'description') {
+            let desc = document.querySelector('meta[name="description"]');
+            if (desc) desc.remove();
+            document.head.innerHTML += val;
+        }
     },
     fallback: {
         selector: 'main',
