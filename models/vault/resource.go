@@ -131,7 +131,7 @@ func MarkResourceVaulted(ctx context.Context, db *pg.DB, resourceID string) erro
 }
 
 // MarkResourceExpired marks a resource as expired
-func MarkResourceExpired(ctx context.Context, db *pg.DB, resourceID string) error {
+func MarkResourceExpired(ctx context.Context, db pg.DBI, resourceID string) error {
 	now := time.Now()
 	_, err := db.Model(&Resource{}).
 		Context(ctx).
@@ -141,6 +141,20 @@ func MarkResourceExpired(ctx context.Context, db *pg.DB, resourceID string) erro
 		Update()
 	if err != nil {
 		return errors.Wrap(err, "failed to mark resource as expired")
+	}
+	return nil
+}
+
+// MarkResourceUnfunded marks a resource as unfunded
+func MarkResourceUnfunded(ctx context.Context, db pg.DBI, resourceID string) error {
+	_, err := db.Model(&Resource{}).
+		Context(ctx).
+		Set("funded = false").
+		Set("funded_at = NULL").
+		Where("resource_id = ?", resourceID).
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to mark resource as unfunded")
 	}
 	return nil
 }

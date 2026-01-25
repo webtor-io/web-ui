@@ -1,22 +1,15 @@
-{{ define "vault/modal" }}
+{{ define "vault/pledge-add-modal" }}
 	{{ if and (.User | hasAuth) .Data.Vault }}
 		{{ with .Data }}
-			<div id="pledge-form" data-async-layout="{{`{{ template "vault/modal" . }}`}}">
+			<div id="pledge-form" data-async-layout="{{`{{ template "vault/pledge-add-modal" . }}`}}">
 				{{ if .VaultForm }}
 					<dialog class="modal" open>
 						<div class="modal-box">
 							<h3 class="text-2xl font-bold text-accent w-full">Keep This Torrent Available</h3>
 							
-							{{ if eq .VaultForm.Status "success" }}
-								<p class="py-4">
-									Your pledge has been successfully registered and your torrent will be saved in the Vault soon.
-								</p>
-								<div class="modal-action justify-center">
-									<form method="dialog">
-										<button class="btn btn-accent" data-umami-event="vault-pledge-success-confirmed">Got it!</button>
-									</form>
-								</div>
-							{{ else if eq .VaultForm.Status "error" }}
+    			{{ if eq .VaultForm.Status "success" }}
+    				{{ template "vault/pledge-success" . }}
+    			{{ else if eq .VaultForm.Status "error" }}
 								<p class="py-4">
 									Unfortunately, your pledge could not be saved due to an error:
 								</p>
@@ -30,24 +23,8 @@
 										<button class="btn btn-accent" data-umami-event="vault-pledge-error-confirmed">Ok</button>
 									</form>
 								</div>
-    			{{ else if .VaultForm.Funded }}
-    				<p class="py-4">
-    					Your pledge has been successfully registered and your torrent will be saved in the Vault soon.
-    				</p>
-    				<div class="modal-action justify-center">
-    					<form method="dialog">
-    						<button class="btn btn-accent" data-umami-event="vault-pledge-funded-confirmed">Got it!</button>
-    					</form>
-    				</div>
-    			{{ else if .VaultForm.Vaulted }}
-    				<p class="py-4">
-    					Your torrent is already in the Vault and will be kept available.
-    				</p>
-    				<div class="modal-action justify-center">
-    					<form method="dialog">
-    						<button class="btn btn-accent" data-umami-event="vault-vaulted-confirmed">Got it!</button>
-    					</form>
-    				</div>
+    			{{ else if or .VaultForm.Funded .VaultForm.Vaulted }}
+    				{{ template "vault/pledge-success" . }}
     			{{ else }}
 								{{ if .VaultForm.Available }}
 									{{ if ge .VaultForm.Available .VaultForm.Required }}

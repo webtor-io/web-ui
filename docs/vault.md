@@ -62,13 +62,13 @@ CREATE TABLE vault.pledge (
 	user_id uuid NOT NULL,
 	amount numeric NOT NULL,
 	funded bool DEFAULT true NOT NULL,
-	frozen bool DEFAULT true NOT NULL,
 	frozen_at timestamptz DEFAULT now() NOT NULL,
 	created_at timestamptz DEFAULT now() NOT NULL,
 	updated_at timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT pledge_pk PRIMARY KEY (pledge_id),
 	CONSTRAINT pledge_user_fk FOREIGN KEY (user_id)
-		REFERENCES public."user" (user_id) ON DELETE CASCADE
+		REFERENCES public."user" (user_id) ON DELETE CASCADE,
+	CONSTRAINT pledge_resource_user_unique UNIQUE (resource_id, user_id)
 );
 ```
 
@@ -78,17 +78,19 @@ CREATE TABLE vault.pledge (
 - `user_id` — user UUID (foreign key to `public.user`)
 - `amount` — amount of pledged Vault Points (numeric)
 - `funded` — pledge active status flag (default `true`)
-- `frozen` — pledge freeze flag (default `true`, means cannot be claimed)
 - `frozen_at` — pledge freeze time (default `now()`)
 - `created_at` — pledge creation time
 - `updated_at` — last update time (automatically updated by trigger)
 
+**Constraints:**
+- `pledge_resource_user_unique` — unique index on `(resource_id, user_id)` to prevent duplicate pledges
+
 **Features:**
 - `funded = true` means the pledge is active and counted in resource funding
-- `frozen = true` means the pledge is frozen and cannot be claimed by the user
-- A pledge can be claimed only if `frozen = false` and `funded = true`
+- Freeze status is determined dynamically by comparing `frozen_at + freeze_period` with current time
+- A pledge can be removed only if it's not frozen (freeze period has expired)
 - When a pledge is created, a record is created in `tx_log` with type `OpTypeFund`
-- When a pledge is claimed, a record is created in `tx_log` with type `OpTypeClaim`
+- When a pledge is removed, a record is created in `tx_log` with type `OpTypeClaim`
 
 ### 3. Table `vault.resource`
 
@@ -205,7 +207,6 @@ type Pledge struct {
 	UserID     uuid.UUID `pg:"user_id,notnull,type:uuid"`
 	Amount     float64   `pg:"amount,notnull,type:numeric"`
 	Funded     bool      `pg:"funded,notnull,default:true"`
-	Frozen     bool      `pg:"frozen,notnull,default:true"`
 	FrozenAt   time.Time `pg:"frozen_at,notnull,default:now()"`
 	CreatedAt  time.Time `pg:"created_at,notnull,default:now()"`
 	UpdatedAt  time.Time `pg:"updated_at,notnull,default:now()"`
@@ -218,10 +219,10 @@ type Pledge struct {
 - `GetPledge(ctx, db, pledgeID)` — get pledge by ID
 - `GetUserPledges(ctx, db, userID)` — get all user's pledges
 - `GetResourcePledges(ctx, db, resourceID)` — get all pledges for a resource
+- `GetUserResourcePledge(ctx, db, userID, resourceID)` — get pledge for specific user and resource
 - `GetFundedResourcePledges(ctx, db, resourceID)` — get active pledges for a resource
 - `CreatePledge(ctx, db, userID, resourceID, amount)` — create pledge
 - `UpdatePledgeFunded(ctx, db, pledgeID, funded)` — update funded status
-- `UpdatePledgeFrozen(ctx, db, pledgeID, frozen)` — update frozen status
 - `DeletePledge(ctx, db, pledgeID)` — delete pledge
 - `SumFundedPledgesForResource(ctx, db, resourceID)` — sum of active pledges for a resource
 
@@ -384,9 +385,10 @@ type UserStats struct {
 2. Fetch all user's pledges in a single database query using `GetUserPledges`
 3. Calculate statistics in application code by iterating through pledges:
    - `Total` = value from `user_vp.total` (nil if unlimited)
-   - `Frozen` = sum of pledges where `frozen = true AND funded = true`
+   - For each pledge, check if it's frozen using `IsPledgeFrozen(pledge)` method
+   - `Frozen` = sum of pledges where `IsPledgeFrozen() = true AND funded = true`
    - `Funded` = sum of all pledges where `funded = true` (guaranteed to be >= 0)
-   - `Claimable` = sum of pledges where `funded = true AND frozen = false`
+   - `Claimable` = sum of pledges where `funded = true AND IsPledgeFrozen() = false`
    - `Available` = `Total - Funded` (nil if `Total` is nil, guaranteed to be >= 0 otherwise)
 4. Apply safety constraints:
    - If `Funded < 0`, set `Funded = 0`
@@ -607,6 +609,90 @@ func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultM
 **Usage:**
 This method is used to check if a user has already pledged to a specific resource. Useful for displaying pledge status in UI or preventing duplicate pledges.
 
+#### Method `IsPledgeFrozen`
+
+Checks if a pledge is currently in the freeze period.
+
+**Signature:**
+```go
+func (s *Vault) IsPledgeFrozen(pledge *vaultModels.Pledge) (bool, error)
+```
+
+**Parameters:**
+- `pledge` — pledge to check (`*vaultModels.Pledge`)
+
+**Algorithm:**
+1. Validate that pledge is not nil
+2. Calculate freeze end time: `freezeEndTime = pledge.FrozenAt + s.freezePeriod`
+3. Compare current time with freeze end time
+4. Return `true` if current time is before freeze end time, `false` otherwise
+
+**Configuration:**
+- `VAULT_PLEDGE_FREEZE_PERIOD` / `--vault-pledge-freeze-period` — freeze period duration (default: 24 hours)
+
+**Features:**
+- Freeze status is determined dynamically based on time, not stored in database
+- Freeze period is configurable via environment variable
+- Default freeze period is 1 day (24 hours)
+
+**Error Handling:**
+- Returns error if pledge is nil
+
+**Usage:**
+This method is used to determine if a pledge can be removed. Pledges cannot be removed during the freeze period to prevent immediate withdrawal after funding.
+
+#### Method `RemovePledge`
+
+Removes a pledge and updates the resource accordingly.
+
+**Signature:**
+```go
+func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) error
+```
+
+**Parameters:**
+- `ctx` — request context
+- `pledge` — pledge to remove (`*vaultModels.Pledge`)
+
+**Algorithm:**
+1. Validate that pledge is not nil
+2. Execute in database transaction with row locking:
+   - **Lock resource row** using `SELECT FOR UPDATE` to prevent concurrent modifications
+   - **Delete pledge** using `DeletePledge` model method
+   - **Create transaction log entry:**
+     - `user_id` = pledge's user ID
+     - `resource_id` = pledge's resource ID
+     - `balance` = `+pledge.Amount` (positive, as VP is returned)
+     - `op_type` = `OpTypeClaim` (3)
+   - **Update resource funding:**
+     - Calculate `newFundedVP = max(0, resource.FundedVP - pledge.Amount)`
+     - Update `resource.funded_vp` to `newFundedVP` using `UpdateResourceFundedVP`
+     - If `newFundedVP < resource.RequiredVP`:
+       - Mark resource as expired using `MarkResourceExpired`
+       - Set `resource.expired = true` and `resource.expired_at = now()`
+       - Mark resource as unfunded using `MarkResourceUnfunded`
+       - Set `resource.funded = false` and `resource.funded_at = NULL`
+3. Return nil on success or error on failure
+
+**Features:**
+- Uses `SELECT FOR UPDATE` to prevent race conditions during concurrent pledge removal
+- Transaction log entry is created with positive balance (OpTypeClaim)
+- Resource is automatically marked as expired and unfunded if funding drops below required amount
+- All operations are atomic within a single database transaction
+- Protects against negative funded_vp values
+
+**Error Handling:**
+- Returns error if pledge is nil
+- Returns error if database connection is unavailable
+- Returns error if resource cannot be locked
+- Returns error if pledge deletion fails
+- Returns error if transaction log creation fails
+- Returns error if resource update fails
+- Returns error if transaction fails at any step
+
+**Usage:**
+This method is called by the vault handler when a user removes their pledge. It ensures that the resource state is correctly updated and the user's VP is returned.
+
 ## Processes and Use Cases
 
 ### 1. Creating a Pledge (Fund)
@@ -619,49 +705,42 @@ This method is used to check if a user has already pledged to a specific resourc
 1. Check user balance via `GetUserStats`
 2. Verify that `Available >= amount`
 3. In a transaction:
-   - Create record in `pledge` with `funded = true`, `frozen = true`, `frozen_at = now()`
+   - Create record in `pledge` with `funded = true`, `frozen_at = now()`
    - Create record in `tx_log` with `op_type = OpTypeFund`, `balance = -amount`
    - Update `funded_vp` in `resource` (sum of all active pledges)
    - If `funded_vp >= required_vp`, set `funded = true`, `funded_at = now()`
 4. If resource is funded — initiate vaulting process
-5. Pledge remains frozen for **1 day** after creation
+5. Pledge remains frozen for **1 day** after creation (determined by `frozen_at + freeze_period`)
 
 **Failure Handling:**
-- If vaulting fails within **7 days**, VP is returned to the user (pledge is claimed back automatically)
+- If vaulting fails within **7 days**, VP is returned to the user (pledge is removed automatically)
 
-### 2. Claiming a Pledge (Claim)
+### 2. Removing a Pledge (Remove)
 
 **Preconditions:**
 - User is authenticated
 - Pledge belongs to the user
-- Pledge is not frozen (`frozen = false`)
+- Pledge is not frozen (`IsPledgeFrozen(pledge) = false`, freeze period has expired)
 - Pledge is active (`funded = true`)
 
 **Steps:**
-1. Check access rights and conditions
-2. In a transaction:
-   - Set `funded = false` in `pledge`
+1. Check access rights and freeze status via `IsPledgeFrozen`
+2. If pledge is frozen, return error "pledge is frozen and cannot be removed"
+3. In a transaction:
+   - Delete pledge record from database
    - Create record in `tx_log` with `op_type = OpTypeClaim`, `balance = +amount`
-   - Update `funded_vp` in `resource` (recalculate sum of active pledges)
-   - If `funded_vp < required_vp` and resource was funded, set `expired = true`, `expired_at = now()`
-3. Return points to user
+   - Update `funded_vp` in `resource` (subtract pledge amount, ensure >= 0)
+   - If `funded_vp < required_vp`:
+     - Set `expired = true`, `expired_at = now()`
+     - Set `funded = false`, `funded_at = NULL`
+4. Return points to user
 
 **Consequences:**
-- If after claiming the resource becomes underfunded (`funded_vp < required_vp`), it is marked as expired
+- If after removal the resource becomes underfunded (`funded_vp < required_vp`), it is marked as expired and unfunded
 - Expired resources are automatically deleted after **7 days**
+- Pledge is permanently deleted from database (cannot be restored)
 
-### 3. Unfreezing a Pledge (Unfreeze)
-
-**Preconditions:**
-- Resource is vaulted (`vaulted = true`)
-- Sufficient time has passed since vaulting
-
-**Steps:**
-1. Find all pledges for resource where `frozen = true`
-2. For each pledge set `frozen = false`
-3. Users can now claim their pledges
-
-### 4. Vaulting a Resource (Vault)
+### 3. Vaulting a Resource (Vault)
 
 **Preconditions:**
 - Resource is funded (`funded = true`)
@@ -670,9 +749,12 @@ This method is used to check if a user has already pledged to a specific resourc
 **Steps:**
 1. Perform operation to place resource in long-term storage
 2. Set `vaulted = true`, `vaulted_at = now()` in `resource`
-3. Optionally: freeze all pledges for this resource for a certain period
 
-### 5. User Tier Change
+**Notes:**
+- Pledges remain frozen for the configured freeze period (default 1 day) from their creation time
+- Freeze status is determined dynamically via `IsPledgeFrozen` method
+
+### 4. User Tier Change
 
 **Preconditions:**
 - User changed subscription/tier
@@ -739,9 +821,11 @@ This method is used to check if a user has already pledged to a specific resourc
 
 2. **Pledges:**
    - Cannot create a pledge larger than available balance
-   - Cannot claim a frozen pledge
+   - Cannot remove a frozen pledge (freeze period has not expired)
    - Sum of all active pledges cannot exceed total (if not NULL)
-   - Pledges are frozen for **1 day** after creation
+   - Pledges are frozen for **1 day** after creation (configurable via `VAULT_PLEDGE_FREEZE_PERIOD`)
+   - Freeze status is determined dynamically by comparing `frozen_at + freeze_period` with current time
+   - Each user can have only one pledge per resource (enforced by unique index)
 
 3. **Resources:**
    - Resource becomes funded when `funded_vp >= required_vp`
@@ -893,16 +977,57 @@ Creates a new pledge for a resource.
 
 ### POST /vault/pledge/remove
 
-Removes a pledge (stub, not yet implemented).
+Removes a user's pledge for a resource and returns VP to their account.
 
-**Authentication:** Required (checks `auth.GetUserFromContext` and `user.HasAuth()`)
+**Authentication:** Required (uses `auth.HasAuth` middleware)
 
-**Current Behavior:**
-- Always returns error "not implemented yet"
-- Redirects to `X-Return-Url` with error message
+**Form Parameters:**
+- `resource_id` (required) — resource identifier (torrent hash)
 
-**Future Implementation:**
-Will allow users to claim back their pledges if they are not frozen.
+**Request Headers:**
+- `X-Return-Url` — URL to redirect after operation (required for redirect)
+
+**Algorithm:**
+1. Get current user from context using `auth.GetUserFromContext`
+2. Get `resource_id` from form data
+3. Validate `resource_id` is not empty
+4. Get vault resource using `vault.GetResource`
+5. Get user's pledge for this resource using `vault.GetPledge`
+6. Check if pledge is frozen using `vault.IsPledgeFrozen`
+7. If pledge is frozen, return error "pledge is frozen and cannot be removed"
+8. Call `vault.RemovePledge` to remove the pledge (in transaction):
+   - Delete pledge from database
+   - Create tx_log entry with OpTypeClaim (positive balance)
+   - Update resource funded_vp
+   - Mark resource as expired/unfunded if needed
+9. On success: redirect to `X-Return-Url` with query parameters `status=success` and `from=/vault/pledge/remove`
+10. On error: redirect to `X-Return-Url` with query parameters `status=error`, `err=<error_message>` and `from=/vault/pledge/remove`
+
+**Success Response:**
+- HTTP 302 redirect to `X-Return-Url?status=success&from=/vault/pledge/remove`
+
+**Error Responses:**
+- HTTP 302 redirect to `X-Return-Url?status=error&err=resource_id+is+required&from=/vault/pledge/remove` — missing resource_id
+- HTTP 302 redirect to `X-Return-Url?status=error&err=resource+not+found&from=/vault/pledge/remove` — resource doesn't exist
+- HTTP 302 redirect to `X-Return-Url?status=error&err=pledge+not+found&from=/vault/pledge/remove` — pledge doesn't exist
+- HTTP 302 redirect to `X-Return-Url?status=error&err=pledge+is+frozen+and+cannot+be+removed&from=/vault/pledge/remove` — pledge is still frozen
+- HTTP 302 redirect to `X-Return-Url?status=error&err=<error>&from=/vault/pledge/remove` — other errors (database errors, etc.)
+
+**Usage Example:**
+```html
+<form method="post" action="/vault/pledge/remove">
+    <input type="hidden" name="resource_id" value="abc123..." />
+    <button type="submit">Remove Pledge</button>
+</form>
+```
+
+**Notes:**
+- Uses `web.RedirectWithSuccess(c)` helper for success redirects
+- Uses `web.RedirectWithError(c, err)` helper for error redirects
+- Both helpers automatically add `from` parameter with current URL path
+- Follows server-side rendering pattern with form submissions
+- Pledge removal is permanent and cannot be undone
+- VP is immediately returned to user's available balance
 
 ## UI Components
 
@@ -916,27 +1041,39 @@ A button component that allows authenticated users to initiate the vault pledge 
 
 **Behavior:**
 - Renders only if user is authenticated (`hasAuth`) and vault service is available (`.Data.Vault = true`)
-- Submits a GET form asynchronously to the current URL with parameter `pledge-form=true`
-- Uses `data-async-target="#pledge-form"` and `data-async-push-state="false"` for progressive enhancement
-- Includes Umami analytics tracking with `data-umami-event="vault-clicked"`
+- Displays different button text based on pledge status:
+  - "Keep This Torrent Available" — if user has no pledge for this resource
+  - "Remove Pledge" — if user has an active pledge for this resource
+- Submits a GET form asynchronously to the current URL with parameter `pledge-add-form=true` or `pledge-remove-form=true`
+- Uses `data-async-target` and `data-async-push-state="false"` for progressive enhancement
+- Includes Umami analytics tracking with `data-umami-event="vault-clicked"` or `data-umami-event="vault-remove-clicked"`
 
 **Template Structure:**
 ```html
 {{ define "vault/button" }}
 	{{ if and (.User | hasAuth) .Data.Vault }}
-		<form method="get" data-async-target="#pledge-form" data-async-push-state="false">
-			<input type="hidden" name="pledge-form" value="true" />
-			<button type="submit" class="btn btn-accent btn-outline" data-umami-event="vault-clicked">
-				Keep This Torrent Available
-			</button>
-		</form>
+		{{ if .Data.VaultButton.Funded }}
+			<form method="get" data-async-target="#pledge-remove-form" data-async-push-state="false">
+				<input type="hidden" name="pledge-remove-form" value="true" />
+				<button type="submit" class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-remove-clicked">
+					Remove Pledge
+				</button>
+			</form>
+		{{ else }}
+			<form method="get" data-async-target="#pledge-add-form" data-async-push-state="false">
+				<input type="hidden" name="pledge-add-form" value="true" />
+				<button type="submit" class="btn btn-accent btn-outline" data-umami-event="vault-clicked">
+					Keep This Torrent Available
+				</button>
+			</form>
+		{{ end }}
 	{{ end }}
 {{ end }}
 ```
 
 **Associated JavaScript:** `assets/src/js/app/vault/button.js` — handles form submission and modal interaction.
 
-### Vault Modal (`templates/partials/vault/modal.html`)
+### Vault Pledge Add Modal (`templates/partials/vault/pledge-add-modal.html`)
 
 A modal dialog that displays vault points information and allows users to confirm or cancel the pledge.
 
@@ -944,9 +1081,10 @@ A modal dialog that displays vault points information and allows users to confir
 
 **Behavior:**
 - Renders only if user is authenticated and vault service is available
-- Opens automatically when `VaultForm` data is present (when `pledge-form=true` parameter is processed)
+- Opens automatically when `VaultPledgeAddForm` data is present (when `pledge-add-form=true` parameter is processed)
 - Uses DaisyUI modal component with `open` attribute for automatic display
-- Wrapped in `<div id="pledge-form">` with `data-async-layout` for dynamic updates
+- Wrapped in `<div id="pledge-add-form">` with `data-async-layout` for dynamic updates
+- Displays different states: default form, success message, error message, funded status, vaulted status
 
 **Display Logic:**
 
@@ -973,13 +1111,53 @@ A modal dialog that displays vault points information and allows users to confir
   - `data-umami-event="vault-upgrade-clicked"` on "Upgrade subscription" link
   - `data-umami-event="instruction-vault"` on "What is Vault?" link
 
+### Vault Pledge Remove Modal (`templates/partials/vault/pledge-remove-modal.html`)
+
+A modal dialog that allows users to remove their pledge and return VP to their account.
+
+**Location:** Rendered on resource pages, opens when user clicks the "Remove Pledge" button.
+
+**Behavior:**
+- Renders only if user is authenticated and vault service is available
+- Opens automatically when `VaultPledgeRemoveForm` data is present (when `pledge-remove-form=true` parameter is processed)
+- Uses DaisyUI modal component with `open` attribute for automatic display
+- Wrapped in `<div id="pledge-remove-form">` with `data-async-layout` for dynamic updates
+- Displays different states: frozen warning, confirmation form, success message, error message
+
+**Display Logic:**
+
+1. **Frozen Status (Frozen = true):**
+   - Message: "Your Vault Points are currently frozen and cannot be removed yet. Please come back later when the freeze period expires."
+   - Shows only "Got it!" button to close modal
+   - Umami event: `vault-pledge-frozen-acknowledged`
+
+2. **Success Status (Status = "success"):**
+   - Message: "Your pledge has been successfully removed and your Vault Points have been returned to your account. The torrent may be removed from the Vault if it's no longer funded. You can always pledge your points again if needed."
+   - Shows only "Got it!" button to close modal
+   - Umami event: `vault-pledge-remove-success-confirmed`
+
+3. **Error Status (Status = "error"):**
+   - Message: "Unfortunately, your pledge could not be removed due to an error:" followed by error details
+   - Shows only "Ok" button to close modal
+   - Umami event: `vault-pledge-remove-error-confirmed`
+
+4. **Default Confirmation (no status):**
+   - Message: "Are you sure you want to remove your pledge for this torrent? This action cannot be undone."
+   - Shows "Remove Pledge" button (submits POST to `/vault/pledge/remove`)
+   - Shows "Cancel" button with `btn-soft` class to close modal
+   - Umami events: `vault-pledge-remove-confirmed`, `vault-pledge-remove-cancelled`
+
+**Additional Elements:**
+- Form uses `data-async-target="#pledge-remove-form"` and `data-async-push-state="false"` for progressive enhancement
+- Resource ID is passed as hidden input field from `.Resource.ID`
+
 ### Handler Integration (`handlers/resource/get.go`)
 
-The resource GET handler integrates vault functionality to display the modal with calculated VP requirements.
+The resource GET handler integrates vault functionality to display modals with calculated VP requirements and pledge status.
 
-**VaultForm Structure:**
+**VaultPledgeAddForm Structure:**
 ```go
-type VaultForm struct {
+type VaultPledgeAddForm struct {
 	Available     *float64 // User's available VP (nil if unlimited)
 	Total         *float64 // User's total VP (nil if unlimited)
 	Required      float64  // Required VP for this resource
@@ -987,16 +1165,34 @@ type VaultForm struct {
 }
 ```
 
+**VaultPledgeRemoveForm Structure:**
+```go
+type VaultPledgeRemoveForm struct {
+	Frozen bool   // True if pledge is frozen
+	Status string // "success", "error", or empty
+	Err    error  // Error message if Status = "error"
+}
+```
+
+**VaultButton Structure:**
+```go
+type VaultButton struct {
+	Funded bool // True if user has active pledge for this resource
+}
+```
+
 **GetData Structure:**
 ```go
 type GetData struct {
-	Args        *GetArgs
-	Resource    *ExtendedResource
-	List        *ra.ListResponse
-	Item        *ra.ListItem
-	Instruction string
-	VaultForm   *VaultForm // Present when pledge-form=true
-	Vault       bool       // True if vault service is available
+	Args              *GetArgs
+	Resource          *ExtendedResource
+	List              *ra.ListResponse
+	Item              *ra.ListItem
+	Instruction       string
+	VaultForm         *VaultPledgeAddForm       // Present when pledge-add-form=true
+	VaultButton       *VaultButton              // Present when user is authenticated
+	VaultPledgeRemove *VaultPledgeRemoveForm    // Present when pledge-remove-form=true
+	Vault             bool                      // True if vault service is available
 }
 ```
 
@@ -1004,18 +1200,37 @@ type GetData struct {
 
 1. **Vault Availability Check:**
    - Sets `d.Vault = s.vault != nil` to indicate if vault service is configured
-   - This flag controls visibility of vault button and modal in templates
+   - This flag controls visibility of vault button and modals in templates
 
-2. **Pledge Form Processing (when `pledge-form=true`):**
+2. **Vault Button State (when user is authenticated):**
+   - Calls `prepareVaultButton` to determine button state:
+     - Gets vault resource via `s.vault.GetResource(ctx, args.ID)`
+     - Gets user's pledge via `s.vault.GetPledge(ctx, args.User, resource)`
+     - Sets `Funded = true` if both resource and pledge are funded
+   - Sets `d.VaultButton` which controls button text and target modal
+
+3. **Pledge Add Form Processing (when `pledge-add-form=true` or `from=/vault/pledge/add`):**
    - Checks if vault service is available (`s.vault != nil`)
    - Checks if user is authenticated (`args.User.HasAuth()`)
-   - Calls `prepareVaultForm` to calculate VP requirements:
+   - Calls `prepareVaultPledgeAddForm` to calculate VP requirements:
      - Gets user vault stats via `s.vault.GetUserStats(ctx, args.User)`
      - Gets required VP via `s.vault.GetRequiredVP(ctx, args.Claims, args.ID)` (encapsulated in Vault service)
      - Gets torrent size separately via REST API `api.ListResourceContentCached` with `Output: api.OutputList`
      - Converts total size to GB: `torrentSizeGB = totalSize / (1024 * 1024 * 1024)`
-     - Returns `VaultForm` with Available, Total, Required, and TorrentSizeGB
+     - Checks resource and pledge status (Funded, Vaulted)
+     - Handles redirect status from `/vault/pledge/add` (success/error)
+     - Returns `VaultPledgeAddForm` with Available, Total, Required, TorrentSizeGB, Status, Err, Funded, Vaulted
    - Sets `d.VaultForm` which triggers modal display in template
+
+4. **Pledge Remove Form Processing (when `pledge-remove-form=true` or `from=/vault/pledge/remove`):**
+   - Checks if vault service is available (`s.vault != nil`)
+   - Checks if user is authenticated (`args.User.HasAuth()`)
+   - Calls `prepareVaultPledgeRemoveForm` to check pledge status:
+     - Handles redirect status from `/vault/pledge/remove` (success/error)
+     - If not redirect, gets vault resource and user's pledge
+     - Checks if pledge is frozen via `s.vault.IsPledgeFrozen(pledge)`
+     - Returns `VaultPledgeRemoveForm` with Frozen, Status, Err
+   - Sets `d.VaultPledgeRemove` which triggers modal display in template
 
 **VP and Size Calculation:**
 - **Required VP**: Calculated by Vault service method `GetRequiredVP`, which internally fetches resource content and converts size to VP (1 VP = 1 GB)
@@ -1039,8 +1254,9 @@ The resource view template includes both vault components:
 
 **Rendering Order:**
 1. Vault button is displayed in the main content area (before file list)
-2. Vault modal is rendered at the end of the template (after all content)
-3. Modal opens automatically when `VaultForm` is present in data
+2. Vault modals are rendered at the end of the template (after all content)
+3. Pledge add modal opens automatically when `VaultPledgeAddForm` is present in data
+4. Pledge remove modal opens automatically when `VaultPledgeRemoveForm` is present in data
 
 **Progressive Enhancement:**
 - Button works without JavaScript (submits GET form)

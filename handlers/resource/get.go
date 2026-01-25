@@ -75,14 +75,15 @@ func (s *Handler) getList(ctx context.Context, args *GetArgs) (l *ra.ListRespons
 }
 
 type GetData struct {
-	Args        *GetArgs
-	Resource    *ExtendedResource
-	List        *ra.ListResponse
-	Item        *ra.ListItem
-	Instruction string
-	VaultForm   *VaultForm
-	VaultButton *VaultButton
-	Vault       bool
+	Args              *GetArgs
+	Resource          *ExtendedResource
+	List              *ra.ListResponse
+	Item              *ra.ListItem
+	Instruction       string
+	VaultForm         *VaultPledgeAddForm
+	VaultButton       *VaultButton
+	VaultPledgeRemove *VaultPledgeRemoveForm
+	Vault             bool
 }
 
 type ExtendedResource struct {
@@ -182,13 +183,21 @@ func (s *Handler) get(c *gin.Context) {
 		}
 		d.VaultButton = vaultButton
 		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/pledge/add" {
-			vaultForm, err := s.prepareVaultForm(c, args)
+			vaultForm, err := s.prepareVaultPledgeAddForm(c, args)
 			if err != nil {
 				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault form")))
 				return
 			}
 
 			d.VaultForm = vaultForm
+		}
+		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/pledge/remove" {
+			vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
+			if err != nil {
+				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault pledge remove form")))
+				return
+			}
+			d.VaultPledgeRemove = vaultPledgeRemoveForm
 		}
 	}
 

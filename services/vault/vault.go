@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	vaultServiceHostFlag = "vault-service-host"
-	vaultServicePortFlag = "vault-service-port"
+	vaultServiceHostFlag        = "vault-service-host"
+	vaultServicePortFlag        = "vault-service-port"
+	vaultPledgeFreezePeriodFlag = "vault-pledge-freeze-period"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -34,21 +35,29 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Value:  80,
 			EnvVar: "VAULT_SERVICE_PORT",
 		},
+		cli.DurationFlag{
+			Name:   vaultPledgeFreezePeriodFlag,
+			Usage:  "vault pledge freeze period",
+			Value:  24 * time.Hour,
+			EnvVar: "VAULT_PLEDGE_FREEZE_PERIOD",
+		},
 	)
 }
 
 type Vault struct {
-	host   string
-	port   int
-	claims *claims.Claims
-	client *http.Client
-	pg     *cs.PG
-	api    *api.Api
+	host         string
+	port         int
+	claims       *claims.Claims
+	client       *http.Client
+	pg           *cs.PG
+	api          *api.Api
+	freezePeriod time.Duration
 }
 
 func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
 	host := c.String(vaultServiceHostFlag)
 	port := c.Int(vaultServicePortFlag)
+	freezePeriod := c.Duration(vaultPledgeFreezePeriodFlag)
 
 	// Return nil if host or port is not configured
 	if host == "" {
@@ -56,12 +65,13 @@ func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, rest
 	}
 
 	return &Vault{
-		host:   host,
-		port:   port,
-		claims: cl,
-		client: client,
-		pg:     pg,
-		api:    restApi,
+		host:         host,
+		port:         port,
+		claims:       cl,
+		client:       client,
+		pg:           pg,
+		api:          restApi,
+		freezePeriod: freezePeriod,
 	}
 }
 
@@ -240,8 +250,15 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 
 	// Process pledges
 	for _, pledge := range pledges {
-		// Frozen: sum of pledges with frozen=true AND funded=true
-		if pledge.Frozen && pledge.Funded {
+		// Check if pledge is frozen using IsPledgeFrozen method
+		isFrozen, err := s.IsPledgeFrozen(&pledge)
+		if err != nil {
+			// If error checking frozen status, skip this pledge
+			continue
+		}
+
+		// Frozen: sum of pledges that are frozen AND funded
+		if isFrozen && pledge.Funded {
 			stats.Frozen += pledge.Amount
 		}
 
@@ -251,7 +268,7 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 		}
 
 		// Claimable: funded but not frozen
-		if pledge.Funded && !pledge.Frozen {
+		if pledge.Funded && !isFrozen {
 			stats.Claimable += pledge.Amount
 		}
 	}
@@ -329,14 +346,13 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			}
 		}
 
-		// Create pledge with Funded=true, Frozen=true, FundedAt=now()
+		// Create pledge with Funded=true, FrozenAt=now()
 		now := time.Now()
 		pledge := &vaultModels.Pledge{
 			UserID:     user.ID,
 			ResourceID: resource.ResourceID,
 			Amount:     resource.RequiredVP,
 			Funded:     true,
-			Frozen:     true,
 			FrozenAt:   now,
 		}
 
@@ -463,6 +479,101 @@ func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultM
 	}
 
 	return pledge, nil
+}
+
+// IsPledgeFrozen checks if a pledge is currently in the freeze period
+func (s *Vault) IsPledgeFrozen(pledge *vaultModels.Pledge) (bool, error) {
+	if pledge == nil {
+		return false, errors.New("pledge is nil")
+	}
+
+	// Calculate the time when freeze period ends
+	freezeEndTime := pledge.FrozenAt.Add(s.freezePeriod)
+
+	// Check if current time is still within freeze period
+	now := time.Now()
+	isFrozen := now.Before(freezeEndTime)
+
+	return isFrozen, nil
+}
+
+// RemovePledge removes a pledge and updates the resource accordingly
+func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) error {
+	if pledge == nil {
+		return errors.New("pledge is nil")
+	}
+
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("database connection is not available")
+	}
+
+	// Execute in transaction
+	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+		// Lock the resource for update
+		resource := &vaultModels.Resource{}
+		err := tx.Model(resource).
+			Where("resource_id = ?", pledge.ResourceID).
+			For("UPDATE").
+			Select()
+		if err != nil {
+			if errors.Is(err, pg.ErrNoRows) {
+				return errors.New("resource not found")
+			}
+			return errors.Wrap(err, "failed to lock resource")
+		}
+
+		// Delete the pledge
+		err = vaultModels.DeletePledge(ctx, tx, pledge.PledgeID)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete pledge")
+		}
+
+		// Create tx_log entry with OpTypeClaim (positive balance - returning points)
+		txLog := &vaultModels.TxLog{
+			UserID:     pledge.UserID,
+			ResourceID: &pledge.ResourceID,
+			Balance:    pledge.Amount,
+			OpType:     vaultModels.OpTypeClaim,
+		}
+		_, err = tx.Model(txLog).Context(ctx).Insert()
+		if err != nil {
+			return errors.Wrap(err, "failed to create claim log")
+		}
+
+		// Update resource: decrease funded_vp by pledge amount
+		newFundedVP := resource.FundedVP - pledge.Amount
+		if newFundedVP < 0 {
+			newFundedVP = 0
+		}
+		err = vaultModels.UpdateResourceFundedVP(ctx, tx, resource.ResourceID, newFundedVP)
+		if err != nil {
+			return errors.Wrap(err, "failed to update resource funded VP")
+		}
+
+		// If funded_vp < required_vp, mark resource as expired and unfunded
+		if newFundedVP < resource.RequiredVP {
+			// Mark as expired
+			err = vaultModels.MarkResourceExpired(ctx, tx, resource.ResourceID)
+			if err != nil {
+				return errors.Wrap(err, "failed to mark resource as expired")
+			}
+
+			// Mark as unfunded
+			err = vaultModels.MarkResourceUnfunded(ctx, tx, resource.ResourceID)
+			if err != nil {
+				return errors.Wrap(err, "failed to mark resource as unfunded")
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // pointsEqual compares two *float64 values, treating nil as distinct from any number

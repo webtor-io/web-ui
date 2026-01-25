@@ -35,7 +35,8 @@
 </div>
 <div id="log-{{ .Resource.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 {{ end }}
-{{ template "vault/modal" . }}
+{{ template "vault/pledge-add-modal" . }}
+{{ template "vault/pledge-remove-modal" . }}
 {{ template "get_extra" . }}
 {{ "resource/get.js" | asset }}
 {{ end }}

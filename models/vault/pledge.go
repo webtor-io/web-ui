@@ -17,7 +17,6 @@ type Pledge struct {
 	UserID     uuid.UUID `pg:"user_id,notnull,type:uuid"`
 	Amount     float64   `pg:"amount,notnull,type:numeric"`
 	Funded     bool      `pg:"funded,notnull,default:true"`
-	Frozen     bool      `pg:"frozen,notnull,default:true"`
 	FrozenAt   time.Time `pg:"frozen_at,notnull,default:now()"`
 	CreatedAt  time.Time `pg:"created_at,notnull,default:now()"`
 	UpdatedAt  time.Time `pg:"updated_at,notnull,default:now()"`
@@ -106,7 +105,6 @@ func CreatePledge(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID s
 		ResourceID: resourceID,
 		Amount:     amount,
 		Funded:     true,
-		Frozen:     true,
 	}
 
 	_, err := db.Model(pledge).
@@ -131,21 +129,8 @@ func UpdatePledgeFunded(ctx context.Context, db *pg.DB, pledgeID uuid.UUID, fund
 	return nil
 }
 
-// UpdatePledgeFrozen updates the frozen status of a pledge
-func UpdatePledgeFrozen(ctx context.Context, db *pg.DB, pledgeID uuid.UUID, frozen bool) error {
-	_, err := db.Model(&Pledge{}).
-		Context(ctx).
-		Set("frozen = ?", frozen).
-		Where("pledge_id = ?", pledgeID).
-		Update()
-	if err != nil {
-		return errors.Wrap(err, "failed to update pledge frozen status")
-	}
-	return nil
-}
-
 // DeletePledge deletes a pledge
-func DeletePledge(ctx context.Context, db *pg.DB, pledgeID uuid.UUID) error {
+func DeletePledge(ctx context.Context, db pg.DBI, pledgeID uuid.UUID) error {
 	_, err := db.Model(&Pledge{}).
 		Context(ctx).
 		Where("pledge_id = ?", pledgeID).
