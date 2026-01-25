@@ -1,6 +1,6 @@
-{{ define "vault/pledge-success" }}
+{{ define "vault/pledge-modal/add/success" }}
 	<p class="py-4">
-		{{ if .VaultForm.Vaulted }}
+		{{ if .Vaulted }}
 			Your torrent is already in the Vault and will be kept available.
 		{{ else }}
 			Your pledge has been successfully registered and your torrent will be saved in the Vault soon.
@@ -10,9 +10,12 @@
 		<form method="dialog">
 			<button class="btn btn-accent" data-umami-event="vault-pledge-confirmed">Got it!</button>
 		</form>
-		<form method="get" data-async-target="#pledge-remove-form" data-async-push-state="false">
+		<form method="get" data-async-target="#pledge-modal" data-async-push-state="false">
 			<input type="hidden" name="pledge-remove-form" value="true" />
 			<button type="submit" class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-pledge-remove-requested">Remove Pledge</button>
 		</form>
 	</div>
+	<script>
+		document.querySelector("#pledge-button").reload();
+	</script>
 {{ end }}

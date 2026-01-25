@@ -170,18 +170,18 @@ function asyncLinks(p = {}) {
     async('a', params);
 }
 
-function asyncGet(p = {}) {
+function asyncLayout(p = {}) {
     const params = Object.assign({
         fetchParams() {
-            const url = this.getAttribute('data-async-get');
+            const url = window.location.href;
             return {url};
         },
     }, p)
-    async('*[data-async-get]', params);
+    async('*[data-async-layout]', params);
 }
 
 export function bindAsync(params = {}) {
     asyncLinks(params);
     asyncForms(params);
-    asyncGet(params);
+    asyncLayout(params);
 }

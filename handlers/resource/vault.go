@@ -17,6 +17,7 @@ type VaultPledgeAddForm struct {
 	Err           error
 	Funded        bool
 	Vaulted       bool
+	ResourceID    string
 }
 
 type VaultButton struct {
@@ -24,9 +25,10 @@ type VaultButton struct {
 }
 
 type VaultPledgeRemoveForm struct {
-	Frozen bool
-	Status string
-	Err    error
+	Frozen     bool
+	Status     string
+	Err        error
+	ResourceID string
 }
 
 func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*VaultPledgeAddForm, error) {
@@ -62,6 +64,7 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 		TorrentSizeGB: torrentSizeGB,
 		Funded:        false,
 		Vaulted:       false,
+		ResourceID:    args.ID,
 	}
 
 	// Check if user is supporting this torrent
@@ -146,7 +149,8 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 	ctx := c.Request.Context()
 
 	form := &VaultPledgeRemoveForm{
-		Frozen: false,
+		Frozen:     false,
+		ResourceID: args.ID,
 	}
 
 	// Handle redirect from vault handler

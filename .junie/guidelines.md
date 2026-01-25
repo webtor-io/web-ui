@@ -235,6 +235,23 @@ Frontend Development Philosophy
   - Include `X-Return-Url` header handling in handlers to redirect back to the originating page after form submissions.
   - Handlers should use `c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))` pattern for form processing.
 
+- Auto-updating components pattern
+  - **Direct reload method**:
+    - If the component container has `data-async-layout` attribute, you can call `reload()` method directly:
+    ```javascript
+    document.querySelector("#component-id").reload();
+    ```
+    - This method is simpler but requires the element to be initialized by the async system first
+  - **Key requirements**:
+    - Container must have unique `id` attribute
+    - Container must have `data-async-layout` attribute with the template path
+    - Hidden form must have `data-async-target` pointing to the container's `id`
+    - Hidden form must have `data-async-push-state="false"` to avoid browser history pollution
+    - Use `requestSubmit()` instead of `submit()` to properly trigger form event handlers
+  - **Reference implementations**:
+    - `templates/partials/vault/button.html` + `templates/partials/vault/pledge-success.html` — Vault button auto-update after pledge creation
+    - `templates/partials/library/button.html` — Library button pattern (similar approach)
+
 - Anti-patterns to avoid
   - **Heavy JavaScript frameworks**: Avoid React, Vue, Angular, or similar client-side frameworks.
   - **AJAX-heavy interfaces**: Don't build interfaces that depend entirely on JavaScript for basic functionality.
