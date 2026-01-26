@@ -133,6 +133,9 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 		claimsPoints = &points
 	}
 
+	//p := float64(1)
+	//claimsPoints = &p
+
 	// Execute in transaction with SELECT FOR UPDATE
 	var result *vaultModels.UserVP
 	err = db.RunInTransaction(ctx, func(tx *pg.Tx) error {
@@ -224,6 +227,12 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 			if err != nil {
 				return errors.Wrap(err, "failed to create change tier log")
 			}
+		}
+
+		// Recalculate pledge funding based on new total
+		err = s.recalculatePledgeFunding(ctx, tx, user, claimsPoints)
+		if err != nil {
+			return errors.Wrap(err, "failed to recalculate pledge funding")
 		}
 
 		// Fetch updated record
@@ -418,11 +427,11 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			return errors.Wrap(err, "failed to update resource funded VP")
 		}
 
-		// If funded_vp >= required_vp, mark resource as funded
+		// If funded_vp >= required_vp, mark resource as funded and unexpired
 		if newFundedVP >= resource.RequiredVP {
-			err = vaultModels.MarkResourceFunded(ctx, tx, resource.ResourceID)
+			err = vaultModels.MarkResourceUnexpiredAndFunded(ctx, tx, resource.ResourceID)
 			if err != nil {
-				return errors.Wrap(err, "failed to mark resource as funded")
+				return errors.Wrap(err, "failed to mark resource as unexpired and funded")
 			}
 		}
 
@@ -606,15 +615,9 @@ func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) er
 		// If funded_vp < required_vp, mark resource as expired and unfunded
 		if newFundedVP < resource.RequiredVP {
 			// Mark as expired
-			err = vaultModels.MarkResourceExpired(ctx, tx, resource.ResourceID)
+			err = vaultModels.MarkResourceExpiredAndUnfunded(ctx, tx, resource.ResourceID)
 			if err != nil {
-				return errors.Wrap(err, "failed to mark resource as expired")
-			}
-
-			// Mark as unfunded
-			err = vaultModels.MarkResourceUnfunded(ctx, tx, resource.ResourceID)
-			if err != nil {
-				return errors.Wrap(err, "failed to mark resource as unfunded")
+				return errors.Wrap(err, "failed to mark resource as expired and unfunded")
 			}
 		}
 
@@ -623,6 +626,140 @@ func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) er
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// defundPledge removes funding from a pledge and updates the resource accordingly
+func (s *Vault) defundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.Pledge, resource *vaultModels.Resource) error {
+	// 1. Set funded = false for the pledge
+	err := vaultModels.UpdatePledgeFunded(ctx, tx, pledge.PledgeID, false)
+	if err != nil {
+		return errors.Wrap(err, "failed to update pledge funded status")
+	}
+
+	// 2. Decrease resource funded_vp by pledge amount
+	newFundedVP := resource.FundedVP - pledge.Amount
+	err = vaultModels.UpdateResourceFundedVP(ctx, tx, resource.ResourceID, newFundedVP)
+	if err != nil {
+		return errors.Wrap(err, "failed to adjust resource funded VP")
+	}
+
+	// Update local resource state
+	resource.FundedVP -= pledge.Amount
+
+	// 3. If funded_vp < required_vp and expired = false, mark as expired
+	if resource.FundedVP < resource.RequiredVP && !resource.Expired {
+		err = vaultModels.MarkResourceExpiredAndUnfunded(ctx, tx, resource.ResourceID)
+		if err != nil {
+			return errors.Wrap(err, "failed to mark resource as expired and unfunded")
+		}
+		resource.Expired = true
+		resource.Funded = false
+	}
+
+	return nil
+}
+
+// fundPledge adds funding to a pledge and updates the resource accordingly
+func (s *Vault) fundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.Pledge, resource *vaultModels.Resource) error {
+	// 1. Set funded = true for the pledge
+	err := vaultModels.UpdatePledgeFunded(ctx, tx, pledge.PledgeID, true)
+	if err != nil {
+		return errors.Wrap(err, "failed to update pledge funded status")
+	}
+
+	// 2. Increase resource funded_vp by pledge amount
+	newFundedVP := resource.FundedVP + pledge.Amount
+	err = vaultModels.UpdateResourceFundedVP(ctx, tx, resource.ResourceID, newFundedVP)
+	if err != nil {
+		return errors.Wrap(err, "failed to adjust resource funded VP")
+	}
+
+	// Update local resource state
+	resource.FundedVP += pledge.Amount
+
+	// 3. If funded_vp >= required_vp and expired = true, mark as unexpired and funded
+	if resource.FundedVP >= resource.RequiredVP && resource.Expired {
+		err = vaultModels.MarkResourceUnexpiredAndFunded(ctx, tx, resource.ResourceID)
+		if err != nil {
+			return errors.Wrap(err, "failed to mark resource as unexpired")
+		}
+		resource.Expired = false
+		resource.Funded = true
+	}
+
+	return nil
+}
+
+// recalculatePledgeFunding recalculates which pledges should be funded based on user's total points
+func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *auth.User, total *float64) error {
+	// Get all user pledges ordered by creation time (ascending)
+	pledges, err := vaultModels.GetUserPledgesOrderedByCreation(ctx, tx, user.ID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get user pledges")
+	}
+
+	// Track accumulated amount
+	accumulatedAmount := float64(0)
+
+	// Process each pledge in order
+	for i := range pledges {
+		pledge := &pledges[i]
+
+		// Fetch resource
+		resource := &vaultModels.Resource{}
+		err := tx.Model(resource).
+			Where("resource_id = ?", pledge.ResourceID).
+			For("UPDATE").
+			Select()
+		if err != nil {
+			if errors.Is(err, pg.ErrNoRows) {
+				// Resource doesn't exist, skip this pledge
+				continue
+			}
+			return errors.Wrap(err, "failed to lock resource")
+		}
+
+		// Check if this pledge should be funded
+		if total == nil || accumulatedAmount+pledge.Amount <= *total {
+			// This pledge should be funded
+			if !pledge.Funded {
+				// Fund the pledge
+				err = s.fundPledge(ctx, tx, pledge, resource)
+				if err != nil {
+					return errors.Wrap(err, "failed to fund pledge")
+				}
+			}
+			// Add to accumulated amount (whether it was already funded or just funded)
+			accumulatedAmount += pledge.Amount
+		} else {
+			// This pledge should NOT be funded (accumulated would exceed total)
+			if pledge.Funded {
+				// Defund the pledge
+				err = s.defundPledge(ctx, tx, pledge, resource)
+				if err != nil {
+					return errors.Wrap(err, "failed to defund pledge")
+				}
+			}
+			// Don't add to accumulated amount
+		}
+	}
+
+	return nil
+}
+
+// RemoveResource removes a resource from the database
+func (s *Vault) RemoveResource(ctx context.Context, resourceID string) error {
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("database connection is not available")
+	}
+
+	err := vaultModels.DeleteResource(ctx, db, resourceID)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete resource")
 	}
 
 	return nil

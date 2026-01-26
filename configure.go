@@ -9,5 +9,6 @@ func configure(app *cli.App) {
 	migrationCMD := makePGMigrationCMD()
 	enrichCMD := makeEnrichCMD()
 	cacheIndexCMD := makeCacheIndexCMD()
-	app.Commands = []cli.Command{serveCMD, migrationCMD, enrichCMD, cacheIndexCMD}
+	vaultCMD := makeVaultCMD()
+	app.Commands = []cli.Command{serveCMD, migrationCMD, enrichCMD, cacheIndexCMD, vaultCMD}
 }

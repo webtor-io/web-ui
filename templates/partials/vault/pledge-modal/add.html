@@ -20,7 +20,7 @@
 		{{ template "vault/pledge-modal/add/success" . }}
 	{{ else }}
 		{{ if .Available }}
-			{{ if ge .Available .Required }}
+			{{ if ge (derefFloat64 .Available) .Required }}
 				<p class="py-4">
 					You have enough Vault Points to store this torrent in the Vault.
 				</p>
@@ -30,6 +30,8 @@
 				</p>
 				<p class="pb-4">
 					Try upgrading your subscription to the next tier to get more Vault Points.
+				</p>
+				<p>
 					<a href="/donate" target="_blank" class="link link-accent" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
 				</p>
 			{{ end }}
@@ -53,7 +55,7 @@
 						<td class="font-semibold">Your Available VP:</td>
 						<td class="text-center">
 							{{ if .Available }}
-								{{ printf "%.2f" .Available }}
+								{{ printf "%.2f" (derefFloat64 .Available) }}
 							{{ else }}
 								<span class="text-xl">∞</span>
 							{{ end }}
@@ -63,7 +65,7 @@
 						<td class="font-semibold">Your Total VP:</td>
 						<td class="text-center">
 							{{ if .Total }}
-								{{ printf "%.2f" .Total }}
+								{{ printf "%.2f" (derefFloat64 .Total) }}
 							{{ else }}
 								<span class="text-xl">∞</span>
 							{{ end }}
@@ -78,7 +80,7 @@
 		</div>
 
 		<div class="modal-action justify-center">
-			{{ if or (not .Available) (ge .Available .Required) }}
+			{{ if or (not .Available) (ge (derefFloat64 .Available) .Required) }}
 				<form action="/vault/pledge/add" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 					<input type="hidden" name="resource_id" value="{{ .ResourceID }}" />
 					<button type="submit" class="btn btn-accent" data-umami-event="vault-store-confirmed">

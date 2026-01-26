@@ -39,34 +39,6 @@ func GetResource(ctx context.Context, db *pg.DB, resourceID string) (*Resource, 
 	return resource, nil
 }
 
-// GetFundedResources returns all funded resources
-func GetFundedResources(ctx context.Context, db *pg.DB) ([]Resource, error) {
-	var resources []Resource
-	err := db.Model(&resources).
-		Context(ctx).
-		Where("funded = true").
-		Order("funded_at DESC").
-		Select()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get funded resources")
-	}
-	return resources, nil
-}
-
-// GetVaultedResources returns all vaulted resources
-func GetVaultedResources(ctx context.Context, db *pg.DB) ([]Resource, error) {
-	var resources []Resource
-	err := db.Model(&resources).
-		Context(ctx).
-		Where("vaulted = true").
-		Order("vaulted_at DESC").
-		Select()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get vaulted resources")
-	}
-	return resources, nil
-}
-
 // CreateResource creates a new resource
 func CreateResource(ctx context.Context, db *pg.DB, resourceID string, requiredVP float64) (*Resource, error) {
 	resource := &Resource{
@@ -100,21 +72,6 @@ func UpdateResourceFundedVP(ctx context.Context, db pg.DBI, resourceID string, f
 	return nil
 }
 
-// MarkResourceFunded marks a resource as funded
-func MarkResourceFunded(ctx context.Context, db pg.DBI, resourceID string) error {
-	now := time.Now()
-	_, err := db.Model(&Resource{}).
-		Context(ctx).
-		Set("funded = true").
-		Set("funded_at = ?", now).
-		Where("resource_id = ?", resourceID).
-		Update()
-	if err != nil {
-		return errors.Wrap(err, "failed to mark resource as funded")
-	}
-	return nil
-}
-
 // MarkResourceVaulted marks a resource as vaulted
 func MarkResourceVaulted(ctx context.Context, db *pg.DB, resourceID string) error {
 	now := time.Now()
@@ -130,33 +87,59 @@ func MarkResourceVaulted(ctx context.Context, db *pg.DB, resourceID string) erro
 	return nil
 }
 
-// MarkResourceExpired marks a resource as expired
-func MarkResourceExpired(ctx context.Context, db pg.DBI, resourceID string) error {
+// MarkResourceUnexpiredAndFunded marks a resource as not expired and funded
+func MarkResourceUnexpiredAndFunded(ctx context.Context, db pg.DBI, resourceID string) error {
+	now := time.Now()
+	_, err := db.Model(&Resource{}).
+		Context(ctx).
+		Set("expired = false").
+		Set("expired_at = NULL").
+		Set("funded = true").
+		Set("funded_at = ?", now).
+		Where("resource_id = ?", resourceID).
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to mark resource as unexpired")
+	}
+	return nil
+}
+
+// MarkResourceExpiredAndUnfunded marks a resource as expired and unfunded
+func MarkResourceExpiredAndUnfunded(ctx context.Context, db pg.DBI, resourceID string) error {
 	now := time.Now()
 	_, err := db.Model(&Resource{}).
 		Context(ctx).
 		Set("expired = true").
 		Set("expired_at = ?", now).
+		Set("funded_at = NULL").
+		Set("funded = false").
 		Where("resource_id = ?", resourceID).
 		Update()
 	if err != nil {
-		return errors.Wrap(err, "failed to mark resource as expired")
+		return errors.Wrap(err, "failed to mark resource as expired and unfunded")
 	}
 	return nil
 }
 
-// MarkResourceUnfunded marks a resource as unfunded
-func MarkResourceUnfunded(ctx context.Context, db pg.DBI, resourceID string) error {
-	_, err := db.Model(&Resource{}).
+// GetExpiredResources returns resources that should be reaped based on expiration and transfer timeout periods
+func GetExpiredResources(ctx context.Context, db *pg.DB, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]Resource, error) {
+	var resources []Resource
+	now := time.Now()
+	expireThreshold := now.Add(-expirePeriod)
+	transferThreshold := now.Add(-transferTimeoutPeriod)
+
+	err := db.Model(&resources).
 		Context(ctx).
-		Set("funded = false").
-		Set("funded_at = NULL").
-		Where("resource_id = ?", resourceID).
-		Update()
+		WhereGroup(func(q *pg.Query) (*pg.Query, error) {
+			q = q.WhereOr("expired_at IS NOT NULL AND expired_at < ?", expireThreshold).
+				WhereOr("funded_at IS NOT NULL AND funded_at < ? AND vaulted = false", transferThreshold)
+			return q, nil
+		}).
+		Select()
 	if err != nil {
-		return errors.Wrap(err, "failed to mark resource as unfunded")
+		return nil, errors.Wrap(err, "failed to get expired resources")
 	}
-	return nil
+	return resources, nil
 }
 
 // DeleteResource deletes a resource

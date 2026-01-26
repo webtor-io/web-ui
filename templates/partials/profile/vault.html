@@ -13,7 +13,7 @@
                                             <td class="text-left font-semibold">Total</td>
                                             <td class="text-center">
                                                 {{ if .Data.VaultStats.Total }}
-                                                    {{ printf "%.2f" .Data.VaultStats.Total }}
+                                                    {{ printf "%.2f" (derefFloat64 .Data.VaultStats.Total) }}
                                                 {{ else }}
                                                     <span class="text-xl">∞</span>
                                                 {{ end }}
@@ -23,7 +23,7 @@
                                             <td class="text-left font-semibold">Available</td>
                                             <td class="text-center">
                                                 {{ if .Data.VaultStats.Available }}
-                                                    {{ printf "%.2f" .Data.VaultStats.Available }}
+                                                    {{ printf "%.2f" (derefFloat64 .Data.VaultStats.Available) }}
                                                 {{ else }}
                                                     <span class="text-xl">∞</span>
                                                 {{ end }}

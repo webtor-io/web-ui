@@ -335,3 +335,11 @@ func (s *Helper) Tools() []hc.Tool {
 func (s *Helper) Duration(d time.Duration) string {
 	return durafmt.Parse(d).LimitFirstN(2).String()
 }
+
+// Deref dereferences a pointer to float64, returning 0 if the pointer is nil
+func (s *Helper) DerefFloat64(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}

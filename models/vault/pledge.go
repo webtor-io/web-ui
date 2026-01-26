@@ -24,22 +24,6 @@ type Pledge struct {
 	User *models.User `pg:"rel:has-one,fk:user_id"`
 }
 
-// GetPledge returns a pledge by ID
-func GetPledge(ctx context.Context, db *pg.DB, pledgeID uuid.UUID) (*Pledge, error) {
-	pledge := &Pledge{}
-	err := db.Model(pledge).
-		Context(ctx).
-		Where("pledge_id = ?", pledgeID).
-		Select()
-	if err != nil {
-		if errors.Is(err, pg.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, errors.Wrap(err, "failed to get pledge")
-	}
-	return pledge, nil
-}
-
 // GetUserPledges returns all pledges for a specific user
 func GetUserPledges(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]Pledge, error) {
 	var pledges []Pledge
@@ -50,6 +34,20 @@ func GetUserPledges(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]Pledge,
 		Select()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user pledges")
+	}
+	return pledges, nil
+}
+
+// GetUserPledgesOrderedByCreation returns all pledges for a specific user ordered by creation time ascending
+func GetUserPledgesOrderedByCreation(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]Pledge, error) {
+	var pledges []Pledge
+	err := db.Model(&pledges).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user pledges ordered by creation")
 	}
 	return pledges, nil
 }
@@ -84,40 +82,8 @@ func GetUserResourcePledge(ctx context.Context, db *pg.DB, userID uuid.UUID, res
 	return pledge, nil
 }
 
-// GetFundedResourcePledges returns all funded pledges for a specific resource
-func GetFundedResourcePledges(ctx context.Context, db *pg.DB, resourceID string) ([]Pledge, error) {
-	var pledges []Pledge
-	err := db.Model(&pledges).
-		Context(ctx).
-		Where("resource_id = ? AND funded = true", resourceID).
-		Order("created_at DESC").
-		Select()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get funded resource pledges")
-	}
-	return pledges, nil
-}
-
-// CreatePledge creates a new pledge
-func CreatePledge(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID string, amount float64) (*Pledge, error) {
-	pledge := &Pledge{
-		UserID:     userID,
-		ResourceID: resourceID,
-		Amount:     amount,
-		Funded:     true,
-	}
-
-	_, err := db.Model(pledge).
-		Context(ctx).
-		Insert()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create pledge")
-	}
-	return pledge, nil
-}
-
 // UpdatePledgeFunded updates the funded status of a pledge
-func UpdatePledgeFunded(ctx context.Context, db *pg.DB, pledgeID uuid.UUID, funded bool) error {
+func UpdatePledgeFunded(ctx context.Context, db pg.DBI, pledgeID uuid.UUID, funded bool) error {
 	_, err := db.Model(&Pledge{}).
 		Context(ctx).
 		Set("funded = ?", funded).
@@ -139,18 +105,4 @@ func DeletePledge(ctx context.Context, db pg.DBI, pledgeID uuid.UUID) error {
 		return errors.Wrap(err, "failed to delete pledge")
 	}
 	return nil
-}
-
-// SumFundedPledgesForResource calculates total funded amount for a resource
-func SumFundedPledgesForResource(ctx context.Context, db *pg.DB, resourceID string) (float64, error) {
-	var sum float64
-	err := db.Model(&Pledge{}).
-		Context(ctx).
-		ColumnExpr("COALESCE(SUM(amount), 0)").
-		Where("resource_id = ? AND funded = true", resourceID).
-		Select(&sum)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to sum funded pledges")
-	}
-	return sum, nil
 }

@@ -341,6 +341,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
      - Create new `user_vp` record with `total = claimsPoints`
      - If `claimsPoints != nil` AND `claimsPoints != 0`, create `tx_log` entry with `OpTypeChangeTier` and `balance = claimsPoints`
      - If `claimsPoints == nil` (unlimited) OR `claimsPoints == 0` (free tier), do not create tx_log entry
+     - **Recalculate pledge funding** based on new total (see `recalculatePledgeFunding` method)
    - **Case 2: Record exists and points match**
      - Do nothing, return existing record
    - **Case 3: Record exists and points differ**
@@ -348,6 +349,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
      - Update `user_vp.total` to new value
      - If `newValue != 0`, create `tx_log` entry with `OpTypeChangeTier` and `balance = difference`
      - If `newValue == 0` (free tier), do not create tx_log entry
+     - **Recalculate pledge funding** based on new total (see `recalculatePledgeFunding` method)
      - Fetch and return updated record
 4. Return updated `UserVP` record or error
 
@@ -703,6 +705,127 @@ func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) er
 
 **Usage:**
 This method is called by the vault handler when a user removes their pledge. It ensures that the resource state is correctly updated and the user's VP is returned.
+
+#### Method `defundPledge` (internal)
+
+Removes funding from a pledge and updates the resource accordingly. This is an internal method used during pledge funding recalculation.
+
+**Signature:**
+```go
+func (s *Vault) defundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.Pledge, resource *vaultModels.Resource) error
+```
+
+**Parameters:**
+- `ctx` — request context
+- `tx` — database transaction
+- `pledge` — pledge to defund
+- `resource` — resource associated with the pledge
+
+**Algorithm:**
+1. Set `funded = false` for the pledge using `UpdatePledgeFunded`
+2. Decrease `resource.funded_vp` by `pledge.Amount` using `AdjustResourceFundedVP`
+3. Update local resource state: `resource.FundedVP -= pledge.Amount`
+4. If `resource.FundedVP < resource.RequiredVP` AND `resource.Expired = false`:
+   - Mark resource as expired and unfunded using `MarkResourceExpiredAndUnfunded`
+   - Set `resource.expired = true`, `resource.expired_at = now()`, `resource.funded_at = NULL`
+   - Update local state: `resource.Expired = true`, `resource.Funded = false`
+
+**Features:**
+- Operates within an existing transaction
+- Updates both database and local resource state for consistency
+- Automatically marks resource as expired when funding drops below required amount
+- Does not create transaction log entries (handled by parent operation)
+
+#### Method `fundPledge` (internal)
+
+Adds funding to a pledge and updates the resource accordingly. This is an internal method used during pledge funding recalculation.
+
+**Signature:**
+```go
+func (s *Vault) fundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.Pledge, resource *vaultModels.Resource) error
+```
+
+**Parameters:**
+- `ctx` — request context
+- `tx` — database transaction
+- `pledge` — pledge to fund
+- `resource` — resource associated with the pledge
+
+**Algorithm:**
+1. Set `funded = true` for the pledge using `UpdatePledgeFunded`
+2. Increase `resource.funded_vp` by `pledge.Amount` using `AdjustResourceFundedVP`
+3. Update local resource state: `resource.FundedVP += pledge.Amount`
+4. If `resource.FundedVP >= resource.RequiredVP` AND `resource.Expired = true`:
+   - Mark resource as unexpired and funded using `MarkResourceUnexpired`
+   - Set `resource.expired = false`, `resource.expired_at = NULL`, `resource.funded = true`, `resource.funded_at = now()`
+   - Update local state: `resource.Expired = false`, `resource.Funded = true`
+
+**Features:**
+- Operates within an existing transaction
+- Updates both database and local resource state for consistency
+- Automatically marks resource as funded when funding reaches required amount
+- Does not create transaction log entries (handled by parent operation)
+
+#### Method `recalculatePledgeFunding` (internal)
+
+Recalculates which pledges should be funded based on user's total points. This method is called automatically when user's total points change.
+
+**Signature:**
+```go
+func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *auth.User, total *float64) error
+```
+
+**Parameters:**
+- `ctx` — request context
+- `tx` — database transaction
+- `user` — authenticated user
+- `total` — user's total vault points (nil if unlimited)
+
+**Algorithm:**
+1. If `total = nil` (unlimited), return immediately (no recalculation needed)
+2. Get all user pledges ordered by creation time (ascending) using `GetUserPledgesOrderedByCreation`
+3. Initialize `accumulatedAmount = 0`
+4. For each pledge in order:
+   - Fetch and lock the resource using `SELECT FOR UPDATE`
+   - If `accumulatedAmount + pledge.Amount <= total`:
+     - If `pledge.Funded = false`: call `fundPledge` to activate the pledge
+     - Add `pledge.Amount` to `accumulatedAmount`
+   - Else (accumulated would exceed total):
+     - If `pledge.Funded = true`: call `defundPledge` to deactivate the pledge
+     - Do not add to `accumulatedAmount`
+5. Return nil on success or error on failure
+
+**Features:**
+- Operates within an existing transaction (part of UpdateUserVP transaction)
+- Processes pledges in creation order (oldest first) to ensure fairness
+- Locks resources with `SELECT FOR UPDATE` to prevent concurrent modifications
+- Automatically funds/defunds pledges based on available points
+- Skips pledges for non-existent resources
+
+**Example Scenario:**
+
+User has 3 pledges (created in order):
+1. Pledge A: 10 VP (created first)
+2. Pledge B: 15 VP (created second)
+3. Pledge C: 20 VP (created third)
+
+**Case 1: User has 30 VP total**
+- Accumulated: 0 → 10 (fund A) → 25 (fund B) → 45 > 30 (defund C)
+- Result: A and B are funded, C is defunded
+
+**Case 2: User downgrades to 20 VP total**
+- Accumulated: 0 → 10 (A stays funded) → 25 > 20 (defund B) → (defund C)
+- Result: Only A is funded, B and C are defunded
+
+**Case 3: User upgrades to 50 VP total**
+- Accumulated: 0 → 10 (A stays funded) → 25 (fund B) → 45 (fund C)
+- Result: All pledges are funded
+
+**Error Handling:**
+- Returns error if fetching pledges fails
+- Returns error if locking resource fails
+- Returns error if funding/defunding operation fails
+- Skips pledges for non-existent resources (logs warning)
 
 ## Processes and Use Cases
 
@@ -1281,6 +1404,75 @@ The resource view template includes both vault components:
 - Button works without JavaScript (submits GET form)
 - With JavaScript, form submission is asynchronous and updates only the modal area
 - Modal can be closed by clicking backdrop or Cancel button
+
+## CLI Commands
+
+### Vault Reap Command
+
+The `vault reap` command (alias: `v r`) is a maintenance command that removes expired vault resources and their associated pledges.
+
+**Usage:**
+```bash
+./web-ui vault reap [options]
+# or using alias
+./web-ui v r [options]
+```
+
+**What it does:**
+
+1. Selects all vault resources that meet one of the following conditions:
+   - `expired_at < now - VAULT_RESOURCE_EXPIRE_PERIOD` (default: 7 days) - resources marked as expired
+   - `funded_at < now - VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD AND vaulted = false` (default: 7 days) - resources that were funded but failed to transfer to vault within the timeout period
+
+2. For each expired resource:
+   - Retrieves all associated pledges
+   - Removes each pledge through the vault service (which handles VP return and tx_log entries)
+   - Deletes the resource from the database
+
+**Configuration:**
+
+The command uses the following environment variables/flags:
+
+- `VAULT_RESOURCE_EXPIRE_PERIOD` / `--vault-resource-expire-period`: Period after which unfunded resource is removed from vault (default: 168h = 7 days)
+- `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` / `--vault-resource-transfer-timeout-period`: Period after which resource is removed and transfer attempts are stopped (default: 168h = 7 days)
+- `VAULT_SERVICE_HOST` / `--vault-service-host`: Vault service host (required)
+- `VAULT_SERVICE_PORT` / `--vault-service-port`: Vault service port (default: 80)
+
+Plus all standard database and API configuration flags.
+
+**Implementation Details:**
+
+- **File:** `reap.go`
+- **Model Method:** `models/vault/resource.go::GetExpiredResources()` - queries resources based on expiration conditions
+- **Service Methods:**
+  - `services/vault/vault.go::RemovePledge()` - handles pledge removal with proper VP return and logging
+  - `services/vault/vault.go::RemoveResource()` - handles resource deletion from the database
+- **Transaction Safety:** Each pledge removal is wrapped in a database transaction to ensure consistency
+
+**Logging:**
+
+The command logs:
+- Start of reap process with configured periods
+- Number of expired resources found
+- Processing of each resource with pledge count
+- Each pledge removal with user ID and amount
+- Resource deletion
+- Completion of reap process
+
+**Error Handling:**
+
+- If a pledge cannot be removed, it logs a warning and continues with the next pledge
+- If a resource cannot be deleted, it logs a warning and continues with the next resource
+- This ensures partial failures don't stop the entire reap process
+
+**Recommended Usage:**
+
+Run this command periodically (e.g., via cron) to clean up expired resources:
+
+```bash
+# Example cron entry (daily at 3 AM)
+0 3 * * * /path/to/web-ui vault reap
+```
 
 ## Future Improvements
 
