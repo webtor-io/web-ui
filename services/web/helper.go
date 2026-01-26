@@ -22,6 +22,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hako/durafmt"
 	"github.com/urfave/cli"
 
 	h "github.com/dustin/go-humanize"
@@ -328,4 +329,9 @@ func (s *Helper) Printf(format string, args ...any) string {
 // Tools returns the list of all available tool pages
 func (s *Helper) Tools() []hc.Tool {
 	return hc.Tools
+}
+
+// Duration formats a time.Duration into a human-readable string
+func (s *Helper) Duration(d time.Duration) string {
+	return durafmt.Parse(d).LimitFirstN(2).String()
 }

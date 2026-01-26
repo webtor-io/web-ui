@@ -117,7 +117,7 @@ func (h *Handler) deletePledge(ctx context.Context, resourceID string, user *aut
 	}
 
 	// Check if pledge is frozen
-	isFrozen, err := h.vault.IsPledgeFrozen(pledge)
+	isFrozen, err := h.vault.IsPledgeFrozen(ctx, pledge)
 	if err != nil {
 		return errors.Wrap(err, "failed to check pledge frozen status")
 	}

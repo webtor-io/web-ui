@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	vaultServiceHostFlag        = "vault-service-host"
-	vaultServicePortFlag        = "vault-service-port"
-	vaultPledgeFreezePeriodFlag = "vault-pledge-freeze-period"
+	vaultServiceHostFlag                   = "vault-service-host"
+	vaultServicePortFlag                   = "vault-service-port"
+	vaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
+	vaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
+	vaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -41,23 +43,39 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Value:  24 * time.Hour,
 			EnvVar: "VAULT_PLEDGE_FREEZE_PERIOD",
 		},
+		cli.DurationFlag{
+			Name:   vaultResourceExpirePeriodFlag,
+			Usage:  "period after which unfunded resource is removed from vault",
+			Value:  7 * 24 * time.Hour,
+			EnvVar: "VAULT_RESOURCE_EXPIRE_PERIOD",
+		},
+		cli.DurationFlag{
+			Name:   vaultResourceTransferTimeoutPeriodFlag,
+			Usage:  "period after which resource is removed and transfer attempts are stopped",
+			Value:  7 * 24 * time.Hour,
+			EnvVar: "VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD",
+		},
 	)
 }
 
 type Vault struct {
-	host         string
-	port         int
-	claims       *claims.Claims
-	client       *http.Client
-	pg           *cs.PG
-	api          *api.Api
-	freezePeriod time.Duration
+	host                  string
+	port                  int
+	claims                *claims.Claims
+	client                *http.Client
+	pg                    *cs.PG
+	api                   *api.Api
+	freezePeriod          time.Duration
+	expirePeriod          time.Duration
+	transferTimeoutPeriod time.Duration
 }
 
 func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
 	host := c.String(vaultServiceHostFlag)
 	port := c.Int(vaultServicePortFlag)
 	freezePeriod := c.Duration(vaultPledgeFreezePeriodFlag)
+	expirePeriod := c.Duration(vaultResourceExpirePeriodFlag)
+	transferTimeoutPeriod := c.Duration(vaultResourceTransferTimeoutPeriodFlag)
 
 	// Return nil if host or port is not configured
 	if host == "" {
@@ -65,14 +83,31 @@ func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, rest
 	}
 
 	return &Vault{
-		host:         host,
-		port:         port,
-		claims:       cl,
-		client:       client,
-		pg:           pg,
-		api:          restApi,
-		freezePeriod: freezePeriod,
+		host:                  host,
+		port:                  port,
+		claims:                cl,
+		client:                client,
+		pg:                    pg,
+		api:                   restApi,
+		freezePeriod:          freezePeriod,
+		expirePeriod:          expirePeriod,
+		transferTimeoutPeriod: transferTimeoutPeriod,
 	}
+}
+
+// GetFreezePeriod returns the pledge freeze period
+func (s *Vault) GetFreezePeriod() time.Duration {
+	return s.freezePeriod
+}
+
+// GetExpirePeriod returns the resource expire period
+func (s *Vault) GetExpirePeriod() time.Duration {
+	return s.expirePeriod
+}
+
+// GetTransferTimeoutPeriod returns the resource transfer timeout period
+func (s *Vault) GetTransferTimeoutPeriod() time.Duration {
+	return s.transferTimeoutPeriod
 }
 
 // UpdateUserVP updates user vault points based on claims
@@ -251,7 +286,7 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 	// Process pledges
 	for _, pledge := range pledges {
 		// Check if pledge is frozen using IsPledgeFrozen method
-		isFrozen, err := s.IsPledgeFrozen(&pledge)
+		isFrozen, err := s.IsPledgeFrozen(ctx, &pledge)
 		if err != nil {
 			// If error checking frozen status, skip this pledge
 			continue
@@ -482,9 +517,26 @@ func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultM
 }
 
 // IsPledgeFrozen checks if a pledge is currently in the freeze period
-func (s *Vault) IsPledgeFrozen(pledge *vaultModels.Pledge) (bool, error) {
+// A pledge is not frozen if the resource is vaulted, regardless of the freeze period
+func (s *Vault) IsPledgeFrozen(ctx context.Context, pledge *vaultModels.Pledge) (bool, error) {
 	if pledge == nil {
 		return false, errors.New("pledge is nil")
+	}
+
+	db := s.pg.Get()
+	if db == nil {
+		return false, errors.New("database connection is not available")
+	}
+
+	// Get the resource to check if it's vaulted
+	resource, err := vaultModels.GetResource(ctx, db, pledge.ResourceID)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get resource")
+	}
+
+	// If resource is vaulted, pledge is not frozen
+	if resource != nil && resource.Vaulted {
+		return false, nil
 	}
 
 	// Calculate the time when freeze period ends

@@ -339,7 +339,7 @@ func serve(c *cli.Context) error {
 	tests.RegisterHandler(r, tm)
 
 	// Setting Instructions
-	instructions.RegisterHandler(r, tm)
+	instructions.RegisterHandler(r, tm, v)
 
 	// Render templates
 	err = tm.Init()

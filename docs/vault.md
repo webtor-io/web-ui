@@ -14,7 +14,8 @@ The Vault system is designed to manage users' virtual points (Vault Points, VP) 
 - **Funding** — the process of accumulating sufficient VP for a resource
 - **Vaulting** — moving a resource to long-term storage after funding
 - **Freezing** — locking a pledge so the user cannot withdraw it
-  - **Freeze period: 1 day** after pledge creation
+  - **Freeze period:** configurable via `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24 hours) after pledge creation
+  - **Freeze is automatically lifted** when the resource is vaulted
 - **Claiming** — returning points to the user from an unfrozen pledge
 - **Expiration** — marking a resource as expired when funding drops below required amount
   - **Deletion period: 7 days** after expiration
@@ -302,6 +303,9 @@ Main service for working with the Vault Points system.
 **Configuration:**
 - `VAULT_SERVICE_HOST` / `--vault-service-host` — Vault service host (required)
 - `VAULT_SERVICE_PORT` / `--vault-service-port` — Vault service port (required)
+- `VAULT_PLEDGE_FREEZE_PERIOD` / `--vault-pledge-freeze-period` — pledge freeze period (default: 24 hours)
+- `VAULT_RESOURCE_EXPIRE_PERIOD` / `--vault-resource-expire-period` — period after which unfunded resource is removed from vault (default: 7 days)
+- `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` / `--vault-resource-transfer-timeout-period` — period after which resource is removed and transfer attempts are stopped (default: 7 days)
 - If either host or port is empty, the service constructor returns `nil`
 
 **Dependencies:**
@@ -615,31 +619,38 @@ Checks if a pledge is currently in the freeze period.
 
 **Signature:**
 ```go
-func (s *Vault) IsPledgeFrozen(pledge *vaultModels.Pledge) (bool, error)
+func (s *Vault) IsPledgeFrozen(ctx context.Context, pledge *vaultModels.Pledge) (bool, error)
 ```
 
 **Parameters:**
+- `ctx` — request context
 - `pledge` — pledge to check (`*vaultModels.Pledge`)
 
 **Algorithm:**
 1. Validate that pledge is not nil
-2. Calculate freeze end time: `freezeEndTime = pledge.FrozenAt + s.freezePeriod`
-3. Compare current time with freeze end time
-4. Return `true` if current time is before freeze end time, `false` otherwise
+2. Get database connection
+3. Fetch the resource associated with the pledge
+4. **If resource is vaulted, return `false` immediately** (freeze is lifted when resource is vaulted)
+5. Calculate freeze end time: `freezeEndTime = pledge.FrozenAt + s.freezePeriod`
+6. Compare current time with freeze end time
+7. Return `true` if current time is before freeze end time, `false` otherwise
 
 **Configuration:**
 - `VAULT_PLEDGE_FREEZE_PERIOD` / `--vault-pledge-freeze-period` — freeze period duration (default: 24 hours)
 
 **Features:**
-- Freeze status is determined dynamically based on time, not stored in database
+- Freeze status is determined dynamically based on time and resource vaulted status, not stored in database
 - Freeze period is configurable via environment variable
-- Default freeze period is 1 day (24 hours)
+- Default freeze period is 24 hours
+- **Freeze is automatically lifted when the resource is vaulted**, regardless of the time elapsed
 
 **Error Handling:**
 - Returns error if pledge is nil
+- Returns error if database connection is unavailable
+- Returns error if resource cannot be fetched
 
 **Usage:**
-This method is used to determine if a pledge can be removed. Pledges cannot be removed during the freeze period to prevent immediate withdrawal after funding.
+This method is used to determine if a pledge can be removed. Pledges cannot be removed during the freeze period to prevent immediate withdrawal after funding. However, once the resource is successfully vaulted, the freeze is lifted and users can remove their pledges.
 
 #### Method `RemovePledge`
 
@@ -710,7 +721,9 @@ This method is called by the vault handler when a user removes their pledge. It 
    - Update `funded_vp` in `resource` (sum of all active pledges)
    - If `funded_vp >= required_vp`, set `funded = true`, `funded_at = now()`
 4. If resource is funded — initiate vaulting process
-5. Pledge remains frozen for **1 day** after creation (determined by `frozen_at + freeze_period`)
+5. Pledge remains frozen after creation for a period configurable via `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24 hours)
+   - Freeze is determined by `frozen_at + freeze_period`
+   - **Freeze is automatically lifted when resource is vaulted**, regardless of time elapsed
 
 **Failure Handling:**
 - If vaulting fails within **7 days**, VP is returned to the user (pledge is removed automatically)
@@ -720,11 +733,14 @@ This method is called by the vault handler when a user removes their pledge. It 
 **Preconditions:**
 - User is authenticated
 - Pledge belongs to the user
-- Pledge is not frozen (`IsPledgeFrozen(pledge) = false`, freeze period has expired)
+- Pledge is not frozen (`IsPledgeFrozen(ctx, pledge) = false`)
+  - Pledge is unfrozen if: resource is vaulted OR freeze period has expired
 - Pledge is active (`funded = true`)
 
 **Steps:**
 1. Check access rights and freeze status via `IsPledgeFrozen`
+   - Method checks if resource is vaulted first (if yes, pledge is not frozen)
+   - If resource is not vaulted, checks if freeze period has expired
 2. If pledge is frozen, return error "pledge is frozen and cannot be removed"
 3. In a transaction:
    - Delete pledge record from database
@@ -750,9 +766,10 @@ This method is called by the vault handler when a user removes their pledge. It 
 1. Perform operation to place resource in long-term storage
 2. Set `vaulted = true`, `vaulted_at = now()` in `resource`
 
-**Notes:**
-- Pledges remain frozen for the configured freeze period (default 1 day) from their creation time
-- Freeze status is determined dynamically via `IsPledgeFrozen` method
+**Effects:**
+- **All pledges for this resource are automatically unfrozen** when the resource becomes vaulted
+- Users can now remove their pledges and reclaim their VP, even if the freeze period has not expired
+- Freeze status is determined dynamically via `IsPledgeFrozen` method, which checks the resource's vaulted status first
 
 ### 4. User Tier Change
 
@@ -821,10 +838,12 @@ This method is called by the vault handler when a user removes their pledge. It 
 
 2. **Pledges:**
    - Cannot create a pledge larger than available balance
-   - Cannot remove a frozen pledge (freeze period has not expired)
+   - Cannot remove a frozen pledge (freeze period has not expired and resource is not vaulted)
    - Sum of all active pledges cannot exceed total (if not NULL)
-   - Pledges are frozen for **1 day** after creation (configurable via `VAULT_PLEDGE_FREEZE_PERIOD`)
-   - Freeze status is determined dynamically by comparing `frozen_at + freeze_period` with current time
+   - Pledges are frozen after creation for a period configurable via `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24 hours)
+   - Freeze status is determined dynamically by checking:
+     1. If resource is vaulted → pledge is NOT frozen (freeze is lifted)
+     2. Otherwise, compare `frozen_at + freeze_period` with current time
    - Each user can have only one pledge per resource (enforced by unique index)
 
 3. **Resources:**
