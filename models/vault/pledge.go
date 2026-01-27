@@ -21,7 +21,8 @@ type Pledge struct {
 	CreatedAt  time.Time `pg:"created_at,notnull,default:now()"`
 	UpdatedAt  time.Time `pg:"updated_at,notnull,default:now()"`
 
-	User *models.User `pg:"rel:has-one,fk:user_id"`
+	User     *models.User `pg:"rel:has-one,fk:user_id"`
+	Resource *Resource    `pg:"rel:has-one,fk:resource_id"`
 }
 
 // GetUserPledges returns all pledges for a specific user
@@ -34,6 +35,21 @@ func GetUserPledges(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]Pledge,
 		Select()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user pledges")
+	}
+	return pledges, nil
+}
+
+// GetUserPledgesWithResources returns all pledges for a specific user with resource information
+func GetUserPledgesWithResources(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]Pledge, error) {
+	var pledges []Pledge
+	err := db.Model(&pledges).
+		Context(ctx).
+		Relation("Resource").
+		Where("pledge.user_id = ?", userID).
+		Order("pledge.created_at DESC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user pledges with resources")
 	}
 	return pledges, nil
 }

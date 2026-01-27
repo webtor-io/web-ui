@@ -464,19 +464,33 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 		return resource, nil
 	}
 
-	// Resource doesn't exist, get required VP
 	requiredVP, err := s.GetRequiredVP(ctx, claims, resourceID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get required VP")
+		return nil, errors.Wrap(err, "failed to get required vault points")
+	}
+
+	torrentName, err := s.getTorrentName(ctx, claims, resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get torrent name")
 	}
 
 	// Create new resource
-	resource, err = vaultModels.CreateResource(ctx, db, resourceID, requiredVP)
+	resource, err = vaultModels.CreateResource(ctx, db, resourceID, requiredVP, torrentName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create resource")
 	}
 
 	return resource, nil
+}
+
+// getTorrentName extracts torrent name from API response
+func (s *Vault) getTorrentName(ctx context.Context, claims *api.Claims, resourceID string) (string, error) {
+	r, err := s.api.GetResourceCached(ctx, claims, resourceID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get resource")
+	}
+
+	return r.Name, nil
 }
 
 // GetRequiredVP calculates the required vault points for a resource based on its total size

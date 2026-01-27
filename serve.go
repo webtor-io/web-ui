@@ -259,7 +259,7 @@ func serve(c *cli.Context) error {
 
 	// Setting VaultHandler
 	if v != nil {
-		vh.RegisterHandler(r, v)
+		vh.RegisterHandler(r, v, tm, pg)
 	}
 
 	// Setting ResourceHandler

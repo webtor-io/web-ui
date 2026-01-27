@@ -108,6 +108,7 @@ CREATE TABLE vault.resource (
 	vaulted_at timestamptz,
 	expired bool DEFAULT false NOT NULL,
 	expired_at timestamptz,
+	name text,
 	created_at timestamptz DEFAULT now() NOT NULL,
 	updated_at timestamptz DEFAULT now() NOT NULL,
 	CONSTRAINT resource_pk PRIMARY KEY (resource_id)
@@ -124,6 +125,7 @@ CREATE TABLE vault.resource (
 - `vaulted_at` — time when resource was placed in vault
 - `expired` — funding expiration flag (becomes `true` when `funded_vp < required_vp` after funding)
 - `expired_at` — funding expiration time
+- `name` — name of the torrent (nullable, extracted from API response during resource creation)
 - `created_at` — record creation time
 - `updated_at` — last update time (automatically updated by trigger)
 
@@ -212,13 +214,15 @@ type Pledge struct {
 	CreatedAt  time.Time `pg:"created_at,notnull,default:now()"`
 	UpdatedAt  time.Time `pg:"updated_at,notnull,default:now()"`
 	
-	User *models.User `pg:"rel:has-one,fk:user_id"`
+	User     *models.User `pg:"rel:has-one,fk:user_id"`
+	Resource *Resource    `pg:"rel:has-one,fk:resource_id"`
 }
 ```
 
 **Methods:**
 - `GetPledge(ctx, db, pledgeID)` — get pledge by ID
-- `GetUserPledges(ctx, db, userID)` — get all user's pledges
+- `GetUserPledges(ctx, db, userID)` — get all user's pledges (sorted by creation time DESC)
+- `GetUserPledgesWithResources(ctx, db, userID)` — get all user's pledges with resource information (sorted by creation time DESC)
 - `GetResourcePledges(ctx, db, resourceID)` — get all pledges for a resource
 - `GetUserResourcePledge(ctx, db, userID, resourceID)` — get pledge for specific user and resource
 - `GetFundedResourcePledges(ctx, db, resourceID)` — get active pledges for a resource
@@ -226,6 +230,49 @@ type Pledge struct {
 - `UpdatePledgeFunded(ctx, db, pledgeID, funded)` — update funded status
 - `DeletePledge(ctx, db, pledgeID)` — delete pledge
 - `SumFundedPledgesForResource(ctx, db, resourceID)` — sum of active pledges for a resource
+
+**Method Details:**
+
+#### `GetUserPledgesWithResources`
+
+Returns all pledges for a specific user with related resource information loaded via database relation.
+
+**Signature:**
+```go
+func GetUserPledgesWithResources(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]Pledge, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `db` — PostgreSQL database connection
+- `userID` — user identifier
+
+**Returns:**
+- Array of `Pledge` objects with `Resource` field populated
+- Pledges are sorted by `created_at DESC` (newest first)
+- Error if database query fails
+
+**Algorithm:**
+1. Query `vault.pledge` table with `WHERE pledge.user_id = ?`
+2. Use `Relation("Resource")` to load related resource data via JOIN
+3. Order results by `pledge.created_at DESC`
+4. Return array of pledges with populated `Resource` field
+
+**Usage:**
+Used by the pledges list page (`GET /vault/pledge`) to display user's pledges with torrent names and resource information.
+
+**Example:**
+```go
+pledges, err := vaultModels.GetUserPledgesWithResources(ctx, db, userID)
+if err != nil {
+    return nil, errors.Wrap(err, "failed to get user pledges")
+}
+for _, pledge := range pledges {
+    if pledge.Resource != nil && pledge.Resource.Name != "" {
+        fmt.Printf("Pledge for: %s\n", pledge.Resource.Name)
+    }
+}
+```
 
 ### Resource (`models/vault/resource.go`)
 
@@ -241,6 +288,7 @@ type Resource struct {
 	VaultedAt  *time.Time `pg:"vaulted_at"`
 	Expired    bool       `pg:"expired,notnull,default:false"`
 	ExpiredAt  *time.Time `pg:"expired_at"`
+	Name       string     `pg:"name,notnull"`
 	CreatedAt  time.Time  `pg:"created_at,notnull,default:now()"`
 	UpdatedAt  time.Time  `pg:"updated_at,notnull,default:now()"`
 }
@@ -250,7 +298,7 @@ type Resource struct {
 - `GetResource(ctx, db, resourceID)` — get resource by ID
 - `GetFundedResources(ctx, db)` — get all funded resources
 - `GetVaultedResources(ctx, db)` — get all vaulted resources
-- `CreateResource(ctx, db, resourceID, requiredVP)` — create resource
+- `CreateResource(ctx, db, resourceID, requiredVP, torrentName)` — create resource (torrentName is string, empty string if name is not available)
 - `UpdateResourceFundedVP(ctx, db, resourceID, fundedVP)` — update funded amount
 - `MarkResourceFunded(ctx, db, resourceID)` — mark resource as funded
 - `MarkResourceVaulted(ctx, db, resourceID)` — mark resource as vaulted
@@ -492,10 +540,13 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 1. Check if resource exists in database using `vaultModels.GetResource`
 2. If resource exists, return it immediately
 3. If resource doesn't exist:
-   - Calculate required VP using `GetRequiredVP` method
+   - Get list from REST API using `ListResourceContentCached` with `Output: api.OutputList`
+   - Calculate required VP from list size: `requiredVP = list.Size / (1024 * 1024 * 1024)`
+   - Get torrent name using `getTorrentName` method (extracts from API response)
    - Create new resource using `vaultModels.CreateResource` with:
      - `resource_id` = provided resourceID
      - `required_vp` = calculated VP amount
+     - `name` = extracted torrent name (can be nil)
      - `funded_vp` = 0
      - `funded` = false
      - `vaulted` = false
@@ -517,6 +568,39 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 
 **Usage:**
 This method is called by the vault handler before creating a pledge. It ensures that a resource record exists in the database with the correct required VP amount calculated from the torrent size.
+
+#### Method `getTorrentName`
+
+Extracts torrent name from API response (private method).
+
+**Signature:**
+```go
+func (s *Vault) getTorrentName(ctx context.Context, claims *api.Claims, resourceID string) (*string, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `claims` — API claims for authentication (`*api.Claims`)
+- `resourceID` — resource identifier (torrent hash)
+
+**Algorithm:**
+1. Call REST API using `ListResourceContentCached` with `Output: api.OutputList`
+2. Check if `list.Name` is not empty
+3. Return pointer to `list.Name` if present, otherwise return `nil`
+
+**Features:**
+- Private method used internally by `GetOrCreateResource`
+- Uses cached REST API call for performance
+- Returns `nil` if torrent name is not available (not an error)
+- Extracts name from the top-level list response
+
+**Error Handling:**
+- Returns error if REST API call fails
+- Returns `nil, nil` if name is not present in response
+- Wraps errors with context for debugging
+
+**Usage:**
+This method is called by `GetOrCreateResource` to extract the torrent name during resource creation. It encapsulates the logic of name extraction, keeping the main method clean.
 
 #### Method `GetRequiredVP`
 
@@ -1057,20 +1141,52 @@ Handler for managing vault pledges through HTTP requests.
 
 **Registration:**
 ```go
-func RegisterHandler(r *gin.Engine, v *vault.Vault)
+func RegisterHandler(r *gin.Engine, v *vault.Vault, tm *template.Manager[*web.Context], pg *cs.PG)
 ```
 
 The handler is registered only if the vault service is not nil. This is checked in `serve.go`:
 ```go
 if v != nil {
-    vh.RegisterHandler(r, v)
+    vh.RegisterHandler(r, v, tm, pg)
 }
 ```
 
 **Dependencies:**
 - Vault service (`services/vault`) — for business logic operations
+- Template Manager (`services/template`) — for rendering HTML views
+- PostgreSQL (`common-services/PG`) — for database access
 - Auth service (`services/auth`) — for user authentication
 - API service (`services/api`) — for getting API claims
+
+**File Structure:**
+The handler is organized into multiple files following the library handler pattern:
+- `handler.go` — contains `Handler` struct, `PledgeDisplay` struct, `PledgeListData` struct, and `RegisterHandler` function
+- `index.go` — contains `index` and `getPledgesList` methods for displaying pledges list
+- `add.go` — contains `addPledge` and `createPledge` methods for creating pledges
+- `remove.go` — contains `removePledge` and `deletePledge` methods for removing pledges
+
+**Data Structures:**
+```go
+type PledgeDisplay struct {
+	PledgeID   string                // Pledge UUID as string
+	ResourceID string                // Resource identifier (torrent hash)
+	Resource   *vaultModels.Resource // Related resource with name and metadata
+	Amount     float64               // Pledged vault points amount
+	IsFrozen   bool                  // Computed frozen status using IsPledgeFrozen
+	CreatedAt  string                // Formatted creation timestamp
+}
+
+type PledgeListData struct {
+	Pledges []PledgeDisplay // Array of pledges for display
+}
+```
+
+The `PledgeDisplay` struct is used to present pledges in the UI with computed `IsFrozen` status. The `IsFrozen` field is calculated using `vault.IsPledgeFrozen()` method which checks both the freeze period and whether the resource is vaulted.
+
+**Routes:**
+- `GET /vault/pledge` — display user's pledges list
+- `POST /vault/pledge/add` — create a new pledge
+- `POST /vault/pledge/remove` — remove an existing pledge
 
 ### POST /vault/pledge/add
 
@@ -1170,6 +1286,73 @@ Removes a user's pledge for a resource and returns VP to their account.
 - Follows server-side rendering pattern with form submissions
 - Pledge removal is permanent and cannot be undone
 - VP is immediately returned to user's available balance
+
+### GET /vault/pledge
+
+Displays a list of user's pledges with resource information.
+
+**Authentication:** Required (uses `auth.HasAuth` middleware)
+
+**Query Parameters:** None
+
+**Algorithm:**
+1. Get current user from context using `auth.GetUserFromContext`
+2. Call business logic method `getPledgesList` with user ID
+3. In `getPledgesList`:
+   - Get database connection from PG service
+   - Call `vaultModels.GetUserPledgesWithResources` to fetch pledges with resource information
+   - For each pledge, compute `IsFrozen` status using `vault.IsPledgeFrozen()` method
+   - Convert pledges to `PledgeDisplay` format with computed frozen status
+   - Return array of `PledgeDisplay` sorted by creation time (newest first)
+4. Prepare `PledgeListData` structure with display pledges array
+5. Render `vault/pledge/index` template with data
+
+**Success Response:**
+- HTTP 200 with rendered HTML page showing pledges list
+
+**Error Responses:**
+- HTTP 500 — database connection error or query failure
+
+**Template Data Structure:**
+```go
+type PledgeListData struct {
+    Pledges []PledgeDisplay
+}
+```
+
+Each `PledgeDisplay` includes:
+- `PledgeID` — unique pledge identifier (UUID as string)
+- `ResourceID` — resource identifier (torrent hash)
+- `Amount` — pledged vault points amount
+- `IsFrozen` — computed frozen status (true = frozen, false = claimable) using `vault.IsPledgeFrozen()`
+- `CreatedAt` — formatted pledge creation timestamp
+- `Resource` — related resource information (loaded via relation):
+  - `Name` — torrent name (string, empty if not available)
+  - `ResourceID` — resource identifier
+
+**Template:** `templates/views/vault/pledge/index.html`
+
+**UI Features:**
+- Page title: "Vault Pledges"
+- Table with columns:
+  - **Torrent** — torrent name (or resource ID if name is empty) as link to resource page with `data-async-target="main"`
+  - **Points** — pledged amount formatted as `%.2f`
+  - **Status** — badge showing "Frozen" (green, if `IsFrozen = true`) or "Claimable" (yellow, if `IsFrozen = false`)
+- Pledges sorted by creation time (newest first)
+- "Back To Profile" button (accent, outline, centered) linking to `/profile` with `data-async-target="main"`
+- Empty state: "No pledges yet" message if user has no pledges
+- Styling consistent with Vault profile section (table in `bg-base-100 rounded-lg shadow p-6`)
+
+**Usage Example:**
+```html
+<a href="/vault/pledge" class="btn btn-accent btn-outline" data-async-target="main">Pledges</a>
+```
+
+**Notes:**
+- Follows two-level handler architecture: `index` (HTTP layer) and `getPledgesList` (business logic)
+- Uses server-side rendering with template builder
+- Integrates with async navigation system via `data-async-target="main"`
+- Accessible from Vault section in user profile via "Pledges" button
 
 ## UI Components
 
