@@ -47,6 +47,7 @@ Some features to mention:
 - [x] Content enrichment
     - [x] OMDB
     - [x] Kinopoisk Unofficial
+- [x] Vault
 - [x] Integrations 
   - [x] Stremio
   - [x] Stremio Addons

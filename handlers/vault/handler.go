@@ -1,6 +1,8 @@
 package vault
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -22,11 +24,15 @@ type PledgeDisplay struct {
 	Resource   *vaultModels.Resource
 	Amount     float64
 	IsFrozen   bool
+	Funded     bool
 	CreatedAt  string
 }
 
 type PledgeListData struct {
-	Pledges []PledgeDisplay
+	Pledges               []PledgeDisplay
+	FreezePeriod          time.Duration
+	ExpirePeriod          time.Duration
+	TransferTimeoutPeriod time.Duration
 }
 
 func RegisterHandler(r *gin.Engine, v *vault.Vault, tm *template.Manager[*web.Context], pg *cs.PG) {

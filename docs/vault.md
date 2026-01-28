@@ -301,7 +301,8 @@ type Resource struct {
 - `CreateResource(ctx, db, resourceID, requiredVP, torrentName)` — create resource (torrentName is string, empty string if name is not available)
 - `UpdateResourceFundedVP(ctx, db, resourceID, fundedVP)` — update funded amount
 - `MarkResourceFunded(ctx, db, resourceID)` — mark resource as funded
-- `MarkResourceVaulted(ctx, db, resourceID)` — mark resource as vaulted
+- `MarkResourceVaulted(ctx, db, resourceID)` — mark resource as vaulted (sets vaulted=true, vaulted_at=now())
+- `UpdateResourceVaulted(ctx, db, resourceID)` — mark resource as vaulted (sets vaulted=true, vaulted_at=now(), used after Vault API sync)
 - `MarkResourceExpired(ctx, db, resourceID)` — mark resource as expired
 - `DeleteResource(ctx, db, resourceID)` — delete resource
 
@@ -349,25 +350,34 @@ const (
 Main service for working with the Vault Points system.
 
 **Configuration:**
-- `VAULT_SERVICE_HOST` / `--vault-service-host` — Vault service host (required)
-- `VAULT_SERVICE_PORT` / `--vault-service-port` — Vault service port (required)
+- `VAULT_SERVICE_HOST` / `--vault-service-host` — Vault service host (required, configured via Vault API)
+- `VAULT_SERVICE_PORT` / `--vault-service-port` — Vault service port (configured via Vault API, default: 80)
+- `VAULT_SECURE` / `--vault-secure` — Use HTTPS for Vault service (configured via Vault API, default: false)
 - `VAULT_PLEDGE_FREEZE_PERIOD` / `--vault-pledge-freeze-period` — pledge freeze period (default: 24 hours)
 - `VAULT_RESOURCE_EXPIRE_PERIOD` / `--vault-resource-expire-period` — period after which unfunded resource is removed from vault (default: 7 days)
 - `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` / `--vault-resource-transfer-timeout-period` — period after which resource is removed and transfer attempts are stopped (default: 7 days)
-- If either host or port is empty, the service constructor returns `nil`
 
 **Dependencies:**
+- Vault API client (`services/vault.Api`) — for communicating with external Vault API service
 - Claims service (`services/claims`) — for getting user tier and VP information
-- HTTP client — for future API calls to vault service
+- HTTP client — for API calls
 - PostgreSQL database (`common-services/PG`) — for database operations
 - REST API service (`services/api`) — for accessing torrent metadata and calculating required VP
 
 **Constructor:**
 ```go
-func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault
+func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault
 ```
 
-Returns `nil` if `VAULT_SERVICE_HOST` or `VAULT_SERVICE_PORT` is not configured.
+**Parameters:**
+- `c` — CLI context with configuration flags
+- `vaultApi` — Vault API client instance (created via `vault.NewApi`)
+- `cl` — Claims service instance
+- `client` — HTTP client
+- `pg` — PostgreSQL database connection
+- `restApi` — REST API service instance
+
+**Returns:** `nil` if `vaultApi` is `nil`, otherwise returns a configured `*Vault` instance.
 
 #### Method `UpdateUserVP`
 
@@ -502,8 +512,10 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
      - Calculate `newFundedVP = resource.FundedVP + resource.RequiredVP`
      - Update `resource.funded_vp` to `newFundedVP` using `UpdateResourceFundedVP`
      - If `newFundedVP >= resource.RequiredVP`:
-       - Mark resource as funded using `MarkResourceFunded`
-       - Set `resource.funded = true` and `resource.funded_at = now()`
+       - Mark resource as unexpired and funded using `MarkResourceUnexpiredAndFunded`
+       - Set `resource.expired = false`, `resource.expired_at = NULL`, `resource.funded = true`, `resource.funded_at = now()`
+       - **Check Vault API status** using `putResourceToVaultAPI` to determine if resource is already vaulted
+       - If `putResourceToVaultAPI` returns `true`, call `UpdateResourceVaulted` to mark resource as vaulted
 2. Return created pledge or error
 
 **Features:**
@@ -819,6 +831,47 @@ func (s *Vault) defundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels
 - Updates both database and local resource state for consistency
 - Automatically marks resource as expired when funding drops below required amount
 - Does not create transaction log entries (handled by parent operation)
+
+#### Method `putResourceToVaultAPI` (internal)
+
+Checks resource status in Vault API and adds it if missing. Returns whether the resource is already vaulted (completed). This method is called automatically when a resource transitions to Funded state.
+
+**Signature:**
+```go
+func (s *Vault) putResourceToVaultAPI(ctx context.Context, tx *pg.Tx, resource *vaultModels.Resource) (bool, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `tx` — database transaction
+- `resource` — resource to check/add in Vault API
+
+**Returns:**
+- `bool` — `true` if resource exists in Vault API with `StatusCompleted`, `false` otherwise
+- `error` — error if Vault API call fails
+
+**Algorithm:**
+1. Skip if Vault API is not configured (`s.vaultApi == nil`) — return `false, nil`
+2. Get resource status from Vault API using `GetResource`
+3. If resource exists in Vault API and has `StatusCompleted`:
+   - Return `true, nil` (resource is vaulted)
+4. If resource doesn't exist in Vault API:
+   - Add resource to Vault API using `PutResource`
+   - Return `false, nil` (resource added but not yet completed)
+5. If resource exists but not completed:
+   - Return `false, nil` (resource is processing)
+
+**Features:**
+- Operates within an existing transaction
+- Gracefully handles missing Vault API configuration
+- Automatically adds resources to Vault API if they don't exist
+- Does not update database directly — caller is responsible for updating `vaulted` status based on return value
+- Does not interfere with recalculate mechanics
+
+**Important Notes:**
+- This method is called when resource transitions to Funded state (in `CreatePledge`)
+- Caller must call `UpdateResourceVaulted` if this method returns `true`
+- Does not affect the recalculate mechanism
 
 #### Method `fundPledge` (internal)
 
@@ -1173,15 +1226,19 @@ type PledgeDisplay struct {
 	Resource   *vaultModels.Resource // Related resource with name and metadata
 	Amount     float64               // Pledged vault points amount
 	IsFrozen   bool                  // Computed frozen status using IsPledgeFrozen
+	Funded     bool                  // Pledge funded status from database
 	CreatedAt  string                // Formatted creation timestamp
 }
 
 type PledgeListData struct {
-	Pledges []PledgeDisplay // Array of pledges for display
+	Pledges               []PledgeDisplay // Array of pledges for display
+	FreezePeriod          time.Duration   // Pledge freeze period from vault service
+	ExpirePeriod          time.Duration   // Resource expire period from vault service
+	TransferTimeoutPeriod time.Duration   // Resource transfer timeout period from vault service
 }
 ```
 
-The `PledgeDisplay` struct is used to present pledges in the UI with computed `IsFrozen` status. The `IsFrozen` field is calculated using `vault.IsPledgeFrozen()` method which checks both the freeze period and whether the resource is vaulted.
+The `PledgeDisplay` struct is used to present pledges in the UI with computed `IsFrozen` status and `Funded` status from database. The `IsFrozen` field is calculated using `vault.IsPledgeFrozen()` method which checks both the freeze period and whether the resource is vaulted. The `Funded` field indicates whether the pledge is funded (true) or expiring (false).
 
 **Routes:**
 - `GET /vault/pledge` — display user's pledges list
@@ -1316,15 +1373,25 @@ Displays a list of user's pledges with resource information.
 **Template Data Structure:**
 ```go
 type PledgeListData struct {
-    Pledges []PledgeDisplay
+    Pledges               []PledgeDisplay
+    FreezePeriod          time.Duration
+    ExpirePeriod          time.Duration
+    TransferTimeoutPeriod time.Duration
 }
 ```
+
+The `PledgeListData` includes:
+- `Pledges` — array of pledges for display
+- `FreezePeriod` — pledge freeze period from vault service (used in status annotation)
+- `ExpirePeriod` — resource expire period from vault service
+- `TransferTimeoutPeriod` — resource transfer timeout period from vault service
 
 Each `PledgeDisplay` includes:
 - `PledgeID` — unique pledge identifier (UUID as string)
 - `ResourceID` — resource identifier (torrent hash)
 - `Amount` — pledged vault points amount
-- `IsFrozen` — computed frozen status (true = frozen, false = claimable) using `vault.IsPledgeFrozen()`
+- `IsFrozen` — computed frozen status using `vault.IsPledgeFrozen()`
+- `Funded` — pledge funded status from database (true = funded, false = expiring)
 - `CreatedAt` — formatted pledge creation timestamp
 - `Resource` — related resource information (loaded via relation):
   - `Name` — torrent name (string, empty if not available)
@@ -1337,9 +1404,17 @@ Each `PledgeDisplay` includes:
 - Table with columns:
   - **Torrent** — torrent name (or resource ID if name is empty) as link to resource page with `data-async-target="main"`
   - **Points** — pledged amount formatted as `%.2f`
-  - **Status** — badge showing "Frozen" (green, if `IsFrozen = true`) or "Claimable" (yellow, if `IsFrozen = false`)
+  - **Status** — badge showing pledge status:
+    - "Frozen" (green badge, `badge-success`) if `IsFrozen = true`
+    - "Expiring" (red badge, `badge-error`) if `Funded = false`
+    - "Claimable" (yellow badge, `badge-warning`) if `IsFrozen = false` and `Funded = true`
 - Pledges sorted by creation time (newest first)
-- "Back To Profile" button (accent, outline, centered) linking to `/profile` with `data-async-target="main"`
+- Status annotation box (below table, using Tailwind Description List `<dl>`):
+  - **Frozen** (bold term) — points become frozen immediately after pledge and unfreeze after the torrent is transferred to Vault and the freeze period expires (displays actual freeze period value)
+  - **Expiring** (bold term) — pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault
+  - **Claimable** (bold term) — points that can be claimed back. After claiming, the content they were pledged to may be removed
+- "Back To Profile" button (accent, outline, centered) linking to `/profile` with `data-async-target="main"` (below annotation box)
+- "What is Vault?" link (below "Back To Profile" button) — links to `/instructions/vault` with Umami tracking (`data-umami-event="instruction-vault"`)
 - Empty state: "No pledges yet" message if user has no pledges
 - Styling consistent with Vault profile section (table in `bg-base-100 rounded-lg shadow p-6`)
 
@@ -1629,7 +1704,7 @@ Plus all standard database and API configuration flags.
 - **Model Method:** `models/vault/resource.go::GetExpiredResources()` - queries resources based on expiration conditions
 - **Service Methods:**
   - `services/vault/vault.go::RemovePledge()` - handles pledge removal with proper VP return and logging
-  - `services/vault/vault.go::RemoveResource()` - handles resource deletion from the database
+  - `services/vault/vault.go::RemoveResource()` - handles resource deletion from both Vault API and database
 - **Transaction Safety:** Each pledge removal is wrapped in a database transaction to ensure consistency
 
 **Logging:**
@@ -1657,6 +1732,311 @@ Run this command periodically (e.g., via cron) to clean up expired resources:
 0 3 * * * /path/to/web-ui vault reap
 ```
 
+## Vault API SDK
+
+The Vault API SDK (`services/vault/api.go`) provides a Go client for interacting with the external Vault API service. This SDK handles HTTP communication, resource management, and caching.
+
+### Configuration
+
+**CLI Flags / Environment Variables:**
+
+```go
+func RegisterApiFlags(f []cli.Flag) []cli.Flag
+```
+
+Available flags:
+- `--vault-service-host` / `VAULT_SERVICE_HOST`: Vault service host (required)
+- `--vault-service-port` / `VAULT_SERVICE_PORT`: Vault service port (default: 80)
+- `--vault-secure` / `VAULT_SECURE`: Use HTTPS for Vault service (default: false)
+
+**Note:** If `VAULT_SERVICE_HOST` is empty, `NewApi` returns `nil` instead of creating an instance.
+
+### Data Structures
+
+#### ErrorResponse
+
+Represents an error response from the Vault API:
+
+```go
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+```
+
+#### Resource
+
+Represents a resource in the Vault API:
+
+```go
+type Resource struct {
+	ResourceID string    `json:"resource_id"`
+	Status     int       `json:"status"`
+	StoredSize int64     `json:"stored_size"`
+	TotalSize  int64     `json:"total_size"`
+	Error      string    `json:"error"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+```
+
+**Status Constants:**
+- `StatusQueued = 0`: Resource is queued for processing
+- `StatusProcessing = 1`: Resource is being processed
+- `StatusCompleted = 2`: Resource is fully stored
+- `StatusFailed = 3`: Resource storage failed
+
+**Helper Methods:**
+- `IsStored() bool`: Returns true if resource is fully stored (status = completed)
+- `IsFailed() bool`: Returns true if resource storage failed
+- `IsProcessing() bool`: Returns true if resource is being processed or queued
+- `GetProgress() float64`: Returns storage progress as percentage (0-100)
+
+### API Client
+
+#### Constructor
+
+```go
+func NewApi(c *cli.Context, cl *http.Client) *Api
+```
+
+Creates a new Vault API client with:
+- URL constructed from host, port, and secure flags
+- HTTP client for making requests
+- LazyMap cache for resources (1 minute TTL)
+
+**Returns:** `nil` if `VAULT_SERVICE_HOST` is empty, otherwise returns a configured `*Api` instance.
+
+#### Methods
+
+##### GetResource
+
+```go
+func (s *Api) GetResource(ctx context.Context, resourceID string) (*Resource, error)
+```
+
+Retrieves a resource by ID from the Vault API.
+
+**Parameters:**
+- `ctx`: Request context
+- `resourceID`: Resource identifier (infohash)
+
+**Returns:**
+- `*Resource`: Resource information
+- `error`: Error if request fails or resource not found
+
+**HTTP Details:**
+- Method: GET
+- Endpoint: `/resource/{id}`
+- Status Codes:
+  - 200: Success, returns Resource
+  - 404: Resource not found
+  - 500: Internal server error
+
+##### GetResourceCached
+
+```go
+func (s *Api) GetResourceCached(ctx context.Context, resourceID string) (*Resource, error)
+```
+
+Retrieves a resource with caching (1 minute TTL). Same parameters and return values as `GetResource`.
+
+**Use Case:** Use this method for frequent resource status checks to reduce API load.
+
+##### PutResource
+
+```go
+func (s *Api) PutResource(ctx context.Context, resourceID string) (*Resource, error)
+```
+
+Queues a resource for storage in the Vault.
+
+**Parameters:**
+- `ctx`: Request context
+- `resourceID`: Resource identifier (infohash)
+
+**Returns:**
+- `*Resource`: Resource information with queued status
+- `error`: Error if request fails
+
+**HTTP Details:**
+- Method: PUT
+- Endpoint: `/resource/{id}`
+- Status Codes:
+  - 202: Accepted, resource queued for processing
+  - 500: Internal server error
+
+**Behavior:**
+- Creates the resource if it doesn't exist
+- Marks existing resource as queued for processing
+- Returns resource with updated status
+
+##### DeleteResource
+
+```go
+func (s *Api) DeleteResource(ctx context.Context, resourceID string) (*Resource, error)
+```
+
+Queues a resource for deletion from the Vault.
+
+**Parameters:**
+- `ctx`: Request context
+- `resourceID`: Resource identifier (infohash)
+
+**Returns:**
+- `*Resource`: Resource information with deletion status
+- `error`: Error if request fails
+
+**HTTP Details:**
+- Method: DELETE
+- Endpoint: `/resource/{id}`
+- Status Codes:
+  - 202: Accepted, resource queued for deletion
+  - 500: Internal server error
+
+### Usage Examples
+
+#### Initialize the API Client
+
+```go
+import (
+	"net/http"
+	"github.com/urfave/cli"
+	vaultapi "github.com/webtor-io/web-ui/services/vault"
+)
+
+func main() {
+	app := cli.NewApp()
+	app.Flags = vaultapi.RegisterApiFlags([]cli.Flag{})
+	
+	app.Action = func(c *cli.Context) error {
+		client := &http.Client{Timeout: 30 * time.Second}
+		api := vaultapi.NewApi(c, client)
+		
+		// Use the API client
+		return nil
+	}
+	
+	app.Run(os.Args)
+}
+```
+
+#### Check Resource Status
+
+```go
+// Get resource status with caching
+resource, err := api.GetResourceCached(ctx, "abc123def456")
+if err != nil {
+	log.WithError(err).Error("failed to get resource")
+	return err
+}
+
+if resource.IsStored() {
+	log.Info("resource is fully stored in vault")
+} else if resource.IsProcessing() {
+	log.Infof("resource is being processed: %.2f%% complete", resource.GetProgress())
+} else if resource.IsFailed() {
+	log.Errorf("resource storage failed: %s", resource.Error)
+}
+```
+
+#### Queue Resource for Storage
+
+```go
+// Queue a resource for vault storage
+resource, err := api.PutResource(ctx, "abc123def456")
+if err != nil {
+	log.WithError(err).Error("failed to queue resource")
+	return err
+}
+
+log.WithField("resource_id", resource.ResourceID).
+	WithField("status", resource.Status).
+	Info("resource queued for storage")
+```
+
+#### Delete Resource from Vault
+
+```go
+// Queue a resource for deletion
+resource, err := api.DeleteResource(ctx, "abc123def456")
+if err != nil {
+	log.WithError(err).Error("failed to queue resource for deletion")
+	return err
+}
+
+log.WithField("resource_id", resource.ResourceID).
+	Info("resource queued for deletion")
+```
+
+### Error Handling
+
+The SDK wraps all errors with context for better debugging:
+
+```go
+resource, err := api.GetResource(ctx, resourceID)
+if err != nil {
+	// Error messages include context about what failed
+	// Examples:
+	// - "failed to get resource: failed to create request: ..."
+	// - "failed to get resource: resource not found"
+	// - "failed to get resource: vault api error: internal error"
+	log.WithError(err).
+		WithField("resource_id", resourceID).
+		Error("failed to retrieve resource from vault")
+	return err
+}
+```
+
+**Error Types:**
+- Network errors: Connection failures, timeouts
+- HTTP errors: 404 (not found), 500 (server error)
+- Parsing errors: Invalid JSON responses
+- API errors: Error messages from the Vault API service
+
+### Integration with Vault Service
+
+The Vault API SDK is designed to work alongside the main Vault service (`services/vault/vault.go`):
+
+- **Vault Service** (`vault.go`): Manages database operations, user VP, pledges, and business logic
+- **Vault API SDK** (`api.go`): Communicates with external Vault API service for resource storage operations
+
+**Typical Flow:**
+
+1. User creates a pledge via Vault Service → database updated
+2. When resource is funded, Vault Service calls Vault API SDK to queue storage
+3. Vault API SDK sends PUT request to external Vault API
+4. External Vault API processes and stores the resource
+5. Vault Service can check storage status via Vault API SDK
+
+**Example Integration:**
+
+```go
+// In vault service method
+func (s *Vault) QueueResourceForStorage(ctx context.Context, resourceID string) error {
+	// Check if resource is funded in database
+	resource, err := s.GetResource(ctx, resourceID)
+	if err != nil {
+		return err
+	}
+	
+	if !resource.Funded {
+		return errors.New("resource is not funded")
+	}
+	
+	// Queue resource for storage via API
+	apiResource, err := s.vaultApi.PutResource(ctx, resourceID)
+	if err != nil {
+		return errors.Wrap(err, "failed to queue resource for storage")
+	}
+	
+	log.WithField("resource_id", resourceID).
+		WithField("status", apiResource.Status).
+		Info("resource queued for vault storage")
+	
+	return nil
+}
+```
+
 ## Future Improvements
 
 1. **Automatic Unfreezing:**
@@ -1682,3 +2062,10 @@ Run this command periodically (e.g., via cron) to clean up expired resources:
    - Ability to transfer pledges between resources
    - Group pledges (multiple users together)
    - Automatic reinvestment on expiration
+
+6. **Vault API SDK Enhancements:**
+   - Retry logic with exponential backoff for failed requests
+   - Circuit breaker pattern for API availability
+   - Metrics and monitoring integration
+   - Batch operations for multiple resources
+   - Webhook support for storage completion notifications

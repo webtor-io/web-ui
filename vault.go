@@ -39,6 +39,7 @@ func configureVaultReap(c *cli.Command) {
 	c.Flags = cs.RegisterPGFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
 	c.Flags = claims.RegisterClientFlags(c.Flags)
+	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
 }
 
@@ -76,8 +77,11 @@ func reap(c *cli.Context) error {
 	// Setting Claims
 	claimsService := claims.New(c, cpCl, pg)
 
+	// Setting Vault API
+	vaultApi := vault.NewApi(c, cl)
+
 	// Setting Vault
-	vaultService := vault.New(c, claimsService, cl, pg, sapi)
+	vaultService := vault.New(c, vaultApi, claimsService, cl, pg, sapi)
 	if vaultService == nil {
 		return errors.New("vault service is not configured (missing VAULT_SERVICE_HOST)")
 	}

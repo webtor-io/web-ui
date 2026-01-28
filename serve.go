@@ -93,6 +93,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
 	c.Flags = ci.RegisterFlags(c.Flags)
+	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
 }
 
@@ -254,8 +255,11 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
+	// Setting Vault API
+	vaultApi := vault.NewApi(c, cl)
+
 	// Setting Vault
-	v := vault.New(c, uc, cl, pg, sapi)
+	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
 
 	// Setting VaultHandler
 	if v != nil {

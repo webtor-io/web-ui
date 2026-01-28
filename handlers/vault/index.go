@@ -23,7 +23,10 @@ func (h *Handler) index(c *gin.Context) {
 	}
 
 	data := &PledgeListData{
-		Pledges: pledges,
+		Pledges:               pledges,
+		FreezePeriod:          h.vault.GetFreezePeriod(),
+		ExpirePeriod:          h.vault.GetExpirePeriod(),
+		TransferTimeoutPeriod: h.vault.GetTransferTimeoutPeriod(),
 	}
 
 	h.tb.Build("vault/pledge/index").HTML(http.StatusOK, web.NewContext(c).WithData(data))
@@ -57,6 +60,7 @@ func (h *Handler) getPledgesList(ctx context.Context, userID uuid.UUID) ([]Pledg
 			Resource:   pledge.Resource,
 			Amount:     pledge.Amount,
 			IsFrozen:   isFrozen,
+			Funded:     pledge.Funded,
 			CreatedAt:  pledge.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}

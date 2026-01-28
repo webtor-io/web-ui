@@ -89,6 +89,19 @@ func MarkResourceVaulted(ctx context.Context, db *pg.DB, resourceID string) erro
 	return nil
 }
 
+// UpdateResourceVaulted updates the vaulted status and timestamp for a resource
+func UpdateResourceVaulted(ctx context.Context, db pg.DBI, resourceID string) error {
+	_, err := db.Model(&Resource{}).
+		Context(ctx).
+		Set("vaulted = ?", true).
+		Set("vaulted_at = ?", time.Now()).
+		Where("resource_id = ?", resourceID).Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to update resource vaulted status")
+	}
+	return nil
+}
+
 // MarkResourceUnexpiredAndFunded marks a resource as not expired and funded
 func MarkResourceUnexpiredAndFunded(ctx context.Context, db pg.DBI, resourceID string) error {
 	now := time.Now()

@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	vaultServiceHostFlag                   = "vault-service-host"
-	vaultServicePortFlag                   = "vault-service-port"
 	vaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
 	vaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
 	vaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
@@ -25,18 +23,6 @@ const (
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
-		cli.StringFlag{
-			Name:   vaultServiceHostFlag,
-			Usage:  "vault service host",
-			Value:  "",
-			EnvVar: "VAULT_SERVICE_HOST",
-		},
-		cli.IntFlag{
-			Name:   vaultServicePortFlag,
-			Usage:  "vault service port",
-			Value:  80,
-			EnvVar: "VAULT_SERVICE_PORT",
-		},
 		cli.DurationFlag{
 			Name:   vaultPledgeFreezePeriodFlag,
 			Usage:  "vault pledge freeze period",
@@ -59,8 +45,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type Vault struct {
-	host                  string
-	port                  int
+	vaultApi              *Api
 	claims                *claims.Claims
 	client                *http.Client
 	pg                    *cs.PG
@@ -70,21 +55,18 @@ type Vault struct {
 	transferTimeoutPeriod time.Duration
 }
 
-func New(c *cli.Context, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
-	host := c.String(vaultServiceHostFlag)
-	port := c.Int(vaultServicePortFlag)
+func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
+	// Return nil if vaultApi is not configured
+	if vaultApi == nil {
+		return nil
+	}
+
 	freezePeriod := c.Duration(vaultPledgeFreezePeriodFlag)
 	expirePeriod := c.Duration(vaultResourceExpirePeriodFlag)
 	transferTimeoutPeriod := c.Duration(vaultResourceTransferTimeoutPeriodFlag)
 
-	// Return nil if host or port is not configured
-	if host == "" {
-		return nil
-	}
-
 	return &Vault{
-		host:                  host,
-		port:                  port,
+		vaultApi:              vaultApi,
 		claims:                cl,
 		client:                client,
 		pg:                    pg,
@@ -433,6 +415,18 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			if err != nil {
 				return errors.Wrap(err, "failed to mark resource as unexpired and funded")
 			}
+
+			// Put to Vault API when resource transitions to Funded state
+			vaulted, err := s.putResourceToVaultAPI(ctx, tx, resource)
+			if err != nil {
+				return errors.Wrap(err, "failed to sync resource with vault api")
+			}
+			if vaulted {
+				err := vaultModels.UpdateResourceVaulted(ctx, tx, resource.ResourceID)
+				if err != nil {
+					return errors.Wrap(err, "failed to set resource vaulted")
+				}
+			}
 		}
 
 		result = pledge
@@ -676,6 +670,35 @@ func (s *Vault) defundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels
 	return nil
 }
 
+// putResourceToVaultAPI checks and syncs resource status with Vault API
+func (s *Vault) putResourceToVaultAPI(ctx context.Context, tx *pg.Tx, resource *vaultModels.Resource) (bool, error) {
+	// Skip if Vault API is not configured
+	if s.vaultApi == nil {
+		return false, nil
+	}
+
+	// Get resource status from Vault API
+	vaultResource, err := s.vaultApi.GetResource(ctx, resource.ResourceID)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get resource from vault api")
+	}
+
+	// If resource exists in Vault and has StatusCompleted, mark as vaulted
+	if vaultResource != nil && vaultResource.Status == StatusCompleted {
+		return true, nil
+	}
+
+	// If resource doesn't exist in Vault, add it via PUT
+	if vaultResource == nil {
+		_, err = s.vaultApi.PutResource(ctx, resource.ResourceID)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to put resource to vault api")
+		}
+	}
+
+	return false, nil
+}
+
 // fundPledge adds funding to a pledge and updates the resource accordingly
 func (s *Vault) fundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.Pledge, resource *vaultModels.Resource) error {
 	// 1. Set funded = true for the pledge
@@ -764,16 +787,23 @@ func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *a
 	return nil
 }
 
-// RemoveResource removes a resource from the database
+// RemoveResource removes a resource from the database and vault API
 func (s *Vault) RemoveResource(ctx context.Context, resourceID string) error {
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("database connection is not available")
 	}
 
-	err := vaultModels.DeleteResource(ctx, db, resourceID)
+	// Delete resource from vault API
+	_, err := s.vaultApi.DeleteResource(ctx, resourceID)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete resource")
+		return errors.Wrap(err, "failed to delete resource from vault api")
+	}
+
+	// Delete resource from database
+	err = vaultModels.DeleteResource(ctx, db, resourceID)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete resource from database")
 	}
 
 	return nil

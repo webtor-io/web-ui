@@ -40,6 +40,8 @@
                                                 <td class="text-center">
                                                     {{ if .IsFrozen }}
                                                         <span class="badge badge-success">Frozen</span>
+                                                    {{ else if not .Funded }}
+                                                        <span class="badge badge-error">Expiring</span>
                                                     {{ else }}
                                                         <span class="badge badge-warning">Claimable</span>
                                                     {{ end }}
@@ -54,8 +56,28 @@
                                 <p class="text-center">No pledges yet</p>
                             </div>
                         {{ end }}
+                        <div class="bg-base-100 rounded-lg shadow p-6 w-full mb-6 text-sm text-left">
+                            <dl class="space-y-3">
+                                <div>
+                                    <dt class="font-bold inline">Frozen</dt>
+                                    <dd class="inline"> — points become frozen immediately after pledge and unfreeze after the torrent is transferred to Vault and the freeze period of <strong class="font-bold">{{ .Data.FreezePeriod | duration }}</strong> expires</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-bold inline">Expiring</dt>
+                                    <dd class="inline"> — pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-bold inline">Claimable</dt>
+                                    <dd class="inline"> — points that can be claimed back. After claiming, the content they were pledged to may be removed</dd>
+                                </div>
+                            </dl>
+                        </div>
                         <div class="flex justify-center mt-4">
                             <a href="/profile" class="btn btn-accent btn-outline" data-async-target="main">Back To Profile</a>
+                        </div>
+                        <div class="text-left w-full text-sm text-accent mt-2">
+                            <span class="text-accent">ⓘ</span>
+                            <a href="/instructions/vault" class="hover:underline" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
                         </div>
                     </div>
                 </div>
