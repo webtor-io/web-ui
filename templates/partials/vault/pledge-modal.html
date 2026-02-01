@@ -1,0 +1,17 @@
+{{ define "vault/pledge-modal" }}
+{{ if or .VaultPledgeAddForm .VaultPledgeRemoveForm }}
+<dialog class="modal" open>
+    <div class="modal-box">
+        {{ if .VaultPledgeAddForm }}
+            {{ template "vault/pledge-modal/add" .VaultPledgeAddForm }}
+        {{ end }}
+        {{ if .VaultPledgeRemoveForm }}
+            {{ template "vault/pledge-modal/remove" .VaultPledgeRemoveForm }}
+        {{ end }}
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{{ end }}
+{{ end }}

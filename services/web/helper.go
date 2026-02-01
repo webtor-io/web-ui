@@ -22,6 +22,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hako/durafmt"
 	"github.com/urfave/cli"
 
 	h "github.com/dustin/go-humanize"
@@ -59,7 +60,23 @@ func RedirectWithError(c *gin.Context, serr error) {
 		return
 	}
 	q := u.Query()
+	q.Set("status", "error")
 	q.Set("err", serr.Error())
+	q.Set("from", c.Request.URL.Path)
+	u.RawQuery = q.Encode()
+	c.Redirect(http.StatusFound, u.String())
+}
+
+func RedirectWithSuccess(c *gin.Context) {
+	u, err := url.Parse(c.GetHeader("X-Return-Url"))
+	if err != nil || u == nil {
+		// if return url is invalid, attempt a plain redirect without query mutation
+		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		return
+	}
+	q := u.Query()
+	q.Set("status", "success")
+	q.Set("from", c.Request.URL.Path)
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
 }
@@ -312,4 +329,17 @@ func (s *Helper) Printf(format string, args ...any) string {
 // Tools returns the list of all available tool pages
 func (s *Helper) Tools() []hc.Tool {
 	return hc.Tools
+}
+
+// Duration formats a time.Duration into a human-readable string
+func (s *Helper) Duration(d time.Duration) string {
+	return durafmt.Parse(d).LimitFirstN(2).String()
+}
+
+// Deref dereferences a pointer to float64, returning 0 if the pointer is nil
+func (s *Helper) DerefFloat64(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
 }

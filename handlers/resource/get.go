@@ -75,11 +75,15 @@ func (s *Handler) getList(ctx context.Context, args *GetArgs) (l *ra.ListRespons
 }
 
 type GetData struct {
-	Args        *GetArgs
-	Resource    *ExtendedResource
-	List        *ra.ListResponse
-	Item        *ra.ListItem
-	Instruction string
+	Args                  *GetArgs
+	Resource              *ExtendedResource
+	List                  *ra.ListResponse
+	Item                  *ra.ListItem
+	Instruction           string
+	VaultPledgeAddForm    *VaultPledgeAddForm
+	VaultButton           *VaultButton
+	VaultPledgeRemoveForm *VaultPledgeRemoveForm
+	Vault                 bool
 }
 
 type ExtendedResource struct {
@@ -166,6 +170,39 @@ func (s *Handler) get(c *gin.Context) {
 		indexTpl.HTML(http.StatusNotFound, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "resource not found")))
 		return
 	}
+
+	// Set vault availability
+	d.Vault = s.vault != nil
+
+	// Prepare vault button state
+	if s.vault != nil && args.User.HasAuth() {
+		vaultButton, err := s.prepareVaultButton(ctx, args)
+		if err != nil {
+			indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault button")))
+			return
+		}
+		d.VaultButton = vaultButton
+		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/pledge/add" {
+			vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
+			if err != nil {
+				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault form")))
+				return
+			}
+
+			d.VaultPledgeAddForm = vaultPledgeAddForm
+		}
+		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/pledge/remove" {
+			vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
+			if err != nil {
+				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault pledge remove form")))
+				return
+			}
+			d.VaultPledgeRemoveForm = vaultPledgeRemoveForm
+		}
+	}
+
+	// Handle pledge-form parameter
+
 	c.Header("X-Robots-Tag", "noindex, follow")
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
 }

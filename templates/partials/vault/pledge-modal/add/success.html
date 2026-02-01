@@ -1,0 +1,26 @@
+{{ define "vault/pledge-modal/add/success" }}
+	<div class="py-4">
+		{{ if not .Funded }}
+			<p>Unfortunately, you don't have enough Vault Points to continue supporting this resource, and it may disappear. Try renewing your subscription.</p>
+			<div class="pt-4">
+				<a href="/donate" target="_blank" class="link link-accent" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
+			</div>
+		{{ else if .Vaulted }}
+			<p>Your torrent is already in the Vault and will be kept available.</p>
+		{{ else }}
+			<p>Your pledge has been successfully registered and your torrent will be saved in the Vault soon.</p>
+		{{ end }}
+	</div>
+	<div class="modal-action justify-center">
+		<form method="dialog">
+			<button class="btn btn-accent" data-umami-event="vault-pledge-confirmed">Got it!</button>
+		</form>
+		<form method="get" data-async-target="#pledge-modal" data-async-push-state="false">
+			<input type="hidden" name="pledge-remove-form" value="true" />
+			<button type="submit" class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-pledge-remove-requested">Remove Pledge</button>
+		</form>
+	</div>
+	<script>
+		document.querySelector("#pledge-button").reload();
+	</script>
+{{ end }}

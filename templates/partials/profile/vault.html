@@ -1,0 +1,56 @@
+{{ define "profile/vault" }}
+    <div class="hero bg-base-200">
+        <div class="hero-content text-center w-full">
+            <div class="w-full">
+                <h2 class="text-2xl font-bold text-accent">Vault Points</h2>
+                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
+                    {{ if .Data.VaultStats }}
+                        <div class="w-full sm:px-5">
+                            <div class="overflow-x-auto mb-6 bg-base-100 rounded-lg shadow p-6 w-full">
+                                <table class="table w-full">
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-left font-semibold">Total</td>
+                                            <td class="text-center">
+                                                {{ if .Data.VaultStats.Total }}
+                                                    {{ printf "%.2f" (derefFloat64 .Data.VaultStats.Total) }}
+                                                {{ else }}
+                                                    <span class="text-xl">∞</span>
+                                                {{ end }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-semibold">Available</td>
+                                            <td class="text-center">
+                                                {{ if .Data.VaultStats.Available }}
+                                                    {{ printf "%.2f" (derefFloat64 .Data.VaultStats.Available) }}
+                                                {{ else }}
+                                                    <span class="text-xl">∞</span>
+                                                {{ end }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-semibold">Funded</td>
+                                            <td class="text-center">{{ printf "%.2f" .Data.VaultStats.Funded }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-semibold">Frozen</td>
+                                            <td class="text-center">{{ printf "%.2f" .Data.VaultStats.Frozen }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="flex justify-center mt-4">
+                                <a href="/vault/pledge" class="btn btn-accent btn-outline" data-async-target="main">Pledges</a>
+                            </div>
+                            <div class="text-left w-full text-sm text-accent mt-2">
+                                <span class="text-accent">ⓘ</span>
+                                <a href="/instructions/vault" class="hover:underline" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
+                            </div>
+                        </div>
+                    {{ end }}
+                </div>
+            </div>
+        </div>
+    </div>
+{{ end }}

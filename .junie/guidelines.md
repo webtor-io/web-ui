@@ -1,5 +1,22 @@
 Project development guidelines (advanced)
 
+Documentation
+- **Before starting work on any feature or component, always check the docs/ directory first**
+  - The docs/ folder contains comprehensive technical specifications and architecture documentation
+  - Each major feature has its own documentation file (e.g., docs/vault.md for the Vault system)
+  - Documentation includes:
+    - Database schemas and data models
+    - Business logic and workflows
+    - API specifications and integration points
+    - Constraints, rules, and edge cases
+  - Reading the relevant documentation before implementation helps avoid mistakes and ensures consistency with the existing architecture
+  - If documentation is missing or outdated for a feature you're working on, consider updating it as part of your work
+- **After completing any task, always update the relevant documentation in docs/ directory**
+  - When adding new methods, functions, or services, document their signatures, parameters, algorithms, and error handling
+  - When modifying existing functionality, update the corresponding documentation to reflect the changes
+  - When adding new database tables or models, update the schema documentation and model descriptions
+  - Documentation updates are a mandatory part of task completion, not an optional step
+
 Build and configuration
 - Toolchain versions
   - Go: go 1.24.x (module file declares 1.24.5). The project is a single Go module: github.com/webtor-io/web-ui.
@@ -90,6 +107,76 @@ Build and configuration
   - Model methods should accept a *pg.DB instance as their first parameter and return appropriate types with error handling.
   - This separation ensures better testability, maintainability, and follows the single responsibility principle.
 
+- Handler architecture: Two-level separation
+  - **ALL handlers must follow a two-level architecture pattern** to separate HTTP concerns from business logic.
+  - **Level 1: HTTP interaction layer** — Handler methods that interact with gin.Context:
+    - Extract parameters from HTTP request (form data, URL params, headers, context values)
+    - Call Level 2 business logic methods with prepared parameters
+    - Handle HTTP responses (redirects, JSON, HTML rendering)
+    - Manage HTTP-specific error handling and status codes
+    - Example: `func (h *Handler) addPledge(c *gin.Context)`
+  - **Level 2: Business logic layer** — Pure functions that contain core logic:
+    - Accept prepared parameters (no gin.Context dependency)
+    - Perform validation, business rules, and orchestration
+    - Call services and models to execute operations
+    - Return clean values and errors (no HTTP concerns)
+    - Example: `func (h *Handler) createPledge(ctx context.Context, resourceID string, user *auth.User, ...) error`
+  - **Benefits of this separation:**
+    - Business logic is testable without HTTP mocking
+    - Clear separation of concerns (HTTP vs domain logic)
+    - Business methods can be reused in different contexts (HTTP, gRPC, CLI)
+    - Easier to understand and maintain code
+  - **Authentication middleware:**
+    - Use `auth.HasAuth` middleware via `r.Group().Use(auth.HasAuth)` for protected endpoints
+    - Do NOT check authentication manually in handler methods
+    - Middleware ensures user is authenticated before handler is called
+  - **Example pattern:**
+    ```go
+    func RegisterHandler(r *gin.Engine, service *Service) {
+        h := &Handler{service: service}
+        gr := r.Group("/api/resource")
+        gr.Use(auth.HasAuth)  // Apply auth middleware to group
+        gr.POST("/create", h.create)
+    }
+    
+    // Level 1: HTTP interaction
+    func (h *Handler) create(c *gin.Context) {
+        // Extract parameters
+        name := c.PostForm("name")
+        user := auth.GetUserFromContext(c)
+        
+        // Call business logic
+        result, err := h.createResource(c.Request.Context(), name, user)
+        if err != nil {
+            web.RedirectWithError(c, err)
+            return
+        }
+        
+        // Handle success response
+        web.RedirectWithSuccess(c)
+    }
+    
+    // Level 2: Business logic
+    func (h *Handler) createResource(ctx context.Context, name string, user *auth.User) (*Resource, error) {
+        // Validate input
+        if name == "" {
+            return nil, errors.New("name is required")
+        }
+        
+        // Execute business logic
+        resource, err := h.service.Create(ctx, name, user.ID)
+        if err != nil {
+            return nil, err
+        }
+        
+        return resource, nil
+    }
+    ```
+  - **Reference implementations:**
+    - `handlers/embed_domain/handler.go` — clean two-level separation with auth middleware
+    - `handlers/vault/handler.go` — vault pledge management with business logic separation
+    - `handlers/streaming/backends/handler.go` — streaming backend management pattern
+
 Running the server locally
 - With local REST API or RapidAPI configured:
   1) npm install
@@ -147,6 +234,23 @@ Frontend Development Philosophy
   - Use `data-async-target` and `data-async-push-state="false"` for partial page updates when needed.
   - Include `X-Return-Url` header handling in handlers to redirect back to the originating page after form submissions.
   - Handlers should use `c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))` pattern for form processing.
+
+- Auto-updating components pattern
+  - **Direct reload method**:
+    - If the component container has `data-async-layout` attribute, you can call `reload()` method directly:
+    ```javascript
+    document.querySelector("#component-id").reload();
+    ```
+    - This method is simpler but requires the element to be initialized by the async system first
+  - **Key requirements**:
+    - Container must have unique `id` attribute
+    - Container must have `data-async-layout` attribute with the template path
+    - Hidden form must have `data-async-target` pointing to the container's `id`
+    - Hidden form must have `data-async-push-state="false"` to avoid browser history pollution
+    - Use `requestSubmit()` instead of `submit()` to properly trigger form event handlers
+  - **Reference implementations**:
+    - `templates/partials/vault/button.html` + `templates/partials/vault/pledge-success.html` — Vault button auto-update after pledge creation
+    - `templates/partials/library/button.html` — Library button pattern (similar approach)
 
 - Anti-patterns to avoid
   - **Heavy JavaScript frameworks**: Avoid React, Vue, Angular, or similar client-side frameworks.

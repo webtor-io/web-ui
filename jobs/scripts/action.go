@@ -11,11 +11,11 @@ import (
 
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
 
-	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/template"
@@ -73,7 +73,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if se.Meta.Transcode {
 		if !se.Meta.TranscodeCache {
 			if !se.ExportMetaItem.Meta.Cache {
-				if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
+				if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1024*1024, 500*1024, "file", true); err != nil {
 					return
 				}
 			}
@@ -93,7 +93,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		j.Done()
 	} else {
 		if !se.ExportMetaItem.Meta.Cache {
-			if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1_000_000, 500_000, "file", true); err != nil {
+			if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1024*1024, 500*1024, "file", true); err != nil {
 				return
 			}
 		}
@@ -174,7 +174,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1_000_000, 0, "", true); err != nil {
+		if err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, "", true); err != nil {
 			return err
 		}
 	}
@@ -249,7 +249,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		limitEnd = size - limitStart
 	}
 	if size > 0 {
-		j.InProgress(fmt.Sprintf("%v, downloading %v", m, humanize.Bytes(uint64(limitStart+limitEnd))))
+		j.InProgress(fmt.Sprintf("%v, downloading %v", m, helpers.Bytes(uint64(limitStart+limitEnd))))
 	} else {
 		j.InProgress(m)
 	}

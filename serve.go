@@ -9,6 +9,7 @@ import (
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
 	"github.com/webtor-io/web-ui/handlers/embed_domain"
+	"github.com/webtor-io/web-ui/handlers/event"
 	"github.com/webtor-io/web-ui/handlers/ext"
 	"github.com/webtor-io/web-ui/handlers/geo"
 	wi "github.com/webtor-io/web-ui/handlers/index"
@@ -28,6 +29,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	vh "github.com/webtor-io/web-ui/handlers/vault"
 	"github.com/webtor-io/web-ui/handlers/webdav"
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
@@ -36,9 +38,11 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	"github.com/webtor-io/web-ui/services/notification"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	"github.com/webtor-io/web-ui/services/vault"
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
@@ -70,6 +74,7 @@ func makeServeCMD() cli.Command {
 
 func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterPGFlags(c.Flags)
+	c.Flags = cs.RegisterNATSFlags(c.Flags)
 	c.Flags = cs.RegisterProbeFlags(c.Flags)
 	c.Flags = cs.RegisterS3ClientFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
@@ -91,6 +96,8 @@ func configureServe(c *cli.Command) {
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
 	c.Flags = ci.RegisterFlags(c.Flags)
+	c.Flags = vault.RegisterApiFlags(c.Flags)
+	c.Flags = vault.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -178,6 +185,12 @@ func serve(c *cli.Context) error {
 		defer cpCl.Close()
 	}
 
+	// Setting NATS
+	nats := cs.NewNATS(c)
+	if nats != nil {
+		defer nats.Close()
+	}
+
 	// Setting UserClaims
 	uc := claims.New(c, cpCl, pg)
 	if uc != nil {
@@ -251,8 +264,22 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
+	// Setting Vault API
+	vaultApi := vault.NewApi(c, cl)
+
+	// Setting Vault
+	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
+
+	// Setting Notification
+	ns := notification.New(c, pg.Get())
+
+	// Setting VaultHandler
+	if v != nil {
+		vh.RegisterHandler(r, v, tm, pg)
+	}
+
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm)
@@ -264,7 +291,7 @@ func serve(c *cli.Context) error {
 	wa.RegisterHandler(r, tm, jobs)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
@@ -328,7 +355,14 @@ func serve(c *cli.Context) error {
 	tests.RegisterHandler(r, tm)
 
 	// Setting Instructions
-	instructions.RegisterHandler(r, tm)
+	instructions.RegisterHandler(r, tm, v)
+
+	// Setting Events
+	if nats != nil {
+		eh := event.New(nats, pg, v, uc, ns)
+		servers = append(servers, eh)
+		defer eh.Close()
+	}
 
 	// Render templates
 	err = tm.Init()

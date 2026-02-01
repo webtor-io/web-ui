@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <p>Your resources will disappear in {{ .Days }} days:</p>
+    <ul>
+        {{ range .Resources }}
+        <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+        {{ end }}
+    </ul>
+    <p>Best regards,<br>Webtor Team</p>
+</body>
+</html>

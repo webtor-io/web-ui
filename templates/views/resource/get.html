@@ -19,7 +19,11 @@
 {{ if and .Item .List }}
 <div class="divider h-0"></div>
 {{ end }}
-{{ template "keep_available/button" $ }}
+<div id="pledge-button" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
+    {{ if and ($.User | hasAuth) .Vault }}
+        {{ template "vault/button" .VaultButton  }}
+    {{ end }}
+</div>
 {{ if .List }}
 <div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
 {{ template "list" $ }}
@@ -34,8 +38,12 @@
     </div>
 </div>
 <div id="log-{{ .Resource.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
+{{ if and ($.User | hasAuth) .Vault }}
+    <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" .Data }}`}}">
+        {{ template "vault/pledge-modal" . }}
+    </div>
 {{ end }}
-{{ template "keep_available/modal" . }}
+{{ end }}
 {{ template "get_extra" . }}
 {{ "resource/get.js" | asset }}
 {{ end }}

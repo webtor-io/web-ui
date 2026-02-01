@@ -4,6 +4,12 @@
 <div id="tier">
     {{ template "profile/tier" $ }}
 </div>
+{{ if .Data.VaultStats }}
+<div class="divider"></div>
+<div id="vault" data-async-layout="{{`{{ template "profile/vault" $ }}`}}">
+    {{ template "profile/vault" $ }}
+</div>
+{{ end }}
 <div class="divider"></div>
 <div id="stremio" data-async-layout="{{`{{ template "profile/stremio" $ }}`}}">
     {{ template "profile/stremio" $ }}

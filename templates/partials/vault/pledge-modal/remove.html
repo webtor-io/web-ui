@@ -1,0 +1,57 @@
+{{ define "vault/pledge-modal/remove" }}
+<h3 class="text-2xl font-bold text-accent w-full">Remove Vault Pledge</h3>
+{{ if eq .Status "success" }}
+	<p class="py-4">
+		Your pledge has been successfully removed and your Vault Points have been returned to your account. The torrent may be removed from the Vault if it's no longer funded. You can always pledge your points again if needed.
+	</p>
+
+	<div class="modal-action justify-center">
+		<form method="dialog">
+			<button class="btn btn-accent" data-umami-event="vault-pledge-remove-success-confirmed">Got it!</button>
+		</form>
+	</div>
+	<script>
+		document.querySelector("#pledge-button").reload();
+	</script>
+	{{ else if eq .Status "error" }}
+		<p class="py-4">
+			Unfortunately, your pledge could not be removed due to an error:
+		</p>
+		{{ if .Err }}
+			<div class="progress-alert progress-alert-oneline closeable mb-4">
+				<pre>{{ .Err | log | shortErr }}</pre>
+			</div>
+		{{ end }}
+		<div class="modal-action justify-center">
+			<form method="dialog">
+				<button class="btn btn-accent" data-umami-event="vault-pledge-remove-error-confirmed">Ok</button>
+			</form>
+		</div>
+	{{ else if .Frozen }}
+		<p class="py-4">
+			Your Vault Points are currently frozen and cannot be removed yet. Please come back later when the freeze period expires.
+		</p>
+
+		<div class="modal-action justify-center">
+			<form method="dialog">
+				<button class="btn btn-accent" data-umami-event="vault-pledge-frozen-acknowledged">Got it!</button>
+			</form>
+		</div>
+	{{ else }}
+		<p class="py-4">
+			Are you sure you want to remove your pledge for this torrent? This action cannot be undone.
+		</p>
+
+		<div class="modal-action justify-center">
+			<form action="/vault/pledge/remove" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
+				<input type="hidden" name="resource_id" value="{{ .ResourceID }}" />
+				<button type="submit" class="btn btn-accent" data-umami-event="vault-pledge-remove-confirmed">
+					Remove Pledge
+				</button>
+			</form>
+			<form method="dialog">
+				<button class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-pledge-remove-cancelled">Cancel</button>
+			</form>
+		</div>
+	{{ end }}
+{{ end }}

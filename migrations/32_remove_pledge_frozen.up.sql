@@ -1,0 +1,1 @@
+ALTER TABLE vault.pledge DROP COLUMN IF EXISTS frozen;
