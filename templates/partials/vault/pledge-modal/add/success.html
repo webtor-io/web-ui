@@ -1,11 +1,16 @@
 {{ define "vault/pledge-modal/add/success" }}
-	<p class="py-4">
-		{{ if .Vaulted }}
-			Your torrent is already in the Vault and will be kept available.
+	<div class="py-4">
+		{{ if not .Funded }}
+			<p>Unfortunately, you don't have enough Vault Points to continue supporting this resource, and it may disappear. Try renewing your subscription.</p>
+			<div class="pt-4">
+				<a href="/donate" target="_blank" class="link link-accent" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
+			</div>
+		{{ else if .Vaulted }}
+			<p>Your torrent is already in the Vault and will be kept available.</p>
 		{{ else }}
-			Your pledge has been successfully registered and your torrent will be saved in the Vault soon.
+			<p>Your pledge has been successfully registered and your torrent will be saved in the Vault soon.</p>
 		{{ end }}
-	</p>
+	</div>
 	<div class="modal-action justify-center">
 		<form method="dialog">
 			<button class="btn btn-accent" data-umami-event="vault-pledge-confirmed">Got it!</button>

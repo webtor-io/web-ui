@@ -20,6 +20,29 @@ The Vault system is designed to manage users' virtual points (Vault Points, VP) 
 - **Expiration** — marking a resource as expired when funding drops below required amount
   - **Deletion period: 7 days** after expiration
 
+## Notification System
+
+The project includes a notification system to keep users informed about their resources. Notifications are sent via email and logged in the `public.notification` table to prevent duplicates (at most one notification per key per recipient every 24 hours).
+
+### Triggers
+
+1.  **Resource Vaulted**: Sent immediately when a resource becomes vaulted (event `resource.vaulted`). All users who made a pledge for this resource are notified.
+    -   **Key**: `vaulted-%resource_id%`
+    -   **Template**: `vaulted.html`
+2.  **Expiring Resources**: Sent for resources that will expire in less than 7, 3, or 1 day. This is handled by a periodic CLI command.
+    -   **Key**: `expiring-%days%`
+    -   **Template**: `expiring.html`
+
+### CLI Command
+
+To send notifications about expiring resources, use the following command:
+
+```bash
+./web-ui notification send
+```
+
+This command should be scheduled to run daily (e.g., via cron). It aggregates all expiring resources for each user into a single email.
+
 ## Database Schema
 
 All tables are located in a separate `vault` schema to isolate them from the main application data.
@@ -178,6 +201,19 @@ CREATE TABLE vault.tx_log (
 - When a pledge is claimed, a record is created with a positive value (credit)
 - For unlimited accounts (`total = NULL`), no log entries are created on tier change
 - For free tier accounts (`total = 0`), no log entries are created on tier change
+
+### 7. Table `public.notification`
+
+Stores information about sent notifications.
+
+- `notification_id` (uuid, primary key) — unique identifier for each notification
+- `key` (text) — unique key for the notification type and context (e.g., `vaulted-123` or `expiring-7`)
+- `title` (text) — the subject line of the email
+- `template` (text) — the name of the template used to render the body
+- `body` (text) — the rendered HTML content of the email
+- `to` (text) — recipient's email address
+- `created_at` (timestamptz) — when the notification was created/sent
+- `updated_at` (timestamptz) — last update timestamp
 
 ## Data Models (Go)
 
@@ -423,6 +459,36 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 - Returns error if database connection is unavailable
 - Returns error if claims cannot be fetched
 - Returns error if transaction fails at any step
+
+#### Method `UpdateUserVPIfExists`
+
+Synchronizes user balance with the claims system only if the user already has a record in the Vault system.
+
+**Signature:**
+```go
+func (s *Vault) UpdateUserVPIfExists(ctx context.Context, user *auth.User) (*vaultModels.UserVP, error)
+```
+
+**Parameters:**
+- `ctx` — request context
+- `user` — authenticated user (`*auth.User`)
+
+**Algorithm:**
+1. Get database connection from PG service
+2. Call `vaultModels.GetUserVP` to check if a `user_vp` record exists for the given user ID
+3. If no record is found (returns `nil`), return `nil, nil` immediately without error
+4. If record is found, call `UpdateUserVP(ctx, user)` to perform the synchronization
+5. Return the result of `UpdateUserVP`
+
+**Features:**
+- Prevents unwanted creation of Vault records for users who have not interacted with the Vault system
+- Safely wraps `UpdateUserVP` for use in automated event processing (e.g., `user.updated` events)
+- Returns `nil, nil` if the user is not in the Vault (not an error)
+
+**Error Handling:**
+- Returns error if database connection is unavailable
+- Returns error if database query fails
+- Propagates errors from `UpdateUserVP` if it is called
 
 #### Method `GetUserStats`
 
@@ -1490,7 +1556,7 @@ A modal dialog that displays vault points information and allows users to confir
 
 1. **Sufficient Points (Available >= RequiredVP or Unlimited):**
    - Message: "You have enough Vault Points to store this torrent in the Vault."
-   - Shows "Store in Vault" button (currently UI-only, action to be implemented)
+   - Shows "Store in Vault" button
    - Shows "Cancel" button to close modal
 
 2. **Insufficient Points (Available < RequiredVP):**
@@ -1498,12 +1564,25 @@ A modal dialog that displays vault points information and allows users to confir
    - Suggests upgrading subscription with link to `/donate` (opens in new tab)
    - Shows only "Cancel" button (no "Store in Vault" button)
 
-**Information Table:**
-- **Required VP:** Amount of VP needed to vault the resource (calculated from total torrent size)
-- **Your Available VP:** User's available VP (or "Unlimited" if null)
-- **Your Total VP:** User's total VP (or "Unlimited" if null)
+3. **Success Status (Status = "success"):**
+   - **Fully Funded (`Funded` = true):**
+     - Message: "Your pledge has been successfully registered and your torrent will be saved in the Vault soon."
+     - Umami event: `vault-pledge-confirmed` on "Got it!" button
+   - **Not Funded (`Funded` = false):**
+     - Message: "Unfortunately, you don't have enough Vault Points to continue supporting this resource, and it may disappear. Try renewing your subscription:"
+     - Shows link to `/donate` with text "Upgrade subscription" (Umami event: `vault-upgrade-clicked`)
+     - Umami event: `vault-pledge-confirmed` on "Got it!" button
 
-**Additional Elements:**
+4. **Vaulted Status (`Vaulted` = true):**
+   - Message: "Your torrent is already in the Vault and will be kept available."
+   - Umami event: `vault-pledge-confirmed` on "Got it!" button
+
+5. **Error Status (Status = "error"):**
+   - Message: "Unfortunately, your pledge could not be saved due to an error:" followed by error details
+   - Shows only "Ok" button to close modal
+   - Umami event: `vault-pledge-error-confirmed`
+
+**Information Table:**
 - Link to `/instructions/vault` with text "What is Vault?" (opens in new tab)
 - Umami analytics tracking:
   - `data-umami-event="vault-store-confirmed"` on "Store in Vault" button

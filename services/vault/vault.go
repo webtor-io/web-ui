@@ -17,7 +17,7 @@ import (
 
 const (
 	vaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
-	vaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
+	VaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
 	vaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
 )
 
@@ -30,7 +30,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			EnvVar: "VAULT_PLEDGE_FREEZE_PERIOD",
 		},
 		cli.DurationFlag{
-			Name:   vaultResourceExpirePeriodFlag,
+			Name:   VaultResourceExpirePeriodFlag,
 			Usage:  "period after which unfunded resource is removed from vault",
 			Value:  7 * 24 * time.Hour,
 			EnvVar: "VAULT_RESOURCE_EXPIRE_PERIOD",
@@ -62,7 +62,7 @@ func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, 
 	}
 
 	freezePeriod := c.Duration(vaultPledgeFreezePeriodFlag)
-	expirePeriod := c.Duration(vaultResourceExpirePeriodFlag)
+	expirePeriod := c.Duration(VaultResourceExpirePeriodFlag)
 	transferTimeoutPeriod := c.Duration(vaultResourceTransferTimeoutPeriodFlag)
 
 	return &Vault{
@@ -115,8 +115,8 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 		claimsPoints = &points
 	}
 
-	//p := float64(1)
-	//claimsPoints = &p
+	p := float64(0)
+	claimsPoints = &p
 
 	// Execute in transaction with SELECT FOR UPDATE
 	var result *vaultModels.UserVP
@@ -235,6 +235,22 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 	}
 
 	return result, nil
+}
+
+// UpdateUserVPIfExists updates user vault points only if user already has a record in Vault
+func (s *Vault) UpdateUserVPIfExists(ctx context.Context, user *auth.User) (*vaultModels.UserVP, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+	vp, err := vaultModels.GetUserVP(ctx, db, user.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check user vault points")
+	}
+	if vp == nil {
+		return nil, nil
+	}
+	return s.UpdateUserVP(ctx, user)
 }
 
 // UserStats represents user vault points statistics

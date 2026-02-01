@@ -19,7 +19,7 @@ require (
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
 	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
-	github.com/webtor-io/common-services v0.0.0-20251108105453-635ef47a01ea
+	github.com/webtor-io/common-services v0.0.0-20260131122210-5178e4b36a70
 	github.com/webtor-io/lazymap v0.0.0-20251112155450-24fcf0ad4b5d
 	github.com/webtor-io/rest-api v1.0.1-0.20251112155849-4fe937f800f4
 	github.com/yargevad/filepathx v1.0.0
@@ -43,6 +43,10 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/nats-io/nats.go v1.48.0 // indirect
+	github.com/nats-io/nkeys v0.4.11 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.56.0 // indirect

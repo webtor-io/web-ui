@@ -9,6 +9,7 @@ import (
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
 	"github.com/webtor-io/web-ui/handlers/embed_domain"
+	"github.com/webtor-io/web-ui/handlers/event"
 	"github.com/webtor-io/web-ui/handlers/ext"
 	"github.com/webtor-io/web-ui/handlers/geo"
 	wi "github.com/webtor-io/web-ui/handlers/index"
@@ -37,6 +38,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	"github.com/webtor-io/web-ui/services/notification"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -72,6 +74,7 @@ func makeServeCMD() cli.Command {
 
 func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterPGFlags(c.Flags)
+	c.Flags = cs.RegisterNATSFlags(c.Flags)
 	c.Flags = cs.RegisterProbeFlags(c.Flags)
 	c.Flags = cs.RegisterS3ClientFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
@@ -182,6 +185,12 @@ func serve(c *cli.Context) error {
 		defer cpCl.Close()
 	}
 
+	// Setting NATS
+	nats := cs.NewNATS(c)
+	if nats != nil {
+		defer nats.Close()
+	}
+
 	// Setting UserClaims
 	uc := claims.New(c, cpCl, pg)
 	if uc != nil {
@@ -260,6 +269,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Vault
 	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
+
+	// Setting Notification
+	ns := notification.New(c, pg.Get())
 
 	// Setting VaultHandler
 	if v != nil {
@@ -344,6 +356,13 @@ func serve(c *cli.Context) error {
 
 	// Setting Instructions
 	instructions.RegisterHandler(r, tm, v)
+
+	// Setting Events
+	if nats != nil {
+		eh := event.New(nats, pg, v, uc, ns)
+		servers = append(servers, eh)
+		defer eh.Close()
+	}
 
 	// Render templates
 	err = tm.Init()
