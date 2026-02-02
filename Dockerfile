@@ -55,4 +55,6 @@ EXPOSE 8080 8081
 ENV GIN_MODE=release
 
 # run it!
-CMD ["./server", "serve"]
+ENTRYPOINT ["./server"]
+
+CMD ["serve"]
