@@ -65,5 +65,7 @@ func (h *Handler) resourceVaulted(msg []byte) error {
 		}
 	}
 
+	log.WithField("resource_id", m.ResourceID).Info("resource vaulted successfully")
+
 	return nil
 }

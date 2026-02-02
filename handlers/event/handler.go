@@ -1,9 +1,6 @@
 package event
 
 import (
-	"context"
-	"time"
-
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -62,36 +59,19 @@ func (h *Handler) Serve() error {
 }
 
 func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject string, consumer string, handler func([]byte) error) error {
-	sub, err := js.PullSubscribe(subject, consumer, nats.Bind(stream, consumer))
+	sub, err := js.QueueSubscribe(subject, consumer, func(msg *nats.Msg) {
+		err := handler(msg.Data)
+		if err != nil {
+			log.WithError(err).WithField("consumer", consumer).Error("failed to handle message")
+			_ = msg.Nak()
+		} else {
+			_ = msg.Ack()
+		}
+	}, nats.Bind(stream, consumer), nats.ManualAck())
 	if err != nil {
 		return err
 	}
 	h.subs = append(h.subs, sub)
-	go func() {
-		for {
-			select {
-			case <-h.done:
-				return
-			default:
-				msgs, err := sub.Fetch(1, nats.MaxWait(5*time.Second))
-				if err != nil {
-					if err == context.DeadlineExceeded || err == nats.ErrTimeout {
-						continue
-					}
-					log.WithError(err).WithField("consumer", consumer).Error("failed to fetch message")
-					continue
-				}
-				msg := msgs[0]
-				err = handler(msg.Data)
-				if err != nil {
-					log.WithError(err).WithField("consumer", consumer).Error("failed to handle message")
-					_ = msg.Nak()
-				} else {
-					_ = msg.Ack()
-				}
-			}
-		}
-	}()
 	return nil
 }
 
