@@ -89,6 +89,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterPprofFlags(c.Flags)
 	c.Flags = umami.RegisterFlags(c.Flags)
 	c.Flags = geoip.RegisterFlags(c.Flags)
+	c.Flags = event.RegisterFlags(c.Flags)
 	c.Flags = library.RegisterFlags(c.Flags)
 	c.Flags = embed.RegisterFlags(c.Flags)
 	c.Flags = rum.RegisterFlags(c.Flags)
@@ -359,9 +360,11 @@ func serve(c *cli.Context) error {
 
 	// Setting Events
 	if nats != nil {
-		eh := event.New(nats, pg, v, uc, ns)
-		servers = append(servers, eh)
-		defer eh.Close()
+		eh := event.New(c, nats, pg, v, uc, ns)
+		if eh != nil {
+			servers = append(servers, eh)
+			defer eh.Close()
+		}
 	}
 
 	// Render templates

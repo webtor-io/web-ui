@@ -6,6 +6,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/notification"
@@ -22,7 +23,10 @@ type Handler struct {
 	done   chan struct{}
 }
 
-func New(nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service) *Handler {
+func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service) *Handler {
+	if !c.Bool(useEventHandlerFlag) {
+		return nil
+	}
 	return &Handler{
 		nats:   nats,
 		pg:     pg,
