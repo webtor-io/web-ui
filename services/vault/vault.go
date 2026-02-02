@@ -115,8 +115,8 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 		claimsPoints = &points
 	}
 
-	p := float64(0)
-	claimsPoints = &p
+	//p := float64(0)
+	//claimsPoints = &p
 
 	// Execute in transaction with SELECT FOR UPDATE
 	var result *vaultModels.UserVP
