@@ -16,7 +16,7 @@
 				<button class="btn btn-accent" data-umami-event="vault-pledge-error-confirmed">Ok</button>
 			</form>
 		</div>
-	{{ else if or .Funded .Vaulted }}
+	{{ else if .Funded }}
 		{{ template "vault/pledge-modal/add/success" . }}
 	{{ else }}
 		{{ if .Available }}
