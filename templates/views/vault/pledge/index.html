@@ -7,10 +7,17 @@
                 <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
                     <div class="w-full sm:px-5">
                         {{ if .Data.Pledges }}
-                            <div class="overflow-x-auto mb-6 bg-base-100 rounded-lg shadow p-6 w-full">
-                                <table class="table w-full">
+                            <div class="overflow-x-auto mb-6 bg-base-100 rounded-lg shadow p-2 w-full">
+                                <table class="table w-full table-fixed">
+                                    <colgroup>
+                                        <col class="w-6">
+                                        <col class="min-w-14">
+                                        <col class="w-24">
+                                        <col class="w-28">
+                                    </colgroup>
                                     <thead>
                                         <tr>
+                                            <th></th>
                                             <th class="text-left">Name</th>
                                             <th class="text-center">Amount</th>
                                             <th class="text-center">Status</th>
@@ -19,22 +26,17 @@
                                     <tbody>
                                         {{ range .Data.Pledges }}
                                             <tr>
-                                                <td class="text-left">
-                                                    {{ if .Resource }}
-                                                        {{ if ne .Resource.Name "" }}
-                                                            <a href="/{{ .ResourceID }}" class="link link-accent" data-async-target="main">
-                                                                {{ .Resource.Name }}
-                                                            </a>
-                                                        {{ else }}
-                                                            <a href="/{{ .ResourceID }}" class="link link-accent" data-async-target="main">
-                                                                {{ .ResourceID }}
-                                                            </a>
-                                                        {{ end }}
-                                                    {{ else }}
-                                                        <a href="/{{ .ResourceID }}" class="link link-accent" data-async-target="main">
-                                                            {{ .ResourceID }}
-                                                        </a>
+                                                <td class="text-center">
+                                                    {{ if and .Resource .Resource.Vaulted }}
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-accent">
+                                                            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                                                        </svg>
                                                     {{ end }}
+                                                </td>
+                                                <td class="text-left">
+                                                    <a href="/{{ .ResourceID }}" class="link link-accent truncate block min-w-14" data-async-target="main">
+                                                        {{ .Resource.Name }}
+                                                    </a>
                                                 </td>
                                                 <td class="text-center">{{ printf "%.2f" .Amount }}</td>
                                                 <td class="text-center">
