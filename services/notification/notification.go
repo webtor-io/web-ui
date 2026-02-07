@@ -10,34 +10,38 @@ import (
 	"time"
 
 	"github.com/go-pg/pg/v10"
+	"github.com/hako/durafmt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/vault"
 	"gopkg.in/gomail.v2"
 )
 
 type Service struct {
-	smtpHost   string
-	smtpPort   int
-	smtpUser   string
-	smtpPass   string
-	smtpSecure bool
-	db         *pg.DB
-	domain     string
+	smtpHost              string
+	smtpPort              int
+	smtpUser              string
+	smtpPass              string
+	smtpSecure            bool
+	db                    *pg.DB
+	domain                string
+	transferTimeoutPeriod time.Duration
 }
 
 func New(c *cli.Context, db *pg.DB) *Service {
 	return &Service{
-		smtpHost:   c.String(common.SMTPHostFlag),
-		smtpPort:   c.Int(common.SMTPPortFlag),
-		smtpUser:   c.String(common.SMTPUserFlag),
-		smtpPass:   c.String(common.SMTPPassFlag),
-		smtpSecure: c.Bool(common.SMTPSecureFlag),
-		db:         db,
-		domain:     c.String(common.DomainFlag),
+		smtpHost:              c.String(common.SMTPHostFlag),
+		smtpPort:              c.Int(common.SMTPPortFlag),
+		smtpUser:              c.String(common.SMTPUserFlag),
+		smtpPass:              c.String(common.SMTPPassFlag),
+		smtpSecure:            c.Bool(common.SMTPSecureFlag),
+		db:                    db,
+		domain:                c.String(common.DomainFlag),
+		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
 	}
 }
 
@@ -173,6 +177,38 @@ func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Reso
 			"Days":      days,
 			"Resources": expResources,
 			"Domain":    s.domain,
+		},
+	}
+	return s.Send(opts)
+}
+
+func (s *Service) SendTransferTimeout(to string, r *vaultModels.Resource) error {
+	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
+	opts := SendOptions{
+		To:       to,
+		Key:      fmt.Sprintf("transfer-timeout-%s", r.ResourceID),
+		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
+		Template: "transfer-timeout.html",
+		Data: map[string]any{
+			"Name":    r.Name,
+			"URL":     fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
+			"Timeout": timeoutStr,
+			"Domain":  s.domain,
+		},
+	}
+	return s.Send(opts)
+}
+
+func (s *Service) SendExpired(to string, r *vaultModels.Resource) error {
+	opts := SendOptions{
+		To:       to,
+		Key:      fmt.Sprintf("expired-%s", r.ResourceID),
+		Title:    fmt.Sprintf("Your resource %s has expired", r.Name),
+		Template: "expired.html",
+		Data: map[string]any{
+			"Name":   r.Name,
+			"URL":    fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
+			"Domain": s.domain,
 		},
 	}
 	return s.Send(opts)

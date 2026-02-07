@@ -82,6 +82,21 @@ func GetResourcePledges(ctx context.Context, db *pg.DB, resourceID string) ([]Pl
 	return pledges, nil
 }
 
+// GetResourcePledgesWithUsers returns all pledges for a specific resource with user information
+func GetResourcePledgesWithUsers(ctx context.Context, db *pg.DB, resourceID string) ([]Pledge, error) {
+	var pledges []Pledge
+	err := db.Model(&pledges).
+		Context(ctx).
+		Relation("User").
+		Where("pledge.resource_id = ?", resourceID).
+		Order("pledge.created_at DESC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get resource pledges with users")
+	}
+	return pledges, nil
+}
+
 // GetUserResourcePledge returns a pledge for a specific user and resource
 func GetUserResourcePledge(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID string) (*Pledge, error) {
 	pledge := &Pledge{}

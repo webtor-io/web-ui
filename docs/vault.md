@@ -32,6 +32,12 @@ The project includes a notification system to keep users informed about their re
 2.  **Expiring Resources**: Sent for resources that will expire in less than 7, 3, or 1 day. This is handled by a periodic CLI command.
     -   **Key**: `expiring-%days%`
     -   **Template**: `expiring.html`
+3.  **Transfer Timeout**: Sent when a resource fails to transfer to the vault within the configured timeout period (default: 7 days). Triggered during the `vault reap` command. Notifies users that the transfer failed due to lack of seeds, all VP has been returned, and suggests trying another torrent or retrying later.
+    -   **Key**: `transfer-timeout-%resource_id%`
+    -   **Template**: `transfer-timeout.html`
+4.  **Resource Expired**: Sent when a resource is removed from the vault due to expiration. Triggered during the `vault reap` command. Notifies users that the resource has been removed and they can pledge again if needed.
+    -   **Key**: `expired-%resource_id%`
+    -   **Template**: `expired.html`
 
 ### CLI Command
 
@@ -1762,8 +1768,11 @@ The `vault reap` command (alias: `v r`) is a maintenance command that removes ex
    - `funded_at < now - VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD AND vaulted = false` (default: 7 days) - resources that were funded but failed to transfer to vault within the timeout period
 
 2. For each expired resource:
-   - Retrieves all associated pledges
+   - Retrieves all associated pledges with user information
    - Removes each pledge through the vault service (which handles VP return and tx_log entries)
+   - Sends email notifications to users about the resource removal:
+     - **Transfer Timeout:** If the resource failed to transfer within the timeout period, sends a notification explaining that the transfer failed due to lack of seeds, all VP has been returned, and suggests trying another torrent or retrying later
+     - **Expiration:** If the resource expired normally, sends a notification explaining that the resource has been removed from the vault and the user can pledge again if needed
    - Deletes the resource from the database
 
 **Configuration:**
@@ -1793,12 +1802,14 @@ The command logs:
 - Number of expired resources found
 - Processing of each resource with pledge count
 - Each pledge removal with user ID and amount
+- Notification sending (success or failure) with user email and resource ID
 - Resource deletion
 - Completion of reap process
 
 **Error Handling:**
 
 - If a pledge cannot be removed, it logs a warning and continues with the next pledge
+- If a notification cannot be sent, it logs a warning and continues (pledge removal still succeeds)
 - If a resource cannot be deleted, it logs a warning and continues with the next resource
 - This ensures partial failures don't stop the entire reap process
 

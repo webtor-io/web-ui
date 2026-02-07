@@ -16,15 +16,15 @@ import (
 )
 
 const (
-	vaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
+	VaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
 	VaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
-	vaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
+	VaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.DurationFlag{
-			Name:   vaultPledgeFreezePeriodFlag,
+			Name:   VaultPledgeFreezePeriodFlag,
 			Usage:  "vault pledge freeze period",
 			Value:  24 * time.Hour,
 			EnvVar: "VAULT_PLEDGE_FREEZE_PERIOD",
@@ -36,7 +36,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			EnvVar: "VAULT_RESOURCE_EXPIRE_PERIOD",
 		},
 		cli.DurationFlag{
-			Name:   vaultResourceTransferTimeoutPeriodFlag,
+			Name:   VaultResourceTransferTimeoutPeriodFlag,
 			Usage:  "period after which resource is removed and transfer attempts are stopped",
 			Value:  7 * 24 * time.Hour,
 			EnvVar: "VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD",
@@ -61,9 +61,9 @@ func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, 
 		return nil
 	}
 
-	freezePeriod := c.Duration(vaultPledgeFreezePeriodFlag)
+	freezePeriod := c.Duration(VaultPledgeFreezePeriodFlag)
 	expirePeriod := c.Duration(VaultResourceExpirePeriodFlag)
-	transferTimeoutPeriod := c.Duration(vaultResourceTransferTimeoutPeriodFlag)
+	transferTimeoutPeriod := c.Duration(VaultResourceTransferTimeoutPeriodFlag)
 
 	return &Vault{
 		vaultApi:              vaultApi,
