@@ -18,29 +18,28 @@ import (
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/vault"
-	"gopkg.in/gomail.v2"
 )
 
 type Service struct {
-	smtpHost              string
-	smtpPort              int
-	smtpUser              string
-	smtpPass              string
-	smtpSecure            bool
-	db                    *pg.DB
+	store                 notificationStore
+	mail                  mailer
 	domain                string
+	templateDir           string
 	transferTimeoutPeriod time.Duration
 }
 
 func New(c *cli.Context, db *pg.DB) *Service {
 	return &Service{
-		smtpHost:              c.String(common.SMTPHostFlag),
-		smtpPort:              c.Int(common.SMTPPortFlag),
-		smtpUser:              c.String(common.SMTPUserFlag),
-		smtpPass:              c.String(common.SMTPPassFlag),
-		smtpSecure:            c.Bool(common.SMTPSecureFlag),
-		db:                    db,
+		store: &pgNotificationStore{db: db},
+		mail: &smtpMailer{
+			host:   c.String(common.SMTPHostFlag),
+			port:   c.Int(common.SMTPPortFlag),
+			user:   c.String(common.SMTPUserFlag),
+			pass:   c.String(common.SMTPPassFlag),
+			secure: c.Bool(common.SMTPSecureFlag),
+		},
 		domain:                c.String(common.DomainFlag),
+		templateDir:           "templates/notification",
 		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
 	}
 }
@@ -57,7 +56,7 @@ func (s *Service) Send(opts SendOptions) error {
 	ctx := context.Background()
 
 	// 1. Check for duplicates in the last 24 hours
-	last, err := models.GetLastNotificationByKeyAndTo(ctx, s.db, opts.Key, opts.To)
+	last, err := s.store.GetLastByKeyAndTo(ctx, opts.Key, opts.To)
 	if err != nil {
 		return errors.Wrap(err, "failed to check for duplicate notification")
 	}
@@ -83,12 +82,12 @@ func (s *Service) Send(opts SendOptions) error {
 		Body:     body,
 		To:       opts.To,
 	}
-	err = models.CreateNotification(ctx, s.db, n)
+	err = s.store.Create(ctx, n)
 	if err != nil {
 		return errors.Wrap(err, "failed to save notification to db")
 	}
 
-	err = s.sendEmail(opts.To, opts.Title, body)
+	err = s.mail.Send(opts.To, opts.Title, body)
 	if err != nil {
 		return errors.Wrap(err, "failed to send email")
 	}
@@ -97,7 +96,7 @@ func (s *Service) Send(opts SendOptions) error {
 }
 
 func (s *Service) render(templateName string, data any) (string, error) {
-	path := filepath.Join("templates", "notification", templateName)
+	path := filepath.Join(s.templateDir, templateName)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return "", fmt.Errorf("template not found: %s", path)
 	}
@@ -115,28 +114,16 @@ func (s *Service) render(templateName string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-func (s *Service) sendEmail(to string, title string, body string) error {
-	if s.smtpHost == "" {
-		log.Warn("SMTP host not configured, skipping email sending")
-		return nil
+func (s *Service) resourceURL(resourceID string) string {
+	return fmt.Sprintf("%s/%s", s.domain, resourceID)
+}
+
+func (s *Service) resourceData(r *vaultModels.Resource) map[string]any {
+	return map[string]any{
+		"Name":   r.Name,
+		"URL":    s.resourceURL(r.ResourceID),
+		"Domain": s.domain,
 	}
-
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.smtpUser)
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", title)
-	m.SetBody("text/html", body)
-
-	d := gomail.NewDialer(s.smtpHost, s.smtpPort, s.smtpUser, s.smtpPass)
-	d.SSL = s.smtpSecure
-
-	if err := d.DialAndSend(m); err != nil {
-		return errors.Wrap(err, "failed to send email via SMTP")
-	}
-
-	log.WithField("to", to).Info("email sent successfully")
-
-	return nil
 }
 
 func (s *Service) SendVaulted(to string, r *vaultModels.Resource) error {
@@ -145,26 +132,22 @@ func (s *Service) SendVaulted(to string, r *vaultModels.Resource) error {
 		Key:      fmt.Sprintf("vaulted-%s", r.ResourceID),
 		Title:    fmt.Sprintf("Your resource %s has been vaulted!", r.Name),
 		Template: "vaulted.html",
-		Data: map[string]any{
-			"Name":   r.Name,
-			"URL":    fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
-			"Domain": s.domain,
-		},
+		Data:     s.resourceData(r),
 	}
 	return s.Send(opts)
 }
 
-type ExpiringResource struct {
+type expiringResource struct {
 	Name string
 	URL  string
 }
 
 func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Resource) error {
-	expResources := make([]ExpiringResource, len(resources))
+	expResources := make([]expiringResource, len(resources))
 	for i, r := range resources {
-		expResources[i] = ExpiringResource{
+		expResources[i] = expiringResource{
 			Name: r.Name,
-			URL:  fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
+			URL:  s.resourceURL(r.ResourceID),
 		}
 	}
 
@@ -184,17 +167,14 @@ func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Reso
 
 func (s *Service) SendTransferTimeout(to string, r *vaultModels.Resource) error {
 	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
+	data := s.resourceData(r)
+	data["Timeout"] = timeoutStr
 	opts := SendOptions{
 		To:       to,
 		Key:      fmt.Sprintf("transfer-timeout-%s", r.ResourceID),
 		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
 		Template: "transfer-timeout.html",
-		Data: map[string]any{
-			"Name":    r.Name,
-			"URL":     fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
-			"Timeout": timeoutStr,
-			"Domain":  s.domain,
-		},
+		Data:     data,
 	}
 	return s.Send(opts)
 }
@@ -205,11 +185,7 @@ func (s *Service) SendExpired(to string, r *vaultModels.Resource) error {
 		Key:      fmt.Sprintf("expired-%s", r.ResourceID),
 		Title:    fmt.Sprintf("Your resource %s has expired", r.Name),
 		Template: "expired.html",
-		Data: map[string]any{
-			"Name":   r.Name,
-			"URL":    fmt.Sprintf("%s/%s", s.domain, r.ResourceID),
-			"Domain": s.domain,
-		},
+		Data:     s.resourceData(r),
 	}
 	return s.Send(opts)
 }
