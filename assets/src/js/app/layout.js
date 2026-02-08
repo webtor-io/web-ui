@@ -1,3 +1,21 @@
+if (!HTMLFormElement.prototype.requestSubmit) {
+    HTMLFormElement.prototype.requestSubmit = function(submitter) {
+        if (submitter) {
+            if (!(submitter instanceof HTMLElement) || submitter.type !== 'submit' || submitter.form !== this) {
+                throw new TypeError('The specified element is not a submit button');
+            }
+            submitter.click();
+            return;
+        }
+        submitter = document.createElement('input');
+        submitter.type = 'submit';
+        submitter.hidden = true;
+        this.appendChild(submitter);
+        submitter.click();
+        this.removeChild(submitter);
+    };
+}
+
 function showProgress() {
     const progress = document.getElementById('progress');
     progress.classList.remove('hidden');
