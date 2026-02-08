@@ -18,6 +18,45 @@ import (
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
+// Interfaces for testability
+type reaperVault interface {
+	RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) error
+	RemoveResource(ctx context.Context, resourceID string) error
+}
+
+type reaperNotification interface {
+	SendTransferTimeout(to string, r *vaultModels.Resource) error
+	SendExpired(to string, r *vaultModels.Resource) error
+}
+
+type reaperStore interface {
+	GetExpiredResources(ctx context.Context, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error)
+	GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error)
+}
+
+// pgReaperStore wraps *pg.DB to implement reaperStore
+type pgReaperStore struct {
+	db *pg.DB
+}
+
+func (s *pgReaperStore) GetExpiredResources(ctx context.Context, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error) {
+	return vaultModels.GetExpiredResources(ctx, s.db, expirePeriod, transferTimeoutPeriod)
+}
+
+func (s *pgReaperStore) GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error) {
+	return vaultModels.GetResourcePledgesWithUsers(ctx, s.db, resourceID)
+}
+
+type reaper struct {
+	store                 reaperStore
+	vault                 reaperVault
+	notification          reaperNotification
+	expirePeriod          time.Duration
+	transferTimeoutPeriod time.Duration
+	pg                    *cs.PG
+	cpCl                  *claims.Client
+}
+
 func makeVaultCMD() cli.Command {
 	vaultCMD := cli.Command{
 		Name:    "vault",
@@ -52,36 +91,23 @@ func reap(c *cli.Context) error {
 	ctx := context.Background()
 
 	// Initialize services
-	vaultService, notificationService, db, err := initializeServices(c)
+	r, err := initializeReaper(c)
 	if err != nil {
 		return err
 	}
+	defer r.Close()
 
-	// Get configuration
-	expirePeriod := c.Duration(vault.VaultResourceExpirePeriodFlag)
-	transferTimeoutPeriod := c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag)
-
-	log.WithField("expire_period", expirePeriod).
-		WithField("transfer_timeout_period", transferTimeoutPeriod).
+	log.WithField("expire_period", r.expirePeriod).
+		WithField("transfer_timeout_period", r.transferTimeoutPeriod).
 		Info("starting vault reap process")
 
-	// Process transfer timeouts
-	err = processTransferTimeouts(ctx, db, vaultService, notificationService, transferTimeoutPeriod)
-	if err != nil {
-		log.WithError(err).Warn("failed to process transfer timeouts")
-	}
-
-	// Process expirations
-	err = processExpirations(ctx, db, vaultService, notificationService, expirePeriod)
-	if err != nil {
-		log.WithError(err).Warn("failed to process expirations")
-	}
+	r.run(ctx)
 
 	log.Info("vault reap process completed")
 	return nil
 }
 
-func initializeServices(c *cli.Context) (*vault.Vault, *notification.Service, *pg.DB, error) {
+func initializeReaper(c *cli.Context) (*reaper, error) {
 	// Setting DB
 	pg := cs.NewPG(c)
 
@@ -90,13 +116,13 @@ func initializeServices(c *cli.Context) (*vault.Vault, *notification.Service, *p
 	err := m.Run()
 	if err != nil {
 		pg.Close()
-		return nil, nil, nil, errors.Wrap(err, "failed to run migrations")
+		return nil, errors.Wrap(err, "failed to run migrations")
 	}
 
 	db := pg.Get()
 	if db == nil {
 		pg.Close()
-		return nil, nil, nil, errors.New("db is nil")
+		return nil, errors.New("db is nil")
 	}
 
 	// Setting HTTP Client
@@ -107,9 +133,6 @@ func initializeServices(c *cli.Context) (*vault.Vault, *notification.Service, *p
 
 	// Setting Claims Client
 	cpCl := claims.NewClient(c)
-	if cpCl != nil {
-		defer cpCl.Close()
-	}
 
 	// Setting Claims
 	claimsService := claims.New(c, cpCl, pg)
@@ -121,68 +144,56 @@ func initializeServices(c *cli.Context) (*vault.Vault, *notification.Service, *p
 	vaultService := vault.New(c, vaultApi, claimsService, cl, pg, sapi)
 	if vaultService == nil {
 		pg.Close()
-		return nil, nil, nil, errors.New("vault service is not configured (missing VAULT_SERVICE_HOST)")
+		if cpCl != nil {
+			cpCl.Close()
+		}
+		return nil, errors.New("vault service is not configured (missing VAULT_SERVICE_HOST)")
 	}
 
 	// Setting Notification Service
 	notificationService := notification.New(c, db)
 
-	return vaultService, notificationService, db, nil
-}
-
-func processTransferTimeouts(ctx context.Context, db *pg.DB, vaultService *vault.Vault, notificationService *notification.Service, transferTimeoutPeriod time.Duration) error {
-	// Get resources with transfer timeout
-	var resources []vaultModels.Resource
-	now := time.Now()
-	transferThreshold := now.Add(-transferTimeoutPeriod)
-
-	err := db.Model(&resources).
-		Context(ctx).
-		Where("funded_at IS NOT NULL AND funded_at < ? AND vaulted = false AND expired_at IS NULL", transferThreshold).
-		Select()
-	if err != nil {
-		return errors.Wrap(err, "failed to get transfer timeout resources")
+	r := &reaper{
+		store:                 &pgReaperStore{db: db},
+		vault:                 vaultService,
+		notification:          notificationService,
+		expirePeriod:          c.Duration(vault.VaultResourceExpirePeriodFlag),
+		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+		pg:                    pg,
+		cpCl:                  cpCl,
 	}
 
-	log.WithField("count", len(resources)).Info("found transfer timeout resources")
-
-	// Process each resource
-	for _, resource := range resources {
-		processResource(ctx, db, vaultService, notificationService, resource, true)
-	}
-
-	return nil
+	return r, nil
 }
 
-func processExpirations(ctx context.Context, db *pg.DB, vaultService *vault.Vault, notificationService *notification.Service, expirePeriod time.Duration) error {
-	// Get expired resources
-	var resources []vaultModels.Resource
-	now := time.Now()
-	expireThreshold := now.Add(-expirePeriod)
+func (r *reaper) Close() {
+	r.pg.Close()
+	r.cpCl.Close()
+}
 
-	err := db.Model(&resources).
-		Context(ctx).
-		Where("expired_at IS NOT NULL AND expired_at < ?", expireThreshold).
-		Select()
+func (r *reaper) run(ctx context.Context) {
+	resources, err := r.store.GetExpiredResources(ctx, r.expirePeriod, r.transferTimeoutPeriod)
 	if err != nil {
-		return errors.Wrap(err, "failed to get expired resources")
+		log.WithError(err).Warn("failed to get expired resources")
+		return
 	}
 
 	log.WithField("count", len(resources)).Info("found expired resources")
 
-	// Process each resource
 	for _, resource := range resources {
-		processResource(ctx, db, vaultService, notificationService, resource, false)
+		r.processResource(ctx, resource)
 	}
-
-	return nil
 }
 
-func processResource(ctx context.Context, db *pg.DB, vaultService *vault.Vault, notificationService *notification.Service, resource vaultModels.Resource, isTransferTimeout bool) {
-	log.WithField("resource_id", resource.ResourceID).Info("processing resource")
+func (r *reaper) processResource(ctx context.Context, resource vaultModels.Resource) {
+	isTransferTimeout := resource.ExpiredAt == nil
+
+	log.WithField("resource_id", resource.ResourceID).
+		WithField("is_transfer_timeout", isTransferTimeout).
+		Info("processing resource")
 
 	// Get all pledges for this resource with user information
-	pledges, err := vaultModels.GetResourcePledgesWithUsers(ctx, db, resource.ResourceID)
+	pledges, err := r.store.GetResourcePledgesWithUsers(ctx, resource.ResourceID)
 	if err != nil {
 		log.WithError(err).
 			WithField("resource_id", resource.ResourceID).
@@ -196,11 +207,11 @@ func processResource(ctx context.Context, db *pg.DB, vaultService *vault.Vault, 
 
 	// Remove all pledges and send notifications
 	for _, pledge := range pledges {
-		removePledgeAndNotify(ctx, vaultService, notificationService, pledge, resource, isTransferTimeout)
+		r.removePledgeAndNotify(ctx, pledge, resource, isTransferTimeout)
 	}
 
 	// Delete the resource
-	err = vaultService.RemoveResource(ctx, resource.ResourceID)
+	err = r.vault.RemoveResource(ctx, resource.ResourceID)
 	if err != nil {
 		log.WithError(err).
 			WithField("resource_id", resource.ResourceID).
@@ -211,9 +222,9 @@ func processResource(ctx context.Context, db *pg.DB, vaultService *vault.Vault, 
 	log.WithField("resource_id", resource.ResourceID).Info("deleted resource")
 }
 
-func removePledgeAndNotify(ctx context.Context, vaultService *vault.Vault, notificationService *notification.Service, pledge vaultModels.Pledge, resource vaultModels.Resource, isTransferTimeout bool) {
+func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.Pledge, resource vaultModels.Resource, isTransferTimeout bool) {
 	// Remove pledge
-	err := vaultService.RemovePledge(ctx, &pledge)
+	err := r.vault.RemovePledge(ctx, &pledge)
 	if err != nil {
 		log.WithError(err).
 			WithField("resource_id", resource.ResourceID).
@@ -233,37 +244,28 @@ func removePledgeAndNotify(ctx context.Context, vaultService *vault.Vault, notif
 		return
 	}
 
+	r.sendNotification(pledge.User.Email, resource, isTransferTimeout)
+}
+
+func (r *reaper) sendNotification(email string, resource vaultModels.Resource, isTransferTimeout bool) {
+	var err error
+	var action string
 	if isTransferTimeout {
-		sendTransferTimeoutNotification(notificationService, pledge.User.Email, resource)
+		err = r.notification.SendTransferTimeout(email, &resource)
+		action = "transfer timeout"
 	} else {
-		sendExpiredNotification(notificationService, pledge.User.Email, resource)
+		err = r.notification.SendExpired(email, &resource)
+		action = "expiration"
 	}
-}
 
-func sendTransferTimeoutNotification(notificationService *notification.Service, email string, resource vaultModels.Resource) {
-	err := notificationService.SendTransferTimeout(email, &resource)
 	if err != nil {
 		log.WithError(err).
 			WithField("resource_id", resource.ResourceID).
 			WithField("user_email", email).
-			Warn("failed to send transfer timeout notification")
+			Warn("failed to send " + action + " notification")
 	} else {
 		log.WithField("resource_id", resource.ResourceID).
 			WithField("user_email", email).
-			Info("sent transfer timeout notification")
-	}
-}
-
-func sendExpiredNotification(notificationService *notification.Service, email string, resource vaultModels.Resource) {
-	err := notificationService.SendExpired(email, &resource)
-	if err != nil {
-		log.WithError(err).
-			WithField("resource_id", resource.ResourceID).
-			WithField("user_email", email).
-			Warn("failed to send expiration notification")
-	} else {
-		log.WithField("resource_id", resource.ResourceID).
-			WithField("user_email", email).
-			Info("sent expiration notification")
+			Info("sent " + action + " notification")
 	}
 }
