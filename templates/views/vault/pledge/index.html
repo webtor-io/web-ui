@@ -1,89 +1,102 @@
 {{ define "title" }}Vault Pledges{{ end }}
 {{ define "main" }}
-    <div class="hero bg-base-200 mt-12">
-        <div class="hero-content text-center w-full">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent">Vault Pledges</h2>
-                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                    <div class="w-full sm:px-5">
-                        {{ if .Data.Pledges }}
-                            <div class="overflow-x-auto mb-6 bg-base-100 rounded-lg shadow p-2 w-full">
-                                <table class="table w-full table-fixed">
-                                    <colgroup>
-                                        <col class="w-6">
-                                        <col class="min-w-14">
-                                        <col class="w-24">
-                                        <col class="w-28">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th></th>
-                                            <th class="text-left">Name</th>
-                                            <th class="text-center">Amount</th>
-                                            <th class="text-center">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {{ range .Data.Pledges }}
-                                            <tr>
-                                                <td class="text-center">
-                                                    {{ if and .Resource .Resource.Vaulted }}
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-accent">
-                                                            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-                                                        </svg>
-                                                    {{ end }}
-                                                </td>
-                                                <td class="text-left">
-                                                    <a href="/{{ .ResourceID }}" class="link link-accent truncate block min-w-14" data-async-target="main">
-                                                        {{ .Resource.Name }}
-                                                    </a>
-                                                </td>
-                                                <td class="text-center">{{ printf "%.2f" .Amount }}</td>
-                                                <td class="text-center">
-                                                    {{ if .IsFrozen }}
-                                                        <span class="badge badge-success">Frozen</span>
-                                                    {{ else if not .Funded }}
-                                                        <span class="badge badge-error">Expiring</span>
-                                                    {{ else }}
-                                                        <span class="badge badge-warning">Claimable</span>
-                                                    {{ end }}
-                                                </td>
-                                            </tr>
-                                        {{ end }}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {{ else }}
-                            <div class="bg-base-100 rounded-lg shadow p-6 w-full mb-6">
-                                <p class="text-center">No pledges yet</p>
-                            </div>
-                        {{ end }}
-                        <div class="bg-base-100 rounded-lg shadow p-6 w-full mb-6 text-sm text-left">
-                            <dl class="space-y-3">
-                                <div>
-                                    <dt class="font-bold inline">Frozen</dt>
-                                    <dd class="inline"> — points become frozen immediately after pledge and unfreeze after the torrent is transferred to Vault and the freeze period of <strong class="font-bold">{{ .Data.FreezePeriod | duration }}</strong> expires</dd>
-                                </div>
-                                <div>
-                                    <dt class="font-bold inline">Expiring</dt>
-                                    <dd class="inline"> — pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault</dd>
-                                </div>
-                                <div>
-                                    <dt class="font-bold inline">Claimable</dt>
-                                    <dd class="inline"> — points that can be claimed back. After claiming, the content they were pledged to may be removed</dd>
-                                </div>
-                            </dl>
-                        </div>
-                        <div class="flex justify-center mt-4">
-                            <a href="/profile" class="btn btn-accent btn-outline" data-async-target="main">Back To Profile</a>
-                        </div>
-                        <div class="text-left w-full text-sm text-accent mt-2">
-                            <span class="text-accent">ⓘ</span>
-                            <a href="/instructions/vault" class="hover:underline" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[800px] mx-auto">
+    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Vault Pledges
     </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Pledges</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">View and manage your Vault point pledges across torrents.</p>
+
+    <!-- Pledges Table -->
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+      {{ if .Data.Pledges }}
+        <div class="bg-base-200/50 rounded-xl overflow-hidden">
+          <table class="table w-full table-fixed text-sm">
+            <colgroup>
+              <col class="w-8">
+              <col>
+              <col class="w-24">
+              <col class="w-28">
+            </colgroup>
+            <thead>
+              <tr class="border-b border-w-line">
+                <th></th>
+                <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">Name</th>
+                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">VP</th>
+                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .Data.Pledges }}
+                <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors">
+                  <td class="text-center">
+                    {{ if and .Resource .Resource.Vaulted }}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL">
+                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                      </svg>
+                    {{ end }}
+                  </td>
+                  <td class="text-left">
+                    <a href="/{{ .ResourceID }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
+                      {{ .Resource.Name }}
+                    </a>
+                  </td>
+                  <td class="text-center text-w-sub">{{ printf "%.2f" .Amount }}</td>
+                  <td class="text-center">
+                    {{ if .IsFrozen }}
+                      <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan">Frozen</span>
+                    {{ else if not .Funded }}
+                      <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL">Expiring</span>
+                    {{ else }}
+                      <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">Claimable</span>
+                    {{ end }}
+                  </td>
+                </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      {{ else }}
+        <div class="bg-base-200/50 rounded-xl p-8 text-center">
+          <p class="text-w-muted">No pledges yet</p>
+          <p class="text-xs text-w-muted mt-2">Pledge Vault points to keep torrents stored in the cloud</p>
+        </div>
+      {{ end }}
+    </div>
+
+    <!-- Status Guide (collapsible) -->
+    <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl mb-6">
+      <input type="checkbox" />
+      <div class="collapse-title text-base font-semibold">Status Guide</div>
+      <div class="collapse-content">
+        <dl class="space-y-4 text-sm pt-2">
+          <div class="flex items-start gap-3">
+            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan mt-0.5 shrink-0">Frozen</span>
+            <dd class="text-w-sub">Points become frozen immediately after pledge and unfreeze after the torrent is transferred to Vault and the freeze period of <strong class="text-w-text">{{ .Data.FreezePeriod | duration }}</strong> expires</dd>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL mt-0.5 shrink-0">Expiring</span>
+            <dd class="text-w-sub">Pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault</dd>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL mt-0.5 shrink-0">Claimable</span>
+            <dd class="text-w-sub">Points that can be claimed back. After claiming, the content they were pledged to may be removed</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-between">
+      <a href="/instructions/vault" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
+      <a href="/profile" class="btn btn-soft" data-async-target="main">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Back to Profile
+      </a>
+    </div>
+  </div>
+</section>
 {{ end }}

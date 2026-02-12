@@ -1,110 +1,271 @@
-{{ define "about_header" }}
-{{ $instruction := .Instruction | kebabToSnake }}
-{{ if eq $instruction "" }}{{ $instruction = "default" }}{{ end }}
-{{ dynamicTemplate (printf "about_instruction_%s_header" $instruction ) . }}
-{{ end }}
-
 {{ define "about" }}
 {{ $instruction := .Instruction | kebabToSnake }}
 {{ if eq $instruction "" }}{{ $instruction = "default" }}{{ end }}
-{{ dynamicTemplate (printf "about_instruction_%s_description" $instruction ) . }}
+
+<!-- Stats Strip -->
+<div class="bg-base-200 border-y border-w-line">
+    <div class="stats stats-horizontal bg-transparent w-full flex justify-center py-2">
+        <div class="stat text-center bg-transparent">
+            <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">5M+</div>
+            <div class="stat-desc text-w-muted mt-1 text-sm">Torrents processed</div>
+        </div>
+        <div class="stat text-center bg-transparent">
+            <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">180+</div>
+            <div class="stat-desc text-w-muted mt-1 text-sm">Countries</div>
+        </div>
+        <div class="stat text-center bg-transparent">
+            <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">100%</div>
+            <div class="stat-desc text-w-muted mt-1 text-sm">Open-source</div>
+        </div>
+        <div class="stat text-center bg-transparent">
+            <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">0</div>
+            <div class="stat-desc text-w-muted mt-1 text-sm">Software to install</div>
+        </div>
+    </div>
+</div>
+
 {{ dynamicTemplate (printf "about_instruction_%s_how_to" $instruction) . }}
-<div class="hero bg-base-200 mt-10">
-    <div class="hero-content text-center">
-        <div>
-            <h2 class="text-2xl font-bold text-accent">Full feature list</h2>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Direct Download Link (DDL)</strong> - select any file inside torrent and download it without VPN and torrent-client.
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Instant video and audio streaming</strong> - select video or audio file inside torrent and start watching it without need of download.
-                Supported formats:
-            </p>
-            <ul class="text-justify pl-8 pt-3">
-                <li>Video: avi, mkv, mp4, webm, m4v, ts, vob</li>
-                <li>Audio: mp3, wav, ogg, flac, m4a</li>
-            </ul>
-            <p class="pt-3 text-justify">
-                <strong class="text-accent">Download whole torrent as ZIP-archive</strong> - download your torrent as ZIP-archive on-the-fly preserving original directory structure without torrent-client.
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Personal Library</strong> – organize your own collection by adding torrents to your account. Movies and series will be detected automatically!
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Vault</strong> – long-term cloud storage for torrents. Keep your torrents available, watch and download them without waiting for seeds.
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Stremio integration</strong> – just install the addon using the link from <a href="/profile" data-async-target="main" class="link" data-umami-event="stremio-about-link">your profile</a> and start watching your library on TV with <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a>.
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">WebDAV support</strong> – access and manage your library as a network folder using a personal link from your <a href="/profile" data-async-target="main" class="link" data-umami-event="webdav-about-link">profile</a>. Tested and works well with Mountain Duck, RaiDrive, Owlfiles.
-            </p>
-            <p class="pt-6 text-justify">
-                <strong class="text-accent">Chrome Extension</strong> - <a href="https://chrome.google.com/webstore/detail/webtorio-watch-torrents-o/ngkpdaefpmokglfnmienfiaioffjodam" target="_blank" class="link">install extension for Google Chrome</a> and <strong>Webtor.io</strong> will be open all downloaded torrents and magnet-links in a new tab.
-            </p>
-            <p class="pt-3 text-justify">
-                <strong class="text-accent">Developer friendly</strong> - with the <a href="https://github.com/webtor-io/embed-sdk-js" target="_blank" class="link">SDK</a> you can provide your users with the ability to watch torrent-videos online on your website.
-            </p>
+
+{{ if eq $instruction "default" }}
+<!-- How It Works -->
+<section id="how" class="py-24 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            How it works
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Three steps. That's it.</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-14">Go from magnet link to streaming video or direct download in under a minute.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Paste or upload</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Enter a magnet link, infohash, or drag-and-drop a .torrent file into the browser.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Pick your file</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Browse the torrent contents and select the file you want to stream or download.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Stream or download</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Watch video instantly in the built-in player, or grab a direct HTTP download link.</p>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-<div class="hero bg-base-200 mt-10">
-    <div class="hero-content text-center">
-        <div>
-            <h2 class="text-2xl font-bold text-accent">FAQ</h2>
-            <h3 class="text-accent font-bold text-justify pt-6">Do I need to turn on my VPN when using <strong>Webtor.io</strong>? Will my ISP see what I'm downloading?</h3>
-            <p class="text-justify pt-3">
-                For an ISP, using <strong>Webtor.io</strong> is no different from using any other site such as YouTube or Google. All information
-                between the user and <strong>Webtor.io</strong> is transmitted only over the secure HTTPS protocol, which excludes the possibility of interception.
-                The user's IP address is not broadcasted to the BitTorrent network, since downloads from the BitTorrent network are only handled by <strong>Webtor.io</strong> servers.
-                Thus, the use of <strong>Webtor.io</strong> is anonymous and safe without any additional measures.
-            </p>
-            <h3 class="text-accent font-bold text-justify pt-6">Can I remove ads when using <strong>Webtor.io</strong>?</h3>
-            <p class="text-justify pt-3">
-                In order to remove ads, you just need to <a href="/donate" target="_blank" class="link" data-umami-event="donate-about">start helping the project</a>. In addition to removing ads, you will also be able to get faster loading speed and a heart icon in the interface!
-            </p>
-            <h3 class="text-accent font-bold text-justify pt-6">Can I use <strong>Webtor.io</strong> on my mobile phone or tablet?</h3>
-            <p class="text-justify pt-3">
-                Yes! You can use <strong>Webtor.io</strong> to download and stream torrents on any mobile device, without having to install additional apps.
-            </p>
-            <h3 class="text-accent font-bold text-justify pt-6">Is <strong>Webtor.io</strong> open-source project?</h3>
-            <p class="text-justify pt-3">
-                All components of <strong>Webtor.io</strong> are absolutely open-source and distributed under MIT license.
-                You can <a href="https://github.com/webtor-io/" target="_blank" class="link">visit github repository</a> to view source codes.
-            </p>
-            <h3 class="text-accent font-bold text-justify pt-6">Can I watch my library on a smart TV?</h3>
-            <p class="text-justify pt-3">
-                Yes! With the new <strong>Stremio integration</strong>, you can stream your personal library directly on your smart TV or any device running <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a>. Just follow the addon link in your profile.
-            </p>
+</section>
+{{ end }}
 
-            <h3 class="text-accent font-bold text-justify pt-6">Do links or streams expire?</h3>
-            <p class="text-justify pt-3">
-                Yes, for security reasons, direct links and streaming sessions are temporary and may expire after a short time. You can always refresh or regenerate them from your library interface.
-            </p>
+<!-- Features -->
+<section id="features" class="py-24 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            Features
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Everything you need, nothing you don't</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-14">A complete torrent toolkit that runs entirely in the cloud and your browser.</p>
 
-            <h3 class="text-accent font-bold text-justify pt-6">Why do some downloaded ZIP archives show a CRC error?</h3>
-            <p class="text-justify pt-3">
-                ZIP archives are generated on-the-fly and don't include full checksum data. Some extraction tools may show a warning or error even when the file is fully intact. We recommend using <strong>7-Zip</strong> for best compatibility.
-            </p>
-            <h3 class="text-accent font-bold text-justify pt-6">Why is my download or streaming speed low?</h3>
-            <p class="text-justify pt-3">
-                Download and streaming speeds may vary due to several factors:
-            </p>
-            <ul class="list-disc list-inside text-justify pl-4 pt-3">
-                <li>The number of seeders available for the torrent</li>
-                <li>File format – some formats require real-time transcoding</li>
-                <li>Your internet connection speed and stability</li>
-                <li>Current load on Webtor servers</li>
-                <li>Your account type – premium users get higher bandwidth</li>
-            </ul>
-            <p class="text-justify pt-3">
-                <strong>Important</strong>: bandwidth is measured in <strong>Mbps</strong> (Megabits per second), while file sizes are shown in <strong>MB</strong> (Megabytes).
-                1&nbsp;MB = 8&nbsp;Mb, so a <strong>50&nbsp;Mbps</strong> connection gives about <strong>6.25&nbsp;MB/s</strong> download speed.
-            </p>
-            <p class="text-justify pt-3">
-                We do our best to optimize delivery, but performance can still differ between torrents. Supporting the project helps unlock better speed and reliability.
-            </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-pink/12 text-w-pink flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Direct Download Links</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Get a regular HTTP download link for any file inside the torrent. No VPN or client needed.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Instant Streaming</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Watch video and listen to audio directly in the browser without waiting for the full download.</p>
+                    <div class="card-actions mt-2">
+                        <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">MKV, MP4, WEBM, AVI &amp; more</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-cyan/12 text-w-cyan flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Stremio Integration</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Watch your library on any smart TV or device running <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a> via the <a href="/profile" data-async-target="main" class="link" data-umami-event="stremio-about-link">addon link</a>.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-cyan/12 text-w-cyan flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">ZIP Archive Download</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Download the entire torrent as a ZIP archive on-the-fly, preserving the original folder structure.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-pink/12 text-w-pink flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Personal Library</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Save torrents to your account. Movies and TV series are detected and organized automatically.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Vault Storage</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Long-term cloud storage for your torrents. Watch and download without waiting for seeds.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">WebDAV Support</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Access your library as a network folder via WebDAV from your <a href="/profile" data-async-target="main" class="link" data-umami-event="webdav-about-link">profile</a>. Works with Mountain Duck, RaiDrive, Owlfiles.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-pink/12 text-w-pink flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Chrome Extension</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed"><a href="https://chrome.google.com/webstore/detail/webtorio-watch-torrents-o/ngkpdaefpmokglfnmienfiaioffjodam" target="_blank" class="link">Install the extension</a> and every torrent or magnet link you click opens automatically in Webtor.</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-12 h-12 rounded-xl bg-w-cyan/12 text-w-cyan flex items-center justify-center">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3">Developer SDK</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Embed the torrent streaming player on your own site with our open-source <a href="https://github.com/webtor-io/embed-sdk-js" target="_blank" class="link">JavaScript SDK</a>.</p>
+                    <div class="card-actions mt-2">
+                        <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">MIT License</span>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
-</div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-24 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="text-center mb-14">
+            <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                FAQ
+            </div>
+            <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Common questions</h2>
+            <p class="text-[1.05rem] text-w-sub max-w-[600px] mx-auto leading-relaxed">Quick answers to the things people ask most.</p>
+        </div>
+
+        <div class="max-w-[740px] mx-auto space-y-3">
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Is Webtor.io free to use?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes, Webtor.io is completely free for basic use. You can stream and download torrents without creating an account. Optional <a href="/donate" class="link" data-umami-event="donate-about">paid plans</a> remove ads, increase bandwidth, and unlock Vault cloud storage.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Do I need a VPN to use Webtor.io? Will my ISP see what I download?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">No VPN required. All traffic between you and Webtor.io travels over HTTPS. Your IP address is never exposed to the BitTorrent network because Webtor.io servers handle all peer communication. For your ISP, using Webtor.io looks no different from visiting any other website.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Can I use Webtor.io on a phone or tablet?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes. Webtor.io works in any modern mobile browser on iOS and Android. You can stream video, listen to audio, and download torrents without installing any additional apps.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">What video and audio formats does Webtor.io support?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Webtor.io supports instant streaming for most popular formats. Video: AVI, MKV, MP4, WEBM, M4V, TS, VOB. Audio: MP3, WAV, OGG, FLAC, M4A. Files that require transcoding may take a moment longer to start playing.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Is Webtor.io an open-source project?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes, 100%. All components of Webtor.io are distributed under the MIT license. You can <a href="https://github.com/webtor-io/" target="_blank" class="link">visit the GitHub repository</a> to view the source code and contribute.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Can I watch my library on a smart TV?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes! With the Stremio integration you can stream your personal library on any smart TV or device running <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a>. Just install the addon using the link from your <a href="/profile" data-async-target="main" class="link">profile</a>.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Do download links or streams expire?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes, for security reasons direct download links and streaming sessions are temporary and may expire after a short time. You can always refresh or regenerate them from your library interface.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">How can I remove ads on Webtor.io?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed"><a href="/donate" class="link" data-umami-event="donate-about">Support the project</a> and you'll get an ad-free experience, faster loading speeds, and a heart icon in the interface.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Why do some downloaded ZIP archives show a CRC error?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">ZIP archives are generated on-the-fly and don't include full checksum data. Some extraction tools may show a warning even when the file is fully intact. We recommend using <strong>7-Zip</strong> for best compatibility.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Why is my download or streaming speed slow on Webtor.io?</div>
+                <div class="collapse-content">
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed mb-2">Speeds may vary due to the number of seeders, file format (some require real-time transcoding), your internet connection, current server load, and your account type. Premium users get higher bandwidth.</p>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed"><strong>Note:</strong> bandwidth is measured in <strong>Mbps</strong> (megabits per second), while file sizes are shown in <strong>MB</strong> (megabytes). 1 MB = 8 Mb, so a 50 Mbps connection gives roughly 6.25 MB/s download speed. <a href="/donate" class="link" data-umami-event="donate-about">Supporting the project</a> helps unlock better speed and reliability.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="relative text-center py-24 px-6 overflow-x-clip">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] cta-glow pointer-events-none"></div>
+    <h2 class="relative z-10 text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight mb-4">Ready to try?</h2>
+    <p class="relative z-10 text-w-sub max-w-[500px] mx-auto mb-9">No signup needed. Paste a magnet link and start streaming in seconds.</p>
+    <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;" class="btn btn-lg btn-pink relative z-10 gap-2 px-9">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Launch Webtor
+    </a>
+</section>
+
 {{ end }}

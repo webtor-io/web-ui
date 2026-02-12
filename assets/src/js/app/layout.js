@@ -61,10 +61,8 @@ window.progress = {
 
 import {bindAsync} from '../lib/async';
 import initAsyncView from '../lib/asyncView';
+import loadAsyncView from '../lib/loadAsyncView';
 
-const initTheme = (await import('../lib/themeSelector')).initTheme;
-
-initTheme(document.querySelector('[data-toggle-theme]'));
 document.body.style.display = 'flex';
 hideProgress();
 bindAsync({
@@ -79,6 +77,10 @@ bindAsync({
     update(key, val) {
         if (key === 'title') document.querySelector('title').innerText = val;
         if (key === 'description') updateDescription(val);
+        if (key === 'nav') {
+            const nav = document.querySelector('nav');
+            if (nav) loadAsyncView(nav, val);
+        }
     },
     fallback: {
         selector: 'main',

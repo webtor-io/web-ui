@@ -26,15 +26,16 @@ function renderBody(target, body) {
         if (script.src === "") continue;
         const url = new URL(script.src);
         const name = url.pathname.replace(/\.js$/, '');
-        const event = new CustomEvent('async:' + name, { detail });
+        const scriptDetail = {
+            target: script.parentElement,
+        };
+        const event = new CustomEvent('async:' + name, { detail: scriptDetail });
         window.dispatchEvent(event);
     }
 
-    // Process async views
-    // const yOffset = -100;
-    // const y = target.getBoundingClientRect().top + window.scrollY + yOffset;
-    //
-    // window.scrollTo({ top: y });
+    if (target.hasAttribute('data-async-scroll-top')) {
+        window.scrollTo({ top: 0 });
+    }
 }
 
 export default loadAsyncView;

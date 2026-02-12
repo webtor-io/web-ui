@@ -159,6 +159,38 @@ func UpdateLibraryName(ctx context.Context, db *pg.DB, l *Library) error {
 	return err
 }
 
+func GetLibraryCounts(ctx context.Context, db *pg.DB, uID uuid.UUID) (torrents, movies, series int, err error) {
+	torrents, err = db.Model((*Library)(nil)).
+		Context(ctx).
+		Where("user_id = ?", uID).
+		Count()
+	if err != nil {
+		return 0, 0, 0, errors.Wrap(err, "failed to count torrents")
+	}
+
+	movies, err = db.Model((*Movie)(nil)).
+		Context(ctx).
+		Join("join library as l").
+		JoinOn("movie.resource_id = l.resource_id").
+		Where("l.user_id = ?", uID).
+		Count()
+	if err != nil {
+		return 0, 0, 0, errors.Wrap(err, "failed to count movies")
+	}
+
+	series, err = db.Model((*Series)(nil)).
+		Context(ctx).
+		Join("join library as l").
+		JoinOn("series.resource_id = l.resource_id").
+		Where("l.user_id = ?", uID).
+		Count()
+	if err != nil {
+		return 0, 0, 0, errors.Wrap(err, "failed to count series")
+	}
+
+	return
+}
+
 func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
 	var list []*Library
 

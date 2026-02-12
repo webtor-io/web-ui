@@ -1,7 +1,18 @@
 {{ define "library/menu" }}
-<div class="flex gap-4 mr-4">
-    {{ range . }}
-        <a class="btn btn-accent capitalize{{ if not .Active }} btn-outline{{ end }}" href="{{ .TargetURL }}" data-async-target="main">{{ .Title }}</a>
+<div class="flex gap-2">
+    {{ $d := .Data }}
+    {{ range $d.Args | makeMenu }}
+        {{ if .Active }}
+            <a class="btn btn-sm bg-w-purple/15 border-w-purple/30 text-w-purpleL capitalize" href="{{ .TargetURL }}" data-async-target="main">
+                {{ .Title }}
+                <span class="ml-0.5 text-[10px] opacity-70">{{ if eq .Title "torrents" }}{{ $d.TorrentCount }}{{ else if eq .Title "movies" }}{{ $d.MovieCount }}{{ else }}{{ $d.SeriesCount }}{{ end }}</span>
+            </a>
+        {{ else }}
+            <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-purple/30 hover:text-w-purpleL capitalize" href="{{ .TargetURL }}" data-async-target="main">
+                {{ .Title }}
+                <span class="ml-0.5 text-[10px] opacity-50">{{ if eq .Title "torrents" }}{{ $d.TorrentCount }}{{ else if eq .Title "movies" }}{{ $d.MovieCount }}{{ else }}{{ $d.SeriesCount }}{{ end }}</span>
+            </a>
+        {{ end }}
     {{ end }}
 </div>
 {{ end }}

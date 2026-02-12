@@ -51,9 +51,6 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.
 	r.POST("/download-dir", func(c *gin.Context) {
 		h.post(c, "download")
 	})
-	r.POST("/download-torrent", func(c *gin.Context) {
-		h.post(c, "download-torrent")
-	})
 	r.POST("/preview-image", func(c *gin.Context) {
 		h.post(c, "preview-image")
 	})

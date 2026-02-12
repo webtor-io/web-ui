@@ -2,53 +2,62 @@
     Vault
 {{ end }}
 {{ define "main" }}
-    <div class="prose mx-auto max-w-2xl mt-10 px-4">
-        <h1 class="text-accent text-3xl font-bold mb-6">Vault</h1>
-
-        <p>Vault is a storage system in Webtor that allows you to:</p>
-
-        <ul class="list-disc list-inside mt-4 space-y-2">
-            <li>save torrents for a long time,</li>
-            <li>watch content without waiting for seeders,</li>
-            <li>support needed torrents with points,</li>
-            <li>have guaranteed access to files.</li>
-        </ul>
-
-        <h2 class="text-2xl font-bold mt-8 mb-4">Vault Points (VP)</h2>
-
-        <ul class="list-disc list-inside mt-4 space-y-2">
-            <li><strong>1 Vault Point = 1 GB</strong></li>
-            <li>Points are provided as part of your subscription or other activities (the amount depends on your subscription tier)</li>
-        </ul>
-
-        {{ with .Data.Vault }}
-        <h2 class="text-2xl font-bold mt-8 mb-4">How saving to Vault works</h2>
-
-        <ol class="list-decimal list-inside mt-4 space-y-2">
-            <li>Click the <strong>"Keep This Torrent Available"</strong> button next to the torrent you want to save.</li>
-            <li>Confirm the number of points required (for example, if the torrent is 10 GB, you need to deposit 10 VP).</li>
-            <li>The funded points are frozen for <strong class="font-bold">{{ .FreezePeriod | duration }}</strong>. The freeze is automatically lifted when the torrent is successfully transferred to the Vault.</li>
-            <li>Webtor transfers the torrent to the Vault (if the transfer fails within <strong class="font-bold">{{ .TransferTimeoutPeriod | duration }}</strong>, VP is returned).</li>
-        </ol>
-
-        <h2 class="text-2xl font-bold mt-8 mb-4">Claiming Vault Points back</h2>
-
-        <ul class="list-disc list-inside mt-4 space-y-2">
-            <li>Points can be claimed back if they are not frozen.</li>
-            <li>If after claiming points back the amount is less than required to keep the torrent, it will be marked as expired and deleted after <strong class="font-bold">{{ .ExpirePeriod | duration }}</strong>.</li>
-            <li>When a torrent is deleted, all pledges associated with it are also deleted.</li>
-        </ul>
-
-        <h2 class="text-2xl font-bold mt-8 mb-4">What if my subscription expires</h2>
-
-        <ul class="list-disc list-inside mt-4 space-y-2">
-            <li>Points that were invested in torrents lose their power and the torrent is marked as expired and deleted after <strong class="font-bold">{{ .ExpirePeriod | duration }}</strong>.</li>
-            <li>If the subscription is renewed, the points become active again and the torrents funded by them are no longer expired.</li>
-        </ul>
-        {{ end }}
-
-        <div class="alert mt-6">
-            <span>⚠️ Important: if a torrent is blocked by copyright holders or removed from public sources, it may disappear – Vault does not guarantee preservation in such cases.</span>
-        </div>
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[800px] mx-auto">
+    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      Guide
     </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Vault</h1>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Vault is a storage system in Webtor that allows you to:</p>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>save torrents for a long time,</li>
+        <li>watch content without waiting for seeders,</li>
+        <li>support needed torrents with points,</li>
+        <li>have guaranteed access to files.</li>
+    </ul>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Vault Points (VP)</h2>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li><strong>1 Vault Point = 1 GB</strong></li>
+        <li>Points are provided as part of your subscription or other activities (the amount depends on your subscription tier)</li>
+    </ul>
+
+    {{ with .Data.Vault }}
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">How saving to Vault works</h2>
+
+    <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>Click the <strong>"Keep This Torrent Available"</strong> button next to the torrent you want to save.</li>
+        <li>Confirm the number of points required (for example, if the torrent is 10 GB, you need to deposit 10 VP).</li>
+        <li>The funded points are frozen for <strong>{{ .FreezePeriod | duration }}</strong>. The freeze is automatically lifted when the torrent is successfully transferred to the Vault.</li>
+        <li>Webtor transfers the torrent to the Vault (if the transfer fails within <strong>{{ .TransferTimeoutPeriod | duration }}</strong>, VP is returned).</li>
+    </ol>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Claiming Vault Points back</h2>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>Points can be claimed back if they are not frozen.</li>
+        <li>If after claiming points back the amount is less than required to keep the torrent, it will be marked as expired and deleted after <strong>{{ .ExpirePeriod | duration }}</strong>.</li>
+        <li>When a torrent is deleted, all pledges associated with it are also deleted.</li>
+    </ul>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">What if my subscription expires</h2>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>Points that were invested in torrents lose their power and the torrent is marked as expired and deleted after <strong>{{ .ExpirePeriod | duration }}</strong>.</li>
+        <li>If the subscription is renewed, the points become active again and the torrents funded by them are no longer expired.</li>
+    </ul>
+    {{ end }}
+
+    <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-6 text-sm text-w-sub">
+      <strong>Important:</strong> If a torrent is blocked by copyright holders or removed from public sources, it may disappear – Vault does not guarantee preservation in such cases.
+    </div>
+  </div>
+</section>
 {{ end }}

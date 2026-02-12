@@ -1,25 +1,41 @@
 {{ define "title" }}Library{{ end }}
 {{ define "main" }}
-    {{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
-    <div class="text-sm pb-4 text-right">
-        <a class="link" data-async-target="main" data-umami-event="stremio-lib-link" href="/profile">Stream you library to TV with Stremio integration</a> 🎬
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[900px] mx-auto">
+
+    <!-- Badge -->
+    <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"/>
+      </svg>
+      Library
     </div>
-    <div class="flex items-center justify-between pb-3">
-        {{ template "library/menu" .Data.Args | makeMenu }}
-        {{ template "library/sort" .Data.Args | makeSort }}
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Library</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Your saved torrents, movies, and series — all in one place.</p>
+
+    <!-- Menu + Sort -->
+    <div class="flex items-center justify-between gap-4 mb-6">
+      {{ template "library/menu" . }}
+      {{ template "library/sort" .Data.Args | makeSort }}
     </div>
-    <div class="divider h-0"></div>
+
+    <!-- Content -->
     {{ if .Data.Items }}
-        {{ template "library/list" . }}
+      {{ template "library/list" . }}
     {{ else }}
-        <div class="text-accent">
-            <p>No torrents yet! Hit “Add to Library” under any loaded torrent to get started.</p>
-        </div>
-    {{ end }}
-    <a class="btn btn-accent btn-outline mt-4 capitalize" href="/" data-async-target="main">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+      <!-- Empty state -->
+      <div class="text-center py-16">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
         </svg>
-        Add to library
-    </a>
+        <p class="text-lg font-semibold text-w-sub mb-2">No torrents yet</p>
+        <p class="text-sm text-w-muted mb-6">Hit "Add to Library" under any loaded torrent to get started.</p>
+        <a class="btn btn-soft" href="/" data-async-target="main">Browse torrents</a>
+      </div>
+    {{ end }}
+
+
+  </div>
+</section>
 {{ end }}

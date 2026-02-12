@@ -1,5 +1,7 @@
 {{ define "title" }}Progress Log Tests{{ end }}
 {{ define "main" }}
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[900px] mx-auto">
     <form class="hidden progress-alert progress-alert-block mt-5 closeable test-info">
         <div class="log-target"></div>
     </form>
@@ -47,4 +49,6 @@
         <a class="closeable-close close">ok</a>
     </div>
     {{ "tests/progress_log.js" | asset }}
+  </div>
+</section>
 {{ end }}

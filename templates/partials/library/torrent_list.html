@@ -1,7 +1,19 @@
 {{ define "library/torrent_list" }}
-<ul>
+<div class="bg-base-200/50 rounded-xl divide-y divide-w-line">
     {{ range . }}
-        <li class="text-accent py-1 hover:text-accent-focus"><a href="/{{ .ResourceID }}" data-async-target="main">{{ .Torrent.Name }}</a></li>
+    <a href="/{{ .ResourceID }}" data-async-target="main"
+       class="flex items-center gap-4 p-4 hover:bg-base-300/30 transition-colors group">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-w-purpleL shrink-0">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+        </svg>
+        <div class="flex-1 min-w-0">
+            <div class="font-medium text-sm truncate group-hover:text-w-purpleL transition-colors">{{ .Torrent.Name }}</div>
+            <div class="text-xs text-w-muted mt-0.5">{{ .Torrent.SizeBytes | bitsForHumans }}{{ if .Torrent.FileCount }} · {{ .Torrent.FileCount }} files{{ end }} · {{ .CreatedAt | timeAgo }}</div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-w-muted/40 group-hover:text-w-purpleL shrink-0 transition-colors">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+    </a>
     {{ end }}
-</ul>
+</div>
 {{ end }}

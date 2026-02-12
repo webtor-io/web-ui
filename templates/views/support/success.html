@@ -1,8 +1,26 @@
 {{ define "title" }}Support{{ end }}
 {{ define "main" }}
-    <h2 class="text-2xl font-bold text-accent mt-5">Support</h2>
-    <div class="progress-alert progress-alert-oneline mb-10 my-7">
-        <pre>success!</pre>
-        <a href="/support" data-async-target="main" class="close closeable-close">send another one</a>
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[600px] mx-auto">
+    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Support
     </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Help Center</h1>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Have a question, found a bug, or need to report content? Fill out the form below and we'll get back to you.</p>
+
+    <div class="bg-success/10 border border-success/30 rounded-2xl p-6 text-center">
+      <svg class="w-10 h-10 text-success mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Your message has been sent successfully!</p>
+      <a href="/support" data-async-target="main" class="link link-hover text-w-pinkL">Send another one</a>
+    </div>
+  </div>
+</section>
 {{ end }}

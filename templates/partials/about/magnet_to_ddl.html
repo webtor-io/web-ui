@@ -1,150 +1,175 @@
-{{ define "about_instruction_magnet_to_ddl_header" }}
-	<h1 class="text-center text-4xl pb-8 font-bold">
-		Magnet to DDL Converter
-	</h1>
-{{ end }}
-
-{{ define "about_instruction_magnet_to_ddl_description" }}
-	<div class="base-200 text-accent pt-6 text-center">
-		<strong>Magnet to DDL</strong> lets you convert a magnet link into a direct download link without using a torrent client.
-		With <strong>Webtor.io</strong>, you can generate a <strong>DDL</strong> link instantly or stream video files directly in your browser.
-	</div>
-{{ end }}
-
 {{ define "about_instruction_magnet_to_ddl_how_to" }}
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">How to download magnets with <strong>Webtor.io</strong></h2>
-				<p class="py-6 text-justify">
-					With <strong>Webtor.io</strong> it is easy to convert your torrent-file or magnet-url into direct download link
-					in 3&nbsp;simple steps without need to use torrent-client:
-				</p>
-				<ol class="list-decimal text-justify pl-8">
-					<li>Paste your magnet-url into text-field</li>
-					<li>Click <strong>Search</strong> button</li>
-					<li>Click on the file link to download</li>
-				</ol>
-			</div>
-		</div>
-	</div>
+<!-- Steps -->
+<section id="how" class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            How it works
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to download magnets with Webtor.io</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Convert your magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.</p>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					What is magnet to DDL and how does it work?
-				</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Copy your magnet link</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Copy the magnet URL from any website or torrent index.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Paste &amp; search</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Paste the magnet link into the text field and click the Search button.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Click to download</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Browse the file list and click any file to get a direct HTTP download link.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-				<p class="py-6 text-justify">
-					Magnet to DDL is a method of converting a magnet link into a
-					<strong>direct download link (DDL)</strong> that works over standard HTTP or HTTPS.
-					A magnet link does not contain the full torrent file — it points to torrent metadata that must be fetched first.
-					With <strong>Webtor.io</strong>, the metadata is resolved on a server and the files become available as regular downloadable links.
-				</p>
+<!-- Explainer: What is Magnet DDL -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Explained
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">What is magnet to DDL and how does it work?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">
+                Magnet to DDL is a method of converting a magnet link into a
+                <strong>direct download link (DDL)</strong> that works over standard HTTP or HTTPS.
+                A magnet link does not contain the full torrent file — it points to torrent metadata that must be fetched first.
+                With <strong>Webtor.io</strong>, the metadata is resolved on a server and the files become available as regular downloadable links.
+            </p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                This approach removes the need to install torrent software and makes downloading or streaming files easier
+                on any device, including mobile phones and tablets.
+            </p>
+        </div>
+    </div>
+</section>
 
-				<p class="text-justify">
-					This approach removes the need to install torrent software and makes downloading or streaming files easier
-					on any device, including mobile phones and tablets.
-				</p>
-			</div>
-		</div>
-	</div>
+<!-- Comparison: Magnet vs Torrent -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>
+            Comparison
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Magnet vs torrent file: what's the difference?</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">A torrent file contains metadata about the content and trackers. A magnet link is a shorter format that references the same content by its hash.</p>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					Magnet vs torrent file: what’s the difference?
-				</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL text-xs font-semibold tracking-widest uppercase mb-3">Magnet link</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Contains a hash and parameters
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Needs metadata resolution first
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Easy to share and copy
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Works without downloading a .torrent file
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-xs font-semibold tracking-widest uppercase mb-3">Torrent file</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Contains the torrent metadata
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Ready to start immediately
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Easy to archive and store
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Requires the .torrent file
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-				<p class="py-6 text-justify">
-					A torrent file contains metadata about the content and trackers.
-					A magnet link is a shorter format that references the same content by its hash and must be resolved before download.
-					In practice, both lead to the same files — the difference is how the download process starts.
-				</p>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">
+            If you only have a magnet link, converting <strong>magnet to DDL</strong> is the simplest way to download files
+            in a browser without installing a torrent client.
+        </p>
+    </div>
+</section>
 
-				<div class="overflow-x-auto">
-					<table class="table table-zebra w-full">
-						<thead>
-						<tr>
-							<th>Magnet link</th>
-							<th>Torrent file</th>
-						</tr>
-						</thead>
-						<tbody>
-						<tr>
-							<td>Contains a hash and parameters</td>
-							<td>Contains the torrent metadata</td>
-						</tr>
-						<tr>
-							<td>Needs metadata resolution first</td>
-							<td>Ready to start immediately</td>
-						</tr>
-						<tr>
-							<td>Easy to share and copy</td>
-							<td>Easy to archive and store</td>
-						</tr>
-						<tr>
-							<td>Works without downloading a .torrent file</td>
-							<td>Requires the .torrent file</td>
-						</tr>
-						</tbody>
-					</table>
-				</div>
+<!-- Safety -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Safety
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Is magnet to DDL safe? Do I need a VPN?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                Magnet to DDL is generally safer than using a traditional torrent client because you do not connect directly
+                to the torrent swarm from your device. Your IP address is not exposed to other peers in the same way as with
+                peer-to-peer downloading. All traffic between you and <strong>Webtor.io</strong> travels over HTTPS, so no VPN is required.
+            </p>
+        </div>
+    </div>
+</section>
 
-				<p class="pt-6 text-justify">
-					If you only have a magnet link, converting <strong>magnet to DDL</strong> is the simplest way to download files
-					in a browser without installing a torrent client.
-				</p>
-			</div>
-		</div>
-	</div>
+<!-- Benefits: Video -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Video streaming
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Why magnet to DDL is better for video files</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">
+            Video torrents are often inconvenient with classic torrent clients: you may need to wait for enough pieces to download
+            before playback works smoothly. With <strong>magnet to DDL</strong>, video files can be streamed over HTTP,
+            so you can start watching instantly without downloading the entire file first.
+        </p>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					Is magnet to DDL safe? Do I need a VPN?
-				</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Movies and TV episodes</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Large MKV / MP4 files</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Mobile devices and tablets</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Quick previews before downloading</span>
+            </div>
+        </div>
 
-				<p class="py-6 text-justify">
-					Magnet to DDL is generally safer than using a traditional torrent client because you do not connect directly
-					to the torrent swarm from your device. Your IP address is not exposed to other peers in the same way as with
-					peer-to-peer downloading.
-				</p>
-			</div>
-		</div>
-	</div>
-
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					Why magnet to DDL is better for video files
-				</h2>
-
-				<p class="py-6 text-justify">
-					Video torrents are often inconvenient with classic torrent clients: you may need to wait for enough pieces to download
-					before playback works smoothly. With <strong>magnet to DDL</strong>, video files can be streamed over HTTP,
-					so you can start watching instantly without downloading the entire file first.
-				</p>
-
-				<p class="text-justify">
-					This makes magnet to DDL especially useful for:
-				</p>
-
-				<ul class="list-disc text-justify pl-8 pt-3">
-					<li>movies and TV episodes</li>
-					<li>large MKV / MP4 files</li>
-					<li>mobile devices and tablets</li>
-					<li>quick previews before downloading</li>
-				</ul>
-
-				<p class="pt-6 text-justify">
-					If your magnet link points to video content, streaming is usually faster and more convenient than downloading everything upfront.
-				</p>
-			</div>
-		</div>
-	</div>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">
+            If your magnet link points to video content, streaming is usually faster and more convenient than downloading everything upfront.
+        </p>
+    </div>
+</section>
 {{ end }}

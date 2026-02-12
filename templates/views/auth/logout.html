@@ -1,11 +1,30 @@
 {{ define "title" }}Logout{{ end }}
 {{ define "main" }}
-<form class="progress-alert progress-alert-block mt-10 hidden closeable">
-    <div class="log-target"></div>
-    <div class="pt-3 flex justify-end hidden alert-close-wrapper">
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-md mx-auto">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl bg-w-pink/10 flex items-center justify-center mx-auto mb-5">
+        <svg class="w-7 h-7 text-w-pinkL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </div>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Sign Out</h1>
+      <p class="text-w-sub text-sm">Logging you out of your account</p>
+    </div>
+
+    <form class="progress-alert progress-alert-block hidden closeable">
+      <div class="log-target"></div>
+      <div class="pt-3 flex justify-end hidden alert-close-wrapper">
         <a data-async-target="main" class="close" href="/login">login again</a>
         <a data-async-target="main" class="close closeable-close" href="/">go home</a>
-    </div>
-</form>
+      </div>
+    </form>
+
+  </div>
+</section>
 {{ "auth/logout.js" | asset }}
 {{ end }}

@@ -1,145 +1,176 @@
-{{ define "about_instruction_torrent_to_ddl_header" }}
-<h1 class="text-center text-4xl pb-8 font-bold">
-	Torrent to DDL Converter
-</h1>
-{{ end }}
-
-{{ define "about_instruction_torrent_to_ddl_description" }}
-<div class="base-200 text-accent pt-6 text-center">
-	<strong>Torrent to DDL</strong> lets you convert a torrent file into a direct download link without using a torrent client.
-	With <strong>Webtor.io</strong>, you can generate a <strong>DDL</strong> link instantly or stream video files directly in your browser.
-</div>
-{{ end }}
-
 {{ define "about_instruction_torrent_to_ddl_how_to" }}
-<div class="hero bg-base-200 mt-6">
-	<div class="hero-content text-center">
-		<div>
-			<h2 class="text-2xl font-bold text-accent">How to download torrents with <strong>Webtor.io</strong></h2>
-			<p class="py-6 text-justify">
-				With <strong>Webtor.io</strong> it is easy to convert your torrent-file or magnet-url into direct download link
-				in 3&nbsp;simple steps without need to use torrent-client:
-			</p>
-			<ol class="list-decimal text-justify pl-8">
-				<li>Locate the torrent file on your computer</li>
-				<li>Upload it to <strong>Webtor.io</strong></li>
-				<li>Click on the file link to download</li>
-			</ol>
-		</div>
-	</div>
-</div>
-<div class="hero bg-base-200 mt-6">
-	<div class="hero-content text-center">
-		<div>
-			<h2 class="text-2xl font-bold text-accent">
-				What is torrent to DDL and how does it work?
-			</h2>
+<!-- Steps -->
+<section id="how" class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            How it works
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to download torrents with Webtor.io</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Convert your torrent file or magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.</p>
 
-			<p class="py-6 text-justify">
-				Torrent to DDL is a method of converting a torrent file into a
-				<strong>direct download link (DDL)</strong> that works over standard HTTP or HTTPS.
-				Instead of connecting to peers through a torrent client, the torrent is processed
-				on a server and the files become available as regular downloadable links.
-			</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Locate your torrent</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Find the .torrent file on your computer or copy a magnet link from any source.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Upload to Webtor.io</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Drop the file into the upload area or paste the magnet link, then click Search.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Click to download</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Browse the file list and click any file to get a direct HTTP download link.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-			<p class="text-justify">
-				This approach removes the need to install torrent software and makes downloading
-				or streaming files easier on any device, including mobile phones and tablets.
-			</p>
-		</div>
-	</div>
-</div>
-<div class="hero bg-base-200 mt-6">
-	<div class="hero-content text-center">
-		<div>
-			<h2 class="text-2xl font-bold text-accent">
-				Torrent vs DDL: what’s the difference?
-			</h2>
+<!-- Explainer: What is DDL -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Explained
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">What is torrent to DDL and how does it work?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">
+                Torrent to DDL is a method of converting a torrent file into a
+                <strong>direct download link (DDL)</strong> that works over standard HTTP or HTTPS.
+                Instead of connecting to peers through a torrent client, the torrent is processed
+                on a server and the files become available as regular downloadable links.
+            </p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                This approach removes the need to install torrent software and makes downloading
+                or streaming files easier on any device, including mobile phones and tablets.
+            </p>
+        </div>
+    </div>
+</section>
 
-			<p class="py-6 text-justify">
-				Torrents and direct download links both deliver files, but they use very different
-				technologies and behave differently in real-world scenarios.
-			</p>
+<!-- Comparison: Torrent vs DDL -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>
+            Comparison
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Torrent vs DDL: what's the difference?</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Torrents and direct download links both deliver files, but they use very different technologies.</p>
 
-			<div class="overflow-x-auto">
-				<table class="table table-zebra w-full">
-					<thead>
-					<tr>
-						<th>Torrent</th>
-						<th>DDL</th>
-					</tr>
-					</thead>
-					<tbody>
-					<tr>
-						<td>Uses peer-to-peer connections</td>
-						<td>Uses standard HTTP/HTTPS</td>
-					</tr>
-					<tr>
-						<td>Requires a torrent client</td>
-						<td>Works directly in the browser</td>
-					</tr>
-					<tr>
-						<td>Speed depends on available peers</td>
-						<td>More stable and predictable speed</td>
-					</tr>
-					<tr>
-						<td>Streaming is often unreliable</td>
-						<td>Streaming works instantly</td>
-					</tr>
-					</tbody>
-				</table>
-			</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL text-xs font-semibold tracking-widest uppercase mb-3">Torrent</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Uses peer-to-peer connections
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Requires a torrent client
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Speed depends on available peers
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Streaming is often unreliable
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-xs font-semibold tracking-widest uppercase mb-3">DDL</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Uses standard HTTP/HTTPS
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Works directly in the browser
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> More stable and predictable speed
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Streaming works instantly
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-			<p class="pt-6 text-justify">
-				Torrent to DDL is often preferred when you want simplicity, stability,
-				and quick access to files without dealing with torrent clients.
-			</p>
-		</div>
-	</div>
-</div>
-<div class="hero bg-base-200 mt-6">
-	<div class="hero-content text-center">
-		<div>
-			<h2 class="text-2xl font-bold text-accent">
-				Is torrent to DDL safe? Do I need a VPN?
-			</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">
+            Torrent to DDL is often preferred when you want simplicity, stability,
+            and quick access to files without dealing with torrent clients.
+        </p>
+    </div>
+</section>
 
-			<p class="py-6 text-justify">
-				Torrent to DDL is generally safer than using a traditional torrent client
-				because you do not connect directly to the torrent swarm.
-				Your IP address is not exposed to other peers in the same way.
-			</p>
-		</div>
-	</div>
-</div>
-<div class="hero bg-base-200 mt-6">
-	<div class="hero-content text-center">
-		<div>
-			<h2 class="text-2xl font-bold text-accent">
-				Why torrent to DDL is better for video files
-			</h2>
+<!-- Safety -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Safety
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Is torrent to DDL safe? Do I need a VPN?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                Torrent to DDL is generally safer than using a traditional torrent client
+                because you do not connect directly to the torrent swarm.
+                Your IP address is not exposed to other peers in the same way.
+                All traffic between you and <strong>Webtor.io</strong> travels over HTTPS, so no VPN is required.
+            </p>
+        </div>
+    </div>
+</section>
 
-			<p class="py-6 text-justify">
-				Video torrents are often inconvenient with classic torrent clients: you may need to wait for enough pieces to download
-				before playback works smoothly. With <strong>torrent to DDL</strong>, video files can be streamed over HTTP,
-				so you can start watching instantly without downloading the entire file first.
-			</p>
+<!-- Benefits: Video -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Video streaming
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Why torrent to DDL is better for video files</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">
+            Video torrents are often inconvenient with classic torrent clients: you may need to wait for enough pieces to download
+            before playback works smoothly. With <strong>torrent to DDL</strong>, video files can be streamed over HTTP,
+            so you can start watching instantly without downloading the entire file first.
+        </p>
 
-			<p class="text-justify">
-				This makes torrent to DDL especially useful for:
-			</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Movies and TV episodes</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Large MKV / MP4 files</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Mobile devices and tablets</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Quick previews before downloading</span>
+            </div>
+        </div>
 
-			<ul class="list-disc text-justify pl-8 pt-3">
-				<li>movies and TV episodes</li>
-				<li>large MKV / MP4 files</li>
-				<li>mobile devices and tablets</li>
-				<li>quick previews before downloading</li>
-			</ul>
-
-			<p class="pt-6 text-justify">
-				If your torrent contains video content, streaming is usually faster and more convenient than downloading everything upfront.
-			</p>
-		</div>
-	</div>
-</div>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">
+            If your torrent contains video content, streaming is usually faster and more convenient than downloading everything upfront.
+        </p>
+    </div>
+</section>
 {{ end }}

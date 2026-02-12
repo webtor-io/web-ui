@@ -1,100 +1,93 @@
 {{ define "profile/addon_urls" }}
-    <div class="bg-base-200 py-8">
-        <div class="container mx-auto px-4">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio Addons</h2>
-                <div class="flex flex-col mt-6 mb-3 w-full">
-                    <div class="w-full sm:px-5">
-                        <!-- Add Addon URL Form -->
-                        <div class="mb-6">
-                            {{ $addonCount := len .Data.AddonUrls }}
-                            {{ $canAddAddon := or (lt $addonCount 3) (.Claims | isPaid) }}
-                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/add" data-async-target="#addon-urls" class="join w-full{{ if not $canAddAddon }} opacity-50{{ end }}">
-                                <input
-                                    name="url"
-                                    placeholder="Enter Stremio addon manifest URL (e.g., https://example.com/manifest.json)"
-                                    class="input input-bordered w-full join-item"
-                                    type="url"
-                                    pattern="https?://.*manifest\.json$"
-                                    title="Please enter a valid Stremio addon manifest URL ending with manifest.json"
-                                    {{ if $canAddAddon }}required{{ else }}disabled{{ end }}
-                                />
-                                <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="addon-url-add"{{ if not $canAddAddon }} disabled{{ end }}>
-                                    Add Addon
-                                </button>
-                            </form>
-                            {{ if not $canAddAddon }}
-                                <div class="text-center text-sm text-accent mt-5">
-                                    You have reached the maximum of 3 addon URLs. Delete an addon to add a new one.
-                                </div>
-                            {{ end }}
-                            {{ if ne .Data.Error nil }}
-                                <div class="text-center text-sm text-accent mt-5">
-                                    {{ .Data.Error | longErr }}
-                                </div>
-                            {{ end }}
-                        </div>
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Addons
+        </h2>
 
-                        <!-- Addon URL List -->
-                        <form method="post" data-async-push-state="false" action="/stremio/addon-url/update" data-async-target="#addon-urls">
-                            <h3 class="text-lg font-semibold mb-2">Your Stremio Addons</h3>
-                            <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
-
-                            <ul id="addon-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
-                                {{ $addons := .Data.AddonUrls }}
-                                {{ range $i, $addon := $addons }}
-                                <li class="p-4 cursor-move select-none flex items-center gap-4 addon-item hover:bg-base-50 transition-colors"
-                                    data-addon-id="{{ $addon.ID }}" draggable="true">
-
-                                    <span class="drag-handle" aria-label="drag" title="drag to sort">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
-                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
-                                        </svg>
-                                    </span>
-
-                                    <div class="flex-1">
-                                        <div class="font-medium text-sm break-all">{{ $addon.Url }}</div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2">
-                                        <label class="label cursor-pointer gap-2">
-                                            <input type="checkbox" name="addon_{{ $addon.ID }}_enabled" class="toggle toggle-accent" {{ if $addon.Enabled }}checked{{ end }}>
-                                            <span class="label-text">Enabled</span>
-                                        </label>
-
-                                        <!-- Delete Button -->
-                                        <button type="button" class="btn btn-soft btn-sm capitalize btn-accent delete-addon" data-addon-id="{{ $addon.ID }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </li>
-                                {{ end }}
-
-                                <!-- Empty state message -->
-                                <li class="p-8 text-center empty-state {{ if $addons }}hidden{{ end }}" id="addon-empty-state">
-                                    <p class="text-base-content opacity-70">No addon URLs added yet</p>
-                                    <p class="text-sm text-base-content opacity-50 mt-2">Add Stremio addon URLs to extend your content library</p>
-                                </li>
-                            </ul>
-
-                            <input type="hidden" name="addon_order" id="addon_order" value="{{ range $i, $a := $addons }}{{ if $i }},{{ end }}{{ $a.ID }}{{ end }}">
-                            <input type="hidden" name="deleted_addons" id="deleted_addons" value="">
-
-                            <div class="mt-5 flex justify-center">
-                                <button type="submit" class="btn btn-accent btn-outline" data-umami-event="addon-url-save">Save</button>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
-                        <span class="text-accent">ⓘ</span>
-                        <a href="/instructions/stremio_addon" class="hover:underline" data-umami-event="instruction-stremio-addon" target="_blank">How to connect Stremio Addon?</a>
-                    </div>
+        <!-- Add Addon URL Form -->
+        <div class="mb-7">
+            {{ $addonCount := len .Data.AddonUrls }}
+            {{ $canAddAddon := or (lt $addonCount 3) (.Claims | isPaid) }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/addon-url/add" data-async-target="#addon-urls" class="join w-full{{ if not $canAddAddon }} opacity-50{{ end }}">
+                <input
+                    name="url"
+                    placeholder="Enter Stremio addon manifest URL (e.g., https://example.com/manifest.json)"
+                    class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item"
+                    type="url"
+                    pattern="https?://.*manifest\.json$"
+                    title="Please enter a valid Stremio addon manifest URL ending with manifest.json"
+                    {{ if $canAddAddon }}required{{ else }}disabled{{ end }}
+                />
+                <button type="submit" class="btn btn-soft join-item" data-umami-event="addon-url-add"{{ if not $canAddAddon }} disabled{{ end }}>
+                    Add
+                </button>
+            </form>
+            {{ if not $canAddAddon }}
+                <div class="text-sm text-w-muted mt-3">
+                    You have reached the maximum of 3 addon URLs. Delete an addon to add a new one.
                 </div>
-            </div>
+            {{ end }}
+            {{ if ne .Data.Error nil }}
+                <div class="text-sm text-error mt-3">
+                    {{ .Data.Error | longErr }}
+                </div>
+            {{ end }}
         </div>
+
+        <!-- Addon URL List -->
+        <form method="post" data-async-push-state="false" action="/stremio/addon-url/update" data-async-target="#addon-urls">
+            <h3 class="text-sm font-semibold mb-2">Your Stremio Addons</h3>
+            <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+
+            <ul id="addon-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+                {{ $addons := .Data.AddonUrls }}
+                {{ range $i, $addon := $addons }}
+                <li class="p-4 cursor-move select-none flex items-center gap-4 addon-item hover:bg-base-300/30 transition-colors"
+                    data-addon-id="{{ $addon.ID }}" draggable="true">
+
+                    <span class="drag-handle" aria-label="drag" title="drag to sort">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                        </svg>
+                    </span>
+
+                    <div class="flex-1">
+                        <div class="font-medium text-sm break-all">{{ $addon.Url }}</div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <label class="label cursor-pointer gap-2">
+                            <input type="checkbox" name="addon_{{ $addon.ID }}_enabled" class="toggle toggle-soft" {{ if $addon.Enabled }}checked{{ end }}>
+                            <span class="label-text text-xs">Enabled</span>
+                        </label>
+
+                        <!-- Delete Button -->
+                        <button type="button" class="btn btn-ghost btn-sm text-w-pinkL hover:bg-w-pink/10 delete-addon" data-addon-id="{{ $addon.ID }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+                {{ end }}
+
+                <!-- Empty state message -->
+                <li class="p-8 text-center empty-state {{ if $addons }}hidden{{ end }}" id="addon-empty-state">
+                    <p class="text-w-muted">No addon URLs added yet</p>
+                    <p class="text-xs text-w-muted mt-2">Add Stremio addon URLs to extend your content library</p>
+                </li>
+            </ul>
+
+            <input type="hidden" name="addon_order" id="addon_order" value="{{ range $i, $a := $addons }}{{ if $i }},{{ end }}{{ $a.ID }}{{ end }}">
+            <input type="hidden" name="deleted_addons" id="deleted_addons" value="">
+
+            <div class="mt-4 flex items-center justify-between">
+                <a href="/instructions/stremio_addon" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-stremio-addon" target="_blank">How to connect Stremio Addon?</a>
+                <button type="submit" class="btn btn-soft" data-umami-event="addon-url-save">Save</button>
+            </div>
+        </form>
     </div>
-    
+
     {{ "profile/addon_urls.js" | asset }}
 {{ end }}

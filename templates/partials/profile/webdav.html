@@ -1,49 +1,43 @@
 {{ define "profile/webdav" }}
-    <div class="hero bg-base-200">
-        <div class="hero-content text-center w-full">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent">WebDAV integration</h2>
-                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                    {{ if .Claims | isPaid }}
-                        {{ if eq .Data.WebDAVURL "" }}
-                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/webdav/url/generate" data-async-target="#webdav">
-                                <button type="submit" class="btn btn-accent btn-outline capitalize whitespace-nowrap" data-umami-event="webdav-generate-url">
-                                    Generate WebDAV URL
-                                </button>
-                            </form>
-                        {{ else }}
-                            <script>
-                                var webdavUrl = "{{ domain }}{{ .Data.WebDAVURL }}";
-                                function copyWebDAVUrl(form, e) {
-                                    e.preventDefault();
-                                    navigator.clipboard.writeText(webdavUrl);
-                                    return false;
-                                }
-                            </script>
-                            <div class="w-full sm:px-5">
-                                <form onsubmit="copyWebDAVUrl(this, event)" class="join w-full">
-                                    <input name="token" readonly class="input input-bordered w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
-                                    <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="webdav-copy-url">copy WebDAV url</button>
-                                </form>
-                                <div class="text-left w-full text-sm text-accent mt-2">
-                                    <span class="text-accent">ⓘ</span>
-                                    <a href="/instructions/webdav" class="hover:underline" data-umami-event="instruction-webdav" target="_blank">How to connect via WebDAV?</a>
-                                </div>
-                            </div>
-                        {{ end }}
-                    {{ else }}
-                        <button disabled class="btn btn-accent btn-outline capitalize whitespace-nowrap">
-                            Generate WebDAV URL
-                        </button>
-                        <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                            <p class="mb-6 text-center text-sm text-base-content opacity-70">
-                                WebDAV integration is available for premium users.<br />
-                                <a href="/donate" class="btn-link" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a>
-                            </p>
-                        </div>
-                    {{ end }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            WebDAV
+        </h2>
+        {{ if .Claims | isPaid }}
+            {{ if eq .Data.WebDAVURL "" }}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/webdav/url/generate" data-async-target="#webdav">
+                    <button type="submit" class="btn btn-soft" data-umami-event="webdav-generate-url">
+                        Generate WebDAV URL
+                    </button>
+                </form>
+            {{ else }}
+                <script>
+                    var webdavUrl = "{{ domain }}{{ .Data.WebDAVURL }}";
+                    function copyWebDAVUrl(form, e) {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(webdavUrl);
+                        return false;
+                    }
+                </script>
+                <form onsubmit="copyWebDAVUrl(this, event)" class="join w-full mb-4">
+                    <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
+                    <button type="submit" class="btn btn-soft join-item" data-umami-event="webdav-copy-url">Copy URL</button>
+                </form>
+                <div class="mt-2">
+                    <a href="/instructions/webdav" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-webdav" target="_blank">How to connect via WebDAV?</a>
                 </div>
+            {{ end }}
+        {{ else }}
+            <button disabled class="btn bg-base-300 text-w-muted border-w-line cursor-not-allowed">
+                Generate WebDAV URL
+            </button>
+            <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4">
+                <p class="text-sm text-w-sub">
+                    WebDAV integration is available for premium users.
+                </p>
+                <a href="/donate" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a>
             </div>
-        </div>
+        {{ end }}
     </div>
 {{ end }}

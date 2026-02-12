@@ -166,7 +166,8 @@ export function init(window, config) {
                                 e.ctrlKey ||
                                 e.shiftKey ||
                                 e.metaKey ||
-                                (e.button && e.button === 1);
+                                (e.button && e.button === 1) ||
+                                parentElement.hasAttribute('download');
 
                             if (eventName && href) {
                                 if (!external) {

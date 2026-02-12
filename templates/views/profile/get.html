@@ -1,45 +1,67 @@
 {{ define "title" }}Profile{{ end }}
 {{ define "main" }}
-{{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
-<div id="tier">
-    {{ template "profile/tier" $ }}
-</div>
-{{ if .Data.VaultStats }}
-<div class="divider"></div>
-<div id="vault" data-async-layout="{{`{{ template "profile/vault" $ }}`}}">
-    {{ template "profile/vault" $ }}
-</div>
-{{ end }}
-<div class="divider"></div>
-<div id="stremio" data-async-layout="{{`{{ template "profile/stremio" $ }}`}}">
-    {{ template "profile/stremio" $ }}
-</div>
-<div class="divider"></div>
-<div id="streaming-backends" data-async-layout="{{`{{ template "profile/streaming_backends" $ }}`}}">
-    {{ template "profile/streaming_backends" $ }}
-</div>
-<div class="divider"></div>
-<div id="addon-urls" data-async-layout="{{`{{ template "profile/addon_urls" $ }}`}}">
-    {{ template "profile/addon_urls" $ }}
-</div>
-<div class="divider"></div>
-<div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" $ }}`}}">
-    {{ template "profile/stremio_settings" $ }}
-</div>
-{{ if not .Data.DisableWebDAV }}
-    <div class="divider"></div>
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[800px] mx-auto">
+    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      Profile
+    </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Profile</h1>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Manage your account settings, integrations, and preferences.</p>
+
+    <div id="tier">
+        {{ template "profile/tier" $ }}
+    </div>
+    {{ if .Data.VaultStats }}
+    <div id="vault" data-async-layout="{{`{{ template "profile/vault" $ }}`}}">
+        {{ template "profile/vault" $ }}
+    </div>
+    {{ end }}
+
+    <!-- Stremio -->
+    <div class="flex items-center gap-3 mt-10 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Stremio</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+    </div>
+
+    <div id="stremio" data-async-layout="{{`{{ template "profile/stremio" $ }}`}}">
+        {{ template "profile/stremio" $ }}
+    </div>
+    <div id="streaming-backends" data-async-layout="{{`{{ template "profile/streaming_backends" $ }}`}}">
+        {{ template "profile/streaming_backends" $ }}
+    </div>
+    <div id="addon-urls" data-async-layout="{{`{{ template "profile/addon_urls" $ }}`}}">
+        {{ template "profile/addon_urls" $ }}
+    </div>
+    <div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" $ }}`}}">
+        {{ template "profile/stremio_settings" $ }}
+    </div>
+
+    <!-- Integrations -->
+    <div class="flex items-center gap-3 mt-10 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Integrations</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+    </div>
+
+    {{ if not .Data.DisableWebDAV }}
     <div id="webdav" data-async-layout="{{`{{ template "profile/webdav" $ }}`}}">
         {{ template "profile/webdav" $ }}
     </div>
-{{ end }}
-{{ if not .Data.DisableEmbed }}
-<div class="divider"></div>
-<div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" $ }}`}}">
-    {{ template "profile/embed_domains" $ }}
-</div>
-{{ end }}
-<div class="divider"></div>
-<div class="flex flex-col justify-center items-center mt-10">
-    <a href="/logout" class="btn btn-accent btn-soft btn-outline capitalize" data-async-target="main" data-umami-event="logout">logout</a>
-</div>
+    {{ end }}
+    {{ if not .Data.DisableEmbed }}
+    <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" $ }}`}}">
+        {{ template "profile/embed_domains" $ }}
+    </div>
+    {{ end }}
+
+    <div class="text-center mt-12">
+        <a href="/logout" class="btn btn-ghost text-w-muted hover:text-error text-sm" data-async-target="main" data-umami-event="logout">Log out</a>
+    </div>
+  </div>
+</section>
 {{ end }}

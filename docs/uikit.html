@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webtor UIKit Reference</title>
+  <link rel="stylesheet" href="../assets/dist/style.css">
+  <link rel="stylesheet" href="../assets/dist/inter.css">
+  <link rel="stylesheet" href="../assets/dist/comfortaa.css">
+  <style>
+    /* Layout-only styles for the reference page itself */
+    .uikit-section { margin-bottom: 4rem; }
+    .uikit-section h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .uikit-section p.desc { color: #94a3b8; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .uikit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+    .uikit-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .uikit-card { padding: 1.5rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.07); }
+    .uikit-label { font-size: 0.7rem; color: #64748b; font-family: monospace; margin-top: 0.5rem; }
+    .swatch { width: 100%; height: 60px; border-radius: 0.75rem; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.07); }
+    .uikit-note { background: rgba(0,206,201,0.06); border: 1px solid rgba(0,206,201,0.2); border-radius: 0.75rem; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.85rem; color: #94a3b8; }
+    .uikit-note strong { color: #00cec9; }
+    .uikit-rule { background: rgba(232,67,147,0.06); border: 1px solid rgba(232,67,147,0.2); border-radius: 0.75rem; padding: 1rem 1.25rem; margin-top: 1rem; font-size: 0.85rem; color: #94a3b8; }
+    .uikit-rule strong { color: #fd79a8; }
+    hr.uikit-divider { border: none; border-top: 1px solid rgba(255,255,255,0.07); margin: 3rem 0; }
+  </style>
+</head>
+<body class="bg-w-bg text-w-text font-sans p-8 max-w-[1200px] mx-auto">
+
+  <!-- Header -->
+  <div class="mb-12">
+    <span class="font-logo text-2xl gradient-text">webtor</span>
+    <h1 class="text-4xl font-extrabold tracking-tight mt-4 mb-2">UIKit Reference</h1>
+    <p class="text-w-sub text-lg">Design tokens, components, and patterns for the Webtor web-ui project.</p>
+    <p class="text-w-muted text-sm mt-2">Open this file in a browser after running <code class="text-w-cyan">npm run build</code>. Loads <code class="text-w-cyan">assets/dist/style.css</code>.</p>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       1. COLOR PALETTE
+       ========================================================= -->
+  <div class="uikit-section" id="colors">
+    <h2>1. Color Palette</h2>
+    <p class="desc">Custom <code>w-*</code> color tokens defined in <code>tailwind.config.js</code>. Use as <code>bg-w-{name}</code>, <code>text-w-{name}</code>, <code>border-w-{name}</code>.</p>
+
+    <div class="uikit-grid">
+      <div>
+        <div class="swatch" style="background:#0a0e1a"></div>
+        <div class="text-sm font-semibold">bg</div>
+        <div class="uikit-label">#0a0e1a &middot; bg-w-bg</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#111827"></div>
+        <div class="text-sm font-semibold">surface</div>
+        <div class="uikit-label">#111827 &middot; bg-w-surface</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#1a2235"></div>
+        <div class="text-sm font-semibold">card</div>
+        <div class="uikit-label">#1a2235 &middot; bg-w-card</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#e84393"></div>
+        <div class="text-sm font-semibold">pink</div>
+        <div class="uikit-label">#e84393 &middot; bg-w-pink</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#fd79a8"></div>
+        <div class="text-sm font-semibold">pinkL</div>
+        <div class="uikit-label">#fd79a8 &middot; text-w-pinkL</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#6c5ce7"></div>
+        <div class="text-sm font-semibold">purple</div>
+        <div class="uikit-label">#6c5ce7 &middot; bg-w-purple</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#a29bfe"></div>
+        <div class="text-sm font-semibold">purpleL</div>
+        <div class="uikit-label">#a29bfe &middot; text-w-purpleL</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#00cec9"></div>
+        <div class="text-sm font-semibold">cyan</div>
+        <div class="uikit-label">#00cec9 &middot; text-w-cyan</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#f1f5f9"></div>
+        <div class="text-sm font-semibold">text</div>
+        <div class="uikit-label">#f1f5f9 &middot; text-w-text</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#94a3b8"></div>
+        <div class="text-sm font-semibold">sub</div>
+        <div class="uikit-label">#94a3b8 &middot; text-w-sub</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:#64748b"></div>
+        <div class="text-sm font-semibold">muted</div>
+        <div class="uikit-label">#64748b &middot; text-w-muted</div>
+      </div>
+      <div>
+        <div class="swatch" style="background:rgba(255,255,255,0.07)"></div>
+        <div class="text-sm font-semibold">line</div>
+        <div class="uikit-label">rgba(255,255,255,0.07) &middot; border-w-line</div>
+      </div>
+    </div>
+
+    <div class="uikit-note">
+      <strong>DaisyUI base colors</strong> are overridden in <code>style.css</code>: base-100&rarr;#0a0e1a, base-200&rarr;#111827, base-300&rarr;#1a2235, accent&rarr;#e84393.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       2. TYPOGRAPHY
+       ========================================================= -->
+  <div class="uikit-section" id="typography">
+    <h2>2. Typography</h2>
+    <p class="desc">Font families: <code>font-sans</code> (Inter), <code>font-logo</code> (Comfortaa). Sizes use <code>clamp()</code> for fluid scaling.</p>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <h1 class="text-[clamp(2.5rem,5vw,4rem)] font-extrabold tracking-tight leading-tight mb-4">Hero Heading (h1)</h1>
+      <div class="uikit-label">text-[clamp(2.5rem,5vw,4rem)] font-extrabold tracking-tight</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Section Heading (h2)</h2>
+      <div class="uikit-label">text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <h3 class="text-lg font-bold mb-2">Card Title (h3)</h3>
+      <div class="uikit-label">text-lg font-bold</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Profile Section Label</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+      </div>
+      <div class="uikit-label">text-xs font-semibold tracking-widest uppercase text-w-muted + h-px divider</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <p class="text-[1.15rem] text-w-sub leading-relaxed mb-3">Intro paragraph &mdash; used below hero headings for page descriptions.</p>
+      <p class="text-w-sub leading-relaxed mb-3">Body text &mdash; regular content paragraphs.</p>
+      <p class="text-sm text-w-muted mb-3">Small text &mdash; secondary descriptions and helper text.</p>
+      <p class="text-xs text-w-muted">Extra-small &mdash; labels, captions, footnotes.</p>
+      <div class="uikit-label mt-4">text-[1.15rem] text-w-sub | text-w-sub | text-sm text-w-muted | text-xs text-w-muted</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface mb-6">
+      <span class="text-3xl font-extrabold gradient-text">Gradient Text</span>
+      <div class="uikit-label">gradient-text (pink&rarr;purple via CSS class)</div>
+    </div>
+
+    <div class="uikit-card bg-w-surface">
+      <span class="text-3xl font-extrabold gradient-stat">42.5K</span>
+      <div class="uikit-label">gradient-stat (same gradient, for stat values)</div>
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       3. BADGES
+       ========================================================= -->
+  <div class="uikit-section" id="badges">
+    <h2>3. Badges</h2>
+    <p class="desc">Section header badges, small feature tags, and stat badges. Color indicates section theme.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Section Header Badges (large)</h3>
+    <div class="uikit-row mb-6">
+      <span class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase">
+        Pink Section
+      </span>
+      <span class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase">
+        Purple Section
+      </span>
+      <span class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 py-3 px-5 text-sm font-medium">
+        Cyan Section
+      </span>
+    </div>
+    <div class="uikit-label mb-6">badge badge-lg bg-w-{color}/10 border-w-{color}/30 text-w-{colorL}</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Small Feature Tags</h3>
+    <div class="uikit-row mb-6">
+      <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">Feature</span>
+      <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL text-[0.7rem] tracking-wide uppercase">New</span>
+      <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide uppercase">Beta</span>
+    </div>
+    <div class="uikit-label mb-6">badge badge-sm bg-w-{color}/10 border-w-{color}/30 text-w-{color}</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Profile Stat Badges</h3>
+    <div class="uikit-row">
+      <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">Unlimited bandwidth</span>
+      <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">Ad-free</span>
+      <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">100Mbps</span>
+    </div>
+    <div class="uikit-label">badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub</div>
+
+    <div class="uikit-rule">
+      <strong>Rule:</strong> Badge color = section theme. Pink for features/profile, purple for comparison, cyan for info/tools.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       4. BUTTONS
+       ========================================================= -->
+  <div class="uikit-section" id="buttons">
+    <h2>4. Buttons</h2>
+    <p class="desc">Button variants for different contexts. Each has a designated use case.</p>
+
+    <div class="uikit-row mb-4">
+      <button class="btn btn-pink">btn-pink (CTA)</button>
+      <button class="btn btn-soft">btn-soft (Profile/Form)</button>
+      <button class="btn btn-soft-cyan">btn-soft-cyan (Cyan)</button>
+      <button class="btn btn-ghost text-w-sub">btn-ghost</button>
+    </div>
+    <div class="uikit-label mb-6">btn btn-{variant}</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Ghost Variants</h3>
+    <div class="uikit-row mb-4">
+      <button class="btn btn-ghost btn-sm text-w-muted gap-1.5">Try demo</button>
+      <button class="btn btn-ghost btn-sm text-w-pinkL hover:bg-w-pink/10">Delete</button>
+      <button class="btn btn-ghost text-w-muted hover:text-error text-sm">Log out</button>
+    </div>
+    <div class="uikit-label mb-6">btn btn-ghost btn-sm text-w-{color}</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Outlined Ghost Buttons</h3>
+    <p class="desc">Subtle bordered buttons for navigation, actions, and secondary controls. On hover: border turns pink, text turns white. Used across navbar, resource pages, profile, and file browser.</p>
+    <div class="uikit-row mb-4">
+      <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
+        My Library
+      </a>
+      <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="#">Install in Stremio</a>
+      <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+        .torrent
+      </a>
+      <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+        ZIP [1.2 GB]
+      </a>
+    </div>
+    <div class="uikit-label mb-4">btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Joined Outlined Ghost Buttons (navbar)</h3>
+    <div class="uikit-row mb-4">
+      <div class="join">
+        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content join-item" href="#">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21C20 19.6044 20 18.9067 19.8278 18.3389C19.44 17.0605 18.4395 16.06 17.1611 15.6722C16.5933 15.5 15.8956 15.5 14.5 15.5H9.5C8.10444 15.5 7.40665 15.5 6.83886 15.6722C5.56045 16.06 4.56004 17.0605 4.17224 18.3389C4 18.9067 4 19.6044 4 21M16.5 7.5C16.5 9.98528 14.4853 12 12 12C9.51472 12 7.5 9.98528 7.5 7.5C7.5 5.01472 9.51472 3 12 3C14.4853 3 16.5 5.01472 16.5 7.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Profile
+        </a>
+        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content join-item" href="#">Login</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">Same classes + <code>join-item</code> inside a <code>join</code> container</div>
+
+    <div class="uikit-note mb-6">
+      <strong>Usage:</strong> Navbar (My Library, Profile, Login), resource page (.torrent, ZIP download), profile (Install in Stremio), file browser (ZIP download). <strong>Hover</strong> = pink border + white text. Icons use <code>currentColor</code> so they follow the text color transition.
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Disabled State</h3>
+    <div class="uikit-row">
+      <button class="btn btn-pink" disabled>btn-pink disabled</button>
+      <button class="btn btn-soft" disabled>btn-soft disabled</button>
+      <button class="btn btn-soft-cyan" disabled>btn-soft-cyan disabled</button>
+    </div>
+
+    <div class="uikit-rule mt-6">
+      <strong>Rules:</strong><br>
+      &bull; <code>btn-pink</code> = homepage &amp; tools page CTAs only<br>
+      &bull; <code>btn-soft</code> = profile &amp; support form actions (pink tint)<br>
+      &bull; <code>btn-soft-cyan</code> = secondary actions in cyan (info, tools, content)<br>
+      &bull; <code>btn-ghost border border-w-line</code> = outlined ghost &mdash; nav, downloads, secondary actions (hover: pink border + white text)<br>
+      &bull; <code>btn-ghost</code> (no border) = tertiary actions (demo, delete, logout)
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       5. FORM INPUTS
+       ========================================================= -->
+  <div class="uikit-section" id="forms">
+    <h2>5. Form Inputs</h2>
+    <p class="desc">Input fields adapt focus color to section context: pink for profile, cyan for support/tools.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Text Input (profile context)</h3>
+    <div class="uikit-card bg-w-surface mb-6" style="max-width:500px">
+      <input type="text" class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none" placeholder="https://example.com" value="">
+      <div class="uikit-label">input bg-base-300 border-w-line focus:border-w-pink focus:outline-none</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Text Input (support/tools context)</h3>
+    <div class="uikit-card bg-w-surface mb-6" style="max-width:500px">
+      <input type="text" class="input w-full bg-base-300 border-w-line focus:border-w-cyan focus:outline-none" placeholder="Your email address" value="">
+      <div class="uikit-label">input bg-base-300 border-w-line focus:border-w-cyan focus:outline-none</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Select Dropdown</h3>
+    <div class="uikit-card bg-w-surface mb-6" style="max-width:500px">
+      <select class="select w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none">
+        <option>Option 1</option>
+        <option>Option 2</option>
+        <option>Option 3</option>
+      </select>
+      <div class="uikit-label">select bg-base-300 border-w-line focus:border-w-pink focus:outline-none</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Textarea</h3>
+    <div class="uikit-card bg-w-surface mb-6" style="max-width:500px">
+      <textarea class="textarea w-full bg-base-300 border-w-line focus:border-w-cyan focus:outline-none" rows="3" placeholder="Describe your issue..."></textarea>
+      <div class="uikit-label">textarea bg-base-300 border-w-line focus:border-w-cyan focus:outline-none</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Readonly Input</h3>
+    <div class="uikit-card bg-w-surface mb-6" style="max-width:500px">
+      <input type="text" class="input w-full bg-base-300 border-w-line" value="https://webtor.io/stremio/manifest.json" readonly>
+      <div class="uikit-label">input bg-base-300 border-w-line (readonly)</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Join Group (input + button)</h3>
+    <div class="uikit-card bg-w-surface" style="max-width:500px">
+      <div class="join w-full">
+        <select class="select bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item">
+          <option>Torrent</option>
+          <option>WebDAV</option>
+        </select>
+        <input type="text" class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item" placeholder="Enter URL...">
+        <button class="btn btn-soft join-item">Add</button>
+      </div>
+      <div class="uikit-label">join w-full &rarr; select join-item + input join-item + btn btn-soft join-item</div>
+    </div>
+
+    <div class="uikit-rule mt-4">
+      <strong>Focus color rules:</strong><br>
+      &bull; <code>focus:border-w-pink</code> = profile section<br>
+      &bull; <code>focus:border-w-cyan</code> = support form &amp; tools pages
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       6. TOGGLES
+       ========================================================= -->
+  <div class="uikit-section" id="toggles">
+    <h2>6. Toggles</h2>
+    <p class="desc">DaisyUI toggle with custom <code>toggle-soft</code> variant for pink-tinted checked state.</p>
+
+    <div class="uikit-card bg-w-surface" style="max-width:500px">
+      <div class="flex flex-col gap-4">
+        <label class="label cursor-pointer gap-3 justify-start">
+          <input type="checkbox" class="toggle toggle-soft" checked>
+          <span class="label-text text-sm">toggle-soft (checked)</span>
+        </label>
+        <label class="label cursor-pointer gap-3 justify-start">
+          <input type="checkbox" class="toggle toggle-soft">
+          <span class="label-text text-sm">toggle-soft (unchecked)</span>
+        </label>
+        <label class="label cursor-pointer gap-3 justify-start">
+          <input type="checkbox" class="toggle text-accent" checked>
+          <span class="label-text text-sm">Default toggle (checked)</span>
+        </label>
+        <label class="label cursor-pointer gap-3 justify-start">
+          <input type="checkbox" class="toggle" disabled>
+          <span class="label-text text-sm">Disabled toggle</span>
+        </label>
+      </div>
+      <div class="uikit-label mt-4">toggle toggle-soft | toggle text-accent | toggle (disabled)</div>
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       7. CARDS
+       ========================================================= -->
+  <div class="uikit-section" id="cards">
+    <h2>7. Cards</h2>
+    <p class="desc">Card patterns for features, profile sections, and premium tiers.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Feature Card (with hover)</h3>
+    <div class="uikit-grid mb-6" style="max-width:700px">
+      <div class="bg-w-card border border-w-line rounded-2xl p-6 hover:border-w-pink/30 transition-all duration-300">
+        <div class="w-12 h-12 rounded-xl bg-w-pink/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-w-pinkL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h3 class="text-lg font-bold mb-2">Feature Title</h3>
+        <p class="text-sm text-w-sub leading-relaxed">Feature description goes here with supporting text.</p>
+      </div>
+      <div class="bg-w-card border border-w-line rounded-2xl p-6 hover:border-w-purple/30 transition-all duration-300">
+        <div class="w-12 h-12 rounded-xl bg-w-purple/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-w-purpleL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3 class="text-lg font-bold mb-2">Another Feature</h3>
+        <p class="text-sm text-w-sub leading-relaxed">Supporting description for this feature card.</p>
+      </div>
+    </div>
+    <div class="uikit-label mb-8">bg-w-card border border-w-line rounded-2xl p-6 hover:border-w-{color}/30 transition-all</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Profile Section Container</h3>
+    <div class="bg-base-200/40 rounded-2xl p-6 border border-w-line/50 mb-6" style="max-width:500px">
+      <h3 class="text-sm font-semibold mb-2">Section Title</h3>
+      <p class="text-xs text-w-muted mb-3">Helper description text</p>
+      <div class="bg-base-200/50 rounded-xl p-4">
+        <p class="text-sm text-w-sub">Inner content area</p>
+      </div>
+    </div>
+    <div class="uikit-label mb-8">bg-base-200/40 rounded-2xl p-6 border border-w-line/50</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Tier / Premium Card</h3>
+    <div class="relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20" style="max-width:500px">
+      <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+      <div class="relative">
+        <h2 class="text-[1.6rem] font-extrabold tracking-tight capitalize text-w-pinkL flex items-center gap-2 mb-5">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          Premium Tier
+        </h2>
+        <div class="flex flex-wrap gap-2">
+          <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">Unlimited bandwidth</span>
+          <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">Ad-free</span>
+        </div>
+      </div>
+    </div>
+    <div class="uikit-label">bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20</div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       8. LISTS
+       ========================================================= -->
+  <div class="uikit-section" id="lists">
+    <h2>8. Lists</h2>
+    <p class="desc">Draggable list items (profile backends/addons) and empty state.</p>
+
+    <div class="bg-base-200/40 rounded-2xl p-6 border border-w-line/50" style="max-width:500px">
+      <h3 class="text-sm font-semibold mb-2">Streaming Backends</h3>
+      <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+
+      <ul class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+        <!-- Regular item -->
+        <li class="p-4 cursor-move select-none flex items-center gap-4 hover:bg-base-300/30 transition-colors">
+          <span class="opacity-60">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5"><path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z"/></svg>
+          </span>
+          <div class="flex-1">
+            <div class="font-medium text-sm">https://example.com/addon</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="label cursor-pointer gap-2">
+              <input type="checkbox" class="toggle toggle-soft" checked>
+              <span class="label-text text-xs">Enabled</span>
+            </label>
+            <button type="button" class="btn btn-ghost btn-sm text-w-pinkL hover:bg-w-pink/10">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+            </button>
+          </div>
+        </li>
+        <!-- Disabled item -->
+        <li class="p-4 select-none flex items-center gap-4 opacity-60">
+          <span class="opacity-30">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5"><path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z"/></svg>
+          </span>
+          <div class="flex-1">
+            <div class="font-medium text-sm">Webtor (default, cannot reorder)</div>
+          </div>
+        </li>
+        <!-- Empty state -->
+        <li class="p-8 text-center hidden">
+          <p class="text-w-muted">No items added yet</p>
+          <p class="text-xs text-w-muted mt-2">Add items to extend functionality</p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="uikit-label mt-4 mb-6">List: bg-base-200/50 rounded-xl divide-y divide-w-line<br>Item: p-4 cursor-move flex items-center gap-4 hover:bg-base-300/30</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Empty State (visible)</h3>
+    <div class="bg-base-200/50 rounded-xl" style="max-width:500px">
+      <div class="p-8 text-center">
+        <p class="text-w-muted">No addon URLs added yet</p>
+        <p class="text-xs text-w-muted mt-2">Add Stremio addon URLs to extend your content library</p>
+      </div>
+    </div>
+    <div class="uikit-label">p-8 text-center text-w-muted</div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       9. ALERTS
+       ========================================================= -->
+  <div class="uikit-section" id="alerts">
+    <h2>9. Alerts &amp; Progress Log</h2>
+    <p class="desc">
+      Progress alerts are JS-driven components (<code>initProgressLog</code> from <code>assets/src/js/lib/progressLog.js</code>)
+      that render real-time log output. Container uses card-based styling (<code>bg-w-surface</code>, <code>border-w-line</code>)
+      with colored dot prefixes (pulsing on in-progress) and tinted summary rows (no dots).
+      See live demos at <code>/tests/progress_log</code>.
+    </p>
+
+    <!-- 9.1 Log Line States -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Log Line States</h3>
+    <div class="progress-alert mb-6" style="max-width:600px">
+      <pre><span class="line">regular info line (gray dot, gray text)</span></pre>
+      <pre class="inprogress"><span class="line">in progress &mdash; pulsing cyan dot<span class="task-status"></span><span class="loader"></span></span></pre>
+      <pre class="statusupdate"><span class="line">status update &mdash; pulsing cyan dot + counter<span class="task-status">42</span><span class="loader"></span></span></pre>
+      <pre class="done"><span class="line">done &mdash; static cyan dot<span class="task-status">done</span></span></pre>
+      <pre class="warn"><span class="line">warning &mdash; pink dot<span class="task-status">warn</span></span></pre>
+      <pre class="error"><span class="line">error &mdash; pink dot<span class="task-status">error</span></span></pre>
+      <pre class="continue"><span class="line">...continued line (no dot, indented)</span></pre>
+    </div>
+    <div class="uikit-label mb-8">
+      <code>pre</code> states: (none)=info, <code>inprogress</code>, <code>statusupdate</code>, <code>done</code>, <code>warn</code>, <code>error</code>, <code>continue</code><br>
+      Dot colors: gray (info) &middot; cyan pulsing (<code>inprogress</code>/<code>statusupdate</code>) &middot; cyan static (<code>done</code>) &middot; pink (<code>warn</code>/<code>error</code>)<br>
+      Status text via <code>span.task-status</code> &mdash; renders as <code>...[done]</code>, <code>...[error]</code>, or <code>(42)</code> for statusupdate<br>
+      Animated ellipsis via <code>span.loader</code> (only visible on <code>inprogress</code>/<code>statusupdate</code>)
+    </div>
+
+    <!-- 9.2 Summary Rows -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Summary Rows</h3>
+    <p class="desc">Tinted rows shown below a log line when done/warn/error includes a message. No dot prefix.</p>
+    <div class="progress-alert mb-6" style="max-width:600px">
+      <pre class="done"><span class="line">transfer complete<span class="task-status">done</span></span></pre>
+      <pre class="done-summary"><span class="line">file saved successfully</span></pre>
+      <pre class="warn"><span class="line">slow connection<span class="task-status">warn</span></span></pre>
+      <pre class="warn-summary"><span class="line">speed limited to 5Mbps &mdash; donate to increase!</span></pre>
+      <pre class="error"><span class="line">peer disconnected<span class="task-status">error</span></span></pre>
+      <pre class="error-summary"><span class="line">no active seeders found for this torrent</span></pre>
+      <pre class="done"><span class="line">download ready<span class="task-status">done</span></span></pre>
+      <pre class="redirect-summary"><span class="line">redirecting to resource page...</span></pre>
+    </div>
+    <div class="uikit-label mb-8">
+      Cyan tint: <code>done-summary</code> / <code>download-summary</code> / <code>redirect-summary</code> &mdash; bg rgba(0,206,201,0.1), text #00cec9<br>
+      Pink tint: <code>warn-summary</code> / <code>error-summary</code> &mdash; bg rgba(232,67,147,0.1), text #fd79a8<br>
+      Summary rows use <code>mx-5 rounded-lg</code> to inset within the container
+    </div>
+
+    <!-- 9.3 Block variant with close buttons -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Block Variant with Close Buttons</h3>
+    <p class="desc">
+      <code>progress-alert-block</code> is the standard block layout used in templates.
+      Close buttons appear via <code>.alert-close-wrapper</code> container, revealed by JS on <code>close()</code>.
+      The <code>.close</code> class inside progress-alert inherits <code>btn-soft-cyan</code> styling.
+    </p>
+    <div class="progress-alert mb-6" style="max-width:600px">
+      <pre class="error"><span class="line">something went wrong<span class="task-status">error</span></span></pre>
+      <pre class="error-summary"><span class="line">connection timed out, please try again</span></pre>
+      <div class="pt-3 flex justify-end gap-2 px-5">
+        <a class="close">got it!</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-4">
+      Close button: <code>.close</code> auto-styled as <code>btn btn-sm btn-soft-cyan</code> via CSS<br>
+      Wrapper: <code>.alert-close-wrapper</code> with <code>pt-3 flex justify-end gap-2 px-5</code>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">With Conditional Error Button</h3>
+    <p class="desc">Extra buttons (e.g. error-specific actions) wrapped in <code>.error</code> div, shown/hidden by JS based on state.</p>
+    <div class="progress-alert mb-6" style="max-width:600px">
+      <pre class="error"><span class="line">something went wrong<span class="task-status">error</span></span></pre>
+      <pre class="error-summary"><span class="line">connection timed out</span></pre>
+      <div class="pt-3 flex justify-end gap-2 px-5">
+        <div>
+          <a class="close">error button?!</a>
+        </div>
+        <a class="close">got it!</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-8">
+      Error-only button: wrapped in <code>&lt;div class="error hidden"&gt;</code>, revealed via <code>enableError()</code> on error state<br>
+      Template: <code>&lt;a class="close closeable-close"&gt;got it!&lt;/a&gt;</code> &mdash; <code>.closeable-close</code> hides the entire alert on click
+    </div>
+
+    <!-- 9.4 One-line variant -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">One-line Variant</h3>
+    <p class="desc">Compact inline layout &mdash; log line and close button side by side.</p>
+    <div class="progress-alert progress-alert-oneline mb-6" style="max-width:600px">
+      <pre><span class="line">one line alert</span></pre>
+      <a class="close" style="margin-right:1rem">ok</a>
+    </div>
+    <div class="uikit-label mb-8">
+      <code>progress-alert progress-alert-oneline</code> &mdash; uses <code>flex items-center</code>, pre takes <code>flex-grow</code>, close button has <code>mr-4</code>
+    </div>
+
+    <!-- 9.5 Done with close -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Done State with Close Button</h3>
+    <div class="progress-alert mb-6" style="max-width:600px">
+      <pre class="done"><span class="line">operation completed successfully<span class="task-status">done</span></span></pre>
+      <div class="pt-3 flex justify-end gap-2 px-5">
+        <a class="close">got it!</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-8">
+      Same pattern as error, but with <code>done</code> state &mdash; cyan dot, cyan text, <code>...[done]</code> suffix
+    </div>
+
+    <!-- 9.6 Design rules -->
+    <div class="uikit-rule mb-8">
+      <strong>Container:</strong> <code>bg-w-surface (#111827) border border-w-line shadow-lg rounded-box popin</code><br>
+      <strong>Log lines:</strong> <code>font-mono text-sm text-w-sub</code> with 6px colored dot via <code>::before</code> pseudo-element<br>
+      <strong>Dot animation:</strong> <code>dot-pulse</code> keyframes (scale 1&rarr;1.5&rarr;1, opacity 0.8&rarr;1&rarr;0.8) on <code>inprogress</code>/<code>statusupdate</code><br>
+      <strong>Close buttons:</strong> <code>.close</code> inside progress-alert = <code>btn btn-sm</code> with cyan soft styling (rgba(0,206,201,0.10) bg, rgba(0,206,201,0.30) border)<br>
+      <strong>Entry animation:</strong> <code>popin</code> keyframes (scaleX 0.95&rarr;1, opacity 0&rarr;1)
+    </div>
+
+    <!-- 9.7 JS API -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">JavaScript API</h3>
+    <div class="uikit-card bg-w-surface mb-6">
+      <pre style="color:#94a3b8;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;line-height:1.6">import { initProgressLog } from "../../lib/progressLog";
+
+// Initialize on a container element (must have .log-target inside)
+const log = initProgressLog(document.querySelector('.my-alert'));
+
+// Chain log entries
+log
+  .info('regular info message')               // gray dot, gray text
+  .inProgress('task1', 'connecting...')      // cyan pulsing dot + loader ellipsis
+  .updateStatus(42)                          // updates to "(42)..." format
+  .done('download complete')                 // cyan static dot + [done] + summary row
+  .warn('speed limited')                     // pink dot + [warn] + summary row
+  .error('connection failed')                // pink dot + [error] + summary row
+  .close();                                  // reveals .alert-close-wrapper</pre>
+      <div class="uikit-label mt-4">
+        Import from <code>assets/src/js/lib/progressLog.js</code><br>
+        Each method returns an <code>Entry</code> for chaining &middot; <code>inProgress(tag, message)</code> creates new line &middot; <code>done/warn/error(message?)</code> updates the tagged line and optionally adds summary row
+      </div>
+    </div>
+
+    <!-- 9.8 Template pattern -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Template Pattern</h3>
+    <div class="uikit-card bg-w-surface mb-6">
+      <pre style="color:#94a3b8;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;line-height:1.6">&lt;!-- Block variant (standard) --&gt;
+&lt;form class="hidden progress-alert progress-alert-block closeable"&gt;
+    &lt;div class="log-target"&gt;&lt;/div&gt;
+    &lt;div class="pt-3 flex justify-end hidden alert-close-wrapper"&gt;
+        &lt;div class="error hidden"&gt;
+            &lt;a class="close closeable-close"&gt;error action&lt;/a&gt;
+        &lt;/div&gt;
+        &lt;a class="close closeable-close"&gt;got it!&lt;/a&gt;
+    &lt;/div&gt;
+&lt;/form&gt;
+
+&lt;!-- One-line variant --&gt;
+&lt;div class="progress-alert progress-alert-oneline closeable"&gt;
+    &lt;pre&gt;one line alert&lt;/pre&gt;
+    &lt;a class="closeable-close close"&gt;ok&lt;/a&gt;
+&lt;/div&gt;
+
+&lt;!-- With SSE auto-connect --&gt;
+&lt;form class="hidden progress-alert progress-alert-block closeable"
+      data-async-progress-log="/job/log/url"
+      data-async-target="main"&gt;
+    &lt;div class="log-target"&gt;&lt;/div&gt;
+&lt;/form&gt;</pre>
+      <div class="uikit-label mt-4">
+        <code>.log-target</code> = where JS appends <code>&lt;pre&gt;</code> lines<br>
+        <code>.closeable-close</code> = click handler hides the entire alert<br>
+        <code>.alert-close-wrapper</code> = hidden by default, revealed on <code>close()</code><br>
+        <code>.error</code> wrapper = hidden by default, revealed on error state via <code>enableError()</code><br>
+        <code>data-async-progress-log</code> = SSE endpoint URL for auto-connecting to server events
+      </div>
+    </div>
+
+    <div class="uikit-note mb-8">
+      <strong>Reference:</strong> Live test page at <code>/tests/progress_log</code> &middot;
+      JS source: <code>assets/src/js/lib/progressLog.js</code> &middot;
+      CSS: <code>@utility progress-alert</code> in <code>assets/src/styles/style.css</code> &middot;
+      Test template: <code>templates/views/tests/progress_log.html</code>
+    </div>
+
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.07);margin:2rem 0">
+
+    <!-- 9.9 Info / Note boxes -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Info / Note Box</h3>
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-4" style="max-width:500px">
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> This is an informational message using cyan theme.</p>
+    </div>
+    <div class="uikit-label mb-6">bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4</div>
+
+    <div class="bg-w-pink/5 border border-w-pink/20 rounded-xl p-4" style="max-width:500px">
+      <p class="text-sm text-w-sub"><strong class="text-w-pinkL">Important:</strong> This is a warning/important note using pink theme.</p>
+    </div>
+    <div class="uikit-label">bg-w-pink/5 border border-w-pink/20 rounded-xl p-4</div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       10. NAVIGATION
+       ========================================================= -->
+  <div class="uikit-section" id="navigation">
+    <h2>10. Navigation</h2>
+    <p class="desc">Navbar pattern with glass effect, logo, and action buttons.</p>
+
+    <div class="uikit-card bg-w-surface">
+      <div class="navbar-redesign rounded-xl p-4 flex items-center gap-4" style="background-color: rgba(10, 14, 26, 0.9); backdrop-filter: blur(12px);">
+        <span class="font-logo text-xl gradient-text">webtor</span>
+        <div class="flex-1"></div>
+        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" href="#">Library</a>
+        <div class="join">
+          <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content join-item" href="#">Profile</a>
+          <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content join-item" href="#">Login</a>
+        </div>
+      </div>
+      <div class="uikit-label mt-4">navbar-redesign &middot; bg rgba(10,14,26,0.9) &middot; backdrop-blur-xl &middot; fixed top-0</div>
+    </div>
+
+    <div class="uikit-note">
+      <strong>Implementation:</strong> See <code>templates/partials/nav.html</code>. Uses <code>navbar-redesign</code> CSS class for hover overrides. Glass effect via inline rgba + backdrop-filter.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       11. FOOTER
+       ========================================================= -->
+  <div class="uikit-section" id="footer">
+    <h2>11. Footer</h2>
+    <p class="desc">Site footer with links organized in columns.</p>
+
+    <div class="uikit-card bg-w-surface">
+      <footer class="footer text-w-muted py-10">
+        <nav>
+          <h6 class="footer-title text-w-sub">Product</h6>
+          <a class="link link-hover text-sm">Home</a>
+          <a class="link link-hover text-sm">Tools</a>
+          <a class="link link-hover text-sm">Support</a>
+        </nav>
+        <nav>
+          <h6 class="footer-title text-w-sub">Legal</h6>
+          <a class="link link-hover text-sm">Terms of Service</a>
+          <a class="link link-hover text-sm">Privacy Policy</a>
+          <a class="link link-hover text-sm">DMCA</a>
+        </nav>
+      </footer>
+      <div class="uikit-label">footer text-w-muted &middot; footer-title text-w-sub &middot; link link-hover text-sm</div>
+    </div>
+
+    <div class="uikit-note">
+      <strong>Implementation:</strong> See <code>templates/partials/footer.html</code>. Uses DaisyUI footer component with custom text colors.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       12. MISC
+       ========================================================= -->
+  <div class="uikit-section" id="misc">
+    <h2>12. Miscellaneous</h2>
+    <p class="desc">Dividers, upload zone, collapse/FAQ, and stats.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Label Divider</h3>
+    <div class="mb-6">
+      <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">Or paste a magnet link</div>
+      <div class="uikit-label">divider text-w-muted text-xs font-semibold tracking-widest uppercase before:bg-w-line after:bg-w-line</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Section Label Divider (profile)</h3>
+    <div class="mb-6">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Section Name</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+      </div>
+      <div class="uikit-label">text-xs tracking-widest uppercase text-w-muted + flex-1 h-px bg-w-line/50</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Upload Zone</h3>
+    <div class="mb-6" style="max-width:500px">
+      <div class="upload-dashed rounded-2xl py-10 px-6 text-center cursor-pointer">
+        <p class="text-lg font-semibold mb-2">Drop a .torrent file here</p>
+        <p class="text-sm text-w-muted">or click to browse</p>
+      </div>
+      <div class="uikit-label">upload-dashed rounded-2xl py-10 px-6 text-center cursor-pointer</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Collapse / FAQ</h3>
+    <div class="mb-6" style="max-width:600px">
+      <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl mb-3">
+        <input type="radio" name="faq-demo" checked />
+        <div class="collapse-title text-base font-semibold">What is Webtor?</div>
+        <div class="collapse-content">
+          <p class="text-sm text-w-sub leading-relaxed">Webtor lets you stream and download torrent content directly in your browser without installing any software.</p>
+        </div>
+      </div>
+      <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+        <input type="radio" name="faq-demo" />
+        <div class="collapse-title text-base font-semibold">How does Vault work?</div>
+        <div class="collapse-content">
+          <p class="text-sm text-w-sub leading-relaxed">Vault lets you store torrents persistently so they remain available for streaming anytime.</p>
+        </div>
+      </div>
+      <div class="uikit-label mt-3">collapse collapse-plus collapse-webtor border border-w-line rounded-2xl</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Stats</h3>
+    <div class="mb-6">
+      <div class="stats stats-horizontal bg-transparent w-full flex justify-center py-2">
+        <div class="stat text-center bg-transparent">
+          <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">100K+</div>
+          <div class="stat-desc text-w-muted mt-1 text-sm">Active users</div>
+        </div>
+        <div class="stat text-center bg-transparent">
+          <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">50M+</div>
+          <div class="stat-desc text-w-muted mt-1 text-sm">Files served</div>
+        </div>
+        <div class="stat text-center bg-transparent">
+          <div class="stat-value text-3xl font-extrabold tracking-tight gradient-stat">99.9%</div>
+          <div class="stat-desc text-w-muted mt-1 text-sm">Uptime</div>
+        </div>
+      </div>
+      <div class="uikit-label">stats stats-horizontal bg-transparent &middot; stat-value gradient-stat &middot; stat-desc text-w-muted</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Glow Effects</h3>
+    <div class="uikit-grid mb-6">
+      <div class="hero-glow rounded-2xl p-8 text-center border border-w-line/30">
+        <p class="text-sm text-w-sub">hero-glow</p>
+        <div class="uikit-label">Radial gradient: pink center, purple mid</div>
+      </div>
+      <div class="cta-glow rounded-2xl p-8 text-center border border-w-line/30">
+        <p class="text-sm text-w-sub">cta-glow</p>
+        <div class="uikit-label">Radial gradient: subtle pink</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       DESIGN RULES SUMMARY
+       ========================================================= -->
+  <div class="uikit-section" id="rules">
+    <h2>Design Rules Summary</h2>
+
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="text-w-sub">Token / Component</th>
+            <th class="text-w-sub">Where to use</th>
+            <th class="text-w-sub">Where NOT to use</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          <tr>
+            <td><code class="text-w-pinkL">btn-pink</code></td>
+            <td>Homepage CTAs, tools page CTAs, navigation CTA (Donate)</td>
+            <td>Everywhere else</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       13. AUTH PAGES
+       ========================================================= -->
+  <div class="uikit-section" id="auth">
+    <h2>13. Auth Pages</h2>
+    <p class="desc">Login, logout, verify, and callback pages share a consistent centered layout with icon header.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Page Layout</h3>
+    <div class="uikit-card bg-w-surface mb-6">
+      <pre style="color:#94a3b8;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;line-height:1.6">&lt;section class="min-h-screen pt-[120px] pb-20 px-6"&gt;
+  &lt;div class="max-w-md mx-auto"&gt;
+    &lt;!-- centered content --&gt;
+  &lt;/div&gt;
+&lt;/section&gt;</pre>
+      <div class="uikit-label mt-4">Same pattern as support form but narrower (<code>max-w-md</code> vs <code>max-w-[600px]</code>)</div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Icon Header</h3>
+    <div class="text-center mb-6">
+      <div class="w-14 h-14 rounded-2xl bg-w-pink/10 flex items-center justify-center mx-auto mb-5">
+        <svg class="w-7 h-7 text-w-pinkL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21C20 19.6044 20 18.9067 19.8278 18.3389C19.44 17.0605 18.4395 16.06 17.1611 15.6722C16.5933 15.5 15.8956 15.5 14.5 15.5H9.5C8.10444 15.5 7.40665 15.5 6.83886 15.6722C5.56045 16.06 4.56004 17.0605 4.17224 18.3389C4 18.9067 4 19.6044 4 21M16.5 7.5C16.5 9.98528 14.4853 12 12 12C9.51472 12 7.5 9.98528 7.5 7.5C7.5 5.01472 9.51472 3 12 3C14.4853 3 16.5 5.01472 16.5 7.5Z"/>
+        </svg>
+      </div>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Sign In</h1>
+      <p class="text-w-sub text-sm">Choose a method to access your account</p>
+    </div>
+    <div class="uikit-label mb-6">Icon: <code>w-14 h-14 rounded-2xl bg-w-pink/10</code> with <code>w-7 h-7 text-w-pinkL</code> SVG<br>Heading: <code>text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight</code></div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Auth Card Sections</h3>
+    <p class="desc">OAuth buttons and email form are wrapped in separate <code>bg-w-card</code> cards, separated by a styled divider.</p>
+    <div style="max-width:400px" class="mx-auto mb-6">
+      <div class="bg-w-card border border-w-line rounded-2xl p-6 mb-6">
+        <button class="btn btn-soft w-full" disabled>Continue with Provider</button>
+        <button class="btn btn-soft w-full mt-3" disabled>Continue with Provider</button>
+      </div>
+      <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">Or use email</div>
+      <div class="bg-w-card border border-w-line rounded-2xl p-6">
+        <p class="text-sm text-w-sub text-center mb-1">Description text</p>
+        <p class="text-xs text-w-muted text-center mb-5">Helper text</p>
+        <div class="join w-full">
+          <input type="email" class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" placeholder="Your Email" disabled>
+          <button class="btn btn-soft join-item" disabled>Send</button>
+        </div>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">Card: <code>bg-w-card border border-w-line rounded-2xl p-6</code><br>Divider: <code>divider text-w-muted text-xs font-semibold tracking-widest uppercase before:bg-w-line after:bg-w-line</code><br>Input: <code>input bg-base-300 border-w-line focus:border-w-pink focus:outline-none</code><br>Buttons: <code>btn btn-soft</code> (auth form context)</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Instruction Notice</h3>
+    <p class="desc">Shown when user is redirected to login from a protected page (library, Stremio).</p>
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-4 text-center" style="max-width:400px;margin:0 auto">
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> Authorization is required to access your library.</p>
+    </div>
+    <div class="uikit-label mb-6">Same info/note box: <code>bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 text-center</code></div>
+
+    <div class="uikit-rule">
+      <strong>Rules:</strong><br>
+      &bull; Auth buttons use <code>btn-soft</code> (form actions, not bright CTA)<br>
+      &bull; Input focus uses <code>focus:border-w-pink</code> (user-account context)<br>
+      &bull; All auth pages use <code>max-w-md mx-auto</code> centered layout<br>
+      &bull; Each page has an icon header (pink-tinted icon box + heading + sub-text)<br>
+      &bull; Logout and verify/callback pages show progress-alert within the centered container
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <p class="text-center text-w-muted text-sm py-8">
+    Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
+  </p>
+
+</body>
+</html>

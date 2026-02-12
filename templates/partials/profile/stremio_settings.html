@@ -1,41 +1,37 @@
 {{ define "profile/stremio_settings" }}
-    <div class="bg-base-200 py-8">
-        <div class="container mx-auto px-4">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent text-center mb-6">Stremio settings</h2>
-                <div class="flex flex-col mt-6 mb-3 w-full">
-                    <div class="w-full sm:px-5">
-                        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
-                            {{ $resolutions := .Data.StremioSettings.PreferredResolutions }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Settings
+        </h2>
 
-                            <input type="hidden" name="resolution_order" id="resolution_order" value="{{ range $i, $r := $resolutions }}{{ if $i }},{{ end }}{{ $r.Resolution }}{{ end }}">
+        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
+            {{ $resolutions := .Data.StremioSettings.PreferredResolutions }}
 
-                            <h3 class="text-lg font-semibold mb-2">Preferred resolutions</h3>
-                            <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
+            <input type="hidden" name="resolution_order" id="resolution_order" value="{{ range $i, $r := $resolutions }}{{ if $i }},{{ end }}{{ $r.Resolution }}{{ end }}">
 
-                            <ul id="resolution-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
-                                {{ range $i, $r := $resolutions }}
-                                <li class="p-4 cursor-move select-none flex items-center gap-4 resolution-item hover:bg-base-50 transition-colors" draggable="true" data-resolution="{{ $r.Resolution }}">
-                                    <span class="drag-handle" aria-label="drag" title="drag to sort">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
-                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
-                                        </svg>
-                                    </span>
-                                    <div class="flex-1 text-left capitalize text-lg font-medium">{{ $r.Resolution }}</div>
-                                    <label class="cursor-pointer">
-                                        <input type="checkbox" name="resolution_{{ $r.Resolution }}" class="toggle toggle-accent" {{ if $r.Enabled }}checked{{ end }} />
-                                    </label>
-                                </li>
-                                {{ end }}
-                            </ul>
-                            <div class="mt-5 flex justify-center">
-                                <button type="submit" class="btn btn-accent capitalize btn-outline" data-umami-event="stremio-settings-save">save</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            <h3 class="text-sm font-semibold mb-2">Preferred Resolutions</h3>
+            <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+
+            <ul id="resolution-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+                {{ range $i, $r := $resolutions }}
+                <li class="p-4 cursor-move select-none flex items-center gap-4 resolution-item hover:bg-base-300/30 transition-colors" draggable="true" data-resolution="{{ $r.Resolution }}">
+                    <span class="drag-handle" aria-label="drag" title="drag to sort">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                        </svg>
+                    </span>
+                    <div class="flex-1 text-left capitalize font-medium">{{ $r.Resolution }}</div>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="resolution_{{ $r.Resolution }}" class="toggle toggle-soft" {{ if $r.Enabled }}checked{{ end }} />
+                    </label>
+                </li>
+                {{ end }}
+            </ul>
+            <div class="mt-4 flex justify-end">
+                <button type="submit" class="btn btn-soft" data-umami-event="stremio-settings-save">Save</button>
             </div>
-        </div>
+        </form>
     </div>
     {{ "profile/stremio_settings.js" | asset }}
 {{ end }}

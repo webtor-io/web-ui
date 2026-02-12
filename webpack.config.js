@@ -6,7 +6,7 @@ const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 
 const fs = require('fs');
 
-const themes = ['night', 'lofi'];
+const themes = ['night'];
 
 function getEntries(path, ext, prefix = '') {
     return new Promise((resolve) => {

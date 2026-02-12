@@ -108,14 +108,6 @@ func (s *Helper) MakeDirDownload(ctx *w.Context, gd *GetData) *ButtonItem {
 	)
 }
 
-func (s *Helper) MakeTorrentDownload(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeResourceButton(ctx, gd,
-		fmt.Sprintf("Download Torrent File"),
-		"download-torrent",
-		"/download-torrent",
-	)
-}
-
 func (s *Helper) HasBreadcrumbs(lr *ra.ListResponse) bool {
 	hasDir := false
 	for _, i := range lr.Items {

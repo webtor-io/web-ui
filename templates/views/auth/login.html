@@ -1,58 +1,75 @@
 {{ define "title" }}Login{{ end }}
 {{ define "main" }}
-{{ if eq .Data.Instruction "library" }}
-    <div class="bg-base-200 text-accent border-accent border shadow-md p-4 rounded-box text-center">
-            <p>Authorization is required to access your library.</p>
-    </div>
-{{ end }}
-{{ if eq .Data.Instruction "stremio-configure" }}
-    <div class="bg-base-200 text-accent border-accent border shadow-md p-4 rounded-box text-center">
-        <p>Authorization is required to access stremio addon.</p>
-    </div>
-{{ end }}
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-md mx-auto">
 
-<!-- Patreon OAuth Login -->
-<div class="mt-6">
-    <button onclick="signInWith(event, 'patreon')" class="btn btn-accent w-full" data-umami-event="login-patreon">
-        <!-- Simple Patreon P logo -->
-        <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="14" cy="8" r="4"></circle>
-            <rect x="4" y="4" width="3" height="16"></rect>
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl bg-w-pink/10 flex items-center justify-center mx-auto mb-5">
+        <svg class="w-7 h-7 text-w-pinkL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21C20 19.6044 20 18.9067 19.8278 18.3389C19.44 17.0605 18.4395 16.06 17.1611 15.6722C16.5933 15.5 15.8956 15.5 14.5 15.5H9.5C8.10444 15.5 7.40665 15.5 6.83886 15.6722C5.56045 16.06 4.56004 17.0605 4.17224 18.3389C4 18.9067 4 19.6044 4 21M16.5 7.5C16.5 9.98528 14.4853 12 12 12C9.51472 12 7.5 9.98528 7.5 7.5C7.5 5.01472 9.51472 3 12 3C14.4853 3 16.5 5.01472 16.5 7.5Z"/>
+        </svg>
+      </div>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Sign In</h1>
+      <p class="text-w-sub text-sm">Choose a method to access your account</p>
+    </div>
+
+    <!-- Instruction notices -->
+    {{ if eq .Data.Instruction "library" }}
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> Authorization is required to access your library.</p>
+    </div>
+    {{ end }}
+    {{ if eq .Data.Instruction "stremio-configure" }}
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> Authorization is required to access Stremio addon.</p>
+    </div>
+    {{ end }}
+
+    <!-- OAuth buttons card -->
+    <div class="bg-w-card border border-w-line rounded-2xl p-6 mb-6">
+      <!-- Patreon -->
+      <button onclick="signInWith(event, 'patreon')" class="btn btn-soft w-full" data-umami-event="login-patreon">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="14" cy="8" r="4"></circle>
+          <rect x="4" y="4" width="3" height="16"></rect>
         </svg>
         Continue with Patreon
-    </button>
-</div>
+      </button>
 
-<!-- Google OAuth Login -->
-<div class="mt-3">
-    <button onclick="signInWith(event, 'google')" class="btn btn-accent w-full" data-umami-event="login-google">
-        <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      <!-- Google -->
+      <button onclick="signInWith(event, 'google')" class="btn btn-soft w-full mt-3" data-umami-event="login-google">
+        <svg class="w-5 h-5" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
         Continue with Google
-    </button>
-</div>
-<!-- Divider -->
-<div class="divider mt-6 mb-4">OR</div>
-
-<!-- Email Magic Link -->
-<div class="text-accent rounded-box text-center">
-    <p>Enter your email to receive a one-time login link.</p>
-    <p class="text-sm opacity-70">No password needed — just click the link in your inbox!</p>
-</div>
-<form onsubmit="submitLoginForm(this, event)" class="join w-full mt-3">
-    <input type="email" name="email" class="input input-bordered w-full join-item" placeholder="Your Email" />
-    <button type="submit" class="btn btn-accent join-item" data-umami-event="login-magic-link">Send Magic Link</button>
-</form>
-<form class="hidden progress-alert progress-alert-block mt-5 closeable">
-    <div class="log-target"></div>
-    <div class="pt-3 flex justify-end hidden alert-close-wrapper">
-        <a class="close closeable-close">got it!</a>
+      </button>
     </div>
-</form>
+
+    <!-- Divider -->
+    <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">Or use email</div>
+
+    <!-- Email Magic Link card -->
+    <div class="bg-w-card border border-w-line rounded-2xl p-6">
+      <p class="text-sm text-w-sub text-center mb-1">Enter your email to receive a one-time login link.</p>
+      <p class="text-xs text-w-muted text-center mb-5">No password needed — just click the link in your inbox!</p>
+      <form onsubmit="submitLoginForm(this, event)" class="join w-full">
+        <input type="email" name="email" class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" placeholder="Your Email" />
+        <button type="submit" class="btn btn-soft join-item" data-umami-event="login-magic-link">Send</button>
+      </form>
+      <form class="hidden progress-alert progress-alert-block mt-5 closeable">
+        <div class="log-target"></div>
+        <div class="pt-3 flex justify-end hidden alert-close-wrapper">
+          <a class="close closeable-close">got it!</a>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</section>
 {{ "auth/login.js" | asset }}
 {{ end }}
 

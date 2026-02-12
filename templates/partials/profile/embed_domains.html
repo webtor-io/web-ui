@@ -1,82 +1,74 @@
 {{ define "profile/embed_domains" }}
-    <div class="hero bg-base-200">
-        <div class="hero-content text-center w-full">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent">Embed Domains</h2>
-                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                    <div class="w-full sm:px-5">
-                        <!-- Add Domain Form -->
-                        <div class="mb-6">
-                            {{ $domainCount := len .Data.EmbedDomains }}
-                            {{ $canAddDomain := lt $domainCount 3 }}
-                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/embed-domain/add" data-async-target="#embed-domains" class="join w-full{{ if not $canAddDomain }} opacity-50{{ end }}">
-                                <input
-                                    name="domain"
-                                    placeholder="Enter domain (e.g., example.com)"
-                                    class="input input-bordered w-full join-item"
-                                    pattern="[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)+"
-                                    title="Please enter a valid domain name"
-                                    {{ if $canAddDomain }}required{{ else }}disabled{{ end }}
-                                />
-                                <button type="submit" class="btn btn-accent join-item capitalize" data-umami-event="embed-domain-add"{{ if not $canAddDomain }} disabled{{ end }}>
-                                    Add Domain
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Embed Domains
+        </h2>
+
+        <!-- Add Domain Form -->
+        <div class="mb-5">
+            {{ $domainCount := len .Data.EmbedDomains }}
+            {{ $canAddDomain := lt $domainCount 3 }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/embed-domain/add" data-async-target="#embed-domains" class="join w-full{{ if not $canAddDomain }} opacity-50{{ end }}">
+                <input
+                    name="domain"
+                    placeholder="Enter domain (e.g., example.com)"
+                    class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item"
+                    pattern="[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)+"
+                    title="Please enter a valid domain name"
+                    {{ if $canAddDomain }}required{{ else }}disabled{{ end }}
+                />
+                <button type="submit" class="btn btn-soft join-item" data-umami-event="embed-domain-add"{{ if not $canAddDomain }} disabled{{ end }}>
+                    Add
+                </button>
+            </form>
+            {{ if not $canAddDomain }}
+                <div class="text-sm text-w-muted mt-3">
+                    You have reached the maximum of 3 domains. Delete a domain to add a new one.
+                </div>
+            {{ end }}
+            {{ if ne .Data.Error nil }}
+                <div class="text-sm text-error mt-3">
+                    {{ .Data.Error | longErr }}
+                </div>
+            {{ end }}
+        </div>
+
+        <!-- Domain List -->
+        <div id="domain-list" class="w-full">
+            {{ if .Data.EmbedDomains }}
+                <div class="space-y-2">
+                    {{ range .Data.EmbedDomains }}
+                        <div class="flex items-center justify-between p-3 bg-base-200/50 rounded-xl domain-item" data-domain-id="{{ .ID }}">
+                            <div class="flex items-center">
+                                <span class="font-medium text-sm">{{ .Domain }}</span>
+                            </div>
+                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/embed-domain/delete/{{ .ID }}" data-async-target="#embed-domains" class="inline">
+                                <button
+                                    type="submit"
+                                    class="btn btn-ghost btn-sm text-w-pinkL hover:bg-w-pink/10"
+                                    data-umami-event="embed-domain-delete"
+                                    onclick="return confirm('Are you sure you want to delete this domain?')"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                    </svg>
                                 </button>
                             </form>
-                            {{ if not $canAddDomain }}
-                                <div class="text-center text-sm text-accent mt-5">
-                                    You have reached the maximum of 3 domains. Delete a domain to add a new one.
-                                </div>
-                            {{ end }}
-                            {{ if ne .Data.Error nil }}
-                                <div class="text-center text-sm text-accent mt-5">
-                                    {{ .Data.Error | longErr }}
-                                </div>
-                            {{ end }}
                         </div>
+                    {{ end }}
+                </div>
+            {{ else }}
+                <div class="text-center py-6 text-w-muted" id="empty-state">
+                    <p>No domains added yet</p>
+                    <p class="text-xs mt-1">Add a domain to disable ads for embeds</p>
+                </div>
+            {{ end }}
+        </div>
 
-                        <!-- Domain List -->
-                        <div id="domain-list" class="w-full">
-                            {{ if .Data.EmbedDomains }}
-                                <div class="space-y-2">
-                                    {{ range .Data.EmbedDomains }}
-                                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg shadow-sm domain-item" data-domain-id="{{ .ID }}">
-                                            <div class="flex items-center">
-                                                <span class="font-medium">{{ .Domain }}</span>
-                                            </div>
-                                            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/embed-domain/delete/{{ .ID }}" data-async-target="#embed-domains" class="inline">
-                                                <button
-                                                    type="submit"
-                                                    class="btn btn-soft btn-sm capitalize btn-accent"
-                                                    data-umami-event="embed-domain-delete"
-                                                    onclick="return confirm('Are you sure you want to delete this domain?')"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                    </svg>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    {{ end }}
-                                </div>
-                            {{ else }}
-                                <div class="text-center py-8 text-base-content/60" id="empty-state">
-                                    <p class="mt-2">No domains added yet</p>
-                                    <p class="text-sm">Add a domain to disable ads for embeds</p>
-                                </div>
-                            {{ end }}
-                        </div>
-                    </div>
-                </div>
-                <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
-                    <span class="text-accent">ⓘ</span>
-                    <a href="https://github.com/webtor-io/embed-sdk-js" class="hover:underline" data-umami-event="instruction-embed-sdk" target="_blank">Learn more about embed-sdk-js</a>
-                </div>
-                <div class="text-left w-full text-sm text-accent mt-2 sm:px-5">
-                    <span class="text-accent">ⓘ</span>
-                    <a href="https://github.com/webtor-io/wordpress-plugin" class="hover:underline" data-umami-event="instruction-wordpress-plugin" target="_blank">Also check wordpress-plugin</a>
-                </div>
-            </div>
+        <div class="mt-4 space-y-1">
+            <a href="https://github.com/webtor-io/embed-sdk-js" class="text-sm text-w-muted hover:text-w-sub link link-hover block" data-umami-event="instruction-embed-sdk" target="_blank">Learn more about embed-sdk-js</a>
+            <a href="https://github.com/webtor-io/wordpress-plugin" class="text-sm text-w-muted hover:text-w-sub link link-hover block" data-umami-event="instruction-wordpress-plugin" target="_blank">Also check wordpress-plugin</a>
         </div>
     </div>
-
 {{ end }}

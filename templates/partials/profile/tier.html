@@ -1,17 +1,33 @@
 {{ define "profile/tier" }}
-    <div class="hero bg-base-200 mt-12">
-        <div class="hero-content text-center">
-            <div>
-                <h2 class="text-2xl font-bold text-accent mb-2">Your tier is <strong class="capitalize">{{ .Claims.Context.Tier.Name }}</strong></h2>
+    <div class="relative overflow-hidden rounded-2xl p-6 mb-6 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+        <div class="relative">
+            <h2 class="text-[1.6rem] font-extrabold tracking-tight capitalize text-w-pinkL flex items-center gap-2 mb-5">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                {{ .Claims.Context.Tier.Name }}
+            </h2>
+            <div class="flex flex-wrap gap-2">
                 {{ if not .Claims.Claims.Connection.Rate }}
-                    <p>You have no bandwidth limits!</p>
+                    <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        Unlimited bandwidth
+                    </span>
                 {{ else }}
-                    <p>Your bandwidth is {{ .Claims.Claims.Connection.Rate }}Mbps!</p>
+                    <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        {{ .Claims.Claims.Connection.Rate }}Mbps
+                    </span>
                 {{ end }}
                 {{ if .Claims | hasAds }}
-                    <p>You have ADS</p>
+                    <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+                        Ads enabled
+                    </span>
                 {{ else }}
-                    <p>You have no ADS!</p>
+                    <span class="badge badge-sm bg-base-300/80 border-w-line/50 text-w-sub gap-1">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                        Ad-free
+                    </span>
                 {{ end }}
             </div>
         </div>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="night">
+<html lang="en" data-theme="night" class="scroll-smooth">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -10,6 +10,8 @@
         <link rel="icon" type="image/png" sizes="16x16" href="/assets/night/favicon-16x16.png">
         <link rel="icon" type="image/png" sizes="32x32" href="/assets/night/favicon-32x32.png">
         <link rel="icon" type="image/png" sizes="48x48" href="/assets/night/favicon-48x48.png">
+        {{ "inter.css" | asset }}
+        {{ "comfortaa.css" | asset }}
         <script>
             window._CSRF = "{{ .CSRF }}";
             window._sessionID = "{{ .SessionID }}";
@@ -18,29 +20,22 @@
             window._umami = {{ umamiConfig | json }};
             {{- end }}
         </script>
-        {{ "baskerville.css" | asset }}
         {{ "style.css" | asset }}
         {{- template "head_extra" . }}
     </head>
-    <body class="flex flex-col min-h-screen">
+    <body class="flex flex-col min-h-screen font-sans antialiased">
         <script>document.body.style.display = 'none';</script>
-        <progress id="progress" class="progress fixed progress-accent h-1"></progress>
-        <header class="pb-3">
+        <progress id="progress" class="progress fixed progress-accent h-1 z-[60]"></progress>
+        <header>
             <nav data-async-layout="{{`{{ template "nav" . }}`}}">{{ template "nav" . }}</nav>
         </header>
-        <div id="wrapper" class="flex flex-col w-full px-4 sm:px-8 items-center mb-5 sm:mb-10">
-            <div class="min-w-80 w-full max-w-3xl">
-                <main id="main" data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}">
-                {{ template "main" . }}
-                </main>
-            </div>
+        <div id="wrapper" class="flex flex-col w-full items-center flex-1">
+            <main id="main" class="w-full" data-async-scroll-top data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}">
+            {{ template "main" . }}
+            </main>
         </div>
-        <div class="flex flex-col w-full px-4 sm:px-8 items-center bg-base-200 mt-auto">
-            <div class="min-w-80 w-full max-w-3xl">
-                <div>
-                    {{ template "footer" . }}
-                </div>
-            </div>
+        <div>
+            {{ template "footer" . }}
         </div>
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}

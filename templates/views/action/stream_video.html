@@ -58,8 +58,8 @@
                 </div>
             </div>
             <div class="modal-action">
-                {{ if $openSubs }}<label for="opensubtitles" class="btn btn-accent btn-outline">OpenSubtitles</label>{{ end }}
-                <label for="subtitles-checkbox" class="btn btn-accent btn-outline">Close</label>
+                {{ if $openSubs }}<label for="opensubtitles" class="btn btn-soft-cyan">OpenSubtitles</label>{{ end }}
+                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Close</label>
             </div>
         </div>
     </div>
@@ -73,13 +73,13 @@
                 <div class="flex-grow text-sm flex items-center">
                     <p>See <a class="link" href="https://github.com/webtor-io/embed-sdk-js">embed-sdk</a> for advanced usage</p>
                 </div>
-                <label for="embed-checkbox" class="btn btn-accent btn-outline copy">Copy</label>
-                <label for="embed-checkbox" class="btn btn-accent btn-outline">Close</label>
+                <label for="embed-checkbox" class="btn btn-soft-cyan copy">Copy</label>
+                <label for="embed-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Close</label>
             </div>
         </div>
     </div>
     <div class="absolute right-0 top-0 p-2 hidden z-50" id="logo">
-        <a type="submit" class="btn btn-accent btn-sm" data-umami-event="embed-download" href="{{ domain }}/{{ .VideoStreamUserData.ResourceID }}?pwd={{ .Item.PathStr | pwd }}&file={{ .Item.PathStr }}#action=download" target="_blank">
+        <a type="submit" class="btn btn-soft-cyan btn-sm" data-umami-event="embed-download" href="{{ domain }}/{{ .VideoStreamUserData.ResourceID }}?pwd={{ .Item.PathStr | pwd }}&file={{ .Item.PathStr }}#action=download" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
             </svg>

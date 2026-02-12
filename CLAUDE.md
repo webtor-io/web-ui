@@ -99,6 +99,32 @@ All handlers must follow two-level separation:
 
 - Tailwind v4, webpack 5, postcss
 - Stylelint available (not wired to npm scripts)
+- **UIKit reference**: `docs/uikit.html` — open in browser after `npm run build` to see all design tokens and components
+
+#### UIKit & Design System Rules
+
+The project uses a custom design system on top of DaisyUI (night theme). All tokens and components are documented in `docs/uikit.html`. **When adding or changing UI components, consult and update `docs/uikit.html` to keep it in sync.**
+
+**Color tokens** (`tailwind.config.js` → `w-*`): `bg`, `surface`, `card`, `pink`, `pinkL`, `purple`, `purpleL`, `cyan`, `text`, `sub`, `muted`, `line`. Use as `bg-w-{name}`, `text-w-{name}`, `border-w-{name}`.
+
+**Button variants** — each has a designated context, do NOT mix:
+| Variant | Use for | Do NOT use for |
+|---------|---------|----------------|
+| `btn-pink` | Homepage & tools page CTAs | Profile, vault, auth, support form |
+| `btn-soft` | Profile, auth & support form actions | Homepage CTAs, vault/library |
+| `btn-accent` | Vault, library actions | Homepage, profile, auth forms |
+| `btn-ghost` | Secondary actions (demo, delete, logout) | Primary actions |
+
+**Focus color** — context-dependent:
+- `focus:border-w-pink` — profile & auth page inputs
+- `focus:border-w-cyan` — support form & tools page inputs
+
+**Badge color** — matches section theme:
+- Pink (`bg-w-pink/10 text-w-pinkL`) — features, profile
+- Purple (`bg-w-purple/10 text-w-purpleL`) — comparison sections
+- Cyan (`bg-w-cyan/10 text-w-cyan`) — info, tools, FAQ
+
+**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`.
 
 ## Configuration (Minimum)
 

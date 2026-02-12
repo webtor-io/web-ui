@@ -1,7 +1,6 @@
 package scripts
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
@@ -34,13 +32,6 @@ type StreamContent struct {
 	Settings            *models.StreamSettings
 	ExternalData        *models.ExternalData
 	DomainSettings      *embed.DomainSettingsData
-}
-
-type TorrentDownload struct {
-	Data     []byte
-	Infohash string
-	Name     string
-	Size     int
 }
 
 func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
@@ -195,48 +186,6 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	return
 }
 
-func (s *ActionScript) downloadTorrent(ctx context.Context, j *job.Job, c *web.Context, resourceID string) (err error) {
-	j.InProgress("retrieving torrent")
-	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
-	defer apiCancel()
-	resp, err := s.api.GetTorrent(apiCtx, c.ApiClaims, resourceID)
-	if err != nil {
-		return errors.Wrap(err, "failed to retrieve for 30 seconds")
-	}
-	defer func(resp io.ReadCloser) {
-		_ = resp.Close()
-	}(resp)
-	torrent, err := io.ReadAll(resp)
-	if err != nil {
-		return errors.Wrap(err, "failed to read torrent")
-	}
-	mi, err := metainfo.Load(bytes.NewBuffer(torrent))
-	if err != nil {
-		return errors.Wrap(err, "failed to load torrent metainfo")
-	}
-	info, err := mi.UnmarshalInfo()
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal torrent metainfo")
-	}
-	j.DoneWithMessage("success! download should start right now!")
-	tpl := s.tb.Build("action/download_torrent").WithLayoutBody(`{{ template "main" . }}`)
-	name := info.Name
-	if name == "" {
-		name = resourceID
-	}
-	str, err := tpl.ToString(c.WithData(&TorrentDownload{
-		Data:     torrent,
-		Infohash: resourceID,
-		Name:     name + ".torrent",
-		Size:     len(torrent),
-	}))
-	if err != nil {
-		return err
-	}
-	j.Custom("action/download_torrent", strings.TrimSpace(str))
-	return nil
-}
-
 func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (err error) {
 	tag := "download"
 	if tagSuff != "" {
@@ -327,8 +276,6 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return s.download(ctx, j, s.c, s.resourceId, s.itemId)
 	case "download-dir":
 		return s.download(ctx, j, s.c, s.resourceId, s.itemId)
-	case "download-torrent":
-		return s.downloadTorrent(ctx, j, s.c, s.resourceId)
 	case "preview-image":
 		return s.previewImage(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
 	case "stream-audio":

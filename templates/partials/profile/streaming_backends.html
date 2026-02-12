@@ -1,162 +1,143 @@
 {{ define "profile/streaming_backends" }}
-    <div class="bg-base-200 py-8">
-        <div class="container mx-auto px-4">
-            <div class="w-full">
-                <h2 class="text-2xl font-bold text-accent text-center mb-6">Streaming Backends</h2>
-                <div class="flex flex-col mt-6 mb-3 w-full">
-                    <div class="w-full sm:px-5">
-                        <!-- Add New Backend Form -->
-                        <div class="mb-6 bg-base-100 rounded-lg shadow p-6">
-                            <h3 class="text-lg font-semibold mb-4">Add New Backend</h3>
-                            <form method="post" data-async-push-state="false" action="/streaming/backends/create" data-async-target="#streaming-backends">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="label">
-                                            <span class="label-text">Backend Type</span>
-                                        </label>
-                                        <select name="type" class="select select-bordered w-full" required>
-                                            <option value="">Select backend type</option>
-                                            {{ range .Data.AvailableBackendTypes }}
-                                            <option value="{{ .Type }}">{{ .DisplayName }}</option>
-                                            {{ end }}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="label">
-                                            <span class="label-text">Access Token</span>
-                                        </label>
-                                        <input type="password" required name="access_token" class="input input-bordered w-full" placeholder="Enter API token">
-                                    </div>
-                                </div>
-                                <div class="mt-5 flex justify-center">
-                                    <button type="submit" class="btn btn-accent btn-outline" data-umami-event="streaming-backend-add">Add Backend</button>
-                                </div>
-                            </form>
-                        
-                            {{ if ne .Data.Error nil }}
-                                <div class="text-center text-sm text-accent mt-5">
-                                    {{ .Data.Error | longErr }}
-                                </div>
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+            Streaming Backends
+        </h2>
+
+        <!-- Add New Backend Form -->
+        <div class="mb-7">
+            <form method="post" data-async-push-state="false" action="/streaming/backends/create" data-async-target="#streaming-backends" class="join w-full">
+                <select name="type" class="select bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" required>
+                    <option value="">Select backend type</option>
+                    {{ range .Data.AvailableBackendTypes }}
+                    <option value="{{ .Type }}">{{ .DisplayName }}</option>
+                    {{ end }}
+                </select>
+                <input type="password" required name="access_token" class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item" placeholder="Enter API token">
+                <button type="submit" class="btn btn-soft join-item" data-umami-event="streaming-backend-add">Add</button>
+            </form>
+
+            {{ if ne .Data.Error nil }}
+                <div class="text-sm text-error mt-3">
+                    {{ .Data.Error | longErr }}
+                </div>
+            {{ end }}
+        </div>
+
+        <!-- Streaming Backends List -->
+        <form method="post" data-async-push-state="false" action="/streaming/backends/update" data-async-target="#streaming-backends">
+            <h3 class="text-sm font-semibold mb-2">Your Streaming Backends</h3>
+            <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+
+            <ul id="backend-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+                <!-- User's Custom Backends -->
+                {{ $backends := .Data.StreamingBackends }}
+                {{ range $i, $backend := $backends }}
+                <li class="p-4 cursor-move select-none flex items-center gap-4 backend-item hover:bg-base-300/30 transition-colors"
+                    data-backend-id="{{ $backend.ID }}" draggable="true">
+
+                    <span class="drag-handle" aria-label="drag" title="drag to sort">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                        </svg>
+                    </span>
+
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <div class="font-medium capitalize">
+                                {{ $displayName := $backend.Type }}
+                                {{ range $.Data.AvailableBackendTypes }}
+                                    {{ if eq .Type $backend.Type }}{{ $displayName = .DisplayName }}{{ end }}
+                                {{ end }}
+                                {{ $displayName }}
+                            </div>
+                        </div>
+                        <div class="text-xs text-w-muted">
+                            {{ if $backend.LastStatus }}
+                            Status: <span class="
+                                {{ if eq $backend.LastStatus "ok" }}text-success
+                                {{ else if eq $backend.LastStatus "invalid_credentials" }}text-error
+                                {{ else if eq $backend.LastStatus "rate_limited" }}text-warning
+                                {{ else }}text-w-sub{{ end }}">{{ $backend.LastStatus }}</span>
+                            {{ end }}
+                            {{ if $backend.LastCheckedAt }}
+                            {{ if $backend.LastStatus }} | {{ end }}Last checked: {{ $backend.LastCheckedAt.Format "2006-01-02 15:04" }}
                             {{ end }}
                         </div>
-
-                        <!-- Streaming Backends List -->
-                        <form method="post" data-async-push-state="false" action="/streaming/backends/update" data-async-target="#streaming-backends">
-                            <h3 class="text-lg font-semibold mb-2">Your Streaming Backends</h3>
-                            <p class="text-sm text-base-content opacity-70 mb-4">Rows are draggable - drag to reorder by preference</p>
-
-                            <ul id="backend-list" class="w-full bg-base-100 rounded-lg shadow divide-y divide-base-300">
-                                <!-- User's Custom Backends -->
-                                {{ $backends := .Data.StreamingBackends }}
-                                {{ range $i, $backend := $backends }}
-                                <li class="p-4 cursor-move select-none flex items-center gap-4 backend-item hover:bg-base-50 transition-colors"
-                                    data-backend-id="{{ $backend.ID }}" draggable="true">
-
-                                    <span class="drag-handle" aria-label="drag" title="drag to sort">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
-                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
-                                        </svg>
-                                    </span>
-
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <div class="text-lg font-medium capitalize">
-                                                {{ $displayName := $backend.Type }}
-                                                {{ range $.Data.AvailableBackendTypes }}
-                                                    {{ if eq .Type $backend.Type }}{{ $displayName = .DisplayName }}{{ end }}
-                                                {{ end }}
-                                                {{ $displayName }}
-                                            </div>
-                                        </div>
-                                        <div class="text-sm text-base-content opacity-70">
-                                            {{ if $backend.LastStatus }}
-                                            Status: <span class="
-                                                {{ if eq $backend.LastStatus "ok" }}text-success
-                                                {{ else if eq $backend.LastStatus "invalid_credentials" }}text-error
-                                                {{ else if eq $backend.LastStatus "rate_limited" }}text-warning
-                                                {{ else }}text-base-content{{ end }}">{{ $backend.LastStatus }}</span>
-                                            {{ end }}
-                                            {{ if $backend.LastCheckedAt }}
-                                            {{ if $backend.LastStatus }} | {{ end }}Last checked: {{ $backend.LastCheckedAt.Format "2006-01-02 15:04" }}
-                                            {{ end }}
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2">
-                                        <label class="label cursor-pointer gap-2">
-                                            <input type="checkbox" name="backend_{{ $backend.ID }}_enabled" class="toggle toggle-accent" {{ if $backend.Enabled }}checked{{ end }}>
-                                            <span class="label-text">Enabled</span>
-                                        </label>
-
-                                        <!-- Delete Button -->
-                                        <button type="button" class="btn btn-soft btn-sm capitalize btn-accent delete-backend" data-backend-id="{{ $backend.ID }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </li>
-
-                                {{ end }}
-
-                                <!-- Webtor (Virtual Backend) - Always last -->
-                                <li class="p-4 select-none flex items-center gap-4 backend-item transition-colors"
-                                    data-backend-type="webtor">
-
-                                    <span class="drag-handle opacity-30" aria-label="drag disabled" title="Webtor cannot be reordered">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
-                                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
-                                        </svg>
-                                    </span>
-
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <div class="text-lg font-medium">Webtor</div>
-                                        </div>
-                                        <div class="text-sm text-base-content opacity-70">
-                                            Built-in streaming backend
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-2">
-                                        <label class="label cursor-pointer gap-2">
-                                            <input type="checkbox" name="webtor_enabled" class="toggle toggle-accent"
-                                            {{ if .Claims | isPaid }}checked{{ end }} disabled>
-                                            <span class="label-text">Enabled</span>
-                                        </label>
-                                    </div>
-                                </li>
-
-
-                                <!-- Empty state message - always present, hidden with CSS when backends exist -->
-                                <li class="p-8 text-center empty-state {{ if $backends }}hidden{{ end }}" id="backends-empty-state">
-                                    <p class="text-base-content opacity-70">No additional streaming backends configured.</p>
-                                    <p class="text-sm text-base-content opacity-50 mt-2">Add Real-Debrid or Torbox accounts above to get started.</p>
-                                </li>
-
-                            </ul>
-                            {{ if not (.Claims | isPaid) }}
-                                <div class="flex flex-col justify-center items-center mt-6 mb-3 w-full">
-                                    <p class="mb-1 text-center text-sm text-base-content opacity-70">
-                                        Webtor streaming backend is available for premium users.<br />
-                                        But you can still use it with ads in Webtor's UI with ads.<br />
-                                        <a href="/donate" class="btn-link" data-umami-event="donate-streaming-backend">Upgrade your tier to unlock it!</a>
-                                    </p>
-                                </div>
-                            {{ end }}
-
-                            <input type="hidden" name="backend_order" id="backend_order" value="{{ range $i, $b := $backends }}{{ if $i }},{{ end }}{{ $b.ID }}{{ end }}">
-                            <input type="hidden" name="deleted_backends" id="deleted_backends" value="">
-
-                            <div class="mt-5 flex justify-center">
-                                <button type="submit" class="btn btn-accent btn-outline" data-umami-event="streaming-backend-save">Save</button>
-                            </div>
-                        </form>
                     </div>
+
+                    <div class="flex items-center gap-2">
+                        <label class="label cursor-pointer gap-2">
+                            <input type="checkbox" name="backend_{{ $backend.ID }}_enabled" class="toggle toggle-soft" {{ if $backend.Enabled }}checked{{ end }}>
+                            <span class="label-text text-xs">Enabled</span>
+                        </label>
+
+                        <!-- Delete Button -->
+                        <button type="button" class="btn btn-ghost btn-sm text-w-pinkL hover:bg-w-pink/10 delete-backend" data-backend-id="{{ $backend.ID }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+
+                {{ end }}
+
+                <!-- Webtor (Virtual Backend) - Always last -->
+                <li class="p-4 select-none flex items-center gap-4 backend-item transition-colors"
+                    data-backend-type="webtor">
+
+                    <span class="drag-handle opacity-30" aria-label="drag disabled" title="Webtor cannot be reordered">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                        </svg>
+                    </span>
+
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <div class="font-medium">Webtor</div>
+                        </div>
+                        <div class="text-xs text-w-muted">
+                            Built-in streaming backend
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <label class="label cursor-pointer gap-2">
+                            <input type="checkbox" name="webtor_enabled" class="toggle toggle-soft"
+                            {{ if .Claims | isPaid }}checked{{ end }} disabled>
+                            <span class="label-text text-xs">Enabled</span>
+                        </label>
+                    </div>
+                </li>
+
+
+                <!-- Empty state message - always present, hidden with CSS when backends exist -->
+                <li class="p-8 text-center empty-state {{ if $backends }}hidden{{ end }}" id="backends-empty-state">
+                    <p class="text-w-muted">No additional streaming backends configured.</p>
+                    <p class="text-xs text-w-muted mt-2">Add Real-Debrid or Torbox accounts above to get started.</p>
+                </li>
+
+            </ul>
+            {{ if not (.Claims | isPaid) }}
+                <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4 text-center">
+                    <p class="text-sm text-w-sub">
+                        Webtor streaming backend is available for premium users.
+                        But you can still use it with ads in Webtor's UI.
+                    </p>
+                    <a href="/donate" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" data-umami-event="donate-streaming-backend">Upgrade your tier to unlock it!</a>
                 </div>
+            {{ end }}
+
+            <input type="hidden" name="backend_order" id="backend_order" value="{{ range $i, $b := $backends }}{{ if $i }},{{ end }}{{ $b.ID }}{{ end }}">
+            <input type="hidden" name="deleted_backends" id="deleted_backends" value="">
+
+            <div class="mt-4 flex justify-end">
+                <button type="submit" class="btn btn-soft" data-umami-event="streaming-backend-save">Save</button>
             </div>
-        </div>
+        </form>
     </div>
-    
+
     {{ "profile/streaming_backends.js" | asset }}
 {{ end }}

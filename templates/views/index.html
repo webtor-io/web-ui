@@ -3,54 +3,113 @@
     <meta name="description" content="{{ with .Data }}{{ if .Tool }}{{ .Tool.Description }}{{ else }}Web-based torrent tool to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage{{ end }}{{ end }}">
 {{ end }}
 {{ define "main" }}
-<div class="text-center py-12 font-baskerville text-7xl">
-    <a href="/" data-async-target="main">
-        <span>web</span><span class="text-accent">tor</span>
-    </a>
-</div>
-{{ template "about_header" .Data }}
 {{ if .Err }}
-<div class="progress-alert progress-alert-oneline mb-10 closeable">
+<div class="progress-alert progress-alert-oneline mb-10 closeable relative z-10 w-full max-w-[680px] mx-auto mt-[80px]">
     <pre>{{ .Err | log | shortErr }}</pre>
     <a class="closeable-close close">ok</a>
 </div>
 {{ end }}
-{{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
 {{ with .Data }}
-{{ if has . "Job" }}
-<form class="hidden progress-alert progress-alert-block mb-10 closeable" data-async-progress-log="{{ .Job | makeJobLogURL }}" data-async-target="main">
-    <div class="log-target"></div>
-    <div class="pt-3 justify-end flex hidden alert-close-wrapper">
-        <a class="closeable-close close">got it!</a>
+<!-- Hero Section -->
+<section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] pb-16 px-6">
+    <div class="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] hero-glow pointer-events-none"></div>
+
+    <!-- big logo -->
+    <div class="font-logo text-[clamp(4rem,10vw,6.5rem)] font-light tracking-tight leading-none mb-7 relative z-10">
+        <a href="/" data-async-target="main" class="no-underline">
+            web<span class="text-w-pink">tor</span>
+        </a>
     </div>
-</form>
-{{ end }}
-<form action="/" method="post" enctype="multipart/form-data" class="join w-full" data-async-target="main">
-    <label class="input join-item w-full">
-        <input type="text" name="resource" value="{{ if has . "Args" }}{{ .Args.Query }}{{ end }}" placeholder="Magnet-uri...?  Infohash...?" required />
-    </label>
-    <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-    <button type="submit" class="btn btn-accent join-item" data-umami-event="search">Search</button>
-</form>
-<div class="divider h-12">OR</div>
-<form action="/" method="post" enctype="multipart/form-data" class="dropzone flex justify-center items-center w-full" data-async-target="main">
-    <label for="dropzone-input" class="group transition duration-200 flex flex-col justify-center items-center w-full h-36 rounded-box border-2 border-dashed cursor-pointer border-accent">
-        <div class="flex flex-col justify-center items-center pt-5 pb-6">
-            <svg aria-hidden="true" class="mb-3 w-10 h-10 text-accent group-hover:text-accent-focus transition duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-            <p class="mb-2 text-m text-accent group-hover:text-accent-focus transition duration-200"><span class="font-semibold">Drop torrent file here</span> or click to select...</p>
-            <p class="text-xs uppercase">(No torrent size limit)</p>
+
+    {{ if .Tool }}
+    <!-- Tool page hero -->
+    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 py-3 px-5 mb-8 relative z-10 text-sm font-medium">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Free online tool
+    </div>
+
+    <h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
+        <span class="gradient-text">{{ .Tool.Benefit }}</span>
+    </h1>
+
+    <p class="relative z-10 text-lg text-w-sub max-w-[560px] mb-12 leading-relaxed">
+        {{ .Tool.Description }}
+    </p>
+    {{ else }}
+    <!-- Homepage hero -->
+    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 py-3 px-5 mb-8 relative z-10 text-sm font-medium">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Open-source &middot; No install needed
+    </div>
+
+    <h1 class="relative z-10 text-[clamp(2.8rem,6vw,4.5rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
+        Stream &amp; download<br><span class="gradient-text">torrents in your browser</span>
+    </h1>
+
+    <p class="relative z-10 text-lg text-w-sub max-w-[560px] mb-12 leading-relaxed">
+        Paste a magnet link or upload a .torrent file and start watching or downloading instantly. No torrent client required.
+    </p>
+    {{ end }}
+
+    {{ if has . "Job" }}
+    <form class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ .Job | makeJobLogURL }}" data-async-target="main">
+        <div class="log-target"></div>
+        <div class="pt-3 justify-end flex hidden alert-close-wrapper">
+            <a class="closeable-close close">got it!</a>
         </div>
-        <input class="dropzone-input hidden" name="resource" type="file" />
-    </label>
-    <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-</form>
-<div class="divider h-12">OR</div>
-<form class="flex flex-col justify-center items-center" action="/" method="post" enctype="multipart/form-data" data-async-target="main">
-    <input type="hidden" name="resource" value="{{ demoMagnet }}" />
-    <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-    <button type="submit" class="btn btn-accent btn-outline" data-umami-event="try-demo">Try demo!</button>
-</form>
-{{ "index.js" | asset }}
+    </form>
+    {{ end }}
+
+    <!-- input area -->
+    <div class="relative z-10 w-full max-w-[680px]">
+        <!-- search -->
+        <form action="/" method="post" enctype="multipart/form-data" class="join w-full" data-async-target="main">
+            <div class="join-item flex items-center bg-base-300 border border-w-line rounded-l-[14px] flex-1 h-12 focus-within:border-w-pink focus-within:shadow-[0_0_40px_rgba(232,67,147,0.12)] transition-all">
+                <svg class="ml-4 shrink-0 text-w-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input type="text" name="resource" value="{{ if has . "Args" }}{{ .Args.Query }}{{ end }}" placeholder="Paste magnet link or infohash..." class="input bg-transparent border-0 focus:outline-none flex-1 text-base placeholder:text-w-muted font-sans" required />
+            </div>
+            <input name="instruction" value="{{ .Instruction }}" type="hidden" />
+            <button type="submit" class="btn join-item btn-pink px-7 h-12 rounded-r-[14px]" data-umami-event="search">Search</button>
+        </form>
+
+        <!-- divider -->
+        <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">or</div>
+
+        <!-- upload zone -->
+        <form action="/" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main">
+            <label for="dropzone-input" class="upload-dashed rounded-2xl py-10 px-6 text-center cursor-pointer block">
+                <svg class="mx-auto w-10 h-10 text-w-pink mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="text-[0.95rem] text-w-sub"><span class="text-w-pinkL font-semibold">Drop torrent file here</span> or click to browse</p>
+                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3">No size limit</span>
+            </label>
+            <input class="dropzone-input hidden" name="resource" type="file" />
+            <input name="instruction" value="{{ .Instruction }}" type="hidden" />
+        </form>
+
+        <!-- demo link -->
+        <form class="flex justify-center mt-4" action="/" method="post" enctype="multipart/form-data" data-async-target="main">
+            <input type="hidden" name="resource" value="{{ demoMagnet }}" />
+            <input name="instruction" value="{{ .Instruction }}" type="hidden" />
+            <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="try-demo">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Try the demo
+            </button>
+        </form>
+    </div>
+
+    <div class="mt-6 w-full max-w-[680px]">
+    {{ if $.Claims | hasAds }}
+    <div id="promo-banner" class="relative max-w-[680px] mx-auto z-10">
+        {{ template "promo" $ }}
+        <button data-promo-dismiss class="promo-close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        {{ "promo.js" | asset }}
+    </div>
+    {{ end }}
+    </div>
+
+    {{ "index.js" | asset }}
+</section>
+
 {{ template "about" . }}
 {{ end }}
 {{ end }}

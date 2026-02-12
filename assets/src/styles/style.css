@@ -2,7 +2,7 @@
 
 @plugin 'daisyui' {
   exclude: properties;
-  themes: night, lofi;
+  themes: night;
 }
 
 @config '../../../tailwind.config.js';
@@ -22,89 +22,199 @@
   animation: popin 200ms;
 }
 
+@property --promo-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
 @utility promo {
-  @apply border-4 p-4 mb-8 w-full block text-center text-white rounded-box bg-black;
+  @apply p-4 pr-8 mb-6 w-full max-w-[680px] mx-auto block text-center text-white relative z-10;
+  font-size: 0.9375rem;
+  border-radius: var(--rounded-box, 1rem);
+  position: relative;
+  overflow: hidden;
+  background: #0a0a14;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: var(--rounded-box, 1rem);
+    background: conic-gradient(
+      from var(--promo-angle),
+      #e84393, #6c5ce7, #00cec9, #fdcb6e, #e84393
+    );
+    animation: promo-spin 3s linear infinite;
+    z-index: -2;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: calc(var(--rounded-box, 1rem) - 2px);
+    background: #0a0a14;
+    z-index: -1;
+  }
+}
+
+@keyframes promo-spin {
+  to { --promo-angle: 360deg; }
+}
+
+/* Promo close button */
+.promo-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.375rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  border-radius: 9999px;
+  z-index: 10;
+  transition: color 0.2s, background-color 0.2s;
+}
+.promo-close:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Compact promo for inner pages */
+.promo-compact #promo-banner {
+  max-width: 100%;
+}
+.promo-compact .promo {
+  padding: 0.5rem 2.25rem 0.5rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  max-width: 100%;
+}
+.promo-compact .promo-close {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 @utility progress-alert {
-  @apply bg-base-200 text-accent border-accent border shadow-md py-4 rounded-box popin;
-
+  @apply shadow-lg py-4 rounded-box popin;
+  background-color: #111827;
+  border: 1px solid rgba(255,255,255,0.07);
   position: relative;
 
   pre {
-    @apply px-5 leading-8 whitespace-pre-wrap flex;
+    @apply px-5 py-1 leading-7 whitespace-pre-wrap flex items-start text-sm;
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
     &::before {
-      content: '> ';
-      @apply shrink-0;
+      content: '';
+      @apply w-1.5 h-1.5 rounded-full shrink-0 mt-[0.720rem] mx-2.25;
+      background-color: #64748b;
     }
 
     &.continue {
       &::before {
-        content: '  ';
+        content: none;
       }
+      @apply pl-[2.125rem];
     }
 
     &.error-summary,
     &.warn-summary {
-      @apply px-5 bg-warning text-warning-content;
+      @apply px-5 py-1.5 rounded-lg mx-5 mt-1;
+      background-color: rgba(232, 67, 147, 0.1);
+      color: #fd79a8;
+      &::before { content: none; }
     }
 
     &.done-summary,
     &.download-summary,
     &.redirect-summary {
-      @apply px-5 bg-success text-success-content;
+      @apply px-5 py-1.5 rounded-lg mx-5 mt-1;
+      background-color: rgba(0, 206, 201, 0.1);
+      color: #00cec9;
+      &::before { content: none; }
     }
 
     &.inprogress,
     &.statusupdate {
+      color: #00cec9;
+      &::before {
+        background-color: #00cec9;
+        animation: dot-pulse 1.5s ease-in-out infinite;
+      }
       span.loader {
-        @apply pl-1;
-        @apply loading-elipsis;
+        @apply pl-1 loading-elipsis;
       }
     }
 
     &.statusupdate {
       span.task-status {
         @apply pl-1;
-
-        &::before {
-          content: '(';
-        }
-
-        &::after {
-          content: ')';
-        }
+        color: #64748b;
+        &::before { content: '('; }
+        &::after { content: ')'; }
       }
     }
 
-    &.done,
-    &.error,
-    &.warn {
+    &.done {
+      color: #00cec9;
+      &::before { background-color: #00cec9; }
       span.task-status {
         @apply pl-1;
+        &::before { content: '...['; }
+        &::after { content: ']'; }
+      }
+    }
 
-        &::before {
-          content: '...[';
-        }
+    &.error {
+      color: #fd79a8;
+      &::before { background-color: #e84393; }
+      span.task-status {
+        @apply pl-1;
+        &::before { content: '...['; }
+        &::after { content: ']'; }
+      }
+    }
 
-        &::after {
-          content: ']';
-        }
+    &.warn {
+      color: #fd79a8;
+      &::before { background-color: #fd79a8; }
+      span.task-status {
+        @apply pl-1;
+        &::before { content: '...['; }
+        &::after { content: ']'; }
       }
     }
   }
 
   .close {
-    @apply btn btn-sm btn-accent mr-4;
+    @apply btn btn-sm;
+    background-color: rgba(0, 206, 201, 0.10) !important;
+    border-color: rgba(0, 206, 201, 0.30) !important;
+    color: #00cec9 !important;
+  }
+  .close:hover {
+    background-color: rgba(0, 206, 201, 0.20) !important;
+    border-color: rgba(0, 206, 201, 0.45) !important;
+    color: #00cec9 !important;
+  }
+
+  .alert-close-wrapper {
+    @apply gap-2 px-5;
   }
 
   &.progress-alert-oneline {
-    @apply flex;
-
-    pre {
-      @apply flex-grow;
-    }
+    @apply flex items-center;
+    pre { @apply flex-grow; }
+    .close { @apply mr-4; }
   }
 }
 
@@ -113,6 +223,17 @@
   @keyframes ellipsis {
     to {
       width: 2.25em;
+    }
+  }
+
+  @keyframes dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 1.0;
     }
   }
 
@@ -132,4 +253,137 @@
 input:-webkit-autofill,
 input:-webkit-autofill:focus {
   transition: background-color 600000s 0s, color 600000s 0s;
+}
+
+/* ===== Override DaisyUI night theme to match redesign ===== */
+[data-theme="night"] {
+  --color-base-100: oklch(16.630% 0.0262 269.371) !important;   /* #0a0e1a */
+  --color-base-200: oklch(21.008% 0.0318 264.665) !important;   /* #111827 */
+  --color-base-300: oklch(25.395% 0.0380 266.275) !important;   /* #1a2235 */
+  --color-base-content: oklch(96.826% 0.0069 247.896) !important; /* #f1f5f9 */
+  --color-accent: oklch(64.306% 0.2118 355.207) !important;      /* #e84393 */
+  --color-accent-content: oklch(100% 0 0) !important;             /* white */
+}
+
+/* ===== Redesign utilities ===== */
+
+.gradient-text,
+.gradient-stat {
+  background: linear-gradient(135deg, #e84393 0%, #a29bfe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-glow {
+  background: radial-gradient(circle, rgba(232,67,147,0.1) 0%, rgba(108,92,231,0.05) 40%, transparent 70%);
+}
+
+.cta-glow {
+  background: radial-gradient(circle, rgba(232,67,147,0.18) 0%, rgba(232,67,147,0.06) 40%, transparent 70%);
+}
+
+.upload-dashed {
+  border: 2px dashed rgba(232, 67, 147, 0.3);
+  transition: all 0.3s;
+}
+.upload-dashed:hover {
+  border-color: #e84393;
+  background: rgba(232, 67, 147, 0.06);
+}
+
+.btn-pink {
+  background-color: #e84393 !important;
+  border-color: #e84393 !important;
+  color: #fff !important;
+}
+.btn-pink:hover {
+  background-color: #fd79a8 !important;
+  border-color: #fd79a8 !important;
+  box-shadow: 0 0 24px rgba(232, 67, 147, 0.35);
+}
+
+.btn-soft {
+  background-color: rgba(232, 67, 147, 0.10) !important;
+  border-color: rgba(232, 67, 147, 0.30) !important;
+  color: #fd79a8 !important;
+}
+.btn-soft:hover {
+  background-color: rgba(232, 67, 147, 0.20) !important;
+  border-color: rgba(232, 67, 147, 0.45) !important;
+  color: #fd79a8 !important;
+}
+
+.btn-soft-cyan {
+  background-color: rgba(0, 206, 201, 0.10) !important;
+  border-color: rgba(0, 206, 201, 0.30) !important;
+  color: #00cec9 !important;
+}
+.btn-soft-cyan:hover {
+  background-color: rgba(0, 206, 201, 0.20) !important;
+  border-color: rgba(0, 206, 201, 0.45) !important;
+  color: #00cec9 !important;
+}
+
+.toggle-soft:checked,
+.toggle-soft[aria-checked=true] {
+  --input-color: #fd79a8 !important;
+  background-color: rgba(232, 67, 147, 0.15) !important;
+  border-color: rgba(232, 67, 147, 0.30) !important;
+}
+
+/* Force custom text colors over DaisyUI component defaults */
+[data-theme="night"] .badge.text-w-pinkL {
+  color: #fd79a8 !important;
+}
+[data-theme="night"] .badge.text-w-muted {
+  color: #64748b !important;
+}
+[data-theme="night"] .badge.text-w-cyan {
+  color: #00cec9 !important;
+}
+[data-theme="night"] .text-w-pinkL {
+  color: #fd79a8;
+}
+[data-theme="night"] .text-w-sub {
+  color: #94a3b8;
+}
+
+/* Menu link hover: override DaisyUI menu active/hover color */
+.navbar-redesign .menu a:hover {
+  color: #f1f5f9 !important;
+  background-color: rgba(255,255,255,0.05) !important;
+}
+
+/* Ghost button hover: override DaisyUI btn-ghost hover color */
+.btn-ghost.text-w-sub:hover,
+.btn-ghost.text-w-muted:hover {
+  color: #f1f5f9 !important;
+}
+
+/* Dark-theme-specific overrides */
+[data-theme="night"] .collapse-webtor {
+  background-color: #1a2235 !important;
+}
+
+[data-theme="night"] .navbar-redesign {
+  background-color: rgba(10, 14, 26, 0.9);
+}
+
+[data-theme="night"] .stat {
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+/* Collapse arrow color */
+[data-theme="night"] .collapse-plus > .collapse-title::after {
+  color: #64748b;
+}
+
+
+/* Progress inside modal: hide cancel, remove bottom margin */
+.modal-box .btn-ghost.closeable-close {
+  display: none !important;
+}
+.modal-box .progress-alert {
+  margin-bottom: 0 !important;
 }

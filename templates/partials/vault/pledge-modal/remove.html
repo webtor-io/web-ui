@@ -1,20 +1,23 @@
 {{ define "vault/pledge-modal/remove" }}
-<h3 class="text-2xl font-bold text-accent w-full">Remove Vault Pledge</h3>
+<h3 class="text-xl font-bold tracking-tight flex items-center gap-2 w-full">
+	<svg class="w-5 h-5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+	Remove Vault Pledge
+</h3>
 {{ if eq .Status "success" }}
-	<p class="py-4">
+	<p class="pt-4 pb-2 text-sm text-w-sub">
 		Your pledge has been successfully removed and your Vault Points have been returned to your account. The torrent may be removed from the Vault if it's no longer funded. You can always pledge your points again if needed.
 	</p>
 
 	<div class="modal-action justify-center">
 		<form method="dialog">
-			<button class="btn btn-accent" data-umami-event="vault-pledge-remove-success-confirmed">Got it!</button>
+			<button class="btn btn-soft" data-umami-event="vault-pledge-remove-success-confirmed">Got it!</button>
 		</form>
 	</div>
 	<script>
 		document.querySelector("#pledge-button").reload();
 	</script>
 	{{ else if eq .Status "error" }}
-		<p class="py-4">
+		<p class="pt-4 pb-2 text-sm text-w-sub">
 			Unfortunately, your pledge could not be removed due to an error:
 		</p>
 		{{ if .Err }}
@@ -24,33 +27,33 @@
 		{{ end }}
 		<div class="modal-action justify-center">
 			<form method="dialog">
-				<button class="btn btn-accent" data-umami-event="vault-pledge-remove-error-confirmed">Ok</button>
+				<button class="btn btn-soft" data-umami-event="vault-pledge-remove-error-confirmed">Ok</button>
 			</form>
 		</div>
 	{{ else if .Frozen }}
-		<p class="py-4">
+		<p class="pt-4 pb-2 text-sm text-w-sub">
 			Your Vault Points are currently frozen and cannot be removed yet. Please come back later when the freeze period expires.
 		</p>
 
 		<div class="modal-action justify-center">
 			<form method="dialog">
-				<button class="btn btn-accent" data-umami-event="vault-pledge-frozen-acknowledged">Got it!</button>
+				<button class="btn btn-soft" data-umami-event="vault-pledge-frozen-acknowledged">Got it!</button>
 			</form>
 		</div>
 	{{ else }}
-		<p class="py-4">
+		<p class="pt-4 pb-2 text-sm text-w-sub">
 			Are you sure you want to remove your pledge for this torrent? This action cannot be undone.
 		</p>
 
 		<div class="modal-action justify-center">
 			<form action="/vault/pledge/remove" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 				<input type="hidden" name="resource_id" value="{{ .ResourceID }}" />
-				<button type="submit" class="btn btn-accent" data-umami-event="vault-pledge-remove-confirmed">
+				<button type="submit" class="btn btn-soft" data-umami-event="vault-pledge-remove-confirmed">
 					Remove Pledge
 				</button>
 			</form>
 			<form method="dialog">
-				<button class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-pledge-remove-cancelled">Cancel</button>
+				<button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-pledge-remove-cancelled">Cancel</button>
 			</form>
 		</div>
 	{{ end }}

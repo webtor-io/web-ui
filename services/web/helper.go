@@ -336,6 +336,11 @@ func (s *Helper) Duration(d time.Duration) string {
 	return durafmt.Parse(d).LimitFirstN(2).String()
 }
 
+// TimeAgo formats a time.Time into a relative string like "3 hours ago"
+func (s *Helper) TimeAgo(t time.Time) string {
+	return h.Time(t)
+}
+
 // Deref dereferences a pointer to float64, returning 0 if the pointer is nil
 func (s *Helper) DerefFloat64(f *float64) float64 {
 	if f == nil {

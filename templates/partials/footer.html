@@ -1,33 +1,45 @@
 {{ define "footer"}}
-    <footer class="footer sm:footer-horizontal text-base-content p-5 mt-5">
-        <nav>
-            <h6 class="footer-title">Tools</h6>
-            {{ range tools }}
-                <a class="link link-hover" href="/{{ .Url }}" data-async-target="main">{{ .Title }}</a>
+    <footer class="bg-base-200 border-t border-w-line">
+        <div class="grid gap-8 grid-cols-2 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] p-10 max-w-[1100px] mx-auto">
+            <aside>
+                <a href="/" data-async-target="main" class="font-logo text-[1.4rem] font-light no-underline">web<span class="text-w-pink">tor</span></a>
+                <p class="text-w-muted text-sm max-w-[280px] leading-relaxed mt-2">An open-source, browser-based torrent tool. Stream, download, and manage torrents without installing anything.</p>
+            </aside>
+            <nav class="flex flex-col gap-2">
+                <h6 class="footer-title text-w-muted">Tools</h6>
+                {{ range tools }}
+                    <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL whitespace-nowrap" href="/{{ .Url }}" data-async-target="main">{{ .Title }}</a>
+                {{ end }}
+            </nav>
+            <nav class="flex flex-col gap-2">
+                <h6 class="footer-title text-w-muted">Resources</h6>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="https://blog.webtor.io/en/post/" target="_blank">Blog</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="https://github.com/webtor-io/" target="_blank">GitHub</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="https://www.reddit.com/r/webtor/" target="_blank">Reddit</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="https://github.com/webtor-io/player-sdk-js" target="_blank">SDK</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="https://rapidapi.com/paveltatarsky-Dx4aX7s_XBt/api/webtor/">RapidAPI</a>
+            </nav>
+            {{ if useAbuseStore }}
+            <nav class="flex flex-col gap-2">
+                <h6 class="footer-title text-w-muted">Support</h6>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="/support" data-async-target="main">Help Center</a>
+            </nav>
+            <nav class="flex flex-col gap-2">
+                <h6 class="footer-title text-w-muted">Legal</h6>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="/legal/dmca" data-async-target="main">DMCA</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL capitalize" href="/legal/privacy" data-async-target="main">Privacy Policy</a>
+                <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="/legal/tos" data-async-target="main">Terms of Service</a>
+            </nav>
             {{ end }}
-        </nav>
-        <nav>
-            <h6 class="footer-title">Resources</h6>
-            <a class="link link-hover" href="https://blog.webtor.io/en/post/" target="_blank">Blog</a>
-            <a class="link link-hover" href="https://github.com/webtor-io/" target="_blank">GitHub</a>
-            <a class="link link-hover" href="https://www.reddit.com/r/webtor/" target="_blank">Reddit</a>
-            <a class="link link-hover" href="https://github.com/webtor-io/player-sdk-js" target="_blank">SDK</a>
-            <a class="link link-hover" href="https://rapidapi.com/paveltatarsky-Dx4aX7s_XBt/api/webtor/">RapidAPI</a>
-        </nav>
-        {{ if useAbuseStore }}
-            <nav>
-                <h6 class="footer-title">Feedback</h6>
-                <a class="link link-hover" href="/support" data-async-target="main">Support</a>
-            </nav>
-            <nav>
-                <h6 class="footer-title">Legal</h6>
-                <a class="link link-hover" href="/legal/dmca" data-async-target="main">DMCA</a>
-                <a class="link link-hover capitalize" href="/legal/privacy" data-async-target="main">Privacy policy</a>
-                <a class="link link-hover" href="/legal/tos" data-async-target="main">Terms of Service</a>
-            </nav>
-        {{ end }}
-    </footer>
-    <footer class="px-5 py-4 border-t footer bg-base-200 text-base-content border-base-300">
-        <aside><p>Copyright © {{ now.UTC.Year }} Webtor.io</p></aside>
+        </div>
+        <div class="border-t border-w-line py-6 px-10">
+            <div class="max-w-[1100px] mx-auto flex justify-between items-center text-xs text-w-muted">
+                <span>Copyright &copy; {{ now.UTC.Year }} Webtor.io</span>
+                <div class="flex gap-5">
+                    <a href="https://github.com/webtor-io/" target="_blank" class="link link-hover text-w-muted hover:text-w-pinkL">GitHub</a>
+                    <a href="https://www.reddit.com/r/webtor/" target="_blank" class="link link-hover text-w-muted hover:text-w-pinkL">Reddit</a>
+                </div>
+            </div>
+        </div>
     </footer>
 {{ end }}

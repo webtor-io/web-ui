@@ -1,15 +1,26 @@
 {{ define "title" }}Support{{ end }}
 {{ define "main" }}
-    <h2 class="text-2xl font-bold text-accent mt-5">Support</h2>
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[600px] mx-auto">
+    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Support
+    </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Help Center</h1>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Have a question, found a bug, or need to report content? Fill out the form below and we'll get back to you.</p>
+
     {{ if .Err }}
-        <div class="progress-alert progress-alert-oneline mb-10 closeable my-7">
-            <pre>{{ .Err | log | shortErr }}</pre>
-            <a class="closeable-close close">ok</a>
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">
+            <p class="text-sm text-error">{{ .Err | log | shortErr }}</p>
         </div>
     {{ end }}
     {{ with .Data }}
-        <form class="w-full my-7" method="post" enctype="multipart/form-data" data-async-target="main">
-            <select class="select select-bordered w-full" name="cause">
+        <form method="post" enctype="multipart/form-data" data-async-target="main">
+            <select class="select w-full bg-base-300 border-w-line focus:border-w-cyan focus:outline-none" name="cause">
                 {{ range $key, $val := .CauseTypes }}
                     {{ with $.Data.Form }}
                         <option {{ if eq .Cause $key }}selected{{end}} {{ if eq $key -1 }}disabled{{ end }} value="{{ $key }}">{{ $val }}</option>
@@ -17,17 +28,19 @@
                 {{ end }}
             </select>
             {{ with .Form }}
-                <input type="text" name="subject" placeholder="Subject" class="input input-bordered w-full mt-5 hidden" data-required value="{{ .Subject }}" />
-                <textarea name="description" class="textarea textarea-bordered w-full mt-5 hidden" placeholder="Description" rows="5" data-required>{{ .Description }}</textarea>
-                <input name="infohash" type="text" placeholder="Infohash, magnet or url" class="input input-bordered w-full mt-5 hidden" data-select="0,1,2" data-required value="{{ .Infohash }}" pattern=".*[0-9a-fA-F]{40}.*" />
-                <input name="filename" type="text" placeholder="Filename" class="input input-bordered w-full mt-5 hidden" data-select="0,1,2" value="{{ .Filename }}" />
-                <input name="email" type="email" placeholder="Email" class="input input-bordered w-full mt-5 hidden" data-required value="{{ .Email }}" />
-                <input name="work" type="text" placeholder="Work" class="input input-bordered w-full mt-5 hidden" data-select="0" value="{{ .Work }}" />
+                <input type="text" name="subject" placeholder="Subject" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-required value="{{ .Subject }}" />
+                <textarea name="description" class="textarea w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" placeholder="Description" rows="5" data-required>{{ .Description }}</textarea>
+                <input name="infohash" type="text" placeholder="Infohash, magnet or url" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2" data-required value="{{ .Infohash }}" pattern=".*[0-9a-fA-F]{40}.*" />
+                <input name="filename" type="text" placeholder="Filename" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2" value="{{ .Filename }}" />
+                <input name="email" type="email" placeholder="Email" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-required value="{{ .Email }}" />
+                <input name="work" type="text" placeholder="Work" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0" value="{{ .Work }}" />
             {{ end }}
             <div class="mt-7 flex justify-end">
-                <button type="submit" class="btn btn-accent btn-outline hidden">Submit</button>
+                <button type="submit" class="btn btn-soft hidden">Submit</button>
             </div>
         </form>
     {{ end }}
-    {{ "support.js" | asset }}
+  </div>
+</section>
+{{ "support.js" | asset }}
 {{ end }}

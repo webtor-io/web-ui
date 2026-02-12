@@ -17,8 +17,11 @@ import (
 )
 
 type IndexData struct {
-	Args  *shared.IndexArgs
-	Items []any
+	Args          *shared.IndexArgs
+	Items         []any
+	TorrentCount  int
+	MovieCount    int
+	SeriesCount   int
 }
 
 func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
@@ -50,15 +53,30 @@ func (s *Handler) index(c *gin.Context) {
 	}
 	args := s.bindIndexArgs(c)
 
-	ls, err := s.getLibraryList(c.Request.Context(), u, args)
+	db := s.pg.Get()
+	if db == nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.New("no db"))
+		return
+	}
 
+	ls, err := s.getLibraryList(c.Request.Context(), u, args)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+
+	tc, mc, sc, err := models.GetLibraryCounts(c.Request.Context(), db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
 	indexData := &IndexData{
-		Args:  args,
-		Items: ls,
+		Args:         args,
+		Items:        ls,
+		TorrentCount: tc,
+		MovieCount:   mc,
+		SeriesCount:  sc,
 	}
 
 	s.tb.Build("library/index").HTML(http.StatusOK, web.NewContext(c).WithData(indexData))

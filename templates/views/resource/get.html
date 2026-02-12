@@ -8,42 +8,82 @@
     {{ end }}
 {{ end }}
 {{ define "main" }}
-{{ if .Claims | hasAds }}{{ template "promo" . }}{{ end }}
-{{ with .Data }}
-{{ if .Item }}
-<div id="file" data-async-layout="{{`{{ template "file" . }}`}}">
-  {{ template "file" $ }}
-</div>
-{{ end }}
-{{ if and ($.Claims | hasAds) (not (.Resource.MagnetURI | isDemoMagnet)) }}{{ template "get_ads" $ }}{{ end }}
-{{ if and .Item .List }}
-<div class="divider h-0"></div>
-{{ end }}
-<div id="pledge-button" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
-    {{ if and ($.User | hasAuth) .Vault }}
-        {{ template "vault/button" .VaultButton  }}
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[900px] mx-auto">
+    {{ if .Claims | hasAds }}
+    <div class="promo-compact">
+        <div id="promo-banner" class="relative max-w-[680px] mx-auto z-10">
+            {{ template "promo" . }}
+            <button data-promo-dismiss class="promo-close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            {{ "promo.js" | asset }}
+        </div>
+    </div>
     {{ end }}
-</div>
-{{ if .List }}
-<div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
-{{ template "list" $ }}
-</div>
-{{ end }}
-<div class="inline-flex gap-3">
-    <div id="library-button" data-async-layout="{{`{{ template "library/button" $ }}`}}">
-        {{ template "library/button" $ }}
+
+    {{ with .Data }}
+    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Torrent
     </div>
-    <div>
-        {{ template "button" makeTorrentDownload $ . }}
+
+    <!-- Torrent header card -->
+    <div class="relative overflow-hidden rounded-2xl p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+        <div class="relative">
+            <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-4 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+            <div class="flex flex-wrap items-center gap-2">
+                <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
+                    {{ if and ($.User | hasAuth) .Vault }}
+                        {{ template "vault/button" .VaultButton }}
+                    {{ end }}
+                </div>
+                <div id="library-button" data-async-layout="{{`{{ template "library/button" $ }}`}}">
+                    {{ template "library/button" $ }}
+                </div>
+                <div class="ml-auto">
+                    <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        .torrent
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-<div id="log-{{ .Resource.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
-{{ if and ($.User | hasAuth) .Vault }}
-    <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" .Data }}`}}">
-        {{ template "vault/pledge-modal" . }}
+
+    <!-- Content divider -->
+    <div class="flex items-center gap-3 mt-6 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Content</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
-{{ end }}
-{{ end }}
+
+    <!-- File preview -->
+    {{ if .Item }}
+    <div id="file" data-async-layout="{{`{{ template "file" . }}`}}">
+      {{ template "file" $ }}
+    </div>
+    {{ end }}
+
+    {{ if and ($.Claims | hasAds) (not (.Resource.MagnetURI | isDemoMagnet)) }}{{ template "get_ads" $ }}{{ end }}
+
+    <!-- File browser -->
+    {{ if .List }}
+    <div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
+    {{ template "list" $ }}
+    </div>
+    {{ end }}
+    {{ if and ($.User | hasAuth) .Vault }}
+        <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" .Data }}`}}">
+            {{ template "vault/pledge-modal" . }}
+        </div>
+    {{ end }}
+    {{ end }}
+
+  </div>
+</section>
 {{ template "get_extra" . }}
 {{ "resource/get.js" | asset }}
 {{ end }}

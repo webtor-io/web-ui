@@ -1,10 +1,12 @@
 {{ define "file" }}
 {{ with .Data }}
-<h1 class="text-2xl font-bold pb-3">#&nbsp;{{ .Item.Name }}</h1>
-<div class="inline-flex gap-3">
-{{ template "stream_button" $ }}
-{{ template "button" makeFileDownload $ . }}
+<div class="bg-base-200/40 rounded-2xl p-6 border border-w-line/50 mb-3">
+    <h2 class="text-base font-semibold mb-4 truncate" title="{{ .Item.Name }}">{{ .Item.Name }}</h2>
+    <div class="flex flex-wrap gap-3">
+        {{ template "stream_button" $ }}
+        {{ template "button" makeFileDownload $ . }}
+    </div>
+    <div id="log-{{ .Item.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 </div>
-<div id="log-{{ .Item.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 {{ end }}
 {{ end }}

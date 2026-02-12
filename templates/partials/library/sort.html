@@ -1,6 +1,6 @@
 {{ define "library/sort"}}
 <form class="ml-auto" data-async-target="#list">
-    <select class="select select-bordered" name="sort" onchange="this.nextElementSibling.click()">
+    <select class="select select-sm bg-base-300 border-w-line focus:border-w-purple focus:outline-none" name="sort" onchange="this.nextElementSibling.click()">
         {{ range . }}
             <option class="capitalize" value="{{ .Value }}" {{if .Selected }}selected{{end}}>{{ .Title }}</option>
         {{ end }}

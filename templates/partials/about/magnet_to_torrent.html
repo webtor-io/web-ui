@@ -1,140 +1,170 @@
-{{ define "about_instruction_magnet_to_torrent_header" }}
-	<h1 class="text-center text-4xl pb-8 font-bold">
-		Magnet to Torrent Converter
-	</h1>
-{{ end }}
-
-{{ define "about_instruction_magnet_to_torrent_description" }}
-	<div class="base-200 text-accent pt-6 text-center">
-		<strong>Magnet to Torrent</strong> lets you convert a magnet link into a downloadable
-		<strong>.torrent file</strong> without using a torrent client.
-		With <strong>Webtor.io</strong>, you can generate a torrent file instantly and use it anywhere you want.
-	</div>
-{{ end }}
-
 {{ define "about_instruction_magnet_to_torrent_how_to" }}
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">How to convert magnets to torrents with <strong>Webtor.io</strong></h2>
-				<p class="py-6 text-justify">
-					With <strong>Webtor.io</strong> it is easy to convert your magnet-url into torrent file
-					in 3&nbsp;simple steps without need to use torrent-client:
-				</p>
-				<ol class="list-decimal text-justify pl-8">
-					<li>Paste your magnet-url into text-field</li>
-					<li>Click <strong>Search</strong> button</li>
-					<li>Scroll bottom and click <strong>Download Torrent File</strong> button</li>
-				</ol>
-			</div>
-		</div>
-	</div>
+<!-- Steps -->
+<section id="how" class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            How it works
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to convert magnets to torrents with Webtor.io</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Convert your magnet link into a .torrent file in 3&nbsp;simple steps — no torrent client needed.</p>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					What is magnet to torrent and how does it work?
-				</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Copy your magnet link</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Copy the magnet URL from any website or torrent index.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Paste &amp; search</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Paste the magnet link into the text field and click the Search button.</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">Download .torrent file</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Scroll down and click <strong>Download Torrent File</strong> to save the .torrent to your device.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
-				<p class="py-6 text-justify">
-					Magnet to torrent is a method of converting a magnet link into a standard
-					<strong>.torrent file</strong>. A magnet link contains only a hash and a set of parameters,
-					while a torrent file includes full metadata such as file lists, sizes, and trackers.
-				</p>
+<!-- Explainer: What is Magnet to Torrent -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Explained
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">What is magnet to torrent and how does it work?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">
+                Magnet to torrent is a method of converting a magnet link into a standard
+                <strong>.torrent file</strong>. A magnet link contains only a hash and a set of parameters,
+                while a torrent file includes full metadata such as file lists, sizes, and trackers.
+            </p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                When you convert a magnet link with <strong>Webtor.io</strong>, the torrent metadata
+                is resolved on a server and packaged into a downloadable torrent file that you can
+                save and reuse later.
+            </p>
+        </div>
+    </div>
+</section>
 
-				<p class="text-justify">
-					When you convert a magnet link with <strong>Webtor.io</strong>, the torrent metadata
-					is resolved on a server and packaged into a downloadable torrent file that you can
-					save and reuse later.
-				</p>
-			</div>
-		</div>
-	</div>
+<!-- Comparison: Magnet vs Torrent file -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>
+            Comparison
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Magnet link vs torrent file: what's the difference?</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Magnet links and torrent files point to the same content, but they work differently and are used in different scenarios.</p>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					Magnet link vs torrent file: what’s the difference?
-				</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL text-xs font-semibold tracking-widest uppercase mb-3">Magnet link</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Contains only a hash and parameters
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Must be resolved before downloading
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Easy to share as a short link
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Cannot be used offline
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-xs font-semibold tracking-widest uppercase mb-3">Torrent file</div>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Contains full torrent metadata
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Ready to use immediately
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Easy to archive and store
+                        </li>
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Can be saved and reused offline
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-				<p class="py-6 text-justify">
-					Magnet links and torrent files point to the same content, but they work differently
-					and are used in different scenarios.
-				</p>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">
+            Converting <strong>magnet to torrent</strong> is useful when you want a permanent
+            file that can be reused, shared, or added to a torrent client later.
+        </p>
+    </div>
+</section>
 
-				<div class="overflow-x-auto">
-					<table class="table table-zebra w-full">
-						<thead>
-						<tr>
-							<th>Magnet link</th>
-							<th>Torrent file</th>
-						</tr>
-						</thead>
-						<tbody>
-						<tr>
-							<td>Contains only a hash and parameters</td>
-							<td>Contains full torrent metadata</td>
-						</tr>
-						<tr>
-							<td>Must be resolved before downloading</td>
-							<td>Ready to use immediately</td>
-						</tr>
-						<tr>
-							<td>Easy to share as a short link</td>
-							<td>Easy to archive and store</td>
-						</tr>
-						<tr>
-							<td>Cannot be used offline</td>
-							<td>Can be saved and reused offline</td>
-						</tr>
-						</tbody>
-					</table>
-				</div>
+<!-- Use cases -->
+<section class="py-16 px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            Use cases
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">When should you convert magnet to torrent?</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">
+            Converting magnet links to torrent files is useful in several common scenarios.
+        </p>
 
-				<p class="pt-6 text-justify">
-					Converting <strong>magnet to torrent</strong> is useful when you want a permanent
-					file that can be reused, shared, or added to a torrent client later.
-				</p>
-			</div>
-		</div>
-	</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Saving torrents for future use</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Sharing with clients that require .torrent files</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Archiving metadata for offline access</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">Previewing file lists before downloading</span>
+            </div>
+        </div>
+    </div>
+</section>
 
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					When should you convert a magnet link to a torrent file?
-				</h2>
-
-				<p class="py-6 text-justify">
-					Magnet to torrent conversion is the best choice when you need more control
-					or long-term access to the torrent metadata.
-				</p>
-
-				<ul class="list-disc text-justify pl-8 pt-3">
-					<li>you want to store the torrent for later use</li>
-					<li>you need to add the torrent to a NAS or seedbox</li>
-					<li>you prefer working with .torrent files</li>
-					<li>you want to share the torrent file instead of a magnet link</li>
-				</ul>
-			</div>
-		</div>
-	</div>
-	<div class="hero bg-base-200 mt-6">
-		<div class="hero-content text-center">
-			<div>
-				<h2 class="text-2xl font-bold text-accent">
-					Is magnet to torrent safe? Do I need a VPN?
-				</h2>
-
-				<p class="py-6 text-justify">
-					Converting a magnet link to a torrent file does not require connecting
-					to the torrent swarm from your device. The metadata resolution happens
-					on the server side, which makes the process simpler and safer for the user.
-				</p>
-			</div>
-		</div>
-	</div>
+<!-- Safety -->
+<section class="py-16 px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Safety
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Is magnet to torrent safe? Do I need a VPN?</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">
+                Converting a magnet link to a torrent file does not require connecting
+                to the torrent swarm from your device. The metadata resolution happens
+                on the server side, which makes the process simpler and safer for the user.
+                All traffic travels over HTTPS, so no VPN is required.
+            </p>
+        </div>
+    </div>
+</section>
 {{ end }}

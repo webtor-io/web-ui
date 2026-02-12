@@ -1,9 +1,12 @@
 {{ define "vault/pledge-modal/add" }}
-<h3 class="text-2xl font-bold text-accent w-full">Keep This Torrent Available</h3>
+<h3 class="text-xl font-bold tracking-tight flex items-center gap-2 w-full">
+	<svg class="w-5 h-5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+	Keep This Torrent Available
+</h3>
 	{{ if eq .Status "success" }}
 		{{ template "vault/pledge-modal/add/success" . }}
 	{{ else if eq .Status "error" }}
-		<p class="py-4">
+		<p class="pt-4 pb-2 text-sm text-w-sub">
 			Unfortunately, your pledge could not be saved due to an error:
 		</p>
 		{{ if .Err }}
@@ -13,7 +16,7 @@
 		{{ end }}
 		<div class="modal-action justify-center">
 			<form method="dialog">
-				<button class="btn btn-accent" data-umami-event="vault-pledge-error-confirmed">Ok</button>
+				<button class="btn btn-soft" data-umami-event="vault-pledge-error-confirmed">Ok</button>
 			</form>
 		</div>
 	{{ else if .Funded }}
@@ -21,75 +24,74 @@
 	{{ else }}
 		{{ if .Available }}
 			{{ if ge (derefFloat64 .Available) .Required }}
-				<p class="py-4">
+				<p class="pt-4 pb-2 text-sm text-w-sub">
 					You have enough Vault Points to store this torrent in the Vault.
 				</p>
 			{{ else }}
-				<p class="py-4">
+				<p class="pt-4 pb-1 text-sm text-w-sub">
 					You don't have enough Vault Points to store this torrent.
 				</p>
-				<p class="pb-4">
+				<p class="pb-2 text-sm text-w-sub">
 					Try upgrading your subscription to the next tier to get more Vault Points.
 				</p>
-				<p>
-					<a href="/donate" target="_blank" class="link link-accent" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
+				<p class="pb-2">
+					<a href="/donate" target="_blank" class="text-sm text-w-pinkL hover:underline" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
 				</p>
 			{{ end }}
 		{{ else }}
-			<p class="py-4">
+			<p class="pt-4 pb-2 text-sm text-w-sub">
 				You have unlimited Vault Points. You can store this torrent in the Vault.
 			</p>
 		{{ end }}
-		<div class="py-4">
-			<table class="table table-sm">
+		<div class="bg-base-200/50 rounded-xl p-4 my-3">
+			<table class="table w-full text-sm">
 				<tbody>
 					<tr>
-						<td class="font-semibold">Torrent Size GB:</td>
-						<td class="text-center">{{ printf "%.2f" .TorrentSizeGB }}</td>
+						<td class="text-left font-semibold text-w-sub">Torrent Size GB</td>
+						<td class="text-right text-w-text">{{ printf "%.2f" .TorrentSizeGB }}</td>
 					</tr>
 					<tr>
-						<td class="font-semibold">Required VP:</td>
-						<td class="text-center">{{ printf "%.2f" .Required }}</td>
+						<td class="text-left font-semibold text-w-sub">Required VP</td>
+						<td class="text-right text-w-text">{{ printf "%.2f" .Required }}</td>
 					</tr>
 					<tr>
-						<td class="font-semibold">Your Available VP:</td>
-						<td class="text-center">
+						<td class="text-left font-semibold text-w-sub">Your Available VP</td>
+						<td class="text-right text-w-text">
 							{{ if .Available }}
 								{{ printf "%.2f" (derefFloat64 .Available) }}
 							{{ else }}
-								<span class="text-xl">∞</span>
+								<span class="text-xl">&#8734;</span>
 							{{ end }}
 						</td>
 					</tr>
 					<tr>
-						<td class="font-semibold">Your Total VP:</td>
-						<td class="text-center">
+						<td class="text-left font-semibold text-w-sub">Your Total VP</td>
+						<td class="text-right text-w-text">
 							{{ if .Total }}
 								{{ printf "%.2f" (derefFloat64 .Total) }}
 							{{ else }}
-								<span class="text-xl">∞</span>
+								<span class="text-xl">&#8734;</span>
 							{{ end }}
 						</td>
 					</tr>
 				</tbody>
 			</table>
 		</div>
-		<div class="text-left w-full text-sm text-accent mt-2">
-			<span class="text-accent">ⓘ</span>
-			<a href="/instructions/vault" class="hover:underline" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
+		<div class="text-left w-full mt-1 mb-2">
+			<a href="/instructions/vault" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
 		</div>
 
 		<div class="modal-action justify-center">
 			{{ if or (not .Available) (ge (derefFloat64 .Available) .Required) }}
 				<form action="/vault/pledge/add" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 					<input type="hidden" name="resource_id" value="{{ .ResourceID }}" />
-					<button type="submit" class="btn btn-accent" data-umami-event="vault-store-confirmed">
+					<button type="submit" class="btn btn-soft" data-umami-event="vault-store-confirmed">
 						Store in Vault
 					</button>
 				</form>
 			{{ end }}
 			<form method="dialog">
-				<button class="btn btn-accent btn-outline btn-soft" data-umami-event="vault-cancelled">Cancel</button>
+				<button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-cancelled">Cancel</button>
 			</form>
 		</div>
 	{{ end }}

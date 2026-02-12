@@ -87,7 +87,10 @@
   }
 
   .close {
-    @apply btn btn-sm btn-accent mr-4;
+    @apply btn btn-sm mr-4;
+    background-color: rgba(0, 206, 201, 0.10);
+    border-color: rgba(0, 206, 201, 0.30);
+    color: #00cec9;
   }
 
   &.progress-alert-oneline {

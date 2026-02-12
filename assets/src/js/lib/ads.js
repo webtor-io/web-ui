@@ -79,7 +79,7 @@ function renderMediaAd(el, ad = {}) {
     el.appendChild(aEl);
     const skipDelay = ad.skipDelay;
     const closeEl = document.createElement('button');
-    closeEl.classList.add('absolute', 'top-2', 'right-2', 'btn', 'btn-accent', 'btn-sm', 'z-50');
+    closeEl.classList.add('absolute', 'top-2', 'right-2', 'btn', 'btn-soft-cyan', 'btn-sm', 'z-50');
     closeEl.textContent = 'Close (' + skipDelay + ')';
     closeEl.setAttribute('data-umami-event', `${ad.trackPrefix}${ad.name}-close`);
     closeEl.disabled = true;
