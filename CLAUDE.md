@@ -7,7 +7,7 @@
 
 ## Build & Toolchain
 
-- **Go** 1.24.x (module: `github.com/webtor-io/web-ui`)
+- **Go** 1.25 (module: `github.com/webtor-io/web-ui`)
 - **Node** 22.x for frontend assets
 - **npm** (not Yarn) — `package-lock.json` is present
 - Frontend assets: webpack → `assets/dist`, served at `/assets`
@@ -27,7 +27,7 @@
 ```
 docker build .
 ```
-Produces minimal Alpine image. Exposes ports 8080, 8081. Runs `./server serve` with `GIN_MODE=release`.
+Produces minimal 3-stage Alpine image. Exposes ports 8080, 8081. Entrypoint `./server serve` with `GIN_MODE=release`.
 
 ## Architecture Rules
 
@@ -112,8 +112,10 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 |---------|---------|----------------|
 | `btn-pink` | Homepage & tools page CTAs | Profile, vault, auth, support form |
 | `btn-soft` | Profile, auth & support form actions | Homepage CTAs, vault/library |
+| `btn-soft-cyan` | Secondary actions in cyan (info, tools, content) | Primary actions, profile/auth |
 | `btn-accent` | Vault, library actions | Homepage, profile, auth forms |
-| `btn-ghost` | Secondary actions (demo, delete, logout) | Primary actions |
+| `btn-ghost border border-w-line` | Outlined ghost (nav, downloads, secondary) | Primary actions |
+| `btn-ghost` (no border) | Tertiary actions (demo, delete, logout) | Primary actions |
 
 **Focus color** — context-dependent:
 - `focus:border-w-pink` — profile & auth page inputs
@@ -124,7 +126,12 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Purple (`bg-w-purple/10 text-w-purpleL`) — comparison sections
 - Cyan (`bg-w-cyan/10 text-w-cyan`) — info, tools, FAQ
 
-**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`.
+**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `loading-elipsis`, `popin`.
+
+**Typography** (`tailwind.config.js`):
+- `font-sans` — Inter (primary body font)
+- `font-logo` — Comfortaa (logo/branding)
+- Font CSS embedded as base64 WOFF2 in `assets/src/styles/inter.css` and `comfortaa.css`
 
 ## Configuration (Minimum)
 
