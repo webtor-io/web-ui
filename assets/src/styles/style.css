@@ -150,9 +150,6 @@
         background-color: #00cec9;
         animation: dot-pulse 1.5s ease-in-out infinite;
       }
-      span.loader {
-        @apply pl-1 loading-elipsis;
-      }
     }
 
     &.statusupdate {
@@ -166,32 +163,54 @@
 
     &.done {
       color: #00cec9;
-      &::before { background-color: #00cec9; }
-      span.task-status {
-        @apply pl-1;
-        &::before { content: '...['; }
-        &::after { content: ']'; }
+      &::before {
+        content: '✓';
+        background: none;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        margin-top: 0;
+        animation: none;
+        color: #00cec9;
+        font-weight: 700;
+        line-height: 1.75rem;
       }
+      span.task-status { display: none; }
     }
 
     &.error {
       color: #fd79a8;
-      &::before { background-color: #e84393; }
-      span.task-status {
-        @apply pl-1;
-        &::before { content: '...['; }
-        &::after { content: ']'; }
+      &::before {
+        content: '✕';
+        background: none;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        margin-top: 0;
+        animation: none;
+        color: #e84393;
+        font-weight: 700;
+        line-height: 1.75rem;
       }
+      span.task-status { display: none; }
     }
 
     &.warn {
       color: #fd79a8;
-      &::before { background-color: #fd79a8; }
-      span.task-status {
-        @apply pl-1;
-        &::before { content: '...['; }
-        &::after { content: ']'; }
+      &::before {
+        content: '⚠';
+        background: none;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        margin-top: 0;
+        animation: none;
+        color: #fd79a8;
+        font-weight: 700;
+        line-height: 1.75rem;
+        font-size: 0.75rem;
       }
+      span.task-status { display: none; }
     }
   }
 

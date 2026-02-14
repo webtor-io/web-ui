@@ -512,31 +512,30 @@
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Log Line States</h3>
     <div class="progress-alert mb-6" style="max-width:600px">
       <pre><span class="line">regular info line (gray dot, gray text)</span></pre>
-      <pre class="inprogress"><span class="line">in progress &mdash; pulsing cyan dot<span class="task-status"></span><span class="loader"></span></span></pre>
-      <pre class="statusupdate"><span class="line">status update &mdash; pulsing cyan dot + counter<span class="task-status">42</span><span class="loader"></span></span></pre>
-      <pre class="done"><span class="line">done &mdash; static cyan dot<span class="task-status">done</span></span></pre>
-      <pre class="warn"><span class="line">warning &mdash; pink dot<span class="task-status">warn</span></span></pre>
-      <pre class="error"><span class="line">error &mdash; pink dot<span class="task-status">error</span></span></pre>
+      <pre class="inprogress"><span class="line">in progress &mdash; pulsing cyan dot<span class="task-status"></span></span></pre>
+      <pre class="statusupdate"><span class="line">status update &mdash; pulsing cyan dot + counter<span class="task-status">42</span></span></pre>
+      <pre class="done"><span class="line">done &mdash; cyan checkmark &#x2713;<span class="task-status">done</span></span></pre>
+      <pre class="warn"><span class="line">warning &mdash; pink warning &#x26A0;<span class="task-status">warn</span></span></pre>
+      <pre class="error"><span class="line">error &mdash; pink cross &#x2715;<span class="task-status">error</span></span></pre>
       <pre class="continue"><span class="line">...continued line (no dot, indented)</span></pre>
     </div>
     <div class="uikit-label mb-8">
       <code>pre</code> states: (none)=info, <code>inprogress</code>, <code>statusupdate</code>, <code>done</code>, <code>warn</code>, <code>error</code>, <code>continue</code><br>
-      Dot colors: gray (info) &middot; cyan pulsing (<code>inprogress</code>/<code>statusupdate</code>) &middot; cyan static (<code>done</code>) &middot; pink (<code>warn</code>/<code>error</code>)<br>
-      Status text via <code>span.task-status</code> &mdash; renders as <code>...[done]</code>, <code>...[error]</code>, or <code>(42)</code> for statusupdate<br>
-      Animated ellipsis via <code>span.loader</code> (only visible on <code>inprogress</code>/<code>statusupdate</code>)
+      Icons: gray dot (info) &middot; cyan pulsing dot (<code>inprogress</code>/<code>statusupdate</code>) &middot; cyan &#x2713; (<code>done</code>) &middot; pink &#x2715; (<code>error</code>) &middot; pink &#x26A0; (<code>warn</code>)<br>
+      Status text via <code>span.task-status</code> &mdash; hidden on <code>done</code>/<code>error</code>/<code>warn</code> (icons are sufficient), shows <code>(42)</code> for statusupdate
     </div>
 
     <!-- 9.2 Summary Rows -->
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Summary Rows</h3>
     <p class="desc">Tinted rows shown below a log line when done/warn/error includes a message. No dot prefix.</p>
     <div class="progress-alert mb-6" style="max-width:600px">
-      <pre class="done"><span class="line">transfer complete<span class="task-status">done</span></span></pre>
+      <pre class="done"><span class="line">transfer complete</span></pre>
       <pre class="done-summary"><span class="line">file saved successfully</span></pre>
-      <pre class="warn"><span class="line">slow connection<span class="task-status">warn</span></span></pre>
+      <pre class="warn"><span class="line">slow connection</span></pre>
       <pre class="warn-summary"><span class="line">speed limited to 5Mbps &mdash; donate to increase!</span></pre>
-      <pre class="error"><span class="line">peer disconnected<span class="task-status">error</span></span></pre>
+      <pre class="error"><span class="line">peer disconnected</span></pre>
       <pre class="error-summary"><span class="line">no active seeders found for this torrent</span></pre>
-      <pre class="done"><span class="line">download ready<span class="task-status">done</span></span></pre>
+      <pre class="done"><span class="line">download ready</span></pre>
       <pre class="redirect-summary"><span class="line">redirecting to resource page...</span></pre>
     </div>
     <div class="uikit-label mb-8">
@@ -553,7 +552,7 @@
       The <code>.close</code> class inside progress-alert inherits <code>btn-soft-cyan</code> styling.
     </p>
     <div class="progress-alert mb-6" style="max-width:600px">
-      <pre class="error"><span class="line">something went wrong<span class="task-status">error</span></span></pre>
+      <pre class="error"><span class="line">something went wrong</span></pre>
       <pre class="error-summary"><span class="line">connection timed out, please try again</span></pre>
       <div class="pt-3 flex justify-end gap-2 px-5">
         <a class="close">got it!</a>
@@ -567,7 +566,7 @@
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">With Conditional Error Button</h3>
     <p class="desc">Extra buttons (e.g. error-specific actions) wrapped in <code>.error</code> div, shown/hidden by JS based on state.</p>
     <div class="progress-alert mb-6" style="max-width:600px">
-      <pre class="error"><span class="line">something went wrong<span class="task-status">error</span></span></pre>
+      <pre class="error"><span class="line">something went wrong</span></pre>
       <pre class="error-summary"><span class="line">connection timed out</span></pre>
       <div class="pt-3 flex justify-end gap-2 px-5">
         <div>
@@ -595,20 +594,20 @@
     <!-- 9.5 Done with close -->
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Done State with Close Button</h3>
     <div class="progress-alert mb-6" style="max-width:600px">
-      <pre class="done"><span class="line">operation completed successfully<span class="task-status">done</span></span></pre>
+      <pre class="done"><span class="line">operation completed successfully</span></pre>
       <div class="pt-3 flex justify-end gap-2 px-5">
         <a class="close">got it!</a>
       </div>
     </div>
     <div class="uikit-label mb-8">
-      Same pattern as error, but with <code>done</code> state &mdash; cyan dot, cyan text, <code>...[done]</code> suffix
+      Same pattern as error, but with <code>done</code> state &mdash; cyan checkmark, cyan text
     </div>
 
     <!-- 9.6 Design rules -->
     <div class="uikit-rule mb-8">
       <strong>Container:</strong> <code>bg-w-surface (#111827) border border-w-line shadow-lg rounded-box popin</code><br>
-      <strong>Log lines:</strong> <code>font-mono text-sm text-w-sub</code> with 6px colored dot via <code>::before</code> pseudo-element<br>
-      <strong>Dot animation:</strong> <code>dot-pulse</code> keyframes (scale 1&rarr;1.5&rarr;1, opacity 0.8&rarr;1&rarr;0.8) on <code>inprogress</code>/<code>statusupdate</code><br>
+      <strong>Log lines:</strong> <code>font-mono text-sm text-w-sub</code> with colored prefix icon via <code>::before</code> pseudo-element<br>
+      <strong>Icons:</strong> gray dot (info) &middot; pulsing cyan dot (<code>inprogress</code>/<code>statusupdate</code>) &middot; &#x2713; checkmark (<code>done</code>) &middot; &#x2715; cross (<code>error</code>) &middot; &#x26A0; warning (<code>warn</code>)<br>
       <strong>Close buttons:</strong> <code>.close</code> inside progress-alert = <code>btn btn-sm</code> with cyan soft styling (rgba(0,206,201,0.10) bg, rgba(0,206,201,0.30) border)<br>
       <strong>Entry animation:</strong> <code>popin</code> keyframes (scaleX 0.95&rarr;1, opacity 0&rarr;1)
     </div>
@@ -624,11 +623,11 @@ const log = initProgressLog(document.querySelector('.my-alert'));
 // Chain log entries
 log
   .info('regular info message')               // gray dot, gray text
-  .inProgress('task1', 'connecting...')      // cyan pulsing dot + loader ellipsis
-  .updateStatus(42)                          // updates to "(42)..." format
-  .done('download complete')                 // cyan static dot + [done] + summary row
-  .warn('speed limited')                     // pink dot + [warn] + summary row
-  .error('connection failed')                // pink dot + [error] + summary row
+  .inProgress('task1', 'connecting...')      // cyan pulsing dot
+  .updateStatus(42)                          // updates to "(42)" format
+  .done('download complete')                 // cyan checkmark + summary row
+  .warn('speed limited')                     // pink warning icon + summary row
+  .error('connection failed')                // pink cross icon + summary row
   .close();                                  // reveals .alert-close-wrapper</pre>
       <div class="uikit-label mt-4">
         Import from <code>assets/src/js/lib/progressLog.js</code><br>

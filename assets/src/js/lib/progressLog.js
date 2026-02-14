@@ -138,9 +138,6 @@ class Renderer {
         const status = document.createElement('span');
         status.classList.add('task-status');
         line.appendChild(status);
-        const loader = document.createElement('span');
-        loader.classList.add('loader');
-        line.appendChild(loader);
         this.lt.appendChild(pre);
     }
 
