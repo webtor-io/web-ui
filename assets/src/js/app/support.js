@@ -1,6 +1,6 @@
 import av from '../lib/av';
 
-function setRequied(input) {
+function setRequired(input) {
     if (input.getAttribute('data-required') !== null)  {
         input.setAttribute('required', 'required');
     }
@@ -15,10 +15,10 @@ function updateForm(select, inputs, submit) {
             const ds = i.getAttribute('data-select');
             if (!ds) {
                 i.classList.remove('hidden');
-                setRequied(i);
+                setRequired(i);
             } else if (ds.split(',').includes(select.value)) {
                 i.classList.remove('hidden');
-                setRequied(i);
+                setRequired(i);
             } else {
                 i.classList.add('hidden');
                 i.removeAttribute('required');
