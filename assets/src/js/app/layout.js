@@ -62,6 +62,7 @@ window.progress = {
 import {bindAsync} from '../lib/async';
 import initAsyncView from '../lib/asyncView';
 import loadAsyncView from '../lib/loadAsyncView';
+import toast from '../lib/toast';
 
 document.body.style.display = 'flex';
 hideProgress();
@@ -72,6 +73,13 @@ bindAsync({
         fetchParams.headers['X-SESSION-ID'] = window._sessionID;
         const res = await fetch(url, fetchParams);
         hideProgress();
+        try {
+            const u = new URL(res.url);
+            if (u.searchParams.get('status') === 'success') {
+                const msg = u.searchParams.get('message');
+                if (msg) toast.success(msg);
+            }
+        } catch(e) { /* ignore URL parse errors */ }
         return res;
     },
     update(key, val) {

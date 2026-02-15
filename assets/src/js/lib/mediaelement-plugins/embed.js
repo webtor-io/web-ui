@@ -31,6 +31,7 @@ Object.assign(MediaElementPlayer.prototype, {
         copy.addEventListener('click', () => {
             const code = embedContainer.querySelector('textarea').value;
             navigator.clipboard.writeText(code);
+            if (window.toast) window.toast.success('Copied!');
         });
         player.embedLayer.style.display = 'none';
         player.embedLayer.style.zIndex = 1000;

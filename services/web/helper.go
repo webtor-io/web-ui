@@ -68,6 +68,10 @@ func RedirectWithError(c *gin.Context, serr error) {
 }
 
 func RedirectWithSuccess(c *gin.Context) {
+	RedirectWithSuccessAndMessage(c, "")
+}
+
+func RedirectWithSuccessAndMessage(c *gin.Context, message string) {
 	u, err := url.Parse(c.GetHeader("X-Return-Url"))
 	if err != nil || u == nil {
 		// if return url is invalid, attempt a plain redirect without query mutation
@@ -77,6 +81,9 @@ func RedirectWithSuccess(c *gin.Context) {
 	q := u.Query()
 	q.Set("status", "success")
 	q.Set("from", c.Request.URL.Path)
+	if message != "" {
+		q.Set("message", message)
+	}
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
 }

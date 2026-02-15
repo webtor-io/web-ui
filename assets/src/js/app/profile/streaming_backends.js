@@ -22,7 +22,8 @@ av(async function(){
         emptyStateId: 'backend-empty-state',
         itemNameSelector: '.text-lg.font-medium',
         confirmMessage: (name) => `Are you sure you want to delete this ${name} backend?`,
-        umamiEventName: 'streaming-backend-delete'
+        umamiEventName: 'streaming-backend-delete',
+        toastMessage: 'Backend deleted'
     });
 });
 

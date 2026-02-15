@@ -2,7 +2,6 @@ package embed_domain
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -55,7 +54,7 @@ func (s *Handler) add(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Domain added")
 }
 
 func (s *Handler) delete(c *gin.Context) {
@@ -66,7 +65,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Domain deleted")
 }
 
 func (s *Handler) addDomain(ctx context.Context, domain string, user *auth.User) (err error) {

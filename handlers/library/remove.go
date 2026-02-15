@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 func (s *Handler) remove(c *gin.Context) {
@@ -22,7 +23,7 @@ func (s *Handler) remove(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Removed from library")
 }
 
 func (s *Handler) removeFromLibrary(ctx context.Context, c *gin.Context, u *auth.User) (err error) {

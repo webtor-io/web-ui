@@ -932,6 +932,56 @@ log
 
   <hr class="uikit-divider">
 
+  <!-- 14. Toast Notifications -->
+  <div class="uikit-section">
+    <h2 class="uikit-section-title">14. Toast Notifications</h2>
+    <p class="uikit-desc">
+      Global toast notifications for user action feedback. Toasts appear in the bottom-right corner,
+      auto-dismiss after 3 seconds, and stack when multiple are shown.
+    </p>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">Types</h3>
+    <div class="flex flex-wrap gap-4 mb-6">
+      <div class="toast-alert toast-alert-success toast-show" style="position:static;opacity:1;transform:none;">Success toast</div>
+      <div class="toast-alert toast-alert-info toast-show" style="position:static;opacity:1;transform:none;">Info toast</div>
+      <div class="toast-alert toast-alert-error toast-show" style="position:static;opacity:1;transform:none;">Error toast</div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">Usage (JavaScript)</h3>
+    <div class="uikit-label mb-2">Client-side triggers:</div>
+    <pre class="bg-base-300 rounded-lg p-4 text-sm mb-4"><code>// Available globally via window.toast
+toast.success('Copied!')
+toast.error('Something went wrong')
+toast.info('Download starting...')</code></pre>
+
+    <div class="uikit-label mb-2">Server-side triggers (automatic):</div>
+    <pre class="bg-base-300 rounded-lg p-4 text-sm mb-4"><code>// In Go handlers, use web.RedirectWithSuccessAndMessage(c, "message")
+// instead of c.Redirect(http.StatusFound, ...)
+// This appends ?status=success&amp;message=... to the redirect URL.
+// The async fetch wrapper detects these params and shows a toast.
+web.RedirectWithSuccessAndMessage(c, "Domain added")
+web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">CSS Classes</h3>
+    <div class="uikit-label mb-6">
+      <code>.toast-alert</code> &mdash; base class<br>
+      <code>.toast-alert-success</code> / <code>.toast-alert-info</code> &mdash; cyan variant (matches <code>btn-soft-cyan</code>)<br>
+      <code>.toast-alert-error</code> &mdash; pink variant (matches <code>btn-soft</code>)
+    </div>
+
+    <div class="uikit-rule">
+      <strong>Rules:</strong><br>
+      &bull; Success/Info toasts use cyan colors &mdash; consistent with progress-alert done states<br>
+      &bull; Error toasts use pink colors &mdash; consistent with progress-alert error states<br>
+      &bull; Toast container is <code>#toast-container</code> with DaisyUI classes <code>toast toast-end toast-bottom z-[70]</code><br>
+      &bull; Use <code>toast.success()</code> for completed actions (copy, save, add, delete)<br>
+      &bull; Use <code>toast.info()</code> for started actions (download starting)<br>
+      &bull; Use <code>toast.error()</code> for client-side failures
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>

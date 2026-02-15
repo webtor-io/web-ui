@@ -19,6 +19,7 @@ import (
 	sv "github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
@@ -63,7 +64,7 @@ func (s *Handler) generateUrl(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Addon URL generated")
 }
 
 func (s *Handler) manifest(c *gin.Context) {

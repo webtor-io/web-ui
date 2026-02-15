@@ -37,6 +37,7 @@
         <div>
             {{ template "footer" . }}
         </div>
+        <div id="toast-container" class="toast toast-end toast-bottom z-[70]"></div>
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}
         {{ "auth.js" | asset }}

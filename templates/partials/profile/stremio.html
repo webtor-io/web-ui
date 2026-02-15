@@ -16,6 +16,7 @@
                 function copyStremioAddonUrl(form, e) {
                     e.preventDefault();
                     navigator.clipboard.writeText(stremioAddonUrl);
+                    if (window.toast) window.toast.success('Copied!');
                     return false;
                 }
             </script>

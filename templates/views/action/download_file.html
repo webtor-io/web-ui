@@ -17,10 +17,10 @@
             donate
         </a>
         {{- end }}
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(wgetCmd)">copy wget cmd</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(curlCmd)">copy curl cmd</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(url)">copy url</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" download href="{{ .Data.URL }}">start download</a>
+        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('Copied!')">copy wget cmd</a>
+        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(curlCmd); toast.success('Copied!')">copy curl cmd</a>
+        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(url); toast.success('Copied!')">copy url</a>
+        <a class="btn btn-sm btn-soft-cyan closeable-close" download href="{{ .Data.URL }}" onclick="toast.info('Download starting...')">start download</a>
         <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content closeable-close">cancel</a>
     </div>
 {{ end }}

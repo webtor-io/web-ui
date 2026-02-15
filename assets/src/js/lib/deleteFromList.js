@@ -15,7 +15,8 @@ export default class DeleteFromList {
         this.confirmMessage = options.confirmMessage;
         this.umamiEventName = options.umamiEventName;
         this.itemNameSelector = options.itemNameSelector || null;
-        
+        this.toastMessage = options.toastMessage || null;
+
         this.deletedItems = new Set();
         this.deletedInput = document.getElementById(this.deletedInputId);
         this.list = document.getElementById(this.listSelector.replace('#', ''));
@@ -66,7 +67,12 @@ export default class DeleteFromList {
             
             // Remove the element from DOM
             item.remove();
-            
+
+            // Show toast notification
+            if (this.toastMessage && window.toast) {
+                window.toast.success(this.toastMessage);
+            }
+
             // Update the order input to remove deleted item
             const orderInput = document.getElementById(this.orderInputId);
             if (orderInput) {

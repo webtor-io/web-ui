@@ -2,7 +2,6 @@ package stremio_addon_url
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -60,7 +59,7 @@ func (s *Handler) add(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Addon added")
 }
 
 func (s *Handler) delete(c *gin.Context) {
@@ -72,7 +71,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Addon deleted")
 }
 
 func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.User, cla *claims.Data) (err error) {
@@ -151,7 +150,7 @@ func (s *Handler) update(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+	web.RedirectWithSuccessAndMessage(c, "Settings saved")
 }
 
 func (s *Handler) updateAddonUrls(deletedAddonsStr, addonOrder string, c *gin.Context, user *auth.User) error {

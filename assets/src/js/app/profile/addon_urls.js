@@ -36,6 +36,8 @@ av(async function(){
             
             // Remove the element from DOM
             addonItem.remove();
+
+            if (window.toast) window.toast.success('Addon deleted');
             
             // Update the addon order input to remove deleted addon
             const orderInput = document.getElementById('addon_order');

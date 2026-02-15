@@ -23,7 +23,7 @@ func (h *Handler) removePledge(c *gin.Context) {
 	}
 
 	// Redirect with success
-	web.RedirectWithSuccess(c)
+	web.RedirectWithSuccessAndMessage(c, "Removed from vault")
 }
 
 // deletePledge contains the core business logic for pledge removal (Level 2: Business logic)

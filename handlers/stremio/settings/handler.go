@@ -11,6 +11,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
@@ -100,10 +101,5 @@ func (s *Handler) updateSettings(c *gin.Context) {
 
 	log.WithField("user_id", user.ID).Info("stremio settings updated successfully")
 
-	// Redirect back to originating page
-	returnURL := c.GetHeader("X-Return-Url")
-	if returnURL == "" {
-		returnURL = "/profile"
-	}
-	c.Redirect(http.StatusFound, returnURL)
+	web.RedirectWithSuccessAndMessage(c, "Settings saved")
 }

@@ -25,7 +25,7 @@ func (h *Handler) addPledge(c *gin.Context) {
 	}
 
 	// Redirect with success
-	web.RedirectWithSuccess(c)
+	web.RedirectWithSuccessAndMessage(c, "Added to vault")
 }
 
 // createPledge contains the core business logic for pledge creation (Level 2: Business logic)
