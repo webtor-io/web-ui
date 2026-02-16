@@ -369,6 +369,20 @@ func (s *Job) close() {
 	}
 }
 
+func (s *Job) HasError() bool {
+	s.lmux.Lock()
+	defer s.lmux.Unlock()
+	if !s.closed {
+		return false
+	}
+	for _, item := range s.l {
+		if item.Level == Error {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Job) Custom(name string, body string) *Job {
 	_ = s.log(LogItem{
 		Level:    Custom,
@@ -396,8 +410,12 @@ func newJobs(queue string, storage Storage) *Jobs {
 func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string, r Runnable, purge bool) *Job {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	if _, ok := s.jobs[id]; ok && !purge {
-		return s.jobs[id]
+	if existing, ok := s.jobs[id]; ok && !purge {
+		if !existing.HasError() {
+			return existing
+		}
+		log.WithField("ID", id).Info("restarting errored job")
+		purge = true
 	}
 	j := New(ctx, id, s.queue, r, s.storage, purge)
 	s.jobs[id] = j
@@ -405,15 +423,18 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 		defer cancel()
 		err := j.Run(ctx)
 		<-time.After(60 * time.Second)
-		if err != nil {
-			dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer dCancel()
-			_ = s.storage.Drop(dCtx, s.queue, id)
-			log.WithError(err).Error("got job error")
-		}
 		s.mux.Lock()
 		defer s.mux.Unlock()
-		delete(s.jobs, id)
+		// Only cleanup if this job is still the current one (not replaced by a restart)
+		if current, ok := s.jobs[id]; ok && current == j {
+			if err != nil {
+				dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer dCancel()
+				_ = s.storage.Drop(dCtx, s.queue, id)
+				log.WithError(err).Error("got job error")
+			}
+			delete(s.jobs, id)
+		}
 	}()
 	return j
 }
