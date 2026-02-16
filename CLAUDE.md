@@ -7,7 +7,7 @@
 
 ## Build & Toolchain
 
-- **Go** 1.25 (module: `github.com/webtor-io/web-ui`)
+- **Go** 1.26 (module: `github.com/webtor-io/web-ui`)
 - **Node** 22.x for frontend assets
 - **npm** (not Yarn) — `package-lock.json` is present
 - Frontend assets: webpack → `assets/dist`, served at `/assets`

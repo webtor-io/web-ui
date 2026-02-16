@@ -577,8 +577,6 @@ github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01 h1:QJxE7EuRg
 github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01/go.mod h1:QDwYabQkJ9WTIp0vFW9cFKaxE9VpXuSWdTqefP2aOwY=
 github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b h1:SHXZgQSZtZe+xt1wtY7toIYv3s9jYq3pEGgVvrROliE=
 github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b/go.mod h1:o9TAux7A8g2Pl2r3Bp45u4bhWyDYrujfKyJAbGQaxA4=
-github.com/webtor-io/common-services v0.0.0-20251108105453-635ef47a01ea h1:gtoEk8QoRuNcro/Ls6WZA6b9jikuvjonrZ34HhqOBwg=
-github.com/webtor-io/common-services v0.0.0-20251108105453-635ef47a01ea/go.mod h1:KWg/F34uDg+IU52yry3jgh0mCloYRMCzpHuU/WRJL2E=
 github.com/webtor-io/common-services v0.0.0-20260131122210-5178e4b36a70 h1:vJN3cnj6B9tsrSXBqOuCkyW7/kW2mWs9dfIX0vKLCp0=
 github.com/webtor-io/common-services v0.0.0-20260131122210-5178e4b36a70/go.mod h1:jSGKiO/KVhavntTXhPXzjvt3sMMbCIYaCnxMhOklvEQ=
 github.com/webtor-io/lazymap v0.0.0-20251112155450-24fcf0ad4b5d h1:Mm6O+OWvNC52H9+/A9IBxlD8hu9WCKlY17k8jUn6M9o=

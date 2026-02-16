@@ -1,6 +1,6 @@
 module github.com/webtor-io/web-ui
 
-go 1.25
+go 1.26
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -11,6 +11,8 @@ require (
 	github.com/gin-contrib/sessions v1.0.2
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
+	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b
+	github.com/nats-io/nats.go v1.48.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sirupsen/logrus v1.9.3
@@ -42,9 +44,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
-	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/nats-io/nats.go v1.48.0 // indirect
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
@@ -158,7 +158,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df // indirect
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/h2non/gock.v1 v1.1.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
