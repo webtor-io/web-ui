@@ -106,6 +106,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			}
 		}
 	}
+	if se.Meta.Transcode && exportResponse.Source.MediaFormat == ra.Video {
+		if err = s.bufferHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 5*time.Minute); err != nil {
+			j.Warn(errors.Wrap(err, "failed to buffer video content"))
+		}
+	}
 	if settings.Poster != "" {
 		sc.ExternalData.Poster = s.api.AttachExternalFile(se, settings.Poster)
 	}
