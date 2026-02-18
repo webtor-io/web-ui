@@ -116,10 +116,8 @@ func (s *ActionScript) bufferHLS(ctx context.Context, j *job.Job, streamURL stri
 	}
 
 	target := bufferDuration.Seconds()
-	var buffered float64
-	segmentsDownloaded := 0
 
-	for buffered < target {
+	for {
 		select {
 		case <-bufferCtx.Done():
 			return errors.Wrap(bufferCtx.Err(), "buffer timeout exceeded")
@@ -141,36 +139,21 @@ func (s *ActionScript) bufferHLS(ctx context.Context, j *job.Job, streamURL stri
 			break
 		}
 
-		newSegments := segments[segmentsDownloaded:]
-		if len(newSegments) == 0 {
-			select {
-			case <-time.After(2 * time.Second):
-				continue
-			case <-bufferCtx.Done():
-				return errors.Wrap(bufferCtx.Err(), "buffer timeout exceeded")
-			}
+		var buffered float64
+		for _, seg := range segments {
+			buffered += seg.Duration
 		}
 
-		for _, seg := range newSegments {
-			segURL, err := resolveURL(variantURL, seg.URL)
-			if err != nil {
-				return errors.Wrap(err, "failed to resolve segment URL")
-			}
-			rc, err := s.api.Download(bufferCtx, segURL)
-			if err != nil {
-				return errors.Wrap(err, "failed to download segment")
-			}
-			_, copyErr := io.Copy(io.Discard, rc)
-			_ = rc.Close()
-			if copyErr != nil {
-				return errors.Wrap(copyErr, "failed to read segment")
-			}
-			segmentsDownloaded++
-			buffered += seg.Duration
-			j.StatusUpdate(fmt.Sprintf("%.0f%%", buffered/target*100))
-			if buffered >= target {
-				break
-			}
+		j.StatusUpdate(fmt.Sprintf("%.0f%%", buffered/target*100))
+
+		if buffered >= target {
+			break
+		}
+
+		select {
+		case <-time.After(2 * time.Second):
+		case <-bufferCtx.Done():
+			return errors.Wrap(bufferCtx.Err(), "buffer timeout exceeded")
 		}
 	}
 
