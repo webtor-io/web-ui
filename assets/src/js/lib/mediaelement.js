@@ -138,8 +138,15 @@ export function initPlayer(target) {
                     if (data.fatal) {
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                // try to recover network error
-                                media.hlsPlayer.startLoad();
+                                if (data.details === 'levelParsingError') {
+                                    // Server returned empty manifest (stream not ready yet), retry after delay
+                                    setTimeout(() => {
+                                        media.hlsPlayer.startLoad();
+                                    }, 3000);
+                                } else {
+                                    // try to recover network error
+                                    media.hlsPlayer.startLoad();
+                                }
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 media.hlsPlayer.recoverMediaError();
