@@ -218,7 +218,8 @@ func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, a
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
 	}
-	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings))))
+	hourKey := time.Now().UTC().Format("2006010215")
+	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey)))
 	r = NewEmbedScript(tb, cl, c, api, settings, file, dsd, warmTimeoutMin)
 	return
 }
