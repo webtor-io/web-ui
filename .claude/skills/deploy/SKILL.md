@@ -12,12 +12,12 @@ Deploy the web-ui project using the helmfile sync script.
 
 1. If the argument is `stage`, deploy only to **webtor.cc** (stage) by running:
    ```
-   /Users/vintikzzzz/Projects/webtor/infra/helmfile/sync.sh --wait web-ui-alt
+   cd ../infra/helmfile && ./sync.sh --wait web-ui-alt
    ```
 
 2. Otherwise (no argument or `prod` / `all`), deploy to **both webtor.io and webtor.cc** (production) by running:
    ```
-   /Users/vintikzzzz/Projects/webtor/infra/helmfile/sync.sh --wait web
+   cd ../infra/helmfile && ./sync.sh --wait web
    ```
 
 3. If no argument is provided, ask the user which target they want:
