@@ -34,7 +34,7 @@
                     <h3 class="font-bold text-lg">Audio</h3>
                     <ul class="flex flex-wrap">
                         {{ range getAudioTracks .VideoStreamUserData .MediaProbe }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="audio cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
+                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="audio cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
                         {{ end }}
                     </ul>
                 </div>
@@ -42,7 +42,7 @@
                     <h3 class="font-bold text-lg">Subtitles</h3>
                     <ul class="flex flex-wrap">
                         {{ range $otherSubs }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
+                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
                         {{ end }}
                     </ul>
                 </div>

@@ -32,3 +32,5 @@ templates/partials/extend.html
 .output.txt
 
 chart
+
+.claude/skills/deploy

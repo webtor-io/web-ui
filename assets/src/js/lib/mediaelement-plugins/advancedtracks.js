@@ -45,20 +45,30 @@ Object.assign(MediaElementPlayer.prototype, {
         this.markTrack(target, 'subtitle');
         const videos = document.querySelectorAll('video.player');
 
-        const hlsPlayer = this.media.hlsPlayer;
+        const hlsPlayer = window.hlsPlayer;
         const provider = target.getAttribute('data-provider');
+        const id = target.getAttribute('data-id');
+        const mpId = target.getAttribute('data-mp-id');
+
         if (hlsPlayer && provider === 'MediaProbe') {
-            const id = parseInt(target.getAttribute('data-mp-id'));
-            hlsPlayer.subtitleTrack = id;
-        } else {
-            const id = target.getAttribute('data-id');
+            // Embedded HLS subtitle — let HLS.js manage text track modes
+            hlsPlayer.subtitleDisplay = true;
+            hlsPlayer.subtitleTrack = parseInt(mpId);
+            // Hide non-MediaProbe HTML5 text tracks
             for (const p of videos) {
                 for (const t of p.textTracks) {
-                    if (t.id === id) {
-                        t.mode = 'showing';
-                    } else {
-                        t.mode = 'hidden';
-                    }
+                    if (t.id) t.mode = 'hidden';
+                }
+            }
+        } else {
+            // "None" or non-MediaProbe (ExportTag/OpenSubtitles/External)
+            if (hlsPlayer) {
+                hlsPlayer.subtitleTrack = -1;
+                hlsPlayer.subtitleDisplay = false;
+            }
+            for (const p of videos) {
+                for (const t of p.textTracks) {
+                    t.mode = (id && id !== 'none' && t.id === id) ? 'showing' : 'hidden';
                 }
             }
         }
@@ -68,7 +78,7 @@ Object.assign(MediaElementPlayer.prototype, {
         this.markTrack(target, 'audio');
         const provider = target.getAttribute('data-provider');
         if (window.hlsPlayer && provider === 'MediaProbe') {
-            window.hlsPlayer.audioTrack = target.getAttribute('data-mp-id');
+            window.hlsPlayer.audioTrack = parseInt(target.getAttribute('data-mp-id'));
         }
     },
     async buildadvancedtracks(player, controls, layers) {

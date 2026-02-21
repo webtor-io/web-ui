@@ -12,6 +12,81 @@ let player;
 let hlsPlayer;
 let video;
 
+function remapTrackGroup(elements, hlsTracks) {
+    if (!elements.length || !hlsTracks.length) return;
+
+    // If counts match, assume order is preserved (common case)
+    if (elements.length === hlsTracks.length) {
+        for (let i = 0; i < elements.length; i++) {
+            elements[i].setAttribute('data-mp-id', String(i));
+        }
+        return;
+    }
+
+    // Counts differ (some codecs skipped by transcoder) — match by lang+name
+    const used = new Set();
+    for (const el of elements) {
+        const lang = (el.getAttribute('data-srclang') || '').toLowerCase();
+        const label = el.textContent.trim();
+
+        // Try exact lang+name match first
+        let matched = false;
+        for (let i = 0; i < hlsTracks.length; i++) {
+            if (used.has(i)) continue;
+            const hlsLang = (hlsTracks[i].lang || '').toLowerCase();
+            const hlsName = (hlsTracks[i].name || '').trim();
+            if (lang && hlsLang && lang === hlsLang && label && hlsName && label === hlsName) {
+                el.setAttribute('data-mp-id', String(i));
+                used.add(i);
+                matched = true;
+                break;
+            }
+        }
+        if (matched) continue;
+
+        // Fallback: match by lang only (first unused)
+        for (let i = 0; i < hlsTracks.length; i++) {
+            if (used.has(i)) continue;
+            const hlsLang = (hlsTracks[i].lang || '').toLowerCase();
+            if (lang && hlsLang && lang === hlsLang) {
+                el.setAttribute('data-mp-id', String(i));
+                used.add(i);
+                matched = true;
+                break;
+            }
+        }
+        if (matched) continue;
+
+        // Fallback: match by name only (first unused)
+        for (let i = 0; i < hlsTracks.length; i++) {
+            if (used.has(i)) continue;
+            const hlsName = (hlsTracks[i].name || '').trim();
+            if (label && hlsName && label === hlsName) {
+                el.setAttribute('data-mp-id', String(i));
+                used.add(i);
+                break;
+            }
+        }
+    }
+}
+
+function remapTrackIds(hlsPlayer) {
+    // Remap both the original and cloned #subtitles containers
+    const containers = document.querySelectorAll('#subtitles');
+    if (!containers.length) return;
+
+    const hlsSubTracks = hlsPlayer.subtitleTracks || [];
+    const hlsAudioTracks = hlsPlayer.audioTracks || [];
+
+    for (const container of containers) {
+        const subEls = Array.from(container.querySelectorAll('.subtitle[data-provider="MediaProbe"]'));
+        remapTrackGroup(subEls, hlsSubTracks);
+
+        const audioEls = Array.from(container.querySelectorAll('.audio[data-provider="MediaProbe"]'));
+        remapTrackGroup(audioEls, hlsAudioTracks);
+    }
+}
+
 export function initPlayer(target) {
     video = target.querySelector('.player');
     let settings = {};
@@ -97,12 +172,19 @@ export function initPlayer(target) {
             media.addEventListener('playing', () => {
                 if (paused) player.pause();
             });
+            let tracksInitialized = false;
             media.addEventListener('canplay', () => {
-                if (hlsPlayer && document.getElementById('subtitles')) {
-                    const audioId = document.querySelector('.audio[data-default=true]').getAttribute('data-mp-id');
-                    const subId = document.querySelector('.subtitle[data-default=true]').getAttribute('data-mp-id');
-                    if (audioId) hlsPlayer.audioTrack = audioId;
-                    if (subId) hlsPlayer.subtitleTrack = subId;
+                if (hlsPlayer && document.getElementById('subtitles') && !tracksInitialized) {
+                    tracksInitialized = true;
+                    const defaultAudio = document.querySelector('.audio[data-default=true]');
+                    const defaultSub = document.querySelector('.subtitle[data-default=true]');
+                    const audioId = defaultAudio ? defaultAudio.getAttribute('data-mp-id') : null;
+                    const subId = defaultSub ? defaultSub.getAttribute('data-mp-id') : null;
+                    if (audioId) hlsPlayer.audioTrack = parseInt(audioId);
+                    if (subId) {
+                        hlsPlayer.subtitleDisplay = true;
+                        hlsPlayer.subtitleTrack = parseInt(subId);
+                    }
                 }
                 if (player) {
                     player.controlsEnabled = controls;
@@ -133,6 +215,7 @@ export function initPlayer(target) {
                     if (media.hlsPlayer.levels.length > 1) {
                         media.hlsPlayer.startLevel = 1;
                     }
+                    remapTrackIds(media.hlsPlayer);
                 });
                 media.hlsPlayer.on(Hls.Events.ERROR, function (event, data) {
                     if (data.fatal) {
