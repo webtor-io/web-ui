@@ -59,8 +59,15 @@
     </div>
     {{ end }}
 
-    <div class="text-center mt-12">
+    <div class="text-center mt-12 flex flex-col items-center gap-3">
         <a href="/logout" class="btn btn-ghost text-w-muted hover:text-error text-sm" data-async-target="main" data-umami-event="logout">Log out</a>
+        <form method="post" action="/profile/delete" data-async-target="main">
+            <button type="submit" class="btn btn-ghost text-w-muted hover:text-error text-xs"
+                data-umami-event="profile-delete"
+                onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone. All your data, settings, and integrations will be permanently removed.')">
+                Delete Account
+            </button>
+        </form>
     </div>
   </div>
 </section>

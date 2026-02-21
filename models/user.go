@@ -92,6 +92,17 @@ func GetOrCreateUser(ctx context.Context, db *pg.DB, email string, patreonUserID
 	return user, true, nil
 }
 
+func DeleteUser(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
+	_, err := db.Model((*User)(nil)).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		Delete()
+	if err != nil {
+		return errors.Wrap(err, "failed to delete user")
+	}
+	return nil
+}
+
 func UpdateUserTier(ctx context.Context, db *pg.DB, u *User) error {
 	_, err := db.Model(u).
 		Context(ctx).

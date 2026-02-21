@@ -1,10 +1,13 @@
 package profile
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/go-pg/pg/v10"
+	uuid "github.com/satori/go.uuid"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
@@ -67,6 +70,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
 	r.GET("/profile", h.get)
+	gr := r.Group("/profile")
+	gr.Use(auth.HasAuth)
+	gr.POST("/delete", h.delete)
 }
 
 // getAvailableBackendTypes returns the list of available streaming backend types
@@ -104,6 +110,20 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 		return "", err
 	}
 	return al + "/webdav/", nil
+}
+
+func deleteUser(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
+	return models.DeleteUser(ctx, db, userID)
+}
+
+func (s *Handler) delete(c *gin.Context) {
+	u := auth.GetUserFromContext(c)
+	db := s.pg.Get()
+	if err := deleteUser(c.Request.Context(), db, u.ID); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, "/logout")
 }
 
 func (s *Handler) get(c *gin.Context) {
