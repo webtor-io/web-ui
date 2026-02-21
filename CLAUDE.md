@@ -149,6 +149,10 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Claims (user tiers): `USE_CLAIMS`, `CLAIMS_PROVIDER_SERVICE_HOST/PORT`
 - Stremio addon: `STREMIO_ADDON_USER_AGENT`, `STREMIO_ADDON_PROXY`
 
+## Workflow
+
+- **After committing and pushing to git**, always suggest running `/deploy` to deploy the changes.
+
 ## Debugging
 
 - pprof/probe via `common-services` flags (secondary port)
