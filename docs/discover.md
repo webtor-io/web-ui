@@ -9,14 +9,19 @@ Pure frontend feature — no Go backend changes needed. All catalog and search f
 ### Files
 
 - `templates/views/discover/index.html` — page template with search bar, grid, modals
-- `assets/src/js/app/discover.js` — all client-side logic (StremioClient, DiscoverState, DiscoverUI, main controller)
 - `handlers/discover/handler.go` — serves the page, passes `AddonUrls` from user profile
+- `assets/src/js/app/discover.js` — entry point (main controller, event bindings, orchestration)
+- `assets/src/js/lib/discover/client.js` — `StremioClient` (API calls, LRU caching, AbortController support)
+- `assets/src/js/lib/discover/state.js` — `DiscoverState` (UI state management)
+- `assets/src/js/lib/discover/ui.js` — `DiscoverUI` (DOM rendering, `el()` helper, CSS class constants)
+- `assets/src/js/lib/discover/lang.js` — `LANG_MAP`, `extractLanguages()` (language detection for stream titles)
+- `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
 
 ### Key Classes
 
-- **StremioClient** — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs
-- **DiscoverState** — holds current UI state (selected type, catalog, items, search query/results)
-- **DiscoverUI** — DOM manipulation (rendering tabs, grids, modals, search bar, empty states)
+- **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls.
+- **DiscoverState** (`lib/discover/state.js`) — holds current UI state (selected type, catalog, items, search query/results)
+- **DiscoverUI** (`lib/discover/ui.js`) — DOM manipulation (rendering tabs, grids, modals, search bar, empty states). Uses `el()` helper for concise DOM creation and CSS class constants for consistent styling.
 
 ## Cinemeta (Default Catalogs)
 
@@ -54,6 +59,7 @@ Pure frontend feature — no Go backend changes needed. All catalog and search f
 - **No pagination in search** — Stremio search protocol doesn't support `skip` alongside `search`; Load More is hidden
 - **Race condition safety** — `searchGeneration` counter discards stale responses when user types faster than responses arrive
 - **8-second timeout** — each search request has an AbortController timeout to prevent slow addons from blocking results
+- **Request cancellation** — switching catalog/type or starting a new search aborts in-flight requests via AbortController
 - **Partial results** — `Promise.allSettled` means failing addons don't block results from working ones
 
 ### Exiting Search
