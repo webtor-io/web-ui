@@ -5,6 +5,7 @@ import (
 
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
@@ -311,6 +312,9 @@ func serve(c *cli.Context) error {
 
 	// Setting Donate
 	donate.RegisterHandler(r)
+
+	// Setting Discover
+	discover.RegisterHandler(r, tm, pg)
 
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
