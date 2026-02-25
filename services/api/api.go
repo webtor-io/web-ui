@@ -210,6 +210,7 @@ type ListResourceContentArgs struct {
 	Offset uint
 	Path   string
 	Output ListResourceContentOutputType
+	Sort   string
 }
 
 func (s *ListResourceContentArgs) ToQuery() url.Values {
@@ -231,6 +232,9 @@ func (s *ListResourceContentArgs) ToQuery() url.Values {
 	q.Set("offset", strconv.Itoa(int(offset)))
 	q.Set("path", path)
 	q.Set("output", string(output))
+	if s.Sort != "" {
+		q.Set("sort", s.Sort)
+	}
 	return q
 }
 
