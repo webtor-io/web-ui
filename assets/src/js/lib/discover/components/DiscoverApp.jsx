@@ -737,26 +737,35 @@ function ItemGrid({ items, showBadges, onClick }) {
     );
 }
 
+function PosterGradient({ name }) {
+    return (
+        <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+            <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">
+                {name || 'Unknown'}
+            </div>
+        </div>
+    );
+}
+
 function ItemCard({ item, showBadge, onClick }) {
     const handleClick = useCallback(() => onClick(item), [item, onClick]);
+    const [imgError, setImgError] = useState(false);
+    const onImgError = useCallback(() => setImgError(true), []);
 
     return (
         <div class="group cursor-pointer" onClick={handleClick}>
             <div class="bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-cyan/30 transition-all duration-300 flex flex-col w-full">
                 <figure class="aspect-[2/3] overflow-hidden relative">
-                    {item.poster ? (
+                    {item.poster && !imgError ? (
                         <img
                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             src={item.poster}
                             alt={item.name || ''}
                             loading="lazy"
+                            onError={onImgError}
                         />
                     ) : (
-                        <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
-                            <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">
-                                {item.name || 'Unknown'}
-                            </div>
-                        </div>
+                        <PosterGradient name={item.name} />
                     )}
                     {showBadge && item.type && (
                         <span class="absolute top-2 left-2 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">

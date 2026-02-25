@@ -87,14 +87,23 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
 }
 
 function ModalHeader({ title, poster, subtitle }) {
+    const [imgError, setImgError] = useState(false);
+
     return (
         <div class="flex gap-4 mb-4">
-            {poster && (
+            {poster && !imgError ? (
                 <img
                     src={poster}
                     alt={title || ''}
                     class="w-20 h-28 object-cover rounded-lg flex-shrink-0"
+                    onError={() => setImgError(true)}
                 />
+            ) : (
+                <div class="w-20 h-28 rounded-lg flex-shrink-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+                    <div class="text-center font-bold text-[10px] p-1 line-clamp-3 drop-shadow-sm">
+                        {title || 'Unknown'}
+                    </div>
+                </div>
             )}
             <div class="flex flex-col justify-center min-w-0">
                 <h3 class="font-bold text-lg line-clamp-2">{title || 'Unknown'}</h3>
