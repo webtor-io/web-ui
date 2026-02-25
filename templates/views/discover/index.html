@@ -17,92 +17,10 @@
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Discover</h1>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Browse movies and series from Cinemeta and your Stremio addons.</p>
 
-    <!-- Search Bar -->
-    <div id="discover-search" class="hidden relative mb-6">
-      <div class="flex items-center bg-w-surface border border-w-line rounded-xl focus-within:border-w-cyan/50 transition-colors">
-        <svg class="w-5 h-5 text-w-muted ml-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.3-4.3"></path>
-        </svg>
-        <input id="discover-search-input" type="text" placeholder="Search movies and series..." class="w-full bg-transparent border-none outline-none px-3 py-3 text-w-text placeholder:text-w-muted text-sm" autocomplete="off" />
-        <button id="discover-search-clear" class="hidden mr-3 p-1 text-w-muted hover:text-w-text transition-colors flex-shrink-0" type="button">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6 6 18M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- Type Tabs -->
-    <div id="discover-type-tabs" class="flex gap-2 mb-4"></div>
-
-    <!-- Catalog Selector -->
-    <div id="discover-catalog-selector" class="mb-6"></div>
-
-    <!-- Loading State -->
-    <div id="discover-loading" class="hidden text-center py-16">
-      <span class="loading loading-spinner loading-lg text-w-cyan"></span>
-      <p class="text-w-sub mt-4">Loading catalogs...</p>
-    </div>
-
-    <!-- No Addons State -->
-    <div id="discover-no-addons" class="hidden text-center py-16">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
-      </svg>
-      <p class="text-lg font-semibold text-w-sub mb-2">No addons configured</p>
-      <p class="text-sm text-w-muted mb-6">Add Stremio addons in your profile to start discovering content.</p>
-      <a class="btn btn-soft-cyan btn-sm px-5" href="/profile" data-async-target="main">Go to Profile</a>
-    </div>
-
-    <!-- No Catalogs State -->
-    <div id="discover-no-catalogs" class="hidden text-center py-16">
-      <p class="text-lg font-semibold text-w-sub mb-2">No catalogs available</p>
-      <p class="text-sm text-w-muted mb-6">Your addons don't provide any catalogs. Try adding a catalog addon like Cinemeta.</p>
-      <a class="btn btn-soft-cyan btn-sm px-5" href="/profile" data-async-target="main">Go to Profile</a>
-    </div>
-
-    <!-- No Search Results State -->
-    <div id="discover-no-results" class="hidden text-center py-16">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
-        <circle cx="11" cy="11" r="8"></circle>
-        <path stroke-linecap="round" d="m21 21-4.3-4.3"></path>
-      </svg>
-      <p class="text-lg font-semibold text-w-sub mb-2">No results found</p>
-      <p id="discover-no-results-message" class="text-sm text-w-muted mb-6"></p>
-    </div>
-
-    <!-- Error State -->
-    <div id="discover-error" class="hidden text-center py-16">
-      <p class="text-lg font-semibold text-w-sub mb-2">Something went wrong</p>
-      <p id="discover-error-message" class="text-sm text-w-muted mb-6"></p>
-      <button id="discover-retry" class="btn btn-soft-cyan btn-sm px-5">Retry</button>
-    </div>
-
-    <!-- Item Grid -->
-    <div id="discover-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
-
-    <!-- Load More -->
-    <div id="discover-load-more" class="hidden text-center mt-8">
-      <button id="discover-load-more-btn" class="btn btn-ghost border border-w-line btn-sm px-8">Load more</button>
-    </div>
+    <!-- Preact mounts here -->
+    <div id="discover-mount"></div>
 
   </div>
-
-  <!-- Stream Modal -->
-  <dialog id="discover-stream-modal" class="modal">
-    <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-lg">
-      <form method="dialog">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">&#10005;</button>
-      </form>
-      <div id="stream-modal-content">
-        <!-- Populated by JS -->
-      </div>
-    </div>
-    <form method="dialog" class="modal-backdrop">
-      <button>close</button>
-    </form>
-  </dialog>
 
   {{ "discover.js" | asset }}
 </section>

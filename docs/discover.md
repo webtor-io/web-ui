@@ -6,22 +6,32 @@ The Discover page (`/discover`) lets users browse and search movies and series f
 
 Pure frontend feature — no Go backend changes needed. All catalog and search fetches happen directly from the browser to addon URLs.
 
+The UI is built with **Preact** (lightweight React alternative) using hooks (`useReducer`, `useState`, `useMemo`, `useEffect`, `useCallback`). State is managed via a single reducer for predictable updates. The API client and utility modules remain plain JS.
+
 ### Files
 
-- `templates/views/discover/index.html` — page template with search bar, grid, modals
+- `templates/views/discover/index.html` — page template with static header and `#discover-mount` div
 - `handlers/discover/handler.go` — serves the page, passes `AddonUrls` from user profile
-- `assets/src/js/app/discover.js` — entry point (main controller, event bindings, orchestration)
+- `assets/src/js/app/discover.js` — entry point (mounts Preact app, ribbon fallback for non-discover pages)
 - `assets/src/js/lib/discover/client.js` — `StremioClient` (API calls, LRU caching, AbortController support)
-- `assets/src/js/lib/discover/state.js` — `DiscoverState` (UI state management)
-- `assets/src/js/lib/discover/ui.js` — `DiscoverUI` (DOM rendering, `el()` helper, CSS class constants)
 - `assets/src/js/lib/discover/lang.js` — `LANG_MAP`, `extractLanguages()` (language detection for stream titles)
 - `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
+- `assets/src/js/lib/discover/components/discoverReducer.js` — state reducer, initial state, helper functions
+- `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component with all sub-components
+- `assets/src/js/lib/discover/components/StreamModal.jsx` — stream modal, episode picker, stream filters
 
-### Key Classes
+### Key Components
 
+- **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, and modal state. Contains sub-components: `SearchBar`, `TypeTabs`, `SearchTabs`, `CatalogSelector`, `ItemGrid`, `ItemCard`, `LoadMore`, and empty states.
+- **StreamModal** — dialog modal driven by `modal` state from reducer. Three views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list).
+- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`.
 - **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls.
-- **DiscoverState** (`lib/discover/state.js`) — holds current UI state (selected type, catalog, items, search query/results)
-- **DiscoverUI** (`lib/discover/ui.js`) — DOM manipulation (rendering tabs, grids, modals, search bar, empty states). Uses `el()` helper for concise DOM creation and CSS class constants for consistent styling.
+
+### Build Configuration
+
+- **Preact** with `@babel/preset-react` using automatic JSX runtime (`importSource: "preact"`)
+- Webpack processes `.jsx?` files, resolves `.jsx` extensions
+- Tailwind purge includes `.jsx` files
 
 ## Cinemeta (Default Catalogs)
 
@@ -72,6 +82,7 @@ Pure frontend feature — no Go backend changes needed. All catalog and search f
 - Clicking a **movie** opens a stream modal with streams from all stream-capable addons
 - Clicking a **series** first fetches meta from Cinemeta (then falls back to user addons) to show an episode picker grouped by season, then fetches streams for the selected episode
 - Streams with an info hash link to `/{infoHash}` for playback via Webtor
+- Stream filters (source, label, language) are reactive — `useMemo` recomputes the filtered list on every filter change
 
 ## Addon Protocol
 
