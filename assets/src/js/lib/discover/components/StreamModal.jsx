@@ -1,8 +1,11 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'preact/hooks';
+import { rebindAsync } from '../../async';
+import { initProgressLog } from '../../progressLog';
 import { parseStreamName, extractInfoHash } from '../stream';
 import { extractLanguages } from '../lang';
+import { loadPrefs, savePrefs } from '../prefs';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -13,6 +16,11 @@ export function StreamModal({ modal, onClose, onEpisodeSelect }) {
         } else {
             dialog.close();
         }
+    }, [modal]);
+
+    // Rebind async link handlers after Preact renders new <a data-async-target> elements
+    useEffect(() => {
+        if (modal && dialogRef.current) rebindAsync(dialogRef.current);
     }, [modal]);
 
     // Handle close via backdrop or Escape
@@ -31,7 +39,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect }) {
                 >
                     &#10005;
                 </button>
-                <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} />
+                <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} />
             </div>
             <form method="dialog" class="modal-backdrop">
                 <button>close</button>
@@ -40,7 +48,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect }) {
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
     if (modal.view === 'loading') {
         return (
             <div>
@@ -50,12 +58,16 @@ function ModalBody({ modal, onClose, onEpisodeSelect }) {
         );
     }
 
+    if (modal.view === 'progress') {
+        return <ProgressView logUrl={modal.logUrl} title={modal.title} poster={modal.poster} />;
+    }
+
     if (modal.view === 'episodes') {
         return <EpisodePicker modal={modal} onEpisodeSelect={onEpisodeSelect} />;
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onClose={onClose} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} />;
     }
 
     return null;
@@ -79,13 +91,42 @@ function ModalHeader({ title, poster, subtitle }) {
     );
 }
 
+// --- Progress View ---
+
+function ProgressView({ logUrl, title, poster }) {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!logUrl || !containerRef.current) return;
+        const form = containerRef.current.querySelector('form');
+        if (!form) return;
+
+        const sdk = initProgressLog(form);
+        return () => sdk.destroy();
+    }, [logUrl]);
+
+    return (
+        <div>
+            <ModalHeader title={title} poster={poster} subtitle="Preparing resource..." />
+            <div ref={containerRef}>
+                {logUrl ? (
+                    <form class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
+                        <div class="log-target"></div>
+                    </form>
+                ) : (
+                    <div class="text-center py-4">
+                        <span class="loading loading-spinner loading-md text-w-cyan"></span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // --- Stream Content ---
 
-function StreamContent({ modal, onClose }) {
+function StreamContent({ modal, onStreamClick }) {
     const { title, poster, streams } = modal;
-    const [activeSources, setActiveSources] = useState({});
-    const [activeLabels, setActiveLabels] = useState({});
-    const [activeLang, setActiveLang] = useState(null);
 
     const parsed = useMemo(() => streams.map(s => parseStreamName(s.name)), [streams]);
 
@@ -120,6 +161,32 @@ function StreamContent({ modal, onClose }) {
         }
         return { allSources: sources, allLabels: labels, allLangs: langs };
     }, [parsed, streams]);
+
+    const [activeSources, setActiveSources] = useState(() => {
+        const prefs = loadPrefs();
+        if (!prefs.sources) return {};
+        const result = {};
+        for (const src of prefs.sources) {
+            if (allSources.includes(src)) result[src] = true;
+        }
+        return result;
+    });
+
+    const [activeLabels, setActiveLabels] = useState(() => {
+        const prefs = loadPrefs();
+        if (!prefs.labels) return {};
+        const result = {};
+        for (const lbl of prefs.labels) {
+            if (allLabels.some(l => l.toLowerCase() === lbl.toLowerCase())) result[lbl] = true;
+        }
+        return result;
+    });
+
+    const [activeLang, setActiveLang] = useState(() => {
+        const prefs = loadPrefs();
+        if (!prefs.lang) return null;
+        return allLangs.some(l => l.name === prefs.lang) ? prefs.lang : null;
+    });
 
     const hasFilters = allSources.length > 1 || allLabels.length > 0 || allLangs.length > 1;
 
@@ -156,6 +223,7 @@ function StreamContent({ modal, onClose }) {
             const next = { ...prev };
             if (next[src]) delete next[src];
             else next[src] = true;
+            savePrefs({ sources: Object.keys(next) });
             return next;
         });
     }, []);
@@ -165,12 +233,17 @@ function StreamContent({ modal, onClose }) {
             const next = { ...prev };
             if (next[lbl]) delete next[lbl];
             else next[lbl] = true;
+            savePrefs({ labels: Object.keys(next) });
             return next;
         });
     }, []);
 
     const toggleLang = useCallback((langName) => {
-        setActiveLang(prev => prev === langName ? null : langName);
+        setActiveLang(prev => {
+            const next = prev === langName ? null : langName;
+            savePrefs({ lang: next });
+            return next;
+        });
     }, []);
 
     if (streams.length === 0) {
@@ -202,7 +275,7 @@ function StreamContent({ modal, onClose }) {
 
             <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
                 {filteredStreams.map(({ stream, parsed: info, visible }, i) => (
-                    visible && <StreamRow key={i} stream={stream} info={info} onClose={onClose} />
+                    visible && <StreamRow key={i} stream={stream} info={info} onStreamClick={onStreamClick} />
                 ))}
             </div>
 
@@ -253,7 +326,7 @@ const PLAY_ICON = (
     </svg>
 );
 
-function StreamRow({ stream, info, onClose }) {
+function StreamRow({ stream, info, onStreamClick }) {
     const infoHash = extractInfoHash(stream);
     const titleLines = (stream.title || '').split('\n').filter(Boolean);
 
@@ -281,14 +354,12 @@ function StreamRow({ stream, info, onClose }) {
 
     if (infoHash) {
         return (
-            <a
-                href={`/${infoHash}`}
-                data-async-target="main"
-                class="flex items-center gap-3 p-3 rounded-lg border border-w-line hover:border-w-cyan/30 hover:bg-w-surface/50 transition-all"
-                onClick={onClose}
+            <div
+                onClick={() => onStreamClick(infoHash)}
+                class="cursor-pointer flex items-center gap-3 p-3 rounded-lg border border-w-line hover:border-w-cyan/30 hover:bg-w-surface/50 transition-all"
             >
                 {content}
-            </a>
+            </div>
         );
     }
 

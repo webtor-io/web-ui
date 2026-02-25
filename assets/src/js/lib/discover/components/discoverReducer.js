@@ -57,6 +57,7 @@ export const initialState = {
     items: [],
     skip: 0,
     hasMore: true,
+    page: 0,
     catalogLoading: false,
     // Search
     isSearchMode: false,
@@ -80,15 +81,16 @@ export function discoverReducer(state, action) {
             return { ...state, phase: action.phase, errorMessage: action.message || '' };
         case 'SELECT_TYPE': {
             const selectedCatalog = getCatalogsForType(state.catalogs, action.selectedType)[0] || null;
-            return { ...state, selectedType: action.selectedType, selectedCatalog, items: [], skip: 0, hasMore: true };
+            return { ...state, selectedType: action.selectedType, selectedCatalog, items: [], skip: 0, hasMore: true, page: 0 };
         }
         case 'SELECT_CATALOG':
-            return { ...state, selectedCatalog: action.catalog, items: [], skip: 0, hasMore: true };
+            return { ...state, selectedCatalog: action.catalog, items: [], skip: 0, hasMore: true, page: 0 };
         case 'CATALOG_LOADING':
             return { ...state, catalogLoading: true };
         case 'CATALOG_LOADED': {
             const newItems = action.append ? [...state.items, ...action.items] : action.items;
-            return { ...state, catalogLoading: false, items: newItems, hasMore: action.hasMore, skip: newItems.length };
+            const newPage = action.append ? state.page + 1 : 0;
+            return { ...state, catalogLoading: false, items: newItems, hasMore: action.hasMore, skip: newItems.length, page: newPage };
         }
         case 'CATALOG_ERROR':
             return state.items.length > 0
@@ -107,7 +109,7 @@ export function discoverReducer(state, action) {
             return {
                 ...state,
                 isSearchMode: false, searchQuery: '', searchResults: [], searchType: 'all', searchLoading: false,
-                selectedType, selectedCatalog, items: [], skip: 0, hasMore: true,
+                selectedType, selectedCatalog, items: [], skip: 0, hasMore: true, page: 0,
             };
         }
         case 'SHOW_MODAL':

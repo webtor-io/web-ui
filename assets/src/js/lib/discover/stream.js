@@ -32,15 +32,15 @@ export function parseStreamName(name) {
 }
 
 export function extractInfoHash(stream) {
-    if (stream.infoHash) return stream.infoHash;
+    if (stream.infoHash) return stream.infoHash.toLowerCase();
     const hashRe = /([0-9a-fA-F]{40})/;
     if (stream.url) {
         const match = stream.url.match(hashRe);
-        if (match) return match[1];
+        if (match) return match[1].toLowerCase();
     }
     if (stream.externalUrl) {
         const match = stream.externalUrl.match(hashRe);
-        if (match) return match[1];
+        if (match) return match[1].toLowerCase();
     }
     return null;
 }

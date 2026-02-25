@@ -65,9 +65,10 @@ export function initProgressLog(el, func) {
         r.renderMessage(data);
     }
 
+    let src = null;
     const url = el.getAttribute('data-async-progress-log');
     if (url) {
-        const src = new EventSource(url, {
+        src = new EventSource(url, {
             withCredentials: true,
         });
         src.onmessage = (ev) => {
@@ -76,7 +77,9 @@ export function initProgressLog(el, func) {
             if (data.level === 'close') src.close();
         };
     }
-    return new SDK(onMessage);
+    const sdk = new SDK(onMessage);
+    sdk.destroy = () => { if (src) { src.close(); src = null; } };
+    return sdk;
 }
 
 class Renderer {

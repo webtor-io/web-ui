@@ -1,4 +1,5 @@
 import { useReducer, useRef, useEffect, useCallback, useState, useMemo } from 'preact/hooks';
+import { rebindAsync } from '../../async';
 import { StremioClient, CINEMETA_BASE } from '../client';
 import {
     discoverReducer, initialState,
@@ -6,6 +7,22 @@ import {
     getSearchTypes, getSearchResultsForType,
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
+import { loadPrefs, savePrefs } from '../prefs';
+
+function setUrlParams(params) {
+    const url = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '' && v !== 0 && v !== '0') url.set(k, String(v));
+        else url.delete(k);
+    }
+    const search = url.toString() ? `?${url}` : '';
+    const existing = window.history.state || {};
+    window.history.replaceState(existing, '', window.location.pathname + search);
+}
+
+function removeUrlParam(key) {
+    setUrlParams({ [key]: null });
+}
 
 export function DiscoverApp({ addonUrls }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
@@ -13,6 +30,11 @@ export function DiscoverApp({ addonUrls }) {
     const abortRef = useRef(null);
     const searchGenRef = useRef(0);
     const debounceRef = useRef(null);
+    const searchAfterInit = useRef(null);
+    const restoredPageRef = useRef(0);
+    const modalItemIdRef = useRef(null);
+    const modalEpisodeRef = useRef(null); // { season, episode }
+    const restoreInProgressRef = useRef(false);
 
     // Create client once
     if (!clientRef.current) {
@@ -50,7 +72,7 @@ export function DiscoverApp({ addonUrls }) {
         }
     }, [client]);
 
-    // --- Init ---
+    // --- Init (with URL state restoration) ---
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -66,9 +88,60 @@ export function DiscoverApp({ addonUrls }) {
                     return;
                 }
 
-                const selectedType = types[0];
-                const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
+                // Restore state from URL params and history.state
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlType = urlParams.get('type');
+                const urlSearch = urlParams.get('search');
+                const urlSearchType = urlParams.get('search-type');
+                const urlPage = parseInt(urlParams.get('page'), 10) || 0;
+                const urlId = urlParams.get('id');
+                const urlSeason = urlParams.get('season');
+                const urlEpisode = urlParams.get('episode');
+                const urlCatalogBase = urlParams.get('catalog-base');
+                const urlCatalogId = urlParams.get('catalog-id');
+
+                const prefs = loadPrefs();
+                let selectedType = types[0];
+                let selectedCatalog;
+
+                // Type: URL > localStorage > default
+                if (urlType && types.includes(urlType)) {
+                    selectedType = urlType;
+                } else if (prefs.type && types.includes(prefs.type)) {
+                    selectedType = prefs.type;
+                }
+
+                selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
+
+                // Catalog: URL > localStorage > default
+                if (urlCatalogBase && urlCatalogId) {
+                    const match = getCatalogsForType(catalogs, selectedType)
+                        .find(c => c.baseUrl === urlCatalogBase && c.id === urlCatalogId);
+                    if (match) selectedCatalog = match;
+                } else if (prefs.catalogBase && prefs.catalogId) {
+                    const match = getCatalogsForType(catalogs, selectedType)
+                        .find(c => c.baseUrl === prefs.catalogBase && c.id === prefs.catalogId);
+                    if (match) selectedCatalog = match;
+                }
+
                 dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog });
+
+                // Store page/modal restore targets
+                if (urlPage > 0) restoredPageRef.current = urlPage;
+                if (urlId) modalItemIdRef.current = urlId;
+                if (urlSeason != null && urlEpisode != null) {
+                    modalEpisodeRef.current = { season: urlSeason, episode: urlEpisode };
+                }
+
+                // Enter search mode if URL has search param
+                if (urlSearch) {
+                    dispatch({ type: 'SEARCH_START', query: urlSearch });
+                    if (urlSearchType && urlSearchType !== 'all') {
+                        dispatch({ type: 'SELECT_SEARCH_TYPE', searchType: urlSearchType });
+                    }
+                    // Trigger actual search
+                    searchAfterInit.current = urlSearch;
+                }
             } catch (e) {
                 if (!cancelled) {
                     dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
@@ -92,11 +165,13 @@ export function DiscoverApp({ addonUrls }) {
     // --- Type/Catalog selection ---
     const selectType = useCallback((type) => {
         abortCatalog();
+        savePrefs({ type });
         dispatch({ type: 'SELECT_TYPE', selectedType: type });
     }, []);
 
     const selectCatalog = useCallback((catalog) => {
         abortCatalog();
+        savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
         dispatch({ type: 'SELECT_CATALOG', catalog });
     }, []);
 
@@ -158,10 +233,32 @@ export function DiscoverApp({ addonUrls }) {
         dispatch({ type: 'EXIT_SEARCH' });
     }, []);
 
-    // --- Card click ---
+    // Trigger search restored from URL after init
+    useEffect(() => {
+        if (state.phase !== 'ready') return;
+        if (!searchAfterInit.current) return;
+        const query = searchAfterInit.current;
+        searchAfterInit.current = null;
+        performSearch(query);
+    }, [state.phase, performSearch]);
+
+    // --- Card click & streams (defined before restore effects that use them) ---
+    const loadStreams = useCallback(async (type, id, item) => {
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading streams...' } });
+        try {
+            const streams = await client.fetchStreams(type, id);
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams } });
+            window.umami?.track('discover-streams-loaded', { type, id, count: streams.length });
+        } catch (e) {
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams: [] } });
+        }
+    }, [client]);
+
     const cardClick = useCallback(async (item) => {
         const type = item.type || state.selectedType;
         const id = item.id;
+
+        setUrlParams({ id, season: null, episode: null });
 
         if (type === 'series') {
             dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...' } });
@@ -178,29 +275,157 @@ export function DiscoverApp({ addonUrls }) {
         } else {
             await loadStreams(type, id, item);
         }
-    }, [client, state.selectedType]);
+    }, [client, state.selectedType, loadStreams]);
 
-    const loadStreams = useCallback(async (type, id, item) => {
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading streams...' } });
-        try {
-            const streams = await client.fetchStreams(type, id);
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams } });
-            window.umami?.track('discover-streams-loaded', { type, id, count: streams.length });
-        } catch (e) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams: [] } });
+    const openModalById = useCallback((id) => {
+        // Try to find the item in loaded items or search results
+        const item = state.items.find(i => i.id === id)
+            || state.searchResults.find(i => i.id === id);
+        const ep = modalEpisodeRef.current;
+        modalEpisodeRef.current = null;
+
+        if (ep) {
+            // Restore directly to streams for a specific episode
+            const type = item?.type || state.selectedType || 'series';
+            const epId = `${id}:${ep.season}:${ep.episode}`;
+            const name = item?.name || id;
+            const epName = `${name} - S${ep.season}E${ep.episode}`;
+            const poster = item?.poster;
+            setUrlParams({ id, season: ep.season, episode: ep.episode });
+            loadStreams(type, epId, { name: epName, poster });
+        } else if (item) {
+            cardClick(item);
+        } else {
+            // Item not in loaded data — open with minimal info, modal will load via API
+            cardClick({ id, name: id, type: state.selectedType });
         }
-    }, [client]);
+    }, [state.items, state.searchResults, state.selectedType, cardClick, loadStreams]);
 
     const onEpisodeSelect = useCallback(async (episode, item) => {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
         const epName = `${item.title} - S${episode.season || '?'}E${episode.episode || '?'}`;
+        setUrlParams({ season: episode.season, episode: episode.episode });
         await loadStreams(type, epId, { name: epName, poster: item.poster });
     }, [loadStreams]);
 
+    const handleStreamClick = useCallback(async (infoHash) => {
+        const currentTitle = state.modal?.title;
+        const currentPoster = state.modal?.poster;
+
+        dispatch({ type: 'SHOW_MODAL', modal: {
+            view: 'progress', title: currentTitle, poster: currentPoster, logUrl: null,
+        }});
+
+        try {
+            const formData = new FormData();
+            formData.append('resource', infoHash);
+            formData.append('_csrf', window._CSRF);
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': window._CSRF,
+                },
+            });
+
+            if (!response.ok) throw new Error('POST failed');
+            const data = await response.json();
+            const logUrl = data.job_log_url;
+            if (!logUrl) throw new Error('No job log URL');
+
+            dispatch({ type: 'SHOW_MODAL', modal: {
+                view: 'progress', title: currentTitle, poster: currentPoster, logUrl,
+            }});
+        } catch (e) {
+            dispatch({ type: 'SHOW_MODAL', modal: {
+                view: 'streams', title: currentTitle, poster: currentPoster, streams: [],
+            }});
+        }
+    }, [state.modal]);
+
     const closeModal = useCallback(() => {
         dispatch({ type: 'CLOSE_MODAL' });
+        setUrlParams({ id: null, season: null, episode: null });
     }, []);
+
+    // --- Restore pages from URL: after each catalog load, if pages remain, trigger another loadMore ---
+    useEffect(() => {
+        if (state.phase !== 'ready') return;
+        if (state.catalogLoading) return;
+        if (state.isSearchMode) return;
+        if (state.items.length === 0) return;
+
+        if (restoredPageRef.current > 0 && state.hasMore) {
+            restoredPageRef.current--;
+            restoreInProgressRef.current = true;
+            loadCatalog(state.selectedCatalog, state.items.length, state.items);
+            return;
+        }
+
+        // Pages done (or were 0). Restore modal if needed.
+        if (restoreInProgressRef.current) {
+            restoreInProgressRef.current = false;
+        }
+        if (modalItemIdRef.current) {
+            const id = modalItemIdRef.current;
+            modalItemIdRef.current = null;
+            openModalById(id);
+        }
+    }, [state.phase, state.catalogLoading, state.isSearchMode, state.items.length, loadCatalog, openModalById]);
+
+    // Restore modal from URL after search results load
+    useEffect(() => {
+        if (state.phase !== 'ready') return;
+        if (!state.isSearchMode) return;
+        if (state.searchLoading) return;
+        if (!modalItemIdRef.current) return;
+        if (state.searchResults.length === 0) return;
+
+        const id = modalItemIdRef.current;
+        modalItemIdRef.current = null;
+        openModalById(id);
+    }, [state.phase, state.isSearchMode, state.searchLoading, state.searchResults.length, openModalById]);
+
+    // Sync state to URL
+    useEffect(() => {
+        if (state.phase !== 'ready') return;
+        // Don't overwrite URL during page/modal restore
+        if (restoreInProgressRef.current) return;
+
+        const params = {};
+        if (state.isSearchMode) {
+            if (state.searchQuery) params.search = state.searchQuery;
+            if (state.searchType && state.searchType !== 'all') params['search-type'] = state.searchType;
+        } else {
+            if (state.selectedType) params.type = state.selectedType;
+            if (state.selectedCatalog) {
+                params['catalog-base'] = state.selectedCatalog.baseUrl;
+                params['catalog-id'] = state.selectedCatalog.id;
+            }
+            if (state.page > 0) params.page = state.page;
+        }
+
+        // Preserve modal params if present
+        const currentUrl = new URLSearchParams(window.location.search);
+        const currentId = currentUrl.get('id');
+        if (currentId) params.id = currentId;
+        const currentSeason = currentUrl.get('season');
+        const currentEpisode = currentUrl.get('episode');
+        if (currentSeason != null) params.season = currentSeason;
+        if (currentEpisode != null) params.episode = currentEpisode;
+
+        const url = new URLSearchParams();
+        for (const [k, v] of Object.entries(params)) {
+            if (v != null && v !== '' && v !== 0 && v !== '0') url.set(k, String(v));
+        }
+        const search = url.toString() ? `?${url}` : '';
+        const newUrl = window.location.pathname + search;
+
+        const existingState = window.history.state || {};
+        window.history.replaceState(existingState, '', newUrl);
+    }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.page]);
 
     const retry = useCallback(() => {
         dispatch({ type: 'SET_PHASE', phase: 'loading' });
@@ -263,6 +488,7 @@ export function DiscoverApp({ addonUrls }) {
                 onSearch={performSearch}
                 onExit={exitSearch}
                 isSearchMode={state.isSearchMode}
+                initialQuery={state.searchQuery}
             />
 
             {state.isSearchMode ? (
@@ -300,6 +526,7 @@ export function DiscoverApp({ addonUrls }) {
                     modal={state.modal}
                     onClose={closeModal}
                     onEpisodeSelect={onEpisodeSelect}
+                    onStreamClick={handleStreamClick}
                 />
             )}
         </div>
@@ -308,10 +535,17 @@ export function DiscoverApp({ addonUrls }) {
 
 // --- Sub-components ---
 
-function SearchBar({ onSearch, onExit, isSearchMode }) {
+function SearchBar({ onSearch, onExit, isSearchMode, initialQuery }) {
     const [value, setValue] = useState('');
     const timerRef = useRef(null);
     const inputRef = useRef(null);
+
+    // Sync input value with initialQuery (restored from URL)
+    useEffect(() => {
+        if (initialQuery && !value) {
+            setValue(initialQuery);
+        }
+    }, [initialQuery]);
 
     // Reset input when exiting search mode
     useEffect(() => {
@@ -510,8 +744,12 @@ function LoadingSpinner() {
 }
 
 function NoAddons() {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (ref.current) rebindAsync(ref.current);
+    }, []);
     return (
-        <div class="text-center py-16">
+        <div ref={ref} class="text-center py-16">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
             </svg>
@@ -523,8 +761,12 @@ function NoAddons() {
 }
 
 function NoCatalogs() {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (ref.current) rebindAsync(ref.current);
+    }, []);
     return (
-        <div class="text-center py-16">
+        <div ref={ref} class="text-center py-16">
             <p class="text-lg font-semibold text-w-sub mb-2">No catalogs available</p>
             <p class="text-sm text-w-muted mb-6">Your addons don't provide any catalogs. Try adding a catalog addon like Cinemeta.</p>
             <a class="btn btn-soft-cyan btn-sm px-5" href="/profile" data-async-target="main">Go to Profile</a>

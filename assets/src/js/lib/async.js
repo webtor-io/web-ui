@@ -59,6 +59,7 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     }
     return res;
 }
+
 async function async(selector, params = {}, scope = null) {
     if (!scope) {
         scope = document;
@@ -88,6 +89,9 @@ async function async(selector, params = {}, scope = null) {
             el.reloadResolve(res);
         }
         if (!el.getAttribute('data-async-target')) continue;
+        // Skip already-bound elements (e.g. on rebind after Preact render)
+        if (el._asyncBound) continue;
+        el._asyncBound = true;
         el.addEventListener(params.event, async function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -189,6 +193,10 @@ function asyncLayout(p = {}) {
         },
     }, p)
     async('*[data-async-layout]', params);
+}
+
+export function rebindAsync(target) {
+    window.dispatchEvent(new CustomEvent('async', { detail: { target } }));
 }
 
 export function bindAsync(params = {}) {
