@@ -5,7 +5,7 @@ import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
 import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -33,13 +33,26 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick }) 
     return (
         <dialog ref={dialogRef} class="modal" onClose={handleClose}>
             <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl">
+                {onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') && (
+                    <button
+                        class="btn btn-sm btn-ghost absolute left-2 top-2 text-w-muted hover:text-w-cyan gap-1 px-2"
+                        onClick={onBackToEpisodes}
+                    >
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"/>
+                        </svg>
+                        Episodes
+                    </button>
+                )}
                 <button
                     class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content"
                     onClick={handleClose}
                 >
                     &#10005;
                 </button>
-                <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} />
+                <div class={onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? 'pt-8' : ''}>
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} />
+                </div>
             </div>
             <form method="dialog" class="modal-backdrop">
                 <button>close</button>
@@ -63,7 +76,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
     }
 
     if (modal.view === 'episodes') {
-        return <EpisodePicker modal={modal} onEpisodeSelect={onEpisodeSelect} />;
+        return <EpisodePicker modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} />;
     }
 
     if (modal.view === 'streams') {
@@ -374,7 +387,7 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
 
@@ -393,7 +406,12 @@ function EpisodePicker({ modal, onEpisodeSelect }) {
         return { seasons: s, seasonNums: nums };
     }, [videos]);
 
-    const [activeSeason, setActiveSeason] = useState(seasonNums[0] ?? 0);
+    const [activeSeason, setActiveSeason] = useState(() => {
+        if (defaultSeason != null && seasonNums.includes(Number(defaultSeason))) {
+            return Number(defaultSeason);
+        }
+        return seasonNums[0] ?? 0;
+    });
 
     const episodes = useMemo(() =>
         (seasons[activeSeason] || []).slice().sort((a, b) => (a.episode || 0) - (b.episode || 0)),

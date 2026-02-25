@@ -277,7 +277,7 @@ export function DiscoverApp({ addonUrls }) {
         }
     }, [client, state.selectedType, loadStreams]);
 
-    const openModalById = useCallback((id) => {
+    const openModalById = useCallback(async (id) => {
         // Try to find the item in loaded items or search results
         const item = state.items.find(i => i.id === id)
             || state.searchResults.find(i => i.id === id);
@@ -285,29 +285,83 @@ export function DiscoverApp({ addonUrls }) {
         modalEpisodeRef.current = null;
 
         if (ep) {
-            // Restore directly to streams for a specific episode
+            // Restore directly to streams for a specific episode, fetching meta for back-nav
             const type = item?.type || state.selectedType || 'series';
             const epId = `${id}:${ep.season}:${ep.episode}`;
             const name = item?.name || id;
             const epName = `${name} - S${ep.season}E${ep.episode}`;
             const poster = item?.poster;
             setUrlParams({ id, season: ep.season, episode: ep.episode });
-            loadStreams(type, epId, { name: epName, poster });
+
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster, subtitle: 'Loading streams...' } });
+
+            // Fetch meta in parallel with streams so we can offer "back to episodes"
+            const [streamsResult, metaResult] = await Promise.allSettled([
+                client.fetchStreams(type, epId),
+                client.fetchMeta(type, id),
+            ]);
+
+            const streams = streamsResult.status === 'fulfilled' ? streamsResult.value : [];
+            const meta = metaResult.status === 'fulfilled' ? metaResult.value : null;
+
+            const backToEpisodes = meta?.videos?.length > 0 ? {
+                title: name, poster, meta, itemId: id, itemType: type, season: ep.season,
+            } : undefined;
+
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster, streams, backToEpisodes } });
+            if (streams.length > 0) {
+                window.umami?.track('discover-streams-loaded', { type, id: epId, count: streams.length });
+            }
         } else if (item) {
             cardClick(item);
         } else {
             // Item not in loaded data — open with minimal info, modal will load via API
             cardClick({ id, name: id, type: state.selectedType });
         }
-    }, [state.items, state.searchResults, state.selectedType, cardClick, loadStreams]);
+    }, [client, state.items, state.searchResults, state.selectedType, cardClick, loadStreams]);
 
     const onEpisodeSelect = useCallback(async (episode, item) => {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
         const epName = `${item.title} - S${episode.season || '?'}E${episode.episode || '?'}`;
         setUrlParams({ season: episode.season, episode: episode.episode });
-        await loadStreams(type, epId, { name: epName, poster: item.poster });
-    }, [loadStreams]);
+
+        const backToEpisodes = {
+            title: item.title,
+            poster: item.poster,
+            meta: item.meta,
+            itemId: item.itemId,
+            itemType: item.itemType,
+            season: episode.season,
+        };
+
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster: item.poster, subtitle: 'Loading streams...', backToEpisodes } });
+        try {
+            const streams = await client.fetchStreams(type, epId);
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster: item.poster, streams, backToEpisodes } });
+            window.umami?.track('discover-streams-loaded', { type, id: epId, count: streams.length });
+        } catch (e) {
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster: item.poster, streams: [], backToEpisodes } });
+        }
+    }, [client]);
+
+    const onBackToEpisodes = useCallback(() => {
+        const back = state.modal?.backToEpisodes;
+        if (!back) return;
+        setUrlParams({ season: null, episode: null });
+        dispatch({
+            type: 'SHOW_MODAL',
+            modal: {
+                view: 'episodes',
+                title: back.title,
+                poster: back.poster,
+                meta: back.meta,
+                itemId: back.itemId,
+                itemType: back.itemType,
+                defaultSeason: back.season != null ? Number(back.season) : undefined,
+            },
+        });
+    }, [state.modal]);
 
     const handleStreamClick = useCallback(async (infoHash, fileIdx) => {
         const currentTitle = state.modal?.title;
@@ -527,6 +581,7 @@ export function DiscoverApp({ addonUrls }) {
                     onClose={closeModal}
                     onEpisodeSelect={onEpisodeSelect}
                     onStreamClick={handleStreamClick}
+                    onBackToEpisodes={state.modal.backToEpisodes ? onBackToEpisodes : undefined}
                 />
             )}
         </div>
