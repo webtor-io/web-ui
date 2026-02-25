@@ -70,6 +70,7 @@ func (s *Handler) getList(ctx context.Context, args *GetArgs) (l *ra.ListRespons
 		Path:   args.PWD,
 		Limit:  limit,
 		Offset: offset,
+		Sort:   "name",
 	})
 	return
 }
