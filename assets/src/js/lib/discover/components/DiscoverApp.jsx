@@ -309,12 +309,12 @@ export function DiscoverApp({ addonUrls }) {
         await loadStreams(type, epId, { name: epName, poster: item.poster });
     }, [loadStreams]);
 
-    const handleStreamClick = useCallback(async (infoHash) => {
+    const handleStreamClick = useCallback(async (infoHash, fileIdx) => {
         const currentTitle = state.modal?.title;
         const currentPoster = state.modal?.poster;
 
         dispatch({ type: 'SHOW_MODAL', modal: {
-            view: 'progress', title: currentTitle, poster: currentPoster, logUrl: null,
+            view: 'progress', title: currentTitle, poster: currentPoster, logUrl: null, fileIdx: fileIdx != null ? fileIdx : null,
         }});
 
         try {
@@ -336,7 +336,7 @@ export function DiscoverApp({ addonUrls }) {
             if (!logUrl) throw new Error('No job log URL');
 
             dispatch({ type: 'SHOW_MODAL', modal: {
-                view: 'progress', title: currentTitle, poster: currentPoster, logUrl,
+                view: 'progress', title: currentTitle, poster: currentPoster, logUrl, fileIdx: fileIdx != null ? fileIdx : null,
             }});
         } catch (e) {
             dispatch({ type: 'SHOW_MODAL', modal: {

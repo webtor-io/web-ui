@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -33,6 +34,7 @@ type GetArgs struct {
 	PageSize uint
 	PWD      string
 	File     string
+	FileIdx  *int
 	Claims   *api.Claims
 	User     *auth.User
 }
@@ -51,12 +53,20 @@ func (s *Handler) bindGetArgs(c *gin.Context) (*GetArgs, error) {
 		}
 	}
 
+	var fileIdx *int
+	if fi := c.Query("file-idx"); fi != "" {
+		if v, err := strconv.Atoi(fi); err == nil && v >= 0 {
+			fileIdx = &v
+		}
+	}
+
 	return &GetArgs{
 		ID:       id,
 		Page:     page,
 		PageSize: pageSize,
 		PWD:      c.Query("pwd"),
 		File:     c.Query("file"),
+		FileIdx:  fileIdx,
 		Claims:   api.GetClaimsFromContext(c),
 		User:     auth.GetUserFromContext(c),
 	}, nil
@@ -124,6 +134,12 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	}
 	if len(list.Items) > 1 {
 		d.List = list
+	}
+	if args.FileIdx != nil && args.File == "" {
+		path, err := s.resolveFileIdx(ctx, args, *args.FileIdx)
+		if err == nil && path != "" {
+			args.File = path
+		}
 	}
 	d.Item, err = s.getBestItem(ctx, list, args)
 	if len(list.Items) == 1 && d.Item == nil {
@@ -248,4 +264,31 @@ func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *Get
 		}
 	}
 	return
+}
+
+func (s *Handler) resolveFileIdx(ctx context.Context, args *GetArgs, fileIdx int) (string, error) {
+	listArgs := &api.ListResourceContentArgs{
+		Limit:  100,
+		Offset: 0,
+	}
+	var idx int
+	for {
+		resp, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, listArgs)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to list resource content for file-idx resolution")
+		}
+		for _, item := range resp.Items {
+			if item.Type == ra.ListTypeFile {
+				if idx == fileIdx {
+					return item.PathStr, nil
+				}
+				idx++
+			}
+		}
+		if int(listArgs.Offset)+len(resp.Items) >= resp.Count {
+			break
+		}
+		listArgs.Offset += listArgs.Limit
+	}
+	return "", fmt.Errorf("file at index %d not found", fileIdx)
 }

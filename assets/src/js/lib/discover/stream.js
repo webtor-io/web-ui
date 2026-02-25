@@ -31,6 +31,11 @@ export function parseStreamName(name) {
     return { source, labels };
 }
 
+export function extractFileIdx(stream) {
+    if (stream.fileIdx != null && stream.fileIdx !== '') return Number(stream.fileIdx);
+    return null;
+}
+
 export function extractInfoHash(stream) {
     if (stream.infoHash) return stream.infoHash.toLowerCase();
     const hashRe = /([0-9a-fA-F]{40})/;

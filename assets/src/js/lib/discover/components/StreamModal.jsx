@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'preact/hooks';
 import { rebindAsync } from '../../async';
 import { initProgressLog } from '../../progressLog';
-import { parseStreamName, extractInfoHash } from '../stream';
+import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
 import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 
@@ -59,7 +59,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
     }
 
     if (modal.view === 'progress') {
-        return <ProgressView logUrl={modal.logUrl} title={modal.title} poster={modal.poster} />;
+        return <ProgressView logUrl={modal.logUrl} title={modal.title} poster={modal.poster} fileIdx={modal.fileIdx} />;
     }
 
     if (modal.view === 'episodes') {
@@ -93,7 +93,7 @@ function ModalHeader({ title, poster, subtitle }) {
 
 // --- Progress View ---
 
-function ProgressView({ logUrl, title, poster }) {
+function ProgressView({ logUrl, title, poster, fileIdx }) {
     const containerRef = useRef(null);
 
     useEffect(() => {
@@ -111,6 +111,7 @@ function ProgressView({ logUrl, title, poster }) {
             <div ref={containerRef}>
                 {logUrl ? (
                     <form class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
+                        {fileIdx != null && <input type="hidden" name="file-idx" value={fileIdx} />}
                         <div class="log-target"></div>
                     </form>
                 ) : (
@@ -328,6 +329,7 @@ const PLAY_ICON = (
 
 function StreamRow({ stream, info, onStreamClick }) {
     const infoHash = extractInfoHash(stream);
+    const fileIdx = extractFileIdx(stream);
     const titleLines = (stream.title || '').split('\n').filter(Boolean);
 
     const content = (
@@ -355,7 +357,7 @@ function StreamRow({ stream, info, onStreamClick }) {
     if (infoHash) {
         return (
             <div
-                onClick={() => onStreamClick(infoHash)}
+                onClick={() => onStreamClick(infoHash, fileIdx)}
                 class="cursor-pointer flex items-center gap-3 p-3 rounded-lg border border-w-line hover:border-w-cyan/30 hover:bg-w-surface/50 transition-all"
             >
                 {content}
