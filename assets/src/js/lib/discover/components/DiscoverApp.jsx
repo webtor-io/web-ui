@@ -12,7 +12,7 @@ import { loadPrefs, savePrefs } from '../prefs';
 function setUrlParams(params) {
     const url = new URLSearchParams(window.location.search);
     for (const [k, v] of Object.entries(params)) {
-        if (v != null && v !== '' && v !== 0 && v !== '0') url.set(k, String(v));
+        if (v != null && v !== '') url.set(k, String(v));
         else url.delete(k);
     }
     const search = url.toString() ? `?${url}` : '';
@@ -289,7 +289,7 @@ export function DiscoverApp({ addonUrls }) {
             const type = item?.type || state.selectedType || 'series';
             const epId = `${id}:${ep.season}:${ep.episode}`;
             const name = item?.name || id;
-            const epName = `${name} - S${ep.season}E${ep.episode}`;
+            const epName = `${name} - ${Number(ep.season) === 0 ? 'Specials' : `S${ep.season}`} E${ep.episode}`;
             const poster = item?.poster;
             setUrlParams({ id, season: ep.season, episode: ep.episode });
 
@@ -323,7 +323,7 @@ export function DiscoverApp({ addonUrls }) {
     const onEpisodeSelect = useCallback(async (episode, item) => {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
-        const epName = `${item.title} - S${episode.season || '?'}E${episode.episode || '?'}`;
+        const epName = `${item.title} - ${Number(episode.season) === 0 ? 'Specials' : `S${episode.season || '?'}`} E${episode.episode || '?'}`;
         setUrlParams({ season: episode.season, episode: episode.episode });
 
         const backToEpisodes = {
@@ -472,7 +472,7 @@ export function DiscoverApp({ addonUrls }) {
 
         const url = new URLSearchParams();
         for (const [k, v] of Object.entries(params)) {
-            if (v != null && v !== '' && v !== 0 && v !== '0') url.set(k, String(v));
+            if (v != null && v !== '') url.set(k, String(v));
         }
         const search = url.toString() ? `?${url}` : '';
         const newUrl = window.location.pathname + search;

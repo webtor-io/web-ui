@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -139,6 +140,15 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		path, err := s.resolveFileIdx(ctx, args, *args.FileIdx)
 		if err == nil && path != "" {
 			args.File = path
+			// Set PWD to the parent directory of the resolved file
+			if dir := filepath.Dir(path); dir != "/" && dir != "." {
+				args.PWD = dir
+				list, err = s.getList(ctx, args)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to list resource after fileIdx resolution")
+				}
+				d.List = list
+			}
 		}
 	}
 	d.Item, err = s.getBestItem(ctx, list, args)
