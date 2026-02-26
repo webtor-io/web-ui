@@ -1,56 +1,36 @@
-import { useReducer, useRef, useEffect, useCallback, useState, useMemo } from 'preact/hooks';
-import { rebindAsync, addPopstateFilter } from '../../async';
+import { useReducer, useRef, useEffect, useCallback, useMemo } from 'preact/hooks';
 import { StremioClient, CINEMETA_BASE } from '../client';
 import {
     discoverReducer, initialState,
-    buildCatalogs, getCatalogsForType, getTypes,
+    getCatalogsForType, getTypes,
     getSearchTypes, getSearchResultsForType,
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
 import { loadPrefs, savePrefs } from '../prefs';
-
-function buildUrl(params) {
-    const url = new URLSearchParams(window.location.search);
-    for (const [k, v] of Object.entries(params)) {
-        if (v != null && v !== '') url.set(k, String(v));
-        else url.delete(k);
-    }
-    const search = url.toString() ? `?${url}` : '';
-    return window.location.pathname + search;
-}
-
-function setUrlParams(params) {
-    const existing = window.history.state || {};
-    const newUrl = buildUrl(params);
-    window.history.replaceState({ ...existing, url: newUrl }, '', newUrl);
-}
-
-function pushUrlParams(params) {
-    const url = buildUrl(params);
-    const main = document.querySelector('main');
-    window.history.pushState({
-        context: 'links', url, targetSelector: 'main',
-        layout: main ? main.getAttribute('data-async-layout') : '',
-        fetchParams: {},
-    }, '', url);
-}
+import { useDiscoverUrl } from './useDiscoverUrl';
+import { restoreModalFromUrl, loadManifests } from './discoverUtils';
+import { SearchBar } from './SearchBar';
+import { ItemGrid } from './ItemGrid';
+import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
+import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults } from './EmptyStates';
 
 export function DiscoverApp({ addonUrls }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
     const clientRef = useRef(null);
     const abortRef = useRef(null);
     const searchGenRef = useRef(0);
-    const debounceRef = useRef(null);
     const searchAfterInit = useRef(null);
     const restoredPageRef = useRef(0);
     const modalItemIdRef = useRef(null);
     const modalEpisodeRef = useRef(null); // { season, episode }
     const modalSeasonRef = useRef(null); // season-only (no episode) from URL
     const restoreInProgressRef = useRef(false);
-    const isPopstateRef = useRef(false); // suppress pushState during popstate/restore
     const stateRef = useRef(null); // latest state snapshot for popstate handler
     const modalRef = useRef(null); // current modal for popstate handler
     const openModalByIdRef = useRef(null); // latest openModalById for popstate handler
+    const performSearchRef = useRef(null); // latest performSearch for popstate handler
+
+    const url = useDiscoverUrl('/discover');
 
     // Create client once
     if (!clientRef.current) {
@@ -93,11 +73,8 @@ export function DiscoverApp({ addonUrls }) {
         let cancelled = false;
         (async () => {
             try {
-                const manifests = await client.fetchAllManifests();
+                const { manifests, catalogs, types } = await loadManifests(client);
                 if (cancelled) return;
-                client.manifests = manifests;
-                const catalogs = buildCatalogs(manifests);
-                const types = getTypes(catalogs);
 
                 if (!types.length) {
                     dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
@@ -186,7 +163,7 @@ export function DiscoverApp({ addonUrls }) {
         savePrefs({ type });
         const catalogs = getCatalogsForType(state.catalogs, type);
         const catalog = catalogs[0] || null;
-        pushUrlParams({
+        url.push({
             type, 'catalog-base': catalog?.baseUrl, 'catalog-id': catalog?.id,
             id: null, season: null, episode: null, search: null, 'search-type': null,
         });
@@ -196,7 +173,7 @@ export function DiscoverApp({ addonUrls }) {
     const selectCatalog = useCallback((catalog) => {
         abortCatalog();
         savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
-        pushUrlParams({
+        url.push({
             'catalog-base': catalog.baseUrl, 'catalog-id': catalog.id,
             id: null, season: null, episode: null,
         });
@@ -209,13 +186,32 @@ export function DiscoverApp({ addonUrls }) {
     }, [state.selectedCatalog, state.items, loadCatalog]);
 
     // --- Search ---
+    const exitSearch = useCallback(() => {
+        abortCatalog();
+        if (!url.isPopstate.current) {
+            const types = getTypes(state.catalogs);
+            const type = types[0] || null;
+            const catalog = type ? getCatalogsForType(state.catalogs, type)[0] : null;
+            url.push({
+                type, 'catalog-base': catalog?.baseUrl, 'catalog-id': catalog?.id,
+                search: null, 'search-type': null, id: null, season: null, episode: null,
+            });
+        }
+        dispatch({ type: 'EXIT_SEARCH' });
+    }, [state.catalogs]);
+
     const performSearch = useCallback(async (query) => {
         query = query.trim();
         if (query.length < 2) {
             if (state.isSearchMode) {
-                dispatch({ type: 'EXIT_SEARCH' });
+                exitSearch();
             }
             return;
+        }
+
+        // Push history entry when first entering search mode (not during popstate)
+        if (!state.isSearchMode && !url.isPopstate.current) {
+            url.push({ search: query, 'search-type': null, type: null, 'catalog-base': null, 'catalog-id': null, id: null, season: null, episode: null });
         }
 
         const gen = ++searchGenRef.current;
@@ -254,12 +250,7 @@ export function DiscoverApp({ addonUrls }) {
 
         dispatch({ type: 'SEARCH_RESULTS', results: merged });
         window.umami?.track('discover-search', { query, count: merged.length });
-    }, [client, state.isSearchMode]);
-
-    const exitSearch = useCallback(() => {
-        abortCatalog();
-        dispatch({ type: 'EXIT_SEARCH' });
-    }, []);
+    }, [client, state.isSearchMode, exitSearch]);
 
     // Trigger search restored from URL after init
     useEffect(() => {
@@ -288,10 +279,10 @@ export function DiscoverApp({ addonUrls }) {
         const restoreSeason = modalSeasonRef.current;
         modalSeasonRef.current = null;
 
-        if (isPopstateRef.current) {
-            setUrlParams({ id, season: restoreSeason ?? null, episode: null });
+        if (url.isPopstate.current) {
+            url.replace({ id, season: restoreSeason ?? null, episode: null });
         } else {
-            pushUrlParams({ id, season: null, episode: null });
+            url.push({ id, season: null, episode: null });
         }
 
         if (type === 'series') {
@@ -328,10 +319,10 @@ export function DiscoverApp({ addonUrls }) {
             const name = item?.name || id;
             const epName = `${name} - ${Number(ep.season) === 0 ? 'Specials' : `S${ep.season}`} E${ep.episode}`;
             const poster = item?.poster;
-            if (isPopstateRef.current) {
-                setUrlParams({ id, season: ep.season, episode: ep.episode });
+            if (url.isPopstate.current) {
+                url.replace({ id, season: ep.season, episode: ep.episode });
             } else {
-                pushUrlParams({ season: ep.season, episode: ep.episode });
+                url.push({ season: ep.season, episode: ep.episode });
             }
 
             dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster, subtitle: 'Loading streams...' } });
@@ -365,7 +356,7 @@ export function DiscoverApp({ addonUrls }) {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
         const epName = `${item.title} - ${Number(episode.season) === 0 ? 'Specials' : `S${episode.season || '?'}`} E${episode.episode || '?'}`;
-        pushUrlParams({ season: episode.season, episode: episode.episode });
+        url.push({ season: episode.season, episode: episode.episode });
 
         const backToEpisodes = {
             title: item.title,
@@ -391,12 +382,13 @@ export function DiscoverApp({ addonUrls }) {
     }, []);
 
     const onSeasonChange = useCallback((season) => {
-        pushUrlParams({ season, episode: null });
+        url.push({ season, episode: null });
     }, []);
 
     const handleStreamClick = useCallback(async (infoHash, fileIdx) => {
         const currentTitle = state.modal?.title;
         const currentPoster = state.modal?.poster;
+        const currentBackToEpisodes = state.modal?.backToEpisodes;
 
         dispatch({ type: 'SHOW_MODAL', modal: {
             view: 'progress', title: currentTitle, poster: currentPoster, logUrl: null, fileIdx: fileIdx != null ? fileIdx : null,
@@ -426,115 +418,131 @@ export function DiscoverApp({ addonUrls }) {
         } catch (e) {
             dispatch({ type: 'SHOW_MODAL', modal: {
                 view: 'streams', title: currentTitle, poster: currentPoster, streams: [],
+                error: 'Failed to prepare the resource. Please try again.',
+                backToEpisodes: currentBackToEpisodes,
             }});
         }
     }, [state.modal]);
 
     const closeModal = useCallback(() => {
         dispatch({ type: 'CLOSE_MODAL' });
-        setUrlParams({ id: null, season: null, episode: null });
+        url.replace({ id: null, season: null, episode: null });
+    }, []);
+
+    const selectSearchType = useCallback((searchType) => {
+        url.push({ 'search-type': searchType === 'all' ? null : searchType });
+        dispatch({ type: 'SELECT_SEARCH_TYPE', searchType });
     }, []);
 
     // Keep refs in sync for popstate handler
     modalRef.current = state.modal;
     openModalByIdRef.current = openModalById;
+    performSearchRef.current = performSearch;
     stateRef.current = state;
 
     // --- Browser back/forward ---
-    useEffect(() => {
-        // Tell async.js to skip popstate when Discover is mounted and URL is /discover
-        const removeFilter = addPopstateFilter(() =>
-            window.location.pathname.startsWith('/discover')
-        );
+    url.onPopstate((urlParams) => {
+        const id = urlParams.get('id');
+        const season = urlParams.get('season');
+        const episode = urlParams.get('episode');
+        const type = urlParams.get('type');
+        const catalogBase = urlParams.get('catalog-base');
+        const catalogId = urlParams.get('catalog-id');
+        const search = urlParams.get('search');
+        const searchType = urlParams.get('search-type');
 
-        const handler = (e) => {
-            if (!window.location.pathname.startsWith('/discover')) return;
+        const cur = stateRef.current;
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const id = urlParams.get('id');
-            const season = urlParams.get('season');
-            const episode = urlParams.get('episode');
-            const type = urlParams.get('type');
-            const catalogBase = urlParams.get('catalog-base');
-            const catalogId = urlParams.get('catalog-id');
-
-            const cur = stateRef.current;
-
-            // Handle type change
-            if (type && cur && type !== cur.selectedType) {
-                const types = getTypes(cur.catalogs);
-                if (types.includes(type)) {
-                    savePrefs({ type });
-                    dispatch({ type: 'SELECT_TYPE', selectedType: type });
-                }
+        // Handle search mode
+        if (search) {
+            if (!cur.isSearchMode || cur.searchQuery !== search) {
+                url.withPopstate(() => performSearchRef.current(search));
             }
-
-            // Handle catalog change
-            if (catalogBase && catalogId && cur) {
-                const curCat = cur.selectedCatalog;
-                if (!curCat || curCat.baseUrl !== catalogBase || curCat.id !== catalogId) {
-                    const match = getCatalogsForType(cur.catalogs, type || cur.selectedType)
-                        .find(c => c.baseUrl === catalogBase && c.id === catalogId);
-                    if (match) {
-                        savePrefs({ catalogBase: match.baseUrl, catalogId: match.id });
-                        dispatch({ type: 'SELECT_CATALOG', catalog: match });
-                    }
-                }
+            const targetType = searchType || 'all';
+            if (targetType !== (cur.searchType || 'all')) {
+                dispatch({ type: 'SELECT_SEARCH_TYPE', searchType: targetType });
             }
-
-            // Handle modal state
-            if (!id) {
-                if (modalRef.current) {
-                    dispatch({ type: 'CLOSE_MODAL' });
-                }
-                return;
-            }
-
+            // Handle modal within search results
             if (id && season && episode) {
                 modalEpisodeRef.current = { season, episode };
-                isPopstateRef.current = true;
-                openModalByIdRef.current(id);
-                isPopstateRef.current = false;
+                url.withPopstate(() => openModalByIdRef.current(id));
             } else if (id) {
-                const currentModal = modalRef.current;
-                if (currentModal?.view === 'episodes' && currentModal?.itemId === id) {
-                    // Same series, navigating between seasons — force remount via _seasonKey
-                    dispatch({
-                        type: 'SHOW_MODAL',
-                        modal: {
-                            ...currentModal,
-                            defaultSeason: season != null ? Number(season) : undefined,
-                            _seasonKey: Date.now(),
-                        },
-                    });
-                } else if (currentModal?.backToEpisodes) {
-                    const back = currentModal.backToEpisodes;
-                    dispatch({
-                        type: 'SHOW_MODAL',
-                        modal: {
-                            view: 'episodes',
-                            title: back.title,
-                            poster: back.poster,
-                            meta: back.meta,
-                            itemId: back.itemId,
-                            itemType: back.itemType,
-                            defaultSeason: season != null ? Number(season) : (back.season != null ? Number(back.season) : undefined),
-                        },
-                    });
-                } else {
-                    isPopstateRef.current = true;
-                    openModalByIdRef.current(id);
-                    isPopstateRef.current = false;
+                url.withPopstate(() => openModalByIdRef.current(id));
+            } else if (modalRef.current) {
+                dispatch({ type: 'CLOSE_MODAL' });
+            }
+            return;
+        }
+
+        // If no search param but currently in search mode — exit search
+        if (cur.isSearchMode) {
+            url.withPopstate(() => { abortCatalog(); dispatch({ type: 'EXIT_SEARCH' }); });
+        }
+
+        // Handle type change
+        if (type && cur && type !== cur.selectedType) {
+            const types = getTypes(cur.catalogs);
+            if (types.includes(type)) {
+                savePrefs({ type });
+                dispatch({ type: 'SELECT_TYPE', selectedType: type });
+            }
+        }
+
+        // Handle catalog change
+        if (catalogBase && catalogId && cur) {
+            const curCat = cur.selectedCatalog;
+            if (!curCat || curCat.baseUrl !== catalogBase || curCat.id !== catalogId) {
+                const match = getCatalogsForType(cur.catalogs, type || cur.selectedType)
+                    .find(c => c.baseUrl === catalogBase && c.id === catalogId);
+                if (match) {
+                    savePrefs({ catalogBase: match.baseUrl, catalogId: match.id });
+                    dispatch({ type: 'SELECT_CATALOG', catalog: match });
                 }
             }
-        };
+        }
 
-        window.addEventListener('popstate', handler);
-        return () => {
-            removeFilter();
-            window.removeEventListener('popstate', handler);
-        };
-    }, []);
+        // Handle modal state
+        if (!id) {
+            if (modalRef.current) {
+                dispatch({ type: 'CLOSE_MODAL' });
+            }
+            return;
+        }
+
+        if (id && season && episode) {
+            modalEpisodeRef.current = { season, episode };
+            url.withPopstate(() => openModalByIdRef.current(id));
+        } else if (id) {
+            const currentModal = modalRef.current;
+            if (currentModal?.view === 'episodes' && currentModal?.itemId === id) {
+                // Same series, navigating between seasons — force remount via _seasonKey
+                dispatch({
+                    type: 'SHOW_MODAL',
+                    modal: {
+                        ...currentModal,
+                        defaultSeason: season != null ? Number(season) : undefined,
+                        _seasonKey: Date.now(),
+                    },
+                });
+            } else if (currentModal?.backToEpisodes) {
+                const back = currentModal.backToEpisodes;
+                dispatch({
+                    type: 'SHOW_MODAL',
+                    modal: {
+                        view: 'episodes',
+                        title: back.title,
+                        poster: back.poster,
+                        meta: back.meta,
+                        itemId: back.itemId,
+                        itemType: back.itemType,
+                        defaultSeason: season != null ? Number(season) : (back.season != null ? Number(back.season) : undefined),
+                    },
+                });
+            } else {
+                url.withPopstate(() => openModalByIdRef.current(id));
+            }
+        }
+    });
 
     // --- Restore pages from URL: after each catalog load, if pages remain, trigger another loadMore ---
     useEffect(() => {
@@ -557,25 +565,7 @@ export function DiscoverApp({ addonUrls }) {
         if (modalItemIdRef.current) {
             const id = modalItemIdRef.current;
             modalItemIdRef.current = null;
-            if (modalEpisodeRef.current) {
-                // Check if history.state has SPA marker (context: 'links' from pushUrlParams).
-                // If so, this is a back/forward to an existing entry (e.g. returning from torrent card) —
-                // the episodes history entry already exists, don't create a duplicate.
-                const isRestoredEntry = window.history.state?.context === 'links';
-                if (isRestoredEntry) {
-                    isPopstateRef.current = true;
-                    openModalById(id);
-                    isPopstateRef.current = false;
-                } else {
-                    // Direct URL: create episodes entry, then push streams entry
-                    setUrlParams({ id, season: null, episode: null });
-                    openModalById(id);
-                }
-            } else {
-                isPopstateRef.current = true;
-                openModalById(id);
-                isPopstateRef.current = false;
-            }
+            restoreModalFromUrl(id, url, openModalById, modalEpisodeRef);
         }
     }, [state.phase, state.catalogLoading, state.isSearchMode, state.items.length, loadCatalog, openModalById]);
 
@@ -589,21 +579,7 @@ export function DiscoverApp({ addonUrls }) {
 
         const id = modalItemIdRef.current;
         modalItemIdRef.current = null;
-        if (modalEpisodeRef.current) {
-            const isRestoredEntry = window.history.state?.context === 'links';
-            if (isRestoredEntry) {
-                isPopstateRef.current = true;
-                openModalById(id);
-                isPopstateRef.current = false;
-            } else {
-                setUrlParams({ id, season: null, episode: null });
-                openModalById(id);
-            }
-        } else {
-            isPopstateRef.current = true;
-            openModalById(id);
-            isPopstateRef.current = false;
-        }
+        restoreModalFromUrl(id, url, openModalById, modalEpisodeRef);
     }, [state.phase, state.isSearchMode, state.searchLoading, state.searchResults.length, openModalById]);
 
     // Sync state to URL
@@ -626,44 +602,26 @@ export function DiscoverApp({ addonUrls }) {
         }
 
         // Preserve modal params if present
-        const currentUrl = new URLSearchParams(window.location.search);
-        const currentId = currentUrl.get('id');
-        if (currentId) params.id = currentId;
-        const currentSeason = currentUrl.get('season');
-        const currentEpisode = currentUrl.get('episode');
-        if (currentSeason != null) params.season = currentSeason;
-        if (currentEpisode != null) params.episode = currentEpisode;
+        const cur = new URLSearchParams(window.location.search);
+        ['id', 'season', 'episode'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
 
-        const url = new URLSearchParams();
-        for (const [k, v] of Object.entries(params)) {
-            if (v != null && v !== '') url.set(k, String(v));
-        }
-        const search = url.toString() ? `?${url}` : '';
-        const newUrl = window.location.pathname + search;
-
-        const existingState = window.history.state || {};
-        window.history.replaceState({ ...existingState, url: newUrl }, '', newUrl);
+        url.replaceAll(params);
     }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.page]);
 
     const retry = useCallback(() => {
         dispatch({ type: 'SET_PHASE', phase: 'loading' });
-        // Re-trigger init by remounting - simplest: reset client manifests
         client.manifests = null;
-        // Force re-init
         prevCatalogRef.current = null;
         (async () => {
             try {
-                const manifests = await client.fetchAllManifests();
-                client.manifests = manifests;
-                const catalogs = buildCatalogs(manifests);
-                const types = getTypes(catalogs);
+                const { catalogs, types } = await loadManifests(client);
                 if (!types.length) {
                     dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
                     return;
                 }
                 const selectedType = types[0];
                 const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog });
+                dispatch({ type: 'INIT_SUCCESS', manifests: client.manifests, catalogs, selectedType, selectedCatalog });
             } catch (e) {
                 dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
             }
@@ -681,7 +639,7 @@ export function DiscoverApp({ addonUrls }) {
         return getSearchResultsForType(state.searchResults, state.searchType);
     }, [state.isSearchMode, state.items, state.searchResults, state.searchType]);
 
-    const showBadges = state.isSearchMode && state.searchType === 'all';
+    const showBadges = useMemo(() => state.isSearchMode && state.searchType === 'all', [state.isSearchMode, state.searchType]);
 
     // --- Render ---
     if (state.phase === 'loading') {
@@ -714,7 +672,7 @@ export function DiscoverApp({ addonUrls }) {
                     searchResults={state.searchResults}
                     searchTypes={searchTypes}
                     searchType={state.searchType}
-                    onSelect={(t) => dispatch({ type: 'SELECT_SEARCH_TYPE', searchType: t })}
+                    onSelect={selectSearchType}
                 />
             ) : (
                 <>
@@ -749,279 +707,6 @@ export function DiscoverApp({ addonUrls }) {
                     onSeasonChange={onSeasonChange}
                 />
             )}
-        </div>
-    );
-}
-
-// --- Sub-components ---
-
-function SearchBar({ onSearch, onExit, isSearchMode, initialQuery }) {
-    const [value, setValue] = useState('');
-    const timerRef = useRef(null);
-    const inputRef = useRef(null);
-
-    // Sync input value with initialQuery (restored from URL)
-    useEffect(() => {
-        if (initialQuery && !value) {
-            setValue(initialQuery);
-        }
-    }, [initialQuery]);
-
-    // Reset input when exiting search mode
-    useEffect(() => {
-        if (!isSearchMode && value) {
-            setValue('');
-        }
-    }, [isSearchMode]);
-
-    const handleInput = useCallback((e) => {
-        const v = e.target.value;
-        setValue(v);
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => onSearch(v), 400);
-    }, [onSearch]);
-
-    const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Escape') {
-            setValue('');
-            onExit();
-            inputRef.current?.blur();
-        }
-    }, [onExit]);
-
-    const handleClear = useCallback(() => {
-        setValue('');
-        onExit();
-    }, [onExit]);
-
-    return (
-        <div class="relative mb-6">
-            <div class="flex items-center bg-w-surface border border-w-line rounded-xl focus-within:border-w-cyan/50 transition-colors">
-                <svg class="w-5 h-5 text-w-muted ml-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.3-4.3"></path>
-                </svg>
-                <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="Search movies and series..."
-                    class="w-full bg-transparent border-none outline-none px-3 py-3 text-w-text placeholder:text-w-muted text-sm"
-                    autocomplete="off"
-                    value={value}
-                    onInput={handleInput}
-                    onKeyDown={handleKeyDown}
-                />
-                {value.length > 0 && (
-                    <button class="mr-3 p-1 text-w-muted hover:text-w-text transition-colors flex-shrink-0" type="button" onClick={handleClear}>
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6 6 18M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function TypeTabs({ types, selectedType, onSelect }) {
-    if (!types.length) return null;
-    return (
-        <div class="flex gap-2 mb-4 flex-wrap">
-            {types.map(type => (
-                <button
-                    key={type}
-                    class={type === selectedType ? 'btn btn-sm bg-w-cyan/15 border border-w-cyan/30 text-w-cyan' : 'btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan'}
-                    onClick={() => onSelect(type)}
-                >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function SearchTabs({ searchResults, searchTypes, searchType, onSelect }) {
-    const tabs = useMemo(() => [
-        { key: 'all', label: 'All', count: searchResults.length },
-        ...searchTypes.map(t => ({
-            key: t,
-            label: t.charAt(0).toUpperCase() + t.slice(1),
-            count: getSearchResultsForType(searchResults, t).length,
-        })),
-    ], [searchResults, searchTypes]);
-
-    return (
-        <div class="flex gap-2 mb-4 flex-wrap">
-            {tabs.map(tab => (
-                <button
-                    key={tab.key}
-                    class={tab.key === searchType ? 'btn btn-sm bg-w-cyan/15 border border-w-cyan/30 text-w-cyan' : 'btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan'}
-                    onClick={() => onSelect(tab.key)}
-                >
-                    {tab.label} ({tab.count})
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
-    if (catalogs.length <= 1) return null;
-
-    const handleChange = useCallback((e) => {
-        const parts = e.target.value.split('::');
-        const match = catalogs.find(c => c.baseUrl === parts[0] && c.id === parts[1]);
-        if (match) onSelect(match);
-    }, [catalogs, onSelect]);
-
-    return (
-        <div class="mb-6">
-            <select
-                class="select select-sm bg-w-surface border-w-line text-w-text"
-                onChange={handleChange}
-                value={selectedCatalog ? `${selectedCatalog.baseUrl}::${selectedCatalog.id}` : ''}
-            >
-                {catalogs.map(cat => (
-                    <option key={`${cat.baseUrl}::${cat.id}`} value={`${cat.baseUrl}::${cat.id}`}>
-                        {cat.name} ({cat.addonName})
-                    </option>
-                ))}
-            </select>
-        </div>
-    );
-}
-
-function ItemGrid({ items, showBadges, onClick }) {
-    if (!items.length) return null;
-    return (
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {items.map(item => (
-                <ItemCard key={item.id} item={item} showBadge={showBadges} onClick={onClick} />
-            ))}
-        </div>
-    );
-}
-
-function PosterGradient({ name }) {
-    return (
-        <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
-            <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">
-                {name || 'Unknown'}
-            </div>
-        </div>
-    );
-}
-
-function ItemCard({ item, showBadge, onClick }) {
-    const handleClick = useCallback(() => onClick(item), [item, onClick]);
-    const [imgError, setImgError] = useState(false);
-    const onImgError = useCallback(() => setImgError(true), []);
-
-    return (
-        <div class="group cursor-pointer" onClick={handleClick}>
-            <div class="bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-cyan/30 transition-all duration-300 flex flex-col w-full">
-                <figure class="aspect-[2/3] overflow-hidden relative">
-                    {item.poster && !imgError ? (
-                        <img
-                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            src={item.poster}
-                            alt={item.name || ''}
-                            loading="lazy"
-                            onError={onImgError}
-                        />
-                    ) : (
-                        <PosterGradient name={item.name} />
-                    )}
-                    {showBadge && item.type && (
-                        <span class="absolute top-2 left-2 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">
-                            {item.type === 'series' ? 'Series' : item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                        </span>
-                    )}
-                </figure>
-                <div class="p-3">
-                    <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-w-cyan transition-colors">
-                        {item.name || 'Unknown'}
-                    </h3>
-                    {(item.releaseInfo || item.year) && (
-                        <span class="text-xs text-w-muted mt-1 block">
-                            {item.releaseInfo || item.year || ''}
-                        </span>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function LoadMore({ onLoadMore }) {
-    return (
-        <div class="text-center mt-8">
-            <button class="btn btn-ghost border border-w-line btn-sm px-8" onClick={onLoadMore}>
-                Load more
-            </button>
-        </div>
-    );
-}
-
-function LoadingSpinner() {
-    return (
-        <div class="text-center py-16">
-            <span class="loading loading-spinner loading-lg text-w-cyan"></span>
-            <p class="text-w-sub mt-4">Loading catalogs...</p>
-        </div>
-    );
-}
-
-function NoAddons() {
-    const ref = useRef(null);
-    useEffect(() => {
-        if (ref.current) rebindAsync(ref.current);
-    }, []);
-    return (
-        <div ref={ref} class="text-center py-16">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
-            </svg>
-            <p class="text-lg font-semibold text-w-sub mb-2">No addons configured</p>
-            <p class="text-sm text-w-muted mb-6">Add Stremio addons in your profile to start discovering content.</p>
-            <a class="btn btn-soft-cyan btn-sm px-5" href="/profile" data-async-target="main">Go to Profile</a>
-        </div>
-    );
-}
-
-function NoCatalogs() {
-    const ref = useRef(null);
-    useEffect(() => {
-        if (ref.current) rebindAsync(ref.current);
-    }, []);
-    return (
-        <div ref={ref} class="text-center py-16">
-            <p class="text-lg font-semibold text-w-sub mb-2">No catalogs available</p>
-            <p class="text-sm text-w-muted mb-6">Your addons don't provide any catalogs. Try adding a catalog addon like Cinemeta.</p>
-            <a class="btn btn-soft-cyan btn-sm px-5" href="/profile" data-async-target="main">Go to Profile</a>
-        </div>
-    );
-}
-
-function ErrorState({ message, onRetry }) {
-    return (
-        <div class="text-center py-16">
-            <p class="text-lg font-semibold text-w-sub mb-2">Something went wrong</p>
-            <p class="text-sm text-w-muted mb-6">{message || 'Could not load content.'}</p>
-            <button class="btn btn-soft-cyan btn-sm px-5" onClick={onRetry}>Retry</button>
-        </div>
-    );
-}
-
-function NoResults({ query }) {
-    return (
-        <div class="text-center py-16">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path stroke-linecap="round" d="m21 21-4.3-4.3"></path>
-            </svg>
-            <p class="text-lg font-semibold text-w-sub mb-2">No results found</p>
-            <p class="text-sm text-w-muted mb-6">No results found for "{query}". Try a different search term.</p>
         </div>
     );
 }

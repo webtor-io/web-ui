@@ -4,6 +4,7 @@ import { initProgressLog } from '../../progressLog';
 import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
 import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
+import { chipClass } from './discoverUtils';
 
 export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange }) {
     const dialogRef = useRef(null);
@@ -149,7 +150,7 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 // --- Stream Content ---
 
 function StreamContent({ modal, onStreamClick }) {
-    const { title, poster, streams } = modal;
+    const { title, poster, streams, error } = modal;
 
     const parsed = useMemo(() => streams.map(s => parseStreamName(s.name)), [streams]);
 
@@ -273,7 +274,9 @@ function StreamContent({ modal, onStreamClick }) {
         return (
             <div>
                 <ModalHeader title={title} poster={poster} subtitle={subtitleText} />
-                <p class="text-w-muted text-sm text-center py-6">No streams available for this title.</p>
+                <p class="text-w-muted text-sm text-center py-6">
+                    {error || 'No streams available for this title.'}
+                </p>
             </div>
         );
     }
@@ -315,7 +318,7 @@ function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLab
             {allSources.map(src => (
                 <button
                     key={`src-${src}`}
-                    class={activeSources[src] ? 'btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan transition-all' : 'btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan transition-all'}
+                    class={chipClass(activeSources[src], 'xs')}
                     onClick={() => onToggleSource(src)}
                 >
                     {src}
@@ -324,7 +327,7 @@ function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLab
             {allLabels.map(lbl => (
                 <button
                     key={`lbl-${lbl}`}
-                    class={activeLabels[lbl] ? 'btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan transition-all' : 'btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan transition-all'}
+                    class={chipClass(activeLabels[lbl], 'xs')}
                     onClick={() => onToggleLabel(lbl)}
                 >
                     {lbl}
@@ -333,7 +336,7 @@ function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLab
             {allLangs.map(lang => (
                 <button
                     key={`lang-${lang.name}`}
-                    class={activeLang === lang.name ? 'btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan transition-all' : 'btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan transition-all'}
+                    class={chipClass(activeLang === lang.name, 'xs')}
                     onClick={() => onToggleLang(lang.name)}
                 >
                     {lang.flag} {lang.name}
@@ -454,7 +457,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange }
                     {seasonNums.map(sn => (
                         <button
                             key={sn}
-                            class={sn === activeSeason ? 'btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan transition-all' : 'btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan transition-all'}
+                            class={chipClass(sn === activeSeason, 'xs')}
                             onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
                         >
                             {sn === 0 ? 'Specials' : `S${sn}`}
