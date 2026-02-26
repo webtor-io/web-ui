@@ -1,4 +1,14 @@
 import loadAsyncView from "./loadAsyncView";
+
+if (!window.__popstateFilters) window.__popstateFilters = [];
+export function addPopstateFilter(fn) {
+    window.__popstateFilters.push(fn);
+    return () => {
+        const i = window.__popstateFilters.indexOf(fn);
+        if (i >= 0) window.__popstateFilters.splice(i, 1);
+    };
+}
+
 async function asyncFetch(url, targetSelector, fetchParams, params) {
     let target;
     if (typeof targetSelector === 'string' || targetSelector instanceof String) {
@@ -64,6 +74,7 @@ async function async(selector, params = {}, scope = null) {
     if (!scope) {
         scope = document;
         window.addEventListener('popstate', async function(e) {
+            if (window.__popstateFilters.some(fn => fn(e))) return;
             if (e.state && e.state.targetSelector && e.state.url && e.state.layout && e.state.context && params.history && e.state.context === params.history.context) {
                 await asyncFetch(
                     e.state.url,

@@ -1,5 +1,5 @@
 import { useReducer, useRef, useEffect, useCallback, useState, useMemo } from 'preact/hooks';
-import { rebindAsync } from '../../async';
+import { rebindAsync, addPopstateFilter } from '../../async';
 import { StremioClient, CINEMETA_BASE } from '../client';
 import {
     discoverReducer, initialState,
@@ -9,19 +9,30 @@ import {
 import { StreamModal } from './StreamModal';
 import { loadPrefs, savePrefs } from '../prefs';
 
-function setUrlParams(params) {
+function buildUrl(params) {
     const url = new URLSearchParams(window.location.search);
     for (const [k, v] of Object.entries(params)) {
         if (v != null && v !== '') url.set(k, String(v));
         else url.delete(k);
     }
     const search = url.toString() ? `?${url}` : '';
-    const existing = window.history.state || {};
-    window.history.replaceState(existing, '', window.location.pathname + search);
+    return window.location.pathname + search;
 }
 
-function removeUrlParam(key) {
-    setUrlParams({ [key]: null });
+function setUrlParams(params) {
+    const existing = window.history.state || {};
+    const newUrl = buildUrl(params);
+    window.history.replaceState({ ...existing, url: newUrl }, '', newUrl);
+}
+
+function pushUrlParams(params) {
+    const url = buildUrl(params);
+    const main = document.querySelector('main');
+    window.history.pushState({
+        context: 'links', url, targetSelector: 'main',
+        layout: main ? main.getAttribute('data-async-layout') : '',
+        fetchParams: {},
+    }, '', url);
 }
 
 export function DiscoverApp({ addonUrls }) {
@@ -34,7 +45,12 @@ export function DiscoverApp({ addonUrls }) {
     const restoredPageRef = useRef(0);
     const modalItemIdRef = useRef(null);
     const modalEpisodeRef = useRef(null); // { season, episode }
+    const modalSeasonRef = useRef(null); // season-only (no episode) from URL
     const restoreInProgressRef = useRef(false);
+    const isPopstateRef = useRef(false); // suppress pushState during popstate/restore
+    const stateRef = useRef(null); // latest state snapshot for popstate handler
+    const modalRef = useRef(null); // current modal for popstate handler
+    const openModalByIdRef = useRef(null); // latest openModalById for popstate handler
 
     // Create client once
     if (!clientRef.current) {
@@ -131,6 +147,8 @@ export function DiscoverApp({ addonUrls }) {
                 if (urlId) modalItemIdRef.current = urlId;
                 if (urlSeason != null && urlEpisode != null) {
                     modalEpisodeRef.current = { season: urlSeason, episode: urlEpisode };
+                } else if (urlSeason != null) {
+                    modalSeasonRef.current = urlSeason;
                 }
 
                 // Enter search mode if URL has search param
@@ -166,12 +184,22 @@ export function DiscoverApp({ addonUrls }) {
     const selectType = useCallback((type) => {
         abortCatalog();
         savePrefs({ type });
+        const catalogs = getCatalogsForType(state.catalogs, type);
+        const catalog = catalogs[0] || null;
+        pushUrlParams({
+            type, 'catalog-base': catalog?.baseUrl, 'catalog-id': catalog?.id,
+            id: null, season: null, episode: null, search: null, 'search-type': null,
+        });
         dispatch({ type: 'SELECT_TYPE', selectedType: type });
-    }, []);
+    }, [state.catalogs]);
 
     const selectCatalog = useCallback((catalog) => {
         abortCatalog();
         savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
+        pushUrlParams({
+            'catalog-base': catalog.baseUrl, 'catalog-id': catalog.id,
+            id: null, season: null, episode: null,
+        });
         dispatch({ type: 'SELECT_CATALOG', catalog });
     }, []);
 
@@ -257,15 +285,24 @@ export function DiscoverApp({ addonUrls }) {
     const cardClick = useCallback(async (item) => {
         const type = item.type || state.selectedType;
         const id = item.id;
+        const restoreSeason = modalSeasonRef.current;
+        modalSeasonRef.current = null;
 
-        setUrlParams({ id, season: null, episode: null });
+        if (isPopstateRef.current) {
+            setUrlParams({ id, season: restoreSeason ?? null, episode: null });
+        } else {
+            pushUrlParams({ id, season: null, episode: null });
+        }
 
         if (type === 'series') {
             dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...' } });
             try {
                 const meta = await client.fetchMeta(type, id);
                 if (meta?.videos?.length > 0) {
-                    dispatch({ type: 'SHOW_MODAL', modal: { view: 'episodes', title: item.name, poster: item.poster, meta, itemId: id, itemType: type } });
+                    dispatch({ type: 'SHOW_MODAL', modal: {
+                        view: 'episodes', title: item.name, poster: item.poster, meta, itemId: id, itemType: type,
+                        defaultSeason: restoreSeason != null ? Number(restoreSeason) : undefined,
+                    } });
                 } else {
                     await loadStreams(type, id, item);
                 }
@@ -291,7 +328,11 @@ export function DiscoverApp({ addonUrls }) {
             const name = item?.name || id;
             const epName = `${name} - ${Number(ep.season) === 0 ? 'Specials' : `S${ep.season}`} E${ep.episode}`;
             const poster = item?.poster;
-            setUrlParams({ id, season: ep.season, episode: ep.episode });
+            if (isPopstateRef.current) {
+                setUrlParams({ id, season: ep.season, episode: ep.episode });
+            } else {
+                pushUrlParams({ season: ep.season, episode: ep.episode });
+            }
 
             dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster, subtitle: 'Loading streams...' } });
 
@@ -324,7 +365,7 @@ export function DiscoverApp({ addonUrls }) {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
         const epName = `${item.title} - ${Number(episode.season) === 0 ? 'Specials' : `S${episode.season || '?'}`} E${episode.episode || '?'}`;
-        setUrlParams({ season: episode.season, episode: episode.episode });
+        pushUrlParams({ season: episode.season, episode: episode.episode });
 
         const backToEpisodes = {
             title: item.title,
@@ -346,22 +387,12 @@ export function DiscoverApp({ addonUrls }) {
     }, [client]);
 
     const onBackToEpisodes = useCallback(() => {
-        const back = state.modal?.backToEpisodes;
-        if (!back) return;
-        setUrlParams({ season: null, episode: null });
-        dispatch({
-            type: 'SHOW_MODAL',
-            modal: {
-                view: 'episodes',
-                title: back.title,
-                poster: back.poster,
-                meta: back.meta,
-                itemId: back.itemId,
-                itemType: back.itemType,
-                defaultSeason: back.season != null ? Number(back.season) : undefined,
-            },
-        });
-    }, [state.modal]);
+        window.history.back();
+    }, []);
+
+    const onSeasonChange = useCallback((season) => {
+        pushUrlParams({ season, episode: null });
+    }, []);
 
     const handleStreamClick = useCallback(async (infoHash, fileIdx) => {
         const currentTitle = state.modal?.title;
@@ -404,6 +435,107 @@ export function DiscoverApp({ addonUrls }) {
         setUrlParams({ id: null, season: null, episode: null });
     }, []);
 
+    // Keep refs in sync for popstate handler
+    modalRef.current = state.modal;
+    openModalByIdRef.current = openModalById;
+    stateRef.current = state;
+
+    // --- Browser back/forward ---
+    useEffect(() => {
+        // Tell async.js to skip popstate when Discover is mounted and URL is /discover
+        const removeFilter = addPopstateFilter(() =>
+            window.location.pathname.startsWith('/discover')
+        );
+
+        const handler = (e) => {
+            if (!window.location.pathname.startsWith('/discover')) return;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            const season = urlParams.get('season');
+            const episode = urlParams.get('episode');
+            const type = urlParams.get('type');
+            const catalogBase = urlParams.get('catalog-base');
+            const catalogId = urlParams.get('catalog-id');
+
+            const cur = stateRef.current;
+
+            // Handle type change
+            if (type && cur && type !== cur.selectedType) {
+                const types = getTypes(cur.catalogs);
+                if (types.includes(type)) {
+                    savePrefs({ type });
+                    dispatch({ type: 'SELECT_TYPE', selectedType: type });
+                }
+            }
+
+            // Handle catalog change
+            if (catalogBase && catalogId && cur) {
+                const curCat = cur.selectedCatalog;
+                if (!curCat || curCat.baseUrl !== catalogBase || curCat.id !== catalogId) {
+                    const match = getCatalogsForType(cur.catalogs, type || cur.selectedType)
+                        .find(c => c.baseUrl === catalogBase && c.id === catalogId);
+                    if (match) {
+                        savePrefs({ catalogBase: match.baseUrl, catalogId: match.id });
+                        dispatch({ type: 'SELECT_CATALOG', catalog: match });
+                    }
+                }
+            }
+
+            // Handle modal state
+            if (!id) {
+                if (modalRef.current) {
+                    dispatch({ type: 'CLOSE_MODAL' });
+                }
+                return;
+            }
+
+            if (id && season && episode) {
+                modalEpisodeRef.current = { season, episode };
+                isPopstateRef.current = true;
+                openModalByIdRef.current(id);
+                isPopstateRef.current = false;
+            } else if (id) {
+                const currentModal = modalRef.current;
+                if (currentModal?.view === 'episodes' && currentModal?.itemId === id) {
+                    // Same series, navigating between seasons — force remount via _seasonKey
+                    dispatch({
+                        type: 'SHOW_MODAL',
+                        modal: {
+                            ...currentModal,
+                            defaultSeason: season != null ? Number(season) : undefined,
+                            _seasonKey: Date.now(),
+                        },
+                    });
+                } else if (currentModal?.backToEpisodes) {
+                    const back = currentModal.backToEpisodes;
+                    dispatch({
+                        type: 'SHOW_MODAL',
+                        modal: {
+                            view: 'episodes',
+                            title: back.title,
+                            poster: back.poster,
+                            meta: back.meta,
+                            itemId: back.itemId,
+                            itemType: back.itemType,
+                            defaultSeason: season != null ? Number(season) : (back.season != null ? Number(back.season) : undefined),
+                        },
+                    });
+                } else {
+                    isPopstateRef.current = true;
+                    openModalByIdRef.current(id);
+                    isPopstateRef.current = false;
+                }
+            }
+        };
+
+        window.addEventListener('popstate', handler);
+        return () => {
+            removeFilter();
+            window.removeEventListener('popstate', handler);
+        };
+    }, []);
+
     // --- Restore pages from URL: after each catalog load, if pages remain, trigger another loadMore ---
     useEffect(() => {
         if (state.phase !== 'ready') return;
@@ -425,7 +557,25 @@ export function DiscoverApp({ addonUrls }) {
         if (modalItemIdRef.current) {
             const id = modalItemIdRef.current;
             modalItemIdRef.current = null;
-            openModalById(id);
+            if (modalEpisodeRef.current) {
+                // Check if history.state has SPA marker (context: 'links' from pushUrlParams).
+                // If so, this is a back/forward to an existing entry (e.g. returning from torrent card) —
+                // the episodes history entry already exists, don't create a duplicate.
+                const isRestoredEntry = window.history.state?.context === 'links';
+                if (isRestoredEntry) {
+                    isPopstateRef.current = true;
+                    openModalById(id);
+                    isPopstateRef.current = false;
+                } else {
+                    // Direct URL: create episodes entry, then push streams entry
+                    setUrlParams({ id, season: null, episode: null });
+                    openModalById(id);
+                }
+            } else {
+                isPopstateRef.current = true;
+                openModalById(id);
+                isPopstateRef.current = false;
+            }
         }
     }, [state.phase, state.catalogLoading, state.isSearchMode, state.items.length, loadCatalog, openModalById]);
 
@@ -439,7 +589,21 @@ export function DiscoverApp({ addonUrls }) {
 
         const id = modalItemIdRef.current;
         modalItemIdRef.current = null;
-        openModalById(id);
+        if (modalEpisodeRef.current) {
+            const isRestoredEntry = window.history.state?.context === 'links';
+            if (isRestoredEntry) {
+                isPopstateRef.current = true;
+                openModalById(id);
+                isPopstateRef.current = false;
+            } else {
+                setUrlParams({ id, season: null, episode: null });
+                openModalById(id);
+            }
+        } else {
+            isPopstateRef.current = true;
+            openModalById(id);
+            isPopstateRef.current = false;
+        }
     }, [state.phase, state.isSearchMode, state.searchLoading, state.searchResults.length, openModalById]);
 
     // Sync state to URL
@@ -478,7 +642,7 @@ export function DiscoverApp({ addonUrls }) {
         const newUrl = window.location.pathname + search;
 
         const existingState = window.history.state || {};
-        window.history.replaceState(existingState, '', newUrl);
+        window.history.replaceState({ ...existingState, url: newUrl }, '', newUrl);
     }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.page]);
 
     const retry = useCallback(() => {
@@ -582,6 +746,7 @@ export function DiscoverApp({ addonUrls }) {
                     onEpisodeSelect={onEpisodeSelect}
                     onStreamClick={handleStreamClick}
                     onBackToEpisodes={state.modal.backToEpisodes ? onBackToEpisodes : undefined}
+                    onSeasonChange={onSeasonChange}
                 />
             )}
         </div>

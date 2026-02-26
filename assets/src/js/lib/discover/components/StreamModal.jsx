@@ -5,7 +5,7 @@ import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
 import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -51,7 +51,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     &#10005;
                 </button>
                 <div class={onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? 'pt-8' : ''}>
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -61,7 +61,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange }) {
     if (modal.view === 'loading') {
         return (
             <div>
@@ -76,7 +76,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick }) {
     }
 
     if (modal.view === 'episodes') {
-        return <EpisodePicker modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} />;
+        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} />;
     }
 
     if (modal.view === 'streams') {
@@ -396,7 +396,7 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect, defaultSeason }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
 
@@ -422,6 +422,15 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason }) {
         return seasonNums[0] ?? 0;
     });
 
+    // Sync activeSeason when defaultSeason changes (e.g. popstate — component already mounted, useState initializer won't re-run)
+    useEffect(() => {
+        if (defaultSeason != null && seasonNums.includes(Number(defaultSeason))) {
+            setActiveSeason(Number(defaultSeason));
+        } else if (defaultSeason == null) {
+            setActiveSeason(seasonNums[0] ?? 0);
+        }
+    }, [defaultSeason]);
+
     const episodes = useMemo(() =>
         (seasons[activeSeason] || []).slice().sort((a, b) => (a.episode || 0) - (b.episode || 0)),
         [seasons, activeSeason]
@@ -446,7 +455,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason }) {
                         <button
                             key={sn}
                             class={sn === activeSeason ? 'btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan transition-all' : 'btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan transition-all'}
-                            onClick={() => setActiveSeason(sn)}
+                            onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
                         >
                             {sn === 0 ? 'Specials' : `S${sn}`}
                         </button>
