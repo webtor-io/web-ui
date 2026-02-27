@@ -2,6 +2,7 @@ package stremio_addon_url
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -44,6 +45,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 	gr := r.Group("/stremio/addon-url")
 	gr.Use(auth.HasAuth)
 	gr.POST("/add", h.add)
+	gr.POST("/batch-add", h.batchAdd)
 	gr.POST("/delete/:id", h.delete)
 	gr.POST("/update", h.update)
 	return nil
@@ -60,6 +62,104 @@ func (s *Handler) add(c *gin.Context) {
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "Addon added")
+}
+
+type batchAddRequest struct {
+	URLs []string `json:"urls"`
+}
+
+type batchAddResponse struct {
+	Added        int  `json:"added"`
+	Skipped      int  `json:"skipped"`
+	Limit        int  `json:"limit"`
+	LimitReached bool `json:"limitReached"`
+}
+
+func (s *Handler) batchAdd(c *gin.Context) {
+	var req batchAddRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	user := auth.GetUserFromContext(c)
+	cla := claims.GetFromContext(c)
+	resp, err := s.batchAddAddonUrls(c.Request.Context(), req.URLs, user, cla)
+	if err != nil {
+		log.WithError(err).Error("failed to batch add addon URLs")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handler) batchAddAddonUrls(ctx context.Context, urls []string, user *auth.User, cla *claims.Data) (*batchAddResponse, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+
+	maxLimit := 0 // 0 = unlimited (paid tier)
+	if cla.Context.Tier.Id == 0 {
+		maxLimit = 3
+	}
+
+	currentCount, err := models.CountUserStremioAddonUrls(ctx, db, user.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count addon URLs")
+	}
+
+	resp := &batchAddResponse{Limit: maxLimit}
+	for _, addonUrl := range urls {
+		addonUrl = strings.TrimSpace(addonUrl)
+		if addonUrl == "" {
+			continue
+		}
+
+		// Validate URL format
+		parsedUrl, err := url.Parse(addonUrl)
+		if err != nil {
+			resp.Skipped++
+			continue
+		}
+		if parsedUrl.Scheme != "http" && parsedUrl.Scheme != "https" {
+			resp.Skipped++
+			continue
+		}
+		if !strings.HasSuffix(parsedUrl.Path, "/manifest.json") && !strings.HasSuffix(parsedUrl.Path, "manifest.json") {
+			resp.Skipped++
+			continue
+		}
+		if s.domain != "" && (parsedUrl.Hostname() == s.domain || parsedUrl.Hostname() == "localhost" || parsedUrl.Hostname() == "127.0.0.1") {
+			resp.Skipped++
+			continue
+		}
+
+		// Check tier limit
+		if maxLimit > 0 && currentCount >= maxLimit {
+			resp.LimitReached = true
+			resp.Skipped++
+			continue
+		}
+
+		// Skip duplicates
+		exists, err := models.StremioAddonUrlExists(ctx, db, user.ID, addonUrl)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check addon URL existence")
+		}
+		if exists {
+			resp.Skipped++
+			continue
+		}
+
+		// Create
+		if err := models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl); err != nil {
+			return nil, errors.Wrap(err, "failed to create addon URL")
+		}
+		resp.Added++
+		currentCount++
+	}
+
+	return resp, nil
 }
 
 func (s *Handler) delete(c *gin.Context) {

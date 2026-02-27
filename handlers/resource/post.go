@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -104,6 +105,13 @@ func (s *Handler) post(c *gin.Context) {
 
 	if !s.useDirectLinks {
 		s.addResourceToSession(c, loadJob.ID)
+	}
+
+	if c.GetHeader("Accept") == "application/json" {
+		c.JSON(http.StatusAccepted, gin.H{
+			"job_log_url": fmt.Sprintf("/queue/%v/job/%v/log", loadJob.Queue, loadJob.ID),
+		})
+		return
 	}
 
 	indexTpl.HTML(http.StatusAccepted, web.NewContext(c).WithData(d))

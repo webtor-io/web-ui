@@ -22,7 +22,10 @@ function getEntries(path, ext, prefix = '') {
 
 
 module.exports = async (env, options) => {
-    const jsEntries = await getEntries('./assets/src/js/app', '.js');
+    const jsEntries = {
+        ...(await getEntries('./assets/src/js/app', '.js')),
+        ...(await getEntries('./assets/src/js/app', '.jsx')),
+    };
     const styleEntries = await getEntries('./assets/src/styles', '.css');
     const devMode = options.mode !== 'production';
     const devEntries = devMode ? await getEntries('./assets/src/js/dev', '.js', 'dev/') : {};
@@ -102,7 +105,7 @@ module.exports = async (env, options) => {
         module: {
             rules: [
                 {
-                    test: /\.js$/,
+                    test: /\.jsx?$/,
                     include: path.resolve(__dirname, 'assets', 'src'),
                     loader: 'babel-loader'
                 },
@@ -116,6 +119,9 @@ module.exports = async (env, options) => {
                     ],
                 },
             ]
+        },
+        resolve: {
+            extensions: ['.js', '.jsx', '.json'],
         },
         plugins,
     };

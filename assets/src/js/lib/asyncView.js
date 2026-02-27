@@ -21,6 +21,7 @@ function initAsyncView(target, init, destroy) {
     const onLoad = function(e) {
         debug(`webtor:async view script loaded name=%o`, name);
         const target = e.detail.target;
+        target.setAttribute('data-async-view', name);
         if (!target.reload) {
             target.reload = function() {
                 return new Promise(function(resolve, _) {
