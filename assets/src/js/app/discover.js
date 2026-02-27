@@ -10,8 +10,9 @@ av(function () {
         addonUrls.unshift(CINEMETA_BASE);
     }
 
+    const hasCustomAddons = (window._addonUrls || []).length > 0;
     const mountEl = container.querySelector('#discover-mount') || container;
-    render(<DiscoverApp addonUrls={addonUrls} />, mountEl);
+    render(<DiscoverApp addonUrls={addonUrls} hasCustomAddons={hasCustomAddons} />, mountEl);
 }, function () {
     // Destroy callback: unmount Preact on async navigation away
     const container = this;

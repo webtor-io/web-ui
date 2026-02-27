@@ -4,34 +4,52 @@ The Discover page (`/discover`) lets users browse and search movies and series f
 
 ## Architecture
 
-Pure frontend feature — no Go backend changes needed. All catalog and search fetches happen directly from the browser to addon URLs.
+Pure frontend feature — no Go backend changes needed for browsing. All catalog and search fetches happen directly from the browser to addon URLs. Addon management uses Go backend endpoints.
 
 The UI is built with **Preact** (lightweight React alternative) using hooks (`useReducer`, `useState`, `useMemo`, `useEffect`, `useCallback`). State is managed via a single reducer for predictable updates. The API client and utility modules remain plain JS.
 
 ### Files
 
 - `templates/views/discover/index.html` — page template with static header and `#discover-mount` div
+- `templates/partials/discover.html` — homepage ribbon with poster cards linking to `/discover`
 - `handlers/discover/handler.go` — serves the page, passes `AddonUrls` from user profile
-- `assets/src/js/app/discover.js` — entry point (mounts Preact app, ribbon fallback for non-discover pages)
+- `handlers/stremio/stremio_addon_url/handler.go` — addon URL management including batch-add endpoint
+- `assets/src/js/app/discover.js` — entry point (mounts Preact app)
 - `assets/src/js/lib/discover/client.js` — `StremioClient` (API calls, LRU caching, AbortController support)
 - `assets/src/js/lib/discover/lang.js` — `LANG_MAP`, `extractLanguages()` (language detection for stream titles)
 - `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
 - `assets/src/js/lib/discover/components/discoverReducer.js` — state reducer, initial state, helper functions
-- `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component with all sub-components
+- `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component orchestrating all sub-components
 - `assets/src/js/lib/discover/components/StreamModal.jsx` — stream modal, episode picker, stream filters
+- `assets/src/js/lib/discover/components/AddonWizard.jsx` — guided addon discovery and installation wizard
+- `assets/src/js/lib/discover/components/useDiscoverUrl.js` — URL/history management hook
+- `assets/src/js/lib/discover/components/discoverUtils.js` — shared utility functions
+- `assets/src/js/lib/discover/components/SearchBar.jsx` — search input component
+- `assets/src/js/lib/discover/components/ItemGrid.jsx` — card grid display
+- `assets/src/js/lib/discover/components/Tabs.jsx` — type tabs, search tabs, catalog selector
+- `assets/src/js/lib/discover/components/EmptyStates.jsx` — loading, error, no-results states
+- `assets/src/js/lib/discover/prefs.js` — localStorage persistence for user selections
 
 ### Key Components
 
-- **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, and modal state. Contains sub-components: `SearchBar`, `TypeTabs`, `SearchTabs`, `CatalogSelector`, `ItemGrid`, `ItemCard`, `LoadMore`, and empty states.
-- **StreamModal** — dialog modal driven by `modal` state from reducer. Three views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list).
+- **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, modal state, and addon wizard flow.
+- **StreamModal** — dialog modal driven by `modal` state from reducer. Views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list), `progress` (torrent processing).
+- **AddonWizard** — two-step guided wizard for discovering and installing Stremio addons. Step 1: source selection (Official Stremio, Community). Step 2: addon browsing with search, filters, and batch install.
 - **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`.
 - **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls.
+- **useDiscoverUrl** — custom hook managing browser history (`pushState`/`replaceState`) and `popstate` events for back/forward navigation.
 
 ### Build Configuration
 
 - **Preact** with `@babel/preset-react` using automatic JSX runtime (`importSource: "preact"`)
 - Webpack processes `.jsx?` files, resolves `.jsx` extensions
 - Tailwind purge includes `.jsx` files
+
+## Homepage Ribbon
+
+The discover ribbon (`templates/partials/discover.html`) shows a row of static movie poster cards on the homepage. Clicking the ribbon or "See more" navigates to `/discover` via `data-async-target="main"`.
+
+Controlled by `{{ if not .Tool }}` — hidden when the page is loaded as a tool/embed.
 
 ## Cinemeta (Default Catalogs)
 
@@ -83,6 +101,55 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - Clicking a **series** first fetches meta from Cinemeta (then falls back to user addons) to show an episode picker grouped by season, then fetches streams for the selected episode
 - Streams with an info hash link to `/{infoHash}` for playback via Webtor
 - Stream filters (source, label, language) are reactive — `useMemo` recomputes the filtered list on every filter change
+- "Back to episodes" navigation available from streams view
+
+## Addon Wizard
+
+The AddonWizard component provides a guided two-step flow for discovering and installing Stremio addons.
+
+### Flow
+
+1. **Step 1 — Source Selection**: User selects addon sources (Official Stremio, Community from stremio-addons.net). "Select all" checkbox available.
+2. **Step 2 — Addon Browsing**: Addons are fetched from selected sources, enriched with community vote data from GitHub Issues, deduplicated, and sorted (torrent addons first, then by votes). User can search, filter (torrent-only toggle, 18+ toggle), and select addons for batch installation.
+
+### Data Sources
+
+- **Official Stremio** — `https://api.strem.io/addonscollection.json`
+- **Community** — `https://stremio-addons.net/api/addon_catalog/all/stremio-addons.net.json`
+- **Popularity votes** — fetched from GitHub Issues at `Stremio-Community/stremio-addons-list`, sorted by thumbs-up reactions
+
+### Deduplication
+
+Addons are deduplicated by normalized manifest ID and normalized name. Official source addons take priority over community duplicates.
+
+### Batch Install Endpoint
+
+`POST /stremio/addon-url/batch-add` — accepts `{ urls: [...] }`, validates each addon URL, saves to user profile. Response: `{ added, skipped, limitReached, limit }`.
+
+Tier-based limits: free tier max 3 addons, paid unlimited.
+
+### Integration with Stream Modal
+
+When opened from the streams modal ("Set up addons" button), the wizard:
+- Saves the current modal state and URL params in `pendingStreamRef`
+- On completion: re-fetches manifests, reloads streams, restores modal and URL
+- On skip/close: restores the previous modal state and URL params
+
+### Third-party Disclaimer
+
+Both wizard steps display a disclaimer: all addon sources and addons are third-party services not affiliated with Webtor.
+
+## Analytics (Umami)
+
+Events tracked:
+
+- `discover-catalog-loaded` — catalog fetch completed (`type`, `catalog`)
+- `discover-search` — search performed (`query`, `count`)
+- `discover-streams-loaded` — streams fetched for item (`type`, `id`, `count`)
+- `discover-wizard-opened` — addon wizard opened
+- `discover-wizard-installed` — addons installed via wizard (`count`)
+- `discover-ribbon-click` — homepage ribbon clicked
+- `discover-see-more-click` — "See more" link clicked on homepage
 
 ## Addon Protocol
 

@@ -1,4 +1,4 @@
-import { useReducer, useRef, useEffect, useCallback, useMemo } from 'preact/hooks';
+import { useReducer, useRef, useEffect, useCallback, useMemo, useState } from 'preact/hooks';
 import { StremioClient, CINEMETA_BASE } from '../client';
 import {
     discoverReducer, initialState,
@@ -6,6 +6,7 @@ import {
     getSearchTypes, getSearchResultsForType,
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
+import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
 import { restoreModalFromUrl, loadManifests } from './discoverUtils';
@@ -14,8 +15,10 @@ import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults } from './EmptyStates';
 
-export function DiscoverApp({ addonUrls }) {
+export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
+    const [showWizard, setShowWizard] = useState(false);
+    const [addonsInstalled, setAddonsInstalled] = useState(false);
     const clientRef = useRef(null);
     const abortRef = useRef(null);
     const searchGenRef = useRef(0);
@@ -29,6 +32,7 @@ export function DiscoverApp({ addonUrls }) {
     const modalRef = useRef(null); // current modal for popstate handler
     const openModalByIdRef = useRef(null); // latest openModalById for popstate handler
     const performSearchRef = useRef(null); // latest performSearch for popstate handler
+    const pendingStreamRef = useRef(null); // stream to reload after wizard
 
     const url = useDiscoverUrl('/discover');
 
@@ -628,6 +632,105 @@ export function DiscoverApp({ addonUrls }) {
         })();
     }, [client]);
 
+    // --- Wizard callbacks ---
+    const onWizardComplete = useCallback(async (savedUrls, result) => {
+        setShowWizard(false);
+        setAddonsInstalled(true);
+        if (result && window.toast) {
+            const msg = `${result.added} addon${result.added !== 1 ? 's' : ''} added${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}${result.limitReached ? ' (free tier limit reached)' : ''}`;
+            window.toast.success(msg);
+        }
+        // Add new URLs to client (strip /manifest.json suffix)
+        for (const u of savedUrls) {
+            const base = u.replace(/\/manifest\.json$/, '');
+            if (!client.addonUrls.includes(base)) {
+                client.addonUrls.push(base);
+            }
+        }
+
+        const pending = pendingStreamRef.current;
+        pendingStreamRef.current = null;
+
+        if (pending) {
+            // Came from "Set up addons" in stream modal — silently refresh manifests,
+            // keep current type/catalog, just reload streams
+            try {
+                const manifests = await client.fetchAllManifests();
+                client.manifests = manifests;
+            } catch (e) { /* streams may still work */ }
+
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: pending.title, poster: pending.poster, subtitle: 'Loading streams...' } });
+            let streams = [];
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    streams = await client.fetchStreams(pending.type, pending.streamId);
+                } catch (e) {
+                    streams = [];
+                }
+                if (streams.length > 0) break;
+                if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+            }
+            dispatch({ type: 'SHOW_MODAL', modal: {
+                view: 'streams', title: pending.title, poster: pending.poster, streams,
+                backToEpisodes: pending.backToEpisodes,
+            } });
+            // Restore URL params so browser back returns to this modal
+            url.push({ id: pending.id, season: pending.season, episode: pending.episode });
+        } else {
+            // Initial wizard (page load) — full re-init to populate catalogs
+            client.manifests = null;
+            prevCatalogRef.current = null;
+            dispatch({ type: 'SET_PHASE', phase: 'loading' });
+            try {
+                const { manifests, catalogs, types } = await loadManifests(client);
+                if (!types.length) {
+                    dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
+                    return;
+                }
+                const selectedType = types[0];
+                const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog });
+            } catch (e) {
+                dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
+            }
+        }
+    }, [client]);
+
+    const onWizardSkip = useCallback(() => {
+        setShowWizard(false);
+        const pending = pendingStreamRef.current;
+        if (pending) {
+            pendingStreamRef.current = null;
+            dispatch({ type: 'SHOW_MODAL', modal: pending.modal });
+            url.push({ id: pending.id, season: pending.season, episode: pending.episode });
+        }
+    }, []);
+
+    const onSetupAddons = useCallback(() => {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        if (id) {
+            const season = params.get('season');
+            const episode = params.get('episode');
+            // For episodes, stream ID is "tt123:season:episode"
+            const streamId = (season != null && episode != null) ? `${id}:${season}:${episode}` : id;
+            const type = state.modal?.backToEpisodes?.itemType || state.selectedType;
+            pendingStreamRef.current = {
+                streamId,
+                type,
+                title: state.modal?.title,
+                poster: state.modal?.poster,
+                backToEpisodes: state.modal?.backToEpisodes,
+                id,
+                season,
+                episode,
+                modal: state.modal,
+            };
+        }
+        closeModal();
+        setShowWizard(true);
+    }, [state.modal, state.selectedType, closeModal]);
+
     // --- Derived data ---
     const types = useMemo(() => getTypes(state.catalogs), [state.catalogs]);
     const catalogsForType = useMemo(() => getCatalogsForType(state.catalogs, state.selectedType), [state.catalogs, state.selectedType]);
@@ -705,8 +808,15 @@ export function DiscoverApp({ addonUrls }) {
                     onStreamClick={handleStreamClick}
                     onBackToEpisodes={state.modal.backToEpisodes ? onBackToEpisodes : undefined}
                     onSeasonChange={onSeasonChange}
+                    hasCustomAddons={hasCustomAddons || addonsInstalled}
+                    onSetupAddons={onSetupAddons}
                 />
             )}
+
+            {showWizard && state.phase === 'ready' && (
+                <AddonWizard onComplete={onWizardComplete} onSkip={onWizardSkip} />
+            )}
+
         </div>
     );
 }

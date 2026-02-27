@@ -6,7 +6,7 @@ import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     &#10005;
                 </button>
                 <div class={onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? 'pt-8' : ''}>
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -62,7 +62,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons }) {
     if (modal.view === 'loading') {
         return (
             <div>
@@ -81,7 +81,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} />;
     }
 
     return null;
@@ -149,7 +149,7 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 
 // --- Stream Content ---
 
-function StreamContent({ modal, onStreamClick }) {
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons }) {
     const { title, poster, streams, error } = modal;
 
     const parsed = useMemo(() => streams.map(s => parseStreamName(s.name)), [streams]);
@@ -274,9 +274,24 @@ function StreamContent({ modal, onStreamClick }) {
         return (
             <div>
                 <ModalHeader title={title} poster={poster} subtitle={subtitleText} />
-                <p class="text-w-muted text-sm text-center py-6">
-                    {error || 'No streams available for this title.'}
-                </p>
+                <div class="text-center py-6">
+                    <p class="text-w-muted text-sm">
+                        {error || 'No streams available for this title.'}
+                    </p>
+                    {!hasCustomAddons && (
+                        <>
+                            <p class="text-w-sub text-xs mt-2 mb-4">
+                                Install streaming addons to get torrent streams.
+                            </p>
+                            <button
+                                class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan"
+                                onClick={onSetupAddons}
+                            >
+                                Set up addons
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
         );
     }
