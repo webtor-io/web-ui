@@ -48,6 +48,7 @@ Some features to mention:
     - [x] OMDB
     - [x] Kinopoisk Unofficial
 - [x] Vault
+- [x] Discover
 - [x] Integrations 
   - [x] Stremio
   - [x] Stremio Addons
