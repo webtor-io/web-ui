@@ -319,6 +319,14 @@ func (s *Job) Done() *Job {
 	return s
 }
 
+func (s *Job) Fail() *Job {
+	_ = s.log(LogItem{
+		Level: Error,
+		Tag:   s.cur,
+	})
+	return s
+}
+
 func (s *Job) DoneWithMessage(msg string) *Job {
 	_ = s.log(LogItem{
 		Level:   Done,

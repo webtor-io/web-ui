@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,85 @@ type StreamContent struct {
 	DomainSettings      *embed.DomainSettingsData
 }
 
+const (
+	bandwidthTestSize   = 30 * 1024 * 1024 // 30MB
+	bandwidthMultiplier = 1.5
+)
+
+type SlowDownloadData struct {
+	MeasuredSpeedMbps float64
+	RequiredSpeedMbps float64
+	BitrateMbps       float64
+	IsRateLimited     bool
+	RateLimitMbps     float64
+	TierName          string
+}
+
+type SlowDownloadError struct {
+	Data SlowDownloadData
+}
+
+func (e *SlowDownloadError) Error() string {
+	return "download speed too slow for streaming"
+}
+
+type firstByteReader struct {
+	r         io.Reader
+	firstByte time.Time
+	started   bool
+}
+
+func (r *firstByteReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	if n > 0 && !r.started {
+		r.firstByte = time.Now()
+		r.started = true
+	}
+	return
+}
+
+func getVideoBitrate(mp *api.MediaProbe) int64 {
+	if mp.Format.BitRate != "" {
+		br, err := strconv.ParseInt(mp.Format.BitRate, 10, 64)
+		if err == nil && br > 0 {
+			return br
+		}
+	}
+	var total int64
+	for _, s := range mp.Streams {
+		if s.BitRate != "" {
+			br, err := strconv.ParseInt(s.BitRate, 10, 64)
+			if err == nil {
+				total += br
+			}
+		}
+	}
+	return total
+}
+
+func parseRateLimit(rate string) int64 {
+	rate = strings.TrimSpace(rate)
+	if !strings.HasSuffix(rate, "M") || len(rate) < 2 {
+		return 0
+	}
+	n, err := strconv.ParseInt(rate[:len(rate)-1], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n * 1_000_000
+}
+
+func isRateLimited(measuredBytesPerSec float64, rateLimitBitsPerSec int64) bool {
+	return measuredBytesPerSec*8 >= float64(rateLimitBitsPerSec)*0.9
+}
+
+func contentProbeURL(downloadURL string) string {
+	if i := strings.IndexByte(downloadURL, '?'); i >= 0 {
+		return downloadURL[:i] + "~cp" + downloadURL[i:]
+	}
+	return downloadURL + "~cp"
+}
+
 func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
 	sc := &StreamContent{
 		Settings:       settings,
@@ -61,32 +141,76 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	sc.Item = &exportResponse.Source
 	se := exportResponse.ExportItems["stream"]
 
-	if se.Meta.Transcode {
-		if !se.Meta.TranscodeCache {
-			if !se.ExportMetaItem.Meta.Cache {
-				if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1024*1024, 500*1024, "file", true); err != nil {
-					return
-				}
-			}
-			if err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, "stream", false); err != nil {
-				return
-			}
+	var downloadSpeed float64
+	fileSize := int(exportResponse.Source.Size)
+	warmupSize := bandwidthTestSize
+	if half := fileSize / 2; half > 0 && warmupSize > half {
+		warmupSize = half
+	}
+	downloadURL := exportResponse.ExportItems["download"].URL
+
+	// Step 1: Torrent warmup (if original content not cached)
+	needTorrentWarmup := !se.ExportMetaItem.Meta.Cache && (!se.Meta.Transcode || !se.Meta.TranscodeCache)
+	if needTorrentWarmup {
+		if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, "file", true); err != nil {
+			return
 		}
-		j.InProgress("probing content media info")
-		mpCtx, mpCancel := context.WithTimeout(ctx, 1*time.Minute)
-		defer mpCancel()
-		mp, err := s.api.GetMediaProbe(mpCtx, exportResponse.ExportItems["media_probe"].URL)
-		if err != nil {
-			return errors.Wrap(err, "failed to get probe data")
+	}
+
+	// Step 2: Content probe via ~cp (before transcoder warmup)
+	j.InProgress("probing content media info")
+	mpCtx, mpCancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer mpCancel()
+	probeURL := contentProbeURL(downloadURL)
+	mp, probeErr := s.api.GetMediaProbe(mpCtx, probeURL)
+	if probeErr != nil {
+		if mpItem, ok := exportResponse.ExportItems["media_probe"]; ok {
+			mp, probeErr = s.api.GetMediaProbe(mpCtx, mpItem.URL)
 		}
+	}
+	if probeErr != nil {
+		if se.Meta.Transcode {
+			return errors.Wrap(probeErr, "failed to get probe data")
+		}
+		log.WithError(probeErr).Warn("failed to get content probe")
+	} else {
 		sc.MediaProbe = mp
 		log.Infof("got media probe %+v", mp)
-		j.Done()
-	} else {
-		if !se.ExportMetaItem.Meta.Cache {
-			if err = s.warmUp(ctx, j, "warming up torrent client", exportResponse.ExportItems["download"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, int(exportResponse.Source.Size), 1024*1024, 500*1024, "file", true); err != nil {
-				return
+	}
+	j.Done()
+
+	// Step 3: Bandwidth check
+	if downloadSpeed > 0 && sc.MediaProbe != nil {
+		j.InProgress("checking bandwidth")
+		bitrate := getVideoBitrate(sc.MediaProbe)
+		if bitrate > 0 && downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
+			sdd := SlowDownloadData{
+				MeasuredSpeedMbps: downloadSpeed * 8 / 1_000_000,
+				RequiredSpeedMbps: float64(bitrate) * bandwidthMultiplier / 1_000_000,
+				BitrateMbps:       float64(bitrate) / 1_000_000,
 			}
+			if c.ApiClaims != nil && c.ApiClaims.Rate != "" {
+				rateLimitBps := parseRateLimit(c.ApiClaims.Rate)
+				if rateLimitBps > 0 && isRateLimited(downloadSpeed, rateLimitBps) {
+					sdd.IsRateLimited = true
+					sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
+				}
+			}
+			if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil {
+				sdd.TierName = c.Claims.Context.Tier.Name
+			}
+			if sdd.TierName == "" {
+				sdd.TierName = "free"
+			}
+			return &SlowDownloadError{Data: sdd}
+		}
+		j.Done()
+	}
+
+	// Step 4: Transcoder warmup (after bandwidth check)
+	if se.Meta.Transcode && !se.Meta.TranscodeCache {
+		if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, "stream", false); err != nil {
+			return
 		}
 	}
 	if exportResponse.Source.MediaFormat == ra.Video {
@@ -170,7 +294,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, "", true); err != nil {
+		if _, err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, "", true); err != nil {
 			return err
 		}
 	}
@@ -191,7 +315,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	return
 }
 
-func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (err error) {
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (downloadSpeed float64, err error) {
 	tag := "download"
 	if tagSuff != "" {
 		tag += "-" + tagSuff
@@ -234,18 +358,25 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 
 	b, err := s.api.DownloadWithRange(warmupCtx, u, 0, limitStart)
 	if err != nil {
-		return errors.Wrap(err, "failed to start download")
+		return 0, errors.Wrap(err, "failed to start download")
 	}
 	defer func(b io.ReadCloser) {
 		_ = b.Close()
 	}(b)
 
-	_, err = io.Copy(io.Discard, b)
+	fbr := &firstByteReader{r: b}
+	n, err := io.Copy(io.Discard, fbr)
+	if fbr.started {
+		elapsed := time.Since(fbr.firstByte)
+		if elapsed > 0 && n > 0 {
+			downloadSpeed = float64(n) / elapsed.Seconds()
+		}
+	}
 
 	if limitEnd > 0 {
 		b2, err := s.api.DownloadWithRange(warmupCtx, u, size-limitEnd, -1)
 		if err != nil {
-			return errors.Wrap(err, "failed to start download")
+			return 0, errors.Wrap(err, "failed to start download")
 		}
 		defer func(b2 io.ReadCloser) {
 			_ = b2.Close()
@@ -253,9 +384,9 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		_, err = io.Copy(io.Discard, b2)
 	}
 	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
-		return errors.Wrap(err, fmt.Sprintf("failed to download within %v minutes", s.warmupTimeoutMin))
+		return 0, errors.Wrap(err, fmt.Sprintf("failed to download within %v minutes", s.warmupTimeoutMin))
 	} else if err != nil {
-		return errors.Wrap(err, "failed to download")
+		return 0, errors.Wrap(err, "failed to download")
 	}
 
 	j.Done()
@@ -299,6 +430,17 @@ type ErrorWrapperScript struct {
 
 func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	err = s.Script.Run(ctx, j)
+	if sde, ok := err.(*SlowDownloadError); ok {
+		tpl := s.tb.Build("action/errors/slow_download").WithLayoutBody(`{{ template "main" . }}`)
+		str, terr := tpl.ToString(s.c.WithData(&sde.Data))
+		if terr != nil {
+			return terr
+		}
+		log.WithError(err).WithField("data", sde.Data).Warn("bandwidth check failed")
+		j.Fail()
+		j.Custom("action/errors/slow_download", strings.TrimSpace(str))
+		return nil
+	}
 	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
 		tpl := s.tb.Build("action/errors/no_peers").WithLayoutBody(`{{ template "main" . }}`)
 		str, terr := tpl.ToString(s.c)
