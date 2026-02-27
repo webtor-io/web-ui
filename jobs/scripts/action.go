@@ -149,12 +149,9 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	downloadURL := exportResponse.ExportItems["download"].URL
 
-	// Step 1: Torrent warmup (if original content not cached)
-	needTorrentWarmup := !se.ExportMetaItem.Meta.Cache && (!se.Meta.Transcode || !se.Meta.TranscodeCache)
-	if needTorrentWarmup {
-		if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, "file", true); err != nil {
-			return
-		}
+	// Step 1: Torrent warmup
+	if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, "file", true); err != nil {
+		return
 	}
 
 	// Step 2: Content probe via ~cp (before transcoder warmup)
