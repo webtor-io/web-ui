@@ -36,7 +36,8 @@ type StreamContent struct {
 }
 
 const (
-	bandwidthTestSize   = 30 * 1024 * 1024 // 30MB
+	bandwidthTestSize   = 50 * 1024 * 1024 // 50MB
+	bandwidthSkipSize   = 10 * 1024 * 1024 // 10MB — skip for speed measurement
 	bandwidthMultiplier = 1.5
 )
 
@@ -57,17 +58,22 @@ func (e *SlowDownloadError) Error() string {
 	return "download speed too slow for streaming"
 }
 
-type firstByteReader struct {
-	r         io.Reader
-	firstByte time.Time
-	started   bool
+type speedReader struct {
+	r            io.Reader
+	bytesRead    int64
+	skipBytes    int64
+	measureStart time.Time
+	started      bool
 }
 
-func (r *firstByteReader) Read(p []byte) (n int, err error) {
+func (r *speedReader) Read(p []byte) (n int, err error) {
 	n, err = r.r.Read(p)
-	if n > 0 && !r.started {
-		r.firstByte = time.Now()
-		r.started = true
+	if n > 0 {
+		r.bytesRead += int64(n)
+		if !r.started && r.bytesRead >= r.skipBytes {
+			r.started = true
+			r.measureStart = time.Now()
+		}
 	}
 	return
 }
@@ -150,7 +156,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	downloadURL := exportResponse.ExportItems["download"].URL
 
 	// Step 1: Torrent warmup
-	if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, "file", true); err != nil {
+	skipBytes := bandwidthSkipSize
+	if warmupSize <= skipBytes {
+		skipBytes = 0
+	}
+	if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
 		return
 	}
 
@@ -206,7 +216,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 
 	// Step 4: Transcoder warmup (after bandwidth check)
 	if se.Meta.Transcode && !se.Meta.TranscodeCache {
-		if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, "stream", false); err != nil {
+		if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, 0, "stream", false); err != nil {
 			return
 		}
 	}
@@ -291,7 +301,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if _, err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, "", true); err != nil {
+		if _, err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, 0, "", true); err != nil {
 			return err
 		}
 	}
@@ -312,7 +322,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	return
 }
 
-func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, tagSuff string, useStatus bool) (downloadSpeed float64, err error) {
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, skipBytes int, tagSuff string, useStatus bool) (downloadSpeed float64, err error) {
 	tag := "download"
 	if tagSuff != "" {
 		tag += "-" + tagSuff
@@ -361,12 +371,13 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		_ = b.Close()
 	}(b)
 
-	fbr := &firstByteReader{r: b}
-	n, err := io.Copy(io.Discard, fbr)
-	if fbr.started {
-		elapsed := time.Since(fbr.firstByte)
-		if elapsed > 0 && n > 0 {
-			downloadSpeed = float64(n) / elapsed.Seconds()
+	sr := &speedReader{r: b, skipBytes: int64(skipBytes)}
+	_, err = io.Copy(io.Discard, sr)
+	if sr.started {
+		measured := sr.bytesRead - sr.skipBytes
+		elapsed := time.Since(sr.measureStart)
+		if elapsed > 0 && measured > 0 {
+			downloadSpeed = float64(measured) / elapsed.Seconds()
 		}
 	}
 
