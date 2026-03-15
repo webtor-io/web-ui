@@ -157,28 +157,33 @@ export class StremioClient {
         return data.metas || [];
     }
 
+    getStreamAddons() {
+        if (!this.manifests) return [];
+        return this.manifests.filter(m => {
+            const resources = m.manifest.resources || [];
+            return resources.some(r =>
+                (typeof r === 'string' && r === 'stream') ||
+                (r && r.name === 'stream')
+            );
+        });
+    }
+
+    async fetchStreamFromAddon(addon, type, id, { signal } = {}) {
+        const url = `${addon.baseUrl}/stream/${type}/${id}.json`;
+        const res = await fetchWithTimeout(url, signal);
+        if (!res.ok) throw new Error('Failed to fetch streams');
+        const data = await res.json();
+        return (data.streams || []).map(s => ({
+            ...s,
+            addonName: addon.manifest.name || 'Unknown',
+        }));
+    }
+
     async fetchStreams(type, id, { signal } = {}) {
-        const streamAddons = this.manifests
-            ? this.manifests.filter(m => {
-                const resources = m.manifest.resources || [];
-                return resources.some(r =>
-                    (typeof r === 'string' && r === 'stream') ||
-                    (r && r.name === 'stream')
-                );
-            })
-            : [];
+        const streamAddons = this.getStreamAddons();
 
         const results = await Promise.allSettled(
-            streamAddons.map(async (addon) => {
-                const url = `${addon.baseUrl}/stream/${type}/${id}.json`;
-                const res = await fetchWithTimeout(url, signal);
-                if (!res.ok) throw new Error('Failed to fetch streams');
-                const data = await res.json();
-                return (data.streams || []).map(s => ({
-                    ...s,
-                    addonName: addon.manifest.name || 'Unknown',
-                }));
-            })
+            streamAddons.map(addon => this.fetchStreamFromAddon(addon, type, id, { signal }))
         );
 
         const streams = [];

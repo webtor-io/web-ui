@@ -33,9 +33,13 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 func (h *Handler) index(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	if !u.HasAuth() {
+		returnURL := "/discover"
+		if c.Request.URL.RawQuery != "" {
+			returnURL += "?" + c.Request.URL.RawQuery
+		}
 		v := url.Values{
 			"from":       []string{"discover"},
-			"return-url": []string{"/discover"},
+			"return-url": []string{returnURL},
 		}
 		c.Redirect(http.StatusFound, "/login?"+v.Encode())
 		return

@@ -47,6 +47,13 @@ func (h *Handler) sitemap(c *gin.Context) {
 		},
 	}
 
+	urls = append(urls, URL{
+		Loc:        h.baseURL + "/about",
+		LastMod:    now,
+		ChangeFreq: "monthly",
+		Priority:   "0.7",
+	})
+
 	for _, tool := range common.Tools {
 		urls = append(urls, URL{
 			Loc:        h.baseURL + "/" + tool.Url,

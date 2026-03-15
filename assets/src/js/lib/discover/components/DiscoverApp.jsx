@@ -266,15 +266,38 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     }, [state.phase, performSearch]);
 
     // --- Card click & streams (defined before restore effects that use them) ---
-    const loadStreams = useCallback(async (type, id, item) => {
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading streams...' } });
-        try {
-            const streams = await client.fetchStreams(type, id);
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams } });
-            window.umami?.track('discover-streams-loaded', { type, id, count: streams.length });
-        } catch (e) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: item.name, poster: item.poster, streams: [] } });
+    const loadStreams = useCallback(async (type, id, item, modalExtra = {}) => {
+        const title = item.name || item.title;
+        const poster = item.poster;
+        const addons = client.getStreamAddons();
+        if (!addons.length) {
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, streams: [], ...modalExtra } });
+            return;
         }
+
+        const addonStatuses = addons.map(a => {
+            let host;
+            try { host = new URL(a.baseUrl).hostname; } catch { host = a.baseUrl; }
+            return { name: a.manifest.name || host, host, status: 'fetching' };
+        });
+
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, addons: [...addonStatuses], ...modalExtra } });
+
+        const allStreams = [];
+        const promises = addons.map(async (addon, i) => {
+            try {
+                const streams = await client.fetchStreamFromAddon(addon, type, id);
+                addonStatuses[i] = { ...addonStatuses[i], status: 'done', count: streams.length };
+                allStreams.push(...streams);
+            } catch (e) {
+                addonStatuses[i] = { ...addonStatuses[i], status: 'error' };
+            }
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, addons: [...addonStatuses], ...modalExtra } });
+        });
+
+        await Promise.allSettled(promises);
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, streams: allStreams, ...modalExtra } });
+        window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length });
     }, [client]);
 
     const cardClick = useCallback(async (item) => {
@@ -329,24 +352,16 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 url.push({ season: ep.season, episode: ep.episode });
             }
 
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster, subtitle: 'Loading streams...' } });
+            // Fetch meta in parallel with stream loading so we can offer "back to episodes"
+            const metaPromise = client.fetchMeta(type, id).catch(() => null);
 
-            // Fetch meta in parallel with streams so we can offer "back to episodes"
-            const [streamsResult, metaResult] = await Promise.allSettled([
-                client.fetchStreams(type, epId),
-                client.fetchMeta(type, id),
-            ]);
+            await loadStreams(type, epId, { name: epName, poster }, {});
 
-            const streams = streamsResult.status === 'fulfilled' ? streamsResult.value : [];
-            const meta = metaResult.status === 'fulfilled' ? metaResult.value : null;
-
-            const backToEpisodes = meta?.videos?.length > 0 ? {
-                title: name, poster, meta, itemId: id, itemType: type, season: ep.season,
-            } : undefined;
-
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster, streams, backToEpisodes } });
-            if (streams.length > 0) {
-                window.umami?.track('discover-streams-loaded', { type, id: epId, count: streams.length });
+            const meta = await metaPromise;
+            if (meta?.videos?.length > 0) {
+                const backToEpisodes = { title: name, poster, meta, itemId: id, itemType: type, season: ep.season };
+                const cur = stateRef.current?.modal;
+                if (cur) dispatch({ type: 'SHOW_MODAL', modal: { ...cur, backToEpisodes } });
             }
         } else if (item) {
             cardClick(item);
@@ -371,15 +386,8 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             season: episode.season,
         };
 
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: epName, poster: item.poster, subtitle: 'Loading streams...', backToEpisodes } });
-        try {
-            const streams = await client.fetchStreams(type, epId);
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster: item.poster, streams, backToEpisodes } });
-            window.umami?.track('discover-streams-loaded', { type, id: epId, count: streams.length });
-        } catch (e) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title: epName, poster: item.poster, streams: [], backToEpisodes } });
-        }
-    }, [client]);
+        await loadStreams(type, epId, { name: epName, poster: item.poster }, { backToEpisodes });
+    }, [loadStreams]);
 
     const onBackToEpisodes = useCallback(() => {
         window.history.back();

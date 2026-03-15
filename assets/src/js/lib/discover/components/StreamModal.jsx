@@ -72,6 +72,10 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
         );
     }
 
+    if (modal.view === 'fetching') {
+        return <FetchingView modal={modal} />;
+    }
+
     if (modal.view === 'progress') {
         return <ProgressView logUrl={modal.logUrl} title={modal.title} poster={modal.poster} fileIdx={modal.fileIdx} />;
     }
@@ -142,6 +146,44 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
                         <span class="loading loading-spinner loading-md text-w-cyan"></span>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+// --- Fetching View (per-addon progress) ---
+
+function FetchingView({ modal }) {
+    const { title, poster, addons } = modal;
+    const doneCount = addons.filter(a => a.status !== 'fetching').length;
+    const subtitle = `Fetching streams... (${doneCount}/${addons.length})`;
+
+    return (
+        <div>
+            <ModalHeader title={title} poster={poster} subtitle={subtitle} />
+            <div class="flex flex-col gap-2 py-2">
+                {addons.map((addon, i) => (
+                    <div key={i} class="flex items-center gap-3 px-3 py-2 rounded-lg border border-w-line/50">
+                        {addon.status === 'fetching' && (
+                            <span class="loading loading-spinner loading-xs text-w-cyan flex-shrink-0"></span>
+                        )}
+                        {addon.status === 'done' && (
+                            <svg class="w-4 h-4 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M20 6L9 17l-5-5"/>
+                            </svg>
+                        )}
+                        {addon.status === 'error' && (
+                            <svg class="w-4 h-4 text-red-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        )}
+                        <span class={`text-sm truncate ${addon.status === 'error' ? 'text-red-400' : addon.status === 'done' ? 'text-w-sub' : 'text-w-text'}`}>
+                            {addon.status === 'fetching' && `Fetching ${addon.host}...`}
+                            {addon.status === 'done' && `${addon.host} — ${addon.count} stream${addon.count !== 1 ? 's' : ''}`}
+                            {addon.status === 'error' && `Error fetching ${addon.host}`}
+                        </span>
+                    </div>
+                ))}
             </div>
         </div>
     );

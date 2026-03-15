@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/webtor-io/web-ui/handlers/about"
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/discover"
@@ -259,6 +260,9 @@ func serve(c *cli.Context) error {
 		// Setting Legal
 		legal.RegisterHandler(r, tm)
 	}
+
+	// Setting About
+	about.RegisterHandler(r, tm)
 
 	// Setting DomainSettings
 	ds, err := embed.NewDomainSettings(c, pg, uc)
