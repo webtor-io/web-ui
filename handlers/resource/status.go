@@ -225,8 +225,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		case res := <-statsChResult:
 			statsCh = res.ch
 			log.WithField("resourceID", resourceID).WithField("connected", res.ch != nil).WithField("msg", res.msg).Info("status: stats connection result")
+			// If export says content is cached (no torrent_client_stat), mark as cached
+			if res.msg == "cached" {
+				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
+			}
 			if !initialSent {
-				// Now we have both vault state and stats connection — send first status
 				if !sendStatus() {
 					return
 				}
@@ -310,7 +313,8 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 
 	statItem, ok := exportResp.ExportItems["torrent_client_stat"]
 	if !ok || statItem.URL == "" {
-		return nil, "no torrent_client_stat in exports"
+		// No stat URL means content is cached (rest-api skips torrent_client_stat for cached content)
+		return nil, "cached"
 	}
 
 	// Check stats URL is accessible before opening SSE
@@ -319,6 +323,10 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	// Open SSE connection to torrent-http-proxy (use parent ctx, not timeout ctx)
 	ch, err := s.api.Stats(ctx, statItem.URL)
 	if err != nil {
+		// 404 from seeder means content is available (cached/vaulted)
+		if err.Error() == "cached" {
+			return nil, "cached"
+		}
 		msg := fmt.Sprintf("stats SSE failed: %v", err)
 		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
 		return nil, msg

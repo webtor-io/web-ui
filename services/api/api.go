@@ -630,6 +630,10 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do request")
 	}
+	if res.StatusCode == http.StatusNotFound {
+		_ = res.Body.Close()
+		return nil, errors.New("cached")
+	}
 	if res.StatusCode != http.StatusOK {
 		_ = res.Body.Close()
 		return nil, errors.Errorf("stats returned status %d", res.StatusCode)
