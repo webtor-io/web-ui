@@ -35,13 +35,9 @@ type TorrentStatsData struct {
 // from vault DB state, vault API state, and torrent seeding stats.
 // Priority: vaulted > vaulting > cached > caching > idle.
 func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource, stats *TorrentStatsData) *TorrentStatus {
-	// Check vault state first (highest priority)
 	vaultState := resolveVaultState(dbResource, apiResource)
-
-	// Check caching state
 	cachingState := resolveCachingState(stats)
 
-	// Apply priority: vaulted > vaulting > cached > caching > idle
 	if vaultState.State == "vaulted" {
 		return vaultState
 	}
@@ -57,7 +53,6 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 	if cachingState.State == "caching" {
 		return cachingState
 	}
-	// Both are idle
 	return &TorrentStatus{State: "idle"}
 }
 
@@ -71,7 +66,7 @@ func resolveVaultState(dbResource *vaultModels.Resource, apiResource *vault.Reso
 	if !dbResource.Funded {
 		return &TorrentStatus{State: "idle"}
 	}
-	// Funded but not vaulted — check API
+	// Funded but not vaulted — check API for progress
 	if apiResource == nil {
 		return &TorrentStatus{State: "vaulting", Progress: 0}
 	}
@@ -82,10 +77,9 @@ func resolveVaultState(dbResource *vaultModels.Resource, apiResource *vault.Reso
 		return &TorrentStatus{State: "vaulted"}
 	case vault.StatusQueued:
 		return &TorrentStatus{State: "vaulting", Progress: 0}
-	case vault.StatusFailed:
-		return &TorrentStatus{State: "idle"}
 	default:
-		return &TorrentStatus{State: "idle"}
+		// Failed or unknown — still funded, system will retry
+		return &TorrentStatus{State: "vaulting", Progress: apiResource.GetProgress()}
 	}
 }
 

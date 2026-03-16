@@ -112,8 +112,9 @@ func TestResolveStatus_VaultFailed(t *testing.T) {
 	db := &vaultModels.Resource{Funded: true, Vaulted: false}
 	apiRes := &vault.Resource{Status: vault.StatusFailed}
 	status := resolveStatus(db, apiRes, nil)
-	if status.State != "idle" {
-		t.Errorf("expected idle for failed vault, got %q", status.State)
+	// Funded resource with failed vault should still show vaulting (system will retry)
+	if status.State != "vaulting" {
+		t.Errorf("expected vaulting for failed vault (still funded), got %q", status.State)
 	}
 }
 
