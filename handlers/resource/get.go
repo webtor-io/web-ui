@@ -96,6 +96,7 @@ type GetData struct {
 	VaultButton           *VaultButton
 	VaultPledgeRemoveForm *VaultPledgeRemoveForm
 	Vault                 bool
+	TorrentStatus         *TorrentStatus
 }
 
 type ExtendedResource struct {
@@ -200,6 +201,9 @@ func (s *Handler) get(c *gin.Context) {
 
 	// Set vault availability
 	d.Vault = s.vault != nil
+
+	// Prepare initial torrent status (vault DB only, no SSE)
+	d.TorrentStatus = s.prepareInitialStatus(ctx, args.ID)
 
 	// Prepare vault button state
 	if s.vault != nil && args.User.HasAuth() {

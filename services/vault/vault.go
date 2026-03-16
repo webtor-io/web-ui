@@ -519,6 +519,14 @@ func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceI
 	return requiredVP, nil
 }
 
+// GetVaultAPIResource retrieves the vault API transfer status for a resource (non-cached, for real-time polling)
+func (s *Vault) GetVaultAPIResource(ctx context.Context, resourceID string) (*Resource, error) {
+	if s.vaultApi == nil {
+		return nil, nil
+	}
+	return s.vaultApi.GetResource(ctx, resourceID)
+}
+
 // GetResource retrieves a resource by ID, returns nil if not found
 func (s *Vault) GetResource(ctx context.Context, resourceID string) (*vaultModels.Resource, error) {
 	db := s.pg.Get()

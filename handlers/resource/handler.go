@@ -41,6 +41,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		useDirectLinks: c.BoolT(common.UseDirectLinks),
 	}
 	r.POST("/", h.post)
+	r.GET("/:resource_id/status", h.status)
 	r.GET("/:resource_id", func(c *gin.Context) {
 		rid := c.Param("resource_id")
 		if strings.HasPrefix(rid, "magnet") {
