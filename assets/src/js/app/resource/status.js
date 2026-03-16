@@ -52,8 +52,11 @@ av(async function() {
     const resourceId = container.dataset.resourceId;
     if (!resourceId) return;
 
+    const badge = container.querySelector('#torrent-status-badge');
+    if (!badge) return;
+
     // Show loading state until first SSE message arrives
-    container.innerHTML = renderLoading();
+    badge.innerHTML = renderLoading();
 
     const source = new EventSource(`/${resourceId}/status`);
     container._statusSource = source;
@@ -61,7 +64,7 @@ av(async function() {
     source.onmessage = (e) => {
         try {
             const status = JSON.parse(e.data);
-            container.innerHTML = renderBadge(status);
+            badge.innerHTML = renderBadge(status);
             if (status.state === 'vaulted') {
                 source.close();
                 container._statusSource = null;

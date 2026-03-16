@@ -30,7 +30,7 @@
         </div>
         {{ if .TorrentStatus }}
         <div id="torrent-status" data-resource-id="{{ .Resource.ID }}">
-            {{ template "resource/status" .TorrentStatus }}
+            <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
             {{ "resource/status.js" | asset }}
         </div>
         {{ end }}
