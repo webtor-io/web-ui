@@ -146,17 +146,17 @@ export function initPlayer(target) {
     let seekOffset = 0;
     let isSeeking = false;
 
+    const isVideo = video.tagName === 'VIDEO';
     let features = [
         'playpause',
         'current',
         'progress',
         'duration',
-        'advancedtracks',
         'volume',
-        'fullscreen',
-        'chromecast',
-        'embed',
     ];
+    if (isVideo) {
+        features.push('advancedtracks', 'fullscreen', 'chromecast', 'embed');
+    }
     if (duration > 0 && !isSession) {
         features.push('availableprogress');
     }

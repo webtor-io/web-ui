@@ -250,7 +250,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 
 	// Step 4: Transcoder warmup / session creation (after bandwidth check)
-	if se.Meta.Transcode && s.useSessionTranscoder && exportResponse.Source.MediaFormat == ra.Video {
+	if se.Meta.Transcode && s.useSessionTranscoder && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
 		// Session-based transcoder path
 		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second)
 		if serr != nil {

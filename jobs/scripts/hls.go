@@ -122,7 +122,7 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 		return nil, errors.Wrap(err, "failed to construct session HLS URL")
 	}
 
-	j.InProgress("buffering video content")
+	j.InProgress("buffering content")
 
 	masterBody, err := fetchBody(bufferCtx, s.api, hlsURL)
 	if err != nil {

@@ -1,14 +1,17 @@
 {{ define "main" }}
-{{ $MediaProbe := .Data.MediaProbe}}
-{{ with .Data.ExportTag }}
+{{ with .Data }}
 <audio class="player"
        crossorigin="anonymous"
-       preload="{{ .Preload }}"
-       {{ if $MediaProbe }}data-duration="{{ $MediaProbe | getDurationSec }}" {{ end }}
+       preload="{{ .ExportTag.Preload }}"
+       {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
+       {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
+       {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
+       {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
+       {{ if .SessionDeletePath }}data-session-delete-path="{{ .SessionDeletePath }}"{{ end }}
        controls
        autoplay
-       data-settings="{{ $.Data.Settings | json }}">
-    {{ range .Sources }}
+       data-settings="{{ .Settings | json }}">
+    {{ range .ExportTag.Sources }}
     <source src="{{ .Src }}" type="{{ .Type }}">
     {{ end }}
 </audio>
