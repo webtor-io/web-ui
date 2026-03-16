@@ -15,6 +15,7 @@
            {{ if .Settings.Width }}width="{{ .Settings.Width }}"{{ end }}
            {{ if .Settings.Height }}height="{{ .Settings.Height }}"{{ end }}
            autoplay
+           playsinline
            data-settings="{{ .Settings | json }}">
         {{ range .ExportTag.Sources }}
         <source src="{{ .Src }}" type="{{ .Type }}">
