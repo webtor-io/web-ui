@@ -26,6 +26,10 @@ const BADGE_CONFIG = {
     },
 };
 
+function renderLoading() {
+    return '<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2"><span class="loading loading-dots loading-xs"></span></div>';
+}
+
 function renderBadge(status) {
     const config = BADGE_CONFIG[status.state];
     if (!config) return '';
@@ -47,6 +51,9 @@ av(async function() {
     const container = this;
     const resourceId = container.dataset.resourceId;
     if (!resourceId) return;
+
+    // Show loading state until first SSE message arrives
+    container.innerHTML = renderLoading();
 
     const source = new EventSource(`/${resourceId}/status`);
     container._statusSource = source;
