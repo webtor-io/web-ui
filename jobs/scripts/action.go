@@ -133,7 +133,7 @@ func sessionBaseURL(streamURL string) (string, error) {
 	if idx < 0 {
 		return "", errors.New("stream URL does not contain ~hls/ suffix")
 	}
-	u.Path = u.Path[:idx] + "~hls-staging"
+	u.Path = u.Path[:idx] + "~hls"
 	return u.String(), nil
 }
 
@@ -249,9 +249,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		j.Done()
 	}
 
-	// Step 4: Transcoder warmup / session creation (after bandwidth check)
-	if se.Meta.Transcode && s.useSessionTranscoder && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
-		// Session-based transcoder path
+	// Step 4: Session transcoder (after bandwidth check)
+	if se.Meta.Transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
 		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second)
 		if serr != nil {
 			return errors.Wrap(serr, "failed to buffer session HLS")
@@ -263,13 +262,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		}}
 		sc.SessionSeekURL = result.SeekURL
 		sc.SessionDeletePath = "/transcoder-session/" + result.Session.ID + "/delete?base=" + url.QueryEscape(result.BaseURL)
-	} else {
-		// Legacy transcoder path
-		if se.Meta.Transcode && !se.Meta.TranscodeCache {
-			if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, 0, "stream", false); err != nil {
-				return
-			}
-		}
 	}
 	if exportResponse.Source.MediaFormat == ra.Video {
 		sc.VideoStreamUserData = vsud
@@ -286,11 +278,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 					j.Done()
 				}
 			}
-		}
-	}
-	if se.Meta.Transcode && !s.useSessionTranscoder && exportResponse.Source.MediaFormat == ra.Video {
-		if err = s.bufferHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 5*time.Minute); err != nil {
-			j.Warn(errors.Wrap(err, "failed to buffer video content"))
 		}
 	}
 	if settings.Poster != "" {
@@ -453,17 +440,16 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 }
 
 type ActionScript struct {
-	api                  *api.Api
-	c                    *web.Context
-	resourceId           string
-	itemId               string
-	action               string
-	tb                   template.Builder[*web.Context]
-	settings             *models.StreamSettings
-	vsud                 *models.VideoStreamUserData
-	dsd                  *embed.DomainSettingsData
-	warmupTimeoutMin     int
-	useSessionTranscoder bool
+	api              *api.Api
+	c                *web.Context
+	resourceId       string
+	itemId           string
+	action           string
+	tb               template.Builder[*web.Context]
+	settings         *models.StreamSettings
+	vsud             *models.VideoStreamUserData
+	dsd              *embed.DomainSettingsData
+	warmupTimeoutMin int
 }
 
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -514,7 +500,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int, useSessionTranscoder bool) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -524,17 +510,16 @@ func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, res
 		tb: tb,
 		c:  c,
 		Script: &ActionScript{
-			tb:                   tb,
-			api:                  api,
-			c:                    c,
-			resourceId:           resourceID,
-			itemId:               itemID,
-			action:               action,
-			settings:             settings,
-			vsud:                 vsud,
-			dsd:                  dsd,
-			warmupTimeoutMin:     warmupTimeoutMin,
-			useSessionTranscoder: useSessionTranscoder,
+			tb:               tb,
+			api:              api,
+			c:                c,
+			resourceId:       resourceID,
+			itemId:           itemID,
+			action:           action,
+			settings:         settings,
+			vsud:             vsud,
+			dsd:              dsd,
+			warmupTimeoutMin: warmupTimeoutMin,
 		},
 	}, id
 }
