@@ -156,8 +156,6 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	var statsCh <-chan api.EventData
 	var statsConnecting bool
-	var statsWasConnected bool
-	var statsGotEvents bool
 	var lastStats *TorrentStatsData
 	var lastJSON string
 	var lastDBResource *vaultModels.Resource
@@ -211,25 +209,17 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		case res := <-statsChResult:
 			statsCh = res.ch
 			statsConnecting = false
-			statsGotEvents = false
-			if res.ch != nil {
-				statsWasConnected = true
-			}
 
 		case ev, ok := <-statsCh:
 			if ok {
-				statsGotEvents = true
 				lastStats = &TorrentStatsData{
 					Total:     ev.Total,
 					Completed: ev.Completed,
 					Seeders:   ev.Seeders,
 				}
 			} else {
-				if !statsGotEvents && statsWasConnected {
-					lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
-				} else {
-					lastStats = nil
-				}
+				// Stats channel closed — seeder gone or connection dropped
+				lastStats = nil
 				statsCh = nil
 			}
 			if !sendStatus() {
