@@ -443,18 +443,92 @@ func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, error) {
 	return s.DownloadWithRange(ctx, u, 0, -1)
 }
 
-func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
+func (s *Api) proxyURL(u string) (string, error) {
 	if s.useInternalTorrentHTTPProxy {
-		internal := fmt.Sprintf("%v:%v", s.torrentHTTPProxyHost, s.torrentHTTPProxyPort)
 		ur, err := url.Parse(u)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		ur.Host = internal
+		ur.Host = fmt.Sprintf("%v:%v", s.torrentHTTPProxyHost, s.torrentHTTPProxyPort)
 		ur.Scheme = "http"
-		u = ur.String()
+		return ur.String(), nil
 	}
-	return http.NewRequestWithContext(ctx, "GET", u, nil)
+	return u, nil
+}
+
+func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
+	resolved, err := s.proxyURL(u)
+	if err != nil {
+		return nil, err
+	}
+	return http.NewRequestWithContext(ctx, "GET", resolved, nil)
+}
+
+type TranscoderSession struct {
+	ID       string  `json:"id"`
+	Duration float64 `json:"duration"`
+}
+
+func appendPath(base string, suffix string) (string, error) {
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	u.Path += suffix
+	return u.String(), nil
+}
+
+func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string) (*TranscoderSession, error) {
+	sessionURL, err := appendPath(baseURL, "/session")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to construct session URL")
+	}
+	resolved, err := s.proxyURL(sessionURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve proxy URL")
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", resolved, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create request")
+	}
+	res, err := s.cl.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create transcoder session")
+	}
+	defer func() { _ = res.Body.Close() }()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read session response")
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("transcoder session creation failed status=%d body=%s", res.StatusCode, string(data))
+	}
+	session := &TranscoderSession{}
+	if err := json.Unmarshal(data, session); err != nil {
+		return nil, errors.Wrapf(err, "failed to parse session response body=%s", string(data))
+	}
+	return session, nil
+}
+
+func (s *Api) DeleteTranscoderSession(ctx context.Context, baseURL string, sessionID string) error {
+	deleteURL, err := appendPath(baseURL, "/session/"+sessionID)
+	if err != nil {
+		return errors.Wrap(err, "failed to construct delete URL")
+	}
+	resolved, err := s.proxyURL(deleteURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to resolve proxy URL")
+	}
+	req, err := http.NewRequestWithContext(ctx, "DELETE", resolved, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create request")
+	}
+	res, err := s.cl.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete transcoder session")
+	}
+	_ = res.Body.Close()
+	return nil
 }
 
 func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, error) {

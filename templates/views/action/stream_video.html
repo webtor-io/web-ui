@@ -6,7 +6,11 @@
            preload="{{ .ExportTag.Preload }}"
            {{ if .ExternalData.Poster }}poster="{{ .ExternalData.Poster }}"
            {{ else if .ExportTag.Poster }}poster="{{ .ExportTag.Poster }}" {{ end }}
-           {{ if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
+           {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
+           {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
+           {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
+           {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
+           {{ if .SessionDeletePath }}data-session-delete-path="{{ .SessionDeletePath }}"{{ end }}
            {{ if .Settings | hasControls }}controls{{ end }}
            {{ if .Settings.Width }}width="{{ .Settings.Width }}"{{ end }}
            {{ if .Settings.Height }}height="{{ .Settings.Height }}"{{ end }}

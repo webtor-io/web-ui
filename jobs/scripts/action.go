@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,9 @@ type StreamContent struct {
 	Settings            *models.StreamSettings
 	ExternalData        *models.ExternalData
 	DomainSettings      *embed.DomainSettingsData
+	TranscoderSession   *api.TranscoderSession
+	SessionSeekURL      string
+	SessionDeletePath   string
 }
 
 const (
@@ -118,6 +122,37 @@ func contentProbeURL(downloadURL string) string {
 		return downloadURL[:i] + "~cp" + downloadURL[i:]
 	}
 	return downloadURL + "~cp"
+}
+
+func sessionBaseURL(streamURL string) (string, error) {
+	u, err := url.Parse(streamURL)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse stream URL")
+	}
+	idx := strings.Index(u.Path, "~hls/")
+	if idx < 0 {
+		return "", errors.New("stream URL does not contain ~hls/ suffix")
+	}
+	u.Path = u.Path[:idx] + "~hls-staging"
+	return u.String(), nil
+}
+
+func sessionHLSURL(baseURL string, sessionID string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse base URL")
+	}
+	u.Path += "/session/" + sessionID + "/index.m3u8"
+	return u.String(), nil
+}
+
+func sessionSeekURL(baseURL string, sessionID string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse base URL")
+	}
+	u.Path += "/session/" + sessionID + "/seek"
+	return u.String(), nil
 }
 
 func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, template string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) (err error) {
@@ -214,10 +249,26 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		j.Done()
 	}
 
-	// Step 4: Transcoder warmup (after bandwidth check)
-	if se.Meta.Transcode && !se.Meta.TranscodeCache {
-		if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, 0, "stream", false); err != nil {
-			return
+	// Step 4: Transcoder warmup / session creation (after bandwidth check)
+	if se.Meta.Transcode && s.useSessionTranscoder && exportResponse.Source.MediaFormat == ra.Video {
+		// Session-based transcoder path
+		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second)
+		if serr != nil {
+			return errors.Wrap(serr, "failed to buffer session HLS")
+		}
+		sc.TranscoderSession = result.Session
+		sc.ExportTag.Sources = []ra.ExportSource{{
+			Src:  result.HLSURL,
+			Type: "application/vnd.apple.mpegurl",
+		}}
+		sc.SessionSeekURL = result.SeekURL
+		sc.SessionDeletePath = "/transcoder-session/" + result.Session.ID + "/delete?base=" + url.QueryEscape(result.BaseURL)
+	} else {
+		// Legacy transcoder path
+		if se.Meta.Transcode && !se.Meta.TranscodeCache {
+			if _, err = s.warmUp(ctx, j, "warming up transcoder", exportResponse.ExportItems["stream"].URL, exportResponse.ExportItems["torrent_client_stat"].URL, 0, -1, -1, 0, "stream", false); err != nil {
+				return
+			}
 		}
 	}
 	if exportResponse.Source.MediaFormat == ra.Video {
@@ -237,7 +288,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			}
 		}
 	}
-	if se.Meta.Transcode && exportResponse.Source.MediaFormat == ra.Video {
+	if se.Meta.Transcode && !s.useSessionTranscoder && exportResponse.Source.MediaFormat == ra.Video {
 		if err = s.bufferHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 5*time.Minute); err != nil {
 			j.Warn(errors.Wrap(err, "failed to buffer video content"))
 		}
@@ -402,16 +453,17 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 }
 
 type ActionScript struct {
-	api              *api.Api
-	c                *web.Context
-	resourceId       string
-	itemId           string
-	action           string
-	tb               template.Builder[*web.Context]
-	settings         *models.StreamSettings
-	vsud             *models.VideoStreamUserData
-	dsd              *embed.DomainSettingsData
-	warmupTimeoutMin int
+	api                  *api.Api
+	c                    *web.Context
+	resourceId           string
+	itemId               string
+	action               string
+	tb                   template.Builder[*web.Context]
+	settings             *models.StreamSettings
+	vsud                 *models.VideoStreamUserData
+	dsd                  *embed.DomainSettingsData
+	warmupTimeoutMin     int
+	useSessionTranscoder bool
 }
 
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -462,25 +514,27 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int, useSessionTranscoder bool) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
-	hourKey := time.Now().UTC().Format("2006010215")
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+hourKey)))
+	now := time.Now().UTC()
+	cacheKey := fmt.Sprintf("%s%d", now.Format("2006010215"), now.Minute()/10)
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey)))
 	return &ErrorWrapperScript{
 		tb: tb,
 		c:  c,
 		Script: &ActionScript{
-			tb:               tb,
-			api:              api,
-			c:                c,
-			resourceId:       resourceID,
-			itemId:           itemID,
-			action:           action,
-			settings:         settings,
-			vsud:             vsud,
-			dsd:              dsd,
-			warmupTimeoutMin: warmupTimeoutMin,
+			tb:                   tb,
+			api:                  api,
+			c:                    c,
+			resourceId:           resourceID,
+			itemId:               itemID,
+			action:               action,
+			settings:             settings,
+			vsud:                 vsud,
+			dsd:                  dsd,
+			warmupTimeoutMin:     warmupTimeoutMin,
+			useSessionTranscoder: useSessionTranscoder,
 		},
 	}, id
 }

@@ -294,7 +294,7 @@ func serve(c *cli.Context) error {
 	sitemap.RegisterHandler(c, r)
 
 	// Setting ActionHandler
-	wa.RegisterHandler(r, tm, jobs)
+	wa.RegisterHandler(r, tm, jobs, sapi)
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v)

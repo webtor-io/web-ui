@@ -87,6 +87,46 @@ function remapTrackIds(hlsPlayer) {
     }
 }
 
+function setupHlsEvents(hls, media) {
+    hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+        if (hls.levels.length > 1) {
+            hls.startLevel = 1;
+        }
+        remapTrackIds(hls);
+    });
+    hls.on(Hls.Events.ERROR, function (event, data) {
+        if (data.fatal) {
+            switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                    if (data.details === 'levelParsingError') {
+                        // Server returned empty manifest (stream not ready yet), retry after delay
+                        setTimeout(() => {
+                            hls.startLoad();
+                        }, 3000);
+                    } else {
+                        // try to recover network error
+                        hls.startLoad();
+                    }
+                    break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                    hls.recoverMediaError();
+                    break;
+                default:
+                    // cannot recover
+                    hls.destroy();
+                    break;
+            }
+        } else {
+            console.log(data);
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'bufferStalledError') {
+                setTimeout(() => {
+                    hls.startLoad();
+                }, 5000);
+            }
+        }
+    });
+}
+
 export function initPlayer(target) {
     video = target.querySelector('.player');
     let settings = {};
@@ -97,6 +137,15 @@ export function initPlayer(target) {
     const controls = video.controls;
     const stretching = height ? 'auto' : 'responsive';
     const duration = video.getAttribute('data-duration') ? parseFloat(video.getAttribute('data-duration')) : -1;
+
+    // Session-based transcoder state
+    const sessionId = video.dataset.sessionId;
+    const sessionSeekUrl = video.dataset.sessionSeekUrl;
+    const sessionDeletePath = video.dataset.sessionDeletePath;
+    const isSession = !!sessionId;
+    let seekOffset = 0;
+    let isSeeking = false;
+
     let features = [
         'playpause',
         'current',
@@ -108,7 +157,7 @@ export function initPlayer(target) {
         'chromecast',
         'embed',
     ];
-    if (duration > 0) {
+    if (duration > 0 && !isSession) {
         features.push('availableprogress');
     }
     if (settings.features) {
@@ -123,6 +172,71 @@ export function initPlayer(target) {
     if (window._domainSettings && window._domainSettings.ads === true) {
         features.push('logo');
     }
+
+    async function doSessionSeek(targetTime) {
+        if (isSeeking) return;
+        isSeeking = true;
+        try {
+            // Show spinner via CSS class — survives MEJS's inline display:none on canplay
+            const loadingOverlay = document.querySelector('.mejs__overlay-loading');
+            const loadingLayer = loadingOverlay ? loadingOverlay.parentNode : null;
+            if (loadingLayer) loadingLayer.classList.add('session-seeking-active');
+
+            const hls = media.hlsPlayer;
+
+            // Save current track selections
+            const savedAudioTrack = hls.audioTrack;
+            const savedSubtitleTrack = hls.subtitleTrack;
+            const savedSubtitleDisplay = hls.subtitleDisplay;
+
+            const separator = sessionSeekUrl.includes('?') ? '&' : '?';
+            await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
+
+            seekOffset = targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0;
+
+            const sourceUrl = video.querySelector('source').getAttribute('src');
+
+            // Reload the manifest on the same HLS instance — keeps MEJS in sync
+            hls.stopLoad();
+            hls.loadSource(sourceUrl);
+
+            // Restore audio track when tracks are actually ready
+            if (savedAudioTrack >= 0) {
+                hls.once(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+                    hls.audioTrack = savedAudioTrack;
+                });
+            }
+
+            // Restore subtitle track when tracks are actually ready
+            if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
+                hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+                    hls.subtitleDisplay = true;
+                    hls.subtitleTrack = savedSubtitleTrack;
+                });
+            }
+
+            // Unlock seeking when manifest is parsed
+            hls.once(Hls.Events.MANIFEST_PARSED, () => {
+                isSeeking = false;
+            });
+
+            // Hide spinner when playback actually starts
+            function onPlaying() {
+                if (loadingLayer) loadingLayer.classList.remove('session-seeking-active');
+                media.removeEventListener('playing', onPlaying);
+            }
+            media.addEventListener('playing', onPlaying);
+        } catch (e) {
+            console.error('Session seek failed:', e);
+            const lo = document.querySelector('.mejs__overlay-loading');
+            if (lo && lo.parentNode) lo.parentNode.classList.remove('session-seeking-active');
+            isSeeking = false;
+        }
+    }
+
+    // We need a reference to `media` available for doSessionSeek
+    let media;
+
     player = new MediaElementPlayer(video, {
         renderers: ['native_hls', 'html5'],
         autoRewind: false,
@@ -146,7 +260,8 @@ export function initPlayer(target) {
             destroyPlayer();
             initPlayer(target);
         },
-        async success(media, node, player) {
+        async success(mediaEl, node, playerInst) {
+            media = mediaEl;
             if (duration > 0) {
                 const oldGetDuration = media.getDuration;
                 media.oldGetDuration = function() {
@@ -156,21 +271,56 @@ export function initPlayer(target) {
                     if (duration > 0) return duration;
                     return this.oldGetDuration();
                 }
-                const oldSetCurrentTime = player.setCurrentTime;
-                player.setCurrentTime = function(time, userInteraction = false) {
-                    if (time > media.oldGetDuration()) {
-                        return;
+                if (isSession) {
+                    // Override getCurrentTime to account for seekOffset
+                    const origGetCurrentTime = playerInst.getCurrentTime.bind(playerInst);
+                    playerInst.getCurrentTime = function() {
+                        return seekOffset + origGetCurrentTime();
+                    };
+
+                    // Override oldGetDuration to account for seekOffset (for available progress)
+                    const origOldGetDuration = media.oldGetDuration.bind(media);
+                    media.oldGetDuration = function() {
+                        return seekOffset + origOldGetDuration();
+                    };
+
+                    // Override setProgressRail to account for seekOffset in buffer indicator
+                    const origSetProgressRail = playerInst.setProgressRail.bind(playerInst);
+                    playerInst.setProgressRail = function(e) {
+                        if (seekOffset > 0 && duration > 0 && playerInst.loaded) {
+                            const target = (e !== undefined && e.detail) ? (e.detail.target || e.target) : media;
+                            if (target && target.buffered && target.buffered.length > 0) {
+                                const bufferedEnd = target.buffered.end(target.buffered.length - 1);
+                                const percent = Math.min(1, Math.max(0, (seekOffset + bufferedEnd) / duration));
+                                playerInst.setTransformStyle(playerInst.loaded, `scaleX(${percent})`);
+                                return;
+                            }
+                        }
+                        origSetProgressRail(e);
+                    };
+
+                    // Override setCurrentTime for session seek
+                    playerInst.setCurrentTime = function(time) {
+                        if (isSeeking) return;
+                        doSessionSeek(time);
+                    };
+                } else {
+                    const oldSetCurrentTime = playerInst.setCurrentTime;
+                    playerInst.setCurrentTime = function(time, userInteraction = false) {
+                        if (time > media.oldGetDuration()) {
+                            return;
+                        }
+                        return oldSetCurrentTime.call(playerInst, time, userInteraction);
                     }
-                    return oldSetCurrentTime.call(player, time, userInteraction);
                 }
             }
             let paused = false;
             window.addEventListener('player_paused', function() {
-                player.pause();
+                playerInst.pause();
                 paused = true;
             });
             media.addEventListener('playing', () => {
-                if (paused) player.pause();
+                if (paused) playerInst.pause();
             });
             let tracksInitialized = false;
             media.addEventListener('canplay', () => {
@@ -186,15 +336,15 @@ export function initPlayer(target) {
                         hlsPlayer.subtitleTrack = parseInt(subId);
                     }
                 }
-                if (player) {
-                    player.controlsEnabled = controls;
+                if (playerInst) {
+                    playerInst.controlsEnabled = controls;
                 }
                 if (!controls) {
                     document.querySelector('.mejs__controls').style.display = 'none';
                 }
                 window.addEventListener('player_play', function() {
                     paused = false;
-                    player.play();
+                    playerInst.play();
                 });
 
                 const event = new CustomEvent('player_ready');
@@ -211,51 +361,24 @@ export function initPlayer(target) {
                 media.addEventListener('seeked', () => {
                     media.hlsPlayer.loadLevel = -1;
                 });
-                media.hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-                    if (media.hlsPlayer.levels.length > 1) {
-                        media.hlsPlayer.startLevel = 1;
-                    }
-                    remapTrackIds(media.hlsPlayer);
-                });
-                media.hlsPlayer.on(Hls.Events.ERROR, function (event, data) {
-                    if (data.fatal) {
-                        switch (data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                if (data.details === 'levelParsingError') {
-                                    // Server returned empty manifest (stream not ready yet), retry after delay
-                                    setTimeout(() => {
-                                        media.hlsPlayer.startLoad();
-                                    }, 3000);
-                                } else {
-                                    // try to recover network error
-                                    media.hlsPlayer.startLoad();
-                                }
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                media.hlsPlayer.recoverMediaError();
-                                break;
-                            default:
-                                // cannot recover
-                                media.hlsPlayer.destroy();
-                                break;
-                        }
-                    } else {
-                        console.log(data);
-                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'bufferStalledError') {
-                            setTimeout(() => {
-                                media.hlsPlayer.startLoad();
-                            }, 5000);
-                            // media.hlsPlayer.recoverMediaError();
-                        }
-                    }
-                });
+                setupHlsEvents(media.hlsPlayer, media);
             }
         },
     });
+
+    // Session cleanup on page unload
+    if (isSession && sessionDeletePath) {
+        window.addEventListener('beforeunload', () => {
+            navigator.sendBeacon(sessionDeletePath);
+        });
+    }
 }
 
 export function destroyPlayer() {
     console.log(player, hlsPlayer, video);
+    if (video && video.dataset.sessionDeletePath) {
+        navigator.sendBeacon(video.dataset.sessionDeletePath);
+    }
     if (player) {
         player.options.stretching = 'none';
         player.pause();

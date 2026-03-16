@@ -94,6 +94,108 @@ func fetchBody(ctx context.Context, a *api.Api, u string) (string, error) {
 	return string(data), nil
 }
 
+type SessionBufferResult struct {
+	Session *api.TranscoderSession
+	BaseURL string
+	HLSURL  string
+	SeekURL string
+}
+
+func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamURL string, bufferDuration time.Duration) (*SessionBufferResult, error) {
+	bufferCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
+	defer cancel()
+
+	baseURL, err := sessionBaseURL(streamURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to derive session base URL")
+	}
+
+	j.InProgress("creating transcoder session")
+	session, err := s.api.CreateTranscoderSession(bufferCtx, baseURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create transcoder session")
+	}
+	j.Done()
+
+	hlsURL, err := sessionHLSURL(baseURL, session.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to construct session HLS URL")
+	}
+
+	j.InProgress("buffering video content")
+
+	masterBody, err := fetchBody(bufferCtx, s.api, hlsURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch session master playlist")
+	}
+
+	variantRel, err := parseMasterVideoVariantURL(masterBody)
+	if err != nil {
+		return nil, err
+	}
+
+	variantURL, err := resolveURL(hlsURL, variantRel)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve variant URL")
+	}
+
+	target := bufferDuration.Seconds()
+
+	for {
+		select {
+		case <-bufferCtx.Done():
+			return nil, errors.Wrap(bufferCtx.Err(), "session buffer timeout exceeded")
+		default:
+		}
+
+		playlistBody, err := fetchBody(bufferCtx, s.api, variantURL)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to fetch session video playlist")
+		}
+
+		segments, endList, err := parseMediaPlaylist(playlistBody)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse session video playlist")
+		}
+
+		if endList {
+			log.Info("session HLS stream complete, no buffering needed")
+			break
+		}
+
+		var buffered float64
+		for _, seg := range segments {
+			buffered += seg.Duration
+		}
+
+		j.StatusUpdate(fmt.Sprintf("%.0f%%", buffered/target*100))
+
+		if buffered >= target {
+			break
+		}
+
+		select {
+		case <-time.After(2 * time.Second):
+		case <-bufferCtx.Done():
+			return nil, errors.Wrap(bufferCtx.Err(), "session buffer timeout exceeded")
+		}
+	}
+
+	j.Done()
+
+	seekURL, err := sessionSeekURL(baseURL, session.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to construct session seek URL")
+	}
+
+	return &SessionBufferResult{
+		Session: session,
+		BaseURL: baseURL,
+		HLSURL:  hlsURL,
+		SeekURL: seekURL,
+	}, nil
+}
+
 func (s *ActionScript) bufferHLS(ctx context.Context, j *job.Job, streamURL string, bufferDuration time.Duration) error {
 	bufferCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
 	defer cancel()

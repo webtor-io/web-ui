@@ -51,3 +51,7 @@ video::-webkit-media-text-track-display {
   align-items: center;
   justify-content: center;
 }
+
+.session-seeking-active {
+  display: flex !important;
+}

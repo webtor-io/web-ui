@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	warmupTimeoutMinFlag = "warmup-timeout-min"
+	warmupTimeoutMinFlag       = "warmup-timeout-min"
+	useSessionTranscoderFlag   = "use-session-transcoder"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -21,23 +22,30 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			EnvVar: "WARMUP_TIMEOUT_MIN",
 			Value:  10,
 		},
+		cli.BoolFlag{
+			Name:   useSessionTranscoderFlag,
+			Usage:  "use session-based transcoder (hls-staging)",
+			EnvVar: "USE_SESSION_TRANSCODER",
+		},
 	)
 }
 
 type Jobs struct {
-	q                *job.Queues
-	tb               template.Builder[*web.Context]
-	api              *api.Api
-	enricher         *enrich.Enricher
-	warmupTimeoutMin int
+	q                    *job.Queues
+	tb                   template.Builder[*web.Context]
+	api                  *api.Api
+	enricher             *enrich.Enricher
+	warmupTimeoutMin     int
+	useSessionTranscoder bool
 }
 
 func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher) *Jobs {
 	return &Jobs{
-		q:                q,
-		tb:               tm,
-		api:              api,
-		enricher:         enricher,
-		warmupTimeoutMin: c.Int(warmupTimeoutMinFlag),
+		q:                    q,
+		tb:                   tm,
+		api:                  api,
+		enricher:             enricher,
+		warmupTimeoutMin:     c.Int(warmupTimeoutMinFlag),
+		useSessionTranscoder: c.Bool(useSessionTranscoderFlag),
 	}
 }
