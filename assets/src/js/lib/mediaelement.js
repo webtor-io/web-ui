@@ -184,13 +184,10 @@ export function initPlayer(target) {
 
             const hls = media.hlsPlayer;
 
-            // Save current track selections (HLS.js only)
-            let savedAudioTrack = -1, savedSubtitleTrack = -1, savedSubtitleDisplay = false;
-            if (hls) {
-                savedAudioTrack = hls.audioTrack;
-                savedSubtitleTrack = hls.subtitleTrack;
-                savedSubtitleDisplay = hls.subtitleDisplay;
-            }
+            // Save current track selections
+            const savedAudioTrack = hls.audioTrack;
+            const savedSubtitleTrack = hls.subtitleTrack;
+            const savedSubtitleDisplay = hls.subtitleDisplay;
 
             const separator = sessionSeekUrl.includes('?') ? '&' : '?';
             await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
@@ -199,43 +196,36 @@ export function initPlayer(target) {
 
             const sourceUrl = video.querySelector('source').getAttribute('src');
 
+            // Reload the manifest on the same HLS instance — keeps MEJS in sync
+            hls.stopLoad();
+            hls.loadSource(sourceUrl);
+
+            // Restore audio track when tracks are actually ready
+            if (savedAudioTrack >= 0) {
+                hls.once(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+                    hls.audioTrack = savedAudioTrack;
+                });
+            }
+
+            // Restore subtitle track when tracks are actually ready
+            if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
+                hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+                    hls.subtitleDisplay = true;
+                    hls.subtitleTrack = savedSubtitleTrack;
+                });
+            }
+
+            // Unlock seeking when manifest is parsed
+            hls.once(Hls.Events.MANIFEST_PARSED, () => {
+                isSeeking = false;
+            });
+
             // Hide spinner when playback actually starts
             function onPlaying() {
                 if (loadingLayer) loadingLayer.classList.remove('session-seeking-active');
                 media.removeEventListener('playing', onPlaying);
             }
             media.addEventListener('playing', onPlaying);
-
-            if (hls) {
-                // HLS.js path (desktop browsers)
-                hls.stopLoad();
-                hls.loadSource(sourceUrl);
-
-                if (savedAudioTrack >= 0) {
-                    hls.once(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-                        hls.audioTrack = savedAudioTrack;
-                    });
-                }
-                if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
-                    hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-                        hls.subtitleDisplay = true;
-                        hls.subtitleTrack = savedSubtitleTrack;
-                    });
-                }
-                hls.once(Hls.Events.MANIFEST_PARSED, () => {
-                    isSeeking = false;
-                });
-            } else {
-                // Native HLS path (iOS Safari)
-                video.src = sourceUrl;
-                video.load();
-                function onCanPlay() {
-                    video.play();
-                    isSeeking = false;
-                    media.removeEventListener('canplay', onCanPlay);
-                }
-                media.addEventListener('canplay', onCanPlay);
-            }
         } catch (e) {
             console.error('Session seek failed:', e);
             const lo = document.querySelector('.mejs__overlay-loading');
@@ -248,7 +238,7 @@ export function initPlayer(target) {
     let media;
 
     player = new MediaElementPlayer(video, {
-        renderers: ['html5', 'native_hls'],
+        renderers: ['native_hls', 'html5'],
         autoRewind: false,
         defaultSeekBackwardInterval: (media) => 15,
         defaultSeekForwardInterval: (media) => 15,
