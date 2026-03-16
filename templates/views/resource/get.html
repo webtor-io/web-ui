@@ -35,7 +35,7 @@
             <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-2 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
             {{ if .TorrentStatus }}
             <div class="mb-4">
-                <div id="torrent-status" data-resource-id="{{ .Resource.ID }}">
+                <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
                     <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
                     {{ "resource/status.js" | asset }}
                 </div>

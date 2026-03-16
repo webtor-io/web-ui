@@ -60,7 +60,10 @@ av(async function() {
     // Show loading state until first SSE message arrives
     badge.innerHTML = renderLoading();
 
-    const source = new EventSource(`/${resourceId}/status`);
+    const csrfToken = container.dataset.csrf;
+    if (!csrfToken) return;
+
+    const source = new EventSource(`/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}`);
     container._statusSource = source;
 
     source.onmessage = (e) => {

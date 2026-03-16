@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	csrf "github.com/utrack/gin-csrf"
 	"github.com/webtor-io/web-ui/services/api"
 	vault "github.com/webtor-io/web-ui/services/vault"
 
@@ -120,6 +122,13 @@ func (s *Handler) prepareInitialStatus(ctx context.Context, resourceID string) *
 // Uses c.Stream() + c.SSEvent() like the job handler for proper proxy compatibility.
 // All computation happens in a background goroutine; the callback only reads from a channel.
 func (s *Handler) status(c *gin.Context) {
+	// Validate CSRF token from query parameter (EventSource doesn't support custom headers)
+	token := c.Query("_csrf")
+	if token == "" || token != csrf.GetToken(c) {
+		c.String(http.StatusForbidden, "CSRF token mismatch")
+		return
+	}
+
 	resourceID := c.Param("resource_id")
 	claims := api.GetClaimsFromContext(c)
 
