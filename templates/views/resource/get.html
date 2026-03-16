@@ -21,26 +21,26 @@
     {{ end }}
 
     {{ with .Data }}
-    <div class="flex flex-wrap items-center gap-2 mb-5">
-        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Torrent
-        </div>
-        {{ if .TorrentStatus }}
-        <div id="torrent-status" data-resource-id="{{ .Resource.ID }}">
-            <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
-            {{ "resource/status.js" | asset }}
-        </div>
-        {{ end }}
+    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Torrent
     </div>
 
     <!-- Torrent header card -->
     <div class="relative overflow-hidden rounded-2xl p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
         <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         <div class="relative">
-            <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-4 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+            <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-2 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+            {{ if .TorrentStatus }}
+            <div class="mb-4">
+                <div id="torrent-status" data-resource-id="{{ .Resource.ID }}">
+                    <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
+                    {{ "resource/status.js" | asset }}
+                </div>
+            </div>
+            {{ end }}
             <div class="flex flex-wrap items-center gap-2">
                 <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
                     {{ if and ($.User | hasAuth) .Vault }}

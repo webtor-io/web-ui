@@ -35,16 +35,18 @@ function renderBadge(status) {
     if (!config) return '';
 
     let label = config.label || '';
+    let peers = '';
     if (status.state === 'caching') {
         label = `Caching ${Math.round(status.progress)}%`;
-        if (status.seeders > 0) {
-            label += ` <span class="opacity-70">${status.seeders} seeds</span>`;
-        }
     } else if (status.state === 'vaulting') {
         label = `Vaulting ${Math.round(status.progress)}%`;
     }
+    // Show peers for non-terminal states
+    if (status.state !== 'cached' && status.state !== 'vaulted' && status.seeders > 0) {
+        peers = ` <span class="opacity-70">(${status.seeders} peers)</span>`;
+    }
 
-    return `<div class="${config.classes}">${config.icon} ${label}</div>`;
+    return `<div class="${config.classes}">${config.icon} ${label}${peers}</div>`;
 }
 
 av(async function() {

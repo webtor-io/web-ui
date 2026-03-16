@@ -630,6 +630,10 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do request")
 	}
+	if res.StatusCode != http.StatusOK {
+		_ = res.Body.Close()
+		return nil, errors.Errorf("stats returned status %d", res.StatusCode)
+	}
 	ch := make(chan EventData)
 	go func() {
 		b := res.Body
@@ -638,6 +642,7 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 			_ = b.Close()
 		}()
 		scanner := bufio.NewScanner(b)
+		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024) // 1MB buffer for large torrent stats
 		scanner.Split(bufio.ScanLines)
 
 		t := ""

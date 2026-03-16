@@ -91,6 +91,11 @@ func resolveCachingState(stats *TorrentStatsData) *TorrentStatus {
 	if stats.Total <= 0 {
 		return &TorrentStatus{State: "idle"}
 	}
+	// If nothing has been downloaded yet, treat as idle — don't show "Caching 0%"
+	// which would be misleading (the seeder may have been started just by our stats probe)
+	if stats.Completed <= 0 {
+		return &TorrentStatus{State: "idle", Seeders: stats.Seeders}
+	}
 	progress := float64(stats.Completed) / float64(stats.Total) * 100
 	if progress >= 100 {
 		return &TorrentStatus{State: "cached", Progress: 100, Seeders: stats.Seeders}
@@ -155,7 +160,6 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	defer close(out)
 
 	var statsCh <-chan api.EventData
-	var statsConnecting bool
 	var lastStats *TorrentStatsData
 	var lastJSON string
 	var lastDBResource *vaultModels.Resource
@@ -167,8 +171,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	}
 	statsChResult := make(chan statsResult, 1)
 
-	// Start initial stats connection attempt
-	statsConnecting = true
+	// Start stats connection attempt (single attempt, no retry to avoid starting idle seeders)
 	go func() {
 		ch, msg := s.tryConnectStats(ctx, claims, resourceID)
 		statsChResult <- statsResult{ch: ch, msg: msg}
@@ -178,7 +181,6 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	defer ticker.Stop()
 
 	vaultTick := 0
-	statsRetryTick := 0
 
 	sendStatus := func() bool {
 		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
@@ -196,10 +198,24 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		return status.State != "vaulted"
 	}
 
-	// Send initial status immediately
-	if !sendStatus() {
-		return
+	// Fetch vault state before first send to avoid idle→vaulted flicker
+	if s.vault != nil {
+		var err error
+		lastDBResource, err = s.vault.GetResource(ctx, resourceID)
+		if err != nil {
+			log.WithError(err).Warn("failed to get vault resource for initial status")
+		}
+		if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
+			lastAPIResource, err = s.vault.GetVaultAPIResource(ctx, resourceID)
+			if err != nil {
+				log.WithError(err).Warn("failed to get vault api resource for initial status")
+			}
+		}
 	}
+
+	// Wait for first stats connection attempt before sending initial status
+	// to avoid idle→caching flicker
+	initialSent := false
 
 	for {
 		select {
@@ -208,17 +224,26 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case res := <-statsChResult:
 			statsCh = res.ch
-			statsConnecting = false
+			log.WithField("resourceID", resourceID).WithField("connected", res.ch != nil).WithField("msg", res.msg).Info("status: stats connection result")
+			if !initialSent {
+				// Now we have both vault state and stats connection — send first status
+				if !sendStatus() {
+					return
+				}
+				initialSent = true
+			}
 
 		case ev, ok := <-statsCh:
 			if ok {
 				lastStats = &TorrentStatsData{
 					Total:     ev.Total,
 					Completed: ev.Completed,
-					Seeders:   ev.Seeders,
+					Seeders:   ev.Peers,
 				}
+				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).Info("status: got stats event")
 			} else {
 				// Stats channel closed — seeder gone or connection dropped
+				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")
 				lastStats = nil
 				statsCh = nil
 			}
@@ -227,15 +252,6 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			}
 
 		case <-ticker.C:
-			statsRetryTick++
-			isCached := lastStats != nil && lastStats.Total > 0 && lastStats.Completed >= int(lastStats.Total)
-			if statsCh == nil && !statsConnecting && !isCached && statsRetryTick%5 == 0 {
-				statsConnecting = true
-				go func() {
-					ch, msg := s.tryConnectStats(ctx, claims, resourceID)
-					statsChResult <- statsResult{ch: ch, msg: msg}
-				}()
-			}
 
 			if s.vault != nil && vaultTick%2 == 0 {
 				var err error
@@ -296,6 +312,9 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	if !ok || statItem.URL == "" {
 		return nil, "no torrent_client_stat in exports"
 	}
+
+	// Check stats URL is accessible before opening SSE
+	log.WithField("resourceID", resourceID).WithField("url", statItem.URL[:min(len(statItem.URL), 80)]).Info("status: connecting to stats SSE")
 
 	// Open SSE connection to torrent-http-proxy (use parent ctx, not timeout ctx)
 	ch, err := s.api.Stats(ctx, statItem.URL)
