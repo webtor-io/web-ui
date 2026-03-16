@@ -91,7 +91,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     return null;
 }
 
-function ModalHeader({ title, poster, subtitle }) {
+function ModalHeader({ title, poster, subtitle, extra }) {
     const [imgError, setImgError] = useState(false);
 
     return (
@@ -113,6 +113,7 @@ function ModalHeader({ title, poster, subtitle }) {
             <div class="flex flex-col justify-center min-w-0">
                 <h3 class="font-bold text-lg line-clamp-2">{title || 'Unknown'}</h3>
                 {subtitle && <p class="text-sm text-w-muted mt-1">{subtitle}</p>}
+                {extra}
             </div>
         </div>
     );
@@ -191,8 +192,18 @@ function FetchingView({ modal }) {
 
 // --- Stream Content ---
 
+function is4kStream(parsedInfo) {
+    return parsedInfo.labels.some(l => l === '4K');
+}
+
 function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons }) {
     const { title, poster, streams, error } = modal;
+
+    const [show4k, setShow4k] = useState(() => {
+        const prefs = loadPrefs();
+        return prefs.show4k === true;
+    });
+    const [show4kWarning, setShow4kWarning] = useState(false);
 
     const parsed = useMemo(() => streams.map(s => parseStreamName(s.name)), [streams]);
 
@@ -201,11 +212,30 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
         [streams]
     );
 
+    // Count how many 4K streams exist (before any filtering)
+    const total4kCount = useMemo(() => parsed.filter(p => is4kStream(p)).length, [parsed]);
+
+    // Base streams: exclude 4K when toggle is off
+    const { baseStreams, baseParsed, baseLangs } = useMemo(() => {
+        if (show4k) {
+            return { baseStreams: streams, baseParsed: parsed, baseLangs: streamLangs };
+        }
+        const indices = [];
+        for (let i = 0; i < parsed.length; i++) {
+            if (!is4kStream(parsed[i])) indices.push(i);
+        }
+        return {
+            baseStreams: indices.map(i => streams[i]),
+            baseParsed: indices.map(i => parsed[i]),
+            baseLangs: indices.map(i => streamLangs[i]),
+        };
+    }, [streams, parsed, streamLangs, show4k]);
+
     const { allSources, allLabels, allLangs } = useMemo(() => {
         const sources = [];
         const labels = [];
         const seenLabelsLower = {};
-        for (const info of parsed) {
+        for (const info of baseParsed) {
             if (!sources.includes(info.source)) sources.push(info.source);
             for (const lbl of info.labels) {
                 const lower = lbl.toLowerCase();
@@ -217,7 +247,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
         }
         const langs = [];
         const seenLangs = {};
-        for (const s of streams) {
+        for (const s of baseStreams) {
             for (const lang of extractLanguages(s.title || '')) {
                 if (!seenLangs[lang.name]) {
                     seenLangs[lang.name] = true;
@@ -226,7 +256,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
             }
         }
         return { allSources: sources, allLabels: labels, allLangs: langs };
-    }, [parsed, streams]);
+    }, [baseParsed, baseStreams]);
 
     const [activeSources, setActiveSources] = useState(() => {
         const prefs = loadPrefs();
@@ -260,29 +290,53 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
         const activeSrcKeys = Object.keys(activeSources);
         const activeLblKeys = Object.keys(activeLabels);
         if (!activeSrcKeys.length && !activeLblKeys.length && !activeLang) {
-            return streams.map((s, i) => ({ stream: s, parsed: parsed[i], langs: streamLangs[i], visible: true }));
+            return baseStreams.map((s, i) => ({ stream: s, parsed: baseParsed[i], langs: baseLangs[i], visible: true }));
         }
-        return streams.map((s, i) => {
+        return baseStreams.map((s, i) => {
             let show = true;
-            if (activeSrcKeys.length > 0 && !activeSources[parsed[i].source]) show = false;
+            if (activeSrcKeys.length > 0 && !activeSources[baseParsed[i].source]) show = false;
             if (show && activeLblKeys.length > 0) {
-                const lblLower = parsed[i].labels.map(l => l.toLowerCase());
+                const lblLower = baseParsed[i].labels.map(l => l.toLowerCase());
                 if (!activeLblKeys.every(k => lblLower.includes(k.toLowerCase()))) show = false;
             }
-            if (show && activeLang && !streamLangs[i].includes(activeLang)) show = false;
-            return { stream: s, parsed: parsed[i], langs: streamLangs[i], visible: show };
+            if (show && activeLang && !baseLangs[i].includes(activeLang)) show = false;
+            return { stream: s, parsed: baseParsed[i], langs: baseLangs[i], visible: show };
         });
-    }, [streams, parsed, streamLangs, activeSources, activeLabels, activeLang]);
+    }, [baseStreams, baseParsed, baseLangs, activeSources, activeLabels, activeLang]);
 
     const visibleCount = filteredStreams.filter(s => s.visible).length;
     const hasActiveFilters = Object.keys(activeSources).length > 0 || Object.keys(activeLabels).length > 0 || activeLang;
 
-    const subtitleText = useMemo(() => {
-        if (hasActiveFilters) {
-            return `${visibleCount} of ${streams.length} stream${streams.length !== 1 ? 's' : ''}`;
+    const toggle4k = useCallback(() => {
+        if (!show4k) {
+            setShow4kWarning(true);
+            window.umami?.track('discover-4k-toggle-attempt');
+        } else {
+            setShow4k(false);
+            savePrefs({ show4k: false });
+            window.umami?.track('discover-4k-disabled');
         }
-        return `${streams.length} stream${streams.length !== 1 ? 's' : ''} found`;
-    }, [hasActiveFilters, visibleCount, streams.length]);
+    }, [show4k]);
+
+    const confirm4k = useCallback(() => {
+        setShow4k(true);
+        setShow4kWarning(false);
+        savePrefs({ show4k: true });
+        window.umami?.track('discover-4k-enabled');
+    }, []);
+
+    const cancel4k = useCallback(() => {
+        setShow4kWarning(false);
+        window.umami?.track('discover-4k-cancelled');
+    }, []);
+
+    const subtitleText = useMemo(() => {
+        const total = baseStreams.length;
+        if (hasActiveFilters) {
+            return `${visibleCount} of ${total} stream${total !== 1 ? 's' : ''}`;
+        }
+        return `${total} stream${total !== 1 ? 's' : ''} found`;
+    }, [hasActiveFilters, visibleCount, baseStreams.length]);
 
     const toggleSource = useCallback((src) => {
         setActiveSources(prev => {
@@ -340,7 +394,12 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle={subtitleText} />
+            <ModalHeader title={title} poster={poster} subtitle={subtitleText}
+                extra={total4kCount > 0 && (
+                    <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
+                        showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
+                )}
+            />
 
             {hasFilters && (
                 <FilterChips
@@ -356,14 +415,67 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons })
                 />
             )}
 
-            <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
-                {filteredStreams.map(({ stream, parsed: info, visible }, i) => (
-                    visible && <StreamRow key={i} stream={stream} info={info} onStreamClick={onStreamClick} />
-                ))}
-            </div>
+            {baseStreams.length === 0 && !show4k && total4kCount > 0 ? (
+                <p class="text-w-muted text-sm text-center py-6">
+                    All {total4kCount} stream{total4kCount !== 1 ? 's are' : ' is'} 4K. Enable "Include 4K" above to see them.
+                </p>
+            ) : (
+                <>
+                    <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
+                        {filteredStreams.map(({ stream, parsed: info, visible }, i) => (
+                            visible && <StreamRow key={i} stream={stream} info={info} onStreamClick={onStreamClick} />
+                        ))}
+                    </div>
 
-            {hasActiveFilters && visibleCount === 0 && (
-                <p class="text-w-muted text-sm text-center py-6">No streams match the selected filters.</p>
+                    {hasActiveFilters && visibleCount === 0 && (
+                        <p class="text-w-muted text-sm text-center py-6">No streams match the selected filters.</p>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+
+function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel }) {
+    return (
+        <div class="mt-3 relative">
+            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                    type="checkbox"
+                    checked={show4k}
+                    onChange={onToggle}
+                    class="toggle toggle-xs toggle-soft"
+                />
+                <span class="text-xs text-w-sub">
+                    Include 4K
+                    <span class="text-w-muted ml-0.5">({count})</span>
+                </span>
+                {!show4k && (
+                    <span class="text-[10px] text-w-muted">(streaming may not work)</span>
+                )}
+            </label>
+
+            {showWarning && (
+                <div class="absolute left-0 top-full mt-1.5 z-50 bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
+                    <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">4K streaming warning</p>
+                    <p class="text-[11px] text-w-muted mt-0.5 leading-snug">
+                        4K content is very large and video streaming will most likely not work. It may also require transcoding, which is disabled for 4K. Only download is recommended.
+                    </p>
+                    <div class="flex justify-between gap-1.5 mt-2">
+                        <button
+                            class="btn btn-ghost btn-xs text-w-muted"
+                            onClick={onCancel}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="btn btn-xs btn-ghost border border-red-400/30 text-red-400/70 hover:bg-red-400/10 hover:text-red-400"
+                            onClick={onConfirm}
+                        >
+                            Show 4K
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );
