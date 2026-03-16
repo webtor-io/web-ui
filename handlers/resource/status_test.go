@@ -129,6 +129,9 @@ func TestResolveStatus_CachingAndVaulting(t *testing.T) {
 	if status.Progress != 30 {
 		t.Errorf("expected progress 30, got %v", status.Progress)
 	}
+	if status.Seeders != 2 {
+		t.Errorf("expected seeders 2 from stats, got %v", status.Seeders)
+	}
 }
 
 func TestResolveStatus_CachedAndVaulting(t *testing.T) {
@@ -139,6 +142,9 @@ func TestResolveStatus_CachedAndVaulting(t *testing.T) {
 	// Vaulting has higher priority than cached
 	if status.State != "vaulting" {
 		t.Errorf("expected vaulting (higher priority), got %q", status.State)
+	}
+	if status.Seeders != 5 {
+		t.Errorf("expected seeders 5 from stats, got %v", status.Seeders)
 	}
 }
 

@@ -46,6 +46,9 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 		return vaultState
 	}
 	if vaultState.State == "vaulting" {
+		if stats != nil {
+			vaultState.Seeders = stats.Seeders
+		}
 		return vaultState
 	}
 	if cachingState.State == "cached" {
@@ -266,16 +269,19 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		case <-ticker.C:
 
 			if s.vault != nil && vaultTick%2 == 0 {
-				var err error
-				lastDBResource, err = s.vault.GetResource(ctx, resourceID)
+				dbRes, err := s.vault.GetResource(ctx, resourceID)
 				if err != nil {
 					log.WithError(err).Warn("failed to get vault resource for status")
+				} else {
+					lastDBResource = dbRes
 				}
 				lastAPIResource = nil
 				if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
-					lastAPIResource, err = s.vault.GetVaultAPIResource(ctx, resourceID)
+					apiRes, err := s.vault.GetVaultAPIResource(ctx, resourceID)
 					if err != nil {
 						log.WithError(err).Warn("failed to get vault api resource for status")
+					} else {
+						lastAPIResource = apiRes
 					}
 				}
 			}
