@@ -385,6 +385,11 @@ input:-webkit-autofill:focus {
   background-color: #1a2235 !important;
 }
 
+.collapse-webtor > .collapse-content {
+  position: relative;
+  z-index: 1;
+}
+
 [data-theme="night"] .navbar-redesign {
   background-color: rgba(10, 14, 26, 0.9);
 }
