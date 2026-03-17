@@ -22,7 +22,7 @@ func (s *Handler) add(c *gin.Context) {
 	}
 	err, rID := s.addTorrentToLibrary(c, u)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to add torrent to library"))
 		return
 	}
 	_, _ = s.jobs.Enrich(web.NewContext(c), rID)

@@ -2,12 +2,13 @@ package geo
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/geoip"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/services/geoip"
 )
 
 func getIp(c *gin.Context) net.IP {

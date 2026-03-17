@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/job"
 )
 
@@ -26,7 +27,7 @@ func (s *Handler) log(c *gin.Context) {
 	defer cancel()
 	l, ok, err := s.q.GetOrCreate(c.Param("queue_id")).Log(ctx, c.Param("job_id"))
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get job log"))
 		return
 	}
 	if !ok {

@@ -3,12 +3,6 @@
     <meta name="description" content="{{ with .Data }}{{ if .Tool }}{{ .Tool.Description }}{{ else }}Web-based torrent platform to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage{{ end }}{{ end }}">
 {{ end }}
 {{ define "main" }}
-{{ if .Err }}
-<div class="progress-alert progress-alert-oneline mb-10 closeable relative z-10 w-full max-w-[680px] mx-auto mt-[80px]">
-    <pre>{{ .Err | log | shortErr }}</pre>
-    <a class="closeable-close close">ok</a>
-</div>
-{{ end }}
 {{ with .Data }}
 <!-- Hero Section -->
 <section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] pb-16 px-6">
@@ -58,6 +52,13 @@
             <a class="closeable-close close">got it!</a>
         </div>
     </form>
+    {{ end }}
+
+    {{ if $.Err }}
+    <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]">
+        <pre class="error">{{ $.Err | shortErr }}</pre>
+        <a class="close" onclick="document.getElementById('index-error').remove()">ok</a>
+    </div>
     {{ end }}
 
     <!-- input area -->

@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -61,7 +61,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 func (s *Handler) generateUrl(c *gin.Context) {
 	_, err := s.at.Generate(c, "stremio", []string{"stremio:read"})
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to generate stremio addon url"))
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "Addon URL generated")
@@ -72,14 +72,13 @@ func (s *Handler) manifest(c *gin.Context) {
 	hasToken := c.Query(sv.AccessTokenParamName) != ""
 	mas, err := s.b.BuildManifestService(user, hasToken)
 	if err != nil {
-		log.WithError(err).Error("failed to build manifest service")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to build manifest service"))
 		return
 	}
 	resp, err := mas.GetManifest(c.Request.Context())
 	if err != nil {
-		log.WithError(err).Error("failed to get manifest response")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get manifest response"))
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -89,14 +88,13 @@ func (s *Handler) catalog(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	cas, err := s.b.BuildCatalogService(user)
 	if err != nil {
-		log.WithError(err).Error("failed to build catalog service")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to build catalog service"))
 		return
 	}
 	resp, err := cas.GetCatalog(c.Request.Context(), ct)
 	if err != nil {
-		log.WithError(err).Error("failed to get catalog response")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get catalog response"))
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -107,14 +105,13 @@ func (s *Handler) meta(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	mes, err := s.b.BuildMetaService(user)
 	if err != nil {
-		log.WithError(err).Error("failed to build meta service")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to build meta service"))
 		return
 	}
 	resp, err := mes.GetMeta(c.Request.Context(), ct, id)
 	if err != nil {
-		log.WithError(err).Error("failed to get meta response")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get meta response"))
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -127,14 +124,13 @@ func (s *Handler) stream(c *gin.Context) {
 	cla := claims.GetFromContext(c)
 	sts, err := s.b.BuildStreamsService(c.Request.Context(), user, s.lr, apiClaims, cla, c.Query(sv.AccessTokenParamName))
 	if err != nil {
-		log.WithError(err).Error("failed to build streams service")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to build streams service"))
 		return
 	}
 	resp, err := sts.GetStreams(c.Request.Context(), ct, id)
 	if err != nil {
-		log.WithError(err).Error("failed to get streams response")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get streams response"))
+		return
 	}
 	c.JSON(http.StatusOK, resp)
 }

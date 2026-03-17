@@ -21,7 +21,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 )
@@ -73,8 +72,7 @@ func (s *Handler) poster(c *gin.Context) {
 
 	pa, err := s.bindPosterArgs(c)
 	if err != nil {
-		log.WithError(err).Error("failed to bind poster args")
-		_ = c.AbortWithError(http.StatusBadRequest, err)
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrap(err, "failed to bind poster args"))
 		return
 	}
 
@@ -82,16 +80,14 @@ func (s *Handler) poster(c *gin.Context) {
 
 	db := s.pg.Get()
 	if db == nil {
-		log.Error("no db")
-		c.Status(http.StatusInternalServerError)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.New("no db"))
 		return
 	}
 
 	b, err := s.getResizedJPEGPosterWithCache(ctx, db, s.s3Cl, pa)
 
 	if err != nil {
-		log.WithError(err).Error("failed to get resized image")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get resized image"))
 		return
 	}
 

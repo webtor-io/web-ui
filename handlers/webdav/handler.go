@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/common"
@@ -53,7 +54,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, at *at.AccessToke
 func (s *Handler) generateUrl(c *gin.Context) {
 	_, err := s.at.Generate(c, "webdav", []string{"webdav:read", "webdav:write"})
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to generate webdav url"))
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "WebDAV URL generated")
@@ -63,7 +64,7 @@ func (s *Handler) handleWebDAV(c *gin.Context) {
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), web.Context{}, web.NewContext(c)))
 	u, err := url.Parse(c.Request.RequestURI)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusBadRequest, err)
+		_ = c.AbortWithError(http.StatusBadRequest, errors.Wrap(err, "failed to parse webdav request uri"))
 		return
 	}
 	c.Request.URL.Path = u.Path

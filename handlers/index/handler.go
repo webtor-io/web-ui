@@ -1,6 +1,7 @@
 package index
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -42,8 +43,14 @@ func (s *Handler) index(c *gin.Context) {
 		}
 	}
 
-	s.tb.Build("index").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
+	ctx := web.NewContext(c).WithData(&Data{
 		Instruction: instruction,
 		Tool:        currentTool,
-	}))
+	})
+
+	if c.Query("status") == "error" && c.Query("err") != "" {
+		ctx = ctx.WithErr(errors.New(c.Query("err")))
+	}
+
+	s.tb.Build("index").HTML(http.StatusOK, ctx)
 }

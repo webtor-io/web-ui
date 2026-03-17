@@ -75,33 +75,25 @@ type PostData struct {
 }
 
 func (s *Handler) post(c *gin.Context) {
-	indexTpl := s.tb.Build("index")
-	var (
-		d       PostData
-		err     error
-		args    *PostArgs
-		loadJob *job.Job
-	)
-	args, err = s.bindArgs(c)
-	if err != nil {
-		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "wrong args provided")))
+	// Ensure RedirectWithError has a valid return URL (missing for magnet GET routes)
+	if c.GetHeader("X-Return-Url") == "" {
+		c.Request.Header.Set("X-Return-Url", "/")
 	}
-	d.Args = args
-	d.Instruction = args.Instruction
+
+	args, err := s.bindArgs(c)
 	if err != nil {
-		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "wrong args provided")))
+		web.RedirectWithError(c, errors.Wrap(err, "wrong args provided"))
 		return
 	}
-	loadJob, err = s.jobs.Load(web.NewContext(c), &scripts.LoadArgs{
+
+	loadJob, err := s.jobs.Load(web.NewContext(c), &scripts.LoadArgs{
 		Query: args.Query,
 		File:  args.File,
 	})
 	if err != nil {
-		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to load resource")))
+		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))
 		return
 	}
-
-	d.Job = loadJob
 
 	if !s.useDirectLinks {
 		s.addResourceToSession(c, loadJob.ID)
@@ -114,5 +106,9 @@ func (s *Handler) post(c *gin.Context) {
 		return
 	}
 
-	indexTpl.HTML(http.StatusAccepted, web.NewContext(c).WithData(d))
+	s.tb.Build("index").HTML(http.StatusAccepted, web.NewContext(c).WithData(PostData{
+		Job:         loadJob,
+		Args:        args,
+		Instruction: args.Instruction,
+	}))
 }

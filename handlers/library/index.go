@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
@@ -59,15 +60,18 @@ func (s *Handler) index(c *gin.Context) {
 		return
 	}
 
-	ls, err := s.getLibraryList(c.Request.Context(), u, args)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	ls, err := s.getLibraryList(ctx, u, args)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library list"))
 		return
 	}
 
-	tc, mc, sc, err := models.GetLibraryCounts(c.Request.Context(), db, u.ID)
+	tc, mc, sc, err := models.GetLibraryCounts(ctx, db, u.ID)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library counts"))
 		return
 	}
 

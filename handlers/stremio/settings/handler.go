@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
@@ -84,7 +83,6 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	// Get database connection
 	db := s.pg.Get()
 	if db == nil {
-		log.WithField("user_id", user.ID).Error("no database connection available")
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.New("no database connection available"))
 		return
 	}
@@ -92,14 +90,9 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	// Save to database
 	err := models.CreateOrUpdateStremioSettings(c.Request.Context(), db, user.ID, settingsData)
 	if err != nil {
-		log.WithError(err).
-			WithField("user_id", user.ID).
-			Error("failed to save stremio settings")
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to save stremio settings"))
 		return
 	}
-
-	log.WithField("user_id", user.ID).Info("stremio settings updated successfully")
 
 	web.RedirectWithSuccessAndMessage(c, "Settings saved")
 }

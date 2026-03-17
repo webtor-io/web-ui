@@ -178,7 +178,7 @@ func (s *Handler) get(c *gin.Context) {
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
 	if err != nil {
-		indexTpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(&GetData{}).WithErr(errors.Wrap(err, "wrong args provided")))
+		c.Redirect(http.StatusFound, "/?status=error&err=wrong+args+provided")
 		return
 	}
 	if !s.useDirectLinks && !s.hasAccessPermission(c, args) {
@@ -195,7 +195,7 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 	if d == nil {
-		indexTpl.HTML(http.StatusNotFound, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "resource not found")))
+		c.Redirect(http.StatusFound, "/?status=error&err=resource+not+found")
 		return
 	}
 
@@ -281,12 +281,18 @@ func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *Get
 }
 
 func (s *Handler) resolveFileIdx(ctx context.Context, args *GetArgs, fileIdx int) (string, error) {
+	const maxFileIdxIterations = 1000
 	listArgs := &api.ListResourceContentArgs{
 		Limit:  100,
 		Offset: 0,
 	}
 	var idx int
+	var iterations int
 	for {
+		iterations++
+		if iterations > maxFileIdxIterations {
+			return "", fmt.Errorf("exceeded max iterations (%d) resolving file index %d", maxFileIdxIterations, fileIdx)
+		}
 		resp, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, listArgs)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to list resource content for file-idx resolution")

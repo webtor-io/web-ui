@@ -20,7 +20,7 @@ func (s *Handler) remove(c *gin.Context) {
 	ctx := c.Request.Context()
 	err := s.removeFromLibrary(ctx, c, u)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to remove from library"))
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "Removed from library")

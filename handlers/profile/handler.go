@@ -2,11 +2,11 @@ package profile
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/go-pg/pg/v10"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -134,12 +134,12 @@ func (s *Handler) get(c *gin.Context) {
 	}
 	stremioURL, err := s.getStremioAddonURL(c)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get stremio addon url"))
 		return
 	}
 	webdavURL, err := s.getWebDAVURL(c)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get webdav url"))
 		return
 	}
 
@@ -147,28 +147,28 @@ func (s *Handler) get(c *gin.Context) {
 	db := s.pg.Get()
 	domains, err := models.GetUserDomains(c.Request.Context(), db, u.ID)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get user domains"))
 		return
 	}
 
 	// Get user addon URLs
 	addonUrls, err := models.GetAllUserStremioAddonUrls(c.Request.Context(), db, u.ID)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get user addon urls"))
 		return
 	}
 
 	// Get Stremio settings
 	ss, err := stremio.GetUserSettingsDataByClaims(c.Request.Context(), db, u.ID)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get stremio settings"))
 		return
 	}
 
 	// Get user streaming backends
 	streamingBackends, err := models.GetUserStreamingBackends(c.Request.Context(), db, u.ID)
 	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get user streaming backends"))
 		return
 	}
 
@@ -177,7 +177,7 @@ func (s *Handler) get(c *gin.Context) {
 	if s.vault != nil {
 		vaultStats, err = s.vault.GetUserStats(c.Request.Context(), u)
 		if err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, err)
+			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get vault user stats"))
 			return
 		}
 	}
