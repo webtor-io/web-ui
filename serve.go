@@ -162,6 +162,7 @@ func serve(c *cli.Context) error {
 		"/s/",
 		"/token/",
 		"/webdav/",
+		"/transcoder-session/",
 	})
 	if err != nil {
 		return err
