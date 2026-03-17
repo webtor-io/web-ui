@@ -34,7 +34,7 @@ jobs:
         run: npm run build
       -
         name: Run go test
-        run: go test ./...
+        run: GOLANG_PROTOBUF_REGISTRATION_CONFLICT=ignore go test ./...
       -
         name: Docker meta
         id: meta
