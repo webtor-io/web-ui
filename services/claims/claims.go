@@ -152,8 +152,6 @@ func (s *Claims) RegisterHandler(r *gin.Engine) {
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), TierUpdatedContext{}, updated))
 		c.Next()
 	})
-	r.Use(func(c *gin.Context) {
-	})
 }
 
 func IsPaid(c *gin.Context) {

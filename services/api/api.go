@@ -27,7 +27,7 @@ import (
 
 	ra "github.com/webtor-io/rest-api/services"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -175,7 +175,7 @@ type MediaProbe struct {
 }
 
 type Claims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	Rate          string `json:"rate,omitempty"`
 	Role          string `json:"role,omitempty"`
 	SessionID     string `json:"sessionID"`
@@ -744,8 +744,8 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Da
 		Domain:        domain,
 		RemoteAddress: getRemoteAddress(c),
 		Agent:         c.Request.Header.Get("User-Agent"),
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Duration(s.expire) * 24 * time.Hour).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(s.expire) * 24 * time.Hour)),
 		},
 	}
 	if uc != nil {

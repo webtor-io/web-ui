@@ -12,6 +12,10 @@ function loadAsyncView(target, body) {
     renderBody(target, body);
 }
 function renderBody(target, body) {
+    // SAFETY: `body` is always same-origin server-rendered HTML from our own Go/Gin
+    // templates — fetched via XMLHttpRequest from the app's own endpoints (async.js),
+    // from same-origin SSE messages (progressLog.js), or from same-origin response
+    // headers (layout.js nav updates). No external or user-supplied HTML reaches here.
     target.innerHTML = body;
     executeScriptElements(target);
     const detail = {

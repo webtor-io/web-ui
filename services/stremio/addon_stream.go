@@ -56,7 +56,9 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	streamURL := fmt.Sprintf("%s/stream/%s/%s.json", addonURL, contentType, contentID)
 
 	// Apply URL mapping
-	streamURL = s.requestURLMapper.MapURL(streamURL)
+	if s.requestURLMapper != nil {
+		streamURL = s.requestURLMapper.MapURL(streamURL)
+	}
 
 	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", streamURL, nil)

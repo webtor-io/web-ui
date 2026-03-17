@@ -96,7 +96,8 @@ module.exports = async (env, options) => {
             watchFiles: ['templates/*.html', 'assets/src/*'],
         },
         optimization: {
-            // splitChunks: {},
+            // splitChunks disabled: entry points are loaded independently via Go
+            // template helpers, which don't support automatic chunk dependencies.
             minimize: true,
             minimizer: [
                 new TerserPlugin({ parallel: true }),

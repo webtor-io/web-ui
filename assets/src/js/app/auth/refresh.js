@@ -5,7 +5,7 @@ av(async function() {
         await refresh(window._CSRF);
         window.location.replace(window.location.href);
     } catch (err) {
-        console.log(err);
+        console.error(err);
         window.location = '/login';
     }
 });

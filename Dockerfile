@@ -1,9 +1,9 @@
-FROM alpine:latest as certs
+FROM alpine:3.21 AS certs
 
 # getting certs
 RUN apk update && apk upgrade && apk add --no-cache ca-certificates
 
-FROM node:22 as build_assets
+FROM node:22 AS build_assets
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN npm install
 
 RUN npm run build
 
-FROM golang:latest as build
+FROM golang:1.26-alpine AS build
 
 # set work dir
 WORKDIR /app
@@ -30,7 +30,7 @@ ENV GOOS=linux
 # build the binary with debug information removed
 RUN go build -ldflags '-w -s -X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore' -a -installsuffix cgo -o server
 
-FROM alpine:latest
+FROM alpine:3.21
 
 # set work dir
 WORKDIR /app

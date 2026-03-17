@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"

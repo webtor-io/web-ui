@@ -456,7 +456,7 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
             </label>
 
             {showWarning && (
-                <div class="absolute left-0 top-full mt-1.5 z-50 bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
+                <div class="absolute left-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
                     <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">4K streaming warning</p>
                     <p class="text-[11px] text-w-muted mt-0.5 leading-snug">
                         4K content is very large and video streaming will most likely not work. It may also require transcoding, which is disabled for 4K. Only download is recommended.

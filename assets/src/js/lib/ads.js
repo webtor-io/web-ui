@@ -19,6 +19,9 @@ function track(msg) {
 function  renderScriptAd(ad) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
+    // SAFETY: `ad.script` comes from `window._ads`, which is populated exclusively by
+    // hardcoded string literals in our Go template `templates/partials/extend.html`.
+    // These are developer-controlled ad network loader snippets, not user input.
     script.innerHTML = ad.script;
     document.body.appendChild(script);
     track(`${ad.trackPrefix}${ad.name}-script`)
@@ -71,7 +74,7 @@ function renderMediaAd(el, ad = {}) {
     window.dispatchEvent(event);
     const mediaEl = generateMediaEl(ad);
     const aEl = document.createElement('a');
-    aEl.classList.add('absolute', 'top-0', 'left-0', 'z-50');
+    aEl.classList.add('absolute', 'top-0', 'left-0', 'z-modal');
     aEl.href = ad.url;
     aEl.target = '_blank';
     aEl.setAttribute('data-umami-event', `${ad.trackPrefix}${ad.name}-click`);
@@ -79,7 +82,7 @@ function renderMediaAd(el, ad = {}) {
     el.appendChild(aEl);
     const skipDelay = ad.skipDelay;
     const closeEl = document.createElement('button');
-    closeEl.classList.add('absolute', 'top-2', 'right-2', 'btn', 'btn-soft-cyan', 'btn-sm', 'z-50');
+    closeEl.classList.add('absolute', 'top-2', 'right-2', 'btn', 'btn-soft-cyan', 'btn-sm', 'z-modal');
     closeEl.textContent = 'Close (' + skipDelay + ')';
     closeEl.setAttribute('data-umami-event', `${ad.trackPrefix}${ad.name}-close`);
     closeEl.disabled = true;

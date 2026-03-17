@@ -48,6 +48,9 @@ func ShortErr(err error) string {
 }
 func LongErr(err error) template.HTML {
 	parts := strings.Split(err.Error(), ": ")
+	for i, p := range parts {
+		parts[i] = template.HTMLEscapeString(p)
+	}
 	parts[0] = "<strong>" + parts[0] + "</strong>"
 	return template.HTML(strings.Join(parts, "<br />"))
 }
@@ -142,11 +145,13 @@ func NewHelper(c *cli.Context) *Helper {
 func (s *Helper) TimeBetween(from string, to string) bool {
 	ft, err := time.Parse(time.DateTime, from)
 	if err != nil {
-		panic(err)
+		log.WithError(err).WithField("from", from).Error("failed to parse 'from' time in TimeBetween")
+		return false
 	}
 	tt, err := time.Parse(time.DateTime, to)
 	if err != nil {
-		panic(err)
+		log.WithError(err).WithField("to", to).Error("failed to parse 'to' time in TimeBetween")
+		return false
 	}
 	now := time.Now()
 	return now.After(ft) && now.Before(tt)
@@ -155,7 +160,8 @@ func (s *Helper) TimeBetween(from string, to string) bool {
 func (s *Helper) CheckProb(probability float64) bool {
 	// Ensure the probability is within bounds [0.0, 1.0]
 	if probability < 0.0 || probability > 1.0 {
-		panic("Probability must be between 0 and 1")
+		log.WithField("probability", probability).Error("probability must be between 0 and 1 in CheckProb")
+		return false
 	}
 	// Generate a random float between 0 and 1
 	return rand.Float64() < probability

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"html/template"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,11 +16,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
-
-	"github.com/gin-contrib/multitemplate"
-
+	log "github.com/sirupsen/logrus"
 	"github.com/yargevad/filepathx"
 )
 
@@ -339,7 +339,9 @@ func (s *Template[K]) HTML(code int, ctx K) {
 		if c.GetHeader("X-Layout") != "" {
 			name, rerr = s.tm.RenderViewByNameAndLayoutBody(s.name, c.GetHeader("X-Layout"))
 			if rerr != nil {
-				panic(rerr)
+				log.WithError(rerr).Error("failed to render view by name and layout body")
+				c.String(http.StatusInternalServerError, "Internal Server Error")
+				return
 			}
 		}
 		for name, vals := range c.Request.Header {
@@ -349,7 +351,9 @@ func (s *Template[K]) HTML(code int, ctx K) {
 			tpl := s.tm.Build(s.name).WithLayoutBody(vals[0])
 			str, rerr := tpl.ToString(ctx)
 			if rerr != nil {
-				panic(rerr)
+				log.WithError(rerr).Error("failed to render update template to string")
+				c.String(http.StatusInternalServerError, "Internal Server Error")
+				return
 			}
 			encoded := base64.StdEncoding.EncodeToString([]byte(str))
 			c.Header(name, encoded)
@@ -358,7 +362,9 @@ func (s *Template[K]) HTML(code int, ctx K) {
 	} else {
 		name, rerr = s.tm.RenderViewByNameAndLayout(s.name, s.layout)
 		if rerr != nil {
-			panic(rerr)
+			log.WithError(rerr).Error("failed to render view by name and layout")
+			c.String(http.StatusInternalServerError, "Internal Server Error")
+			return
 		}
 	}
 	c.HTML(code, name, ctx)

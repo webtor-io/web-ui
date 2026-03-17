@@ -1,5 +1,18 @@
 # Project: web-ui (github.com/webtor-io/web-ui)
 
+## Architectural Decisions (web-ui specific)
+
+| Решение | Причина |
+|---------|---------|
+| Go/Gin + HTML templates, не SPA | SEO, быстрый first paint, работает без JS. Preact только для progressive enhancement |
+| Preact, не React/Vue/Angular | Минимальный бандл (~3KB). Пользователи часто на медленном интернете |
+| DaisyUI + кастомные токены (w-*) | Единая дизайн-система, быстрая разработка. Свои токены поверх DaisyUI night theme |
+| `data-async` progressive enhancement | Формы работают без JS, async-атрибуты добавляют AJAX поведение поверх |
+| Webpack 5, не Vite | Стабильность, проверенные плагины, нет причин мигрировать |
+| Модели в models/, не в handlers | Чёткое разделение DB-логики. Handlers никогда не делают SQL-запросы напрямую |
+| Two-level handler pattern | HTTP-слой отделён от бизнес-логики. Упрощает тестирование и переиспользование |
+| 4K стриминг отключён | Транскодирование 4K слишком ресурсозатратно, стриминг больших файлов нестабилен |
+
 ## Documentation
 
 - **Before starting work, check the `docs/` directory** — it contains technical specs, DB schemas, business logic, API specs, and edge cases for major features (e.g., `docs/vault.md`).

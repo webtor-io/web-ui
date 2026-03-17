@@ -1,7 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  purge: ['./templates/**/*.html', './assets/src/**/*.{js,jsx}'],
-  content: [],
+  content: ['./templates/**/*.html', './assets/src/**/*.{js,jsx}'],
   theme: {
     fontFamily: {
       'sans': ['Inter', 'system-ui', 'sans-serif'],
@@ -10,6 +9,15 @@ module.exports = {
     extend: {
       minWidth: {
         '80': '20rem',
+      },
+      zIndex: {
+        'dropdown':       '10',
+        'sticky':         '20',
+        'navbar':         '30',
+        'modal-backdrop': '40',
+        'modal':          '50',
+        'toast':          '60',
+        'tooltip':        '70',
       },
       colors: {
         w: {

@@ -68,6 +68,11 @@ func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject str
 	}
 	h.subs = append(h.subs, sub)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithField("consumer", consumer).Errorf("panic in message handler: %v", r)
+			}
+		}()
 		for {
 			select {
 			case <-h.done:

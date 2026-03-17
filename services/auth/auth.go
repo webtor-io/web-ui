@@ -438,7 +438,9 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 	}
 	// CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOriginFunc: func(origin string) bool {
+			return true
+		},
 		AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
 		AllowHeaders:     append([]string{"content-type"}, supertokens.GetAllCORSHeaders()...),
 		MaxAge:           1 * time.Minute,

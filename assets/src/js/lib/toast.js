@@ -11,6 +11,7 @@ function show(msg, type) {
 
     const alert = document.createElement('div');
     alert.className = `toast-alert toast-alert-${type}`;
+    alert.setAttribute('role', 'alert');
     alert.textContent = msg;
 
     container.appendChild(alert);

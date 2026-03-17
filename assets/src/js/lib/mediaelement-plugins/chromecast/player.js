@@ -241,7 +241,7 @@ export default class ChromecastPlayer {
             const event = mejs.Utils.createEvent('play', t.media);
             t.media.dispatchEvent(event);
         }, (error) => {
-            console.log(error);
+            console.error(error);
             t._getErrorMessage(error);
         });
     }

@@ -39,8 +39,8 @@ func TestManifest_GetManifest(t *testing.T) {
 		t.Errorf("Expected ID 'org.stremio.webtor.io', got '%s'", response.Id)
 	}
 
-	if response.Version != "0.0.1" {
-		t.Errorf("Expected Version '0.0.1', got '%s'", response.Version)
+	if response.Version != "0.0.2" {
+		t.Errorf("Expected Version '0.0.2', got '%s'", response.Version)
 	}
 
 	if response.Name != "Webtor.io" {

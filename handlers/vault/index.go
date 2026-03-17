@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/web"
@@ -50,7 +51,7 @@ func (h *Handler) getPledgesList(ctx context.Context, userID uuid.UUID) ([]Pledg
 		// Check if pledge is frozen using IsPledgeFrozen method
 		isFrozen, err := h.vault.IsPledgeFrozen(ctx, &pledge)
 		if err != nil {
-			// If error checking frozen status, skip this pledge
+			log.WithError(err).WithField("pledgeID", pledge.PledgeID).Warn("failed to check pledge frozen status, skipping")
 			continue
 		}
 

@@ -25,7 +25,7 @@
     </head>
     <body class="flex flex-col min-h-screen font-sans antialiased">
         <script>document.body.style.display = 'none';</script>
-        <progress id="progress" class="progress fixed progress-accent h-1 z-[60]"></progress>
+        <progress id="progress" class="progress fixed progress-accent h-1 z-toast"></progress>
         <header>
             <nav data-async-layout="{{`{{ template "nav" . }}`}}">{{ template "nav" . }}</nav>
         </header>
@@ -37,7 +37,7 @@
         <div>
             {{ template "footer" . }}
         </div>
-        <div id="toast-container" class="toast toast-end toast-bottom z-[70]"></div>
+        <div id="toast-container" class="toast toast-end toast-bottom z-tooltip" role="status" aria-live="assertive" aria-atomic="false"></div>
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}
         {{ "auth.js" | asset }}

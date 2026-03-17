@@ -9,7 +9,7 @@ window.submitLoginForm = function(target, e) {
             await supertokens.sendMagicLink(data, window._CSRF);
             e.done('magic link sent to ' + data.email);
         } catch (err) {
-            console.log(err);
+            console.error(err);
             if (err.statusText) {
                 e.error(err.statusText.toLowerCase());
             } else if (err.message) {
@@ -36,7 +36,7 @@ window.signInWith = function(e, provider) {
         try {
             await supertokens.signInWith(window._CSRF, provider);
         } catch (err) {
-            console.log(err);
+            console.error(err);
             if (err.statusText) {
                 progressEntry.error(err.statusText.toLowerCase());
             } else if (err.message) {

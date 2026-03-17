@@ -12,6 +12,21 @@ let player;
 let hlsPlayer;
 let video;
 
+// Stored listener references for cleanup
+let _listeners = [];
+
+function addTrackedListener(target, event, handler) {
+    target.addEventListener(event, handler);
+    _listeners.push({ target, event, handler });
+}
+
+function removeAllTrackedListeners() {
+    for (const { target, event, handler } of _listeners) {
+        target.removeEventListener(event, handler);
+    }
+    _listeners = [];
+}
+
 function remapTrackGroup(elements, hlsTracks) {
     if (!elements.length || !hlsTracks.length) return;
 
@@ -117,7 +132,7 @@ function setupHlsEvents(hls, media) {
                     break;
             }
         } else {
-            console.log(data);
+            console.warn('HLS non-fatal error:', data.type, data.details);
             if (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'bufferStalledError') {
                 setTimeout(() => {
                     hls.startLoad();
@@ -260,7 +275,7 @@ export function initPlayer(target) {
             maxMaxBufferLength: 180,
         },
         error: function(e) {
-            console.log(e);
+            console.error('MediaElement player error:', e);
             destroyPlayer();
             initPlayer(target);
         },
@@ -319,15 +334,16 @@ export function initPlayer(target) {
                 }
             }
             let paused = false;
-            window.addEventListener('player_paused', function() {
+            addTrackedListener(window, 'player_paused', function() {
                 playerInst.pause();
                 paused = true;
             });
-            media.addEventListener('playing', () => {
+            addTrackedListener(media, 'playing', () => {
                 if (paused) playerInst.pause();
             });
             let tracksInitialized = false;
-            media.addEventListener('canplay', () => {
+            let playerPlayListenerAdded = false;
+            addTrackedListener(media, 'canplay', () => {
                 if (hlsPlayer && document.getElementById('subtitles') && !tracksInitialized) {
                     tracksInitialized = true;
                     const defaultAudio = document.querySelector('.audio[data-default=true]');
@@ -346,10 +362,13 @@ export function initPlayer(target) {
                 if (!controls) {
                     document.querySelector('.mejs__controls').style.display = 'none';
                 }
-                window.addEventListener('player_play', function() {
-                    paused = false;
-                    playerInst.play();
-                });
+                if (!playerPlayListenerAdded) {
+                    playerPlayListenerAdded = true;
+                    addTrackedListener(window, 'player_play', function() {
+                        paused = false;
+                        playerInst.play();
+                    });
+                }
 
                 const event = new CustomEvent('player_ready');
                 window.dispatchEvent(event);
@@ -357,12 +376,12 @@ export function initPlayer(target) {
             if (media.hlsPlayer) {
                 hlsPlayer = media.hlsPlayer;
                 window.hlsPlayer = hlsPlayer;
-                media.addEventListener('seeking', () => {
+                addTrackedListener(media, 'seeking', () => {
                     if (media.hlsPlayer.loadLevel > 1) {
                         media.hlsPlayer.loadLevel = 1;
                     }
                 });
-                media.addEventListener('seeked', () => {
+                addTrackedListener(media, 'seeked', () => {
                     media.hlsPlayer.loadLevel = -1;
                 });
                 setupHlsEvents(media.hlsPlayer, media);
@@ -372,14 +391,14 @@ export function initPlayer(target) {
 
     // Session cleanup on page unload
     if (isSession && sessionDeletePath) {
-        window.addEventListener('beforeunload', () => {
+        addTrackedListener(window, 'beforeunload', () => {
             navigator.sendBeacon(sessionDeletePath);
         });
     }
 }
 
 export function destroyPlayer() {
-    console.log(player, hlsPlayer, video);
+    removeAllTrackedListeners();
     if (video && video.dataset.sessionDeletePath) {
         navigator.sendBeacon(video.dataset.sessionDeletePath);
     }

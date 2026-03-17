@@ -13,6 +13,9 @@ type Handler struct {
 }
 
 func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
+	if !gin.IsDebugging() {
+		return
+	}
 	h := &Handler{
 		tb: tm.MustRegisterViews("tests/**/*").WithLayout("main"),
 	}

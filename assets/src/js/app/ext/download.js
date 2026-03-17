@@ -18,7 +18,6 @@ function fetch(downloadId) {
     debug('request downloadId=%d', downloadId);
     return new Promise((resolve) => {
         window.addEventListener('message', (event) => {
-            console.log(event);
             if (event.source !== window) {
                 return;
             }

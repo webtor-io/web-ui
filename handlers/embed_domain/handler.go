@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -49,7 +50,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
 func (s *Handler) add(c *gin.Context) {
 	domain := strings.TrimSpace(strings.ToLower(c.PostForm("domain")))
 	user := auth.GetUserFromContext(c)
-	err := s.addDomain(c.Request.Context(), domain, user)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	err := s.addDomain(ctx, domain, user)
 	if err != nil {
 		web.RedirectWithError(c, err)
 		return
@@ -60,7 +63,9 @@ func (s *Handler) add(c *gin.Context) {
 func (s *Handler) delete(c *gin.Context) {
 	id := c.Param("id")
 	user := auth.GetUserFromContext(c)
-	err := s.deleteDomain(c.Request.Context(), id, user)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	err := s.deleteDomain(ctx, id, user)
 	if err != nil {
 		web.RedirectWithError(c, err)
 		return
