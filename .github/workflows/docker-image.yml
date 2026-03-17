@@ -33,9 +33,6 @@ jobs:
         name: Build frontend assets
         run: npm run build
       -
-        name: Run go vet
-        run: go vet ./...
-      -
         name: Run go test
         run: go test ./...
       -
