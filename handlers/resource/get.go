@@ -91,7 +91,6 @@ type GetData struct {
 	Resource              *ExtendedResource
 	List                  *ra.ListResponse
 	Item                  *ra.ListItem
-	Instruction           string
 	VaultPledgeAddForm    *VaultPledgeAddForm
 	VaultButton           *VaultButton
 	VaultPledgeRemoveForm *VaultPledgeRemoveForm
@@ -174,11 +173,10 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 }
 
 func (s *Handler) get(c *gin.Context) {
-	indexTpl := s.tb.Build("index")
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
 	if err != nil {
-		c.Redirect(http.StatusFound, "/?status=error&err=wrong+args+provided")
+		web.RedirectWithErrorAndPath(c, "/", err)
 		return
 	}
 	if !s.useDirectLinks && !s.hasAccessPermission(c, args) {
@@ -191,11 +189,12 @@ func (s *Handler) get(c *gin.Context) {
 	defer cancel()
 	d, err := s.prepareGetData(ctx, args)
 	if err != nil {
-		indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(&GetData{}).WithErr(err))
+		_ = c.Error(err)
+		web.RedirectWithErrorAndPath(c, "/", err)
 		return
 	}
 	if d == nil {
-		c.Redirect(http.StatusFound, "/?status=error&err=resource+not+found")
+		web.RedirectWithErrorAndPath(c, "/", errors.New("resource not found"))
 		return
 	}
 
@@ -209,14 +208,16 @@ func (s *Handler) get(c *gin.Context) {
 	if s.vault != nil && args.User.HasAuth() {
 		vaultButton, err := s.prepareVaultButton(ctx, args)
 		if err != nil {
-			indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault button")))
+			_ = c.Error(errors.Wrap(err, "failed to prepare vault button"))
+			getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
 			return
 		}
 		d.VaultButton = vaultButton
 		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/pledge/add" {
 			vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
 			if err != nil {
-				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault form")))
+				_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
+				getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
 				return
 			}
 
@@ -225,7 +226,8 @@ func (s *Handler) get(c *gin.Context) {
 		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/pledge/remove" {
 			vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
 			if err != nil {
-				indexTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(errors.Wrap(err, "failed to prepare vault pledge remove form")))
+				_ = c.Error(errors.Wrap(err, "failed to prepare vault pledge remove form"))
+				getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
 				return
 			}
 			d.VaultPledgeRemoveForm = vaultPledgeRemoveForm

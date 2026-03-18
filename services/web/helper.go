@@ -55,11 +55,10 @@ func LongErr(err error) template.HTML {
 	return template.HTML(strings.Join(parts, "<br />"))
 }
 
-func RedirectWithError(c *gin.Context, serr error) {
-	u, err := url.Parse(c.GetHeader("X-Return-Url"))
+func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
+	u, err := url.Parse(path)
 	if err != nil || u == nil {
-		// if return url is invalid, attempt a plain redirect without query mutation
-		c.Redirect(http.StatusFound, c.GetHeader("X-Return-Url"))
+		c.Redirect(http.StatusFound, path)
 		return
 	}
 	q := u.Query()
@@ -68,6 +67,10 @@ func RedirectWithError(c *gin.Context, serr error) {
 	q.Set("from", c.Request.URL.Path)
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
+}
+
+func RedirectWithError(c *gin.Context, serr error) {
+	RedirectWithErrorAndPath(c, c.GetHeader("X-Return-Url"), serr)
 }
 
 func RedirectWithSuccess(c *gin.Context) {

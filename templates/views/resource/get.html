@@ -62,6 +62,12 @@
         </div>
     </div>
 
+    {{ if $.Err }}
+    <div class="progress-alert progress-alert-oneline mb-4">
+        <pre class="error">{{ $.Err | shortErr }}</pre>
+    </div>
+    {{ end }}
+
     <!-- Content divider -->
     <div class="flex items-center gap-3 mt-6 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Content</h2>
