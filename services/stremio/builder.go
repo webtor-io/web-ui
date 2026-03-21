@@ -78,12 +78,23 @@ func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
-	acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, u.ID, s.cache, s.userAgent, s.requestURLMapper)
+
+	settings, err := GetUserSettingsDataByClaims(ctx, db, u.ID)
 	if err != nil {
 		return nil, err
 	}
-	sts := NewLibrary(s.domain, db, u, s.rapi, apiClaims)
-	cs := NewCompositeStream([]StreamsService{sts, acs})
+
+	services := []StreamsService{NewLibrary(s.domain, db, u, s.rapi, apiClaims)}
+
+	if !settings.DiscoverOnly {
+		acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, u.ID, s.cache, s.userAgent, s.requestURLMapper)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, acs)
+	}
+
+	cs := NewCompositeStream(services)
 	ds := NewDedupStream(cs)
 	ps := NewPreferredStream(ds, db, u, cla)
 	prs := NewPrefetchResourceStream(ps, s.rapi, apiClaims)

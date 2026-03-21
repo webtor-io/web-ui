@@ -79,6 +79,7 @@ func (s *Handler) updateSettings(c *gin.Context) {
 	}
 
 	settingsData.PreferredResolutions = orderedQualities
+	settingsData.DiscoverOnly = c.PostForm("discover_only") == "on"
 
 	// Get database connection
 	db := s.pg.Get()

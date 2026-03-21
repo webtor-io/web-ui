@@ -18,6 +18,7 @@ type ResolutionSetting struct {
 // StremioSettingsData represents the structure of the JSONB settings field
 type StremioSettingsData struct {
 	PreferredResolutions []ResolutionSetting `json:"preferred_resolutions"`
+	DiscoverOnly         bool                `json:"discover_only"`
 }
 
 type StremioSettings struct {
