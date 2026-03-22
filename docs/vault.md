@@ -10,7 +10,7 @@ The Vault system manages users' virtual points (Vault Points, VP) and their pled
 - **Pledge** — user's investment of VP in a specific resource. One pledge per user per resource.
 - **Funding** — resource is funded when `funded_vp >= required_vp`.
 - **Vaulting** — moving a funded resource to long-term storage.
-- **Freezing** — pledge is locked for `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24h) after creation. Freeze is lifted when resource is vaulted.
+- **Freezing** — pledge is locked for `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24h) after creation. Freeze runs its full duration regardless of vault status.
 - **Expiration** — resource marked expired when `funded_vp < required_vp`. Deleted after 7 days.
 - **Transfer Timeout** — if vaulting fails within `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` (default: 7 days), VP is returned.
 
@@ -18,7 +18,7 @@ The Vault system manages users' virtual points (Vault Points, VP) and their pled
 
 1. **Created** → `funded=false`, `vaulted=false`, `expired=false`
 2. **Funded** → `funded_vp >= required_vp`, `funded=true`
-3. **Vaulted** → `vaulted=true` (all pledges auto-unfrozen)
+3. **Vaulted** → `vaulted=true`
 4. **Expired** (optional) → `funded_vp < required_vp`, deleted after 7 days
 
 ## Database Schema
@@ -49,7 +49,7 @@ All tables in `vault` schema.
 | created_at, updated_at | timestamptz | Timestamps |
 
 - Unique constraint on `(resource_id, user_id)`
-- Freeze determined dynamically: `frozen_at + freeze_period > now()` (unless resource is vaulted)
+- Freeze determined dynamically: `frozen_at + freeze_period > now()`
 
 ### vault.resource
 
@@ -197,7 +197,7 @@ Idempotent. Returns existing resource or creates new one:
 
 #### IsPledgeFrozen
 
-Dynamic check: returns `false` if resource is vaulted, otherwise checks `frozen_at + freeze_period > now()`.
+Dynamic check: returns `true` if `frozen_at + freeze_period > now()`, regardless of vault status.
 
 #### recalculatePledgeFunding (internal)
 

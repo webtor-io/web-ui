@@ -557,27 +557,11 @@ func (s *Vault) GetPledge(ctx context.Context, user *auth.User, resource *vaultM
 	return pledge, nil
 }
 
-// IsPledgeFrozen checks if a pledge is currently in the freeze period
-// A pledge is not frozen if the resource is vaulted, regardless of the freeze period
+// IsPledgeFrozen checks if a pledge is currently in the freeze period.
+// The freeze runs for the full freezePeriod from FrozenAt, regardless of vault status.
 func (s *Vault) IsPledgeFrozen(ctx context.Context, pledge *vaultModels.Pledge) (bool, error) {
 	if pledge == nil {
 		return false, errors.New("pledge is nil")
-	}
-
-	db := s.pg.Get()
-	if db == nil {
-		return false, errors.New("database connection is not available")
-	}
-
-	// Get the resource to check if it's vaulted
-	resource, err := vaultModels.GetResource(ctx, db, pledge.ResourceID)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get resource")
-	}
-
-	// If resource is vaulted, pledge is not frozen
-	if resource != nil && resource.Vaulted {
-		return false, nil
 	}
 
 	// Calculate the time when freeze period ends

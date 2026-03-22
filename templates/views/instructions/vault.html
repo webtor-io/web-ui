@@ -35,7 +35,7 @@
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
         <li>Click the <strong>"Keep This Torrent Available"</strong> button next to the torrent you want to save.</li>
         <li>Confirm the number of points required (for example, if the torrent is 10 GB, you need to deposit 10 VP).</li>
-        <li>The funded points are frozen for <strong>{{ .FreezePeriod | duration }}</strong>. The freeze is automatically lifted when the torrent is successfully transferred to the Vault.</li>
+        <li>The funded points are frozen for <strong>{{ .FreezePeriod | duration }}</strong> after the pledge is created.</li>
         <li>Webtor transfers the torrent to the Vault (if the transfer fails within <strong>{{ .TransferTimeoutPeriod | duration }}</strong>, VP is returned).</li>
     </ol>
 
