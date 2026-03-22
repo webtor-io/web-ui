@@ -38,7 +38,7 @@ var Tools = []Tool{
 		Url:         "torrent-to-stream",
 		Title:       "Torrent → Stream",
 		Benefit:     "Convert Any Torrent to HLS Stream",
-		Description: "Convert torrent files to HLS video streams on the fly. Cloud-based torrent to stream conversion with adaptive bitrate for smooth playback on any device.",
+		Description: "Convert torrent files to HLS video streams on the fly. Cloud-based real-time torrent to stream transcoding for smooth playback on any device.",
 	},
 	{
 		Url:         "watch-torrents-online",
