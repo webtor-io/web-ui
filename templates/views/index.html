@@ -2,6 +2,67 @@
 {{ define "description" }}
     <meta name="description" content="{{ with .Data }}{{ if .Tool }}{{ .Tool.Description }}{{ else }}Web-based torrent platform to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage{{ end }}{{ end }}">
 {{ end }}
+{{ define "canonical" }}
+    {{ with .Data }}{{ if .Tool }}<link rel="canonical" href="{{ domain }}/{{ .Tool.Url }}">{{ else }}<link rel="canonical" href="{{ domain }}/">{{ end }}{{ end }}
+{{ end }}
+{{ define "og" }}
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Webtor.io">
+    {{ with .Data }}
+    {{ if .Tool }}
+    <meta property="og:title" content="{{ .Tool.Title | seoFriendly }} – {{ .Tool.Benefit }}">
+    <meta property="og:description" content="{{ .Tool.Description }}">
+    <meta property="og:url" content="{{ domain }}/{{ .Tool.Url }}">
+    {{ else }}
+    <meta property="og:title" content="Webtor.io — Stream & Download Torrents in Browser">
+    <meta property="og:description" content="Web-based torrent platform to stream and download your own torrents directly in the browser. No software required.">
+    <meta property="og:url" content="{{ domain }}/">
+    {{ end }}
+    {{ end }}
+    <meta property="og:image" content="{{ domain }}/assets/night/favicon.svg">
+{{ end }}
+{{ define "head_extra" }}
+    {{ with .Data }}{{ if .Tool }}
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "{{ .Tool.Title | seoFriendly }}",
+        "description": "{{ .Tool.Description }}",
+        "url": "{{ domain }}/{{ .Tool.Url }}",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "provider": {
+            "@type": "Organization",
+            "name": "Webtor",
+            "url": "{{ domain }}"
+        }
+    }
+    </script>
+    {{ else }}
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Webtor",
+        "description": "Stream and download torrents directly in your browser. No software required.",
+        "url": "{{ domain }}",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        }
+    }
+    </script>
+    {{ end }}{{ end }}
+{{ end }}
 {{ define "main" }}
 {{ with .Data }}
 <!-- Hero Section -->

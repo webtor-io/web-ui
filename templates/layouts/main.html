@@ -5,6 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <title>{{ template "title" . }} | Webtor.io</title>
         {{ block "description" . }}{{ end }}
+        {{ block "canonical" . }}{{ end }}
+        {{ block "og" . }}
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="Webtor.io">
+        <meta property="og:title" content="{{ template "title" . }} | Webtor.io">
+        <meta property="og:image" content="{{ domain }}/assets/night/favicon.svg">
+        {{ end }}
+        <meta name="twitter:card" content="summary">
         <link rel="shortcut icon" href="/assets/night/favicon.ico">
         <link rel="icon" type="image/svg+xml" href="/assets/night/favicon.svg" >
         <link rel="icon" type="image/png" sizes="16x16" href="/assets/night/favicon-16x16.png">

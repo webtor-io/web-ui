@@ -35,6 +35,12 @@ var Tools = []Tool{
 		Description: "Convert magnet links to .torrent files in your browser. Generate torrent files online with cloud-based processing.",
 	},
 	{
+		Url:         "torrent-to-stream",
+		Title:       "Torrent → Stream",
+		Benefit:     "Convert Any Torrent to HLS Stream",
+		Description: "Convert torrent files to HLS video streams on the fly. Cloud-based torrent to stream conversion with adaptive bitrate for smooth playback on any device.",
+	},
+	{
 		Url:         "watch-torrents-online",
 		Title:       "Watch Torrents Online",
 		Benefit:     "Stream Torrent Videos in Browser",
@@ -51,5 +57,17 @@ var Tools = []Tool{
 		Title:       "Online Torrent Downloader",
 		Benefit:     "Download Torrents Online – No Torrent Client Needed",
 		Description: "Download torrent files and magnet links directly in your browser. No torrent client required. Web-based torrent downloading with server-side processing.",
+	},
+	{
+		Url:         "stream-torrent-online",
+		Title:       "Stream Torrent Online",
+		Benefit:     "Stream Any Torrent Directly in Your Browser",
+		Description: "Stream torrent files and magnet links directly in your browser without downloading. Instant cloud-based torrent streaming with HLS transcoding for any video format.",
+	},
+	{
+		Url:         "torrent-player",
+		Title:       "Online Torrent Player",
+		Benefit:     "Play Any Torrent Video in Your Browser",
+		Description: "Free online torrent player that plays video files from torrents directly in the browser. Supports MKV, AVI, MP4, WEBM and more with real-time transcoding.",
 	},
 }
