@@ -11,7 +11,7 @@ The Vault system manages users' virtual points (Vault Points, VP) and their pled
 - **Funding** — resource is funded when `funded_vp >= required_vp`.
 - **Vaulting** — moving a funded resource to long-term storage.
 - **Freezing** — pledge is locked for `VAULT_PLEDGE_FREEZE_PERIOD` (default: 24h) after creation. Freeze runs its full duration regardless of vault status.
-- **Expiration** — resource marked expired when `funded_vp < required_vp`. Deleted after 7 days.
+- **Expiration** — resource marked expired when `funded_vp < required_vp`. Abandoned resources (no pledges) deleted after 1 day; resources with unfunded pledges deleted after 7 days.
 - **Transfer Timeout** — if vaulting fails within `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` (default: 7 days), VP is returned.
 
 ### Resource Lifecycle
@@ -19,7 +19,7 @@ The Vault system manages users' virtual points (Vault Points, VP) and their pled
 1. **Created** → `funded=false`, `vaulted=false`, `expired=false`
 2. **Funded** → `funded_vp >= required_vp`, `funded=true`
 3. **Vaulted** → `vaulted=true`
-4. **Expired** (optional) → `funded_vp < required_vp`, deleted after 7 days
+4. **Expired** (optional) → `funded_vp < required_vp`, deleted after 1 day (no pledges) or 7 days (with unfunded pledges)
 
 ## Database Schema
 
@@ -131,7 +131,8 @@ Methods: `GetTxLog`, `GetUserTxLogs`, `GetUserTxLogsByType`, `GetResourceTxLogs`
 | `VAULT_SERVICE_PORT` | 80 | Vault API port |
 | `VAULT_SECURE` | false | Use HTTPS |
 | `VAULT_PLEDGE_FREEZE_PERIOD` | 24h | Pledge freeze period |
-| `VAULT_RESOURCE_EXPIRE_PERIOD` | 7 days | Deletion delay after expiration |
+| `VAULT_RESOURCE_EXPIRE_PERIOD` | 7 days | Deletion delay for expired resources with unfunded pledges |
+| `VAULT_RESOURCE_ABANDONED_EXPIRE_PERIOD` | 1 day | Deletion delay for expired resources with no pledges |
 | `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` | 7 days | Transfer timeout |
 
 ### Constructor
@@ -236,7 +237,8 @@ Called when resource transitions to funded. Checks Vault API status:
 ```
 
 Selects resources where:
-- `expired_at < now - VAULT_RESOURCE_EXPIRE_PERIOD`, or
+- `expired_at < now - VAULT_RESOURCE_EXPIRE_PERIOD` AND has pledges (unfunded), or
+- `expired_at < now - VAULT_RESOURCE_ABANDONED_EXPIRE_PERIOD` AND has no pledges (abandoned), or
 - `funded_at < now - VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD AND vaulted = false`
 
 For each: removes pledges (returns VP), sends notifications, deletes resource. Partial failures logged and skipped.
@@ -346,7 +348,7 @@ Constructor `NewApi` returns `nil` if `VAULT_SERVICE_HOST` is empty.
 
 1. **Balance**: non-negative, `NULL` = unlimited, synced with claims on every access
 2. **Pledges**: cannot exceed available VP; cannot remove frozen pledge; one per user per resource; freeze determined dynamically
-3. **Resources**: funded when `funded_vp >= required_vp`; expired resources deleted after 7 days; vaulted resources can expire if underfunded
+3. **Resources**: funded when `funded_vp >= required_vp`; abandoned expired resources deleted after 1 day, expired with unfunded pledges after 7 days; vaulted resources can expire if underfunded
 4. **Transactions**: all balance ops logged in tx_log; balance never zero; OpTypeFund always negative, OpTypeClaim always positive
 5. **Concurrency**: `SELECT FOR UPDATE` for all balance-changing operations
 6. **Copyright**: if torrent is blocked/removed by copyright holders, it may disappear from vault

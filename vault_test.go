@@ -20,7 +20,7 @@ type mockReaperStore struct {
 	pledgesWithUsersErr map[string]error
 }
 
-func (m *mockReaperStore) GetExpiredResources(_ context.Context, _ time.Duration, _ time.Duration) ([]vaultModels.Resource, error) {
+func (m *mockReaperStore) GetExpiredResources(_ context.Context, _ time.Duration, _ time.Duration, _ time.Duration) ([]vaultModels.Resource, error) {
 	return m.expiredResources, m.expiredResourcesErr
 }
 
@@ -101,11 +101,12 @@ func (m *mockReaperNotification) SendExpired(to string, r *vaultModels.Resource)
 
 func newTestReaper(store reaperStore, v reaperVault, n reaperNotification) *reaper {
 	return &reaper{
-		store:                 store,
-		vault:                 v,
-		notification:          n,
-		expirePeriod:          7 * 24 * time.Hour,
-		transferTimeoutPeriod: 7 * 24 * time.Hour,
+		store:                  store,
+		vault:                  v,
+		notification:           n,
+		expirePeriod:           7 * 24 * time.Hour,
+		abandonedExpirePeriod:  24 * time.Hour,
+		transferTimeoutPeriod:  7 * 24 * time.Hour,
 	}
 }
 

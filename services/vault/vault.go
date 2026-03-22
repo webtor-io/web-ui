@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	VaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
-	VaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
-	VaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
+	VaultPledgeFreezePeriodFlag              = "vault-pledge-freeze-period"
+	VaultResourceExpirePeriodFlag            = "vault-resource-expire-period"
+	VaultResourceAbandonedExpirePeriodFlag   = "vault-resource-abandoned-expire-period"
+	VaultResourceTransferTimeoutPeriodFlag   = "vault-resource-transfer-timeout-period"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -31,9 +32,15 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 		},
 		cli.DurationFlag{
 			Name:   VaultResourceExpirePeriodFlag,
-			Usage:  "period after which unfunded resource is removed from vault",
+			Usage:  "period after which unfunded resource with pledges is removed from vault",
 			Value:  7 * 24 * time.Hour,
 			EnvVar: "VAULT_RESOURCE_EXPIRE_PERIOD",
+		},
+		cli.DurationFlag{
+			Name:   VaultResourceAbandonedExpirePeriodFlag,
+			Usage:  "period after which expired resource without any pledges is removed from vault",
+			Value:  24 * time.Hour,
+			EnvVar: "VAULT_RESOURCE_ABANDONED_EXPIRE_PERIOD",
 		},
 		cli.DurationFlag{
 			Name:   VaultResourceTransferTimeoutPeriodFlag,

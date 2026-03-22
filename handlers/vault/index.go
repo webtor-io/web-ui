@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -55,6 +56,15 @@ func (h *Handler) getPledgesList(ctx context.Context, userID uuid.UUID) ([]Pledg
 			continue
 		}
 
+		// Calculate ExpiresIn for unfunded pledges with expired resource
+		var expiresIn time.Duration
+		if !pledge.Funded && pledge.Resource != nil && pledge.Resource.ExpiredAt != nil {
+			remaining := time.Until(pledge.Resource.ExpiredAt.Add(h.vault.GetExpirePeriod()))
+			if remaining > 0 {
+				expiresIn = remaining
+			}
+		}
+
 		displayPledges = append(displayPledges, PledgeDisplay{
 			PledgeID:   pledge.PledgeID.String(),
 			ResourceID: pledge.ResourceID,
@@ -63,6 +73,7 @@ func (h *Handler) getPledgesList(ctx context.Context, userID uuid.UUID) ([]Pledg
 			IsFrozen:   isFrozen,
 			Funded:     pledge.Funded,
 			CreatedAt:  pledge.CreatedAt.Format("2006-01-02 15:04:05"),
+			ExpiresIn:  expiresIn,
 		})
 	}
 

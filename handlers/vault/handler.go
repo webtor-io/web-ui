@@ -26,6 +26,7 @@ type PledgeDisplay struct {
 	IsFrozen   bool
 	Funded     bool
 	CreatedAt  string
+	ExpiresIn  time.Duration // time until resource is removed (for unfunded pledges)
 }
 
 type PledgeListData struct {

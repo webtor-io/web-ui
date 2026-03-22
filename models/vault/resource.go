@@ -136,17 +136,24 @@ func MarkResourceExpiredAndUnfunded(ctx context.Context, db pg.DBI, resourceID s
 	return nil
 }
 
-// GetExpiredResources returns resources that should be reaped based on expiration and transfer timeout periods
-func GetExpiredResources(ctx context.Context, db *pg.DB, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]Resource, error) {
+// GetExpiredResources returns resources that should be reaped based on expiration and transfer timeout periods.
+// Resources without any pledges (abandoned) expire after abandonedExpirePeriod (1 day by default).
+// Resources with unfunded pledges expire after expirePeriod (7 days by default).
+func GetExpiredResources(ctx context.Context, db *pg.DB, expirePeriod time.Duration, abandonedExpirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]Resource, error) {
 	var resources []Resource
 	now := time.Now()
 	expireThreshold := now.Add(-expirePeriod)
+	abandonedThreshold := now.Add(-abandonedExpirePeriod)
 	transferThreshold := now.Add(-transferTimeoutPeriod)
 
 	err := db.Model(&resources).
 		Context(ctx).
 		WhereGroup(func(q *pg.Query) (*pg.Query, error) {
-			q = q.WhereOr("expired_at IS NOT NULL AND expired_at < ?", expireThreshold).
+			// Expired resources with pledges still attached (unfunded) — wait full expire period
+			q = q.WhereOr("expired_at IS NOT NULL AND expired_at < ? AND EXISTS (SELECT 1 FROM vault.pledge WHERE pledge.resource_id = resource.resource_id)", expireThreshold).
+				// Expired resources with no pledges (abandoned) — expire faster
+				WhereOr("expired_at IS NOT NULL AND expired_at < ? AND NOT EXISTS (SELECT 1 FROM vault.pledge WHERE pledge.resource_id = resource.resource_id)", abandonedThreshold).
+				// Transfer timeout — resource funded but never vaulted
 				WhereOr("funded_at IS NOT NULL AND funded_at < ? AND vaulted = false", transferThreshold)
 			return q, nil
 		}).

@@ -30,7 +30,7 @@ type reaperNotification interface {
 }
 
 type reaperStore interface {
-	GetExpiredResources(ctx context.Context, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error)
+	GetExpiredResources(ctx context.Context, expirePeriod time.Duration, abandonedExpirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error)
 	GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error)
 }
 
@@ -39,8 +39,8 @@ type pgReaperStore struct {
 	db *pg.DB
 }
 
-func (s *pgReaperStore) GetExpiredResources(ctx context.Context, expirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error) {
-	return vaultModels.GetExpiredResources(ctx, s.db, expirePeriod, transferTimeoutPeriod)
+func (s *pgReaperStore) GetExpiredResources(ctx context.Context, expirePeriod time.Duration, abandonedExpirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error) {
+	return vaultModels.GetExpiredResources(ctx, s.db, expirePeriod, abandonedExpirePeriod, transferTimeoutPeriod)
 }
 
 func (s *pgReaperStore) GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error) {
@@ -48,13 +48,14 @@ func (s *pgReaperStore) GetResourcePledgesWithUsers(ctx context.Context, resourc
 }
 
 type reaper struct {
-	store                 reaperStore
-	vault                 reaperVault
-	notification          reaperNotification
-	expirePeriod          time.Duration
-	transferTimeoutPeriod time.Duration
-	pg                    *cs.PG
-	cpCl                  *claims.Client
+	store                  reaperStore
+	vault                  reaperVault
+	notification           reaperNotification
+	expirePeriod           time.Duration
+	abandonedExpirePeriod  time.Duration
+	transferTimeoutPeriod  time.Duration
+	pg                     *cs.PG
+	cpCl                   *claims.Client
 }
 
 func makeVaultCMD() cli.Command {
@@ -98,6 +99,7 @@ func reap(c *cli.Context) error {
 	defer r.Close()
 
 	log.WithField("expire_period", r.expirePeriod).
+		WithField("abandoned_expire_period", r.abandonedExpirePeriod).
 		WithField("transfer_timeout_period", r.transferTimeoutPeriod).
 		Info("starting vault reap process")
 
@@ -154,13 +156,14 @@ func initializeReaper(c *cli.Context) (*reaper, error) {
 	notificationService := notification.New(c, db)
 
 	r := &reaper{
-		store:                 &pgReaperStore{db: db},
-		vault:                 vaultService,
-		notification:          notificationService,
-		expirePeriod:          c.Duration(vault.VaultResourceExpirePeriodFlag),
-		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
-		pg:                    pg,
-		cpCl:                  cpCl,
+		store:                  &pgReaperStore{db: db},
+		vault:                  vaultService,
+		notification:           notificationService,
+		expirePeriod:           c.Duration(vault.VaultResourceExpirePeriodFlag),
+		abandonedExpirePeriod:  c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
+		transferTimeoutPeriod:  c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+		pg:                     pg,
+		cpCl:                   cpCl,
 	}
 
 	return r, nil
@@ -172,7 +175,7 @@ func (r *reaper) Close() {
 }
 
 func (r *reaper) run(ctx context.Context) {
-	resources, err := r.store.GetExpiredResources(ctx, r.expirePeriod, r.transferTimeoutPeriod)
+	resources, err := r.store.GetExpiredResources(ctx, r.expirePeriod, r.abandonedExpirePeriod, r.transferTimeoutPeriod)
 	if err != nil {
 		log.WithError(err).Warn("failed to get expired resources")
 		return
