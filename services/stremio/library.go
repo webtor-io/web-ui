@@ -346,8 +346,12 @@ func (s *Library) makeVideos(vc models.VideoContentWithMetadata) ([]VideoItem, e
 		} else {
 			id = fmt.Sprintf("%v%v", idPrefix, vc.GetID().String())
 		}
+		name := fmt.Sprintf("Episode %d", ep)
+		if e.EpisodeMetadata != nil && e.EpisodeMetadata.Title != nil && *e.EpisodeMetadata.Title != "" {
+			name = *e.EpisodeMetadata.Title
+		}
 		vi := VideoItem{
-			Name:    fmt.Sprintf("Episode %d", ep),
+			Name:    name,
 			ID:      fmt.Sprintf("%v:%v:%v", id, sea, ep),
 			Season:  sea,
 			Episode: ep,

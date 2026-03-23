@@ -33,4 +33,4 @@ templates/partials/extend.html
 
 chart
 
-.claude/skills/deploy
+.claude/skills/deploy*.yaml.gotmpl

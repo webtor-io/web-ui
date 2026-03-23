@@ -2,9 +2,10 @@ package models
 
 import (
 	"context"
-	"github.com/go-pg/pg/v10"
+	"errors"
 	"time"
 
+	"github.com/go-pg/pg/v10"
 	"github.com/satori/go.uuid"
 )
 
@@ -102,4 +103,24 @@ func GetMoviesByResourceID(ctx context.Context, db *pg.DB, resourceID string) ([
 	}
 
 	return movies, nil
+}
+
+func GetMovieWithMetadataByResourceID(ctx context.Context, db *pg.DB, resourceID string) (*Movie, error) {
+	var m Movie
+
+	err := db.Model(&m).
+		Context(ctx).
+		Where("resource_id = ?", resourceID).
+		Relation("MovieMetadata").
+		Limit(1).
+		Select()
+
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &m, nil
 }

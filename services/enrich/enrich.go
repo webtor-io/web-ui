@@ -18,9 +18,10 @@ import (
 )
 
 type Enricher struct {
-	pg      *services.PG
-	api     *api.Api
-	mappers []MetadataMapper
+	pg             *services.PG
+	api            *api.Api
+	mappers        []MetadataMapper
+	episodeMappers []EpisodeMapper
 }
 
 type MetadataMapper interface {
@@ -28,11 +29,21 @@ type MetadataMapper interface {
 	GetName() string
 }
 
-func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper) *Enricher {
+type EpisodeMapper interface {
+	MapEpisodes(ctx context.Context, videoID string, season int, force bool) ([]*models.EpisodeMetadata, error)
+	GetName() string
+}
+
+func (s *Enricher) HasMappers() bool {
+	return len(s.mappers) > 0
+}
+
+func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper) *Enricher {
 	return &Enricher{
-		pg:      pg,
-		api:     api,
-		mappers: mappers,
+		pg:             pg,
+		api:            api,
+		mappers:        mappers,
+		episodeMappers: episodeMappers,
 	}
 }
 
@@ -200,6 +211,14 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to link series %+v with metadata for hash %s", ser, hash)
 		}
+
+		// Enrich episodes with metadata
+		if len(s.episodeMappers) > 0 {
+			err = s.enrichEpisodes(ctx, db, ser, md.VideoID, force)
+			if err != nil {
+				log.WithError(err).Warnf("failed to enrich episodes for series %v hash %s", md.VideoID, hash)
+			}
+		}
 	}
 	return &mt, nil
 }
@@ -244,6 +263,79 @@ func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, 
 
 	return nil
 }
+func (s *Enricher) enrichEpisodes(ctx context.Context, db *pg.DB, ser *models.Series, videoID string, force bool) error {
+	// Reload series with episodes
+	serWithEps, err := models.GetSeriesWithEpisodes(ctx, db, ser.SeriesID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get series with episodes")
+	}
+
+	// Collect unique seasons
+	seasons := map[int]bool{}
+	for _, ep := range serWithEps.Episodes {
+		if ep.Season != nil {
+			seasons[int(*ep.Season)] = true
+		}
+	}
+
+	// Fetch episode metadata for each season
+	seasonEpisodes := map[int][]*models.EpisodeMetadata{}
+	for season := range seasons {
+		eps, err := s.mapEpisodeMetadata(ctx, videoID, season, force)
+		if err != nil {
+			log.WithError(err).Warnf("failed to map episode metadata for season %d", season)
+			continue
+		}
+		if eps != nil {
+			seasonEpisodes[season] = eps
+		}
+	}
+
+	// Link episode metadata to episodes
+	for _, ep := range serWithEps.Episodes {
+		if ep.Season == nil || ep.Episode == nil {
+			continue
+		}
+		season := int(*ep.Season)
+		episodeNum := int(*ep.Episode)
+
+		eps, ok := seasonEpisodes[season]
+		if !ok {
+			continue
+		}
+
+		for _, emd := range eps {
+			if int(emd.Season) == season && int(emd.Episode) == episodeNum {
+				metadataID, err := models.UpsertEpisodeMetadata(ctx, db, emd)
+				if err != nil {
+					log.WithError(err).Warnf("failed to upsert episode metadata S%dE%d", season, episodeNum)
+					continue
+				}
+				err = models.LinkEpisodeToMetadata(ctx, db, ep.EpisodeID, metadataID)
+				if err != nil {
+					log.WithError(err).Warnf("failed to link episode S%dE%d to metadata", season, episodeNum)
+				}
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Enricher) mapEpisodeMetadata(ctx context.Context, videoID string, season int, force bool) ([]*models.EpisodeMetadata, error) {
+	for _, m := range s.episodeMappers {
+		eps, err := m.MapEpisodes(ctx, videoID, season, force)
+		if err != nil {
+			return nil, errors.Wrapf(err, "got \"%v\" episode mapper error", m.GetName())
+		}
+		if eps != nil {
+			return eps, nil
+		}
+	}
+	return nil, nil
+}
+
 func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool) (md *models.VideoMetadata, err error) {
 	for _, m := range s.mappers {
 		md, err = m.Map(ctx, vc, t, f)

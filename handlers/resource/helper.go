@@ -6,6 +6,7 @@ import (
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/helpers"
+	"github.com/webtor-io/web-ui/models"
 	w "github.com/webtor-io/web-ui/services/web"
 )
 
@@ -178,4 +179,85 @@ type Helper struct {
 
 func NewHelper() *Helper {
 	return &Helper{}
+}
+
+func (s *Helper) getMetadata(gd *GetData) *models.VideoMetadata {
+	if gd.Movie != nil {
+		return gd.Movie.GetMetadata()
+	}
+	if gd.Series != nil {
+		return gd.Series.GetMetadata()
+	}
+	return nil
+}
+
+func (s *Helper) HasEnrichment(gd *GetData) bool {
+	return s.getMetadata(gd) != nil
+}
+
+func (s *Helper) GetEnrichedTitle(gd *GetData) string {
+	md := s.getMetadata(gd)
+	if md != nil {
+		return md.Title
+	}
+	return ""
+}
+
+func (s *Helper) HasEnrichedYear(gd *GetData) bool {
+	md := s.getMetadata(gd)
+	return md != nil && md.Year != nil && *md.Year != 0
+}
+
+func (s *Helper) GetEnrichedYear(gd *GetData) int {
+	md := s.getMetadata(gd)
+	if md != nil && md.Year != nil {
+		return int(*md.Year)
+	}
+	return 0
+}
+
+func (s *Helper) GetEnrichedPlot(gd *GetData) string {
+	md := s.getMetadata(gd)
+	if md != nil {
+		return md.Plot
+	}
+	return ""
+}
+
+func (s *Helper) HasEnrichedRating(gd *GetData) bool {
+	md := s.getMetadata(gd)
+	return md != nil && md.Rating != nil && *md.Rating > 0
+}
+
+func (s *Helper) GetEnrichedRating(gd *GetData) float64 {
+	md := s.getMetadata(gd)
+	if md != nil && md.Rating != nil {
+		return *md.Rating
+	}
+	return 0
+}
+
+func (s *Helper) HasEnrichedPoster(gd *GetData) bool {
+	md := s.getMetadata(gd)
+	return md != nil && md.PosterURL != ""
+}
+
+func (s *Helper) GetEnrichedPosterURL(gd *GetData) string {
+	md := s.getMetadata(gd)
+	if md == nil || md.VideoID == "" {
+		return ""
+	}
+	ct := "movie"
+	if gd.Series != nil {
+		ct = "series"
+	}
+	return fmt.Sprintf("/lib/%s/poster/%s/480.jpg", ct, md.VideoID)
+}
+
+func (s *Helper) IsEnrichedMovie(gd *GetData) bool {
+	return gd.Movie != nil && gd.Movie.GetMetadata() != nil
+}
+
+func (s *Helper) IsEnrichedSeries(gd *GetData) bool {
+	return gd.Series != nil && gd.Series.GetMetadata() != nil
 }

@@ -96,6 +96,8 @@ type GetData struct {
 	VaultPledgeRemoveForm *VaultPledgeRemoveForm
 	Vault                 bool
 	TorrentStatus         *TorrentStatus
+	Movie                 *models.Movie
+	Series                *models.Series
 }
 
 type ExtendedResource struct {
@@ -159,15 +161,21 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		return nil, errors.Wrap(err, "failed to get item")
 	}
 
-	if args.User.HasAuth() {
-		db := s.pg.Get()
-		if db == nil {
-			return nil, errors.New("failed to connect to database")
+	db := s.pg.Get()
+	if db != nil {
+		if args.User.HasAuth() {
+			d.Resource.InLibrary, err = models.IsInLibrary(ctx, db, args.User.ID, d.Resource.ID)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to check if resource is in-library")
+			}
 		}
-		d.Resource.InLibrary, err = models.IsInLibrary(ctx, db, args.User.ID, d.Resource.ID)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if resource is in-library")
+		// Load enrichment data
+		d.Movie, _ = models.GetMovieWithMetadataByResourceID(ctx, db, args.ID)
+		if d.Movie == nil {
+			d.Series, _ = models.GetSeriesWithMetadataByResourceID(ctx, db, args.ID)
 		}
+	} else if args.User.HasAuth() {
+		return nil, errors.New("failed to connect to database")
 	}
 	return d, nil
 }

@@ -2,10 +2,11 @@ package models
 
 import (
 	"context"
-	"github.com/go-pg/pg/v10"
-	"github.com/pkg/errors"
+	"errors"
 	"time"
 
+	"github.com/go-pg/pg/v10"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 )
 
@@ -134,12 +135,12 @@ func GetSeriesByID(ctx context.Context, db *pg.DB, uID uuid.UUID, seriesID strin
 		JoinOn("series.resource_id = l.resource_id").
 		Where("series.series_id = ?", seriesID).
 		Where("l.user_id = ?", uID).
-		Relation("Episodes").
+		Relation("Episodes.EpisodeMetadata").
 		Limit(1)
 
 	err := query.Select()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch series")
+		return nil, pkgerrors.Wrap(err, "failed to fetch series")
 	}
 
 	return &s, nil
@@ -157,14 +158,32 @@ func GetSeriesByVideoID(ctx context.Context, db *pg.DB, uID uuid.UUID, videoID s
 		Where("l.user_id = ?", uID).
 		Where("smd.video_id = ?", videoID).
 		Relation("SeriesMetadata").
-		Relation("Episodes")
+		Relation("Episodes.EpisodeMetadata")
 
 	err := query.Select()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch series list")
+		return nil, pkgerrors.Wrap(err, "failed to fetch series list")
 	}
 
 	return list, nil
+}
+
+func GetSeriesWithMetadataByResourceID(ctx context.Context, db *pg.DB, resourceID string) (*Series, error) {
+	var s Series
+	err := db.Model(&s).
+		Context(ctx).
+		Where("resource_id = ?", resourceID).
+		Relation("SeriesMetadata").
+		Relation("Episodes.EpisodeMetadata").
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func GetSeriesWithEpisodes(ctx context.Context, db *pg.DB, sID uuid.UUID) (*Series, error) {
@@ -172,7 +191,7 @@ func GetSeriesWithEpisodes(ctx context.Context, db *pg.DB, sID uuid.UUID) (*Seri
 	err := db.Model(&s).
 		Context(ctx).
 		Where("series.series_id = ?", sID).
-		Relation("Episodes").
+		Relation("Episodes.EpisodeMetadata").
 		Select()
 	if err != nil {
 		return nil, err

@@ -1,11 +1,54 @@
 {{ define "title" }}
     {{ with .Data }}
-        {{ if has . "Item" }}
+        {{ if . | hasEnrichment }}
+            {{ . | getEnrichedTitle }}{{ if . | hasEnrichedYear }} ({{ . | getEnrichedYear }}){{ end }}
+        {{ else if has . "Item" }}
             {{ .Item.PathStr }} | {{ .Resource.Name }}
         {{ else }}
             {{ .Resource.Name }}
         {{ end }}
     {{ end }}
+{{ end }}
+{{ define "description" }}
+    {{ with .Data }}{{ if . | hasEnrichment }}{{ $plot := . | getEnrichedPlot }}{{ if $plot }}
+    <meta name="description" content="{{ $plot }}">
+    {{ end }}{{ end }}{{ end }}
+{{ end }}
+{{ define "og" }}
+    <meta property="og:site_name" content="Webtor.io">
+    <meta name="twitter:card" content="summary_large_image">
+    {{ with .Data }}
+    {{ if . | hasEnrichment }}
+    <meta property="og:type" content="{{ if . | isEnrichedMovie }}video.movie{{ else }}video.tv_show{{ end }}">
+    <meta property="og:title" content="{{ . | getEnrichedTitle }}{{ if . | hasEnrichedYear }} ({{ . | getEnrichedYear }}){{ end }} | Webtor.io">
+    {{ $plot := . | getEnrichedPlot }}{{ if $plot }}<meta property="og:description" content="{{ $plot }}">{{ end }}
+    {{ if . | hasEnrichedPoster }}<meta property="og:image" content="{{ domain }}{{ . | getEnrichedPosterURL }}">{{ end }}
+    {{ else }}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ .Resource.Name }} | Webtor.io">
+    <meta property="og:image" content="{{ domain }}/assets/night/favicon.svg">
+    {{ end }}
+    {{ end }}
+{{ end }}
+{{ define "head_extra" }}
+{{ with .Data }}{{ if . | hasEnrichment }}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "{{ if . | isEnrichedMovie }}Movie{{ else }}TVSeries{{ end }}",
+    "name": "{{ . | getEnrichedTitle }}"
+    {{ if . | hasEnrichedYear }},"datePublished": "{{ . | getEnrichedYear }}"{{ end }}
+    {{ $plot := . | getEnrichedPlot }}{{ if $plot }},"description": "{{ $plot }}"{{ end }}
+    {{ if . | hasEnrichedRating }},"aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "{{ printf "%.1f" (. | getEnrichedRating) }}",
+        "bestRating": "10"
+    }{{ end }}
+    {{ if . | hasEnrichedPoster }},"image": "{{ domain }}{{ . | getEnrichedPosterURL }}"{{ end }}
+    ,"url": "{{ domain }}/{{ .Resource.ID }}"
+}
+</script>
+{{ end }}{{ end }}
 {{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-6">
@@ -25,10 +68,115 @@
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
         </svg>
-        Torrent
+        {{ if . | isEnrichedMovie }}Movie{{ else if . | isEnrichedSeries }}Series{{ else }}Torrent{{ end }}
     </div>
 
     <!-- Torrent header card -->
+    {{ if . | hasEnrichment }}
+    <div class="relative overflow-hidden rounded-2xl p-4 sm:p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+        <dialog id="share-dialog" class="modal">
+            <div class="modal-box max-w-sm bg-w-card border border-w-line">
+                <h3 class="font-bold text-lg mb-4">Share</h3>
+                <div class="flex gap-2">
+                    <input id="share-url" type="text" readonly class="input input-bordered input-sm flex-1 bg-base-200 text-w-sub" />
+                    <button type="button" class="btn btn-sm btn-soft" onclick="copyShareUrl()">Copy</button>
+                </div>
+                <div class="modal-action">
+                    <form method="dialog"><button class="btn btn-sm btn-ghost">Close</button></form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button>close</button></form>
+        </dialog>
+        <script>
+        function shareResource(){
+            var u=new URL(window.location.href);
+            u.searchParams.set('utm_source','webtor');
+            u.searchParams.set('utm_medium','share');
+            u.searchParams.set('utm_campaign','resource_share');
+            var url=u.toString();
+            if(typeof umami!=='undefined')umami.track('share-resource');
+            if(navigator.share){
+                navigator.share({title:document.title,url:url}).catch(function(){});
+            }else{
+                var d=document.getElementById('share-dialog');
+                document.getElementById('share-url').value=url;
+                d.showModal();
+            }
+        }
+        function copyShareUrl(){
+            var input=document.getElementById('share-url');
+            navigator.clipboard.writeText(input.value).then(function(){
+                if(window.toast)window.toast.success('Link copied!');
+                if(typeof umami!=='undefined')umami.track('share-copy-url');
+                document.getElementById('share-dialog').close();
+            });
+        }
+        </script>
+        <div class="relative flex gap-3 sm:gap-5">
+            <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+                    <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ . | getEnrichedTitle }}</div>
+                </div>
+                {{ if . | hasEnrichedPoster }}
+                <img src="{{ . | getEnrichedPosterURL }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                     onerror="this.remove()">
+                {{ end }}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug break-words line-clamp-2 text-balance" title="{{ . | getEnrichedTitle }}">{{ . | getEnrichedTitle }}</h1>
+                    <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200" onclick="shareResource()" aria-label="Share">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mb-3 text-sm text-w-sub">
+                    {{ if . | hasEnrichedYear }}<span>{{ . | getEnrichedYear }}</span>{{ end }}
+                    {{ if . | hasEnrichedRating }}
+                    <span class="flex items-center gap-1 text-yellow-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
+                        {{ printf "%.1f" (. | getEnrichedRating) }}
+                    </span>
+                    {{ end }}
+                    {{ if . | isEnrichedSeries }}<span class="badge badge-sm bg-w-cyan/10 text-w-cyan border-0">Series</span>{{ end }}
+                </div>
+                {{ $plot := . | getEnrichedPlot }}{{ if $plot }}
+                <p class="text-sm text-w-sub leading-relaxed mb-4 line-clamp-3">{{ $plot }}</p>
+                {{ end }}
+                <p class="text-xs text-w-muted mb-3 truncate" title="{{ .Resource.Name }}">{{ .Resource.Name }}</p>
+                {{ if .TorrentStatus }}
+                <div class="mb-3">
+                    <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
+                        <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
+                        {{ "resource/status.js" | asset }}
+                    </div>
+                </div>
+                {{ end }}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
+                        {{ if and ($.User | hasAuth) .Vault }}
+                            {{ template "vault/button" .VaultButton }}
+                        {{ end }}
+                    </div>
+                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" $ }}`}}">
+                        {{ template "library/button" $ }}
+                    </div>
+                    <div class="sm:ml-auto shrink-0">
+                        <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            .torrent
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{ else }}
+    <!-- Fallback: plain torrent header card -->
     <div class="relative overflow-hidden rounded-2xl p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
         <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         <div class="relative">
@@ -61,6 +209,7 @@
             </div>
         </div>
     </div>
+    {{ end }}
 
     {{ if $.Err }}
     <div class="progress-alert progress-alert-oneline mb-4">

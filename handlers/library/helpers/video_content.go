@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+
 	"github.com/webtor-io/web-ui/models"
 )
 
@@ -59,4 +60,35 @@ func (s *VideoContentHelper) GetOriginalPoster(m models.VideoContentWithMetadata
 
 func (s *VideoContentHelper) GetCachedPoster240(m models.VideoContentWithMetadata) string {
 	return fmt.Sprintf("/lib/%v/poster/%v/240.jpg", m.GetContentType(), m.GetMetadata().VideoID)
+}
+
+func (s *VideoContentHelper) HasEpisodeStill(ep *models.Episode) bool {
+	return ep.EpisodeMetadata != nil && ep.EpisodeMetadata.StillURL != nil && *ep.EpisodeMetadata.StillURL != ""
+}
+
+func (s *VideoContentHelper) GetCachedEpisodeStill(ep *models.Episode, width int) string {
+	if ep.EpisodeMetadata == nil || ep.Season == nil || ep.Episode == nil {
+		return ""
+	}
+	return fmt.Sprintf("/lib/episode/still/%v/%v/%v/%v.jpg", ep.EpisodeMetadata.VideoID, *ep.Season, *ep.Episode, width)
+}
+
+func (s *VideoContentHelper) GetEpisodeTitle(ep *models.Episode) string {
+	if ep.EpisodeMetadata != nil && ep.EpisodeMetadata.Title != nil && *ep.EpisodeMetadata.Title != "" {
+		return *ep.EpisodeMetadata.Title
+	}
+	if ep.Title != nil {
+		return *ep.Title
+	}
+	if ep.Episode != nil {
+		return fmt.Sprintf("Episode %d", *ep.Episode)
+	}
+	return ""
+}
+
+func (s *VideoContentHelper) GetEpisodePlot(ep *models.Episode) string {
+	if ep.EpisodeMetadata != nil && ep.EpisodeMetadata.Plot != nil {
+		return *ep.EpisodeMetadata.Plot
+	}
+	return ""
 }

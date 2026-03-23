@@ -21,7 +21,17 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		if err != nil {
 			return
 		}
-		j.Redirect("/" + j.Context.Value("respID").(string))
+		rID := j.Context.Value("respID").(string)
+		if s.enricher.HasMappers() {
+			j.InProgress("enriching content")
+			enrichErr := s.enricher.Enrich(ctx, rID, c.ApiClaims, false)
+			if enrichErr != nil {
+				j.Warn(enrichErr)
+			} else {
+				j.Done()
+			}
+		}
+		j.Redirect("/" + rID)
 		return
 	}), false)
 	return
