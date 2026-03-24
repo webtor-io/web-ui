@@ -16,7 +16,7 @@
         {{ "embed.css" | asset }}
         {{ "embed/index.js" | asset }}
     </head>
-    <body data-iframe-height class="relative">
+    <body data-iframe-height class="relative" style="background-color: black;">
         {{ if .Err }}
         <div class="progress-alert progress-alert-oneline mb-10 closeable relative bg-black/50">
             <pre>{{ .Err | log | shortErr }}</pre>

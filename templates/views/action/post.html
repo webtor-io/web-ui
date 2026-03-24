@@ -6,7 +6,7 @@
 </div>
 {{ end }}
 {{ if has .Data "Job" }}
-<form class="hidden progress-alert progress-alert-block mb-10 closeable" data-async-progress-log="{{ .Data.Job | makeJobLogURL }}" data-async-target="main">
+<form class="hidden progress-alert progress-alert-block mt-6 mb-10 closeable" data-async-progress-log="{{ .Data.Job | makeJobLogURL }}" data-async-target="main">
   <div class="log-target"></div>
 </form>
 {{ end }}

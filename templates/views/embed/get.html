@@ -13,6 +13,12 @@
             window._tier = "{{ .Claims | tierName }}"
         </script>
         <style>
+            html {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                background-color: black;
+            }
             body {
                 margin: 0;
                 padding: 0;
@@ -24,28 +30,39 @@
                 cursor: pointer;
             }
             button {
-                background-color: transparent;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(4px);
                 border: none;
+                border-radius: 50%;
                 height: 5rem;
                 width: 5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
                 cursor: pointer;
+                transition: transform 0.2s ease, background 0.2s ease;
+            }
+            button:hover {
+                transform: translate(-50%, -50%) scale(1.1);
+                background: rgba(232, 67, 147, 0.4);
             }
             button svg {
-                height: 5rem;
-                width: 5rem;
+                height: 4rem;
+                width: 4rem;
+                margin-left: 4px;
             }
         </style>
         {{ "embed/check.js" | asset }}
     </head>
     <body>
         <button type="button" title="Play" aria-label="Play" aria-pressed="false" data-umami-event="play-embed">
-			<svg xmlns="http://www.w3.org/2000/svg" id="mep_0-icon-overlay-play" class="mejs__icon-overlay-play" aria-hidden="true" focusable="false">
-				<use xlink:href="assets/mejs-controls.svg#icon-overlay-play"></use>
-			</svg>
-		</button>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" aria-hidden="true" focusable="false">
+                <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
+            </svg>
+        </button>
     </body>
 </html>

@@ -36,7 +36,6 @@ type StreamContent struct {
 	DomainSettings      *embed.DomainSettingsData
 	TranscoderSession   *api.TranscoderSession
 	SessionSeekURL      string
-	SessionDeletePath   string
 }
 
 const (
@@ -261,7 +260,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			Type: "application/vnd.apple.mpegurl",
 		}}
 		sc.SessionSeekURL = result.SeekURL
-		sc.SessionDeletePath = "/transcoder-session/" + result.Session.ID + "/delete?base=" + url.QueryEscape(result.BaseURL)
 	}
 	if exportResponse.Source.MediaFormat == ra.Video {
 		sc.VideoStreamUserData = vsud

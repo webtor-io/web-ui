@@ -35,7 +35,9 @@ async function initPlaceholder(data) {
         (await import('@open-iframe-resizer/core'));
         setHeight();
     } else {
+        document.documentElement.style.height = '100%';
         document.body.style.height = data.height;
+        document.body.setAttribute('data-fixed-height', '');
     }
     if (data.poster) {
         document.body.style.backgroundImage = 'url(' + data.poster + ')';

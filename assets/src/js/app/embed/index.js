@@ -12,7 +12,12 @@ function setHeight() {
 
 function startPlayer(progress, el) {
     window.removeEventListener('resize', setHeight);
-    document.body.style.height = 'auto';
+    if (window._embedSettings.height) {
+        document.documentElement.style.height = '100%';
+        document.body.style.height = '100%';
+    } else {
+        document.body.style.height = 'auto';
+    }
     progress.classList.add('hidden');
     el.classList.remove('hidden');
     const event = new CustomEvent('player_play');
@@ -63,6 +68,8 @@ window.addEventListener('load', async () => {
     });
     if (!window._embedSettings.height) {
         (await import('@open-iframe-resizer/core'));
+    } else {
+        document.body.setAttribute('data-fixed-height', '');
     }
     setHeight();
     window.addEventListener('resize', setHeight);

@@ -1,0 +1,439 @@
+/* Webtor Custom Player Styles */
+
+.wt-player-mount {
+    position: relative;
+    width: 100%;
+}
+
+/* Spacing above player only on main site, not in embed iframe */
+body:not([data-iframe-height]) .wt-player-mount {
+    margin-top: 1.5rem;
+}
+
+/* Main container */
+.wt-player {
+    position: relative;
+    width: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: Inter, system-ui, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    border-radius: var(--rounded-btn, 0.5rem);
+}
+
+.wt-player--video {
+    cursor: pointer;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* In embed — no border/radius */
+body[data-iframe-height] .wt-player {
+    border-radius: 0;
+}
+
+body[data-iframe-height] .wt-player--video {
+    box-shadow: none;
+}
+
+/* Embed with fixed height — fill the iframe */
+body[data-iframe-height][data-fixed-height] .wt-player--video {
+    aspect-ratio: auto;
+    width: 100%;
+    height: 100vh;
+}
+
+body[data-iframe-height][data-fixed-height] .wt-player-mount {
+    height: 100vh;
+}
+
+.wt-player--video.wt-player--fullscreen {
+    aspect-ratio: auto;
+    width: 100vw;
+    height: 100vh;
+}
+
+.wt-player--audio {
+    background: #111827;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+}
+
+/* Video element */
+.wt-player video,
+.wt-player audio {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.wt-player audio {
+    display: none;
+}
+
+/* Overlays */
+.wt-player-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.wt-player-overlay--play {
+    pointer-events: auto;
+}
+
+/* Big play button */
+.wt-player-big-play {
+    width: 5rem;
+    height: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    border-radius: 50%;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.wt-player-big-play:hover {
+    transform: scale(1.1);
+    background: rgba(232, 67, 147, 0.4);
+}
+
+.wt-player-big-play svg {
+    margin-left: 4px; /* Visual centering for play triangle */
+}
+
+/* Controls container */
+.wt-player-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    padding: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    cursor: default;
+}
+
+.wt-player--controls-visible .wt-player-controls,
+.wt-player-controls:hover {
+    opacity: 1;
+}
+
+.wt-player--audio .wt-player-controls {
+    position: relative;
+    background: transparent;
+    opacity: 1;
+    padding: 0.625rem 0 0;
+}
+
+/* Controls row */
+.wt-player-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.75rem 0.5rem;
+    min-height: 2.75rem;
+}
+
+.wt-player--audio .wt-player-controls-row {
+    padding: 0.5rem 0.75rem;
+}
+
+.wt-player-controls-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.wt-player-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* Buttons */
+.wt-player-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0.375rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: none;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.wt-player-btn:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.wt-player-btn--play {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0.375rem;
+}
+
+/* Time display */
+.wt-player-time {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.wt-player-time-sep {
+    color: rgba(255, 255, 255, 0.4);
+    margin: 0 0.125rem;
+}
+
+/* Progress bar */
+.wt-player-progress {
+    position: relative;
+    height: 1.25rem;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    touch-action: none;
+}
+
+.wt-player-progress-track {
+    position: relative;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: height 0.15s ease;
+}
+
+.wt-player-progress--active .wt-player-progress-track {
+    height: 5px;
+}
+
+.wt-player-progress--disabled {
+    pointer-events: none;
+}
+
+.wt-player-progress--disabled .wt-player-progress-thumb {
+    width: 5px;
+    height: 150%;
+    background: white;
+    animation: wt-seek-pulse 1s ease-in-out infinite;
+}
+
+@keyframes wt-seek-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.wt-player-progress-buffered {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.15);
+    transform-origin: left;
+    border-radius: 2px;
+}
+
+.wt-player-progress-played {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, #e84393, #6c5ce7);
+    transform-origin: left;
+    border-radius: 2px;
+}
+
+/* Thumb — thin vertical bar at current position */
+.wt-player-progress-thumb {
+    position: absolute;
+    top: 50%;
+    width: 3px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1px;
+    transform: translate(-50%, -50%);
+    transition: width 0.15s ease, height 0.15s ease, background 0.15s ease;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.wt-player-progress--active .wt-player-progress-thumb,
+.wt-player-progress:hover .wt-player-progress-thumb {
+    width: 5px;
+    height: 150%;
+    background: white;
+}
+
+.wt-player-progress-thumb--ghost {
+    background: rgba(255, 255, 255, 0.35) !important;
+    width: 5px !important;
+    height: 150% !important;
+    z-index: 1 !important;
+}
+
+/* Hover tooltip */
+.wt-player-progress-tooltip {
+    position: absolute;
+    bottom: 100%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 0.6875rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.25rem;
+}
+
+/* Volume control */
+.wt-player-volume {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.wt-player-volume-slider-wrap {
+    width: 0;
+    overflow: hidden;
+    transition: width 0.2s ease;
+}
+
+.wt-player-volume--expanded .wt-player-volume-slider-wrap {
+    width: 4.5rem;
+}
+
+.wt-player-volume-slider {
+    position: relative;
+    width: 4rem;
+    height: 1.5rem;
+    margin-left: 0.25rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.wt-player-volume-track {
+    position: relative;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: height 0.15s ease;
+}
+
+.wt-player-volume:hover .wt-player-volume-track,
+.wt-player-volume-slider--active .wt-player-volume-track {
+    height: 5px;
+}
+
+.wt-player-volume-level {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, #e84393, #6c5ce7);
+    transform-origin: left;
+    border-radius: 2px;
+}
+
+.wt-player-volume-thumb {
+    position: absolute;
+    top: 50%;
+    width: 3px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1px;
+    transform: translate(-50%, -50%);
+    transition: width 0.15s ease, height 0.15s ease, background 0.15s ease;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.wt-player-volume:hover .wt-player-volume-thumb,
+.wt-player-volume-slider--active .wt-player-volume-thumb {
+    width: 5px;
+    height: 150%;
+    background: white;
+}
+
+.wt-player-volume-thumb--ghost {
+    background: rgba(255, 255, 255, 0.35) !important;
+    width: 5px !important;
+    height: 150% !important;
+    z-index: 1 !important;
+}
+
+/* Cast button */
+.wt-player-cast-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 30;
+    cursor: pointer;
+}
+
+.wt-player-cast-button google-cast-launcher {
+    --connected-color: #e84393;
+    --disconnected-color: rgba(255, 255, 255, 0.7);
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+/* Subtitle text tracks */
+video::-webkit-media-text-track-display {
+    bottom: 5rem !important;
+    line-height: 1.5 !important;
+    top: auto !important;
+}
+
+video::cue {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 4px;
+    padding: 0.125rem 0.375rem;
+}
+
+/* Loading spinner animation */
+@keyframes wt-spin {
+    to { transform: rotate(360deg); }
+}
+
+.wt-player-overlay--loading svg {
+    animation: wt-spin 1s linear infinite;
+}
+
+/* Logo/download overlay (ads) */
+.wt-player-logo {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 25;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.wt-player-mount:has(.wt-player--controls-visible) .wt-player-logo {
+    opacity: 1;
+}

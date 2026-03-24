@@ -1,9 +1,7 @@
 package action
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
@@ -12,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
@@ -88,16 +85,6 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.
 		if err := vsud.UpdateSessionData(c); err != nil {
 			_ = c.Error(err)
 		}
-	})
-	r.POST("/transcoder-session/:sessionID/delete", func(c *gin.Context) {
-		baseURL := c.Query("base")
-		sessionID := c.Param("sessionID")
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-		defer cancel()
-		if err := h.api.DeleteTranscoderSession(ctx, baseURL, sessionID); err != nil {
-			log.WithError(err).Warn("failed to delete transcoder session")
-		}
-		c.Status(http.StatusOK)
 	})
 }
 
