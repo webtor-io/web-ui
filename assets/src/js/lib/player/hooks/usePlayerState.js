@@ -105,6 +105,10 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         const video = videoRef.current;
         if (!video) return;
         if (video.paused) {
+            // On iOS, video may not be loaded yet — load first if needed
+            if (video.readyState === 0) {
+                video.load();
+            }
             video.play().catch(() => {});
         } else {
             video.pause();
@@ -134,9 +138,17 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         const container = containerRef.current;
         if (!container) return;
         if (document.fullscreenElement || document.webkitFullscreenElement) {
-            (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) exit.call(document);
         } else {
-            (container.requestFullscreen || container.webkitRequestFullscreen).call(container);
+            const enter = container.requestFullscreen || container.webkitRequestFullscreen;
+            if (enter) {
+                enter.call(container);
+            } else {
+                // iOS: native video fullscreen (only option)
+                const video = container.querySelector('video');
+                if (video && video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+            }
         }
     }, [containerRef]);
 

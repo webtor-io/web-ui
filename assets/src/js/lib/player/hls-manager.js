@@ -24,11 +24,16 @@ const HLS_CONFIG = {
  */
 export { Hls };
 
+// iOS/iPadOS detection — use native HLS there (ManagedMediaSource is unreliable)
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 export function createHls(videoEl, sourceUrl, onReady) {
-    if (!Hls || !Hls.isSupported()) {
-        // Fallback: native HLS (Safari)
+    if (!Hls || !Hls.isSupported() || isIOS) {
+        // Native HLS (Safari/iOS) — browser handles m3u8 natively
         if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
             videoEl.src = sourceUrl;
+            videoEl.load();
             if (onReady) videoEl.addEventListener('loadedmetadata', onReady, { once: true });
             return null;
         }

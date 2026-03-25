@@ -5,9 +5,23 @@
     width: 100%;
 }
 
-/* Spacing above player only on main site, not in embed iframe */
-body:not([data-iframe-height]) .wt-player-mount {
+/* Spacing above player/preview only on main site, not in embed iframe */
+body:not([data-iframe-height]) .wt-player-mount,
+body:not([data-iframe-height]) .wt-preview-mount {
     margin-top: 1.5rem;
+}
+
+/* Image preview — same style as video player */
+.wt-preview-mount {
+    position: relative;
+    width: 100%;
+}
+
+.wt-preview-image {
+    width: 100%;
+    display: block;
+    border-radius: var(--rounded-btn, 0.5rem);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
 /* Main container */
@@ -48,9 +62,60 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
 }
 
 .wt-player--video.wt-player--fullscreen {
-    aspect-ratio: auto;
     width: 100vw;
     height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Mobile: larger controls, thicker progress bar */
+@media (max-width: 640px) and (pointer: coarse) {
+    .wt-player-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0.5rem;
+    }
+
+    .wt-player-btn--play {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    .wt-player-progress-track {
+        height: 5px;
+    }
+
+    .wt-player-progress {
+        padding: 0.625rem 0;
+    }
+
+    .wt-player-progress-thumb {
+        width: 5px;
+        height: 150%;
+    }
+
+    .wt-player-big-play {
+        width: 4rem;
+        height: 4rem;
+    }
+
+    .wt-player-big-play svg {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    /* Stretch player/preview to near screen edges on mobile */
+    body:not([data-iframe-height]) .wt-player-mount,
+    body:not([data-iframe-height]) .wt-preview-mount {
+        margin-left: -1.25rem;
+        margin-right: -1.25rem;
+        width: calc(100% + 2.5rem);
+    }
+
+    body:not([data-iframe-height]) .wt-player--video {
+        border-radius: 0.25rem;
+        box-shadow: none;
+    }
 }
 
 .wt-player--audio {

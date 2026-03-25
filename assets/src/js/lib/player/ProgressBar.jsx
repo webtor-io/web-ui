@@ -38,6 +38,7 @@ export function ProgressBar({ currentTime, duration, buffered, onSeek, disabled 
         function handleUp(e) {
             const pos = getPositionFromEvent(e);
             setDragging(false);
+            setHovering(false);
             if (onSeek && duration > 0) onSeek(pos * duration);
             document.removeEventListener('pointermove', handleMove);
             document.removeEventListener('pointerup', handleUp);
@@ -56,9 +57,8 @@ export function ProgressBar({ currentTime, duration, buffered, onSeek, disabled 
             ref={barRef}
             class={`wt-player-progress ${hovering || dragging ? 'wt-player-progress--active' : ''} ${disabled ? 'wt-player-progress--disabled' : ''}`}
             onPointerDown={handlePointerDown}
-            onMouseEnter={() => setHovering(true)}
+            onMouseMove={(e) => { setHovering(true); handleMouseMove(e); }}
             onMouseLeave={() => { if (!dragging) setHovering(false); }}
-            onMouseMove={handleMouseMove}
             role="slider"
             aria-label="Seek"
             aria-valuenow={Math.floor(currentTime)}

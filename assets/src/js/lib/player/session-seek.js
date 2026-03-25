@@ -34,6 +34,7 @@ function captureFrame(videoEl) {
 export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange }) {
     let isSeeking = false;
     let seekOffset = 0;
+    const isNative = !hls; // native HLS (iOS) — no HLS.js instance
 
     function getSeekOffset() {
         return seekOffset;
@@ -45,16 +46,16 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
     }
 
     async function seek(targetTime) {
-        if (isSeeking || !hls) return;
+        if (isSeeking) return;
         setIsSeeking(true);
 
         try {
             // Freeze current frame as overlay to avoid black flash
             const freezeFrame = captureFrame(videoEl);
 
-            const savedAudioTrack = hls.audioTrack;
-            const savedSubtitleTrack = hls.subtitleTrack;
-            const savedSubtitleDisplay = hls.subtitleDisplay;
+            const savedAudioTrack = hls ? hls.audioTrack : -1;
+            const savedSubtitleTrack = hls ? hls.subtitleTrack : -1;
+            const savedSubtitleDisplay = hls ? hls.subtitleDisplay : false;
 
             const separator = sessionSeekUrl.includes('?') ? '&' : '?';
             await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
@@ -62,23 +63,30 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             seekOffset = targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0;
             if (onSeekOffsetChange) onSeekOffsetChange(seekOffset);
 
-            // Reload manifest on same HLS instance
-            hls.stopLoad();
-            hls.loadSource(sourceUrl);
+            if (isNative) {
+                // Native HLS (iOS): reload source by resetting src
+                videoEl.src = sourceUrl;
+                videoEl.load();
+                videoEl.play().catch(() => {});
+            } else {
+                // HLS.js: reload manifest
+                hls.stopLoad();
+                hls.loadSource(sourceUrl);
 
-            // Restore audio track
-            if (savedAudioTrack >= 0) {
-                hls.once(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-                    hls.audioTrack = savedAudioTrack;
-                });
-            }
+                // Restore audio track
+                if (savedAudioTrack >= 0) {
+                    hls.once(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+                        hls.audioTrack = savedAudioTrack;
+                    });
+                }
 
-            // Restore subtitle track
-            if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
-                hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-                    hls.subtitleDisplay = true;
-                    hls.subtitleTrack = savedSubtitleTrack;
-                });
+                // Restore subtitle track
+                if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
+                    hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+                        hls.subtitleDisplay = true;
+                        hls.subtitleTrack = savedSubtitleTrack;
+                    });
+                }
             }
 
             // Unlock seeking and remove freeze frame when playback resumes

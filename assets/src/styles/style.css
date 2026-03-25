@@ -432,6 +432,12 @@ input:-webkit-autofill:focus {
   color: #fd79a8;
 }
 
+/* Hide empty pledge/library button containers to prevent flex gap */
+#pledge-button:not(:has(*)),
+#library-button:not(:has(*)) {
+  display: none;
+}
+
 /* Progress inside modal: hide cancel, remove bottom margin */
 .modal-box .btn-ghost.closeable-close {
   display: none !important;

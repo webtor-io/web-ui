@@ -67,10 +67,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (isSession && sessionSeekUrl) {
             // Immediately show target position on timeline
             state.setCurrentTime(time);
-            // Lazily create session seeker when HLS is ready
-            if (!sessionSeekerRef.current && hlsRef.current) {
+            // Lazily create session seeker (works with HLS.js or native HLS)
+            if (!sessionSeekerRef.current) {
                 sessionSeekerRef.current = createSessionSeeker({
-                    hls: hlsRef.current,
+                    hls: hlsRef.current, // null for native HLS (iOS)
                     videoEl,
                     sessionSeekUrl,
                     sourceUrl,
@@ -189,6 +189,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         function onCanPlay() {
             if (!dispatched) {
                 dispatched = true;
+                // Native HLS (iOS) starts at live edge — force start from beginning
+                if (!hlsRef.current && videoEl.currentTime > 1) {
+                    videoEl.currentTime = 0;
+                }
                 // Set container aspect-ratio from actual video dimensions
                 if (videoEl.videoWidth && videoEl.videoHeight) {
                     containerEl.style.aspectRatio = `${videoEl.videoWidth} / ${videoEl.videoHeight}`;
@@ -292,16 +296,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     return (
         <>
-            {/* Loading / seeking overlay */}
-            {showControls && isVideo && (state.loading || sessionSeeking) && (
+            {/* Loading spinner (only when playing + buffering, or seeking) */}
+            {showControls && isVideo && (sessionSeeking || (state.playing && state.loading)) && (
                 <div class="wt-player-overlay wt-player-overlay--loading">
                     <LoadingSpinner />
                 </div>
             )}
 
-            {/* Big play button (paused, video only — hidden during seek) */}
-            {showControls && isVideo && !state.playing && !state.loading && !sessionSeeking && (
-                <div class="wt-player-overlay wt-player-overlay--play">
+            {/* Big play button — shown when paused, regardless of loading state */}
+            {showControls && isVideo && !state.playing && !sessionSeeking && (
+                <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
                     <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); state.togglePlay(); }} aria-label="Play">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
                             <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
