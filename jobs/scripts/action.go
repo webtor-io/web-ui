@@ -261,8 +261,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		}}
 		sc.SessionSeekURL = result.SeekURL
 	}
+	sc.VideoStreamUserData = vsud
 	if exportResponse.Source.MediaFormat == ra.Video {
-		sc.VideoStreamUserData = vsud
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
 			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
 				j.InProgress("loading OpenSubtitles")
