@@ -98,6 +98,7 @@ type GetData struct {
 	TorrentStatus         *TorrentStatus
 	Movie                 *models.Movie
 	Series                *models.Series
+	WatchedPaths          map[string]bool
 }
 
 type ExtendedResource struct {
@@ -173,6 +174,10 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		d.Movie, _ = models.GetMovieWithMetadataByResourceID(ctx, db, args.ID)
 		if d.Movie == nil {
 			d.Series, _ = models.GetSeriesWithMetadataByResourceID(ctx, db, args.ID)
+		}
+		// Load watch history for file list
+		if args.User.HasAuth() {
+			d.WatchedPaths, _ = models.GetWatchedPaths(ctx, db, args.User.ID, args.ID)
 		}
 	} else if args.User.HasAuth() {
 		return nil, errors.New("failed to connect to database")

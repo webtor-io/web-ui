@@ -12,7 +12,12 @@ av( async function() {
     const modal = urlParams.get('modal');
     const purge = urlParams.get('purge');
     if (!action) return;
-    const form = document.querySelector('form.' + action);
+    let form = document.querySelector('form.' + action);
+    // "stream" is a shorthand — try stream-video first, then stream-audio
+    if (!form && action === 'stream') {
+        form = document.querySelector('form.stream-video') || document.querySelector('form.stream-audio');
+    }
+    if (!form) return;
     if (purge) {
         const purgeInput = document.createElement('input');
         purgeInput.setAttribute('type', 'hidden');

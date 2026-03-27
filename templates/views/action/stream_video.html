@@ -4,6 +4,8 @@
     <video class="player"
            crossorigin="anonymous"
            preload="{{ .ExportTag.Preload }}"
+           data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
+           data-path="{{ .Item.PathStr }}"
            {{ if .ExternalData.Poster }}poster="{{ .ExternalData.Poster }}"
            {{ else if .ExportTag.Poster }}poster="{{ .ExportTag.Poster }}" {{ end }}
            {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"

@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { useRef, useState, useEffect, useCallback } from 'preact/hooks';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useHls } from './hooks/useHls';
+import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { Controls } from './Controls';
 import { LoadingSpinner } from './icons';
@@ -30,6 +31,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const sessionDeletePath = videoEl.dataset.sessionDeletePath;
     const isSession = !!sessionId;
     const poster = videoEl.getAttribute('poster');
+    const resourceID = videoEl.dataset.resourceId;
+    const path = videoEl.dataset.path;
 
     // Source URL from first <source> element
     const sourceEl = videoEl.querySelector('source');
@@ -60,6 +63,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl);
+
+    // Watch history hook (position tracking + resume)
+    const resumePosition = useWatchHistory(videoRef, {
+        resourceID, path,
+        currentTime: state.currentTime,
+        duration: state.duration,
+        playing: state.playing,
+    });
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -203,6 +214,31 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         videoEl.addEventListener('canplay', onCanPlay);
         return () => videoEl.removeEventListener('canplay', onCanPlay);
     }, []);
+
+    // Resume from saved position
+    useEffect(() => {
+        if (resumePosition === null || resumePosition <= 0) return;
+        // Wait for canplay before seeking
+        function doResume() {
+            if (isSession && sessionSeekUrl) {
+                handleSeek(resumePosition);
+            } else {
+                const video = videoRef.current;
+                if (video) video.currentTime = resumePosition;
+            }
+        }
+        const video = videoRef.current;
+        if (video && video.readyState >= 2) {
+            doResume();
+        } else if (video) {
+            function onReady() {
+                video.removeEventListener('canplay', onReady);
+                doResume();
+            }
+            video.addEventListener('canplay', onReady);
+            return () => video.removeEventListener('canplay', onReady);
+        }
+    }, [resumePosition]);
 
     // Chromecast integration
     useEffect(() => {

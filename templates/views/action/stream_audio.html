@@ -3,6 +3,8 @@
 <audio class="player"
        crossorigin="anonymous"
        preload="{{ .ExportTag.Preload }}"
+       data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
+       data-path="{{ .Item.PathStr }}"
        {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
        {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
        {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}

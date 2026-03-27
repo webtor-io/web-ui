@@ -1,0 +1,39 @@
+{{ define "continue_watching" }}
+{{ if .ContinueWatching }}
+<div class="mt-12 relative z-10 w-full" id="continue-watching-ribbon">
+    <div class="max-w-[1100px] mx-auto overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-5 gap-3">
+            <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Continue Watching
+            </div>
+        </div>
+
+        <!-- Card Ribbon -->
+        <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none">
+            {{ range .ContinueWatching }}
+            <a href="/{{ .ResourceID }}?file={{ .Path }}#action=stream" data-async-target="main" data-umami-event="continue-watching-click" class="shrink-0 w-[140px] group cursor-pointer">
+                <div class="relative aspect-[2/3] rounded-xl overflow-hidden border border-w-line group-hover:border-w-pink/30 group-hover:shadow-[0_0_20px_rgba(232,67,147,0.1)] transition-all duration-300">
+                    {{ if .PosterURL }}
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                         src="{{ .PosterURL }}" alt="{{ .DisplayName }}" loading="lazy" />
+                    {{ else }}
+                    <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 flex items-center justify-center">
+                        <div class="text-center font-bold text-sm p-2 text-w-purpleL/60 line-clamp-3">{{ .DisplayName }}</div>
+                    </div>
+                    {{ end }}
+                    <!-- Progress bar -->
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
+                        <div class="h-full bg-w-pink transition-all" style="width: {{ .Progress }}%"></div>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm font-medium text-w-text truncate group-hover:text-w-pinkL transition-colors">{{ .DisplayName }}</p>
+                <p class="text-xs text-w-muted">{{ .UpdatedAt | timeAgo }}</p>
+            </a>
+            {{ end }}
+        </div>
+    </div>
+</div>
+{{ end }}
+{{ end }}

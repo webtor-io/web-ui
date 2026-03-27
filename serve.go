@@ -32,6 +32,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
+	wh "github.com/webtor-io/web-ui/handlers/watch_history"
 	"github.com/webtor-io/web-ui/handlers/webdav"
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
@@ -290,7 +291,10 @@ func serve(c *cli.Context) error {
 	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)
 
 	// Setting IndexHandler
-	wi.RegisterHandler(r, tm)
+	wi.RegisterHandler(r, tm, pg)
+
+	// Setting WatchHistoryHandler
+	wh.RegisterHandler(r, pg)
 
 	// Setting SitemapHandler
 	sitemap.RegisterHandler(c, r)
