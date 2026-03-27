@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/jobs/scripts"
+	"github.com/webtor-io/web-ui/models"
 	sv "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -72,10 +73,11 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 }
 
 type PostData struct {
-	Job         *job.Job
-	Args        *PostArgs
-	Instruction string
-	Tool        *common.Tool
+	Job              *job.Job
+	Args             *PostArgs
+	Instruction      string
+	Tool             *common.Tool
+	ContinueWatching []*models.WatchHistory
 }
 
 func (s *Handler) post(c *gin.Context) {
