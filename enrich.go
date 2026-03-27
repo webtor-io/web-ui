@@ -96,7 +96,7 @@ func enrich(c *cli.Context) error {
 		return err
 	}
 	for _, resource := range resources {
-		err = en.Enrich(ctx, resource.ResourceID, &api.Claims{}, force)
+		err = en.Enrich(ctx, resource.ResourceID, &api.Claims{}, force, "")
 		if err != nil {
 			return err
 		}

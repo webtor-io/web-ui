@@ -2,13 +2,15 @@ package enrich
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	om "github.com/webtor-io/web-ui/models/omdb"
 	"github.com/webtor-io/web-ui/services/omdb"
-	"strconv"
 )
 
 type OMDB struct {
@@ -147,4 +149,48 @@ func (s *OMDB) Map(ctx context.Context, m *models.VideoContent, mt models.Conten
 	return NewOmdbMetadata(omdbInfo).MakeVideoMetadata(), nil
 }
 
+func (s *OMDB) MapByID(ctx context.Context, videoID string, ct models.ContentType, force bool) (*models.VideoMetadata, error) {
+	if !strings.HasPrefix(videoID, "tt") {
+		return nil, nil
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+
+	if !force {
+		mi, err := om.GetInfoByID(ctx, db, videoID)
+		if err != nil {
+			return nil, err
+		}
+		if mi != nil {
+			return NewOmdbMetadata(mi).MakeVideoMetadata(), nil
+		}
+	}
+
+	omData, err := s.api.GetByIMDBID(ctx, videoID)
+	if err != nil {
+		return nil, err
+	}
+	if omData == nil {
+		return nil, nil
+	}
+
+	otype := om.OmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		otype = om.OmdbTypeSeries
+	}
+
+	omdbInfo, err := om.UpsertInfo(ctx, db, omData.ImdbID, otype, omData.Raw)
+	if err != nil {
+		return nil, err
+	}
+	if omdbInfo == nil {
+		return nil, nil
+	}
+
+	return NewOmdbMetadata(omdbInfo).MakeVideoMetadata(), nil
+}
+
 var _ MetadataMapper = (*OMDB)(nil)
+var _ DirectMapper = (*OMDB)(nil)

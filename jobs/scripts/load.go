@@ -19,8 +19,9 @@ import (
 )
 
 type LoadArgs struct {
-	Query string
-	File  []byte
+	Query       string
+	File        []byte
+	HintVideoID string
 }
 
 type LoadScript struct {

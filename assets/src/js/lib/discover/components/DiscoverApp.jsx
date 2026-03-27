@@ -269,9 +269,10 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const loadStreams = useCallback(async (type, id, item, modalExtra = {}) => {
         const title = item.name || item.title;
         const poster = item.poster;
+        const metaId = id.split(':')[0];
         const addons = client.getStreamAddons();
         if (!addons.length) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, streams: [], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, streams: [], ...modalExtra } });
             return;
         }
 
@@ -281,7 +282,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             return { name: a.manifest.name || host, host, status: 'fetching' };
         });
 
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, addons: [...addonStatuses], ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, addons: [...addonStatuses], ...modalExtra } });
 
         const allStreams = [];
         const promises = addons.map(async (addon, i) => {
@@ -292,11 +293,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             } catch (e) {
                 addonStatuses[i] = { ...addonStatuses[i], status: 'error' };
             }
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, addons: [...addonStatuses], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, addons: [...addonStatuses], ...modalExtra } });
         });
 
         await Promise.allSettled(promises);
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, streams: allStreams, ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, streams: allStreams, ...modalExtra } });
         window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length });
     }, [client]);
 
@@ -410,6 +411,8 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             const formData = new FormData();
             formData.append('resource', infoHash);
             formData.append('_csrf', window._CSRF);
+            const metaId = state.modal?.metaId;
+            if (metaId) formData.append('hint_video_id', metaId);
             const response = await fetch('/', {
                 method: 'POST',
                 body: formData,

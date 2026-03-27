@@ -3,6 +3,9 @@ package enrich
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
@@ -100,4 +103,42 @@ func (s *KinopoiskUnofficial) Map(ctx context.Context, m *models.VideoContent, c
 	return s.makeVideoMetadata(mi), nil
 }
 
+func (s *KinopoiskUnofficial) MapByID(ctx context.Context, videoID string, ct models.ContentType, force bool) (*models.VideoMetadata, error) {
+	if !strings.HasPrefix(videoID, "kp") {
+		return nil, nil
+	}
+	kpID, err := strconv.Atoi(strings.TrimPrefix(videoID, "kp"))
+	if err != nil {
+		return nil, nil
+	}
+
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+
+	if !force {
+		mi, err := km.GetInfoByID(ctx, db, kpID)
+		if err != nil {
+			return nil, err
+		}
+		if mi != nil {
+			return s.makeVideoMetadata(mi), nil
+		}
+	}
+
+	data, err := s.api.GetByKpID(ctx, kpID)
+	if err != nil {
+		return nil, err
+	}
+
+	mi, err := km.UpsertInfo(ctx, db, data.KinopoiskID, data.Raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.makeVideoMetadata(mi), nil
+}
+
 var _ MetadataMapper = (*KinopoiskUnofficial)(nil)
+var _ DirectMapper = (*KinopoiskUnofficial)(nil)

@@ -191,4 +191,74 @@ func (s *TMDB) GetTmdbID(ctx context.Context, videoID string, ct models.ContentT
 	return 0, nil
 }
 
+func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentType, force bool) (*models.VideoMetadata, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+
+	ttype := tm.TmdbTypeMovie
+	searchType := tmdb.TmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		ttype = tm.TmdbTypeSeries
+		searchType = tmdb.TmdbTypeTV
+	}
+
+	var tmdbID int
+
+	if strings.HasPrefix(videoID, "tt") {
+		var err error
+		tmdbID, err = s.GetTmdbID(ctx, videoID, ct)
+		if err != nil {
+			return nil, err
+		}
+		if tmdbID == 0 {
+			return nil, nil
+		}
+	} else if strings.HasPrefix(videoID, "tmdb") {
+		id, err := strconv.Atoi(strings.TrimPrefix(videoID, "tmdb"))
+		if err != nil {
+			return nil, nil
+		}
+		tmdbID = id
+	} else {
+		return nil, nil
+	}
+
+	if !force {
+		mi, err := tm.GetInfoByID(ctx, db, tmdbID)
+		if err != nil {
+			return nil, err
+		}
+		if mi != nil {
+			return s.makeVideoMetadata(mi), nil
+		}
+	}
+
+	details, err := s.api.GetDetails(ctx, tmdbID, searchType)
+	if err != nil {
+		return nil, err
+	}
+	if details == nil {
+		return nil, nil
+	}
+
+	if _, ok := details["imdb_id"]; !ok {
+		extIDs, err := s.api.GetExternalIDs(ctx, tmdbID, searchType)
+		if err == nil && extIDs != nil {
+			if imdbID, ok := extIDs["imdb_id"].(string); ok && imdbID != "" {
+				details["imdb_id"] = imdbID
+			}
+		}
+	}
+
+	info, err := tm.UpsertInfo(ctx, db, tmdbID, ttype, details)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.makeVideoMetadata(info), nil
+}
+
 var _ MetadataMapper = (*TMDB)(nil)
+var _ DirectMapper = (*TMDB)(nil)

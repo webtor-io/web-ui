@@ -154,3 +154,51 @@ func (api *Api) SearchByTitleAndYear(ctx context.Context, title string, year *in
 		Raw:    raw,
 	}, nil
 }
+
+func (api *Api) GetByIMDBID(ctx context.Context, imdbID string) (*OmdbResponse, error) {
+	reqURL := fmt.Sprintf("%s/", api.url)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "create request")
+	}
+
+	q := req.URL.Query()
+	q.Set("i", imdbID)
+	q.Set("plot", "full")
+	req.URL.RawQuery = q.Encode()
+
+	req, err = api.prepareRequest(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "prepare request")
+	}
+
+	resp, err := api.cl.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "request failed")
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, errors.Wrapf(err, "decode response for imdb id %v", imdbID)
+	}
+
+	if r, ok := raw["Response"].(string); !ok || r != "True" {
+		if strings.Contains(fmt.Sprintf("%s", raw["Error"]), "not found") {
+			return nil, nil
+		}
+		return nil, errors.Errorf("omdb error: %v", raw["Error"])
+	}
+
+	id, _ := raw["imdbID"].(string)
+	tpe, _ := raw["Type"].(string)
+
+	return &OmdbResponse{
+		ImdbID: id,
+		Type:   OmdbType(tpe),
+		Raw:    raw,
+	}, nil
+}

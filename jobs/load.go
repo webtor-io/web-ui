@@ -24,7 +24,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		rID := j.Context.Value("respID").(string)
 		if s.enricher.HasMappers() {
 			j.InProgress("enriching content")
-			enrichErr := s.enricher.Enrich(ctx, rID, c.ApiClaims, false)
+			enrichErr := s.enricher.Enrich(ctx, rID, c.ApiClaims, false, args.HintVideoID)
 			if enrichErr != nil {
 				j.Warn(enrichErr)
 			} else {

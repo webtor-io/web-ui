@@ -23,7 +23,7 @@ func NewEnrichScript(enricher *enrich.Enricher, c *web.Context, rID string) *Enr
 }
 
 func (s *EnrichScript) Run(ctx context.Context, j *job.Job) (err error) {
-	return s.enricher.Enrich(ctx, s.rID, s.c.ApiClaims, false)
+	return s.enricher.Enrich(ctx, s.rID, s.c.ApiClaims, false, "")
 }
 
 func Enrich(enricher *enrich.Enricher, c *web.Context, rID string) (job.Runnable, string) {

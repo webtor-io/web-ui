@@ -22,6 +22,7 @@ type PostArgs struct {
 	File        []byte
 	Query       string
 	Instruction string
+	HintVideoID string
 	Claims      *api.Claims
 }
 
@@ -59,11 +60,14 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 		}
 	}
 
+	hintVideoID, _ := c.GetPostForm("hint_video_id")
+
 	return &PostArgs{
 		File:        fd,
 		Query:       query,
 		Claims:      api.GetClaimsFromContext(c),
 		Instruction: instruction,
+		HintVideoID: hintVideoID,
 	}, nil
 }
 
@@ -87,8 +91,9 @@ func (s *Handler) post(c *gin.Context) {
 	}
 
 	loadJob, err := s.jobs.Load(web.NewContext(c), &scripts.LoadArgs{
-		Query: args.Query,
-		File:  args.File,
+		Query:       args.Query,
+		File:        args.File,
+		HintVideoID: args.HintVideoID,
 	})
 	if err != nil {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))

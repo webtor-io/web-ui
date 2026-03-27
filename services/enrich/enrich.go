@@ -29,6 +29,10 @@ type MetadataMapper interface {
 	GetName() string
 }
 
+type DirectMapper interface {
+	MapByID(ctx context.Context, videoID string, ct models.ContentType, force bool) (*models.VideoMetadata, error)
+}
+
 type EpisodeMapper interface {
 	MapEpisodes(ctx context.Context, videoID string, season int, force bool) ([]*models.EpisodeMetadata, error)
 	GetName() string
@@ -92,7 +96,7 @@ func parseItem(item *ra.ListItem) (ti *ptn.TorrentInfo, err error) {
 	return ti, nil
 }
 
-func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool) (*models.MediaInfoMediaType, error) {
+func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool, hintVideoID string) (*models.MediaInfoMediaType, error) {
 
 	items, err := s.retrieveTorrentItems(ctx, hash, claims)
 
@@ -166,7 +170,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	}
 
 	for _, m := range movies {
-		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force)
+		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force, hintVideoID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for movie %+v hash %s", m, hash)
 		}
@@ -193,7 +197,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	for _, ser := range seriesSlice {
 		var md *models.VideoMetadata
 		if mt != models.MediaInfoMediaTypeSeriesCompilation && mt != models.MediaInfoMediaTypeSeriesSplitScenes {
-			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force)
+			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID)
 		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for hash %s", hash)
@@ -223,8 +227,11 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	return &mt, nil
 }
 
-func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool) error {
+func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
 	log.Infof("enriching media info for hash %s", hash)
+	if hintVideoID != "" {
+		log.Infof("enrichment hint video id: %s", hintVideoID)
+	}
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("db is nil")
@@ -239,7 +246,7 @@ func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, 
 	}
 	log.Infof("start processing media info %+v", mi)
 
-	mt, err := s.enrichMediaInfo(ctx, db, hash, claims, force)
+	mt, err := s.enrichMediaInfo(ctx, db, hash, claims, force, hintVideoID)
 	if err != nil {
 		if strings.Contains(err.Error(), "PermissionDenied") {
 			mi.Status = int16(models.MediaInfoStatusForbidden)
@@ -336,7 +343,23 @@ func (s *Enricher) mapEpisodeMetadata(ctx context.Context, videoID string, seaso
 	return nil, nil
 }
 
-func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool) (md *models.VideoMetadata, err error) {
+func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, hintVideoID string) (md *models.VideoMetadata, err error) {
+	if hintVideoID != "" {
+		for _, m := range s.mappers {
+			if dm, ok := m.(DirectMapper); ok {
+				md, err = dm.MapByID(ctx, hintVideoID, t, f)
+				if err != nil {
+					log.WithError(err).Warnf("direct mapper %q failed for hint %v", m.GetName(), hintVideoID)
+					continue
+				}
+				if md != nil {
+					log.Infof("direct mapper %q resolved hint %v", m.GetName(), hintVideoID)
+					return
+				}
+			}
+		}
+		log.Infof("no mapper handled hint %v, falling back to title+year", hintVideoID)
+	}
 	for _, m := range s.mappers {
 		md, err = m.Map(ctx, vc, t, f)
 		if err != nil {
