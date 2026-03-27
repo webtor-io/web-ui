@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -129,9 +130,11 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 }
 
 type enrichedMeta struct {
-	ResourceID string `pg:"resource_id"`
-	Title      string `pg:"title"`
-	PosterURL  string `pg:"poster_url"`
+	ResourceID  string      `pg:"resource_id"`
+	Title       string      `pg:"title"`
+	PosterURL   string      `pg:"poster_url"`
+	VideoID     string      `pg:"video_id"`
+	ContentType ContentType `pg:"-"`
 }
 
 // enrichWatchHistory fills Title and PosterURL from movie/series data.
@@ -143,12 +146,14 @@ func enrichWatchHistory(ctx context.Context, db *pg.DB, list []*WatchHistory, re
 		ColumnExpr("movie.resource_id").
 		ColumnExpr("COALESCE(mmd.title, movie.title) AS title").
 		ColumnExpr("mmd.poster_url").
+		ColumnExpr("mmd.video_id").
 		Join("LEFT JOIN movie_metadata AS mmd ON mmd.movie_metadata_id = movie.movie_metadata_id").
 		Where("movie.resource_id IN (?)", pg.In(resourceIDs)).
 		Select(&movies)
 
 	metaMap := make(map[string]*enrichedMeta)
 	for i := range movies {
+		movies[i].ContentType = ContentTypeMovie
 		metaMap[movies[i].ResourceID] = &movies[i]
 	}
 
@@ -158,21 +163,25 @@ func enrichWatchHistory(ctx context.Context, db *pg.DB, list []*WatchHistory, re
 		ColumnExpr("series.resource_id").
 		ColumnExpr("COALESCE(smd.title, series.title) AS title").
 		ColumnExpr("smd.poster_url").
+		ColumnExpr("smd.video_id").
 		Join("LEFT JOIN series_metadata AS smd ON smd.series_metadata_id = series.series_metadata_id").
 		Where("series.resource_id IN (?)", pg.In(resourceIDs)).
 		Select(&series)
 
 	for i := range series {
 		if _, ok := metaMap[series[i].ResourceID]; !ok {
+			series[i].ContentType = ContentTypeSeries
 			metaMap[series[i].ResourceID] = &series[i]
 		}
 	}
 
-	// Apply to list
+	// Apply to list — convert poster URLs to proxied URLs via library endpoint
 	for _, wh := range list {
 		if m, ok := metaMap[wh.ResourceID]; ok {
 			wh.Title = m.Title
-			wh.PosterURL = m.PosterURL
+			if m.PosterURL != "" && m.VideoID != "" {
+				wh.PosterURL = fmt.Sprintf("/lib/%s/poster/%s/240.jpg", m.ContentType, m.VideoID)
+			}
 		}
 	}
 }
