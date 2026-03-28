@@ -72,16 +72,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         playing: state.playing,
     });
 
-    // Hide video until resume position check completes to avoid flash from beginning
+    // Hide video until resume position check completes to avoid flash from beginning.
+    // Use a black overlay instead of opacity:0 on the video element — iOS Safari
+    // has rendering bugs with invisible <video> elements that break seeking.
     const [resumeApplied, setResumeApplied] = useState(false);
-
-    useEffect(() => {
-        if (!resumeApplied) {
-            videoEl.style.opacity = '0';
-        } else {
-            videoEl.style.opacity = '';
-        }
-    }, [resumeApplied]);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -349,6 +343,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     return (
         <>
+            {/* Black cover while resume position is being fetched — prevents flash from beginning */}
+            {!resumeApplied && (
+                <div class="wt-player-overlay" style="background:#000;z-index:50" />
+            )}
+
             {/* Loading spinner (only when playing + buffering, or seeking) */}
             {showControls && isVideo && (sessionSeeking || (state.playing && state.loading)) && (
                 <div class="wt-player-overlay wt-player-overlay--loading">
