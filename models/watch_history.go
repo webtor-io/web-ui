@@ -105,6 +105,105 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 		return nil, errors.Wrap(err, "failed to fetch recently watched")
 	}
 
+	// Track resource IDs already found (in-progress episodes)
+	seen := make(map[string]bool, len(list))
+	for _, wh := range list {
+		seen[wh.ResourceID] = true
+	}
+
+	// Find series where all started episodes are fully watched but next episode exists.
+	// 1. Get all resources with at least one fully watched episode
+	var watchedResources []struct {
+		ResourceID string    `pg:"resource_id"`
+		UpdatedAt  time.Time `pg:"updated_at"`
+	}
+	_ = db.ModelContext(ctx, (*WatchHistory)(nil)).
+		ColumnExpr("resource_id, MAX(updated_at) AS updated_at").
+		Where("user_id = ?", userID).
+		Where("watched = true").
+		Group("resource_id").
+		Select(&watchedResources)
+
+	// Filter to resources not already in the in-progress list
+	var candidateIDs []string
+	updatedMap := make(map[string]time.Time)
+	for _, wr := range watchedResources {
+		if !seen[wr.ResourceID] {
+			candidateIDs = append(candidateIDs, wr.ResourceID)
+			updatedMap[wr.ResourceID] = wr.UpdatedAt
+		}
+	}
+
+	if len(candidateIDs) > 0 {
+		// 2. Load episodes for candidate resources
+		var episodes []*Episode
+		_ = db.ModelContext(ctx, &episodes).
+			Where("resource_id IN (?)", pg.In(candidateIDs)).
+			Where("path IS NOT NULL").
+			OrderExpr("resource_id, season NULLS LAST, episode NULLS LAST").
+			Select()
+
+		// 3. Load watched paths for candidates
+		var watchedPaths []WatchHistory
+		_ = db.ModelContext(ctx, &watchedPaths).
+			Column("resource_id", "path", "watched").
+			Where("user_id = ?", userID).
+			Where("resource_id IN (?)", pg.In(candidateIDs)).
+			Select()
+
+		watchedSet := make(map[string]bool) // "resourceID:path" -> watched
+		for _, wp := range watchedPaths {
+			watchedSet[wp.ResourceID+":"+wp.Path] = wp.Watched
+		}
+
+		// 4. For each resource find the next episode after the last watched one.
+		// Group episodes by resource, find index of last watched, take the next one.
+		epsByResource := make(map[string][]*Episode)
+		for _, ep := range episodes {
+			epsByResource[ep.ResourceID] = append(epsByResource[ep.ResourceID], ep)
+		}
+
+		var nextResourceIDs []string
+		for resourceID, eps := range epsByResource {
+			// Find the last watched episode index (by season/episode order)
+			lastWatchedIdx := -1
+			for i, ep := range eps {
+				key := resourceID + ":" + *ep.Path
+				if watched, ok := watchedSet[key]; ok && watched {
+					lastWatchedIdx = i
+				}
+			}
+			if lastWatchedIdx < 0 || lastWatchedIdx >= len(eps)-1 {
+				continue // no watched episodes or last episode already watched
+			}
+			nextEp := eps[lastWatchedIdx+1]
+			list = append(list, &WatchHistory{
+				UserID:     userID,
+				ResourceID: nextEp.ResourceID,
+				Path:       *nextEp.Path,
+				UpdatedAt:  updatedMap[nextEp.ResourceID],
+			})
+			nextResourceIDs = append(nextResourceIDs, nextEp.ResourceID)
+		}
+
+		// Load Torrent relation for next-episode entries
+		if len(nextResourceIDs) > 0 {
+			var torrents []*TorrentResource
+			_ = db.ModelContext(ctx, &torrents).
+				Where("resource_id IN (?)", pg.In(nextResourceIDs)).
+				Select()
+			tMap := make(map[string]*TorrentResource, len(torrents))
+			for _, t := range torrents {
+				tMap[t.ResourceID] = t
+			}
+			for _, wh := range list {
+				if wh.Torrent == nil {
+					wh.Torrent = tMap[wh.ResourceID]
+				}
+			}
+		}
+	}
+
 	if len(list) == 0 {
 		return nil, nil
 	}
