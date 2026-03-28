@@ -149,7 +149,8 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     z-index: 10;
 }
 
-.wt-player-overlay--play {
+.wt-player-overlay--play,
+.wt-resume-prompt {
     pointer-events: auto;
 }
 
@@ -487,6 +488,46 @@ video::cue {
 
 .wt-player-overlay--loading svg {
     animation: wt-spin 1s linear infinite;
+}
+
+/* Resume prompt buttons */
+.wt-resume-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: opacity 0.15s, transform 0.15s;
+}
+.wt-resume-btn:active {
+    transform: scale(0.97);
+}
+.wt-resume-btn--primary {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.wt-resume-btn--primary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.wt-resume-btn--ghost {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 400;
+    border: none;
+}
+.wt-resume-btn--ghost:hover {
+    color: rgba(255, 255, 255, 0.8);
 }
 
 /* Logo/download overlay (ads) */

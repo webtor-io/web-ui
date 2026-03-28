@@ -10,7 +10,7 @@ const MIN_POSITION_CHANGE = 5; // minimum seconds change before sending update
  * - On pause/visibilitychange/beforeunload: sends current position
  * - Returns resumePosition (null until fetched)
  */
-export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing }) {
+export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing, paused }) {
     const [resumePosition, setResumePosition] = useState(null);
     const [resumeReady, setResumeReady] = useState(false);
     const lastSentPositionRef = useRef(0);
@@ -18,11 +18,13 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
     const currentTimeRef = useRef(0);
     const durationRef = useRef(0);
     const playingRef = useRef(false);
+    const pausedRef = useRef(false);
 
     // Keep refs in sync
     currentTimeRef.current = currentTime;
     durationRef.current = duration;
     playingRef.current = playing;
+    pausedRef.current = !!paused;
 
     // Fetch saved position on mount
     useEffect(() => {
@@ -99,7 +101,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         if (!resourceID || !path) return;
 
         const interval = setInterval(() => {
-            if (playingRef.current && durationRef.current > 0) {
+            if (playingRef.current && durationRef.current > 0 && !pausedRef.current) {
                 sendPosition(currentTimeRef.current, durationRef.current);
             }
         }, SAVE_INTERVAL);
@@ -109,7 +111,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
 
     // Save on pause
     useEffect(() => {
-        if (!playing && duration > 0 && currentTime > 0) {
+        if (!playing && duration > 0 && currentTime > 0 && !paused) {
             sendPosition(currentTime, duration);
         }
     }, [playing]);
@@ -119,13 +121,13 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         if (!resourceID || !path) return;
 
         const onVisibilityChange = () => {
-            if (document.hidden && playingRef.current && durationRef.current > 0) {
+            if (document.hidden && playingRef.current && durationRef.current > 0 && !pausedRef.current) {
                 sendPosition(currentTimeRef.current, durationRef.current);
             }
         };
 
         const onBeforeUnload = () => {
-            sendBeaconPosition();
+            if (!pausedRef.current) sendBeaconPosition();
         };
 
         document.addEventListener('visibilitychange', onVisibilityChange);
@@ -137,5 +139,19 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         };
     }, [resourceID, path, sendPosition, sendBeaconPosition]);
 
-    return { resumePosition, resumeReady };
+    // Force-send position (bypasses debounce and paused flag) — use after seek
+    const forceSendPosition = useCallback((pos, dur) => {
+        if (!resourceID || !path || dur <= 0) return;
+        lastSentPositionRef.current = pos;
+        lastSentTimeRef.current = Date.now();
+        const body = JSON.stringify({ resource_id: resourceID, path, position: pos, duration: dur });
+        fetch('/watch/position', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window._CSRF || '' },
+            body,
+            keepalive: true,
+        }).catch(() => {});
+    }, [resourceID, path]);
+
+    return { resumePosition, resumeReady, forceSendPosition };
 }

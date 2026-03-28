@@ -64,18 +64,18 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl);
 
-    // Watch history hook (position tracking + resume)
-    const { resumePosition, resumeReady } = useWatchHistory(videoRef, {
+    // Resume prompt state — must be declared before useWatchHistory which reads it.
+    const [showResumePrompt, setShowResumePrompt] = useState(false);
+
+    // Watch history hook (position tracking + resume).
+    // `paused` prevents overwriting saved position while resume prompt is open.
+    const { resumePosition, resumeReady, forceSendPosition } = useWatchHistory(videoRef, {
         resourceID, path,
         currentTime: state.currentTime,
         duration: state.duration,
         playing: state.playing,
+        paused: showResumePrompt,
     });
-
-    // Hide video until resume position check completes to avoid flash from beginning.
-    // Use a black overlay instead of opacity:0 on the video element — iOS Safari
-    // has rendering bugs with invisible <video> elements that break seeking.
-    const [resumeApplied, setResumeApplied] = useState(false);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -220,36 +220,36 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         return () => videoEl.removeEventListener('canplay', onCanPlay);
     }, []);
 
-    // Once resume check completes: seek if needed, reveal video
+    // Once resume check completes: show resume prompt if there's a saved position
     useEffect(() => {
         if (!resumeReady) return;
-        if (!resumePosition || resumePosition <= 0) {
-            setResumeApplied(true);
-            return;
-        }
-        const video = videoRef.current;
-        if (!video) return;
-
-        function doSeek() {
-            if (isSession && sessionSeekUrl) {
-                handleSeek(resumePosition);
-            } else {
-                video.currentTime = resumePosition;
-            }
-            setResumeApplied(true);
-        }
-
-        if (video.readyState >= 2) {
-            doSeek();
-        } else {
-            function onReady() {
-                video.removeEventListener('canplay', onReady);
-                doSeek();
-            }
-            video.addEventListener('canplay', onReady);
-            return () => video.removeEventListener('canplay', onReady);
+        if (resumePosition && resumePosition > 0) {
+            setShowResumePrompt(true);
         }
     }, [resumeReady]);
+
+    // Handle resume choice
+    const handleResume = useCallback(() => {
+        setShowResumePrompt(false);
+        const video = videoRef.current;
+        if (!video) return;
+        if (isSession && sessionSeekUrl) {
+            handleSeek(resumePosition);
+        } else {
+            video.currentTime = resumePosition;
+        }
+        // Save resumed position immediately
+        const dur = duration > 0 ? duration : (video.duration || 0);
+        if (dur > 0) forceSendPosition(resumePosition, dur);
+    }, [resumePosition, isSession, sessionSeekUrl, handleSeek, duration, forceSendPosition]);
+
+    const handleStartOver = useCallback(() => {
+        setShowResumePrompt(false);
+        // Save position 0 immediately
+        const video = videoRef.current;
+        const dur = duration > 0 ? duration : (video?.duration || 0);
+        if (dur > 0) forceSendPosition(0, dur);
+    }, [duration, forceSendPosition]);
 
     // Chromecast integration
     useEffect(() => {
@@ -294,11 +294,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (checkbox) checkbox.checked = !checkbox.checked;
     }, []);
 
-    // Click on video to toggle play (video only)
+    // Click on video to toggle play (video only).
+    // Use ref for showResumePrompt to avoid re-registering native DOM listeners.
+    const showResumePromptRef = useRef(false);
+    showResumePromptRef.current = showResumePrompt;
+
     const handleVideoClick = useCallback((e) => {
-        if (!isVideo || sessionSeekingRef.current) return;
-        // Don't toggle if clicking controls
+        if (!isVideo || sessionSeekingRef.current || showResumePromptRef.current) return;
         if (e.target.closest('.wt-player-controls')) return;
+        if (e.target.closest('.wt-resume-prompt')) return;
         state.togglePlay();
         resetHideTimer();
     }, [isVideo, state.togglePlay]);
@@ -343,9 +347,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     return (
         <>
-            {/* Black cover while resume position is being fetched — prevents flash from beginning */}
-            {!resumeApplied && (
-                <div class="wt-player-overlay" style="background:#000;z-index:50" />
+            {/* Resume prompt — ask user to continue or start over */}
+            {showResumePrompt && isVideo && (
+                <div class="wt-player-overlay wt-resume-prompt" style="background:rgba(0,0,0,0.75);z-index:50;display:flex;align-items:center;justify-content:center"
+                     onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleResume(); }}
+                            class="wt-resume-btn wt-resume-btn--primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" /></svg>
+                            Continue from {formatTime(resumePosition)}
+                        </button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleStartOver(); }}
+                            class="wt-resume-btn wt-resume-btn--ghost">
+                            Start from beginning
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* Loading spinner (only when playing + buffering, or seeking) */}
@@ -356,7 +373,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             )}
 
             {/* Big play button — shown when paused, regardless of loading state */}
-            {showControls && isVideo && !state.playing && !sessionSeeking && (
+            {showControls && isVideo && !state.playing && !sessionSeeking && !showResumePrompt && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
                     <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); state.togglePlay(); }} aria-label="Play">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
@@ -390,6 +407,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             )}
         </>
     );
+}
+
+function formatTime(seconds) {
+    const s = Math.floor(seconds);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function parseFeatures(settings, isVideo, duration, isSession) {
