@@ -65,12 +65,23 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const hlsRef = useHls(videoRef, sourceUrl);
 
     // Watch history hook (position tracking + resume)
-    const resumePosition = useWatchHistory(videoRef, {
+    const { resumePosition, resumeReady } = useWatchHistory(videoRef, {
         resourceID, path,
         currentTime: state.currentTime,
         duration: state.duration,
         playing: state.playing,
     });
+
+    // Hide video until resume position check completes to avoid flash from beginning
+    const [resumeApplied, setResumeApplied] = useState(false);
+
+    useEffect(() => {
+        if (!resumeApplied) {
+            videoEl.style.opacity = '0';
+        } else {
+            videoEl.style.opacity = '';
+        }
+    }, [resumeApplied]);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -215,30 +226,36 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         return () => videoEl.removeEventListener('canplay', onCanPlay);
     }, []);
 
-    // Resume from saved position
+    // Once resume check completes: seek if needed, reveal video
     useEffect(() => {
-        if (resumePosition === null || resumePosition <= 0) return;
-        // Wait for canplay before seeking
-        function doResume() {
+        if (!resumeReady) return;
+        if (!resumePosition || resumePosition <= 0) {
+            setResumeApplied(true);
+            return;
+        }
+        const video = videoRef.current;
+        if (!video) return;
+
+        function doSeek() {
             if (isSession && sessionSeekUrl) {
                 handleSeek(resumePosition);
             } else {
-                const video = videoRef.current;
-                if (video) video.currentTime = resumePosition;
+                video.currentTime = resumePosition;
             }
+            setResumeApplied(true);
         }
-        const video = videoRef.current;
-        if (video && video.readyState >= 2) {
-            doResume();
-        } else if (video) {
+
+        if (video.readyState >= 2) {
+            doSeek();
+        } else {
             function onReady() {
                 video.removeEventListener('canplay', onReady);
-                doResume();
+                doSeek();
             }
             video.addEventListener('canplay', onReady);
             return () => video.removeEventListener('canplay', onReady);
         }
-    }, [resumePosition]);
+    }, [resumeReady]);
 
     // Chromecast integration
     useEffect(() => {

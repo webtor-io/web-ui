@@ -12,6 +12,7 @@ const MIN_POSITION_CHANGE = 5; // minimum seconds change before sending update
  */
 export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing }) {
     const [resumePosition, setResumePosition] = useState(null);
+    const [resumeReady, setResumeReady] = useState(false);
     const lastSentPositionRef = useRef(0);
     const lastSentTimeRef = useRef(0);
     const currentTimeRef = useRef(0);
@@ -25,7 +26,10 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
 
     // Fetch saved position on mount
     useEffect(() => {
-        if (!resourceID || !path) return;
+        if (!resourceID || !path) {
+            setResumeReady(true);
+            return;
+        }
         fetch(`/watch/position?resource-id=${encodeURIComponent(resourceID)}&path=${encodeURIComponent(path)}`)
             .then(r => {
                 if (r.ok) return r.json();
@@ -39,7 +43,8 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
                     }
                 }
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => setResumeReady(true));
     }, [resourceID, path]);
 
     // Send position to server
@@ -132,5 +137,5 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         };
     }, [resourceID, path, sendPosition, sendBeaconPosition]);
 
-    return resumePosition;
+    return { resumePosition, resumeReady };
 }
