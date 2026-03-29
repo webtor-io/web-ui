@@ -426,6 +426,18 @@ func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method strin
 	}
 }
 
+func (s *Api) GetSpeedtestURL(ctx context.Context, c *Claims) (string, error) {
+	u := s.url + "/speedtest"
+	var resp struct {
+		URL string `json:"url"`
+	}
+	err := s.doRequest(ctx, c, u, "GET", nil, &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.URL, nil
+}
+
 func (s *Api) ExportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string) (e *ra.ExportResponse, err error) {
 	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	if imdbID != "" {

@@ -24,6 +24,7 @@ import (
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	"github.com/webtor-io/web-ui/handlers/sitemap"
+	"github.com/webtor-io/web-ui/handlers/speedtest"
 	sta "github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/handlers/streaming/backends"
 	"github.com/webtor-io/web-ui/handlers/stremio"
@@ -266,6 +267,9 @@ func serve(c *cli.Context) error {
 
 	// Setting About
 	about.RegisterHandler(r, tm)
+
+	// Setting Speedtest
+	speedtest.RegisterHandler(r, tm, sapi)
 
 	// Setting DomainSettings
 	ds, err := embed.NewDomainSettings(c, pg, uc)
