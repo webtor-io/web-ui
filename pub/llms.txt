@@ -1,0 +1,38 @@
+# Webtor.io
+
+> Webtor is a free online torrent streaming platform. It lets users watch videos, listen to audio, and download files from torrents directly in the browser — no software installation required.
+
+## What Webtor Does
+
+- Streams video and audio from torrent files or magnet links in the browser
+- Transcodes content on-the-fly to HLS for universal playback
+- Supports subtitles (SRT, ASS, VTT) with automatic charset detection
+- Provides a download option for any file in a torrent
+- Offers an embeddable player via JavaScript SDK for third-party websites
+- Works without registration for basic usage
+
+## How to Use
+
+1. Go to https://webtor.io
+2. Upload a .torrent file, paste a magnet link, or paste an infohash
+3. Browse the torrent contents and click any file to stream or download
+
+## API
+
+Webtor provides a REST API for developers:
+- Documentation: https://webtor.io/api
+- Embed SDK (npm): @webtor/embed-sdk-js
+
+## Premium Features
+
+- Faster streaming speeds (up to 50 Mbps)
+- No ads
+- Vault storage (save files for instant access later)
+- 7-day free trial available at https://webtor.io/donate
+
+## Links
+
+- Website: https://webtor.io
+- Blog: https://blog.webtor.io
+- GitHub: https://github.com/webtor-io
+- Chrome Extension: available in Chrome Web Store (search "Webtor")
