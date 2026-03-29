@@ -10,7 +10,7 @@ const QUALITY_TIERS = [
 ];
 
 const PLANS = [
-    { name: 'Free',    speed: 0,   label: 'Rate-limited' },
+    { name: 'Free',    speed: 5,   label: '5 Mbps'       },
     { name: 'Bronze',  speed: 20,  label: '20 Mbps'      },
     { name: 'Silver',  speed: 50,  label: '50 Mbps'      },
     { name: 'Gold',    speed: 100, label: '100 Mbps'     },
