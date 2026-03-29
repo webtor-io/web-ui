@@ -11,6 +11,22 @@
 - Offers an embeddable player via JavaScript SDK for third-party websites
 - Works without registration for basic usage
 
+## Discover
+
+Webtor has a built-in content discovery feature at https://webtor.io/discover — browse and search for movies, TV shows, and other content. Find something interesting, click, and start streaming instantly.
+
+## Library
+
+Registered users get a personal Library where all watched and saved content is stored. Access it at https://webtor.io/library — resume playback, manage your collection, and keep track of what you've watched.
+
+## WebDAV
+
+Webtor exposes torrent content as a WebDAV mount. This means you can connect any WebDAV-compatible app (VLC, Infuse, nPlayer, Kodi, file managers) to stream or browse torrent files as if they were on a network drive.
+
+## Stremio Integration
+
+Webtor works as a Stremio addon. Users can install the Webtor addon inside Stremio to stream torrent content through the Stremio app on any device. It also supports other Stremio community addons for content discovery — configure addon sources in your Webtor profile at https://webtor.io/profile.
+
 ## How to Use
 
 1. Go to https://webtor.io
