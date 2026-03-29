@@ -189,13 +189,15 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	downloadURL := exportResponse.ExportItems["download"].URL
 
-	// Step 1: Torrent warmup
-	skipBytes := bandwidthSkipSize
-	if warmupSize <= skipBytes {
-		skipBytes = 0
-	}
-	if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
-		return
+	// Step 1: Torrent warmup (skip for cached/vault content)
+	if !se.Meta.Cache {
+		skipBytes := bandwidthSkipSize
+		if warmupSize <= skipBytes {
+			skipBytes = 0
+		}
+		if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
+			return
+		}
 	}
 
 	// Step 2: Content probe via ~cp (before transcoder warmup)
@@ -220,8 +222,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 
-	// Step 3: Bandwidth check
-	if downloadSpeed > 0 && sc.MediaProbe != nil {
+	// Step 3: Bandwidth check (skip for cached/vault content)
+	if !se.Meta.Cache && downloadSpeed > 0 && sc.MediaProbe != nil {
 		j.InProgress("checking bandwidth")
 		bitrate := getVideoBitrate(sc.MediaProbe)
 		if bitrate > 0 && downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
