@@ -1,0 +1,78 @@
+{{ define "title" }}Speed Test — {{ .Data.SpeedDisplay }} Mbps{{ end }}
+{{ define "description" }}
+    <meta name="description" content="Your Webtor connection speed: {{ .Data.SpeedDisplay }} Mbps.">
+{{ end }}
+{{ define "main" }}
+{{ "speedtest.js" | asset }}
+<section class="min-h-screen pt-[120px] pb-20 px-6">
+  <div class="max-w-[640px] mx-auto">
+
+    <!-- Badge -->
+    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      Speed Test
+    </div>
+
+    <!-- Speed -->
+    <div class="text-center mb-8">
+      <div class="text-5xl font-extrabold text-w-cyan tabular-nums">{{ .Data.SpeedDisplay }}</div>
+      <div class="text-w-sub text-sm mt-1">Mbps</div>
+    </div>
+
+    <!-- Quality tiers -->
+    <h2 class="text-lg font-bold mb-3">Video Quality</h2>
+    <div class="space-y-2 mb-8">
+      {{ range .Data.Quality }}
+      <div class="flex items-center gap-3 p-3 rounded-lg {{ if .Ok }}bg-base-200{{ else }}bg-base-200/50 opacity-50{{ end }}">
+        {{ if .Ok }}
+        <span class="text-green-400 text-lg">&#10003;</span>
+        {{ else }}
+        <span class="text-w-muted text-lg">&#10007;</span>
+        {{ end }}
+        <span class="flex-1 font-medium">{{ .Name }}</span>
+        <span class="text-w-sub text-sm">needs {{ printf "%.1f" .MinSpeed }} Mbps</span>
+      </div>
+      {{ end }}
+    </div>
+
+    <!-- Plan recommendations -->
+    <h2 class="text-lg font-bold mb-3">Plan Recommendations</h2>
+    <div class="space-y-2 mb-8">
+      {{ range .Data.Plans }}
+      <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 {{ if .IsCurrent }}ring-2 ring-w-cyan bg-w-cyan/5{{ end }}">
+        {{ if .Supported }}
+        <span class="text-green-400">&#10003;</span>
+        {{ else }}
+        <span class="text-w-muted">&#10007;</span>
+        {{ end }}
+        <span class="flex-1 font-medium">{{ .Name }}</span>
+        <span class="text-w-sub text-sm">{{ .Label }}</span>
+        {{ if .IsCurrent }}
+        <span class="badge badge-sm bg-w-cyan/20 text-w-cyan border-0">Your plan</span>
+        {{ else if .Supported }}
+        <a href="/donate" class="link text-w-cyan text-xs" data-async-target="main">Upgrade</a>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+
+    {{ if .Data.RateLimited }}
+    <div class="alert bg-w-purple/10 text-w-purpleL text-sm mb-8">
+      Your speed may be limited by your current plan ({{ .Data.RateLimit }} Mbps). Consider upgrading for faster streaming.
+    </div>
+    {{ end }}
+
+    <!-- Run again -->
+    <a href="/speedtest?again" data-async-target="main" class="btn btn-ghost border border-w-line w-full">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 4v6h6M23 20v-6h-6"/>
+        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+      </svg>
+      Run Again
+    </a>
+
+  </div>
+</section>
+{{ end }}

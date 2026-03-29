@@ -5,10 +5,7 @@
 {{ define "main" }}
 {{ "speedtest.js" | asset }}
 <section class="min-h-screen pt-[120px] pb-20 px-6">
-  <div class="max-w-[640px] mx-auto"
-       id="speedtest-app"
-       data-tier="{{ .Data.TierName }}"
-       data-rate-limit="{{ .Data.RateLimit }}">
+  <div class="max-w-[640px] mx-auto">
 
     <!-- Badge -->
     <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
@@ -22,8 +19,13 @@
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Connection Speed Test</h1>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Measure your download speed from Webtor servers to find out what video quality you can stream without buffering.</p>
 
+    <!-- Hidden form for posting results -->
+    <form id="speedtest-form" action="/speedtest" method="post" data-async-target="main" data-async-push-state="false" class="hidden">
+      <input type="hidden" name="speed" id="speedtest-speed-input" value="0" />
+    </form>
+
     <!-- Controls -->
-    <div id="speedtest-controls">
+    <div id="speedtest-controls" {{ if .Data.AutoStart }}data-autostart{{ end }}>
       <button id="speedtest-start" class="btn btn-soft-cyan btn-lg w-full text-base">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="5 3 19 12 5 21 5 3"/>
@@ -40,35 +42,6 @@
       </div>
       <progress id="speedtest-bar" class="progress progress-accent w-full mt-6" value="0" max="100"></progress>
       <div id="speedtest-status" class="text-w-muted text-sm text-center mt-2">Connecting...</div>
-    </div>
-
-    <!-- Results -->
-    <div id="speedtest-results" class="hidden mt-8">
-      <!-- Speed -->
-      <div class="text-center mb-8">
-        <div id="speedtest-final-speed" class="text-5xl font-extrabold text-w-cyan tabular-nums">0.0</div>
-        <div class="text-w-sub text-sm mt-1">Mbps</div>
-      </div>
-
-      <!-- Quality tiers -->
-      <h2 class="text-lg font-bold mb-3">Video Quality</h2>
-      <div id="speedtest-quality" class="space-y-2 mb-8"></div>
-
-      <!-- Plan recommendations -->
-      <h2 class="text-lg font-bold mb-3">Plan Recommendations</h2>
-      <div id="speedtest-plans" class="space-y-2 mb-8"></div>
-
-      <!-- Rate limit note -->
-      <div id="speedtest-rate-note" class="hidden alert bg-w-purple/10 text-w-purpleL text-sm mb-8"></div>
-
-      <!-- Run again -->
-      <button id="speedtest-again" class="btn btn-ghost border border-w-line w-full">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M1 4v6h6M23 20v-6h-6"/>
-          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
-        </svg>
-        Run Again
-      </button>
     </div>
 
   </div>
