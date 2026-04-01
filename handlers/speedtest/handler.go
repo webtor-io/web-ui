@@ -1,6 +1,7 @@
 package speedtest
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -38,13 +39,17 @@ type Plan struct {
 }
 
 type ResultData struct {
-	SpeedMbps    float64
-	SpeedDisplay string
-	TierName     string
-	RateLimit    uint64
-	Quality      []QualityTier
-	Plans        []Plan
-	RateLimited  bool
+	SpeedMbps           float64
+	SpeedDisplay        string
+	PremiumSpeedMbps    float64
+	PremiumSpeedDisplay string
+	HasPremium          bool
+	SpeedBoost          string
+	TierName            string
+	RateLimit           uint64
+	Quality             []QualityTier
+	Plans               []Plan
+	RateLimited         bool
 }
 
 var qualityTiers = []struct {
@@ -109,12 +114,24 @@ func (s *Handler) postResult(c *gin.Context) {
 	speedMbps, _ := strconv.ParseFloat(speedStr, 64)
 	speedMbps = math.Round(speedMbps*10) / 10
 
+	premiumStr := c.PostForm("premium-speed")
+	premiumMbps, _ := strconv.ParseFloat(premiumStr, 64)
+	premiumMbps = math.Round(premiumMbps*10) / 10
+
+	hasPremium := premiumMbps > 0
+
+	// Quality и plans строятся по premium скорости если она есть
+	bestSpeed := speedMbps
+	if hasPremium && premiumMbps > bestSpeed {
+		bestSpeed = premiumMbps
+	}
+
 	var quality []QualityTier
 	for _, t := range qualityTiers {
 		quality = append(quality, QualityTier{
 			Name:     t.Name,
 			MinSpeed: t.MinSpeed,
-			Ok:       speedMbps >= t.MinSpeed,
+			Ok:       bestSpeed >= t.MinSpeed,
 		})
 	}
 
@@ -125,29 +142,41 @@ func (s *Handler) postResult(c *gin.Context) {
 			Speed:     p.Speed,
 			Label:     p.Label,
 			IsCurrent: strings.EqualFold(p.Name, tierName),
-			Supported: speedMbps >= float64(p.Speed),
+			Supported: bestSpeed >= float64(p.Speed),
 		})
 	}
 
 	rateLimited := rateLimit > 0 && speedMbps >= float64(rateLimit)*0.9
 
+	var speedBoost string
+	if hasPremium && speedMbps > 0 {
+		boost := premiumMbps / speedMbps
+		if boost >= 1.1 {
+			speedBoost = fmt.Sprintf("%.1fx", boost)
+		}
+	}
+
 	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(&ResultData{
-		SpeedMbps:    speedMbps,
-		SpeedDisplay: strconv.FormatFloat(speedMbps, 'f', 1, 64),
-		TierName:     tierName,
-		RateLimit:    rateLimit,
-		Quality:      quality,
-		Plans:        planList,
-		RateLimited:  rateLimited,
+		SpeedMbps:           speedMbps,
+		SpeedDisplay:        strconv.FormatFloat(speedMbps, 'f', 1, 64),
+		PremiumSpeedMbps:    premiumMbps,
+		PremiumSpeedDisplay: strconv.FormatFloat(premiumMbps, 'f', 1, 64),
+		HasPremium:          hasPremium,
+		SpeedBoost:          speedBoost,
+		TierName:            tierName,
+		RateLimit:           rateLimit,
+		Quality:             quality,
+		Plans:               planList,
+		RateLimited:         rateLimited,
 	}))
 }
 
 func (s *Handler) getURL(c *gin.Context) {
 	ctx := w.NewContext(c)
-	u, err := s.sapi.GetSpeedtestURL(c.Request.Context(), ctx.ApiClaims)
+	urls, err := s.sapi.GetSpeedtestURLs(c.Request.Context(), ctx.ApiClaims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"url": u})
+	c.JSON(http.StatusOK, gin.H{"urls": urls})
 }

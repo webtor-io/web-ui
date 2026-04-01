@@ -23,26 +23,54 @@ async function runTest(root) {
     const speedEl = root.querySelector('#speedtest-speed');
     const bar = root.querySelector('#speedtest-bar');
     const statusEl = root.querySelector('#speedtest-status');
+    const phaseEl = root.querySelector('#speedtest-phase');
     const form = root.querySelector('#speedtest-form');
     const speedInput = root.querySelector('#speedtest-speed-input');
+    const premiumSpeedInput = root.querySelector('#speedtest-premium-speed-input');
 
     controls.classList.add('hidden');
     progress.classList.remove('hidden');
     speedEl.textContent = '0.0';
     bar.value = 0;
     statusEl.textContent = 'Getting test server...';
+    if (phaseEl) phaseEl.textContent = '';
 
     try {
         const urlRes = await fetch('/speedtest/url');
         if (!urlRes.ok) throw new Error('Failed to get speedtest URL');
-        const { url } = await urlRes.json();
+        const { urls } = await urlRes.json();
 
-        statusEl.textContent = 'Measuring speed...';
+        let standardSpeed = 0;
+        let premiumSpeed = 0;
 
-        const speedMbps = await measure(url, speedEl, bar);
+        for (const entry of urls) {
+            const isPremium = entry.type === 'premium';
 
-        // Post result to server for SSR rendering
-        speedInput.value = speedMbps.toFixed(1);
+            if (phaseEl) {
+                phaseEl.textContent = isPremium ? 'Premium Server' : 'Standard Server';
+                phaseEl.className = isPremium
+                    ? 'text-sm font-semibold text-w-purpleL mb-1'
+                    : 'text-sm font-semibold text-w-cyan mb-1';
+            }
+            statusEl.textContent = isPremium
+                ? 'Testing premium server...'
+                : 'Measuring speed...';
+            speedEl.textContent = '0.0';
+            bar.value = 0;
+
+            const speed = await measure(entry.url, speedEl, bar);
+
+            if (isPremium) {
+                premiumSpeed = speed;
+            } else {
+                standardSpeed = speed;
+            }
+        }
+
+        speedInput.value = standardSpeed.toFixed(1);
+        if (premiumSpeedInput) {
+            premiumSpeedInput.value = premiumSpeed.toFixed(1);
+        }
         form.requestSubmit();
     } catch (err) {
         statusEl.textContent = 'Error: ' + err.message;

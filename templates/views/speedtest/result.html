@@ -20,10 +20,38 @@
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Measure your download speed from Webtor servers to find out what video quality you can stream without buffering.</p>
 
     <!-- Speed -->
+    {{ if .Data.HasPremium }}
+    <div class="grid grid-cols-2 gap-6 mb-8">
+      <div class="text-center">
+        <div class="text-w-sub text-xs font-semibold tracking-widest uppercase mb-2">Standard</div>
+        <div class="text-4xl font-extrabold text-w-cyan tabular-nums">{{ .Data.SpeedDisplay }}</div>
+        <div class="text-w-sub text-sm mt-1">Mbps</div>
+      </div>
+      <div class="text-center">
+        <div class="text-w-purpleL text-xs font-semibold tracking-widest uppercase mb-2">Premium</div>
+        <div class="text-4xl font-extrabold text-w-purpleL tabular-nums">{{ .Data.PremiumSpeedDisplay }}</div>
+        <div class="text-w-sub text-sm mt-1">Mbps</div>
+      </div>
+    </div>
+    {{ if .Data.SpeedBoost }}
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-w-purple/10 text-w-purpleL text-sm font-semibold">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        {{ .Data.SpeedBoost }} faster with Premium
+      </div>
+    </div>
+    {{ end }}
+    <div class="text-center text-w-sub text-xs mb-8">
+      With a paid subscription, content is served through premium servers for faster streaming.
+    </div>
+    {{ else }}
     <div class="text-center mb-8">
       <div class="text-5xl font-extrabold text-w-cyan tabular-nums">{{ .Data.SpeedDisplay }}</div>
       <div class="text-w-sub text-sm mt-1">Mbps</div>
     </div>
+    {{ end }}
 
     <!-- Quality tiers -->
     <h2 class="text-lg font-bold mb-3">Video Quality</h2>
