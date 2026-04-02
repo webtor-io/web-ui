@@ -239,21 +239,25 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 	var measurements []measurement
 
 	if standardURL := c.PostForm("standard-url"); standardURL != "" && speedMbps > 0 {
-		measurements = append(measurements, measurement{
-			speedMbps:  float32(speedMbps),
-			requestURL: stripQueryParams(standardURL),
-			destType:   "standard",
-			destIP:     resolveDestIP(standardURL),
-		})
+		if destIP := resolveDestIP(standardURL); destIP != "" {
+			measurements = append(measurements, measurement{
+				speedMbps:  float32(speedMbps),
+				requestURL: stripQueryParams(standardURL),
+				destType:   "standard",
+				destIP:     destIP,
+			})
+		}
 	}
 
 	if premiumURL := c.PostForm("premium-url"); premiumURL != "" && premiumMbps > 0 {
-		measurements = append(measurements, measurement{
-			speedMbps:  float32(premiumMbps),
-			requestURL: stripQueryParams(premiumURL),
-			destType:   "premium",
-			destIP:     resolveDestIP(premiumURL),
-		})
+		if destIP := resolveDestIP(premiumURL); destIP != "" {
+			measurements = append(measurements, measurement{
+				speedMbps:  float32(premiumMbps),
+				requestURL: stripQueryParams(premiumURL),
+				destType:   "premium",
+				destIP:     destIP,
+			})
+		}
 	}
 
 	if len(measurements) == 0 {

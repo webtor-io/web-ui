@@ -1,7 +1,7 @@
 CREATE TABLE public.speedtest_result (
 	speedtest_result_id	uuid		DEFAULT uuid_generate_v4() NOT NULL,
 	source_ip		text		NOT NULL,
-	dest_ip			text,
+	dest_ip			text		NOT NULL,
 	speed_mbps		real		NOT NULL,
 	request_url		text		NOT NULL,
 	dest_type		text		NOT NULL,
