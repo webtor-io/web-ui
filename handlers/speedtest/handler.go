@@ -1,13 +1,20 @@
 package speedtest
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
+	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/template"
 	w "github.com/webtor-io/web-ui/services/web"
@@ -16,12 +23,14 @@ import (
 type Handler struct {
 	tb   template.Builder[*w.Context]
 	sapi *api.Api
+	pg   *cs.PG
 }
 
 type Data struct {
 	TierName  string
 	RateLimit uint64
 	AutoStart bool
+	URLs      []api.SpeedtestURL
 }
 
 type QualityTier struct {
@@ -74,14 +83,14 @@ var plans = []struct {
 	{"Gold", 100, "100 Mbps"},
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*w.Context], sapi *api.Api) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*w.Context], sapi *api.Api, pg *cs.PG) {
 	h := &Handler{
 		tb:   tm.MustRegisterViews("speedtest/*").WithLayout("main"),
 		sapi: sapi,
+		pg:   pg,
 	}
 	r.GET("/speedtest", h.get)
 	r.POST("/speedtest", h.postResult)
-	r.GET("/speedtest/url", h.getURL)
 }
 
 func (s *Handler) getTierData(ctx *w.Context) (string, uint64) {
@@ -99,10 +108,18 @@ func (s *Handler) getTierData(ctx *w.Context) (string, uint64) {
 func (s *Handler) get(c *gin.Context) {
 	ctx := w.NewContext(c)
 	tierName, rateLimit := s.getTierData(ctx)
+	var urls []api.SpeedtestURL
+	u, err := s.sapi.GetSpeedtestURLs(c.Request.Context(), ctx.ApiClaims)
+	if err != nil {
+		log.WithError(err).Warn("failed to get speedtest urls")
+	} else {
+		urls = u
+	}
 	s.tb.Build("speedtest/index").HTML(http.StatusOK, ctx.WithData(&Data{
 		TierName:  tierName,
 		RateLimit: rateLimit,
 		AutoStart: c.Request.URL.Query().Has("again"),
+		URLs:      urls,
 	}))
 }
 
@@ -156,6 +173,9 @@ func (s *Handler) postResult(c *gin.Context) {
 		}
 	}
 
+	// Save results to DB
+	s.saveResults(c, speedMbps, premiumMbps)
+
 	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(&ResultData{
 		SpeedMbps:           speedMbps,
 		SpeedDisplay:        strconv.FormatFloat(speedMbps, 'f', 1, 64),
@@ -171,12 +191,89 @@ func (s *Handler) postResult(c *gin.Context) {
 	}))
 }
 
-func (s *Handler) getURL(c *gin.Context) {
-	ctx := w.NewContext(c)
-	urls, err := s.sapi.GetSpeedtestURLs(c.Request.Context(), ctx.ApiClaims)
+func getRemoteAddress(c *gin.Context) string {
+	if addr := c.Request.Header.Get(gin.PlatformCloudflare); addr != "" {
+		return addr
+	}
+	return c.ClientIP()
+}
+
+func stripQueryParams(rawURL string) string {
+	u, err := url.Parse(rawURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return rawURL
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
+}
+
+func resolveDestIP(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	host := u.Hostname()
+	ips, err := net.LookupHost(host)
+	if err != nil || len(ips) == 0 {
+		return ""
+	}
+	return ips[0]
+}
+
+type measurement struct {
+	speedMbps  float32
+	requestURL string
+	destType   string
+	destIP     string
+}
+
+func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps float64) {
+	db := s.pg.Get()
+	if db == nil {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"urls": urls})
+
+	sourceIP := getRemoteAddress(c)
+
+	var measurements []measurement
+
+	if standardURL := c.PostForm("standard-url"); standardURL != "" && speedMbps > 0 {
+		measurements = append(measurements, measurement{
+			speedMbps:  float32(speedMbps),
+			requestURL: stripQueryParams(standardURL),
+			destType:   "standard",
+			destIP:     resolveDestIP(standardURL),
+		})
+	}
+
+	if premiumURL := c.PostForm("premium-url"); premiumURL != "" && premiumMbps > 0 {
+		measurements = append(measurements, measurement{
+			speedMbps:  float32(premiumMbps),
+			requestURL: stripQueryParams(premiumURL),
+			destType:   "premium",
+			destIP:     resolveDestIP(premiumURL),
+		})
+	}
+
+	if len(measurements) == 0 {
+		return
+	}
+
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, m := range measurements {
+			err := models.CreateSpeedtestResult(bgCtx, db, &models.SpeedtestResult{
+				SourceIP:   sourceIP,
+				DestIP:     m.destIP,
+				SpeedMbps:  m.speedMbps,
+				RequestURL: m.requestURL,
+				DestType:   m.destType,
+			})
+			if err != nil {
+				log.WithError(err).Warn("failed to save speedtest result")
+			}
+		}
+	}()
 }

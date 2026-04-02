@@ -269,7 +269,7 @@ func serve(c *cli.Context) error {
 	about.RegisterHandler(r, tm)
 
 	// Setting Speedtest
-	speedtest.RegisterHandler(r, tm, sapi)
+	speedtest.RegisterHandler(r, tm, sapi, pg)
 
 	// Setting DomainSettings
 	ds, err := embed.NewDomainSettings(c, pg, uc)

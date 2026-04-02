@@ -36,9 +36,12 @@ async function runTest(root) {
     if (phaseEl) phaseEl.textContent = '';
 
     try {
-        const urlRes = await fetch('/speedtest/url');
-        if (!urlRes.ok) throw new Error('Failed to get speedtest URL');
-        const { urls } = await urlRes.json();
+        const urlInputs = root.querySelectorAll('.speedtest-url');
+        const urls = Array.from(urlInputs).map(el => ({
+            url: el.value,
+            type: el.dataset.type,
+        }));
+        if (urls.length === 0) throw new Error('No speedtest URLs available');
 
         let standardSpeed = 0;
         let premiumSpeed = 0;
