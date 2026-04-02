@@ -147,15 +147,21 @@
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />
         </form>
 
-        <!-- demo link -->
-        <form class="flex justify-center mt-4" action="/" method="post" enctype="multipart/form-data" data-async-target="main">
-            <input type="hidden" name="resource" value="{{ demoMagnet }}" />
-            <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-            <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="try-demo">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Try the demo
-            </button>
-        </form>
+        <!-- demo & speedtest links -->
+        <div class="flex justify-center items-center gap-4 mt-4">
+            <form action="/" method="post" enctype="multipart/form-data" data-async-target="main">
+                <input type="hidden" name="resource" value="{{ demoMagnet }}" />
+                <input name="instruction" value="{{ .Instruction }}" type="hidden" />
+                <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="try-demo">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Try the demo
+                </button>
+            </form>
+            <a href="/speedtest" data-async-target="main" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="speedtest-hero">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Speed test
+            </a>
+        </div>
     </div>
 
     {{ template "continue_watching" . }}
