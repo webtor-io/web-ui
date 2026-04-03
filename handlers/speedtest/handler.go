@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
@@ -59,6 +60,7 @@ type ResultData struct {
 	Quality             []QualityTier
 	Plans               []Plan
 	RateLimited         bool
+	ShareURL            string
 }
 
 var qualityTiers = []struct {
@@ -90,6 +92,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*w.Context], sapi *api.
 		pg:   pg,
 	}
 	r.GET("/speedtest", h.get)
+	r.GET("/speedtest/:id", h.getShared)
 	r.POST("/speedtest", h.postResult)
 }
 
@@ -135,60 +138,17 @@ func (s *Handler) postResult(c *gin.Context) {
 	premiumMbps, _ := strconv.ParseFloat(premiumStr, 64)
 	premiumMbps = math.Round(premiumMbps*10) / 10
 
-	hasPremium := premiumMbps > 0
-
-	// Quality и plans строятся по premium скорости если она есть
-	bestSpeed := speedMbps
-	if hasPremium && premiumMbps > bestSpeed {
-		bestSpeed = premiumMbps
-	}
-
-	var quality []QualityTier
-	for _, t := range qualityTiers {
-		quality = append(quality, QualityTier{
-			Name:     t.Name,
-			MinSpeed: t.MinSpeed,
-			Ok:       bestSpeed >= t.MinSpeed,
-		})
-	}
-
-	var planList []Plan
-	for _, p := range plans {
-		planList = append(planList, Plan{
-			Name:      p.Name,
-			Speed:     p.Speed,
-			Label:     p.Label,
-			IsCurrent: strings.EqualFold(p.Name, tierName),
-			Supported: bestSpeed >= float64(p.Speed),
-		})
-	}
-
-	rateLimited := rateLimit > 0 && speedMbps >= float64(rateLimit)*0.9
-
-	var speedBoost string
-	if hasPremium && speedMbps > 0 {
-		boost := premiumMbps / speedMbps
-		if boost >= 1.1 {
-			speedBoost = fmt.Sprintf("%.1fx", boost)
-		}
-	}
-
 	// Save results to DB
-	s.saveResults(c, speedMbps, premiumMbps)
+	sessionID := s.saveResults(c, speedMbps, premiumMbps)
 
-	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(&ResultData{
-		SpeedMbps:           speedMbps,
-		SpeedDisplay:        strconv.FormatFloat(speedMbps, 'f', 1, 64),
-		PremiumSpeedMbps:    premiumMbps,
-		PremiumSpeedDisplay: strconv.FormatFloat(premiumMbps, 'f', 1, 64),
-		HasPremium:          hasPremium,
-		SpeedBoost:          speedBoost,
-		TierName:            tierName,
-		RateLimit:           rateLimit,
-		Quality:             quality,
-		Plans:               planList,
-		RateLimited:         rateLimited,
-	}))
+	var shareURL string
+	if sessionID != "" {
+		shareURL = "/speedtest/" + sessionID
+	}
+
+	data := s.buildResultData(speedMbps, premiumMbps, tierName, rateLimit, shareURL)
+
+	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(data))
 }
 
 func getRemoteAddress(c *gin.Context) string {
@@ -228,10 +188,10 @@ type measurement struct {
 	destIP     string
 }
 
-func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps float64) {
+func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps float64) string {
 	db := s.pg.Get()
 	if db == nil {
-		return
+		return ""
 	}
 
 	sourceIP := getRemoteAddress(c)
@@ -261,23 +221,117 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 	}
 
 	if len(measurements) == 0 {
+		return ""
+	}
+
+	sessionID := uuid.NewV4()
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	for _, m := range measurements {
+		err := models.CreateSpeedtestResult(ctx, db, &models.SpeedtestResult{
+			SourceIP:   sourceIP,
+			DestIP:     m.destIP,
+			SpeedMbps:  m.speedMbps,
+			RequestURL: m.requestURL,
+			DestType:   m.destType,
+			SessionID:  sessionID,
+		})
+		if err != nil {
+			log.WithError(err).Warn("failed to save speedtest result")
+			return ""
+		}
+	}
+
+	return sessionID.String()
+}
+
+func (s *Handler) buildResultData(speedMbps, premiumMbps float64, tierName string, rateLimit uint64, shareURL string) *ResultData {
+	hasPremium := premiumMbps > 0
+
+	bestSpeed := speedMbps
+	if hasPremium && premiumMbps > bestSpeed {
+		bestSpeed = premiumMbps
+	}
+
+	var quality []QualityTier
+	for _, t := range qualityTiers {
+		quality = append(quality, QualityTier{
+			Name:     t.Name,
+			MinSpeed: t.MinSpeed,
+			Ok:       bestSpeed >= t.MinSpeed,
+		})
+	}
+
+	var planList []Plan
+	for _, p := range plans {
+		planList = append(planList, Plan{
+			Name:      p.Name,
+			Speed:     p.Speed,
+			Label:     p.Label,
+			IsCurrent: strings.EqualFold(p.Name, tierName),
+			Supported: bestSpeed >= float64(p.Speed),
+		})
+	}
+
+	rateLimited := rateLimit > 0 && speedMbps >= float64(rateLimit)*0.9
+
+	var speedBoost string
+	if hasPremium && speedMbps > 0 {
+		boost := premiumMbps / speedMbps
+		if boost >= 1.1 {
+			speedBoost = fmt.Sprintf("%.1fx", boost)
+		}
+	}
+
+	return &ResultData{
+		SpeedMbps:           speedMbps,
+		SpeedDisplay:        strconv.FormatFloat(speedMbps, 'f', 1, 64),
+		PremiumSpeedMbps:    premiumMbps,
+		PremiumSpeedDisplay: strconv.FormatFloat(premiumMbps, 'f', 1, 64),
+		HasPremium:          hasPremium,
+		SpeedBoost:          speedBoost,
+		TierName:            tierName,
+		RateLimit:           rateLimit,
+		Quality:             quality,
+		Plans:               planList,
+		RateLimited:         rateLimited,
+		ShareURL:            shareURL,
+	}
+}
+
+func (s *Handler) getShared(c *gin.Context) {
+	ctx := w.NewContext(c)
+
+	sessionID, err := uuid.FromString(c.Param("id"))
+	if err != nil {
+		c.String(http.StatusNotFound, "Not found")
 		return
 	}
 
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		for _, m := range measurements {
-			err := models.CreateSpeedtestResult(bgCtx, db, &models.SpeedtestResult{
-				SourceIP:   sourceIP,
-				DestIP:     m.destIP,
-				SpeedMbps:  m.speedMbps,
-				RequestURL: m.requestURL,
-				DestType:   m.destType,
-			})
-			if err != nil {
-				log.WithError(err).Warn("failed to save speedtest result")
-			}
+	db := s.pg.Get()
+	if db == nil {
+		c.String(http.StatusInternalServerError, "Database unavailable")
+		return
+	}
+
+	results, err := models.GetSpeedtestResultsBySessionID(c.Request.Context(), db, sessionID)
+	if err != nil || len(results) == 0 {
+		c.String(http.StatusNotFound, "Not found")
+		return
+	}
+
+	var speedMbps, premiumMbps float64
+	for _, r := range results {
+		switch r.DestType {
+		case "premium":
+			premiumMbps = float64(r.SpeedMbps)
+		default:
+			speedMbps = float64(r.SpeedMbps)
 		}
-	}()
+	}
+
+	data := s.buildResultData(speedMbps, premiumMbps, "", 0, "/speedtest/"+sessionID.String())
+
+	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(data))
 }

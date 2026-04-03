@@ -17,6 +17,7 @@ type SpeedtestResult struct {
 	SpeedMbps         float32   `pg:"speed_mbps,notnull"`
 	RequestURL        string    `pg:"request_url,notnull"`
 	DestType          string    `pg:"dest_type,notnull"`
+	SessionID         uuid.UUID `pg:"session_id,type:uuid"`
 	CreatedAt         time.Time `pg:"created_at,notnull,default:now()"`
 	UpdatedAt         time.Time `pg:"updated_at,notnull,default:now()"`
 }
@@ -27,4 +28,16 @@ func CreateSpeedtestResult(ctx context.Context, db pg.DBI, r *SpeedtestResult) e
 		return errors.Wrap(err, "failed to create speedtest result")
 	}
 	return nil
+}
+
+func GetSpeedtestResultsBySessionID(ctx context.Context, db pg.DBI, sessionID uuid.UUID) ([]*SpeedtestResult, error) {
+	var results []*SpeedtestResult
+	err := db.Model(&results).Context(ctx).
+		Where("session_id = ?", sessionID).
+		Order("dest_type ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get speedtest results by session id")
+	}
+	return results, nil
 }

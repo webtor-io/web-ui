@@ -96,14 +96,25 @@
     </div>
     {{ end }}
 
-    <!-- Run again -->
-    <a href="/speedtest?again" data-async-target="main" class="btn btn-ghost border border-w-line w-full">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M1 4v6h6M23 20v-6h-6"/>
-        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
-      </svg>
-      Run Again
-    </a>
+    <!-- Actions -->
+    <div class="flex gap-3">
+      <a href="/speedtest?again" data-async-target="main" class="btn btn-ghost border border-w-line flex-1">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 4v6h6M23 20v-6h-6"/>
+          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+        </svg>
+        Run Again
+      </a>
+      {{ if .Data.ShareURL }}
+      <button class="btn btn-soft-cyan flex-1" onclick="navigator.clipboard.writeText(location.origin+'{{ .Data.ShareURL }}').then(function(){var b=event.target.closest('button');b.querySelector('.share-label').textContent='Copied!';setTimeout(function(){b.querySelector('.share-label').textContent='Share Result'},2000)})" data-umami-event="speedtest-share">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+        <span class="share-label">Share Result</span>
+      </button>
+      {{ end }}
+    </div>
 
   </div>
 </section>
