@@ -84,7 +84,7 @@
         {{ if .IsCurrent }}
         <span class="badge badge-sm bg-w-cyan/20 text-w-cyan border-0">Your plan</span>
         {{ else if .Supported }}
-        <a href="/donate" class="link text-w-cyan text-xs" data-async-target="main">Upgrade</a>
+        <a href="/donate" class="link text-w-cyan text-xs" target="_blank" data-umami-event="donate-speedtest">Upgrade</a>
         {{ end }}
       </div>
       {{ end }}

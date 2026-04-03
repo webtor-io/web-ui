@@ -3,7 +3,7 @@
 <strong>streaming is not possible</strong>
 your plan ({{ .Data.TierName }}) limits speed to {{ printf "%.1f" .Data.RateLimitMbps }} Mbps
 this file requires at least {{ printf "%.1f" .Data.RequiredSpeedMbps }} Mbps for smooth playback
-consider <a href="/donate" class="link" target="_blank">upgrading your plan</a> for faster speeds
+consider <a href="/donate" class="link" target="_blank" data-umami-event="donate-slow-download">upgrading your plan</a> for faster speeds
 {{- else -}}
 <strong>streaming is not possible — download speed too slow</strong>
 download speed: {{ printf "%.1f" .Data.MeasuredSpeedMbps }} Mbps, required: {{ printf "%.1f" .Data.RequiredSpeedMbps }} Mbps
