@@ -18,10 +18,16 @@ type mockReaperStore struct {
 	expiredResourcesErr error
 	pledgesWithUsers    map[string][]vaultModels.Pledge
 	pledgesWithUsersErr map[string]error
+	ghostResources      []vaultModels.Resource
+	ghostResourcesErr   error
 }
 
 func (m *mockReaperStore) GetExpiredResources(_ context.Context, _ time.Duration, _ time.Duration, _ time.Duration) ([]vaultModels.Resource, error) {
 	return m.expiredResources, m.expiredResourcesErr
+}
+
+func (m *mockReaperStore) GetGhostResources(_ context.Context) ([]vaultModels.Resource, error) {
+	return m.ghostResources, m.ghostResourcesErr
 }
 
 func (m *mockReaperStore) GetResourcePledgesWithUsers(_ context.Context, resourceID string) ([]vaultModels.Pledge, error) {
@@ -727,5 +733,134 @@ func TestProcessResource_PledgeWithUserNoEmail_And_PledgeWithEmail(t *testing.T)
 	}
 	if n.calls[0].email != "user2@example.com" {
 		t.Errorf("expected notification for user2, got %q", n.calls[0].email)
+	}
+}
+
+// --- Tests for ghost resource reaping ---
+
+func TestReapGhostResources_NoGhosts(t *testing.T) {
+	store := &mockReaperStore{
+		expiredResources: []vaultModels.Resource{},
+		ghostResources:   []vaultModels.Resource{},
+	}
+	v := &mockReaperVault{}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.run(context.Background())
+
+	if len(v.removeResourceIDs) != 0 {
+		t.Errorf("expected no resources removed, got %d", len(v.removeResourceIDs))
+	}
+}
+
+func TestReapGhostResources_RemovesGhosts(t *testing.T) {
+	store := &mockReaperStore{
+		expiredResources: []vaultModels.Resource{},
+		ghostResources: []vaultModels.Resource{
+			{ResourceID: "ghost1", Name: "Ghost Resource 1", FundedVP: 10.0, RequiredVP: 10.0, Funded: true, Vaulted: true},
+			{ResourceID: "ghost2", Name: "Ghost Resource 2", FundedVP: 5.0, RequiredVP: 5.0, Funded: true, Vaulted: true},
+		},
+	}
+	v := &mockReaperVault{}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.run(context.Background())
+
+	if len(v.removeResourceIDs) != 2 {
+		t.Fatalf("expected 2 ghost resources removed, got %d", len(v.removeResourceIDs))
+	}
+	if v.removeResourceIDs[0] != "ghost1" || v.removeResourceIDs[1] != "ghost2" {
+		t.Errorf("expected ghost1 and ghost2 removed, got %v", v.removeResourceIDs)
+	}
+	// No pledge removals or notifications for ghost resources
+	if len(v.removePledgeCalls) != 0 {
+		t.Errorf("expected no pledge removals for ghosts, got %d", len(v.removePledgeCalls))
+	}
+	if len(n.calls) != 0 {
+		t.Errorf("expected no notifications for ghosts, got %d", len(n.calls))
+	}
+}
+
+func TestReapGhostResources_GetError(t *testing.T) {
+	store := &mockReaperStore{
+		expiredResources:  []vaultModels.Resource{},
+		ghostResourcesErr: fmt.Errorf("db error"),
+	}
+	v := &mockReaperVault{}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.run(context.Background())
+
+	if len(v.removeResourceIDs) != 0 {
+		t.Errorf("expected no resources removed on error, got %d", len(v.removeResourceIDs))
+	}
+}
+
+func TestReapGhostResources_PartialRemoveError(t *testing.T) {
+	store := &mockReaperStore{
+		expiredResources: []vaultModels.Resource{},
+		ghostResources: []vaultModels.Resource{
+			{ResourceID: "ghost1", Name: "Ghost 1", FundedVP: 10.0},
+			{ResourceID: "ghost2", Name: "Ghost 2", FundedVP: 5.0},
+		},
+	}
+	// RemoveResource always fails
+	v := &mockReaperVault{removeResourceErr: fmt.Errorf("api error")}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.run(context.Background())
+
+	// Both removals attempted despite errors
+	if len(v.removeResourceIDs) != 2 {
+		t.Errorf("expected 2 removal attempts, got %d", len(v.removeResourceIDs))
+	}
+}
+
+func TestReapGhostResources_MixedWithExpired(t *testing.T) {
+	expired := timePtr(time.Now().Add(-8 * 24 * time.Hour))
+	userID := uuid.NewV4()
+
+	store := &mockReaperStore{
+		expiredResources: []vaultModels.Resource{
+			makeResource("expired-res", expired),
+		},
+		pledgesWithUsers: map[string][]vaultModels.Pledge{
+			"expired-res": {
+				makePledge(uuid.NewV4(), "expired-res", userID, 1.0, &models.User{
+					UserID: userID,
+					Email:  "user@example.com",
+				}),
+			},
+		},
+		ghostResources: []vaultModels.Resource{
+			{ResourceID: "ghost1", Name: "Ghost 1", FundedVP: 10.0},
+		},
+	}
+	v := &mockReaperVault{}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.run(context.Background())
+
+	// 1 expired + 1 ghost = 2 resources removed
+	if len(v.removeResourceIDs) != 2 {
+		t.Fatalf("expected 2 resources removed, got %d", len(v.removeResourceIDs))
+	}
+	if v.removeResourceIDs[0] != "expired-res" {
+		t.Errorf("expected expired-res first, got %q", v.removeResourceIDs[0])
+	}
+	if v.removeResourceIDs[1] != "ghost1" {
+		t.Errorf("expected ghost1 second, got %q", v.removeResourceIDs[1])
+	}
+	// 1 pledge removal (from expired), 1 notification
+	if len(v.removePledgeCalls) != 1 {
+		t.Errorf("expected 1 pledge removal, got %d", len(v.removePledgeCalls))
+	}
+	if len(n.calls) != 1 {
+		t.Errorf("expected 1 notification, got %d", len(n.calls))
 	}
 }

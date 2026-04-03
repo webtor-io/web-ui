@@ -32,6 +32,7 @@ type reaperNotification interface {
 type reaperStore interface {
 	GetExpiredResources(ctx context.Context, expirePeriod time.Duration, abandonedExpirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error)
 	GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error)
+	GetGhostResources(ctx context.Context) ([]vaultModels.Resource, error)
 }
 
 // pgReaperStore wraps *pg.DB to implement reaperStore
@@ -45,6 +46,10 @@ func (s *pgReaperStore) GetExpiredResources(ctx context.Context, expirePeriod ti
 
 func (s *pgReaperStore) GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error) {
 	return vaultModels.GetResourcePledgesWithUsers(ctx, s.db, resourceID)
+}
+
+func (s *pgReaperStore) GetGhostResources(ctx context.Context) ([]vaultModels.Resource, error) {
+	return vaultModels.GetGhostResources(ctx, s.db)
 }
 
 type reaper struct {
@@ -185,6 +190,41 @@ func (r *reaper) run(ctx context.Context) {
 
 	for _, resource := range resources {
 		r.processResource(ctx, resource)
+	}
+
+	// Clean up ghost resources — funded_vp > 0 but no funded pledges
+	// (caused by user account deletion cascading pledges but not updating resource)
+	r.reapGhostResources(ctx)
+}
+
+func (r *reaper) reapGhostResources(ctx context.Context) {
+	resources, err := r.store.GetGhostResources(ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to get ghost resources")
+		return
+	}
+
+	if len(resources) == 0 {
+		return
+	}
+
+	log.WithField("count", len(resources)).Info("found ghost resources (funded but no pledges)")
+
+	for _, resource := range resources {
+		log.WithField("resource_id", resource.ResourceID).
+			WithField("name", resource.Name).
+			WithField("funded_vp", resource.FundedVP).
+			Info("removing ghost resource")
+
+		err := r.vault.RemoveResource(ctx, resource.ResourceID)
+		if err != nil {
+			log.WithError(err).
+				WithField("resource_id", resource.ResourceID).
+				Warn("failed to remove ghost resource")
+			continue
+		}
+
+		log.WithField("resource_id", resource.ResourceID).Info("removed ghost resource")
 	}
 }
 

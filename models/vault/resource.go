@@ -164,6 +164,22 @@ func GetExpiredResources(ctx context.Context, db *pg.DB, expirePeriod time.Durat
 	return resources, nil
 }
 
+// GetGhostResources returns resources where funded_vp > 0 but no funded pledges exist.
+// This happens when a user account is deleted — CASCADE removes pledges but resource
+// retains its funded state.
+func GetGhostResources(ctx context.Context, db *pg.DB) ([]Resource, error) {
+	var resources []Resource
+	err := db.Model(&resources).
+		Context(ctx).
+		Where("funded_vp > 0").
+		Where("NOT EXISTS (SELECT 1 FROM vault.pledge WHERE pledge.resource_id = resource.resource_id AND pledge.funded = true)").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get ghost resources")
+	}
+	return resources, nil
+}
+
 // DeleteResource deletes a resource
 func DeleteResource(ctx context.Context, db *pg.DB, resourceID string) error {
 	_, err := db.Model(&Resource{}).
