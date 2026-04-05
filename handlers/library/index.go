@@ -39,6 +39,14 @@ func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
 	} else {
 		args.Section = shared.SectionType(c.Param("type"))
 	}
+	switch shared.WatchedFilter(c.Query("watched")) {
+	case shared.WatchedFilterUnwatched:
+		args.Watched = shared.WatchedFilterUnwatched
+	case shared.WatchedFilterWatched:
+		args.Watched = shared.WatchedFilterWatched
+	default:
+		args.Watched = shared.WatchedFilterAll
+	}
 	return
 }
 
@@ -69,6 +77,9 @@ func (s *Handler) index(c *gin.Context) {
 		return
 	}
 
+	// Annotate each item with UserWatched flag (bulk prefetch to avoid N+1).
+	s.annotateWatched(ctx, db, u.ID, ls)
+
 	tc, mc, sc, err := models.GetLibraryCounts(ctx, db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library counts"))
@@ -95,9 +106,9 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	case shared.SectionTypeTorrents:
 		return s.getTorrentList(ctx, u.ID, db, args.Sort)
 	case shared.SectionTypeMovies:
-		return s.getMovieList(ctx, u.ID, db, args.Sort)
+		return s.getMovieList(ctx, u.ID, db, args.Sort, args.Watched)
 	case shared.SectionTypeSeries:
-		return s.getSeriesList(ctx, u.ID, db, args.Sort)
+		return s.getSeriesList(ctx, u.ID, db, args.Sort, args.Watched)
 	}
 	return
 }
@@ -114,8 +125,8 @@ func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, s
 	return
 }
 
-func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType) (items []any, err error) {
-	ls, err := models.GetLibraryMovieList(ctx, db, id, sort)
+func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, watched shared.WatchedFilter) (items []any, err error) {
+	ls, err := models.GetLibraryMovieList(ctx, db, id, sort, string(watched))
 	if err != nil {
 		return
 	}
@@ -126,8 +137,8 @@ func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sor
 	return
 }
 
-func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType) (items []any, err error) {
-	ls, err := models.GetLibrarySeriesList(ctx, db, id, sort)
+func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, watched shared.WatchedFilter) (items []any, err error) {
+	ls, err := models.GetLibrarySeriesList(ctx, db, id, sort, string(watched))
 	if err != nil {
 		return
 	}
@@ -136,4 +147,56 @@ func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, so
 		items[i] = v
 	}
 	return
+}
+
+// annotateWatched sets the transient UserWatched flag on each Movie/Series in
+// items, using a single bulk query per kind against movie_status /
+// series_status. Errors are swallowed: a missing watched badge is a
+// display-only concern and must not fail rendering of the library page.
+func (s *Handler) annotateWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, items []any) {
+	if len(items) == 0 {
+		return
+	}
+	var movieIDs []string
+	var seriesIDs []string
+	movieByVideoID := map[string]*models.Movie{}
+	seriesByVideoID := map[string]*models.Series{}
+
+	for _, it := range items {
+		switch v := it.(type) {
+		case *models.Movie:
+			if v.MovieMetadata != nil && v.MovieMetadata.VideoID != "" {
+				movieIDs = append(movieIDs, v.MovieMetadata.VideoID)
+				movieByVideoID[v.MovieMetadata.VideoID] = v
+			}
+		case *models.Series:
+			if v.SeriesMetadata != nil && v.SeriesMetadata.VideoID != "" {
+				seriesIDs = append(seriesIDs, v.SeriesMetadata.VideoID)
+				seriesByVideoID[v.SeriesMetadata.VideoID] = v
+			}
+		}
+	}
+
+	if len(movieIDs) > 0 {
+		if m, err := models.GetMovieStatusMap(ctx, db, userID, movieIDs); err == nil {
+			for vid, status := range m {
+				if status.Watched {
+					if mv := movieByVideoID[vid]; mv != nil {
+						mv.UserWatched = true
+					}
+				}
+			}
+		}
+	}
+	if len(seriesIDs) > 0 {
+		if m, err := models.GetSeriesStatusMap(ctx, db, userID, seriesIDs); err == nil {
+			for vid, status := range m {
+				if status.Watched {
+					if sv := seriesByVideoID[vid]; sv != nil {
+						sv.UserWatched = true
+					}
+				}
+			}
+		}
+	}
 }

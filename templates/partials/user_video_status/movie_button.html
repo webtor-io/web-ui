@@ -1,0 +1,34 @@
+{{ define "user_video_status/movie_button" }}
+{{/*
+    Mark/Unmark as watched button for a Movie on the resource page.
+    Rendered only when enrichment has produced a video_id (IMDB tt-id) and
+    the user is authenticated. The button is tied to the IMDB video_id, not
+    to the resource_id — so the state is shared across torrents of the same
+    film.
+*/}}
+{{ with .Data }}
+{{ if and ($.User | hasAuth) .Movie .Movie.MovieMetadata .Movie.MovieMetadata.VideoID }}
+{{ $videoID := .Movie.MovieMetadata.VideoID }}
+{{ if and .MovieStatus .MovieStatus.Watched }}
+<form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/library/movie/{{ $videoID }}/unmark" data-async-target="main" data-async-no-scroll="true">
+    <button type="submit" class="btn btn-ghost btn-sm text-green-400 hover:bg-green-500/10 whitespace-nowrap" data-umami-event="unmark-movie-watched">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Watched
+    </button>
+</form>
+{{ else }}
+<form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/library/movie/{{ $videoID }}/mark" data-async-target="main" data-async-no-scroll="true">
+    <button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="mark-movie-watched">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+        Mark as watched
+    </button>
+</form>
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}

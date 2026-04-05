@@ -1,5 +1,9 @@
 import executeScriptElements from "./executeScriptElements";
-function loadAsyncView(target, body) {
+// options (optional): { noScroll?: boolean } — lets callers suppress the
+// automatic scroll-to-top that `data-async-scroll-top` targets normally
+// trigger. Used by small in-place toggles (e.g. watched mark/unmark buttons)
+// that reload a big target but shouldn't jump the user back to the top.
+function loadAsyncView(target, body, options) {
     const els = target.querySelectorAll('[data-async-view]');
     for (const el of els) {
         const view = el.getAttribute('data-async-view');
@@ -9,9 +13,9 @@ function loadAsyncView(target, body) {
         const event = new CustomEvent(`async:${view}_destroy`, { detail });
         window.dispatchEvent(event);
     }
-    renderBody(target, body);
+    renderBody(target, body, options);
 }
-function renderBody(target, body) {
+function renderBody(target, body, options) {
     // SAFETY: `body` is always same-origin server-rendered HTML from our own Go/Gin
     // templates — fetched via XMLHttpRequest from the app's own endpoints (async.js),
     // from same-origin SSE messages (progressLog.js), or from same-origin response
@@ -37,7 +41,7 @@ function renderBody(target, body) {
         window.dispatchEvent(event);
     }
 
-    if (target.hasAttribute('data-async-scroll-top')) {
+    if (target.hasAttribute('data-async-scroll-top') && !(options && options.noScroll)) {
         window.scrollTo({ top: 0 });
     }
 }

@@ -2,8 +2,8 @@
 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
     {{ range . }}
     <a href="/{{ .ResourceID }}" data-async-target="main" class="group flex">
-        <div class="bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-purple/30 transition-all duration-300 flex flex-col w-full">
-            <figure class="aspect-[2/3] overflow-hidden">
+        <div class="bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-purple/30 transition-all duration-300 flex flex-col w-full {{ if .UserWatched }}opacity-70{{ end }}">
+            <figure class="aspect-[2/3] overflow-hidden relative">
                 {{ if . | hasPoster }}
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                          src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}" />
@@ -11,6 +11,12 @@
                     <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                         <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">{{ . | getTitle }}</div>
                     </div>
+                {{ end }}
+                {{ if .UserWatched }}
+                <div class="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/70 backdrop-blur-sm text-green-400 text-[10px] font-semibold uppercase tracking-wider shadow-lg" title="Watched">
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Watched
+                </div>
                 {{ end }}
             </figure>
             <div class="p-3">

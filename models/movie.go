@@ -20,6 +20,9 @@ type Movie struct {
 	CreatedAt       time.Time  `pg:"created_at,default:now()"`
 	UpdatedAt       time.Time  `pg:"updated_at,default:now()"`
 
+	// Transient: populated by handlers from movie_status for UI badges.
+	UserWatched bool `pg:"-"`
+
 	MediaInfo     *MediaInfo     `pg:"rel:has-one,fk:resource_id"`
 	MovieMetadata *MovieMetadata `pg:"rel:has-one,fk:movie_metadata_id"`
 	LibraryItems  []*Library     `pg:"rel:has-many,fk:library_id,join_fk:resource_id"`

@@ -4,13 +4,16 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/user_video_status"
 )
 
 type Handler struct {
-	pg *cs.PG
+	pg          *cs.PG
+	videoStatus *user_video_status.Service
 }
 
 type PositionRequest struct {
@@ -26,8 +29,8 @@ type PositionResponse struct {
 	Watched  bool    `json:"watched"`
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG) {
-	h := &Handler{pg: pg}
+func RegisterHandler(r *gin.Engine, pg *cs.PG, videoStatus *user_video_status.Service) {
+	h := &Handler{pg: pg, videoStatus: videoStatus}
 	r.PUT("/watch/position", h.updatePosition)
 	r.GET("/watch/position", h.getPosition)
 }
@@ -64,10 +67,41 @@ func (h *Handler) updatePosition(c *gin.Context) {
 		Duration:   req.Duration,
 	}
 
-	if err := models.UpsertWatchPosition(c.Request.Context(), db, wh); err != nil {
+	transitioned, err := models.UpsertWatchPosition(c.Request.Context(), db, wh)
+	if err != nil {
 		_ = c.Error(err)
 		c.Status(http.StatusInternalServerError)
 		return
+	}
+
+	// On the false → true transition (user just crossed 90% for the first
+	// time), resolve the file to an IMDB video_id and auto-mark it in
+	// user_video_status. Failures here are logged but do NOT fail the request:
+	// the resume position is the critical path; the IMDB-level profile update
+	// is a best-effort side effect.
+	if transitioned && h.videoStatus != nil {
+		ctx := c.Request.Context()
+		ref, rerr := models.ResolveVideoFromResourcePath(ctx, db, req.ResourceID, req.Path)
+		if rerr != nil {
+			log.WithError(rerr).
+				WithField("resource_id", req.ResourceID).
+				WithField("path", req.Path).
+				Warn("failed to resolve video_id for auto-watched mark")
+		} else if ref != nil {
+			var merr error
+			switch ref.Kind {
+			case models.VideoRefKindMovie:
+				merr = h.videoStatus.MarkMovieWatched(ctx, user.ID, ref.VideoID, models.UserVideoSourceAuto90pct)
+			case models.VideoRefKindEpisode:
+				merr = h.videoStatus.MarkEpisodeWatched(ctx, user.ID, ref.VideoID, ref.Season, ref.Episode, models.UserVideoSourceAuto90pct)
+			}
+			if merr != nil {
+				log.WithError(merr).
+					WithField("video_id", ref.VideoID).
+					WithField("kind", ref.Kind).
+					Warn("failed to auto-mark user video status")
+			}
+		}
 	}
 
 	c.Status(http.StatusNoContent)

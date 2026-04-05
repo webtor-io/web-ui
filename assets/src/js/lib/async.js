@@ -9,7 +9,7 @@ export function addPopstateFilter(fn) {
     };
 }
 
-async function asyncFetch(url, targetSelector, fetchParams, params) {
+async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     let target;
     if (typeof targetSelector === 'string' || targetSelector instanceof String) {
         target = document.querySelector(targetSelector);
@@ -51,7 +51,7 @@ async function asyncFetch(url, targetSelector, fetchParams, params) {
     }
     const res = await fetchFunc(url, fetchParams);
     const text = await res.text();
-    loadAsyncView(target, text, params);
+    loadAsyncView(target, text, options);
     for (const f of updateFields) {
         let updated = false;
         for (const [h, val] of res.headers.entries()) {
@@ -110,6 +110,11 @@ async function async(selector, params = {}, scope = null) {
             if (el.getAttribute('data-async-push-state') && el.getAttribute('data-async-push-state') === 'false') {
                 history = false;
             }
+            // Per-element opt-out for the scroll-to-top that `data-async-scroll-top`
+            // targets normally trigger. Useful for small in-place toggles that
+            // reload the whole main content but shouldn't jump the viewport.
+            const noScroll = el.getAttribute('data-async-no-scroll') === 'true';
+            const options = { noScroll };
             const targetSelector = this.getAttribute('data-async-target');
             const target = document.querySelector(targetSelector);
             const layout = target.getAttribute('data-async-layout');
@@ -126,7 +131,7 @@ async function async(selector, params = {}, scope = null) {
             }
             const self = this;
             const fetch = function() {
-                return asyncFetch.call(self, url, targetSelector, fetchParams, params);
+                return asyncFetch.call(self, url, targetSelector, fetchParams, params, options);
             }
             params.history.wrap(fetch, push, url, fetchParams);
             return false;

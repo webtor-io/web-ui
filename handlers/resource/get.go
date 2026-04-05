@@ -99,6 +99,9 @@ type GetData struct {
 	Movie                 *models.Movie
 	Series                *models.Series
 	WatchedPaths          map[string]bool
+	MovieStatus           *models.MovieStatus
+	SeriesStatus          *models.SeriesStatus
+	PathActions           map[string]*PathAction
 }
 
 type ExtendedResource struct {
@@ -178,6 +181,61 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		// Load watch history for file list
 		if args.User.HasAuth() {
 			d.WatchedPaths, _ = models.GetWatchedPaths(ctx, db, args.User.ID, args.ID)
+
+			// Load IMDB-level user watch status (user_video_status) and augment
+			// WatchedPaths for cross-torrent propagation: if this series was
+			// watched on a different torrent (different dub/quality), those
+			// episodes should still appear as watched in the file list here.
+			if d.Movie != nil && d.Movie.MovieMetadata != nil && d.Movie.MovieMetadata.VideoID != "" {
+				d.MovieStatus, _ = models.GetMovieStatus(ctx, db, args.User.ID, d.Movie.MovieMetadata.VideoID)
+				if d.MovieStatus != nil && d.MovieStatus.Watched && d.Movie.Path != nil {
+					if d.WatchedPaths == nil {
+						d.WatchedPaths = map[string]bool{}
+					}
+					d.WatchedPaths[*d.Movie.Path] = true
+				}
+			}
+			if d.Series != nil && d.Series.SeriesMetadata != nil && d.Series.SeriesMetadata.VideoID != "" {
+				videoID := d.Series.SeriesMetadata.VideoID
+				d.SeriesStatus, _ = models.GetSeriesStatus(ctx, db, args.User.ID, videoID)
+				seriesWatched := d.SeriesStatus != nil && d.SeriesStatus.Watched
+
+				epMap, _ := models.GetEpisodeStatusMapForSeries(ctx, db, args.User.ID, videoID)
+
+				// Augment WatchedPaths with cross-torrent propagation: episodes
+				// marked watched (via any source — manual, 90%, or series-level)
+				// should render their green checkmark in the file browser even
+				// when the current playback was on a different torrent.
+				if seriesWatched {
+					if d.WatchedPaths == nil {
+						d.WatchedPaths = map[string]bool{}
+					}
+					for _, ep := range d.Series.Episodes {
+						if ep.Path != nil {
+							d.WatchedPaths[*ep.Path] = true
+						}
+					}
+				} else if len(epMap) > 0 {
+					if d.WatchedPaths == nil {
+						d.WatchedPaths = map[string]bool{}
+					}
+					for _, ep := range d.Series.Episodes {
+						if ep.Path == nil || ep.Season == nil || ep.Episode == nil {
+							continue
+						}
+						key := models.EpisodeKey{Season: *ep.Season, Episode: *ep.Episode}
+						if st, ok := epMap[key]; ok && st.Watched {
+							d.WatchedPaths[*ep.Path] = true
+						}
+					}
+				}
+			}
+
+			// Build path → mark/unmark URL map for the inline watched toggle
+			// in the file browser. Covers both movies and series episodes;
+			// files that aren't enriched (subtitles, samples, NFOs) get no
+			// entry and render without a toggle.
+			d.PathActions = buildPathActions(d.Movie, d.Series)
 		}
 	} else if args.User.HasAuth() {
 		return nil, errors.New("failed to connect to database")

@@ -310,7 +310,10 @@ func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, 
 	return list, nil
 }
 
-func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Movie, error) {
+// GetLibraryMovieList loads movies in the user's library, optionally filtered
+// by watched state. watchedFilter is one of "", "unwatched", or "watched" and
+// matches against movie_status.watched column.
+func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Movie, error) {
 	var list []*Movie
 
 	query := db.Model(&list).
@@ -319,8 +322,17 @@ func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort Sor
 		JoinOn("movie.resource_id = l.resource_id").
 		Join("left join movie_metadata as mmd").
 		JoinOn("movie.movie_metadata_id = mmd.movie_metadata_id").
+		Join("left join movie_status as ums").
+		JoinOn("ums.user_id = l.user_id AND ums.video_id = mmd.video_id AND ums.watched = true").
 		Where("l.user_id = ?", uID).
 		Relation("MovieMetadata")
+
+	switch watchedFilter {
+	case "unwatched":
+		query.Where("ums.video_id IS NULL")
+	case "watched":
+		query.Where("ums.video_id IS NOT NULL")
+	}
 
 	switch sort {
 	case SortTypeRecentlyAdded:
@@ -341,7 +353,10 @@ func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort Sor
 	return list, nil
 }
 
-func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Series, error) {
+// GetLibrarySeriesList is the series counterpart to GetLibraryMovieList.
+// Filtering considers only series-level series_status (manual declaration
+// or auto_all_episodes); per-episode rows are not included in the filter.
+func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Series, error) {
 	var list []*Series
 
 	query := db.Model(&list).
@@ -350,8 +365,17 @@ func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort So
 		JoinOn("series.resource_id = l.resource_id").
 		Join("left join series_metadata as smd").
 		JoinOn("series.series_metadata_id = smd.series_metadata_id").
+		Join("left join series_status as uss").
+		JoinOn("uss.user_id = l.user_id AND uss.video_id = smd.video_id AND uss.watched = true").
 		Where("l.user_id = ?", uID).
 		Relation("SeriesMetadata")
+
+	switch watchedFilter {
+	case "unwatched":
+		query.Where("uss.video_id IS NULL")
+	case "watched":
+		query.Where("uss.video_id IS NOT NULL")
+	}
 
 	switch sort {
 	case SortTypeRecentlyAdded:

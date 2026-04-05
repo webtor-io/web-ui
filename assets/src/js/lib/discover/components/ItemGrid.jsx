@@ -1,11 +1,17 @@
 import { useCallback, useState } from 'preact/hooks';
 
-export function ItemGrid({ items, showBadges, onClick }) {
+export function ItemGrid({ items, showBadges, watchedIds, onClick }) {
     if (!items.length) return null;
     return (
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {items.map(item => (
-                <ItemCard key={item.id} item={item} showBadge={showBadges} onClick={onClick} />
+                <ItemCard
+                    key={item.id}
+                    item={item}
+                    showBadge={showBadges}
+                    watched={watchedIds ? watchedIds.has(item.id) : false}
+                    onClick={onClick}
+                />
             ))}
         </div>
     );
@@ -21,7 +27,7 @@ function PosterGradient({ name }) {
     );
 }
 
-function ItemCard({ item, showBadge, onClick }) {
+function ItemCard({ item, showBadge, watched, onClick }) {
     const handleClick = useCallback(() => onClick(item), [item, onClick]);
     const [imgError, setImgError] = useState(false);
     const onImgError = useCallback(() => setImgError(true), []);
@@ -45,6 +51,12 @@ function ItemCard({ item, showBadge, onClick }) {
                         <span class="absolute top-2 left-2 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">
                             {item.type === 'series' ? 'Series' : item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                         </span>
+                    )}
+                    {watched && (
+                        <div class="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/70 backdrop-blur-sm text-green-400 text-[10px] font-semibold uppercase tracking-wider shadow-lg" title="Watched">
+                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Watched
+                        </div>
                     )}
                 </figure>
                 <div class="p-3">

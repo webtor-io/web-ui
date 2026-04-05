@@ -5,6 +5,31 @@
     <div class="flex flex-wrap gap-3">
         {{ template "stream_button" $ }}
         {{ template "button" makeFileDownload $ . }}
+        {{/* Watched toggle for movies / episodes. Shown only for enriched files.
+             Targets "main" so the file-list toggle and header button stay in sync
+             after click (they all read the same user_video_status state). */}}
+        {{ $action := index .PathActions .Item.PathStr }}
+        {{ if and ($.User | hasAuth) $action }}
+            {{ $watched := and .WatchedPaths (index .WatchedPaths .Item.PathStr) }}
+            {{ if $watched }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.UnmarkURL }}" data-async-target="main" data-async-no-scroll="true">
+                <button type="submit" class="btn btn-ghost text-green-400 hover:bg-green-500/10 whitespace-nowrap" data-umami-event="unmark-file-watched-preview">
+                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Watched
+                </button>
+            </form>
+            {{ else }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.MarkURL }}" data-async-target="main" data-async-no-scroll="true">
+                <button type="submit" class="btn btn-soft whitespace-nowrap" data-umami-event="mark-file-watched-preview">
+                    <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                    Mark as watched
+                </button>
+            </form>
+            {{ end }}
+        {{ end }}
     </div>
     <div id="log-{{ .Item.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}" />
 </div>

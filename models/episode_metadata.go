@@ -62,6 +62,21 @@ func LinkEpisodeToMetadata(
 	return err
 }
 
+// CountEpisodeMetadataByVideoID returns the number of known episodes for a
+// series identified by its IMDB video_id. Used to drive the all-episodes-watched
+// rule in user_video_status service — when the count of watched episodes
+// equals this total (and the total is > 0), the series is auto-marked.
+func CountEpisodeMetadataByVideoID(
+	ctx context.Context,
+	db *pg.DB,
+	videoID string,
+) (int, error) {
+	return db.Model((*EpisodeMetadata)(nil)).
+		Context(ctx).
+		Where("video_id = ?", videoID).
+		Count()
+}
+
 func GetEpisodeMetadata(
 	ctx context.Context,
 	db *pg.DB,

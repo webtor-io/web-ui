@@ -32,6 +32,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
 	wh "github.com/webtor-io/web-ui/handlers/watch_history"
 	"github.com/webtor-io/web-ui/handlers/webdav"
@@ -46,6 +47,7 @@ import (
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	"github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/vault"
 
 	"github.com/gin-contrib/multitemplate"
@@ -297,8 +299,14 @@ func serve(c *cli.Context) error {
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm, pg)
 
+	// Setting UserVideoStatus service
+	uvs := user_video_status.New(pg.Get())
+
+	// Setting UserVideoStatusHandler (manual mark/unmark)
+	uvsh.RegisterHandler(r, uvs)
+
 	// Setting WatchHistoryHandler
-	wh.RegisterHandler(r, pg)
+	wh.RegisterHandler(r, pg, uvs)
 
 	// Setting SitemapHandler
 	sitemap.RegisterHandler(c, r)

@@ -1,0 +1,21 @@
+{{ define "library/watched_filter" }}
+{{/*
+    Watched filter for the library index page. Rendered only for movie/series
+    sections (torrent-level watched state is ambiguous — a torrent can contain
+    both movies and series, so there's nothing to filter on). Uses the existing
+    ?sort= query string contract, adds ?watched=unwatched|watched. An empty
+    value means "show all".
+*/}}
+{{ with .Data.Args }}
+{{ if or (eq (printf "%s" .Section) "movies") (eq (printf "%s" .Section) "series") }}
+<form data-async-target="#list" class="shrink-0">
+    <input type="hidden" name="sort" value="{{ .Sort }}" />
+    <select class="select select-sm bg-base-300 border-w-line focus:border-w-purple focus:outline-none" name="watched" onchange="this.form.requestSubmit()">
+        <option value="" {{ if eq (printf "%s" .Watched) "" }}selected{{ end }}>All</option>
+        <option value="unwatched" {{ if eq (printf "%s" .Watched) "unwatched" }}selected{{ end }}>Unwatched</option>
+        <option value="watched" {{ if eq (printf "%s" .Watched) "watched" }}selected{{ end }}>Watched</option>
+    </select>
+</form>
+{{ end }}
+{{ end }}
+{{ end }}

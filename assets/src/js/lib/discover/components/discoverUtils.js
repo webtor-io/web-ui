@@ -32,3 +32,29 @@ export async function loadManifests(client) {
     const types = getTypes(catalogs);
     return { manifests, catalogs, types };
 }
+
+// Queries the server for the subset of the given IMDB ids that this user has
+// marked as watched. Returns [] on any failure (auth error, network, etc.) —
+// a failed marker query must never block discover rendering. Filters out
+// non-IMDB ids (Stremio can return addon-specific ids like "tt1234567:1:2"
+// for episodes — we only query top-level titles).
+export async function fetchWatchedIDs(ids) {
+    const titleIds = (ids || []).filter(id => typeof id === 'string' && id.startsWith('tt') && !id.includes(':'));
+    if (titleIds.length === 0) return [];
+    try {
+        const res = await fetch('/library/watched/ids', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': window._CSRF,
+            },
+            body: JSON.stringify({ ids: titleIds }),
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data.watched) ? data.watched : [];
+    } catch (e) {
+        return [];
+    }
+}

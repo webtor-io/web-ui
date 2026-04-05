@@ -163,6 +163,11 @@
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" $ }}`}}">
                         {{ template "library/button" $ }}
                     </div>
+                    {{ if or .Movie .Series }}
+                    <div id="watched-button" class="shrink-0" data-async-layout="{{`{{ if .Data.Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}`}}">
+                        {{ if .Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}
+                    </div>
+                    {{ end }}
                     <div class="sm:ml-auto shrink-0">
                         <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">

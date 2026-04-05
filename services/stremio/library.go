@@ -108,7 +108,7 @@ var _ StreamsService = (*Library)(nil)
 func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoContentWithMetadata, error) {
 	var items []models.VideoContentWithMetadata
 	if t == "movie" {
-		ls, err := models.GetLibraryMovieList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded)
+		ls, err := models.GetLibraryMovieList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded, "")
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoC
 			items[i] = v
 		}
 	} else if t == "series" {
-		ls, err := models.GetLibrarySeriesList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded)
+		ls, err := models.GetLibrarySeriesList(ctx, s.db, s.u.ID, models.SortTypeRecentlyAdded, "")
 		if err != nil {
 			return nil, err
 		}
