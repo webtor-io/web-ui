@@ -25,7 +25,7 @@ Three tables, mirroring the existing `movie_metadata` / `series_metadata` / `epi
 | `video_id` | `text` | PK part. IMDB tt-id from `movie_metadata.video_id`. |
 | `watched` | `boolean` | Whether the user declared this movie watched. Phase 1 always writes `true` on mark; unmark deletes the row. The column exists (rather than the row merely "existing") to leave room for future rating-without-watched semantics. |
 | `rating` | `smallint` | Future like/dislike: `-1`, `1`, or `NULL`. Reserved column. |
-| `source` | `text` | How the row was created: `'manual'` (user clicked the button) or `'auto_90pct'` (user crossed the 90% playback threshold). |
+| `source` | `smallint` | How the row was created, stored as a compact numeric enum (`models.UserVideoSource`): `1 = manual` (user clicked the button), `2 = auto_90pct` (user crossed the 90% playback threshold). Migration 44 created the column as `text`; migration 45 converted it to `smallint` and froze the numeric mapping. |
 | `watched_at` | `timestamptz` | When the row was set to watched — used for time-weighted signals in the future rec engine. |
 | `created_at`, `updated_at` | `timestamptz` | Audit. `updated_at` is maintained by the shared `update_updated_at()` trigger. |
 
@@ -35,15 +35,15 @@ Index: `(user_id, updated_at DESC)` for per-user feed queries.
 
 Same columns as `movie_status`. Used for:
 
-- **Manual series-level mark** (`source = 'manual'`) — user declared the whole series watched without touching episodes.
-- **Auto series-level mark** (`source = 'auto_all_episodes'`) — service inserted this row after the user watched every known episode of the series (see rule below).
+- **Manual series-level mark** (`source = UserVideoSourceManual`, stored as `1`) — user declared the whole series watched without touching episodes.
+- **Auto series-level mark** (`source = UserVideoSourceAutoAllEpisodes`, stored as `3`) — service inserted this row after the user watched every known episode of the series (see rule below).
 
 ### `episode_status`
 
 | Column | Type | Notes |
 |---|---|---|
 | `user_id`, `video_id`, `season`, `episode` | PK | `video_id` is the **series** IMDB id. `(season, episode)` keys into `episode_metadata`. |
-| `watched`, `rating`, `source`, `watched_at`, `created_at`, `updated_at` | | Same semantics as `movie_status`. `source` is `'manual'` or `'auto_90pct'`. |
+| `watched`, `rating`, `source`, `watched_at`, `created_at`, `updated_at` | | Same semantics as `movie_status`. `source` is `UserVideoSourceManual` (1) or `UserVideoSourceAuto90pct` (2). |
 
 Indexes: `(user_id, updated_at DESC)`, `(user_id, video_id)` — the second one drives the series completion count query.
 
@@ -53,19 +53,21 @@ The up-migration replays existing `watch_history.watched = true` rows into the n
 
 1. Movies: `JOIN movie + movie_metadata`, take `video_id`.
 2. Episodes: `JOIN episode + series + series_metadata` with matching `(resource_id, path)`.
-3. Series-level: `GROUP BY (user_id, video_id) HAVING count(ues) = count(episode_metadata)` — insert an `auto_all_episodes` row where the user has watched every known episode.
+3. Series-level: `GROUP BY (user_id, video_id) HAVING count(ues) = count(episode_metadata)` — insert an `UserVideoSourceAutoAllEpisodes` row where the user has watched every known episode.
+
+Migration 44 wrote these rows with textual `source` values (`'manual'`, `'auto_90pct'`, `'auto_all_episodes'`); migration 45 subsequently altered the column to `smallint` and rewrote those three values as `1 / 2 / 3`.
 
 Rows whose enrichment never resolved a `video_id` are silently dropped. They remain valid in `watch_history` but are not part of the IMDB-keyed profile.
 
 ## The "all episodes watched" rule
 
-A series is auto-marked watched **only when every episode in `episode_metadata` for that `video_id` has a corresponding `episode_status` row with `status = 'watched'`**.
+A series is auto-marked watched **only when every episode in `episode_metadata` for that `video_id` has a corresponding `episode_status` row with `watched = true`**.
 
 **Why not "watched the last episode"?**
 
 - **Ongoing series** — the "last" episode today may not be the last tomorrow. If we marked the series on finale watch, a later season would leave the flag inconsistent.
 - **Skip-watchers** — people sometimes jump to a finale (procedurals, sports). Marking the whole series based on one episode poisons the future recommendation profile.
-- **Symmetry with unmark** — `UnmarkEpisode` cleanly drops the `auto_all_episodes` row when the condition stops holding. Last-episode logic has no equivalent.
+- **Symmetry with unmark** — `UnmarkEpisode` cleanly drops the `UserVideoSourceAutoAllEpisodes` row when the condition stops holding. Last-episode logic has no equivalent.
 
 The service computes this after every episode upsert:
 
@@ -73,7 +75,7 @@ The service computes this after every episode upsert:
 total := CountEpisodeMetadataByVideoID(videoID)
 done  := CountWatchedEpisodes(userID, videoID)
 if total > 0 && done >= total {
-    // upsert series_status with source='auto_all_episodes'
+    // upsert series_status with source = models.UserVideoSourceAutoAllEpisodes
 }
 ```
 
@@ -85,7 +87,7 @@ Series-level and per-episode rows are deliberately **decoupled**:
 
 - `MarkSeriesWatched` only writes the series-level row. It does **not** cascade into episode rows. Reason: if the user later unmarks the series, cascading would destroy real per-episode history.
 - `UnmarkSeries` only deletes the series-level row; episode rows survive.
-- `UnmarkEpisode` deletes the episode row and, if a series-level row exists with `source = 'auto_all_episodes'`, drops it too. A **manual** series row (`source = 'manual'`) is preserved — it represents explicit user intent.
+- `UnmarkEpisode` deletes the episode row and, if a series-level row exists with `source = UserVideoSourceAutoAllEpisodes`, drops it too. A **manual** series row (`source = UserVideoSourceManual`) is preserved — it represents explicit user intent.
 
 **Display rule**: the resource page and file list treat a series-level `'watched'` row as implying every episode is watched. When no series-level row exists, each episode is displayed by its own row.
 
@@ -102,7 +104,7 @@ Implemented in `handlers/resource/get.go` `prepareGetData`: `WatchedPaths` is au
 `handlers/watch_history/handler.go` `updatePosition` calls `models.UpsertWatchPosition`, which now returns a `transitioned bool` — `true` iff the `watched` flag flipped from `false` to `true` on this upsert. When that happens, the handler:
 
 1. Resolves the `(resource_id, path)` to a `VideoRef` (movie or episode) via `models.ResolveVideoFromResourcePath`.
-2. Calls `Service.MarkMovieWatched` or `Service.MarkEpisodeWatched` with `source = 'auto_90pct'`.
+2. Calls `Service.MarkMovieWatched` or `Service.MarkEpisodeWatched` with `source = models.UserVideoSourceAuto90pct`.
 
 If the resource has not been enriched yet (no `video_id`), the resolver returns `nil` and the call is silently skipped. The IMDB-level profile update is **best-effort**: failures are logged but do not fail the playback position request. Resume is the critical path.
 
@@ -135,7 +137,7 @@ Form-based, redirect via `X-Return-Url` for progressive-enhancement compatibilit
 ## Files
 
 **Models**
-- `models/movie_status.go`, `models/series_status.go`, `models/episode_status.go` — table structs, upsert/get/delete/bulk helpers, shared status/source constants.
+- `models/movie_status.go`, `models/series_status.go`, `models/episode_status.go` — table structs, upsert/get/delete/bulk helpers. The shared `UserVideoSource int16` enum (`Manual = 1`, `Auto90pct = 2`, `AutoAllEpisodes = 3`) lives in `movie_status.go` and is used as the `Source` field type on all three structs. Numeric values are frozen by migration 45 and must not be renumbered.
 - `models/video_ref.go` — `ResolveVideoFromResourcePath`, used by watch_history auto-mark.
 - `models/episode_metadata.go` — added `CountEpisodeMetadataByVideoID`.
 - `models/watch_history.go` — `UpsertWatchPosition` now returns `(transitioned, error)`; `GetRecentlyWatched` calls `filterOutFullyWatched`; `WatchHistory` struct has transient `VideoID`/`ContentType` populated by enrichment.
@@ -161,8 +163,8 @@ Form-based, redirect via `X-Return-Url` for progressive-enhancement compatibilit
 - Edits: `templates/views/resource/get.html`, `templates/partials/library/video_list.html`, `templates/views/library/index.html`, `templates/partials/list.html` (inline per-file watched toggle).
 
 **Migration**
-- `migrations/44_create_user_video_status.up.sql`
-- `migrations/44_create_user_video_status.down.sql`
+- `migrations/44_create_video_status.up.sql` / `.down.sql` — initial tables (source as text).
+- `migrations/45_video_status_source_smallint.up.sql` / `.down.sql` — convert the `source` column of all three tables from `text` to `smallint` and rewrite the existing `'manual' / 'auto_90pct' / 'auto_all_episodes'` values as `1 / 2 / 3` via `ALTER COLUMN ... TYPE smallint USING CASE ... END`.
 
 ## Future work (not in Phase 1)
 

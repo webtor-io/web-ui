@@ -20,7 +20,7 @@ type userVideoStatusStore interface {
 	// Series
 	UpsertSeriesStatus(ctx context.Context, s *models.SeriesStatus) error
 	DeleteSeriesStatus(ctx context.Context, userID uuid.UUID, videoID string) error
-	DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source string) error
+	DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error
 
 	// Episodes
 	UpsertEpisodeStatus(ctx context.Context, s *models.EpisodeStatus) error
@@ -66,7 +66,7 @@ func (s *pgUserVideoStatusStore) DeleteSeriesStatus(ctx context.Context, userID 
 	return models.DeleteSeriesStatus(ctx, s.db, userID, videoID)
 }
 
-func (s *pgUserVideoStatusStore) DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source string) error {
+func (s *pgUserVideoStatusStore) DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error {
 	return models.DeleteSeriesStatusBySource(ctx, s.db, userID, videoID, source)
 }
 

@@ -13,16 +13,16 @@ import (
 type EpisodeStatus struct {
 	tableName struct{} `pg:"episode_status"`
 
-	UserID    uuid.UUID  `pg:"user_id,pk"`
-	VideoID   string     `pg:"video_id,pk"`
-	Season    int16      `pg:"season,pk"`
-	Episode   int16      `pg:"episode,pk"`
-	Watched   bool       `pg:"watched,use_zero"`
-	Rating    *int16     `pg:"rating"`
-	Source    string     `pg:"source"`
-	WatchedAt *time.Time `pg:"watched_at"`
-	CreatedAt time.Time  `pg:"created_at"`
-	UpdatedAt time.Time  `pg:"updated_at"`
+	UserID    uuid.UUID       `pg:"user_id,pk"`
+	VideoID   string          `pg:"video_id,pk"`
+	Season    int16           `pg:"season,pk"`
+	Episode   int16           `pg:"episode,pk"`
+	Watched   bool            `pg:"watched,use_zero"`
+	Rating    *int16          `pg:"rating"`
+	Source    UserVideoSource `pg:"source"`
+	WatchedAt *time.Time      `pg:"watched_at"`
+	CreatedAt time.Time       `pg:"created_at"`
+	UpdatedAt time.Time       `pg:"updated_at"`
 }
 
 // EpisodeKey is a compact map key for (season, episode) lookups in templates.

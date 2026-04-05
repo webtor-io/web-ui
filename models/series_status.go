@@ -12,14 +12,14 @@ import (
 type SeriesStatus struct {
 	tableName struct{} `pg:"series_status"`
 
-	UserID    uuid.UUID  `pg:"user_id,pk"`
-	VideoID   string     `pg:"video_id,pk"`
-	Watched   bool       `pg:"watched,use_zero"`
-	Rating    *int16     `pg:"rating"`
-	Source    string     `pg:"source"`
-	WatchedAt *time.Time `pg:"watched_at"`
-	CreatedAt time.Time  `pg:"created_at"`
-	UpdatedAt time.Time  `pg:"updated_at"`
+	UserID    uuid.UUID       `pg:"user_id,pk"`
+	VideoID   string          `pg:"video_id,pk"`
+	Watched   bool            `pg:"watched,use_zero"`
+	Rating    *int16          `pg:"rating"`
+	Source    UserVideoSource `pg:"source"`
+	WatchedAt *time.Time      `pg:"watched_at"`
+	CreatedAt time.Time       `pg:"created_at"`
+	UpdatedAt time.Time       `pg:"updated_at"`
 }
 
 func UpsertSeriesStatus(ctx context.Context, db *pg.DB, s *SeriesStatus) error {
@@ -67,7 +67,7 @@ func DeleteSeriesStatus(ctx context.Context, db *pg.DB, userID uuid.UUID, videoI
 // DeleteSeriesStatusBySource deletes a series-level row only if its source
 // matches. Used by the service to drop an auto_all_episodes row when an episode
 // is unmarked, without clobbering a manual declaration.
-func DeleteSeriesStatusBySource(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID string, source string) error {
+func DeleteSeriesStatusBySource(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID string, source UserVideoSource) error {
 	_, err := db.Model((*SeriesStatus)(nil)).
 		Context(ctx).
 		Where("user_id = ? AND video_id = ? AND source = ?", userID, videoID, source).

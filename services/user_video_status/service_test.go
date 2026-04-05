@@ -63,7 +63,7 @@ func (m *mockStore) DeleteSeriesStatus(_ context.Context, _ uuid.UUID, videoID s
 	return nil
 }
 
-func (m *mockStore) DeleteSeriesStatusBySource(_ context.Context, _ uuid.UUID, videoID string, source string) error {
+func (m *mockStore) DeleteSeriesStatusBySource(_ context.Context, _ uuid.UUID, videoID string, source models.UserVideoSource) error {
 	if s, ok := m.series[videoID]; ok && s.Source == source {
 		delete(m.series, videoID)
 	}
@@ -136,7 +136,7 @@ func TestMarkMovieWatched(t *testing.T) {
 		t.Error("expected watched=true")
 	}
 	if got.Source != models.UserVideoSourceManual {
-		t.Errorf("expected source 'manual', got %q", got.Source)
+		t.Errorf("expected source 'manual', got %s", got.Source)
 	}
 	if got.WatchedAt == nil {
 		t.Error("expected watched_at to be set")
@@ -210,7 +210,7 @@ func TestMarkEpisodeWatched_AutoMarksSeriesWhenAllEpisodesComplete(t *testing.T)
 		t.Fatal("expected series to be auto-marked after all episodes watched")
 	}
 	if got.Source != models.UserVideoSourceAutoAllEpisodes {
-		t.Errorf("expected source 'auto_all_episodes', got %q", got.Source)
+		t.Errorf("expected source 'auto_all_episodes', got %s", got.Source)
 	}
 	if !got.Watched {
 		t.Error("expected watched=true")
@@ -275,7 +275,7 @@ func TestUnmarkEpisode_PreservesManualSeriesRow(t *testing.T) {
 		t.Fatal("expected manual series row to be preserved")
 	}
 	if got.Source != models.UserVideoSourceManual {
-		t.Errorf("expected source 'manual', got %q", got.Source)
+		t.Errorf("expected source 'manual', got %s", got.Source)
 	}
 }
 
@@ -293,7 +293,7 @@ func TestMarkSeriesWatched(t *testing.T) {
 		t.Fatal("expected series status to be upserted")
 	}
 	if got.Source != models.UserVideoSourceManual {
-		t.Errorf("expected source 'manual', got %q", got.Source)
+		t.Errorf("expected source 'manual', got %s", got.Source)
 	}
 }
 

@@ -36,7 +36,7 @@ func New(db *pg.DB) *Service {
 // Also propagates watched=true into watch_history for every matching file
 // across all of the user's torrents of this movie, so the continue-watching
 // ribbon picks up the declared intent.
-func (s *Service) MarkMovieWatched(ctx context.Context, userID uuid.UUID, videoID string, source string) error {
+func (s *Service) MarkMovieWatched(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error {
 	if videoID == "" {
 		return errors.New("videoID is required")
 	}
@@ -69,7 +69,7 @@ func (s *Service) UnmarkMovie(ctx context.Context, userID uuid.UUID, videoID str
 // source='auto_all_episodes'. This is the "all episodes watched" rule —
 // deliberately correct for ongoing series, where the series-level row will
 // fall out of sync naturally once new episodes are enriched.
-func (s *Service) MarkEpisodeWatched(ctx context.Context, userID uuid.UUID, videoID string, season, episode int16, source string) error {
+func (s *Service) MarkEpisodeWatched(ctx context.Context, userID uuid.UUID, videoID string, season, episode int16, source models.UserVideoSource) error {
 	if videoID == "" {
 		return errors.New("videoID is required")
 	}
@@ -114,7 +114,7 @@ func (s *Service) UnmarkEpisode(ctx context.Context, userID uuid.UUID, videoID s
 // rows are independent so that unmarking the series later does not destroy
 // actual per-episode history. Templates are expected to display "all episodes
 // watched" implicitly whenever a series-level row exists.
-func (s *Service) MarkSeriesWatched(ctx context.Context, userID uuid.UUID, videoID string, source string) error {
+func (s *Service) MarkSeriesWatched(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error {
 	if videoID == "" {
 		return errors.New("videoID is required")
 	}

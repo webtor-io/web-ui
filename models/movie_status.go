@@ -9,27 +9,50 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-// Shared source constants for movie_status / series_status / episode_status
-// tables. The `source` column records how the row was created, which becomes
-// useful as a signal weight for the future recommendation engine (manual
-// declaration is a stronger signal than auto_90pct, etc.).
+// UserVideoSource is the compact enum stored in the `source` smallint column
+// of movie_status / series_status / episode_status. It records how the row
+// came into existence, which we use as a signal weight for the future
+// recommendation engine:
+//
+//   - Manual         — explicit user click, strongest signal.
+//   - Auto90pct      — user crossed the 90% playback threshold. Medium signal
+//     (could be autoplay / background / someone else's session).
+//   - AutoAllEpisodes — derived series-level row inserted when every known
+//     episode has an Auto90pct row; only as reliable as its constituents.
+//
+// Numeric values are frozen by migration 45 and must not be renumbered.
+type UserVideoSource int16
+
 const (
-	UserVideoSourceManual          = "manual"
-	UserVideoSourceAuto90pct       = "auto_90pct"
-	UserVideoSourceAutoAllEpisodes = "auto_all_episodes"
+	UserVideoSourceManual          UserVideoSource = 1
+	UserVideoSourceAuto90pct       UserVideoSource = 2
+	UserVideoSourceAutoAllEpisodes UserVideoSource = 3
 )
+
+func (s UserVideoSource) String() string {
+	switch s {
+	case UserVideoSourceManual:
+		return "manual"
+	case UserVideoSourceAuto90pct:
+		return "auto_90pct"
+	case UserVideoSourceAutoAllEpisodes:
+		return "auto_all_episodes"
+	default:
+		return "unknown"
+	}
+}
 
 type MovieStatus struct {
 	tableName struct{} `pg:"movie_status"`
 
-	UserID    uuid.UUID  `pg:"user_id,pk"`
-	VideoID   string     `pg:"video_id,pk"`
-	Watched   bool       `pg:"watched,use_zero"`
-	Rating    *int16     `pg:"rating"`
-	Source    string     `pg:"source"`
-	WatchedAt *time.Time `pg:"watched_at"`
-	CreatedAt time.Time  `pg:"created_at"`
-	UpdatedAt time.Time  `pg:"updated_at"`
+	UserID    uuid.UUID       `pg:"user_id,pk"`
+	VideoID   string          `pg:"video_id,pk"`
+	Watched   bool            `pg:"watched,use_zero"`
+	Rating    *int16          `pg:"rating"`
+	Source    UserVideoSource `pg:"source"`
+	WatchedAt *time.Time      `pg:"watched_at"`
+	CreatedAt time.Time       `pg:"created_at"`
+	UpdatedAt time.Time       `pg:"updated_at"`
 }
 
 func UpsertMovieStatus(ctx context.Context, db *pg.DB, s *MovieStatus) error {
