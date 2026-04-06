@@ -1,5 +1,5 @@
 {{ define "user_video_status/rate-modal/form" }}
-<div class="flex justify-center pt-2 pb-3">
+<div class="flex flex-col items-center pt-2 pb-3 gap-1">
     <div class="rating rating-md gap-0.5" id="rate-stars">
         {{ range $i := seq 1 10 }}
         <input type="radio" name="rating" value="{{ $i }}"
@@ -8,6 +8,7 @@
                data-umami-event="rate-star-clicked" />
         {{ end }}
     </div>
+    <span id="rate-label" class="text-sm font-semibold text-yellow-400 h-5">{{ if gt .CurrentRating 0 }}{{ .CurrentRating }}/10{{ end }}</span>
 </div>
 <div class="modal-action mt-0 justify-center">
     <form action="/library/{{ .Type }}/{{ .VideoID }}/rate" method="post"
@@ -33,6 +34,7 @@
 (function() {
     var stars = document.querySelectorAll('#rate-stars input[name="rating"]');
     var hidden = document.getElementById('rate-value');
+    var label = document.getElementById('rate-label');
     var selected = {{ .CurrentRating }};
 
     function paint(upTo, bright, dim) {
@@ -51,6 +53,10 @@
         }
     }
 
+    function showLabel(val) {
+        label.textContent = val > 0 ? val + '/10' : '';
+    }
+
     paint(selected, '1', '0.25');
 
     for (var i = 0; i < stars.length; i++) {
@@ -58,13 +64,17 @@
             selected = parseInt(this.value);
             hidden.value = selected;
             paint(selected, '1', '0.25');
+            showLabel(selected);
         });
         stars[i].addEventListener('mouseenter', function() {
-            paintHover(parseInt(this.value));
+            var val = parseInt(this.value);
+            paintHover(val);
+            showLabel(val);
         });
     }
     document.getElementById('rate-stars').addEventListener('mouseleave', function() {
         paint(selected, '1', '0.25');
+        showLabel(selected);
     });
 })();
 </script>

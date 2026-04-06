@@ -45,7 +45,7 @@
         <div>
             {{ template "footer" . }}
         </div>
-        <div id="toast-container" class="toast toast-end toast-bottom z-tooltip" role="status" aria-live="assertive" aria-atomic="false"></div>
+        <div id="toast-container" class="toast toast-end toast-bottom z-toast" role="status" aria-live="assertive" aria-atomic="false"></div>
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}
         {{ "auth.js" | asset }}

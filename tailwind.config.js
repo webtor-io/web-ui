@@ -16,7 +16,7 @@ module.exports = {
         'navbar':         '30',
         'modal-backdrop': '40',
         'modal':          '50',
-        'toast':          '60',
+        'toast':          '9999',
         'tooltip':        '70',
       },
       colors: {
