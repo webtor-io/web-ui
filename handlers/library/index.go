@@ -180,9 +180,12 @@ func (s *Handler) annotateWatched(ctx context.Context, db *pg.DB, userID uuid.UU
 	if len(movieIDs) > 0 {
 		if m, err := models.GetMovieStatusMap(ctx, db, userID, movieIDs); err == nil {
 			for vid, status := range m {
-				if status.Watched {
-					if mv := movieByVideoID[vid]; mv != nil {
+				if mv := movieByVideoID[vid]; mv != nil {
+					if status.Watched {
 						mv.UserWatched = true
+					}
+					if status.Rating != nil {
+						mv.UserRating = status.Rating
 					}
 				}
 			}
@@ -191,9 +194,12 @@ func (s *Handler) annotateWatched(ctx context.Context, db *pg.DB, userID uuid.UU
 	if len(seriesIDs) > 0 {
 		if m, err := models.GetSeriesStatusMap(ctx, db, userID, seriesIDs); err == nil {
 			for vid, status := range m {
-				if status.Watched {
-					if sv := seriesByVideoID[vid]; sv != nil {
+				if sv := seriesByVideoID[vid]; sv != nil {
+					if status.Watched {
 						sv.UserWatched = true
+					}
+					if status.Rating != nil {
+						sv.UserRating = status.Rating
 					}
 				}
 			}

@@ -16,11 +16,15 @@ type userVideoStatusStore interface {
 	// Movies
 	UpsertMovieStatus(ctx context.Context, s *models.MovieStatus) error
 	DeleteMovieStatus(ctx context.Context, userID uuid.UUID, videoID string) error
+	UpsertMovieRating(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error
+	ClearMovieRating(ctx context.Context, userID uuid.UUID, videoID string) error
 
 	// Series
 	UpsertSeriesStatus(ctx context.Context, s *models.SeriesStatus) error
 	DeleteSeriesStatus(ctx context.Context, userID uuid.UUID, videoID string) error
 	DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error
+	UpsertSeriesRating(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error
+	ClearSeriesRating(ctx context.Context, userID uuid.UUID, videoID string) error
 
 	// Episodes
 	UpsertEpisodeStatus(ctx context.Context, s *models.EpisodeStatus) error
@@ -42,8 +46,8 @@ type userVideoStatusStore interface {
 	// drives the discover page marker. Client sends a candidate list of
 	// IMDB ids (the currently visible catalog / search page), server
 	// returns the subset that this user has actually marked watched.
-	FilterWatchedMovieIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error)
-	FilterWatchedSeriesIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error)
+	GetMovieStatusMap(ctx context.Context, userID uuid.UUID, videoIDs []string) (map[string]*models.MovieStatus, error)
+	GetSeriesStatusMap(ctx context.Context, userID uuid.UUID, videoIDs []string) (map[string]*models.SeriesStatus, error)
 }
 
 type pgUserVideoStatusStore struct {
@@ -58,6 +62,14 @@ func (s *pgUserVideoStatusStore) DeleteMovieStatus(ctx context.Context, userID u
 	return models.DeleteMovieStatus(ctx, s.db, userID, videoID)
 }
 
+func (s *pgUserVideoStatusStore) UpsertMovieRating(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error {
+	return models.UpsertMovieRating(ctx, s.db, userID, videoID, rating)
+}
+
+func (s *pgUserVideoStatusStore) ClearMovieRating(ctx context.Context, userID uuid.UUID, videoID string) error {
+	return models.ClearMovieRating(ctx, s.db, userID, videoID)
+}
+
 func (s *pgUserVideoStatusStore) UpsertSeriesStatus(ctx context.Context, m *models.SeriesStatus) error {
 	return models.UpsertSeriesStatus(ctx, s.db, m)
 }
@@ -68,6 +80,14 @@ func (s *pgUserVideoStatusStore) DeleteSeriesStatus(ctx context.Context, userID 
 
 func (s *pgUserVideoStatusStore) DeleteSeriesStatusBySource(ctx context.Context, userID uuid.UUID, videoID string, source models.UserVideoSource) error {
 	return models.DeleteSeriesStatusBySource(ctx, s.db, userID, videoID, source)
+}
+
+func (s *pgUserVideoStatusStore) UpsertSeriesRating(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error {
+	return models.UpsertSeriesRating(ctx, s.db, userID, videoID, rating)
+}
+
+func (s *pgUserVideoStatusStore) ClearSeriesRating(ctx context.Context, userID uuid.UUID, videoID string) error {
+	return models.ClearSeriesRating(ctx, s.db, userID, videoID)
 }
 
 func (s *pgUserVideoStatusStore) UpsertEpisodeStatus(ctx context.Context, m *models.EpisodeStatus) error {
@@ -94,10 +114,10 @@ func (s *pgUserVideoStatusStore) SetWatchHistoryWatchedForEpisode(ctx context.Co
 	return models.SetWatchedForEpisode(ctx, s.db, userID, videoID, season, episode, watched)
 }
 
-func (s *pgUserVideoStatusStore) FilterWatchedMovieIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
-	return models.FilterWatchedMovieIDs(ctx, s.db, userID, videoIDs)
+func (s *pgUserVideoStatusStore) GetMovieStatusMap(ctx context.Context, userID uuid.UUID, videoIDs []string) (map[string]*models.MovieStatus, error) {
+	return models.GetMovieStatusMap(ctx, s.db, userID, videoIDs)
 }
 
-func (s *pgUserVideoStatusStore) FilterWatchedSeriesIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
-	return models.FilterWatchedSeriesIDs(ctx, s.db, userID, videoIDs)
+func (s *pgUserVideoStatusStore) GetSeriesStatusMap(ctx context.Context, userID uuid.UUID, videoIDs []string) (map[string]*models.SeriesStatus, error) {
+	return models.GetSeriesStatusMap(ctx, s.db, userID, videoIDs)
 }

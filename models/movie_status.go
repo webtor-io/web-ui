@@ -97,6 +97,43 @@ func DeleteMovieStatus(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID
 	return nil
 }
 
+// UpsertMovieRating sets (or updates) the user's rating for a movie without
+// touching watched/source/watched_at. If no status row exists yet (the user
+// rates before watching), a new row is created with watched=false.
+func UpsertMovieRating(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID string, rating int16) error {
+	s := &MovieStatus{
+		UserID:  userID,
+		VideoID: videoID,
+		Rating:  &rating,
+		Source:  UserVideoSourceManual,
+	}
+	_, err := db.Model(s).
+		Context(ctx).
+		OnConflict("(user_id, video_id) DO UPDATE").
+		Set("rating = EXCLUDED.rating").
+		Set("updated_at = now()").
+		Insert()
+	if err != nil {
+		return errors.Wrap(err, "failed to upsert movie rating")
+	}
+	return nil
+}
+
+// ClearMovieRating removes the user's rating for a movie, preserving the
+// watched state if present.
+func ClearMovieRating(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID string) error {
+	_, err := db.Model((*MovieStatus)(nil)).
+		Context(ctx).
+		Set("rating = NULL").
+		Set("updated_at = now()").
+		Where("user_id = ? AND video_id = ?", userID, videoID).
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to clear movie rating")
+	}
+	return nil
+}
+
 // FilterWatchedMovieIDs takes a candidate list of IMDB ids and returns the
 // subset that the given user has marked as watched. Used by the
 // /library/watched/ids endpoint that drives the discover-page watched marker

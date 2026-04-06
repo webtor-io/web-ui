@@ -3,6 +3,7 @@ package user_video_status
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -26,31 +27,40 @@ func RegisterHandler(r *gin.Engine, svc *uvs.Service) {
 	// Movies
 	gr.POST("/movie/:video_id/mark", h.markMovie)
 	gr.POST("/movie/:video_id/unmark", h.unmarkMovie)
+	gr.POST("/movie/:video_id/rate", h.rateMovie)
+	gr.POST("/movie/:video_id/unrate", h.unrateMovie)
 
 	// Series (whole series watched)
 	gr.POST("/series/:video_id/mark", h.markSeries)
 	gr.POST("/series/:video_id/unmark", h.unmarkSeries)
+	gr.POST("/series/:video_id/rate", h.rateSeries)
+	gr.POST("/series/:video_id/unrate", h.unrateSeries)
 
 	// Individual episodes
 	gr.POST("/series/:video_id/episode/:season/:episode/mark", h.markEpisode)
 	gr.POST("/series/:video_id/episode/:season/:episode/unmark", h.unmarkEpisode)
 
-	// Watched-ids filter — client sends visible IMDB ids, server returns
-	// the subset the user has marked watched. Drives the discover marker.
-	gr.POST("/watched/ids", h.filterWatchedIDs)
+	// User status filter — client sends visible IMDB ids, server returns
+	// watched + rating state for each. Drives discover badges.
+	gr.POST("/status", h.filterUserStatus)
 }
 
-// --- Watched IDs filter ---
+// --- User status filter ---
 
-type watchedIDsRequest struct {
+type userStatusRequest struct {
 	IDs []string `json:"ids"`
 }
 
-type watchedIDsResponse struct {
-	Watched []string `json:"watched"`
+type userStatusItem struct {
+	Watched bool  `json:"watched"`
+	Rating  int16 `json:"rating,omitempty"`
 }
 
-func (h *Handler) filterWatchedIDs(c *gin.Context) {
+type userStatusResponse struct {
+	Statuses map[string]*userStatusItem `json:"statuses"`
+}
+
+func (h *Handler) filterUserStatus(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	// auth.HasAuth middleware already guarantees HasAuth() — defensive check.
 	if user == nil || !user.HasAuth() {
@@ -58,22 +68,28 @@ func (h *Handler) filterWatchedIDs(c *gin.Context) {
 		return
 	}
 
-	var req watchedIDsRequest
+	var req userStatusRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	watched, err := h.svc.FilterWatchedIDs(c.Request.Context(), user.ID, req.IDs)
+	statuses, err := h.svc.FilterUserStatus(c.Request.Context(), user.ID, req.IDs)
 	if err != nil {
 		_ = c.Error(err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	if watched == nil {
-		watched = []string{}
+	resp := userStatusResponse{
+		Statuses: make(map[string]*userStatusItem, len(statuses)),
 	}
-	c.JSON(http.StatusOK, watchedIDsResponse{Watched: watched})
+	for vid, st := range statuses {
+		resp.Statuses[vid] = &userStatusItem{
+			Watched: st.Watched,
+			Rating:  st.Rating,
+		}
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // --- Movies ---
@@ -85,7 +101,7 @@ func (h *Handler) markMovie(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Marked as watched")
+	redirectWithRatePrompt(c, "Marked as watched")
 }
 
 func (h *Handler) doMarkMovie(ctx context.Context, user *auth.User, videoID string) error {
@@ -127,7 +143,7 @@ func (h *Handler) markSeries(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Marked as watched")
+	redirectWithRatePrompt(c, "Marked as watched")
 }
 
 func (h *Handler) doMarkSeries(ctx context.Context, user *auth.User, videoID string) error {
@@ -210,6 +226,112 @@ func (h *Handler) doUnmarkEpisode(ctx context.Context, user *auth.User, videoID 
 		return errors.New("video_id is required")
 	}
 	return h.svc.UnmarkEpisode(ctx, user.ID, videoID, season, episode)
+}
+
+// --- Rating ---
+
+func (h *Handler) rateMovie(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	videoID := c.Param("video_id")
+	rating, err := parseRating(c)
+	if err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	if err := h.doRateMovie(c.Request.Context(), user, videoID, rating); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "Rating saved")
+}
+
+func (h *Handler) doRateMovie(ctx context.Context, user *auth.User, videoID string, rating int16) error {
+	if user == nil || !user.HasAuth() {
+		return errors.New("unauthorized")
+	}
+	return h.svc.RateMovie(ctx, user.ID, videoID, rating)
+}
+
+func (h *Handler) unrateMovie(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	videoID := c.Param("video_id")
+	if err := h.doUnrateMovie(c.Request.Context(), user, videoID); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "Rating removed")
+}
+
+func (h *Handler) doUnrateMovie(ctx context.Context, user *auth.User, videoID string) error {
+	if user == nil || !user.HasAuth() {
+		return errors.New("unauthorized")
+	}
+	return h.svc.UnrateMovie(ctx, user.ID, videoID)
+}
+
+func (h *Handler) rateSeries(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	videoID := c.Param("video_id")
+	rating, err := parseRating(c)
+	if err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	if err := h.doRateSeries(c.Request.Context(), user, videoID, rating); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "Rating saved")
+}
+
+func (h *Handler) doRateSeries(ctx context.Context, user *auth.User, videoID string, rating int16) error {
+	if user == nil || !user.HasAuth() {
+		return errors.New("unauthorized")
+	}
+	return h.svc.RateSeries(ctx, user.ID, videoID, rating)
+}
+
+func (h *Handler) unrateSeries(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	videoID := c.Param("video_id")
+	if err := h.doUnrateSeries(c.Request.Context(), user, videoID); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "Rating removed")
+}
+
+func (h *Handler) doUnrateSeries(ctx context.Context, user *auth.User, videoID string) error {
+	if user == nil || !user.HasAuth() {
+		return errors.New("unauthorized")
+	}
+	return h.svc.UnrateSeries(ctx, user.ID, videoID)
+}
+
+func parseRating(c *gin.Context) (int16, error) {
+	r, err := strconv.Atoi(c.PostForm("rating"))
+	if err != nil || r < 1 || r > 10 {
+		return 0, errors.New("rating must be between 1 and 10")
+	}
+	return int16(r), nil
+}
+
+// redirectWithRatePrompt redirects back to the resource page with both the
+// success status and rate-form=true, so the rating modal auto-opens after
+// marking as watched.
+func redirectWithRatePrompt(c *gin.Context, message string) {
+	u, err := url.Parse(c.GetHeader("X-Return-Url"))
+	if err != nil || u == nil {
+		web.RedirectWithSuccessAndMessage(c, message)
+		return
+	}
+	q := u.Query()
+	q.Set("status", "success")
+	q.Set("from", c.Request.URL.Path)
+	q.Set("message", message)
+	q.Set("rate-form", "true")
+	u.RawQuery = q.Encode()
+	c.Redirect(http.StatusFound, u.String())
 }
 
 func parseSeasonEpisode(c *gin.Context) (int16, int16, error) {

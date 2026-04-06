@@ -9,7 +9,7 @@ import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
-import { restoreModalFromUrl, loadManifests, fetchWatchedIDs } from './discoverUtils';
+import { restoreModalFromUrl, loadManifests, fetchUserStatuses } from './discoverUtils';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
@@ -66,11 +66,9 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             }
             dispatch({ type: 'CATALOG_LOADED', items: skip > 0 ? metas : metas, append: skip > 0, hasMore: (data.metas || []).length > 0 });
             window.umami?.track('discover-catalog-loaded', { type: catalog.type, catalog: catalog.id });
-            // Fire-and-forget watched-marker query for the newly arrived batch.
-            // Failures are swallowed inside fetchWatchedIDs — a missing badge
-            // must never block catalog rendering.
-            fetchWatchedIDs(metas.map(m => m.id)).then(ids => {
-                if (ids.length) dispatch({ type: 'WATCHED_IDS_MERGED', ids });
+            // Fire-and-forget user status query for the newly arrived batch.
+            fetchUserStatuses(metas.map(m => m.id)).then(statuses => {
+                if (Object.keys(statuses).length) dispatch({ type: 'USER_STATUSES_MERGED', statuses });
             });
         } catch (e) {
             if (e.name === 'AbortError') return;
@@ -260,8 +258,8 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
 
         dispatch({ type: 'SEARCH_RESULTS', results: merged });
         window.umami?.track('discover-search', { query, count: merged.length });
-        fetchWatchedIDs(merged.map(m => m.id)).then(ids => {
-            if (ids.length) dispatch({ type: 'WATCHED_IDS_MERGED', ids });
+        fetchUserStatuses(merged.map(m => m.id)).then(statuses => {
+            if (Object.keys(statuses).length) dispatch({ type: 'USER_STATUSES_MERGED', statuses });
         });
     }, [client, state.isSearchMode, exitSearch]);
 
@@ -814,7 +812,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 <p class="text-w-muted text-center col-span-full py-8">No items found.</p>
             )}
 
-            <ItemGrid items={displayItems} showBadges={showBadges} watchedIds={state.watchedIds} onClick={cardClick} />
+            <ItemGrid items={displayItems} showBadges={showBadges} userStatuses={state.userStatuses} onClick={cardClick} />
 
             {!state.isSearchMode && !state.catalogLoading && state.hasMore && state.items.length > 0 && (
                 <LoadMore onLoadMore={loadMore} />

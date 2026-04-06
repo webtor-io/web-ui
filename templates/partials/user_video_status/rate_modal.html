@@ -1,0 +1,12 @@
+{{ define "user_video_status/rate-modal" }}
+{{ if .RateForm }}
+<dialog class="modal" open>
+    <div class="modal-box max-w-sm bg-w-card border border-w-line/50 rounded-2xl">
+        {{ template "user_video_status/rate-modal/form" .RateForm }}
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{{ end }}
+{{ end }}

@@ -1,0 +1,71 @@
+{{ define "user_video_status/rate-modal/form" }}
+<div class="flex justify-center pt-2 pb-3">
+    <div class="rating rating-md gap-0.5" id="rate-stars">
+        {{ range $i := seq 1 10 }}
+        <input type="radio" name="rating" value="{{ $i }}"
+               class="mask mask-star-2 bg-yellow-400"
+               {{ if eq $.CurrentRating $i }}checked{{ end }}
+               data-umami-event="rate-star-clicked" />
+        {{ end }}
+    </div>
+</div>
+<div class="modal-action mt-0 justify-center">
+    <form action="/library/{{ .Type }}/{{ .VideoID }}/rate" method="post"
+          data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
+        <input type="hidden" name="rating" value="{{ .CurrentRating }}" id="rate-value" />
+        <button type="submit" class="btn btn-soft" data-umami-event="rate-confirmed">
+            Rate
+        </button>
+    </form>
+    {{ if gt .CurrentRating 0 }}
+    <form action="/library/{{ .Type }}/{{ .VideoID }}/unrate" method="post"
+          data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
+        <button type="submit" class="btn btn-ghost text-w-sub" data-umami-event="rate-removed">
+            Drop
+        </button>
+    </form>
+    {{ end }}
+    <form method="dialog">
+        <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="rate-cancelled">Cancel</button>
+    </form>
+</div>
+<script>
+(function() {
+    var stars = document.querySelectorAll('#rate-stars input[name="rating"]');
+    var hidden = document.getElementById('rate-value');
+    var selected = {{ .CurrentRating }};
+
+    function paint(upTo, bright, dim) {
+        for (var i = 0; i < stars.length; i++) {
+            stars[i].style.opacity = (i + 1) <= upTo ? bright : dim;
+        }
+    }
+
+    function paintHover(upTo) {
+        for (var i = 0; i < stars.length; i++) {
+            if (i + 1 <= upTo) {
+                stars[i].style.opacity = (i + 1) === upTo ? '1' : '0.7';
+            } else {
+                stars[i].style.opacity = '0.25';
+            }
+        }
+    }
+
+    paint(selected, '1', '0.25');
+
+    for (var i = 0; i < stars.length; i++) {
+        stars[i].addEventListener('change', function() {
+            selected = parseInt(this.value);
+            hidden.value = selected;
+            paint(selected, '1', '0.25');
+        });
+        stars[i].addEventListener('mouseenter', function() {
+            paintHover(parseInt(this.value));
+        });
+    }
+    document.getElementById('rate-stars').addEventListener('mouseleave', function() {
+        paint(selected, '1', '0.25');
+    });
+})();
+</script>
+{{ end }}

@@ -38,11 +38,14 @@ export async function loadManifests(client) {
 // a failed marker query must never block discover rendering. Filters out
 // non-IMDB ids (Stremio can return addon-specific ids like "tt1234567:1:2"
 // for episodes — we only query top-level titles).
-export async function fetchWatchedIDs(ids) {
+// Fetches user statuses (watched + rating) for IMDB ids in one request.
+// Returns { statuses: { "tt123": { watched: true, rating: 7 }, ... } }.
+// On failure returns empty object — must never block discover rendering.
+export async function fetchUserStatuses(ids) {
     const titleIds = (ids || []).filter(id => typeof id === 'string' && id.startsWith('tt') && !id.includes(':'));
-    if (titleIds.length === 0) return [];
+    if (titleIds.length === 0) return {};
     try {
-        const res = await fetch('/library/watched/ids', {
+        const res = await fetch('/library/status', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -51,10 +54,10 @@ export async function fetchWatchedIDs(ids) {
             },
             body: JSON.stringify({ ids: titleIds }),
         });
-        if (!res.ok) return [];
+        if (!res.ok) return {};
         const data = await res.json();
-        return Array.isArray(data.watched) ? data.watched : [];
+        return data.statuses || {};
     } catch (e) {
-        return [];
+        return {};
     }
 }

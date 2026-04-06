@@ -47,7 +47,7 @@ import (
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
-	"github.com/webtor-io/web-ui/services/user_video_status"
+	uvss "github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/vault"
 
 	"github.com/gin-contrib/multitemplate"
@@ -300,7 +300,7 @@ func serve(c *cli.Context) error {
 	wi.RegisterHandler(r, tm, pg)
 
 	// Setting UserVideoStatus service
-	uvs := user_video_status.New(pg.Get())
+	uvs := uvss.New(pg.Get())
 
 	// Setting UserVideoStatusHandler (manual mark/unmark)
 	uvsh.RegisterHandler(r, uvs)

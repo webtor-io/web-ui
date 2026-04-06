@@ -132,7 +132,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 mb-3 text-sm text-w-sub">
+                <div class="flex flex-wrap items-center gap-2 mb-1 text-sm text-w-sub">
                     {{ if . | hasEnrichedYear }}<span>{{ . | getEnrichedYear }}</span>{{ end }}
                     {{ if . | hasEnrichedRating }}
                     <span class="flex items-center gap-1 text-yellow-400">
@@ -142,18 +142,30 @@
                     {{ end }}
                     {{ if . | isEnrichedSeries }}<span class="badge badge-sm bg-w-cyan/10 text-w-cyan border-0">Series</span>{{ end }}
                 </div>
-                {{ $plot := . | getEnrichedPlot }}{{ if $plot }}
-                <p class="text-sm text-w-sub leading-relaxed mb-4 line-clamp-3">{{ $plot }}</p>
-                {{ end }}
-                <p class="text-xs text-w-muted mb-3 truncate" title="{{ .Resource.Name }}">{{ .Resource.Name }}</p>
-                {{ if .TorrentStatus }}
-                <div class="mb-3">
-                    <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
-                        <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
-                        {{ "resource/status.js" | asset }}
+                {{ if or .Movie .Series }}
+                <div class="flex items-center gap-2 mt-2 mb-3">
+                    <div class="join">
+                        <div id="watched-button" data-async-layout="{{`{{ if .Data.Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}`}}">
+                            {{ if .Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}
+                        </div>
+                        <div id="rate-button" data-async-layout="{{`{{ template "user_video_status/rate_button" $ }}`}}">
+                            {{ template "user_video_status/rate_button" $ }}
+                        </div>
                     </div>
                 </div>
                 {{ end }}
+                {{ $plot := . | getEnrichedPlot }}{{ if $plot }}
+                <p class="text-sm text-w-sub leading-relaxed mb-4 line-clamp-3">{{ $plot }}</p>
+                {{ end }}
+                <div class="flex items-center gap-2 mb-3">
+                    {{ if .TorrentStatus }}
+                    <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
+                        <div id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</div>
+                        {{ "resource/status.js" | asset }}
+                    </div>
+                    {{ end }}
+                    <span class="text-xs text-w-muted truncate" title="{{ .Resource.Name }}">{{ .Resource.Name }}</span>
+                </div>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
                         {{ if and ($.User | hasAuth) .Vault }}
@@ -163,11 +175,6 @@
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" $ }}`}}">
                         {{ template "library/button" $ }}
                     </div>
-                    {{ if or .Movie .Series }}
-                    <div id="watched-button" class="shrink-0" data-async-layout="{{`{{ if .Data.Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}`}}">
-                        {{ if .Movie }}{{ template "user_video_status/movie_button" $ }}{{ else }}{{ template "user_video_status/series_button" $ }}{{ end }}
-                    </div>
-                    {{ end }}
                     <div class="sm:ml-auto shrink-0">
                         <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -291,6 +298,11 @@
     {{ if and ($.User | hasAuth) .Vault }}
         <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" .Data }}`}}">
             {{ template "vault/pledge-modal" . }}
+        </div>
+    {{ end }}
+    {{ if and ($.User | hasAuth) (or .Movie .Series) }}
+        <div id="rate-modal" data-async-layout="{{`{{ template "user_video_status/rate-modal" .Data }}`}}">
+            {{ template "user_video_status/rate-modal" . }}
         </div>
     {{ end }}
     {{ end }}

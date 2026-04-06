@@ -133,29 +133,106 @@ func (s *Service) UnmarkSeries(ctx context.Context, userID uuid.UUID, videoID st
 	return s.store.DeleteSeriesStatus(ctx, userID, videoID)
 }
 
-// FilterWatchedIDs returns the subset of the given IMDB ids that are marked
-// watched for the user, merging hits from movie_status and series_status.
-// Single pass through both tables; order of the returned slice is unspecified.
-// Used by the discover watched-marker endpoint.
-func (s *Service) FilterWatchedIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
+// RateMovie sets the user's rating (1-10) for a movie and automatically
+// marks it as watched (rating implies the user has seen it).
+func (s *Service) RateMovie(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error {
+	if videoID == "" {
+		return errors.New("videoID is required")
+	}
+	if rating < 1 || rating > 10 {
+		return errors.New("rating must be between 1 and 10")
+	}
+	if err := s.store.UpsertMovieRating(ctx, userID, videoID, rating); err != nil {
+		return err
+	}
+	now := time.Now()
+	if err := s.store.UpsertMovieStatus(ctx, &models.MovieStatus{
+		UserID:    userID,
+		VideoID:   videoID,
+		Watched:   true,
+		Source:    models.UserVideoSourceManual,
+		WatchedAt: &now,
+	}); err != nil {
+		return err
+	}
+	return s.store.SetWatchHistoryWatchedForMovie(ctx, userID, videoID, true)
+}
+
+// UnrateMovie removes the user's rating for a movie, preserving watched state.
+func (s *Service) UnrateMovie(ctx context.Context, userID uuid.UUID, videoID string) error {
+	if videoID == "" {
+		return errors.New("videoID is required")
+	}
+	return s.store.ClearMovieRating(ctx, userID, videoID)
+}
+
+// RateSeries sets the user's rating (1-10) for a series and automatically
+// marks it as watched.
+func (s *Service) RateSeries(ctx context.Context, userID uuid.UUID, videoID string, rating int16) error {
+	if videoID == "" {
+		return errors.New("videoID is required")
+	}
+	if rating < 1 || rating > 10 {
+		return errors.New("rating must be between 1 and 10")
+	}
+	if err := s.store.UpsertSeriesRating(ctx, userID, videoID, rating); err != nil {
+		return err
+	}
+	now := time.Now()
+	return s.store.UpsertSeriesStatus(ctx, &models.SeriesStatus{
+		UserID:    userID,
+		VideoID:   videoID,
+		Watched:   true,
+		Source:    models.UserVideoSourceManual,
+		WatchedAt: &now,
+	})
+}
+
+// UnrateSeries removes the user's rating for a series, preserving watched state.
+func (s *Service) UnrateSeries(ctx context.Context, userID uuid.UUID, videoID string) error {
+	if videoID == "" {
+		return errors.New("videoID is required")
+	}
+	return s.store.ClearSeriesRating(ctx, userID, videoID)
+}
+
+// UserStatus holds watched + rating state for a single IMDB id.
+type UserStatus struct {
+	Watched bool
+	Rating  int16 // 0 = unrated
+}
+
+// FilterUserStatus returns watched and rating state for the given IMDB ids
+// in a single pass, merging movie_status and series_status. Used by the
+// discover endpoint so the client gets both badges in one request.
+func (s *Service) FilterUserStatus(ctx context.Context, userID uuid.UUID, videoIDs []string) (map[string]*UserStatus, error) {
 	if len(videoIDs) == 0 {
 		return nil, nil
 	}
-	movies, err := s.store.FilterWatchedMovieIDs(ctx, userID, videoIDs)
+	result := make(map[string]*UserStatus, len(videoIDs))
+	movies, err := s.store.GetMovieStatusMap(ctx, userID, videoIDs)
 	if err != nil {
 		return nil, err
 	}
-	series, err := s.store.FilterWatchedSeriesIDs(ctx, userID, videoIDs)
+	for vid, st := range movies {
+		us := &UserStatus{Watched: st.Watched}
+		if st.Rating != nil {
+			us.Rating = *st.Rating
+		}
+		result[vid] = us
+	}
+	series, err := s.store.GetSeriesStatusMap(ctx, userID, videoIDs)
 	if err != nil {
 		return nil, err
 	}
-	if len(movies) == 0 && len(series) == 0 {
-		return nil, nil
+	for vid, st := range series {
+		us := &UserStatus{Watched: st.Watched}
+		if st.Rating != nil {
+			us.Rating = *st.Rating
+		}
+		result[vid] = us
 	}
-	out := make([]string, 0, len(movies)+len(series))
-	out = append(out, movies...)
-	out = append(out, series...)
-	return out, nil
+	return result, nil
 }
 
 // checkAndMarkSeriesComplete inspects the per-episode watched count for a

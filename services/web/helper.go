@@ -364,3 +364,25 @@ func (s *Helper) DerefFloat64(f *float64) float64 {
 	}
 	return *f
 }
+
+// DerefInt16 dereferences a pointer to int16, returning 0 if nil.
+// Returns int for easy use in template comparisons.
+func (s *Helper) DerefInt16(p *int16) int {
+	if p == nil {
+		return 0
+	}
+	return int(*p)
+}
+
+// Seq returns a slice of consecutive integers [from..to] inclusive.
+// Used in templates for star-rating loops: {{ range seq 1 10 }}.
+func (s *Helper) Seq(from, to int) []int {
+	if to < from {
+		return nil
+	}
+	result := make([]int, 0, to-from+1)
+	for i := from; i <= to; i++ {
+		result = append(result, i)
+	}
+	return result
+}

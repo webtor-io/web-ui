@@ -102,6 +102,13 @@ type GetData struct {
 	MovieStatus           *models.MovieStatus
 	SeriesStatus          *models.SeriesStatus
 	PathActions           map[string]*PathAction
+	RateForm              *RateForm
+}
+
+type RateForm struct {
+	VideoID       string
+	Type          string // "movie" or "series"
+	CurrentRating int    // 0 = unrated
 }
 
 type ExtendedResource struct {
@@ -305,10 +312,36 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
-	// Handle pledge-form parameter
+	// Prepare rate modal if requested (via rate button or after marking watched).
+	if args.User.HasAuth() && (d.Movie != nil || d.Series != nil) {
+		if c.Query("rate-form") == "true" {
+			d.RateForm = s.prepareRateForm(d)
+		}
+	}
 
 	c.Header("X-Robots-Tag", "noindex, follow")
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
+}
+
+func (s *Handler) prepareRateForm(d *GetData) *RateForm {
+	form := &RateForm{}
+	if d.Movie != nil && d.Movie.MovieMetadata != nil && d.Movie.MovieMetadata.VideoID != "" {
+		form.VideoID = d.Movie.MovieMetadata.VideoID
+		form.Type = "movie"
+		if d.MovieStatus != nil && d.MovieStatus.Rating != nil {
+			form.CurrentRating = int(*d.MovieStatus.Rating)
+		}
+	} else if d.Series != nil && d.Series.SeriesMetadata != nil && d.Series.SeriesMetadata.VideoID != "" {
+		form.VideoID = d.Series.SeriesMetadata.VideoID
+		form.Type = "series"
+		if d.SeriesStatus != nil && d.SeriesStatus.Rating != nil {
+			form.CurrentRating = int(*d.SeriesStatus.Rating)
+		}
+	}
+	if form.VideoID == "" {
+		return nil
+	}
+	return form
 }
 
 func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *GetArgs) (i *ra.ListItem, err error) {

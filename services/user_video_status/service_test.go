@@ -105,11 +105,27 @@ func (m *mockStore) SetWatchHistoryWatchedForEpisode(_ context.Context, _ uuid.U
 	return nil
 }
 
-func (m *mockStore) FilterWatchedMovieIDs(_ context.Context, _ uuid.UUID, _ []string) ([]string, error) {
+func (m *mockStore) UpsertMovieRating(_ context.Context, _ uuid.UUID, _ string, _ int16) error {
+	return nil
+}
+
+func (m *mockStore) ClearMovieRating(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (m *mockStore) UpsertSeriesRating(_ context.Context, _ uuid.UUID, _ string, _ int16) error {
+	return nil
+}
+
+func (m *mockStore) ClearSeriesRating(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (m *mockStore) GetMovieStatusMap(_ context.Context, _ uuid.UUID, _ []string) (map[string]*models.MovieStatus, error) {
 	return nil, nil
 }
 
-func (m *mockStore) FilterWatchedSeriesIDs(_ context.Context, _ uuid.UUID, _ []string) ([]string, error) {
+func (m *mockStore) GetSeriesStatusMap(_ context.Context, _ uuid.UUID, _ []string) (map[string]*models.SeriesStatus, error) {
 	return nil, nil
 }
 

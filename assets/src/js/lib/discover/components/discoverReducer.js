@@ -67,10 +67,9 @@ export const initialState = {
     searchLoading: false,
     // Modal
     modal: null, // { view: 'loading'|'streams'|'episodes', title, poster, ... }
-    // Watched marker — accumulated Set of IMDB ids the server confirmed as
-    // watched for this user. Additive-only during a session: we never remove,
-    // since items in-view don't change their watched state client-side.
-    watchedIds: new Set(),
+    // User statuses — accumulated map of IMDB id → { watched, rating }.
+    // Additive-only during a session.
+    userStatuses: {},
 };
 
 export function discoverReducer(state, action) {
@@ -120,11 +119,9 @@ export function discoverReducer(state, action) {
             return { ...state, modal: action.modal };
         case 'CLOSE_MODAL':
             return { ...state, modal: null };
-        case 'WATCHED_IDS_MERGED': {
-            if (!action.ids || action.ids.length === 0) return state;
-            const next = new Set(state.watchedIds);
-            for (const id of action.ids) next.add(id);
-            return { ...state, watchedIds: next };
+        case 'USER_STATUSES_MERGED': {
+            if (!action.statuses || Object.keys(action.statuses).length === 0) return state;
+            return { ...state, userStatuses: { ...state.userStatuses, ...action.statuses } };
         }
         default:
             return state;
