@@ -9,6 +9,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 type WatchHistory struct {
@@ -110,42 +111,46 @@ func GetWatchPosition(ctx context.Context, db *pg.DB, userID uuid.UUID, resource
 // GetRecentlyWatched returns one entry per resource (the most recently updated unwatched file),
 // enriched with movie/series metadata for display names and posters.
 func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit int) ([]*WatchHistory, error) {
-	// Use DISTINCT ON to get one entry per resource — the most recently updated unwatched file.
-	// Only unwatched files. DISTINCT ON picks one per resource — the most recently updated.
+	// Phase 1: fetch unwatched entries and watched-resource aggregates in parallel.
 	var list []*WatchHistory
-	err := db.Model(&list).
-		Context(ctx).
-		DistinctOn("watch_history.resource_id").
-		Where("watch_history.user_id = ?", userID).
-		Where("watch_history.watched = false").
-		Where("watch_history.duration > 0").
-		Relation("Torrent").
-		OrderExpr("watch_history.resource_id, watch_history.updated_at DESC").
-		Select()
-	if err != nil {
+	var watchedResources []struct {
+		ResourceID string    `pg:"resource_id"`
+		UpdatedAt  time.Time `pg:"updated_at"`
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return db.Model(&list).
+			Context(gctx).
+			DistinctOn("watch_history.resource_id").
+			Where("watch_history.user_id = ?", userID).
+			Where("watch_history.watched = false").
+			Where("watch_history.duration > 0").
+			Relation("Torrent").
+			OrderExpr("watch_history.resource_id, watch_history.updated_at DESC").
+			Select()
+	})
+
+	g.Go(func() error {
+		return db.ModelContext(gctx, (*WatchHistory)(nil)).
+			ColumnExpr("resource_id, MAX(updated_at) AS updated_at").
+			Where("user_id = ?", userID).
+			Where("watched = true").
+			Group("resource_id").
+			Select(&watchedResources)
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, errors.Wrap(err, "failed to fetch recently watched")
 	}
 
-	// Track resource IDs already found (in-progress episodes)
+	// Build candidate list for next-episode detection.
 	seen := make(map[string]bool, len(list))
 	for _, wh := range list {
 		seen[wh.ResourceID] = true
 	}
 
-	// Find series where all started episodes are fully watched but next episode exists.
-	// 1. Get all resources with at least one fully watched episode
-	var watchedResources []struct {
-		ResourceID string    `pg:"resource_id"`
-		UpdatedAt  time.Time `pg:"updated_at"`
-	}
-	_ = db.ModelContext(ctx, (*WatchHistory)(nil)).
-		ColumnExpr("resource_id, MAX(updated_at) AS updated_at").
-		Where("user_id = ?", userID).
-		Where("watched = true").
-		Group("resource_id").
-		Select(&watchedResources)
-
-	// Filter to resources not already in the in-progress list
 	var candidateIDs []string
 	updatedMap := make(map[string]time.Time)
 	for _, wr := range watchedResources {
@@ -156,29 +161,38 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 	}
 
 	if len(candidateIDs) > 0 {
-		// 2. Load episodes for candidate resources
+		// Phase 2: load episodes and watched paths in parallel.
 		var episodes []*Episode
-		_ = db.ModelContext(ctx, &episodes).
-			Where("resource_id IN (?)", pg.In(candidateIDs)).
-			Where("path IS NOT NULL").
-			OrderExpr("resource_id, season NULLS LAST, episode NULLS LAST").
-			Select()
-
-		// 3. Load watched paths for candidates
 		var watchedPaths []WatchHistory
-		_ = db.ModelContext(ctx, &watchedPaths).
-			Column("resource_id", "path", "watched").
-			Where("user_id = ?", userID).
-			Where("resource_id IN (?)", pg.In(candidateIDs)).
-			Select()
 
-		watchedSet := make(map[string]bool) // "resourceID:path" -> watched
+		g, gctx = errgroup.WithContext(ctx)
+
+		g.Go(func() error {
+			return db.ModelContext(gctx, &episodes).
+				Where("resource_id IN (?)", pg.In(candidateIDs)).
+				Where("path IS NOT NULL").
+				OrderExpr("resource_id, season NULLS LAST, episode NULLS LAST").
+				Select()
+		})
+
+		g.Go(func() error {
+			return db.ModelContext(gctx, &watchedPaths).
+				Column("resource_id", "path", "watched").
+				Where("user_id = ?", userID).
+				Where("resource_id IN (?)", pg.In(candidateIDs)).
+				Select()
+		})
+
+		if err := g.Wait(); err != nil {
+			return nil, errors.Wrap(err, "failed to fetch episode data")
+		}
+
+		watchedSet := make(map[string]bool)
 		for _, wp := range watchedPaths {
 			watchedSet[wp.ResourceID+":"+wp.Path] = wp.Watched
 		}
 
-		// 4. For each resource find the next episode after the last watched one.
-		// Group episodes by resource, find index of last watched, take the next one.
+		// Find next episode per resource.
 		epsByResource := make(map[string][]*Episode)
 		for _, ep := range episodes {
 			epsByResource[ep.ResourceID] = append(epsByResource[ep.ResourceID], ep)
@@ -186,7 +200,6 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 
 		var nextResourceIDs []string
 		for resourceID, eps := range epsByResource {
-			// Find the last watched episode index (by season/episode order)
 			lastWatchedIdx := -1
 			for i, ep := range eps {
 				key := resourceID + ":" + *ep.Path
@@ -195,7 +208,7 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 				}
 			}
 			if lastWatchedIdx < 0 || lastWatchedIdx >= len(eps)-1 {
-				continue // no watched episodes or last episode already watched
+				continue
 			}
 			nextEp := eps[lastWatchedIdx+1]
 			list = append(list, &WatchHistory{
@@ -207,7 +220,7 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 			nextResourceIDs = append(nextResourceIDs, nextEp.ResourceID)
 		}
 
-		// Load Torrent relation for next-episode entries
+		// Phase 3: load torrents for next-episode entries.
 		if len(nextResourceIDs) > 0 {
 			var torrents []*TorrentResource
 			_ = db.ModelContext(ctx, &torrents).
@@ -229,26 +242,23 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 		return nil, nil
 	}
 
-	// Sort by updated_at DESC (DISTINCT ON requires ORDER BY resource_id first)
+	// Sort by updated_at DESC (DISTINCT ON requires ORDER BY resource_id first).
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].UpdatedAt.After(list[j].UpdatedAt)
 	})
 
-	// Limit after sorting
 	if len(list) > limit {
 		list = list[:limit]
 	}
 
-	// Enrich with movie/series metadata
+	// Phase 4: enrich with metadata — movies and series in parallel.
 	resourceIDs := make([]string, len(list))
 	for i, wh := range list {
 		resourceIDs[i] = wh.ResourceID
 	}
-	enrichWatchHistory(ctx, db, list, resourceIDs)
+	enrichWatchHistoryParallel(ctx, db, list, resourceIDs)
 
-	// Hide items the user has marked as fully watched at the IMDB level
-	// (movie_status.watched / series_status.watched = true). This covers both
-	// manual declarations and auto_all_episodes rows.
+	// Phase 5: filter out fully-watched — movie_status and series_status in parallel.
 	list = filterOutFullyWatched(ctx, db, list, userID)
 
 	if len(list) == 0 {
@@ -266,37 +276,43 @@ type enrichedMeta struct {
 	ContentType ContentType `pg:"-"`
 }
 
-// enrichWatchHistory fills Title and PosterURL from movie/series data.
-// Uses VideoContent.title as primary source, metadata poster as secondary.
-func enrichWatchHistory(ctx context.Context, db *pg.DB, list []*WatchHistory, resourceIDs []string) {
-	// Try movies: title from movie (VideoContent), poster from movie_metadata
+// enrichWatchHistoryParallel fills Title and PosterURL from movie/series data,
+// fetching both in parallel.
+func enrichWatchHistoryParallel(ctx context.Context, db *pg.DB, list []*WatchHistory, resourceIDs []string) {
 	var movies []enrichedMeta
-	_ = db.ModelContext(ctx, (*Movie)(nil)).
-		ColumnExpr("movie.resource_id").
-		ColumnExpr("COALESCE(mmd.title, movie.title) AS title").
-		ColumnExpr("mmd.poster_url").
-		ColumnExpr("mmd.video_id").
-		Join("LEFT JOIN movie_metadata AS mmd ON mmd.movie_metadata_id = movie.movie_metadata_id").
-		Where("movie.resource_id IN (?)", pg.In(resourceIDs)).
-		Select(&movies)
+	var series []enrichedMeta
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return db.ModelContext(gctx, (*Movie)(nil)).
+			ColumnExpr("movie.resource_id").
+			ColumnExpr("COALESCE(mmd.title, movie.title) AS title").
+			ColumnExpr("mmd.poster_url").
+			ColumnExpr("mmd.video_id").
+			Join("LEFT JOIN movie_metadata AS mmd ON mmd.movie_metadata_id = movie.movie_metadata_id").
+			Where("movie.resource_id IN (?)", pg.In(resourceIDs)).
+			Select(&movies)
+	})
+
+	g.Go(func() error {
+		return db.ModelContext(gctx, (*Series)(nil)).
+			ColumnExpr("series.resource_id").
+			ColumnExpr("COALESCE(smd.title, series.title) AS title").
+			ColumnExpr("smd.poster_url").
+			ColumnExpr("smd.video_id").
+			Join("LEFT JOIN series_metadata AS smd ON smd.series_metadata_id = series.series_metadata_id").
+			Where("series.resource_id IN (?)", pg.In(resourceIDs)).
+			Select(&series)
+	})
+
+	_ = g.Wait()
 
 	metaMap := make(map[string]*enrichedMeta)
 	for i := range movies {
 		movies[i].ContentType = ContentTypeMovie
 		metaMap[movies[i].ResourceID] = &movies[i]
 	}
-
-	// Try series: title from series (VideoContent), poster from series_metadata
-	var series []enrichedMeta
-	_ = db.ModelContext(ctx, (*Series)(nil)).
-		ColumnExpr("series.resource_id").
-		ColumnExpr("COALESCE(smd.title, series.title) AS title").
-		ColumnExpr("smd.poster_url").
-		ColumnExpr("smd.video_id").
-		Join("LEFT JOIN series_metadata AS smd ON smd.series_metadata_id = series.series_metadata_id").
-		Where("series.resource_id IN (?)", pg.In(resourceIDs)).
-		Select(&series)
-
 	for i := range series {
 		if _, ok := metaMap[series[i].ResourceID]; !ok {
 			series[i].ContentType = ContentTypeSeries
@@ -304,7 +320,6 @@ func enrichWatchHistory(ctx context.Context, db *pg.DB, list []*WatchHistory, re
 		}
 	}
 
-	// Apply to list — convert poster URLs to proxied URLs via library endpoint
 	for _, wh := range list {
 		if m, ok := metaMap[wh.ResourceID]; ok {
 			wh.Title = m.Title
@@ -338,24 +353,35 @@ func filterOutFullyWatched(ctx context.Context, db *pg.DB, list []*WatchHistory,
 
 	watchedMovies := map[string]bool{}
 	watchedSeries := map[string]bool{}
+
+	g, gctx := errgroup.WithContext(ctx)
+
 	if len(movieIDs) > 0 {
-		if m, err := GetMovieStatusMap(ctx, db, userID, movieIDs); err == nil {
-			for vid, st := range m {
-				if st.Watched {
-					watchedMovies[vid] = true
+		g.Go(func() error {
+			if m, err := GetMovieStatusMap(gctx, db, userID, movieIDs); err == nil {
+				for vid, st := range m {
+					if st.Watched {
+						watchedMovies[vid] = true
+					}
 				}
 			}
-		}
+			return nil
+		})
 	}
 	if len(seriesIDs) > 0 {
-		if m, err := GetSeriesStatusMap(ctx, db, userID, seriesIDs); err == nil {
-			for vid, st := range m {
-				if st.Watched {
-					watchedSeries[vid] = true
+		g.Go(func() error {
+			if m, err := GetSeriesStatusMap(gctx, db, userID, seriesIDs); err == nil {
+				for vid, st := range m {
+					if st.Watched {
+						watchedSeries[vid] = true
+					}
 				}
 			}
-		}
+			return nil
+		})
 	}
+
+	_ = g.Wait()
 
 	if len(watchedMovies) == 0 && len(watchedSeries) == 0 {
 		return list
