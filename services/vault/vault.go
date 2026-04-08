@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -349,6 +350,7 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 
 	// Execute in transaction
 	var result *vaultModels.Pledge
+	var vaultPutDone bool // tracks whether PUT was sent to vault API inside the tx
 	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
 		// Lock user VP for update
 		userVP := &vaultModels.UserVP{}
@@ -444,6 +446,7 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			if err != nil {
 				return errors.Wrap(err, "failed to sync resource with vault api")
 			}
+			vaultPutDone = true
 			if vaulted {
 				err := vaultModels.UpdateResourceVaulted(ctx, tx, resource.ResourceID)
 				if err != nil {
@@ -457,6 +460,16 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 	})
 
 	if err != nil {
+		// Transaction rolled back — if we already sent PUT to vault, clean up
+		if vaultPutDone && s.vaultApi != nil {
+			if _, delErr := s.vaultApi.DeleteResource(ctx, resource.ResourceID); delErr != nil {
+				log.WithError(delErr).WithField("resource_id", resource.ResourceID).
+					Error("failed to delete orphaned resource from vault after tx rollback")
+			} else {
+				log.WithField("resource_id", resource.ResourceID).
+					Warn("deleted orphaned resource from vault after tx rollback")
+			}
+		}
 		return nil, err
 	}
 
