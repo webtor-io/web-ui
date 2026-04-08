@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -350,7 +349,6 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 
 	// Execute in transaction
 	var result *vaultModels.Pledge
-	var shouldPutToVault bool
 	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
 		// Lock user VP for update
 		userVP := &vaultModels.UserVP{}
@@ -440,7 +438,18 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 			if err != nil {
 				return errors.Wrap(err, "failed to mark resource as unexpired and funded")
 			}
-			shouldPutToVault = true
+
+			// Put to Vault API when resource transitions to Funded state
+			vaulted, err := s.putResourceToVaultAPI(ctx, tx, resource)
+			if err != nil {
+				return errors.Wrap(err, "failed to sync resource with vault api")
+			}
+			if vaulted {
+				err := vaultModels.UpdateResourceVaulted(ctx, tx, resource.ResourceID)
+				if err != nil {
+					return errors.Wrap(err, "failed to set resource vaulted")
+				}
+			}
 		}
 
 		result = pledge
@@ -449,23 +458,6 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 
 	if err != nil {
 		return nil, err
-	}
-
-	// Put to Vault API AFTER successful commit to avoid side-effects on rollback
-	if shouldPutToVault {
-		vaulted, putErr := s.putResourceToVaultAPI(ctx, resource)
-		if putErr != nil {
-			log.WithError(putErr).WithField("resource_id", resource.ResourceID).
-				Error("failed to put resource to vault api after commit")
-		} else if vaulted {
-			db := s.pg.Get()
-			if db != nil {
-				if err := vaultModels.UpdateResourceVaulted(ctx, db, resource.ResourceID); err != nil {
-					log.WithError(err).WithField("resource_id", resource.ResourceID).
-						Error("failed to set resource vaulted")
-				}
-			}
-		}
 	}
 
 	return result, nil
@@ -694,7 +686,7 @@ func (s *Vault) defundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels
 }
 
 // putResourceToVaultAPI checks and syncs resource status with Vault API
-func (s *Vault) putResourceToVaultAPI(ctx context.Context, resource *vaultModels.Resource) (bool, error) {
+func (s *Vault) putResourceToVaultAPI(ctx context.Context, tx *pg.Tx, resource *vaultModels.Resource) (bool, error) {
 	// Skip if Vault API is not configured
 	if s.vaultApi == nil {
 		return false, nil
