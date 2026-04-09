@@ -7,6 +7,13 @@
 
 @config '../../../tailwind.config.js';
 
+/* Show card action buttons on touch devices where hover is unavailable */
+@media (hover: none) {
+  .card-action {
+    opacity: 0.5 !important;
+  }
+}
+
 @utility loading-elipsis {
   &::after {
     overflow: hidden;

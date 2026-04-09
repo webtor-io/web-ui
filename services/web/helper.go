@@ -55,7 +55,15 @@ func LongErr(err error) template.HTML {
 	return template.HTML(strings.Join(parts, "<br />"))
 }
 
+func wantsJSON(c *gin.Context) bool {
+	return strings.Contains(c.GetHeader("Accept"), "application/json")
+}
+
 func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
+	if wantsJSON(c) {
+		c.JSON(http.StatusOK, gin.H{"status": "error", "message": serr.Error()})
+		return
+	}
 	u, err := url.Parse(path)
 	if err != nil || u == nil {
 		c.Redirect(http.StatusFound, path)
@@ -78,6 +86,14 @@ func RedirectWithSuccess(c *gin.Context) {
 }
 
 func RedirectWithSuccessAndMessage(c *gin.Context, message string) {
+	if wantsJSON(c) {
+		resp := gin.H{"status": "success"}
+		if message != "" {
+			resp["message"] = message
+		}
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	u, err := url.Parse(c.GetHeader("X-Return-Url"))
 	if err != nil || u == nil {
 		// if return url is invalid, attempt a plain redirect without query mutation
@@ -92,6 +108,12 @@ func RedirectWithSuccessAndMessage(c *gin.Context, message string) {
 	}
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
+}
+
+// WantsJSON reports whether the request prefers a JSON response.
+// Exported so handlers can check before calling custom redirect logic.
+func WantsJSON(c *gin.Context) bool {
+	return wantsJSON(c)
 }
 
 func (s *Helper) ShortErr(err error) string {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,12 +18,19 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
+type RateFormData struct {
+	VideoID       string
+	Type          string // "movie" or "series"
+	CurrentRating int
+}
+
 type IndexData struct {
 	Args          *shared.IndexArgs
 	Items         []any
 	TorrentCount  int
 	MovieCount    int
 	SeriesCount   int
+	RateForm      *RateFormData
 }
 
 func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
@@ -92,6 +100,30 @@ func (s *Handler) index(c *gin.Context) {
 		TorrentCount: tc,
 		MovieCount:   mc,
 		SeriesCount:  sc,
+	}
+
+	// Detect rate-form prompt (from mark-watched redirect or explicit rate badge click).
+	if c.Query("rate-form") == "true" {
+		rf := &RateFormData{}
+		if vid := c.Query("rate-video-id"); vid != "" {
+			// Explicit: user clicked the rate badge on a card.
+			rf.VideoID = vid
+			rf.Type = c.Query("rate-type")
+			if cur, err := strconv.Atoi(c.Query("rate-current")); err == nil {
+				rf.CurrentRating = cur
+			}
+		} else if from := c.Query("from"); from != "" {
+			// From redirectWithRatePrompt after marking watched.
+			// Path format: /library/{type}/{videoID}/mark
+			parts := strings.Split(strings.Trim(from, "/"), "/")
+			if len(parts) >= 3 {
+				rf.Type = parts[1]
+				rf.VideoID = parts[2]
+			}
+		}
+		if rf.VideoID != "" {
+			indexData.RateForm = rf
+		}
 	}
 
 	s.tb.Build("library/index").HTML(http.StatusOK, web.NewContext(c).WithData(indexData))

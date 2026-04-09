@@ -320,6 +320,14 @@ func parseRating(c *gin.Context) (int16, error) {
 // success status and rate-form=true, so the rating modal auto-opens after
 // marking as watched.
 func redirectWithRatePrompt(c *gin.Context, message string) {
+	if web.WantsJSON(c) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "success",
+			"message":   message,
+			"rate-form": true,
+		})
+		return
+	}
 	u, err := url.Parse(c.GetHeader("X-Return-Url"))
 	if err != nil || u == nil {
 		web.RedirectWithSuccessAndMessage(c, message)

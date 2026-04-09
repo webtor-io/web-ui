@@ -58,6 +58,21 @@ func (s *VideoContentHelper) GetOriginalPoster(m models.VideoContentWithMetadata
 	return ""
 }
 
+func (s *VideoContentHelper) HasVideoID(m models.VideoContentWithMetadata) bool {
+	return m.GetMetadata() != nil && m.GetMetadata().VideoID != ""
+}
+
+func (s *VideoContentHelper) GetVideoID(m models.VideoContentWithMetadata) string {
+	if m.GetMetadata() != nil {
+		return m.GetMetadata().VideoID
+	}
+	return ""
+}
+
+func (s *VideoContentHelper) GetVideoType(m models.VideoContentWithMetadata) string {
+	return string(m.GetContentType())
+}
+
 func (s *VideoContentHelper) GetCachedPoster240(m models.VideoContentWithMetadata) string {
 	return fmt.Sprintf("/lib/%v/poster/%v/240.jpg", m.GetContentType(), m.GetMetadata().VideoID)
 }

@@ -41,6 +41,56 @@ export async function loadManifests(client) {
 // Fetches user statuses (watched + rating) for IMDB ids in one request.
 // Returns { statuses: { "tt123": { watched: true, rating: 7 }, ... } }.
 // On failure returns empty object — must never block discover rendering.
+// Generic API POST wrapper. Server returns JSON when Accept: application/json:
+//   { status: "success"|"error", message?: string, ... }
+// Toast is shown automatically from the server-provided message.
+async function apiPost(url, body) {
+    try {
+        const opts = {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': window._CSRF,
+                'X-Return-Url': window.location.pathname + window.location.search,
+            },
+        };
+        if (body) opts.body = body;
+        const res = await fetch(url, opts);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.status === 'success' && data.message && window.toast) {
+            window.toast.success(data.message);
+        } else if (data.status === 'error') {
+            if (window.toast) window.toast.error(data.message || 'Something went wrong');
+            return null;
+        }
+        return data;
+    } catch (e) {
+        if (window.toast) window.toast.error('Network error');
+        return null;
+    }
+}
+
+export async function toggleWatched(videoID, type, currentlyWatched) {
+    const action = currentlyWatched ? 'unmark' : 'mark';
+    const data = await apiPost(`/library/${type}/${videoID}/${action}`);
+    if (!data) return null;
+    return { watched: !currentlyWatched, rateForm: !!data['rate-form'] };
+}
+
+export async function rateVideo(videoID, type, rating) {
+    const body = new URLSearchParams();
+    body.set('rating', String(rating));
+    const data = await apiPost(`/library/${type}/${videoID}/rate`, body);
+    return !!data;
+}
+
+export async function unrateVideo(videoID, type) {
+    const data = await apiPost(`/library/${type}/${videoID}/unrate`);
+    return !!data;
+}
+
 export async function fetchUserStatuses(ids) {
     const titleIds = (ids || []).filter(id => typeof id === 'string' && id.startsWith('tt') && !id.includes(':'));
     if (titleIds.length === 0) return {};

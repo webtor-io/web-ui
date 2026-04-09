@@ -9,7 +9,8 @@ import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
-import { restoreModalFromUrl, loadManifests, fetchUserStatuses } from './discoverUtils';
+import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo } from './discoverUtils';
+import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
@@ -19,6 +20,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
     const [showWizard, setShowWizard] = useState(false);
     const [addonsInstalled, setAddonsInstalled] = useState(false);
+    const [ratingTarget, setRatingTarget] = useState(null);
     const clientRef = useRef(null);
     const abortRef = useRef(null);
     const searchGenRef = useRef(0);
@@ -277,9 +279,10 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         const title = item.name || item.title;
         const poster = item.poster;
         const metaId = id.split(':')[0];
+        const itemType = type;
         const addons = client.getStreamAddons();
         if (!addons.length) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, streams: [], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, streams: [], ...modalExtra } });
             return;
         }
 
@@ -289,7 +292,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             return { name: a.manifest.name || host, host, status: 'fetching' };
         });
 
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, addons: [...addonStatuses], ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, addons: [...addonStatuses], ...modalExtra } });
 
         const allStreams = [];
         const promises = addons.map(async (addon, i) => {
@@ -300,11 +303,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             } catch (e) {
                 addonStatuses[i] = { ...addonStatuses[i], status: 'error' };
             }
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, addons: [...addonStatuses], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, addons: [...addonStatuses], ...modalExtra } });
         });
 
         await Promise.allSettled(promises);
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, streams: allStreams, ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, streams: allStreams, ...modalExtra } });
         window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length });
     }, [client]);
 
@@ -749,6 +752,73 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         setShowWizard(true);
     }, [state.modal, state.selectedType, closeModal]);
 
+    // --- Watched / Rating ---
+    const handleToggleWatched = useCallback(async (item) => {
+        const type = item.type || state.selectedType;
+        const currentlyWatched = state.userStatuses[item.id]?.watched || false;
+        const prev = state.userStatuses[item.id];
+
+        if (currentlyWatched) {
+            // Unmark: clear watched + rating (server deletes entire status row)
+            dispatch({ type: 'USER_STATUSES_MERGED', statuses: {
+                [item.id]: { watched: false, rating: 0 },
+            }});
+            const result = await toggleWatched(item.id, type, true);
+            if (!result) {
+                dispatch({ type: 'USER_STATUSES_MERGED', statuses: { [item.id]: { ...prev } } });
+            }
+        } else {
+            // Mark watched, then prompt for rating
+            dispatch({ type: 'USER_STATUSES_MERGED', statuses: {
+                [item.id]: { ...prev, watched: true },
+            }});
+            const result = await toggleWatched(item.id, type, false);
+            if (result) {
+                if (result.rateForm) setRatingTarget({ item, type, currentRating: 0 });
+            } else {
+                dispatch({ type: 'USER_STATUSES_MERGED', statuses: { [item.id]: { ...prev } } });
+            }
+        }
+    }, [state.selectedType, state.userStatuses]);
+
+    const handleOpenRating = useCallback((item) => {
+        const type = item.type || state.selectedType;
+        const currentRating = state.userStatuses[item.id]?.rating || 0;
+        setRatingTarget({ item, type, currentRating });
+    }, [state.selectedType, state.userStatuses]);
+
+    const handleRate = useCallback(async (rating) => {
+        if (!ratingTarget) return;
+        const { item, type } = ratingTarget;
+        setRatingTarget(null);
+        const prevStatus = state.userStatuses[item.id];
+        dispatch({ type: 'USER_STATUSES_MERGED', statuses: {
+            [item.id]: { ...prevStatus, watched: true, rating },
+        }});
+        const ok = await rateVideo(item.id, type, rating);
+        if (!ok) {
+            dispatch({ type: 'USER_STATUSES_MERGED', statuses: { [item.id]: { ...prevStatus } } });
+        }
+    }, [ratingTarget, state.userStatuses]);
+
+    const handleUnrate = useCallback(async () => {
+        if (!ratingTarget) return;
+        const { item, type } = ratingTarget;
+        setRatingTarget(null);
+        const prev = state.userStatuses[item.id];
+        dispatch({ type: 'USER_STATUSES_MERGED', statuses: {
+            [item.id]: { ...prev, rating: 0 },
+        }});
+        const ok = await unrateVideo(item.id, type);
+        if (!ok) {
+            dispatch({ type: 'USER_STATUSES_MERGED', statuses: { [item.id]: { ...prev } } });
+        }
+    }, [ratingTarget, state.userStatuses]);
+
+    const handleCloseRating = useCallback(() => {
+        setRatingTarget(null);
+    }, []);
+
     // --- Derived data ---
     const types = useMemo(() => getTypes(state.catalogs), [state.catalogs]);
     const catalogsForType = useMemo(() => getCatalogsForType(state.catalogs, state.selectedType), [state.catalogs, state.selectedType]);
@@ -812,7 +882,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 <p class="text-w-muted text-center col-span-full py-8">No items found.</p>
             )}
 
-            <ItemGrid items={displayItems} showBadges={showBadges} userStatuses={state.userStatuses} onClick={cardClick} />
+            <ItemGrid items={displayItems} showBadges={showBadges} userStatuses={state.userStatuses} onClick={cardClick} onToggleWatched={handleToggleWatched} onRate={handleOpenRating} />
 
             {!state.isSearchMode && !state.catalogLoading && state.hasMore && state.items.length > 0 && (
                 <LoadMore onLoadMore={loadMore} />
@@ -828,11 +898,23 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     onSeasonChange={onSeasonChange}
                     hasCustomAddons={hasCustomAddons || addonsInstalled}
                     onSetupAddons={onSetupAddons}
+                    userStatuses={state.userStatuses}
+                    onToggleWatched={handleToggleWatched}
+                    onRate={handleOpenRating}
                 />
             )}
 
             {showWizard && state.phase === 'ready' && (
                 <AddonWizard onComplete={onWizardComplete} onSkip={onWizardSkip} />
+            )}
+
+            {ratingTarget && (
+                <RatingDialog
+                    currentRating={ratingTarget.currentRating}
+                    onRate={handleRate}
+                    onUnrate={handleUnrate}
+                    onClose={handleCloseRating}
+                />
             )}
 
         </div>
