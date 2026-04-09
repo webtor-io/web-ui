@@ -171,14 +171,16 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
                         {item.name || 'Unknown'}
                     </h3>
                     <div class="flex justify-between items-center mt-1.5">
-                        <span class="text-xs text-w-muted">
-                            {item.releaseInfo || item.year || ''}
+                        <div class="flex items-center gap-1.5">
+                            {(item.releaseInfo || item.year) && (
+                                <span class="text-xs text-w-muted">{item.releaseInfo || item.year}</span>
+                            )}
                             {showBadge && item.type && (
-                                <span class="text-w-muted/60 uppercase tracking-wider ml-1.5">
+                                <span class="text-[10px] text-w-muted/60 uppercase tracking-wider">
                                     {item.type === 'series' ? 'series' : item.type}
                                 </span>
                             )}
-                        </span>
+                        </div>
                         {item.imdbRating && <StarRating rating={item.imdbRating} />}
                     </div>
                 </div>

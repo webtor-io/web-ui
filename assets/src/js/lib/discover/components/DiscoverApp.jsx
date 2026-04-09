@@ -328,24 +328,47 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             url.push({ id, season: null, episode: null });
         }
 
+        // Build metadata from catalog item; fetchMeta will fill in missing fields.
         const cardMeta = { year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description };
+
+        // Enrich cardMeta from Stremio meta response (has description, imdbRating, etc.)
+        function enrichFromMeta(meta) {
+            if (!meta) return;
+            if (!cardMeta.description && meta.description) cardMeta.description = meta.description;
+            if (!cardMeta.imdbRating && meta.imdbRating) cardMeta.imdbRating = meta.imdbRating;
+            if (!cardMeta.releaseInfo && meta.releaseInfo) cardMeta.releaseInfo = meta.releaseInfo;
+            if (!cardMeta.year && meta.year) cardMeta.year = meta.year;
+        }
+
         if (type === 'series') {
             dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...', itemType: type, itemId: id, ...cardMeta } });
             try {
                 const meta = await client.fetchMeta(type, id);
+                enrichFromMeta(meta);
                 if (meta?.videos?.length > 0) {
                     dispatch({ type: 'SHOW_MODAL', modal: {
-                        view: 'episodes', title: item.name, poster: item.poster, meta, itemId: id, itemType: type, ...cardMeta,
+                        view: 'episodes', title: meta.name || item.name, poster: meta.poster || item.poster, meta, itemId: id, itemType: type, ...cardMeta,
                         defaultSeason: restoreSeason != null ? Number(restoreSeason) : undefined,
                     } });
                 } else {
-                    await loadStreams(type, id, item);
+                    await loadStreams(type, id, { ...item, ...cardMeta });
                 }
             } catch (e) {
-                await loadStreams(type, id, item);
+                await loadStreams(type, id, { ...item, ...cardMeta });
             }
         } else {
-            await loadStreams(type, id, item);
+            // Fetch meta in parallel with streams to enrich modal with description/rating.
+            const metaPromise = client.fetchMeta(type, id).catch(() => null);
+            const streamsPromise = loadStreams(type, id, { ...item, ...cardMeta });
+            const meta = await metaPromise;
+            await streamsPromise;
+            if (meta) {
+                enrichFromMeta(meta);
+                const cur = stateRef.current?.modal;
+                if (cur && cur.metaId === id.split(':')[0]) {
+                    dispatch({ type: 'SHOW_MODAL', modal: { ...cur, ...cardMeta, title: meta.name || cur.title, poster: meta.poster || cur.poster } });
+                }
+            }
         }
     }, [client, state.selectedType, loadStreams]);
 
