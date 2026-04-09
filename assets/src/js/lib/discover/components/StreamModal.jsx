@@ -33,7 +33,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
 
     return (
         <dialog ref={dialogRef} class="modal" onClose={handleClose}>
-            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden p-0">
+            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl max-h-[calc(100dvh-3rem)] flex flex-col overflow-hidden p-0">
                 <div class="flex justify-between items-center shrink-0 px-6 pt-4 pb-2">
                     {onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? (
                         <button
