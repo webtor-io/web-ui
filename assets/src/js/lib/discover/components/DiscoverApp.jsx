@@ -280,9 +280,14 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         const poster = item.poster;
         const metaId = id.split(':')[0];
         const itemType = type;
+        const year = item.year;
+        const releaseInfo = item.releaseInfo;
+        const imdbRating = item.imdbRating;
+        const description = item.description;
         const addons = client.getStreamAddons();
+        const itemMeta = { year, releaseInfo, imdbRating, description };
         if (!addons.length) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, streams: [], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: [], ...modalExtra } });
             return;
         }
 
@@ -292,7 +297,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             return { name: a.manifest.name || host, host, status: 'fetching' };
         });
 
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, addons: [...addonStatuses], ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
 
         const allStreams = [];
         const promises = addons.map(async (addon, i) => {
@@ -303,11 +308,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             } catch (e) {
                 addonStatuses[i] = { ...addonStatuses[i], status: 'error' };
             }
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, addons: [...addonStatuses], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
         });
 
         await Promise.allSettled(promises);
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, streams: allStreams, ...modalExtra } });
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: allStreams, ...modalExtra } });
         window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length });
     }, [client]);
 
@@ -323,13 +328,14 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             url.push({ id, season: null, episode: null });
         }
 
+        const cardMeta = { year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description };
         if (type === 'series') {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...' } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...', itemType: type, itemId: id, ...cardMeta } });
             try {
                 const meta = await client.fetchMeta(type, id);
                 if (meta?.videos?.length > 0) {
                     dispatch({ type: 'SHOW_MODAL', modal: {
-                        view: 'episodes', title: item.name, poster: item.poster, meta, itemId: id, itemType: type,
+                        view: 'episodes', title: item.name, poster: item.poster, meta, itemId: id, itemType: type, ...cardMeta,
                         defaultSeason: restoreSeason != null ? Number(restoreSeason) : undefined,
                     } });
                 } else {
@@ -366,11 +372,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             // Fetch meta in parallel with stream loading so we can offer "back to episodes"
             const metaPromise = client.fetchMeta(type, id).catch(() => null);
 
-            await loadStreams(type, epId, { name: epName, poster }, {});
+            await loadStreams(type, epId, { name: epName, poster, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description }, {});
 
             const meta = await metaPromise;
             if (meta?.videos?.length > 0) {
-                const backToEpisodes = { title: name, poster, meta, itemId: id, itemType: type, season: ep.season };
+                const backToEpisodes = { title: name, poster, meta, itemId: id, itemType: type, season: ep.season, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description };
                 const cur = stateRef.current?.modal;
                 if (cur) dispatch({ type: 'SHOW_MODAL', modal: { ...cur, backToEpisodes } });
             }
@@ -395,9 +401,13 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             itemId: item.itemId,
             itemType: item.itemType,
             season: episode.season,
+            year: item.year,
+            releaseInfo: item.releaseInfo,
+            imdbRating: item.imdbRating,
+            description: item.description,
         };
 
-        await loadStreams(type, epId, { name: epName, poster: item.poster }, { backToEpisodes });
+        await loadStreams(type, epId, { name: epName, poster: item.poster, year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description }, { backToEpisodes });
     }, [loadStreams]);
 
     const onBackToEpisodes = useCallback(() => {
@@ -560,6 +570,10 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                         meta: back.meta,
                         itemId: back.itemId,
                         itemType: back.itemType,
+                        year: back.year,
+                        releaseInfo: back.releaseInfo,
+                        imdbRating: back.imdbRating,
+                        description: back.description,
                         defaultSeason: season != null ? Number(season) : (back.season != null ? Number(back.season) : undefined),
                     },
                 });

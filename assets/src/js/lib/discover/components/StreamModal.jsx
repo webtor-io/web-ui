@@ -77,18 +77,19 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
             onRate={onRate}
         />
     ) : null;
+    const headerMeta = { year: modal.year || modal.releaseInfo, imdbRating: modal.imdbRating, description: modal.description };
 
     if (modal.view === 'loading') {
         return (
             <div>
-                <ModalHeader title={modal.title} poster={modal.poster} subtitle={modal.subtitle} extra={statusButtons} />
+                <ModalHeader title={modal.title} poster={modal.poster} subtitle={modal.subtitle} extra={statusButtons} {...headerMeta} />
                 <p class="text-w-muted text-sm text-center py-6">{modal.subtitle || 'Loading...'}</p>
             </div>
         );
     }
 
     if (modal.view === 'fetching') {
-        return <FetchingView modal={modal} statusButtons={statusButtons} />;
+        return <FetchingView modal={modal} statusButtons={statusButtons} headerMeta={headerMeta} />;
     }
 
     if (modal.view === 'progress') {
@@ -96,11 +97,11 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     }
 
     if (modal.view === 'episodes') {
-        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} />;
+        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} />;
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} statusButtons={statusButtons} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} statusButtons={statusButtons} headerMeta={headerMeta} />;
     }
 
     return null;
@@ -118,7 +119,7 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, onToggleWatch
     }, [videoId, videoType, onRate]);
 
     return (
-        <div class="join mt-2">
+        <div class="join mt-2 mb-1">
             {watched ? (
                 <button type="button" onClick={handleWatched}
                     class="btn btn-ghost btn-xs join-item border border-green-500/20 text-green-400 hover:bg-green-500/10 whitespace-nowrap">
@@ -154,28 +155,42 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, onToggleWatch
     );
 }
 
-function ModalHeader({ title, poster, subtitle, extra }) {
+function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, imdbRating, description }) {
     const [imgError, setImgError] = useState(false);
 
     return (
-        <div class="flex gap-4 mb-4">
-            {poster && !imgError ? (
-                <img
-                    src={poster}
-                    alt={title || ''}
-                    class="w-20 h-28 object-cover rounded-lg flex-shrink-0"
-                    onError={() => setImgError(true)}
-                />
-            ) : (
-                <div class="w-20 h-28 rounded-lg flex-shrink-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
-                    <div class="text-center font-bold text-[10px] p-1 line-clamp-3 drop-shadow-sm">
+        <div class="flex gap-3 sm:gap-5 mb-4">
+            <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+                    <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">
                         {title || 'Unknown'}
                     </div>
                 </div>
-            )}
+                {poster && !imgError && (
+                    <img
+                        src={poster}
+                        alt={title || ''}
+                        class="absolute inset-0 w-full h-full object-cover"
+                        onError={() => setImgError(true)}
+                    />
+                )}
+            </div>
             <div class="flex flex-col justify-center min-w-0">
                 <h3 class="font-bold text-lg line-clamp-2">{title || 'Unknown'}</h3>
+                {(year || imdbRating) && (
+                    <div class="flex flex-wrap items-center gap-2 mt-1 text-sm text-w-sub">
+                        {year && <span>{year}</span>}
+                        {imdbRating && (
+                            <span class="flex items-center gap-1 text-yellow-400">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
+                                {parseFloat(imdbRating).toFixed(1)}
+                            </span>
+                        )}
+                    </div>
+                )}
                 {extra}
+                {description && <p class="text-sm text-w-sub leading-relaxed mt-1 line-clamp-3">{description}</p>}
+                {afterDescription}
                 {subtitle && <p class="text-sm text-w-muted mt-1">{subtitle}</p>}
             </div>
         </div>
@@ -217,14 +232,14 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 
 // --- Fetching View (per-addon progress) ---
 
-function FetchingView({ modal, statusButtons }) {
+function FetchingView({ modal, statusButtons, headerMeta }) {
     const { title, poster, addons } = modal;
     const doneCount = addons.filter(a => a.status !== 'fetching').length;
     const subtitle = `Fetching streams... (${doneCount}/${addons.length})`;
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle={subtitle} extra={statusButtons} />
+            <ModalHeader title={title} poster={poster} subtitle={subtitle} extra={statusButtons} {...headerMeta} />
             <div class="flex flex-col gap-2 py-2">
                 {addons.map((addon, i) => (
                     <div key={i} class="flex items-center gap-3 px-3 py-2 rounded-lg border border-w-line/50">
@@ -259,7 +274,7 @@ function is4kStream(parsedInfo) {
     return parsedInfo.labels.some(l => l === '4K');
 }
 
-function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, statusButtons }) {
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, statusButtons, headerMeta }) {
     const { title, poster, streams, error } = modal;
 
     const [show4k, setShow4k] = useState(() => {
@@ -432,7 +447,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
     if (streams.length === 0) {
         return (
             <div>
-                <ModalHeader title={title} poster={poster} subtitle={subtitleText} extra={statusButtons} />
+                <ModalHeader title={title} poster={poster} subtitle={subtitleText} extra={statusButtons} {...headerMeta} />
                 <div class="text-center py-6">
                     <p class="text-w-muted text-sm">
                         {error || 'No streams available for this title.'}
@@ -457,14 +472,12 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle={subtitleText}
-                extra={<>
-                    {statusButtons}
-                    {total4kCount > 0 && (
-                        <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
-                            showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
-                    )}
-                </>}
+            <ModalHeader title={title} poster={poster} subtitle={subtitleText} {...headerMeta}
+                extra={statusButtons}
+                afterDescription={total4kCount > 0 ? (
+                    <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
+                        showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
+                ) : undefined}
             />
 
             {hasFilters && (
@@ -634,7 +647,7 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
 
@@ -677,7 +690,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
     if (!videos.length) {
         return (
             <div>
-                <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} />
+                <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} {...headerMeta} />
                 <p class="text-w-muted text-sm text-center py-6">No episodes found.</p>
             </div>
         );
@@ -685,7 +698,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} />
+            <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} {...headerMeta} />
 
             {seasonNums.length > 1 && (
                 <div class="flex gap-1.5 mb-3 flex-wrap">

@@ -1,9 +1,44 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useState, useMemo } from 'preact/hooks';
+
+// 5-star half-step rating from 0-10 scale, matching library/stars.html exactly.
+// DaisyUI fills stars via :has(~[aria-current=true]) — all siblings before the
+// selected one get opacity:1. We must set aria-current="true" on the right element.
+function StarRating({ rating }) {
+    if (!rating || parseFloat(rating) <= 0) return null;
+    const r = parseFloat(rating);
+    const stars5 = r / 2; // 0-10 → 0-5
+
+    const items = useMemo(() => {
+        const result = [];
+        const step = 0.5;
+        for (let i = 0; i <= 5; i += step) {
+            const isHalf = (i * 2) % 2 === 1;
+            const selected = stars5 >= i && stars5 < i + step;
+            if (i === 0) {
+                result.push(<div key="h" class="rating-hidden" />);
+            } else if (isHalf) {
+                result.push(<div key={i} class="mask mask-star-2 mask-half-1" aria-current={selected ? 'true' : undefined} />);
+            } else {
+                result.push(<div key={i} class="mask mask-star-2 mask-half-2" aria-current={selected ? 'true' : undefined} />);
+            }
+        }
+        return result;
+    }, [stars5]);
+
+    return (
+        <div class="flex items-center gap-1">
+            <div class="rating rating-xs rating-half flex items-center text-w-purpleL">
+                {items}
+            </div>
+            <span class="text-xs text-w-muted">{r.toFixed(1)}</span>
+        </div>
+    );
+}
 
 export function ItemGrid({ items, showBadges, userStatuses, onClick, onToggleWatched, onRate }) {
     if (!items.length) return null;
     return (
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {items.map(item => {
                 const status = userStatuses && userStatuses[item.id];
                 return (
@@ -111,7 +146,7 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
 
     return (
         <div class="group cursor-pointer" onClick={handleClick}>
-            <div class={`bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-cyan/30 transition-all duration-300 flex flex-col w-full${watched ? ' opacity-70' : ''}`}>
+            <div class={`bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-purple/30 transition-all duration-300 flex flex-col w-full${watched ? ' opacity-70' : ''}`}>
                 <figure class="aspect-[2/3] overflow-hidden relative">
                     {item.poster && !imgError ? (
                         <img
@@ -132,23 +167,24 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
                     )}
                 </figure>
                 <div class="p-3">
-                    <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-w-cyan transition-colors">
+                    <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-w-purpleL transition-colors">
                         {item.name || 'Unknown'}
                     </h3>
-                    <div class="flex items-center gap-1.5 mt-1">
-                        {(item.releaseInfo || item.year) && (
-                            <span class="text-xs text-w-muted">
-                                {item.releaseInfo || item.year}
-                            </span>
-                        )}
-                        {showBadge && item.type && (
-                            <span class="text-[10px] text-w-muted/60 uppercase tracking-wider">
-                                {item.type === 'series' ? 'series' : item.type}
-                            </span>
-                        )}
+                    <div class="flex justify-between items-center mt-1.5">
+                        <span class="text-xs text-w-muted">
+                            {item.releaseInfo || item.year || ''}
+                            {showBadge && item.type && (
+                                <span class="text-w-muted/60 uppercase tracking-wider ml-1.5">
+                                    {item.type === 'series' ? 'series' : item.type}
+                                </span>
+                            )}
+                        </span>
+                        {item.imdbRating && <StarRating rating={item.imdbRating} />}
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+
+export { StarRating };
