@@ -33,25 +33,27 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
 
     return (
         <dialog ref={dialogRef} class="modal" onClose={handleClose}>
-            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl">
-                {onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') && (
+            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden p-0">
+                <div class="flex justify-between items-center shrink-0 px-6 pt-4 pb-2">
+                    {onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? (
+                        <button
+                            class="btn btn-sm btn-ghost text-w-muted hover:text-w-cyan gap-1 px-2"
+                            onClick={onBackToEpisodes}
+                        >
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 18l-6-6 6-6"/>
+                            </svg>
+                            Episodes
+                        </button>
+                    ) : <div />}
                     <button
-                        class="btn btn-sm btn-ghost absolute left-2 top-2 text-w-muted hover:text-w-cyan gap-1 px-2"
-                        onClick={onBackToEpisodes}
+                        class="btn btn-sm btn-circle btn-ghost text-w-muted hover:text-base-content"
+                        onClick={handleClose}
                     >
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 18l-6-6 6-6"/>
-                        </svg>
-                        Episodes
+                        &#10005;
                     </button>
-                )}
-                <button
-                    class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content"
-                    onClick={handleClose}
-                >
-                    &#10005;
-                </button>
-                <div class={onBackToEpisodes && (modal.view === 'streams' || modal.view === 'loading') ? 'pt-8' : ''}>
+                </div>
+                <div class="overflow-y-auto px-6 pb-6">
                     <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} userStatuses={userStatuses} onToggleWatched={onToggleWatched} onRate={onRate} />
                 </div>
             </div>
