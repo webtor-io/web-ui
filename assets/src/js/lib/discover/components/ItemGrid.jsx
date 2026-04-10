@@ -68,13 +68,18 @@ function PosterGradient({ name }) {
     );
 }
 
+// Card visual primitives (.w-card-frame, .w-card-title, .w-card-badge,
+// .w-card-badge-ghost) are defined in assets/src/styles/style.css and shared
+// with templates/partials/library/video_list.html. See docs/uikit.html
+// section 7 "Video Card".
+
 function WatchedBadge({ watched, onClick }) {
     if (watched) {
         return (
             <button
                 type="button"
                 onClick={onClick}
-                class="absolute top-2 right-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/70 backdrop-blur-sm text-green-400 text-xs font-semibold uppercase tracking-wider shadow-lg cursor-pointer hover:bg-black/90 transition-colors"
+                class="w-card-badge top-2 right-2 text-green-400 uppercase tracking-wider"
                 title="Unmark watched"
             >
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -86,7 +91,7 @@ function WatchedBadge({ watched, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            class="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full bg-black/70 backdrop-blur-sm text-w-sub shadow-lg cursor-pointer hover:text-green-400 hover:bg-black/90 transition-colors opacity-0 group-hover:opacity-100 card-action"
+            class="w-card-badge-ghost top-2 right-2 hover:text-green-400"
             title="Mark as watched"
         >
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -103,7 +108,7 @@ function RatingBadge({ rating, onClick }) {
             <button
                 type="button"
                 onClick={onClick}
-                class="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/70 backdrop-blur-sm text-yellow-400 text-xs font-semibold shadow-lg cursor-pointer hover:bg-black/90 transition-colors"
+                class="w-card-badge top-2 left-2 text-yellow-400"
                 title="Change rating"
             >
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
@@ -115,7 +120,7 @@ function RatingBadge({ rating, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            class="absolute top-2 left-2 flex items-center justify-center w-8 h-8 rounded-full bg-black/70 backdrop-blur-sm text-w-sub shadow-lg cursor-pointer hover:text-yellow-400 hover:bg-black/90 transition-colors opacity-0 group-hover:opacity-100 card-action"
+            class="w-card-badge-ghost top-2 left-2 hover:text-yellow-400"
             title="Rate"
         >
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -145,8 +150,8 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
     const isImdb = item.id && item.id.startsWith('tt');
 
     return (
-        <div class="group cursor-pointer" onClick={handleClick}>
-            <div class={`bg-w-card border border-w-line rounded-xl overflow-hidden hover:border-w-purple/30 transition-all duration-300 flex flex-col w-full${watched ? ' opacity-70' : ''}`}>
+        <div class="group cursor-pointer flex" onClick={handleClick}>
+            <div class={`w-card-frame${watched ? ' is-watched' : ''}`}>
                 <figure class="aspect-[2/3] overflow-hidden relative">
                     {item.poster && !imgError ? (
                         <img
@@ -167,9 +172,7 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
                     )}
                 </figure>
                 <div class="p-3">
-                    <h3 class="font-semibold text-sm line-clamp-1 group-hover:text-w-purpleL transition-colors">
-                        {item.name || 'Unknown'}
-                    </h3>
+                    <h3 class="w-card-title">{item.name || 'Unknown'}</h3>
                     <div class="flex justify-between items-center mt-1.5">
                         <div class="flex items-center gap-1.5">
                             {(item.releaseInfo || item.year) && (

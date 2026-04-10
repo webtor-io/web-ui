@@ -7,10 +7,96 @@
 
 @config '../../../tailwind.config.js';
 
-/* Show card action buttons on touch devices where hover is unavailable */
+/* ===== Video card grid (library + discover) =====
+   Shared visual primitives for video cards. Used by both
+   templates/partials/library/video_list.html (Go templates) and
+   assets/src/js/lib/discover/components/ItemGrid.jsx (Preact).
+   Change here → both pages stay in sync.
+   See docs/uikit.html section 7 "Video Card" for examples. */
+
+.w-card-frame {
+  background-color: #1a2235; /* w-card */
+  border: 1px solid rgba(255, 255, 255, 0.07); /* w-line */
+  border-radius: 0.75rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  transition: border-color 0.3s, opacity 0.3s;
+}
+.w-card-frame:hover {
+  border-color: rgba(108, 92, 231, 0.3); /* w-purple/30 */
+}
+.w-card-frame.is-watched {
+  opacity: 0.7;
+}
+
+/* Card title — auto-color on parent .group hover */
+.w-card-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color 0.15s;
+}
+.group:hover .w-card-title {
+  color: #a29bfe; /* w-purpleL */
+}
+
+/* Active overlay badge on a poster — has text label.
+   Add positioning utility (top-2 right-2 / left-2) and color
+   utility (text-green-400 / text-yellow-400) inline. */
+.w-card-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 9999px;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.w-card-badge:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Ghost overlay — icon-only, hover-revealed on desktop, faded on touch.
+   Add positioning + hover color utility (hover:text-green-400) inline. */
+.w-card-badge-ghost {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: #94a3b8; /* w-sub */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  opacity: 0;
+  transition: background-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.group:hover .w-card-badge-ghost {
+  opacity: 1;
+}
+.w-card-badge-ghost:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+}
 @media (hover: none) {
-  .card-action {
-    opacity: 0.5 !important;
+  .w-card-badge-ghost {
+    opacity: 0.5;
   }
 }
 
