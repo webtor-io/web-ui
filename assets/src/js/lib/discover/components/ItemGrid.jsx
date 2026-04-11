@@ -73,7 +73,7 @@ function PosterGradient({ name }) {
 // with templates/partials/library/video_list.html. See docs/uikit.html
 // section 7 "Video Card".
 
-function WatchedBadge({ watched, onClick }) {
+export function WatchedBadge({ watched, onClick }) {
     if (watched) {
         return (
             <button
@@ -102,7 +102,7 @@ function WatchedBadge({ watched, onClick }) {
     );
 }
 
-function RatingBadge({ rating, onClick }) {
+export function RatingBadge({ rating, onClick }) {
     if (rating > 0) {
         return (
             <button

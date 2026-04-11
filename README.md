@@ -27,11 +27,6 @@ Some features to mention:
   - [x] Google authentication
   - [x] Patreon authentication
 - [x] Ads and statistic integration support
-- [x] Tools
-  - [x] Torrent => DDL
-  - [x] Magnet => DDL
-  - [x] Magnet => Torrent
-  - [x] Torrent => ZIP
 - [x] Misc
   - [x] Feedback form
   - [x] Allow magnet-url as query string
@@ -44,11 +39,14 @@ Some features to mention:
   - [x] Torrents
   - [x] Movies
   - [x] Series
+  - [x] Watched/Rate
 - [x] Content enrichment
     - [x] OMDB
     - [x] Kinopoisk Unofficial
+    - [x] TMDB
 - [x] Vault
 - [x] Discover
+  - [x] AI Recommendations
 - [x] Integrations 
   - [x] Stremio
   - [x] Stremio Addons
