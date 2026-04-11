@@ -227,6 +227,23 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	return &mt, nil
 }
 
+// LookupByTitleYear iterates through configured metadata mappers (TMDB, OMDB,
+// Kinopoisk, ...) and returns the first matching video metadata for the given
+// title and optional year.
+//
+// Unlike Enrich, this lookup does not persist anything against a torrent
+// resource — it is intended for flows that only have text identifiers (e.g.
+// AI recommendations, manual search). Individual mappers may still cache
+// results in their own tables, which later benefits regular torrent
+// enrichment.
+func (s *Enricher) LookupByTitleYear(ctx context.Context, title string, year *int16, ct models.ContentType) (*models.VideoMetadata, error) {
+	vc := &models.VideoContent{
+		Title: title,
+		Year:  year,
+	}
+	return s.mapMetadata(ctx, vc, ct, false, "")
+}
+
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
 	log.Infof("enriching media info for hash %s", hash)
 	if hintVideoID != "" {

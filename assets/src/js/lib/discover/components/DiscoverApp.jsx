@@ -15,6 +15,7 @@ import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults } from './EmptyStates';
+import { AISection } from './ai/AISection';
 
 export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
@@ -371,6 +372,23 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             }
         }
     }, [client, state.selectedType, loadStreams]);
+
+    // Bridge from an AI recommendation card to the existing stream-loading
+    // flow. AI items carry video_id (IMDB) / title / poster / plot / reason
+    // / rating, which we shape into the catalog-item contract cardClick
+    // expects.
+    const handleAICardClick = useCallback((aiItem) => {
+        if (!aiItem?.video_id) return;
+        cardClick({
+            id: aiItem.video_id,
+            name: aiItem.title,
+            poster: aiItem.poster,
+            type: aiItem.type || 'movie',
+            year: aiItem.year,
+            imdbRating: aiItem.rating,
+            description: aiItem.plot,
+        });
+    }, [cardClick]);
 
     const openModalById = useCallback(async (id) => {
         // Try to find the item in loaded items or search results
@@ -824,6 +842,27 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         setRatingTarget({ item, type, currentRating });
     }, [state.selectedType, state.userStatuses]);
 
+    // AI shims for watched / rating. Defined AFTER handleToggleWatched and
+    // handleOpenRating because those const useCallbacks live in the same
+    // function scope and JavaScript's temporal dead zone would otherwise
+    // throw on first render — the upstream declarations are further down
+    // the file.
+    const handleAIToggleWatched = useCallback((aiItem) => {
+        if (!aiItem?.video_id) return;
+        handleToggleWatched({
+            id: aiItem.video_id,
+            type: aiItem.type || 'movie',
+        });
+    }, [handleToggleWatched]);
+
+    const handleAIOpenRating = useCallback((aiItem) => {
+        if (!aiItem?.video_id) return;
+        handleOpenRating({
+            id: aiItem.video_id,
+            type: aiItem.type || 'movie',
+        });
+    }, [handleOpenRating]);
+
     const handleRate = useCallback(async (rating) => {
         if (!ratingTarget) return;
         const { item, type } = ratingTarget;
@@ -888,6 +927,18 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
 
     return (
         <div>
+            {/* AI recommendations section — self-contained, hides itself when
+                the feature flag is off (phase === 'disabled'). Rendered above
+                the search bar as a top-of-page spotlight. */}
+            <AISection
+                aiState={state.ai}
+                dispatch={dispatch}
+                onCardClick={handleAICardClick}
+                userStatuses={state.userStatuses}
+                onToggleWatched={handleAIToggleWatched}
+                onRate={handleAIOpenRating}
+            />
+
             <SearchBar
                 onSearch={performSearch}
                 onExit={exitSearch}

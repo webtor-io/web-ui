@@ -28,7 +28,7 @@
 
 {{ if eq $instruction "default" }}
 <!-- How It Works -->
-<section id="how" class="py-24 px-6">
+<section id="how" class="py-24 px-3 sm:px-6">
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -65,7 +65,7 @@
 {{ end }}
 
 <!-- Features -->
-<section id="features" class="py-24 px-6 bg-base-200">
+<section id="features" class="py-24 px-3 sm:px-6 bg-base-200">
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
@@ -124,18 +124,33 @@
                     <div class="w-12 h-12 rounded-xl bg-w-pink/12 text-w-pink flex items-center justify-center">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                     </div>
-                    <h3 class="card-title text-[1.05rem] mt-3">Personal Library</h3>
-                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Save torrents to your account. Movies and TV series are detected and organized automatically.</p>
+                    <h3 class="card-title text-[1.05rem] mt-3">Cloud Library</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Save torrents to your account &mdash; movies and TV series are detected and organized automatically. Upgrade to <a href="/profile" data-async-target="main" class="link" data-umami-event="vault-about-link">Vault</a> for long-term storage that keeps files available even when seeders disappear.</p>
+                    <div class="card-actions mt-2">
+                        <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide uppercase">Vault Pro</span>
+                    </div>
                 </div>
             </div>
 
             <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
                 <div class="card-body">
-                    <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <div class="w-12 h-12 rounded-xl bg-w-cyan/12 text-w-cyan flex items-center justify-center">
+                        {{ if aiEnabled }}
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a4 4 0 0 1-2.275 2.275L3 12l5.813 1.912a4 4 0 0 1 2.275 2.275L12 21l1.912-5.813a4 4 0 0 1 2.275-2.275L21 12l-5.813-1.912a4 4 0 0 1-2.275-2.275z"/></svg>
+                        {{ else }}
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        {{ end }}
                     </div>
-                    <h3 class="card-title text-[1.05rem] mt-3">Vault Storage</h3>
-                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Long-term cloud storage for your torrents. Watch and download without waiting for seeds.</p>
+                    {{ if aiEnabled }}
+                    <h3 class="card-title text-[1.05rem] mt-3">AI&#8209;Powered Discover</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Describe what you want to watch in plain words and get a personalized list of films &mdash; each with a one-line reason tying it to your taste. Built on top of the <a href="/discover" data-async-target="main" class="link" data-umami-event="discover-about-link">Discover catalog</a>.</p>
+                    <div class="card-actions mt-2">
+                        <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">Beta</span>
+                    </div>
+                    {{ else }}
+                    <h3 class="card-title text-[1.05rem] mt-3">Discover Catalog</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">Browse a unified catalog assembled from your <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a> addons. Search by title, filter by genre, and start streaming through Webtor with one click. Open from the <a href="/discover" data-async-target="main" class="link" data-umami-event="discover-about-link">Discover</a> page.</p>
+                    {{ end }}
                 </div>
             </div>
 
@@ -177,7 +192,7 @@
 </section>
 
 <!-- FAQ -->
-<section id="faq" class="py-24 px-6">
+<section id="faq" class="py-24 px-3 sm:px-6">
     <div class="max-w-[1100px] mx-auto">
         <div class="text-center mb-14">
             <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
@@ -226,6 +241,26 @@
                 <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes! With the Stremio integration you can stream your personal library on any smart TV or device running <a href="https://www.stremio.com/" target="_blank" class="link">Stremio</a>. Just install the addon using the link from your <a href="/profile" data-async-target="main" class="link">profile</a>.</p></div>
             </div>
 
+            {{ if aiEnabled }}
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">What is Discover and how do the AI recommendations work?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed"><a href="/discover" data-async-target="main" class="link" data-umami-event="discover-faq-link">Discover</a> is a recommendations page powered by AI. Open it from the main navigation, type what you want to watch (or tap one of the suggested chips), and Webtor returns a personalized list of films &mdash; each with a short reason explaining why it fits your taste and what you've watched before. Click any card to start streaming through your usual addons.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">Is AI Discover free? How many requests do I get?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Yes &mdash; every account gets {{ aiFreeQuota }} free AI {{ if eq (aiFreeQuota) 1 }}request{{ else }}requests{{ end }} per day. <a href="/donate" target="_blank" class="link" data-umami-event="donate-ai-faq">Supporters of the project</a> get {{ aiPaidQuota }} requests per day. Suggestion chips and the rest of the Discover catalog are unlimited; only the natural-language search counts against the daily quota.</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">What AI model powers the recommendations? Is my data safe?</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">Recommendations are generated by <a href="https://www.anthropic.com/claude" target="_blank" class="link">Anthropic's Claude</a> &mdash; a fast model for the free tier and a more capable one for supporters. We send the model only your title/year/rating history. <strong>No email, IP address, or any other personal data is shared</strong>. The response is used purely to suggest films you can stream through your usual addons.</p></div>
+            </div>
+            {{ end }}
+
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">Do download links or streams expire?</div>
@@ -258,7 +293,7 @@
 </section>
 
 <!-- CTA -->
-<section class="relative text-center py-24 px-6 overflow-x-clip">
+<section class="relative text-center py-24 px-3 sm:px-6 overflow-x-clip">
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] cta-glow pointer-events-none"></div>
     <h2 class="relative z-10 text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight mb-4">Ready to try?</h2>
     <p class="relative z-10 text-w-sub max-w-[500px] mx-auto mb-9">No signup needed. Paste a magnet link and start streaming in seconds.</p>

@@ -1,6 +1,6 @@
 # Discover
 
-The Discover page (`/discover`) lets users browse and search movies and series from Cinemeta and their configured Stremio addons.
+The Discover page (`/discover`) lets users browse and search movies and series from Cinemeta and their configured Stremio addons. It also hosts the AI-powered recommendation section at the top — see [ai_recommendations.md](./ai_recommendations.md) for the full spec of that feature (Claude-backed chips + free-form query + per-card reasons, opt-in via `AI_RECOMMENDATIONS_ENABLED`).
 
 ## Architecture
 
@@ -29,6 +29,10 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/components/Tabs.jsx` — type tabs, search tabs, catalog selector
 - `assets/src/js/lib/discover/components/EmptyStates.jsx` — loading, error, no-results states
 - `assets/src/js/lib/discover/prefs.js` — localStorage persistence for user selections
+- `assets/src/js/lib/discover/aiClient.js` — thin fetch wrapper for `/discover/ai/*` endpoints (AI recommendations)
+- `assets/src/js/lib/discover/components/ai/` — AI recommendations UI: `AISection.jsx`, `AIChipsRow.jsx`, `AIQueryInput.jsx`, `AIRecsGrid.jsx`, `AIRecCard.jsx`
+- `handlers/discover_ai/handler.go` — Go handler for AI recommendations (chips, recommend, refine)
+- `services/recommendations/` — Claude-backed recommendation pipeline: prompt, context, resolver, quota, cache
 
 ### Key Components
 

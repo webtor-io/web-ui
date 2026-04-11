@@ -9,6 +9,7 @@ import (
 	enr "github.com/webtor-io/web-ui/services/enrich"
 	ku "github.com/webtor-io/web-ui/services/kinopoisk_unofficial"
 	"github.com/webtor-io/web-ui/services/omdb"
+	rec "github.com/webtor-io/web-ui/services/recommendations"
 	"github.com/webtor-io/web-ui/services/tmdb"
 )
 
@@ -17,6 +18,10 @@ func configureEnricher(f []cli.Flag) []cli.Flag {
 	f = omdb.RegisterFlags(f)
 	f = ku.RegisterFlags(f)
 	return f
+}
+
+func configureRecommendations(f []cli.Flag) []cli.Flag {
+	return rec.RegisterFlags(f)
 }
 
 func makeEnricher(c *cli.Context, cl *http.Client, pg *cs.PG, sapi *api.Api) *enr.Enricher {

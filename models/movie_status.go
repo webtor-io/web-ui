@@ -161,6 +161,48 @@ func FilterWatchedMovieIDs(ctx context.Context, db *pg.DB, userID uuid.UUID, vid
 	return out, nil
 }
 
+// RatedMovie is a flat view of a user's movie status joined with metadata,
+// used by AI recommendations and similar flows that need a textual picture of
+// what the user has watched and how they felt about it.
+type RatedMovie struct {
+	VideoID   string     `pg:"video_id"`
+	Title     string     `pg:"title"`
+	Year      *int16     `pg:"year"`
+	Rating    *int16     `pg:"rating"`
+	Watched   bool       `pg:"watched"`
+	WatchedAt *time.Time `pg:"watched_at"`
+}
+
+// ListUserRatedMovies returns up to `limit` recent movies the user has watched
+// or rated, joined with movie_metadata so titles and years are available for
+// the recommendation engine. Ordered by watched_at (fallback to updated_at)
+// descending. Rows without metadata are skipped — Claude can't do anything
+// with an IMDB id it doesn't recognise anyway.
+func ListUserRatedMovies(ctx context.Context, db *pg.DB, userID uuid.UUID, limit int) ([]RatedMovie, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	var out []RatedMovie
+	_, err := db.Query(&out, `
+		SELECT
+			ms.video_id,
+			mmd.title,
+			mmd.year,
+			ms.rating,
+			ms.watched,
+			ms.watched_at
+		FROM movie_status ms
+		JOIN movie_metadata mmd ON mmd.video_id = ms.video_id
+		WHERE ms.user_id = ?
+		ORDER BY COALESCE(ms.watched_at, ms.updated_at) DESC
+		LIMIT ?
+	`, userID, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list user rated movies")
+	}
+	return out, nil
+}
+
 // GetMovieStatusMap returns a map of video_id -> *MovieStatus for the
 // given user, filtered to the requested video IDs. Used for bulk prefetch in
 // library listings to avoid N+1 queries.

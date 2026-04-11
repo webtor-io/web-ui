@@ -7,6 +7,7 @@ import (
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/discover"
+	"github.com/webtor-io/web-ui/handlers/discover_ai"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
@@ -44,6 +45,7 @@ import (
 	"github.com/webtor-io/web-ui/services/geoip"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
+	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -101,6 +103,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = rum.RegisterFlags(c.Flags)
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
+	c.Flags = configureRecommendations(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
 	c.Flags = ci.RegisterFlags(c.Flags)
 	c.Flags = vault.RegisterApiFlags(c.Flags)
@@ -128,7 +131,8 @@ func serve(c *cli.Context) error {
 	tm := template.NewManager[*w.Context](re).
 		WithHelper(w.NewHelper(c)).
 		WithHelper(umami.NewHelper(c)).
-		WithHelper(geoip.NewHelper())
+		WithHelper(geoip.NewHelper()).
+		WithHelper(rec.NewHelper(c))
 
 	var servers []cs.Servable
 	// Setting Probe
@@ -337,6 +341,18 @@ func serve(c *cli.Context) error {
 
 	// Setting Discover
 	discover.RegisterHandler(r, tm, pg)
+
+	// Setting AI Recommendations (Discover)
+	//
+	// rec.New returns nil when the feature flag is off or
+	// ANTHROPIC_API_KEY is empty. In that case we skip handler
+	// registration entirely — the routes simply don't exist and gin
+	// returns its default 404, which the Discover frontend reads as
+	// "feature disabled" and hides the section.
+	recSvc := rec.New(c, pg, redis, en)
+	if recSvc != nil {
+		discover_ai.RegisterHandler(r, recSvc)
+	}
 
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
