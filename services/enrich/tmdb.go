@@ -274,7 +274,11 @@ func (s *TMDB) ensureByTmdbID(ctx context.Context, db *pg.DB, tmdbID int, ttype 
 // RefreshPopular implements PopularProvider. It calls TMDB discover to
 // fetch popular recent movies and upserts each one into tmdb.info so the
 // AI recommendations prompt can query them by year + rating.
-func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit int) (int, error) {
+//
+// By default existing entries are skipped (idempotent, fast). When force
+// is true, every discovered film is re-fetched from TMDB and upserted —
+// useful after adding new fields to GetDetails (e.g. credits).
+func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit int, force bool) (int, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return 0, errors.New("db is nil")
@@ -297,13 +301,15 @@ func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit 
 			}
 			seen++
 
-			existing, err := tm.GetInfoByID(ctx, db, r.ID)
-			if err != nil {
-				log.WithError(err).WithField("tmdb_id", r.ID).Warn("popular: db check failed")
-				continue
-			}
-			if existing != nil {
-				continue
+			if !force {
+				existing, err := tm.GetInfoByID(ctx, db, r.ID)
+				if err != nil {
+					log.WithError(err).WithField("tmdb_id", r.ID).Warn("popular: db check failed")
+					continue
+				}
+				if existing != nil {
+					continue
+				}
 			}
 
 			_, err = s.ensureByTmdbID(ctx, db, r.ID, tm.TmdbTypeMovie, tmdb.TmdbTypeMovie)

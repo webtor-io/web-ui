@@ -66,6 +66,10 @@ func configureEnrich(c *cli.Command) {
 			Value:  300,
 			EnvVar: "ENRICH_POPULAR_LIMIT",
 		},
+		cli.BoolFlag{
+			Name:  "force",
+			Usage: "re-fetch and update all films even if already cached (useful after adding new metadata fields like credits)",
+		},
 	)
 
 	c.Subcommands = []cli.Command{runCmd, popularCmd}
@@ -74,6 +78,7 @@ func configureEnrich(c *cli.Command) {
 func enrichPopular(c *cli.Context) error {
 	releaseDateGte := c.String("release-date-gte")
 	limit := c.Int("limit")
+	force := c.Bool("force")
 
 	pg := cs.NewPG(c)
 	defer pg.Close()
@@ -92,10 +97,11 @@ func enrichPopular(c *cli.Context) error {
 	log.WithFields(log.Fields{
 		"release_date_gte": releaseDateGte,
 		"limit":            limit,
+		"force":            force,
 	}).Info("starting enrich popular")
 
 	ctx := context.Background()
-	if err := en.RefreshPopular(ctx, releaseDateGte, limit); err != nil {
+	if err := en.RefreshPopular(ctx, releaseDateGte, limit, force); err != nil {
 		return errors.Wrap(err, "enrich popular failed")
 	}
 

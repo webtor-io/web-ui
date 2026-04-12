@@ -200,9 +200,15 @@ func (api *Api) search(ctx context.Context, title string, year *int16, tmdbType 
 }
 
 func (api *Api) GetDetails(ctx context.Context, tmdbID int, tmdbType TmdbType) (map[string]any, error) {
-	u := fmt.Sprintf("%s/3/%s/%d", api.url, tmdbType, tmdbID)
+	u, _ := url.Parse(fmt.Sprintf("%s/3/%s/%d", api.url, tmdbType, tmdbID))
+	q := u.Query()
+	// Append credits so the metadata JSONB includes cast and crew —
+	// needed by the AI recommendations prompt to match actor/director
+	// queries against fresh releases that postdate Claude's training data.
+	q.Set("append_to_response", "credits")
+	u.RawQuery = q.Encode()
 
-	raw, err := api.doRequest(ctx, u)
+	raw, err := api.doRequest(ctx, u.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "tmdb get details")
 	}

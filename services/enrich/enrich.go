@@ -44,7 +44,7 @@ type EpisodeMapper interface {
 // RefreshPopular on those that support it, and each implementation
 // upserts the results into its own cache tables.
 type PopularProvider interface {
-	RefreshPopular(ctx context.Context, releaseDateGte string, limit int) (int, error)
+	RefreshPopular(ctx context.Context, releaseDateGte string, limit int, force bool) (int, error)
 }
 
 func (s *Enricher) HasMappers() bool {
@@ -55,13 +55,13 @@ func (s *Enricher) HasMappers() bool {
 // PopularProvider interface to fetch and cache popular recent releases.
 // Today only TMDB implements it; adding support in OMDB or Kinopoisk
 // later requires zero changes here.
-func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, limit int) error {
+func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, limit int, force bool) error {
 	for _, m := range s.mappers {
 		pp, ok := m.(PopularProvider)
 		if !ok {
 			continue
 		}
-		count, err := pp.RefreshPopular(ctx, releaseDateGte, limit)
+		count, err := pp.RefreshPopular(ctx, releaseDateGte, limit, force)
 		if err != nil {
 			log.WithError(err).WithField("mapper", m.GetName()).Error("refresh popular failed")
 			continue
@@ -69,6 +69,7 @@ func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, li
 		log.WithFields(log.Fields{
 			"mapper": m.GetName(),
 			"count":  count,
+			"force":  force,
 		}).Info("refreshed popular films")
 	}
 	return nil

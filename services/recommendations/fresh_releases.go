@@ -109,10 +109,18 @@ func (l *DBFreshReleasesLoader) buildBlock(ctx context.Context) string {
 			rating = fmt.Sprintf(" %.1f", va)
 		}
 
+		// Director + top cast help Claude match actor/director queries
+		// ("films with Gosling") against fresh releases it doesn't know.
+		people := extractPeople(info.Metadata)
+
 		sb.WriteString(info.Title)
 		sb.WriteString(year)
 		sb.WriteString(genreStr)
 		sb.WriteString(rating)
+		if people != "" {
+			sb.WriteString(" — ")
+			sb.WriteString(people)
+		}
 		sb.WriteByte('\n')
 	}
 
@@ -122,6 +130,60 @@ func (l *DBFreshReleasesLoader) buildBlock(ctx context.Context) string {
 	}).Debug("fresh releases block built")
 
 	return sb.String()
+}
+
+// extractPeople builds a compact "dir: Name; cast: A, B, C" string from
+// the TMDB credits block (present when GetDetails is called with
+// append_to_response=credits). Returns "" if no credits in metadata.
+func extractPeople(metadata map[string]any) string {
+	credits, ok := metadata["credits"]
+	if !ok {
+		return ""
+	}
+	cm, ok := credits.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	var parts []string
+
+	// Director from crew
+	if crew, ok := cm["crew"].([]any); ok {
+		for _, c := range crew {
+			p, ok := c.(map[string]any)
+			if !ok {
+				continue
+			}
+			if job, _ := p["job"].(string); job == "Director" {
+				if name, _ := p["name"].(string); name != "" {
+					parts = append(parts, "dir: "+name)
+					break
+				}
+			}
+		}
+	}
+
+	// Top 3 cast
+	if cast, ok := cm["cast"].([]any); ok {
+		var names []string
+		for i, c := range cast {
+			if i >= 3 {
+				break
+			}
+			p, ok := c.(map[string]any)
+			if !ok {
+				continue
+			}
+			if name, _ := p["name"].(string); name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 {
+			parts = append(parts, strings.Join(names, ", "))
+		}
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 // extractGenreNames pulls genre name strings from the TMDB metadata
