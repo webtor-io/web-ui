@@ -50,6 +50,27 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) error {
 	if err != nil {
 		return err
 	}
-	r.StaticFile("/favicon.ico", assetsPath+"/favicon.ico")
+	// Serve favicon and manifest files from root for search engine discoverability
+	// (robots.txt blocks /assets/, so root proxying is needed)
+	nightPath := assetsPath + "/night"
+	for _, name := range []string{
+		"favicon.ico",
+		"favicon.svg",
+		"favicon-16x16.png",
+		"favicon-32x32.png",
+		"favicon-48x48.png",
+		"manifest.webmanifest",
+		"android-chrome-36x36.png",
+		"android-chrome-48x48.png",
+		"android-chrome-72x72.png",
+		"android-chrome-96x96.png",
+		"android-chrome-144x144.png",
+		"android-chrome-192x192.png",
+		"android-chrome-256x256.png",
+		"android-chrome-384x384.png",
+		"android-chrome-512x512.png",
+	} {
+		r.StaticFile("/"+name, nightPath+"/"+name)
+	}
 	return nil
 }
