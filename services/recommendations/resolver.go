@@ -2,6 +2,7 @@ package recommendations
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -334,11 +335,17 @@ func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.Co
 	if ct == models.ContentTypeSeries {
 		recType = "series"
 	}
+	// Poster URL goes through the /lib proxy (S3-cached, resized) rather
+	// than exposing the raw TMDB/OMDB URL to the client. This matches the
+	// pattern used by the library grid and watch-history — see
+	// handlers/library/poster.go and models/watch_history.go.
+	poster := fmt.Sprintf("/lib/%s/poster/%s/240.jpg", recType, md.VideoID)
+
 	return &Recommendation{
 		VideoID: md.VideoID,
 		Title:   posterTitle,
 		Year:    md.Year,
-		Poster:  md.PosterURL,
+		Poster:  poster,
 		Plot:    md.Plot,
 		Rating:  rating,
 		Reason:  strings.TrimSpace(item.Reason),
