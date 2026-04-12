@@ -92,6 +92,18 @@ type SeasonEpisode struct {
 	VoteAverage   float64 `json:"vote_average"`
 }
 
+// DiscoverResult is a single film returned by the /discover/movie endpoint.
+// We only parse the fields needed by the enrichment pipeline; the full
+// metadata (genres with names, overview, poster, etc.) is fetched later
+// via GetDetails for films that aren't already in tmdb.info.
+type DiscoverResult struct {
+	ID          int     `json:"id"`
+	Title       string  `json:"title"`
+	ReleaseDate string  `json:"release_date"`
+	VoteAverage float64 `json:"vote_average"`
+	VoteCount   int     `json:"vote_count"`
+}
+
 type Api struct {
 	url            string
 	cl             *http.Client
@@ -257,6 +269,68 @@ func (api *Api) GetTVSeason(ctx context.Context, tvID int, seasonNumber int) (*S
 
 func (api *Api) StillURL(stillPath string, size string) string {
 	return fmt.Sprintf("%s/%s%s", api.imageBaseURL, size, stillPath)
+}
+
+// DiscoverMovies calls the TMDB /discover/movie endpoint to fetch popular
+// recent releases. releaseDateGte filters to films released on or after
+// that date (YYYY-MM-DD). Results are sorted by popularity descending.
+// Returns the results for the requested page and the total number of
+// pages available (for pagination).
+func (api *Api) DiscoverMovies(ctx context.Context, releaseDateGte string, minVotes int, page int) ([]DiscoverResult, int, error) {
+	u, _ := url.Parse(fmt.Sprintf("%s/3/discover/movie", api.url))
+	q := u.Query()
+	q.Set("sort_by", "popularity.desc")
+	q.Set("primary_release_date.gte", releaseDateGte)
+	q.Set("vote_count.gte", strconv.Itoa(minVotes))
+	q.Set("page", strconv.Itoa(page))
+	u.RawQuery = q.Encode()
+
+	raw, err := api.doRequest(ctx, u.String())
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "tmdb discover movies")
+	}
+	if raw == nil {
+		return nil, 0, nil
+	}
+
+	totalPages := 1
+	if tp, ok := raw["total_pages"].(float64); ok {
+		totalPages = int(tp)
+	}
+
+	results, ok := raw["results"].([]any)
+	if !ok || len(results) == 0 {
+		return nil, totalPages, nil
+	}
+
+	out := make([]DiscoverResult, 0, len(results))
+	for _, r := range results {
+		m, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		dr := DiscoverResult{}
+		if id, ok := m["id"].(float64); ok {
+			dr.ID = int(id)
+		}
+		if t, ok := m["title"].(string); ok {
+			dr.Title = t
+		}
+		if rd, ok := m["release_date"].(string); ok {
+			dr.ReleaseDate = rd
+		}
+		if va, ok := m["vote_average"].(float64); ok {
+			dr.VoteAverage = va
+		}
+		if vc, ok := m["vote_count"].(float64); ok {
+			dr.VoteCount = int(vc)
+		}
+		if dr.ID > 0 {
+			out = append(out, dr)
+		}
+	}
+
+	return out, totalPages, nil
 }
 
 func (api *Api) PosterURL(posterPath string, size string) string {

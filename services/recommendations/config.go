@@ -15,12 +15,16 @@ const (
 	FlagModel          = "ai-recommendations-model"
 	FlagFreeModel      = "ai-recommendations-free-model"
 	FlagPaidModel      = "ai-recommendations-paid-model"
+	FlagChipsModel     = "ai-recommendations-chips-model"
 	FlagFreeDailyQuota = "ai-recommendations-free-daily-quota"
 	FlagPaidDailyQuota = "ai-recommendations-paid-daily-quota"
 	FlagMaxQueryLength = "ai-recommendations-max-query-length"
 	FlagHistoryLimit   = "ai-recommendations-history-limit"
-	FlagChipsTTL       = "ai-recommendations-chips-ttl-seconds"
-	FlagRecsTTL        = "ai-recommendations-recs-ttl-seconds"
+	FlagChipsTTL              = "ai-recommendations-chips-ttl-seconds"
+	FlagRecsTTL               = "ai-recommendations-recs-ttl-seconds"
+	FlagFreshReleasesMinYear  = "ai-recommendations-fresh-releases-min-year"
+	FlagFreshReleasesLimit    = "ai-recommendations-fresh-releases-limit"
+	FlagFreshReleasesCacheTTL = "ai-recommendations-fresh-releases-cache-ttl-seconds"
 )
 
 // DefaultModel is the Claude model we target out of the box. Haiku 4.5 has
@@ -38,12 +42,16 @@ type Config struct {
 	Model           string
 	FreeModel       string
 	PaidModel       string
+	ChipsModel      string
 	FreeDailyQuota  int
 	PaidDailyQuota  int
 	MaxQueryLength  int
 	HistoryLimit    int
-	ChipsTTLSeconds int
-	RecsTTLSeconds  int
+	ChipsTTLSeconds        int
+	RecsTTLSeconds         int
+	FreshReleasesMinYear   int
+	FreshReleasesLimit     int
+	FreshReleasesCacheTTL  int
 }
 
 // RegisterFlags registers all CLI flags for the recommendations service.
@@ -75,6 +83,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   FlagPaidModel,
 			Usage:  "Claude model id for paid-tier users (overrides --ai-recommendations-model)",
 			EnvVar: "AI_RECOMMENDATIONS_PAID_MODEL",
+		},
+		cli.StringFlag{
+			Name:   FlagChipsModel,
+			Usage:  "Claude model id for chip generation (defaults to free-tier model if unset — chips are lightweight and don't benefit from a smarter model)",
+			EnvVar: "AI_RECOMMENDATIONS_CHIPS_MODEL",
 		},
 		cli.IntFlag{
 			Name:   FlagFreeDailyQuota,
@@ -112,6 +125,24 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Value:  30 * 60,
 			EnvVar: "AI_RECOMMENDATIONS_RECS_TTL_SECONDS",
 		},
+		cli.IntFlag{
+			Name:   FlagFreshReleasesMinYear,
+			Usage:  "minimum release year for fresh releases injected into the AI prompt (compensates for Claude's training cutoff)",
+			Value:  2025,
+			EnvVar: "AI_RECOMMENDATIONS_FRESH_RELEASES_MIN_YEAR",
+		},
+		cli.IntFlag{
+			Name:   FlagFreshReleasesLimit,
+			Usage:  "max number of recent films to load into the AI prompt",
+			Value:  200,
+			EnvVar: "AI_RECOMMENDATIONS_FRESH_RELEASES_LIMIT",
+		},
+		cli.IntFlag{
+			Name:   FlagFreshReleasesCacheTTL,
+			Usage:  "how long the in-memory fresh releases prompt block is cached (seconds)",
+			Value:  3600,
+			EnvVar: "AI_RECOMMENDATIONS_FRESH_RELEASES_CACHE_TTL_SECONDS",
+		},
 	)
 }
 
@@ -123,13 +154,28 @@ func ConfigFromCLI(c *cli.Context) Config {
 		Model:           c.String(FlagModel),
 		FreeModel:       c.String(FlagFreeModel),
 		PaidModel:       c.String(FlagPaidModel),
+		ChipsModel:      c.String(FlagChipsModel),
 		FreeDailyQuota:  c.Int(FlagFreeDailyQuota),
 		PaidDailyQuota:  c.Int(FlagPaidDailyQuota),
 		MaxQueryLength:  c.Int(FlagMaxQueryLength),
 		HistoryLimit:    c.Int(FlagHistoryLimit),
-		ChipsTTLSeconds: c.Int(FlagChipsTTL),
-		RecsTTLSeconds:  c.Int(FlagRecsTTL),
+		ChipsTTLSeconds:       c.Int(FlagChipsTTL),
+		RecsTTLSeconds:        c.Int(FlagRecsTTL),
+		FreshReleasesMinYear:  c.Int(FlagFreshReleasesMinYear),
+		FreshReleasesLimit:    c.Int(FlagFreshReleasesLimit),
+		FreshReleasesCacheTTL: c.Int(FlagFreshReleasesCacheTTL),
 	}
+}
+
+// ResolveChipsModel returns the Claude model id used for chip generation.
+// Override chain: ChipsModel → free-tier model → legacy Model → DefaultModel.
+// Chips are lightweight (6 short labels) so the default intentionally
+// falls back to the free-tier model (Haiku), not the paid one.
+func (c Config) ResolveChipsModel() string {
+	if c.ChipsModel != "" {
+		return c.ChipsModel
+	}
+	return c.ResolveModel(TierFree)
 }
 
 // ResolveModel returns the effective Claude model id for the given tier,

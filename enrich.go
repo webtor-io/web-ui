@@ -2,27 +2,33 @@ package main
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"net/http"
 )
 
 func makeEnrichCMD() cli.Command {
 	enrichCMD := cli.Command{
 		Name:    "enrich",
 		Aliases: []string{"e"},
-		Usage:   "Enriches torrents with metadata",
-		Action:  enrich,
+		Usage:   "Enriches content with metadata",
 	}
 	configureEnrich(&enrichCMD)
 	return enrichCMD
 }
 
 func configureEnrich(c *cli.Command) {
-	c.Flags = append(c.Flags,
+	runCmd := cli.Command{
+		Name:   "run",
+		Usage:  "Enriches specific torrent resources with metadata",
+		Action: enrich,
+	}
+	runCmd.Flags = append(runCmd.Flags,
 		cli.BoolFlag{
 			Name:  "force",
 			Usage: "force enrichment",
@@ -31,16 +37,70 @@ func configureEnrich(c *cli.Command) {
 			Name:  "force-error",
 			Usage: "force error enrichment",
 		},
-	)
-	c.Flags = append(c.Flags,
 		cli.StringFlag{
 			Name:  "id",
 			Usage: "id for enrichment",
 		},
 	)
-	c.Flags = cs.RegisterPGFlags(c.Flags)
-	c.Flags = api.RegisterFlags(c.Flags)
-	c.Flags = configureEnricher(c.Flags)
+	runCmd.Flags = cs.RegisterPGFlags(runCmd.Flags)
+	runCmd.Flags = api.RegisterFlags(runCmd.Flags)
+	runCmd.Flags = configureEnricher(runCmd.Flags)
+
+	popularCmd := cli.Command{
+		Name:   "popular",
+		Usage:  "Fetches popular recent films from metadata providers into the DB cache",
+		Action: enrichPopular,
+	}
+	popularCmd.Flags = cs.RegisterPGFlags(popularCmd.Flags)
+	popularCmd.Flags = configureEnricher(popularCmd.Flags)
+	popularCmd.Flags = append(popularCmd.Flags,
+		cli.StringFlag{
+			Name:   "release-date-gte",
+			Usage:  "minimum release date (YYYY-MM-DD)",
+			Value:  "2025-01-01",
+			EnvVar: "ENRICH_POPULAR_RELEASE_DATE_GTE",
+		},
+		cli.IntFlag{
+			Name:   "limit",
+			Usage:  "max number of films to fetch",
+			Value:  300,
+			EnvVar: "ENRICH_POPULAR_LIMIT",
+		},
+	)
+
+	c.Subcommands = []cli.Command{runCmd, popularCmd}
+}
+
+func enrichPopular(c *cli.Context) error {
+	releaseDateGte := c.String("release-date-gte")
+	limit := c.Int("limit")
+
+	pg := cs.NewPG(c)
+	defer pg.Close()
+
+	m := cs.NewPGMigration(pg)
+	if err := m.Run(); err != nil {
+		return err
+	}
+
+	cl := http.DefaultClient
+	// api.Api is not needed for popular — only the enricher's metadata
+	// mappers, which are wired through makeEnricher. We pass a nil api
+	// since popular flow never hits the REST API.
+	en := makeEnricher(c, cl, pg, nil)
+
+	log.WithFields(log.Fields{
+		"release_date_gte": releaseDateGte,
+		"limit":            limit,
+	}).Info("starting enrich popular")
+
+	ctx := context.Background()
+	if err := en.RefreshPopular(ctx, releaseDateGte, limit); err != nil {
+		return errors.Wrap(err, "enrich popular failed")
+	}
+
+	log.Info("enrich popular completed")
+	return nil
 }
 
 func enrich(c *cli.Context) error {

@@ -27,8 +27,9 @@ func New(c *cli.Context, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup
 	resolver := NewResolver(lookup, resolverConcurrency)
 	quota := NewRedisQuota(redis.Get(), cfg)
 	chipsCache := NewRedisChipsCache(redis.Get())
+	freshReleases := NewDBFreshReleasesLoader(pg, int16(cfg.FreshReleasesMinYear), cfg.FreshReleasesLimit, cfg.FreshReleasesCacheTTL)
 
-	svc := NewClaudeService(cfg, contextBuilder, resolver, quota, chipsCache)
+	svc := NewClaudeService(cfg, contextBuilder, resolver, quota, chipsCache, freshReleases)
 	if svc == nil {
 		// Explicit interface-nil so callers can do `if svc != nil`.
 		// Without this, returning a typed (*ClaudeService)(nil) would

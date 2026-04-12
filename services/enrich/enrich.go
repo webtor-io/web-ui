@@ -38,8 +38,40 @@ type EpisodeMapper interface {
 	GetName() string
 }
 
+// PopularProvider is an optional capability of a MetadataMapper. Mappers
+// that can fetch lists of currently popular / trending films implement
+// this interface. Enricher.RefreshPopular iterates all mappers, calls
+// RefreshPopular on those that support it, and each implementation
+// upserts the results into its own cache tables.
+type PopularProvider interface {
+	RefreshPopular(ctx context.Context, releaseDateGte string, limit int) (int, error)
+}
+
 func (s *Enricher) HasMappers() bool {
 	return len(s.mappers) > 0
+}
+
+// RefreshPopular asks each metadata mapper that supports the
+// PopularProvider interface to fetch and cache popular recent releases.
+// Today only TMDB implements it; adding support in OMDB or Kinopoisk
+// later requires zero changes here.
+func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, limit int) error {
+	for _, m := range s.mappers {
+		pp, ok := m.(PopularProvider)
+		if !ok {
+			continue
+		}
+		count, err := pp.RefreshPopular(ctx, releaseDateGte, limit)
+		if err != nil {
+			log.WithError(err).WithField("mapper", m.GetName()).Error("refresh popular failed")
+			continue
+		}
+		log.WithFields(log.Fields{
+			"mapper": m.GetName(),
+			"count":  count,
+		}).Info("refreshed popular films")
+	}
+	return nil
 }
 
 func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper) *Enricher {

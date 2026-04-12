@@ -63,14 +63,16 @@ const (
 // primary rate limiter. Not caching keeps the happy path trivial and
 // removes an entire class of double-consume races.
 type ClaudeService struct {
-	cfg       Config
-	client    *anthropic.Client
-	freeModel anthropic.Model
-	paidModel anthropic.Model
-	context   *UserContextBuilder
-	resolver  *Resolver
-	quota     Quota
-	chips     ChipsCache
+	cfg            Config
+	client         *anthropic.Client
+	freeModel      anthropic.Model
+	paidModel      anthropic.Model
+	chipsModel     anthropic.Model
+	context        *UserContextBuilder
+	resolver       *Resolver
+	quota          Quota
+	chips          ChipsCache
+	freshReleases  FreshReleasesLoader
 }
 
 // modelFor returns the Claude model id to use for a given tier. The two
@@ -93,6 +95,7 @@ func NewClaudeService(
 	resolver *Resolver,
 	quota Quota,
 	chips ChipsCache,
+	freshReleases FreshReleasesLoader,
 ) *ClaudeService {
 	if !cfg.Enabled {
 		log.Info("ai_rec: feature flag off — recommendations service not started")
@@ -119,20 +122,24 @@ func NewClaudeService(
 
 	freeModel := cfg.ResolveModel(TierFree)
 	paidModel := cfg.ResolveModel(TierPaid)
+	chipsModel := cfg.ResolveChipsModel()
 
 	s := &ClaudeService{
-		cfg:       cfg,
-		client:    &client,
-		freeModel: anthropic.Model(freeModel),
-		paidModel: anthropic.Model(paidModel),
-		context:   contextBuilder,
-		resolver:  resolver,
-		quota:     quota,
-		chips:     chips,
+		cfg:           cfg,
+		client:        &client,
+		freeModel:     anthropic.Model(freeModel),
+		paidModel:     anthropic.Model(paidModel),
+		chipsModel:    anthropic.Model(chipsModel),
+		context:       contextBuilder,
+		resolver:      resolver,
+		quota:         quota,
+		chips:         chips,
+		freshReleases: freshReleases,
 	}
 	log.WithFields(log.Fields{
-		"free_model": freeModel,
-		"paid_model": paidModel,
+		"free_model":  freeModel,
+		"paid_model":  paidModel,
+		"chips_model": chipsModel,
 	}).Info("ai_rec: ClaudeService ready")
 	return s
 }
@@ -523,15 +530,30 @@ func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, userPrompt st
 	// returning, so otherwise the metric is misleadingly close to zero.
 	streamStart := time.Now()
 
-	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:     s.modelFor(tier),
-		MaxTokens: claudeMaxTokensRecommend,
-		System: []anthropic.TextBlockParam{
-			{
-				Text:         systemPromptNDJSON,
-				CacheControl: anthropic.NewCacheControlEphemeralParam(),
-			},
+	// System prompt: two blocks with independent cache breakpoints.
+	// Block 1 (base rules, ~2500 tok) is stable across all requests.
+	// Block 2 (fresh releases from DB) changes every ~6h when the cron
+	// runs, but Anthropic caches each prefix independently, so block 1
+	// is always a cache hit even when block 2 refreshes.
+	systemBlocks := []anthropic.TextBlockParam{
+		{
+			Text:         systemPromptNDJSON,
+			CacheControl: anthropic.NewCacheControlEphemeralParam(),
 		},
+	}
+	if s.freshReleases != nil {
+		if block := s.freshReleases.LoadFreshReleases(ctx); block != "" {
+			systemBlocks = append(systemBlocks, anthropic.TextBlockParam{
+				Text:         block,
+				CacheControl: anthropic.NewCacheControlEphemeralParam(),
+			})
+		}
+	}
+
+	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
+		Model:       s.modelFor(tier),
+		MaxTokens:   claudeMaxTokensRecommend,
+		System:      systemBlocks,
 		Messages:    messages,
 		Temperature: anthropic.Float(0.7),
 	})
@@ -695,7 +717,7 @@ func (s *ClaudeService) callClaudeForChips(ctx context.Context, userPrompt strin
 	}
 
 	resp, err := s.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     s.modelFor(tier),
+		Model:     s.chipsModel,
 		MaxTokens: claudeMaxTokensChips,
 		System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
 		Messages: []anthropic.MessageParam{

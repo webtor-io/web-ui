@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
@@ -235,6 +236,21 @@ func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentTyp
 		}
 	}
 
+	info, err := s.ensureByTmdbID(ctx, db, tmdbID, ttype, searchType)
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, nil
+	}
+	return s.makeVideoMetadata(info), nil
+}
+
+// ensureByTmdbID fetches full metadata from TMDB for a given tmdb_id and
+// upserts it into tmdb.info. Shared by MapByID (on-demand per torrent)
+// and RefreshPopular (batch cron). Returns nil when TMDB has no details
+// for this id (rare, happens for deleted entries).
+func (s *TMDB) ensureByTmdbID(ctx context.Context, db *pg.DB, tmdbID int, ttype tm.TmdbType, searchType tmdb.TmdbType) (*tm.Info, error) {
 	details, err := s.api.GetDetails(ctx, tmdbID, searchType)
 	if err != nil {
 		return nil, err
@@ -252,13 +268,59 @@ func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentTyp
 		}
 	}
 
-	info, err := tm.UpsertInfo(ctx, db, tmdbID, ttype, details)
-	if err != nil {
-		return nil, err
+	return tm.UpsertInfo(ctx, db, tmdbID, ttype, details)
+}
+
+// RefreshPopular implements PopularProvider. It calls TMDB discover to
+// fetch popular recent movies and upserts each one into tmdb.info so the
+// AI recommendations prompt can query them by year + rating.
+func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit int) (int, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return 0, errors.New("db is nil")
 	}
 
-	return s.makeVideoMetadata(info), nil
+	added := 0
+	page := 1
+	seen := 0
+	for seen < limit {
+		results, totalPages, err := s.api.DiscoverMovies(ctx, releaseDateGte, 50, page)
+		if err != nil {
+			return added, errors.Wrapf(err, "discover page %d", page)
+		}
+		if len(results) == 0 {
+			break
+		}
+		for _, r := range results {
+			if seen >= limit {
+				break
+			}
+			seen++
+
+			existing, err := tm.GetInfoByID(ctx, db, r.ID)
+			if err != nil {
+				log.WithError(err).WithField("tmdb_id", r.ID).Warn("popular: db check failed")
+				continue
+			}
+			if existing != nil {
+				continue
+			}
+
+			_, err = s.ensureByTmdbID(ctx, db, r.ID, tm.TmdbTypeMovie, tmdb.TmdbTypeMovie)
+			if err != nil {
+				log.WithError(err).WithField("tmdb_id", r.ID).WithField("title", r.Title).Warn("popular: enrich failed")
+				continue
+			}
+			added++
+		}
+		if page >= totalPages {
+			break
+		}
+		page++
+	}
+	return added, nil
 }
 
 var _ MetadataMapper = (*TMDB)(nil)
 var _ DirectMapper = (*TMDB)(nil)
+var _ PopularProvider = (*TMDB)(nil)

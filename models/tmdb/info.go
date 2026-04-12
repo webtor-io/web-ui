@@ -93,6 +93,26 @@ func UpsertInfo(ctx context.Context, db *pg.DB, tmdbID int, tmdbType TmdbType, m
 	return m, err
 }
 
+// ListRecentPopular returns films released on or after minYear, sorted by
+// TMDB vote_average descending. Used by the AI recommendations service to
+// build the "recent releases" prompt block that compensates for Claude's
+// training data cutoff. Only movies with an IMDB id are returned (the
+// resolver drops non-IMDB entries anyway).
+func ListRecentPopular(ctx context.Context, db *pg.DB, minYear int16, limit int) ([]Info, error) {
+	var infos []Info
+	err := db.ModelContext(ctx, &infos).
+		Where("year >= ?", minYear).
+		Where("type = ?", TmdbTypeMovie).
+		Where("imdb_id IS NOT NULL").
+		OrderExpr("(metadata->>'vote_average')::float DESC NULLS LAST").
+		Limit(limit).
+		Select()
+	if err != nil {
+		return nil, err
+	}
+	return infos, nil
+}
+
 func parseYear(dateStr string) int {
 	if len(dateStr) < 4 {
 		return 0

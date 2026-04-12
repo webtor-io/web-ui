@@ -11,27 +11,43 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Privacy Policy</h1>
 
-    <p class="text-sm text-w-muted mb-8">Last updated: August 10, 2025</p>
+    <p class="text-sm text-w-muted mb-8">Last updated: April 12, 2026</p>
 
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Webtor ("we," "our," or "us") values your privacy. This Privacy Policy explains how we handle your personal information when you use our service.</p>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">1. Information We Collect</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">When you sign in with Google, we only collect your <span class="font-semibold">email address</span>.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2">We collect the following data depending on how you use Webtor:</p>
+    <ul class="list-disc list-inside text-[1.05rem] text-w-sub leading-relaxed mb-4 space-y-1 pl-2">
+      <li><span class="font-semibold">Email address</span> — collected when you sign in with Google or Patreon, used solely for authentication.</li>
+      <li><span class="font-semibold">Personal library</span> — content you save to your account, including its metadata (titles, file lists). You control what is added and removed.</li>
+      <li><span class="font-semibold">Watch and rating history</span> — when you mark movies or series as watched or rate them, we store a reference to the film identifier (e.g. IMDB id), your rating signal, and the watch timestamp.</li>
+      <li><span class="font-semibold">AI recommendation queries</span> — when you use the AI Discover feature, we process the text you type to generate personalized suggestions and to enforce daily usage limits.</li>
+    </ul>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">2. How We Use Your Information</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We use your email address solely to authenticate you in Webtor.</p>
+    <ul class="list-disc list-inside text-[1.05rem] text-w-sub leading-relaxed mb-4 space-y-1 pl-2">
+      <li><span class="font-semibold">Email</span> — to authenticate your account and communicate about your subscription.</li>
+      <li><span class="font-semibold">Library</span> — to store and organize the content you choose to save.</li>
+      <li><span class="font-semibold">Watch history</span> — to power the "continue watching" feature, to display your watched/rated state across the interface, and to ground AI recommendations in your actual taste.</li>
+      <li><span class="font-semibold">AI queries</span> — to generate film suggestions via our AI provider (see section 3) and to manage your daily request quota.</li>
+    </ul>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">3. Data Sharing</h2>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We do <span class="font-semibold">not</span> sell, rent, or share your email address with third parties, except as required by law.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">When you use the <span class="font-semibold">AI Discover</span> feature, your recent watch history (film titles, release years, and rating signals — up to 40 entries) along with your query text are sent to <a href="https://www.anthropic.com" target="_blank" class="link link-hover text-w-pinkL">Anthropic</a>, our AI provider, to generate personalized recommendations. <span class="font-semibold">No email address, user identifier, IP address, or any other personally identifiable information is included</span> in these requests. Anthropic processes this data under their <a href="https://www.anthropic.com/policies/privacy" target="_blank" class="link link-hover text-w-pinkL">API data usage policy</a>, which prohibits training on API inputs.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">AI Discover is entirely opt-in — no data is sent to Anthropic until you actively tap a suggestion chip or type a query on the Discover page.</p>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">4. Data Storage and Security</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Your email address is stored securely and protected against unauthorized access.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Your data is stored securely and protected against unauthorized access. Watch history and AI usage data are associated with your account and are not publicly accessible.</p>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">5. Data Deletion</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">You can request deletion of your account and all associated data at any time by contacting <a href="/support" class="link link-hover text-w-pinkL" data-async-target="main">{{ domain }}/support</a>.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">You can delete your account and all associated data (including watch history and AI usage data) at any time from your <a href="/profile" class="link link-hover text-w-pinkL" data-async-target="main">profile page</a>.</p>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">6. Changes to This Policy</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We may update this policy from time to time. Changes will be posted on this page.</p>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">6. Analytics</h2>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We use <a href="https://umami.is" target="_blank" class="link link-hover text-w-pinkL">Umami</a>, a privacy-focused, self-hosted analytics tool, to understand how visitors use Webtor. Umami does not use cookies, does not collect personal data, and all data is aggregated — no individual user can be identified.</p>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">7. Changes to This Policy</h2>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We may update this policy from time to time. Changes will be posted on this page with an updated revision date.</p>
   </div>
 </section>
 {{ end }}
