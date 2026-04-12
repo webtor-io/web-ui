@@ -181,34 +181,18 @@ func (s *Handler) getResizedJPEGPoster(ctx context.Context, db *pg.DB, args *Pos
 	return &buf, nil
 }
 
-func (s *Handler) getPosterMetadata(ctx context.Context, db *pg.DB, t models.ContentType, videoID string) (md *models.VideoMetadata, err error) {
-	// Primary path: look up in the torrent-enrichment tables
-	// (movie_metadata / series_metadata). This covers films the user has
-	// interacted with via a torrent.
-	if t == models.ContentTypeSeries {
-		var smd *models.SeriesMetadata
-		smd, err = models.GetSeriesMetadataByVideoID(ctx, db, videoID)
-		if err == nil && smd != nil && smd.PosterURL != "" {
-			return smd.VideoMetadata, nil
-		}
-	} else if t == models.ContentTypeMovie {
-		var mmd *models.MovieMetadata
-		mmd, err = models.GetMovieMetadataByVideoID(ctx, db, videoID)
-		if err == nil && mmd != nil && mmd.PosterURL != "" {
-			return mmd.VideoMetadata, nil
-		}
-	}
-
-	// Fallback: use the enricher's DirectMapper chain (TMDB → OMDB → …).
-	// This covers AI-recommended films that were enriched into tmdb.info
-	// via the discover flow but never went through torrent enrichment.
+func (s *Handler) getPosterMetadata(ctx context.Context, _ *pg.DB, t models.ContentType, videoID string) (md *models.VideoMetadata, err error) {
+	// Delegate entirely to the enricher's DirectMapper chain (currently
+	// TMDB MapByID). It checks tmdb.info cache first; on a miss it calls
+	// the TMDB API, upserts the result, and returns the metadata with a
+	// poster URL. This covers both torrent-enriched films and AI/discover-
+	// enriched ones through a single code path.
 	if s.enricher != nil {
 		md, err = s.enricher.LookupByVideoID(ctx, videoID, t)
 		if err == nil && md != nil && md.PosterURL != "" {
 			return md, nil
 		}
 	}
-
 	return nil, nil
 }
 
