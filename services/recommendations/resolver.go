@@ -339,7 +339,9 @@ func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.Co
 	// than exposing the raw TMDB/OMDB URL to the client. This matches the
 	// pattern used by the library grid and watch-history — see
 	// handlers/library/poster.go and models/watch_history.go.
-	poster := fmt.Sprintf("/lib/%s/poster/%s/240.jpg", recType, md.VideoID)
+	// 500px covers the chessboard grid at 220px CSS (md) on 2x retina
+	// and mobile full-width at 1x. Matches TMDB's w500 source size.
+	poster := fmt.Sprintf("/lib/%s/poster/%s/500.jpg", recType, md.VideoID)
 
 	return &Recommendation{
 		VideoID: md.VideoID,
