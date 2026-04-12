@@ -355,7 +355,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting Library
-	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl)
+	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en)
 
 	// Setting CacheIndex
 	cacheIndex := ci.New(c, pg)

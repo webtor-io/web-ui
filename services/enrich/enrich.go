@@ -259,6 +259,29 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	return &mt, nil
 }
 
+// LookupByVideoID iterates through mappers that implement DirectMapper and
+// returns the first match for the given video ID (typically an IMDB tt* id).
+// Used by the poster proxy when a film exists in tmdb.info (via AI/discover
+// enrichment) but not yet in movie_metadata (which is populated through
+// the torrent enrichment flow).
+func (s *Enricher) LookupByVideoID(ctx context.Context, videoID string, ct models.ContentType) (*models.VideoMetadata, error) {
+	for _, m := range s.mappers {
+		dm, ok := m.(DirectMapper)
+		if !ok {
+			continue
+		}
+		md, err := dm.MapByID(ctx, videoID, ct, false)
+		if err != nil {
+			log.WithError(err).WithField("mapper", m.GetName()).WithField("video_id", videoID).Warn("direct lookup failed")
+			continue
+		}
+		if md != nil {
+			return md, nil
+		}
+	}
+	return nil, nil
+}
+
 // LookupByTitleYear iterates through configured metadata mappers (TMDB, OMDB,
 // Kinopoisk, ...) and returns the first matching video metadata for the given
 // title and optional year.

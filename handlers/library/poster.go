@@ -117,6 +117,9 @@ func (s *Handler) getResizedPoster(ctx context.Context, db *pg.DB, args *PosterA
 	if err != nil {
 		return nil, err
 	}
+	if md == nil || md.PosterURL == "" {
+		return nil, errors.Errorf("no poster found for %s %s", args.t, args.imdbID)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", md.PosterURL, nil)
 	if err != nil {
@@ -179,22 +182,34 @@ func (s *Handler) getResizedJPEGPoster(ctx context.Context, db *pg.DB, args *Pos
 }
 
 func (s *Handler) getPosterMetadata(ctx context.Context, db *pg.DB, t models.ContentType, videoID string) (md *models.VideoMetadata, err error) {
+	// Primary path: look up in the torrent-enrichment tables
+	// (movie_metadata / series_metadata). This covers films the user has
+	// interacted with via a torrent.
 	if t == models.ContentTypeSeries {
 		var smd *models.SeriesMetadata
 		smd, err = models.GetSeriesMetadataByVideoID(ctx, db, videoID)
-		if err != nil || smd == nil {
-			return
+		if err == nil && smd != nil && smd.PosterURL != "" {
+			return smd.VideoMetadata, nil
 		}
-		return smd.VideoMetadata, nil
 	} else if t == models.ContentTypeMovie {
 		var mmd *models.MovieMetadata
 		mmd, err = models.GetMovieMetadataByVideoID(ctx, db, videoID)
-		if err != nil || mmd == nil {
-			return
+		if err == nil && mmd != nil && mmd.PosterURL != "" {
+			return mmd.VideoMetadata, nil
 		}
-		return mmd.VideoMetadata, nil
 	}
-	return nil, errors.New("invalid video type")
+
+	// Fallback: use the enricher's DirectMapper chain (TMDB → OMDB → …).
+	// This covers AI-recommended films that were enriched into tmdb.info
+	// via the discover flow but never went through torrent enrichment.
+	if s.enricher != nil {
+		md, err = s.enricher.LookupByVideoID(ctx, videoID, t)
+		if err == nil && md != nil && md.PosterURL != "" {
+			return md, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (s *PosterArgs) Key() string {
