@@ -9,16 +9,25 @@ import (
 	"golang.org/x/text/language"
 )
 
-var SupportedLangs = []string{"en", "ru", "es", "de"}
+var SupportedLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it"}
 
 var DefaultLang = "en"
 
 // LangNames maps language codes to their native display names.
+//
+// Note: "pt" carries Brazilian Portuguese (PT-BR) content. We use the bare
+// two-letter code for URL/middleware simplicity — see middleware.go:69
+// which assumes 2-char prefixes. If/when we add European Portuguese, split
+// this into "pt-br" and "pt-pt" and teach the middleware about variable-
+// length prefixes.
 var LangNames = map[string]string{
 	"en": "English",
 	"ru": "Русский",
 	"es": "Español",
 	"de": "Deutsch",
+	"fr": "Français",
+	"pt": "Português",
+	"it": "Italiano",
 }
 
 type Service struct {

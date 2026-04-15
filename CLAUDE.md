@@ -19,8 +19,9 @@
 ## Internationalization (i18n)
 
 - **Full guide**: `docs/i18n.md` — архитектура, паттерны, правила переводов
-- **Languages**: EN (default, no prefix), RU (`/ru/`), ES (`/es/`), DE (`/de/`)
-- **Locale files**: `locales/{en,ru,es,de}.json` — flat key-value JSON
+- **Languages**: EN (default, no prefix), RU (`/ru/`), ES (`/es/`), DE (`/de/`), FR (`/fr/`), PT-BR (`/pt/`), IT (`/it/`)
+- **Locale files**: `locales/{en,ru,es,de,fr,pt,it}.json` — flat key-value JSON
+- **PT note**: bundle `pt` содержит PT-BR. `Accept-Language: pt-BR`/`pt-PT` оба сворачиваются в `pt` через `language.Base()`. Разделять на `pt-br`/`pt-pt` — только когда потребуется европейский португальский (нужна правка middleware для переменных префиксов)
 - **Template translation**: `{{ t $.Lang "key" }}`, `{{ tp $.Lang "key" "Param" value }}`
 - **Links**: всегда `{{ langPath $.Lang "/path" }}`
 - **Sub-templates с чужими данными**: `{{ template "name" withContext $ data }}`
