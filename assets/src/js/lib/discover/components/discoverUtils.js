@@ -1,4 +1,5 @@
 import { buildCatalogs, getCatalogsForType, getTypes } from './discoverReducer';
+import { langPath, t } from '../i18n';
 
 // Shared button chip class for Tabs (btn-sm) and FilterChips (btn-xs)
 // Size classes must be written as full literals for Tailwind static analysis
@@ -62,19 +63,19 @@ async function apiPost(url, body) {
         if (data.status === 'success' && data.message && window.toast) {
             window.toast.success(data.message);
         } else if (data.status === 'error') {
-            if (window.toast) window.toast.error(data.message || 'Something went wrong');
+            if (window.toast) window.toast.error(data.message || t('discover.somethingWrong'));
             return null;
         }
         return data;
     } catch (e) {
-        if (window.toast) window.toast.error('Network error');
+        if (window.toast) window.toast.error(t('discover.networkError'));
         return null;
     }
 }
 
 export async function toggleWatched(videoID, type, currentlyWatched) {
     const action = currentlyWatched ? 'unmark' : 'mark';
-    const data = await apiPost(`/library/${type}/${videoID}/${action}`);
+    const data = await apiPost(langPath(`/library/${type}/${videoID}/${action}`));
     if (!data) return null;
     return { watched: !currentlyWatched, rateForm: !!data['rate-form'] };
 }
@@ -82,12 +83,12 @@ export async function toggleWatched(videoID, type, currentlyWatched) {
 export async function rateVideo(videoID, type, rating) {
     const body = new URLSearchParams();
     body.set('rating', String(rating));
-    const data = await apiPost(`/library/${type}/${videoID}/rate`, body);
+    const data = await apiPost(langPath(`/library/${type}/${videoID}/rate`), body);
     return !!data;
 }
 
 export async function unrateVideo(videoID, type) {
-    const data = await apiPost(`/library/${type}/${videoID}/unrate`);
+    const data = await apiPost(langPath(`/library/${type}/${videoID}/unrate`));
     return !!data;
 }
 
@@ -95,7 +96,7 @@ export async function fetchUserStatuses(ids) {
     const titleIds = (ids || []).filter(id => typeof id === 'string' && id.startsWith('tt') && !id.includes(':'));
     if (titleIds.length === 0) return {};
     try {
-        const res = await fetch('/library/status', {
+        const res = await fetch(langPath('/library/status'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

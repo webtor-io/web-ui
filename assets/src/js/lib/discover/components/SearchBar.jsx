@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
+import { t } from '../i18n';
 
 export function SearchBar({ onSearch, onExit, isSearchMode, initialQuery }) {
     const [value, setValue] = useState('');
@@ -49,7 +50,7 @@ export function SearchBar({ onSearch, onExit, isSearchMode, initialQuery }) {
                 <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Search movies and series..."
+                    placeholder={t('discover.search')}
                     class="w-full bg-transparent border-none outline-none px-3 py-3 text-w-text placeholder:text-w-muted text-sm"
                     autocomplete="off"
                     value={value}

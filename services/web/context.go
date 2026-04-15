@@ -8,6 +8,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/geoip"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 type Context struct {
@@ -20,6 +21,7 @@ type Context struct {
 	TierUpdated bool
 	Geo         *geoip.Data
 	ApiClaims   *api.Claims
+	Lang        string
 	ginCtx      *gin.Context
 }
 
@@ -39,6 +41,11 @@ func (s *Context) GetGinContext() *gin.Context {
 	return s.ginCtx
 }
 
+// Path returns the current request path (after language prefix stripping).
+func (c *Context) Path() string {
+	return c.ginCtx.Request.URL.Path
+}
+
 func NewContext(c *gin.Context) *Context {
 	user := auth.GetUserFromContext(c)
 	cl := claims.GetFromContext(c)
@@ -46,6 +53,7 @@ func NewContext(c *gin.Context) *Context {
 	geoData := geo.GetFromContext(c)
 	aCl := api.GetClaimsFromContext(c)
 	tu := claims.GetTierUpdateFromContext(c)
+	lang := i18n.GetLang(c)
 
 	return &Context{
 		CSRF:        sess.CSRF,
@@ -55,6 +63,7 @@ func NewContext(c *gin.Context) *Context {
 		SessionID:   sess.ID,
 		Geo:         geoData,
 		TierUpdated: tu,
+		Lang:        lang,
 		ginCtx:      c,
 	}
 }

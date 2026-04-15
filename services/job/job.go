@@ -336,19 +336,19 @@ func (s *Job) DoneWithMessage(msg string) *Job {
 	return s
 }
 
-func (s *Job) Download(url string) *Job {
+func (s *Job) Download(url string, message string) *Job {
 	_ = s.log(LogItem{
 		Level:    Download,
-		Message:  "success! download should start right now!",
+		Message:  message,
 		Location: url,
 	})
 	return s
 }
 
-func (s *Job) Redirect(url string) *Job {
+func (s *Job) Redirect(url string, message string) *Job {
 	_ = s.log(LogItem{
 		Level:    Redirect,
-		Message:  "success! redirecting",
+		Message:  message,
 		Location: url,
 	})
 	return s

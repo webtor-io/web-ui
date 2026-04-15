@@ -35,10 +35,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type Web struct {
-	host string
-	port int
-	ln   net.Listener
-	r    *gin.Engine
+	host    string
+	port    int
+	ln      net.Listener
+	r       *gin.Engine
+	handler http.Handler
 }
 
 func (s *Web) Serve() error {
@@ -49,7 +50,11 @@ func (s *Web) Serve() error {
 		return errors.Wrap(err, "failed to web listen to tcp connection")
 	}
 	log.Infof("serving web at %v", addr)
-	return http.Serve(s.ln, s.r)
+	h := s.handler
+	if h == nil {
+		h = s.r
+	}
+	return http.Serve(s.ln, h)
 }
 
 func (s *Web) Close() {
@@ -60,6 +65,17 @@ func (s *Web) Close() {
 	if s.ln != nil {
 		_ = s.ln.Close()
 	}
+}
+
+// Use wraps the Gin engine with an HTTP-level middleware.
+// Middleware added via Use runs BEFORE Gin's router, which is needed
+// for things like language-prefix stripping that must rewrite the URL
+// path before route matching.
+func (s *Web) Use(mw func(http.Handler) http.Handler) {
+	if s.handler == nil {
+		s.handler = s.r
+	}
+	s.handler = mw(s.handler)
 }
 
 func New(c *cli.Context, r *gin.Engine) (*Web, error) {

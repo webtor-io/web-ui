@@ -42,24 +42,12 @@ type View struct {
 
 func (s *View) makeTemplate() (t *template.Template, err error) {
 	var templates []string
-	if s.LayoutBody != "" {
-		t, err = template.New(s.Name).Parse(s.LayoutBody)
-		if err != nil {
-			return nil, err
-		}
-	} else if s.Layout != "" {
-		templates = append(templates, s.LayoutPath)
-		t = template.New(filepath.Base(s.LayoutPath))
-	} else {
-		t = template.New(filepath.Base(s.Path))
-	}
-	templates = append(templates, s.Path)
-	templates = append(templates, s.Partials...)
 
 	// Create a pointer to hold the parsed template for the dynamicTemplate function
 	var parsedTemplate *template.Template
 
-	// Add the "dynamicTemplate" function that dynamically executes templates by name
+	// Build the full FuncMap upfront so it's available for ALL parse calls,
+	// including LayoutBody which is parsed from a string (not a file).
 	funcs := make(FuncMap)
 	for k, v := range s.Funcs {
 		funcs[k] = v
@@ -74,6 +62,20 @@ func (s *View) makeTemplate() (t *template.Template, err error) {
 		}
 		return template.HTML(buf.String()), nil
 	}
+
+	if s.LayoutBody != "" {
+		t, err = template.New(s.Name).Funcs(funcs).Parse(s.LayoutBody)
+		if err != nil {
+			return nil, err
+		}
+	} else if s.Layout != "" {
+		templates = append(templates, s.LayoutPath)
+		t = template.New(filepath.Base(s.LayoutPath))
+	} else {
+		t = template.New(filepath.Base(s.Path))
+	}
+	templates = append(templates, s.Path)
+	templates = append(templates, s.Partials...)
 
 	parsedTemplate, err = t.Funcs(funcs).ParseFiles(templates...)
 	return parsedTemplate, err

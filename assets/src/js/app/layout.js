@@ -66,6 +66,20 @@ import toast from '../lib/toast';
 
 document.body.style.display = 'flex';
 hideProgress();
+
+// Lang switcher: flip <html lang> synchronously on click — before the
+// async-target fetch starts — so any client-side code reading
+// `document.documentElement.lang` between click and response (e.g. view
+// scripts re-initializing their i18n bundle) sees the new value. Capture
+// phase so we beat the bindAsync click listener.
+document.addEventListener('click', (e) => {
+    const link = e.target.closest && e.target.closest('a[data-lang]');
+    if (!link) return;
+    const lang = link.getAttribute('data-lang');
+    if (lang && document.documentElement.lang !== lang) {
+        document.documentElement.lang = lang;
+    }
+}, true);
 bindAsync({
     async fetch(f, url, fetchParams) {
         showProgress();
@@ -88,6 +102,21 @@ bindAsync({
         if (key === 'nav') {
             const nav = document.querySelector('nav');
             if (nav) loadAsyncView(nav, val);
+        }
+        if (key === 'footer') {
+            const footer = document.getElementById('footer');
+            if (footer) loadAsyncView(footer, val);
+        }
+        if (key === 'lang') {
+            if (val && document.documentElement.lang !== val) {
+                // Language changed via async nav. Sync <html lang> so the
+                // next call to getLang() (lib/i18n.js) reads the new value.
+                // Per-view i18n modules (lib/discover/i18n.js,
+                // lib/player/i18n.js) observe this on their next init() call
+                // — which fires on every async nav via av/asyncView — and
+                // reload the new locale's message bundle.
+                document.documentElement.lang = val;
+            }
         }
     },
     fallback: {

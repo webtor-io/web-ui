@@ -61,7 +61,7 @@ func (s *Handler) add(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Addon added")
+	web.RedirectWithSuccessAndMessage(c, "toast.addonAdded")
 }
 
 type batchAddRequest struct {
@@ -171,7 +171,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Addon deleted")
+	web.RedirectWithSuccessAndMessage(c, "toast.addonDeleted")
 }
 
 func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.User, cla *claims.Data) (err error) {
@@ -250,7 +250,7 @@ func (s *Handler) update(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Settings saved")
+	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }
 
 func (s *Handler) updateAddonUrls(deletedAddonsStr, addonOrder string, c *gin.Context, user *auth.User) error {

@@ -2,6 +2,7 @@ import { PlayIcon, PauseIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, 
 import { ProgressBar } from './ProgressBar';
 import { TimeDisplay } from './TimeDisplay';
 import { VolumeControl } from './VolumeControl';
+import { t } from './i18n';
 
 /**
  * Control bar component.
@@ -31,7 +32,7 @@ export function Controls({
                 {/* Left group: play + time */}
                 <div class="wt-player-controls-left">
                     {features.playpause && (
-                        <button type="button" class="wt-player-btn wt-player-btn--play" onClick={seeking ? undefined : onTogglePlay} aria-label={playing ? 'Pause' : 'Play'} disabled={seeking}>
+                        <button type="button" class="wt-player-btn wt-player-btn--play" onClick={seeking ? undefined : onTogglePlay} aria-label={playing ? t('player.pause') : t('player.play')} disabled={seeking}>
                             {playing ? <PauseIcon /> : <PlayIcon />}
                         </button>
                     )}
@@ -53,19 +54,19 @@ export function Controls({
                     )}
 
                     {features.advancedtracks && (
-                        <button type="button" class="wt-player-btn" onClick={onCaptionsClick} aria-label="Subtitles & Audio">
+                        <button type="button" class="wt-player-btn" onClick={onCaptionsClick} aria-label={t('player.subtitlesAndAudio')}>
                             <CaptionsIcon />
                         </button>
                     )}
 
                     {features.embed && (
-                        <button type="button" class="wt-player-btn" onClick={onEmbedClick} aria-label="Embed">
+                        <button type="button" class="wt-player-btn" onClick={onEmbedClick} aria-label={t('player.embed')}>
                             <EmbedIcon />
                         </button>
                     )}
 
                     {features.fullscreen && isVideo && (
-                        <button type="button" class="wt-player-btn" onClick={onToggleFullscreen} aria-label={fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
+                        <button type="button" class="wt-player-btn" onClick={onToggleFullscreen} aria-label={fullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}>
                             {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                         </button>
                     )}

@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -28,6 +29,7 @@ var (
 
 type EmbedScript struct {
 	api              *api.Api
+	i18n             *i18n.Service
 	settings         *models.EmbedSettings
 	file             string
 	tb               template.Builder[*web.Context]
@@ -41,10 +43,11 @@ type EmbedAdsData struct {
 	DomainSettings *embed.DomainSettingsData
 }
 
-func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmupTimeoutMin int) *EmbedScript {
+func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmupTimeoutMin int) *EmbedScript {
 	return &EmbedScript{
 		c:                c,
 		api:              api,
+		i18n:             i18nSvc,
 		settings:         settings,
 		file:             file,
 		tb:               tb,
@@ -52,6 +55,10 @@ func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.C
 		dsd:              dsd,
 		warmupTimeoutMin: warmupTimeoutMin,
 	}
+}
+
+func (s *EmbedScript) t(key string) string {
+	return i18n.TranslateWithLocalizer(s.i18n.Localizer(s.c.Lang), key)
 }
 
 func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, error) {
@@ -100,7 +107,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	if err != nil {
 		return
 	}
-	ls, _, err := Load(s.api, s.c, args)
+	ls, _, err := Load(s.api, s.i18n, s.c, args)
 	if err != nil {
 		return err
 	}
@@ -124,7 +131,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return err
 	}
 	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
-	as, _ := Action(s.tb, s.api, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
+	as, _ := Action(s.tb, s.api, s.i18n, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err
@@ -133,7 +140,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {
-	j.InProgress("searching for stream content")
+	j.InProgress(s.t("job.searchingContent"))
 	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer apiCancel()
 	pwd := settings.PWD
@@ -213,13 +220,13 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 	return
 }
 
-func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmTimeoutMin int) (r job.Runnable, hash string, err error) {
+func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmTimeoutMin int) (r job.Runnable, hash string, err error) {
 	geoHash := ""
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
 	}
 	hourKey := time.Now().UTC().Format("2006010215")
-	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey)))
-	r = NewEmbedScript(tb, cl, c, api, settings, file, dsd, warmTimeoutMin)
+	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang)))
+	r = NewEmbedScript(tb, cl, c, api, i18nSvc, settings, file, dsd, warmTimeoutMin)
 	return
 }

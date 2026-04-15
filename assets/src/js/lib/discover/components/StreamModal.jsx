@@ -5,6 +5,7 @@ import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
 import { extractLanguages } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
+import { t, tf } from '../i18n';
 
 export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, userStatuses, onToggleWatched, onRate }) {
     const dialogRef = useRef(null);
@@ -43,7 +44,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M15 18l-6-6 6-6"/>
                             </svg>
-                            Episodes
+                            {t('discover.episodes')}
                         </button>
                     ) : <div />}
                     <button
@@ -85,7 +86,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
         return (
             <div>
                 <ModalHeader title={modal.title} poster={modal.poster} subtitle={modal.subtitle} extra={statusButtons} {...headerMeta} />
-                <p class="text-w-muted text-sm text-center py-6">{modal.subtitle || 'Loading...'}</p>
+                <p class="text-w-muted text-sm text-center py-6">{modal.subtitle || t('discover.loading')}</p>
             </div>
         );
     }
@@ -126,7 +127,7 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, onToggleWatch
                 <button type="button" onClick={handleWatched}
                     class="btn btn-ghost btn-xs join-item border border-green-500/20 text-green-400 hover:bg-green-500/10 whitespace-nowrap">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Watched
+                    {t('discover.watched')}
                 </button>
             ) : (
                 <button type="button" onClick={handleWatched}
@@ -135,7 +136,7 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, onToggleWatch
                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
-                    Watched
+                    {t('discover.watched')}
                 </button>
             )}
             {rating > 0 ? (
@@ -150,7 +151,7 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, onToggleWatch
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
                     </svg>
-                    Rate
+                    {t('discover.rate')}
                 </button>
             )}
         </div>
@@ -165,7 +166,7 @@ function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, i
             <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
                 <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                     <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">
-                        {title || 'Unknown'}
+                        {title || t('discover.unknown')}
                     </div>
                 </div>
                 {poster && !imgError && (
@@ -178,7 +179,7 @@ function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, i
                 )}
             </div>
             <div class="flex flex-col justify-center min-w-0">
-                <h3 class="font-bold text-lg line-clamp-2">{title || 'Unknown'}</h3>
+                <h3 class="font-bold text-lg line-clamp-2">{title || t('discover.unknown')}</h3>
                 {(year || imdbRating) && (
                     <div class="flex flex-wrap items-center gap-2 mt-1 text-sm text-w-sub">
                         {year && <span>{year}</span>}
@@ -215,7 +216,7 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle="Preparing resource..." />
+            <ModalHeader title={title} poster={poster} subtitle={t('discover.preparingResource')} />
             <div ref={containerRef}>
                 {logUrl ? (
                     <form class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
@@ -237,7 +238,7 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 function FetchingView({ modal, statusButtons, headerMeta }) {
     const { title, poster, addons } = modal;
     const doneCount = addons.filter(a => a.status !== 'fetching').length;
-    const subtitle = `Fetching streams... (${doneCount}/${addons.length})`;
+    const subtitle = tf('discover.fetchingStreams', doneCount, addons.length);
 
     return (
         <div>
@@ -259,9 +260,9 @@ function FetchingView({ modal, statusButtons, headerMeta }) {
                             </svg>
                         )}
                         <span class={`text-sm truncate ${addon.status === 'error' ? 'text-red-400' : addon.status === 'done' ? 'text-w-sub' : 'text-w-text'}`}>
-                            {addon.status === 'fetching' && `Fetching ${addon.host}...`}
-                            {addon.status === 'done' && `${addon.host} — ${addon.count} stream${addon.count !== 1 ? 's' : ''}`}
-                            {addon.status === 'error' && `Error fetching ${addon.host}`}
+                            {addon.status === 'fetching' && tf('discover.fetchingAddon', addon.host)}
+                            {addon.status === 'done' && tf('discover.addonStreams', addon.host, addon.count)}
+                            {addon.status === 'error' && tf('discover.errorFetchingAddon', addon.host)}
                         </span>
                     </div>
                 ))}
@@ -498,7 +499,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
 
             {baseStreams.length === 0 && !show4k && total4kCount > 0 ? (
                 <p class="text-w-muted text-sm text-center py-6">
-                    All {total4kCount} stream{total4kCount !== 1 ? 's are' : ' is'} 4K. Enable "Include 4K" above to see them.
+                    {tf('discover.all4kStreams', total4kCount)}
                 </p>
             ) : (
                 <>
@@ -692,7 +693,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
     if (!videos.length) {
         return (
             <div>
-                <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} {...headerMeta} />
+                <ModalHeader title={title} poster={poster} subtitle={t('discover.selectEpisode')} extra={statusButtons} {...headerMeta} />
                 <p class="text-w-muted text-sm text-center py-6">No episodes found.</p>
             </div>
         );
@@ -700,7 +701,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle="Select an episode" extra={statusButtons} {...headerMeta} />
+            <ModalHeader title={title} poster={poster} subtitle={t('discover.selectEpisode')} extra={statusButtons} {...headerMeta} />
 
             {seasonNums.length > 1 && (
                 <div class="flex gap-1.5 mb-3 flex-wrap">

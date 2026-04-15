@@ -1,8 +1,17 @@
-{{ define "title" }}Speed Test — Check Your Connection{{ end }}
+{{ define "title" }}{{ t $.Lang "speedtest.title" }}{{ end }}
 {{ define "description" }}
-    <meta name="description" content="Test your download speed from Webtor servers. Find out what video quality you can stream without buffering and which plan suits your connection.">
+    <meta name="description" content="{{ t $.Lang "speedtest.subtitle" }}">
 {{ end }}
 {{ define "main" }}
+<script>
+window._speedtestI18n = {
+  gettingServer: {{ t $.Lang "speedtest.gettingServer" | json }},
+  measuring: {{ t $.Lang "speedtest.measuring" | json }},
+  testingPremium: {{ t $.Lang "speedtest.testingPremium" | json }},
+  premiumServer: {{ t $.Lang "speedtest.premiumServer" | json }},
+  standardServer: {{ t $.Lang "speedtest.standardServer" | json }},
+};
+</script>
 {{ "speedtest.js" | asset }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
@@ -12,15 +21,15 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
       </svg>
-      Speed Test
+      {{ t $.Lang "speedtest.badge" }}
     </div>
 
     <!-- Hero -->
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Connection Speed Test</h1>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Measure your download speed from Webtor servers to find out what video quality you can stream without buffering.</p>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "speedtest.title" }}</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "speedtest.subtitle" }}</p>
 
     <!-- Hidden form for posting results -->
-    <form id="speedtest-form" action="/speedtest" method="post" data-async-target="main" data-async-push-state="false" class="hidden">
+    <form id="speedtest-form" action="{{ langPath $.Lang "/speedtest" }}" method="post" data-async-target="main" data-async-push-state="false" class="hidden">
       <input type="hidden" name="speed" id="speedtest-speed-input" value="0" />
       <input type="hidden" name="premium-speed" id="speedtest-premium-speed-input" value="0" />
       {{ range .Data.URLs }}
@@ -34,7 +43,7 @@
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
-        Start Speed Test
+        {{ t $.Lang "speedtest.start" }}
       </button>
     </div>
 
@@ -46,7 +55,7 @@
         <div class="text-w-sub text-sm mt-1">Mbps</div>
       </div>
       <progress id="speedtest-bar" class="progress progress-accent w-full mt-6" value="0" max="100"></progress>
-      <div id="speedtest-status" class="text-w-muted text-sm text-center mt-2">Connecting...</div>
+      <div id="speedtest-status" class="text-w-muted text-sm text-center mt-2">{{ t $.Lang "speedtest.connecting" }}</div>
     </div>
 
   </div>

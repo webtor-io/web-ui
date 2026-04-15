@@ -1,5 +1,5 @@
 {{ define "title" }}
-    WebDAV Integration
+    {{ t $.Lang "instructions.webdav.title" }}
 {{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
@@ -8,39 +8,39 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      Guide
+      {{ t $.Lang "instructions.guide" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to connect Webtor via WebDAV</h1>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "instructions.webdav.heading" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Access your torrent library just like a regular folder. With WebDAV, you can browse, stream, and manage your files directly from your favorite apps.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.webdav.intro" }}</p>
 
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>Copy your personal WebDAV URL from your <a href="/profile" class="text-w-pinkL hover:underline">Webtor profile</a>.</li>
-        <li>Install a WebDAV client on your device (see recommendations below).</li>
-        <li>Connect using your WebDAV URL and start browsing your library.</li>
+        <li>{{ tpHTML $.Lang "instructions.webdav.step1" "ProfileURL" (langPath $.Lang "/profile") }}</li>
+        <li>{{ t $.Lang "instructions.webdav.step2" }}</li>
+        <li>{{ t $.Lang "instructions.webdav.step3" }}</li>
     </ol>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Recommended Clients</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.webdav.clientsTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li><strong>💻 Windows:</strong> <a href="https://www.raidrive.com/" class="text-w-pinkL hover:underline" target="_blank">RaiDrive</a> (free for personal use) / <a href="https://mountainduck.io/" class="text-w-pinkL hover:underline" target="_blank">Mountain Duck</a></li>
-        <li><strong>🍏 macOS:</strong> <a href="https://mountainduck.io/" class="text-w-pinkL hover:underline" target="_blank">Mountain Duck</a></li>
-        <li><strong>📱 Mobile:</strong> Owlfiles <a href="https://apps.apple.com/ru/app/owlfiles-file-manager/id510282524" class="text-w-pinkL hover:underline" target="_blank">iOS</a> / <a href="https://play.google.com/store/apps/details?id=com.skyjos.apps.fileexplorerfree" class="text-w-pinkL hover:underline" target="_blank">Android</a></li>
-        <li><strong>🖥️ Advanced:</strong> <a href="https://rclone.org/" class="text-w-pinkL hover:underline" target="_blank">rclone</a> CLI tool with VFS caching support</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.clientWindows" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.clientMac" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.clientMobile" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.clientAdvanced" }}</li>
     </ul>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Your WebDAV Folders</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.webdav.foldersTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li><strong>torrents/</strong> – Add or remove torrents (writable)</li>
-        <li><strong>all/</strong> – Full content browsing (read-only)</li>
-        <li><strong>movies/</strong> – All recognized movies (read-only)</li>
-        <li><strong>series/</strong> – TV shows and episodes (read-only)</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.folderTorrents" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.folderAll" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.folderMovies" }}</li>
+        <li>{{ tHTML $.Lang "instructions.webdav.folderSeries" }}</li>
     </ul>
 
     <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-6 text-sm text-w-sub">
-      <strong>Note:</strong> WebDAV access is only available for <strong>paid users</strong>.
+      <strong>{{ t $.Lang "instructions.note" }}</strong> {{ tHTML $.Lang "instructions.webdav.notePaid" }}
     </div>
   </div>
 </section>

@@ -2,8 +2,10 @@ import { render } from 'preact';
 import av from '../lib/av';
 import { CINEMETA_BASE } from '../lib/discover/client';
 import { DiscoverApp } from '../lib/discover/components/DiscoverApp';
+import { init as initI18n } from '../lib/discover/i18n';
 
-av(function () {
+av(async function () {
+    await initI18n();
     const container = this;
     const addonUrls = [...(window._addonUrls || [])];
     if (!addonUrls.some(u => u.replace(/\/manifest\.json$/, '') === CINEMETA_BASE)) {

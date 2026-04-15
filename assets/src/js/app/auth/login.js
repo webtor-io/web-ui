@@ -1,13 +1,16 @@
+import { init as initI18n, t, tf } from '../../lib/auth/i18n';
+
 window.submitLoginForm = function(target, e) {
     (async (data) => {
+        await initI18n();
         const initProgressLog = (await import('../../lib/progressLog')).initProgressLog;
         const pl = initProgressLog(document.querySelector('.progress-alert'));
         pl.clear();
-        const e = pl.inProgress('login','sending magic link to ' + data.email);
+        const e = pl.inProgress('login', tf('auth.progress.sendingMagicLink', data.email));
         const supertokens = (await import('../../lib/supertokens'));
         try {
             await supertokens.sendMagicLink(data, window._CSRF);
-            e.done('magic link sent to ' + data.email);
+            e.done(tf('auth.progress.magicLinkSent', data.email));
         } catch (err) {
             console.error(err);
             if (err.statusText) {
@@ -15,7 +18,7 @@ window.submitLoginForm = function(target, e) {
             } else if (err.message) {
                 e.error(err.message.toLowerCase());
             } else {
-                e.error('unknown error');
+                e.error(t('auth.progress.unknownError'));
             }
         }
         e.close();
@@ -28,10 +31,11 @@ window.submitLoginForm = function(target, e) {
 
 window.signInWith = function(e, provider) {
     (async () => {
+        await initI18n();
         const initProgressLog = (await import('../../lib/progressLog')).initProgressLog;
         const pl = initProgressLog(document.querySelector('.progress-alert'));
         pl.clear();
-        const progressEntry = pl.inProgress('login',`redirecting to ${provider}`);
+        const progressEntry = pl.inProgress('login', tf('auth.progress.redirectingTo', provider));
         const supertokens = (await import('../../lib/supertokens'));
         try {
             await supertokens.signInWith(window._CSRF, provider);
@@ -42,7 +46,7 @@ window.signInWith = function(e, provider) {
             } else if (err.message) {
                 progressEntry.error(err.message.toLowerCase());
             } else {
-                progressEntry.error(`failed to redirect to ${provider}`);
+                progressEntry.error(tf('auth.progress.redirectFailed', provider));
             }
             progressEntry.close();
         }

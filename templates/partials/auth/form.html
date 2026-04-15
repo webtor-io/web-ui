@@ -10,21 +10,21 @@
           <polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
       </div>
-      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Verifying</h1>
-      <p class="text-w-sub text-sm">Please wait while we verify your account</p>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">{{ t .Ctx.Lang "auth.verify.title" }}</h1>
+      <p class="text-w-sub text-sm">{{ t .Ctx.Lang "auth.verify.subtitle" }}</p>
     </div>
 
     <form class="progress-alert progress-alert-block hidden closeable">
       <div class="log-target"></div>
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
         <div class="error hidden">
-          <a data-async-target="main" class="close" href="/login">login again</a>
+          <a data-async-target="main" class="close" href="{{ langPath .Ctx.Lang "/login" }}">{{ t .Ctx.Lang "auth.logout.loginAgain" }}</a>
         </div>
         {{ if eq .Data.ReturnURL "" }}
-          <a data-async-target="main" class="close closeable-close" href="/lib/">library</a>
-          <a data-async-target="main" class="close closeable-close" href="/profile">profile</a>
+          <a data-async-target="main" class="close closeable-close" href="{{ langPath .Ctx.Lang "/lib/" }}">{{ t .Ctx.Lang "auth.verify.library" }}</a>
+          <a data-async-target="main" class="close closeable-close" href="{{ langPath .Ctx.Lang "/profile" }}">{{ t .Ctx.Lang "auth.verify.profile" }}</a>
         {{ else }}
-          <a data-async-target="main" id="return-url" class="close closeable-close" href="{{ .Data.ReturnURL }}">Next</a>
+          <a data-async-target="main" id="return-url" class="close closeable-close" href="{{ .Data.ReturnURL }}">{{ t .Ctx.Lang "auth.verify.next" }}</a>
         {{ end }}
       </div>
     </form>

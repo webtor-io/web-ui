@@ -16,8 +16,18 @@ type ButtonItem struct {
 	ItemID     string
 	ResourceID string
 	Name       string
+	Size       string
 	Action     string
 	Endpoint   string
+}
+
+// NameWithSize returns the display name, appending size in brackets if present.
+// Used for rendering in templates: {{ .NameWithSize }}
+func (b *ButtonItem) NameWithSize() string {
+	if b.Size != "" {
+		return b.Name + " [" + b.Size + "]"
+	}
+	return b.Name
 }
 
 type Breadcrumb struct {
@@ -71,42 +81,27 @@ func (s *Helper) MakeResourceButton(ctx *w.Context, gd *GetData, name string, ac
 }
 
 func (s *Helper) MakeFileDownload(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeButton(ctx, gd,
-		fmt.Sprintf("Download [%v]", helpers.Bytes(uint64(gd.Item.Size))),
-		"download",
-		"/download-file",
-	)
+	b := s.MakeButton(ctx, gd, "resource.download", "download", "/download-file")
+	b.Size = helpers.Bytes(uint64(gd.Item.Size))
+	return b
 }
 
 func (s *Helper) MakeImage(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeButton(ctx, gd,
-		"Preview",
-		"preview",
-		"/preview-image",
-	)
+	return s.MakeButton(ctx, gd, "resource.preview", "preview", "/preview-image")
 }
 
 func (s *Helper) MakeAudio(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeButton(ctx, gd,
-		"Stream",
-		"stream",
-		"/stream-audio",
-	)
+	return s.MakeButton(ctx, gd, "resource.stream", "stream", "/stream-audio")
 }
+
 func (s *Helper) MakeVideo(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeButton(ctx, gd,
-		"Stream",
-		"stream",
-		"/stream-video",
-	)
+	return s.MakeButton(ctx, gd, "resource.stream", "stream", "/stream-video")
 }
 
 func (s *Helper) MakeDirDownload(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeDirButton(ctx, gd,
-		fmt.Sprintf("Download Directory as ZIP [%v]", helpers.Bytes(uint64(gd.List.Size))),
-		"download-dir",
-		"/download-dir",
-	)
+	b := s.MakeDirButton(ctx, gd, "resource.downloadDir", "download-dir", "/download-dir")
+	b.Size = helpers.Bytes(uint64(gd.List.Size))
+	return b
 }
 
 func (s *Helper) HasBreadcrumbs(lr *ra.ListResponse) bool {

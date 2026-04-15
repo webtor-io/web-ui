@@ -14,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
 	log "github.com/sirupsen/logrus"
@@ -160,7 +161,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
 	}
-	j.InProgress("retrieving resource data")
+	j.InProgress(s.t("job.retrievingData"))
 	resCtx, resCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer resCancel()
 	resourceResponse, err := s.api.GetResource(resCtx, c.ApiClaims, resourceID)
@@ -169,7 +170,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 	sc.Resource = resourceResponse
-	j.InProgress("retrieving stream url")
+	j.InProgress(s.t("job.retrievingStreamUrl"))
 	exportCtx, exportCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer exportCancel()
 	exportResponse, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, settings.ImdbID)
@@ -195,13 +196,13 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		if warmupSize <= skipBytes {
 			skipBytes = 0
 		}
-		if downloadSpeed, err = s.warmUp(ctx, j, "warming up torrent client", downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
+		if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
 			return
 		}
 	}
 
 	// Step 2: Content probe via ~cp (before transcoder warmup)
-	j.InProgress("probing content media info")
+	j.InProgress(s.t("job.probingMedia"))
 	mpCtx, mpCancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer mpCancel()
 	probeURL := contentProbeURL(downloadURL)
@@ -224,7 +225,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 
 	// Step 3: Bandwidth check (skip for cached/vault content)
 	if !se.Meta.Cache && downloadSpeed > 0 && sc.MediaProbe != nil {
-		j.InProgress("checking bandwidth")
+		j.InProgress(s.t("job.checkingBandwidth"))
 		bitrate := getVideoBitrate(sc.MediaProbe)
 		if bitrate > 0 && downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
 			sdd := SlowDownloadData{
@@ -267,7 +268,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if exportResponse.Source.MediaFormat == ra.Video {
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
 			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
-				j.InProgress("loading OpenSubtitles")
+				j.InProgress(s.t("job.loadingSubtitles"))
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
 				subs, err := s.api.GetOpenSubtitles(osCtx, subtitles.URL)
@@ -295,7 +296,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if err != nil {
 		return errors.Wrap(err, "failed to render resource")
 	}
-	j.InProgress("waiting player initialization")
+	j.InProgress(s.t("job.waitingPlayer"))
 	return
 }
 
@@ -328,7 +329,7 @@ type FileDownload struct {
 }
 
 func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
-	j.InProgress("retrieving download link")
+	j.InProgress(s.t("job.retrievingDownloadLink"))
 	exportCtx, exportCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer exportCancel()
 	resp, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, "")
@@ -339,11 +340,11 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if _, err := s.warmUp(ctx, j, "warming up torrent client", resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, 0, "", true); err != nil {
+		if _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, 0, "", true); err != nil {
 			return err
 		}
 	}
-	j.DoneWithMessage("success! file is ready for download!")
+	j.DoneWithMessage(s.t("job.downloadReady"))
 	tpl := s.tb.Build("action/download_file").WithLayoutBody(`{{ template "main" . }}`)
 	hasAds := false
 	if c.Claims != nil && c.Claims.Claims != nil {
@@ -372,7 +373,10 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		limitEnd = size - limitStart
 	}
 	if size > 0 {
-		j.InProgress(fmt.Sprintf("%v, downloading %v", m, helpers.Bytes(uint64(limitStart+limitEnd))))
+		downloading := s.tp("job.downloading", map[string]any{
+			"Bytes": helpers.Bytes(uint64(limitStart + limitEnd)),
+		})
+		j.InProgress(fmt.Sprintf("%v, %v", m, downloading))
 	} else {
 		j.InProgress(m)
 	}
@@ -380,7 +384,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	defer warmupCancel()
 
 	if useStatus {
-		j.StatusUpdate("waiting for peers")
+		j.StatusUpdate(s.t("job.waitingForPeers"))
 		go func() {
 			ch, err := s.api.Stats(warmupCtx, su)
 			if err != nil {
@@ -393,7 +397,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 					if !ok {
 						return
 					}
-					j.StatusUpdate(fmt.Sprintf("%v peers", ev.Peers))
+					j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
 				case <-warmupCtx.Done():
 					return
 				}
@@ -442,6 +446,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 type ActionScript struct {
 	api              *api.Api
 	c                *web.Context
+	i18n             *i18n.Service
 	resourceId       string
 	itemId           string
 	action           string
@@ -450,6 +455,14 @@ type ActionScript struct {
 	vsud             *models.VideoStreamUserData
 	dsd              *embed.DomainSettingsData
 	warmupTimeoutMin int
+}
+
+func (s *ActionScript) t(key string) string {
+	return i18n.TranslateWithLocalizer(s.i18n.Localizer(s.c.Lang), key)
+}
+
+func (s *ActionScript) tp(key string, data map[string]any) string {
+	return i18n.TranslateWithLocalizerData(s.i18n.Localizer(s.c.Lang), key, data)
 }
 
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -500,18 +513,19 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
 	cacheKey := fmt.Sprintf("%s%d", now.Format("2006010215"), now.Minute()/10)
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey)))
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang)))
 	return &ErrorWrapperScript{
 		tb: tb,
 		c:  c,
 		Script: &ActionScript{
 			tb:               tb,
 			api:              api,
+			i18n:             i18nSvc,
 			c:                c,
 			resourceId:       resourceID,
 			itemId:           itemID,

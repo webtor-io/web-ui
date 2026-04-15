@@ -1,14 +1,14 @@
-{{ define "title" }}Vault Pledges{{ end }}
+{{ define "title" }}{{ t $.Lang "vault.pledges.badge" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
     <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      Vault Pledges
+      {{ t $.Lang "vault.pledges.badge" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Pledges</h1>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">View and manage your Vault point pledges across torrents.</p>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "vault.pledges.title" }}</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "vault.pledges.subtitle" }}</p>
 
     <!-- Pledges Table -->
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
@@ -24,9 +24,9 @@
             <thead>
               <tr class="border-b border-w-line">
                 <th></th>
-                <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">Name</th>
-                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">VP</th>
-                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">Status</th>
+                <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.name" }}</th>
+                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.vp" }}</th>
+                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.status" }}</th>
               </tr>
             </thead>
             <tbody>
@@ -40,21 +40,21 @@
                     {{ end }}
                   </td>
                   <td class="text-left">
-                    <a href="/{{ .ResourceID }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
+                    <a href="{{ langPath $.Lang (printf "/%s" .ResourceID) }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
                       {{ .Resource.Name }}
                     </a>
                   </td>
                   <td class="text-center text-w-sub">{{ printf "%.2f" .Amount }}</td>
                   <td class="text-center">
                     {{ if .IsFrozen }}
-                      <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan">Frozen</span>
+                      <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan">{{ t $.Lang "vault.pledges.frozen" }}</span>
                     {{ else if not .Funded }}
                       <div class="flex flex-col items-center gap-0.5">
-                        <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL">Expiring</span>
+                        <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
                         {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
                       </div>
                     {{ else }}
-                      <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">Claimable</span>
+                      <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">{{ t $.Lang "vault.pledges.claimable" }}</span>
                     {{ end }}
                   </td>
                 </tr>
@@ -64,8 +64,8 @@
         </div>
       {{ else }}
         <div class="bg-base-200/50 rounded-xl p-8 text-center">
-          <p class="text-w-muted">No pledges yet</p>
-          <p class="text-xs text-w-muted mt-2">Pledge Vault points to keep torrents stored in the cloud</p>
+          <p class="text-w-muted">{{ t $.Lang "vault.pledges.noPledges" }}</p>
+          <p class="text-xs text-w-muted mt-2">{{ t $.Lang "vault.pledges.noPledgesHint" }}</p>
         </div>
       {{ end }}
     </div>
@@ -73,20 +73,20 @@
     <!-- Status Guide (collapsible) -->
     <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl mb-6">
       <input type="checkbox" />
-      <div class="collapse-title text-base font-semibold">Status Guide</div>
+      <div class="collapse-title text-base font-semibold">{{ t $.Lang "vault.pledges.statusGuide" }}</div>
       <div class="collapse-content">
         <dl class="space-y-4 text-sm pt-2">
           <div class="flex items-start gap-3">
-            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan mt-0.5 shrink-0">Frozen</span>
-            <dd class="text-w-sub">Points become frozen immediately after pledge and unfreeze after the freeze period of <strong class="text-w-text">{{ .Data.FreezePeriod | duration }}</strong> expires</dd>
+            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan mt-0.5 shrink-0">{{ t $.Lang "vault.pledges.frozen" }}</span>
+            <dd class="text-w-sub">{{ t $.Lang "vault.pledges.frozenDesc" }}</dd>
           </div>
           <div class="flex items-start gap-3">
-            <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL mt-0.5 shrink-0">Expiring</span>
-            <dd class="text-w-sub">Pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault</dd>
+            <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL mt-0.5 shrink-0">{{ t $.Lang "vault.pledges.expiring" }}</span>
+            <dd class="text-w-sub">{{ t $.Lang "vault.pledges.expiringDesc" }}</dd>
           </div>
           <div class="flex items-start gap-3">
-            <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL mt-0.5 shrink-0">Claimable</span>
-            <dd class="text-w-sub">Points that can be claimed back. After claiming, the content they were pledged to may be removed</dd>
+            <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL mt-0.5 shrink-0">{{ t $.Lang "vault.pledges.claimable" }}</span>
+            <dd class="text-w-sub">{{ t $.Lang "vault.pledges.claimableDesc" }}</dd>
           </div>
         </dl>
       </div>
@@ -94,10 +94,10 @@
 
     <!-- Actions -->
     <div class="flex items-center justify-between">
-      <a href="/instructions/vault" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
-      <a href="/profile" class="btn btn-soft" data-async-target="main">
+      <a href="{{ langPath $.Lang "/instructions/vault" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">{{ t $.Lang "vault.whatIs" }}</a>
+      <a href="{{ langPath $.Lang "/profile" }}" class="btn btn-soft" data-async-target="main">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-        Back to Profile
+        {{ t $.Lang "vault.pledges.backToProfile" }}
       </a>
     </div>
   </div>

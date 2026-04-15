@@ -95,5 +95,5 @@ func (s *Handler) updateSettings(c *gin.Context) {
 		return
 	}
 
-	web.RedirectWithSuccessAndMessage(c, "Settings saved")
+	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }

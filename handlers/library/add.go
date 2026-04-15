@@ -26,7 +26,7 @@ func (s *Handler) add(c *gin.Context) {
 		return
 	}
 	_, _ = s.jobs.Enrich(web.NewContext(c), rID)
-	web.RedirectWithSuccessAndMessage(c, "Added to library")
+	web.RedirectWithSuccessAndMessage(c, "toast.addedToLibrary")
 }
 
 func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, id string) {

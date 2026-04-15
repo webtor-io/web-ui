@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hako/durafmt"
@@ -34,8 +35,8 @@ import (
 	"github.com/webtor-io/web-ui/services/obfuscator"
 )
 
-func (s *Helper) MakeJobLogURL(j *job.Job) string {
-	return fmt.Sprintf("/queue/%v/job/%v/log", j.Queue, j.ID)
+func (s *Helper) MakeJobLogURL(lang string, j *job.Job) string {
+	return LangURL(lang, fmt.Sprintf("/queue/%v/job/%v/log", j.Queue, j.ID))
 }
 
 func (s *Helper) Log(err error) error {
@@ -86,6 +87,7 @@ func RedirectWithSuccess(c *gin.Context) {
 }
 
 func RedirectWithSuccessAndMessage(c *gin.Context, message string) {
+	message = i18n.T(c, message)
 	if wantsJSON(c) {
 		resp := gin.H{"status": "success"}
 		if message != "" {
@@ -407,4 +409,130 @@ func (s *Helper) Seq(from, to int) []int {
 		result = append(result, i)
 	}
 	return result
+}
+
+// --- i18n URL helpers ---
+
+// LangInfo holds display info for the language switcher.
+type LangInfo struct {
+	Code    string
+	Name    string
+	URL     string
+	Current bool
+}
+
+// HrefLang holds data for <link rel="alternate" hreflang="..."> tags.
+type HrefLang struct {
+	Lang string
+	URL  string
+}
+
+// CtxData wraps arbitrary template data with the full web.Context.
+// Used to pass context to sub-templates that receive non-Context data
+// (e.g. ButtonItem, VaultButton) without polluting their structs.
+//
+// Template usage: {{ template "button" withContext $ (makeFileDownload $ .) }}
+// In sub-template: {{ t .Ctx.Lang .Data.Name }}, {{ .Ctx.User | hasAuth }}, etc.
+type CtxData struct {
+	Ctx  *Context
+	Data any
+}
+
+// WithContext wraps data with the full web.Context for sub-template rendering.
+func (s *Helper) WithContext(ctx *Context, data any) *CtxData {
+	return &CtxData{Ctx: ctx, Data: data}
+}
+
+// BlogLang maps the current site language to a blog language code.
+// The Hugo blog only supports en and ru; everything else falls back to en.
+// Template usage: {{ blogLang $.Lang }}
+func (s *Helper) BlogLang(lang string) string {
+	if lang == "ru" {
+		return "ru"
+	}
+	return "en"
+}
+
+// LangURL returns the URL for a given language and path.
+// English (default) has no prefix; other languages get /{lang}{path}.
+func LangURL(lang string, path string) string {
+	if lang == i18n.DefaultLang {
+		return path
+	}
+	if path == "/" {
+		return "/" + lang + "/"
+	}
+	return "/" + lang + path
+}
+
+// LangURL is the template-callable wrapper.
+// Template usage: {{ langURL "ru" $.Path }}
+func (s *Helper) LangURL(lang string, path string) string {
+	return LangURL(lang, path)
+}
+
+// Langs returns info for all supported languages (for the language switcher).
+// Template usage: {{ range langs $.Lang $.Path }}
+//
+// For non-default languages the switcher points at the prefixed URL
+// (`/ru/foo`) — prefix match in the HTTP middleware updates the cookie
+// automatically. For the default language (English) the switcher needs an
+// explicit `?lang=en` hint so the middleware knows the user is *choosing*
+// English rather than following an arbitrary bare URL; otherwise the cookie
+// still holds the previous preference and the no-prefix redirect below would
+// bounce the user back to the prefixed page.
+func (s *Helper) Langs(currentLang string, path string) []LangInfo {
+	langs := make([]LangInfo, 0, len(i18n.SupportedLangs))
+	for _, code := range i18n.SupportedLangs {
+		url := s.LangURL(code, path)
+		if code == i18n.DefaultLang {
+			if strings.Contains(url, "?") {
+				url += "&lang=" + code
+			} else {
+				url += "?lang=" + code
+			}
+		}
+		langs = append(langs, LangInfo{
+			Code:    code,
+			Name:    i18n.LangNames[code],
+			URL:     url,
+			Current: code == currentLang,
+		})
+	}
+	return langs
+}
+
+// HrefLangs returns alternate-language links for SEO (hreflang tags).
+// Template usage: {{ range hrefLangs $.Path }}
+func (s *Helper) HrefLangs(path string) []HrefLang {
+	links := make([]HrefLang, 0, len(i18n.SupportedLangs)+1)
+	for _, code := range i18n.SupportedLangs {
+		if code == i18n.DefaultLang {
+			links = append(links, HrefLang{Lang: code, URL: s.domain + path})
+		} else if path == "/" {
+			links = append(links, HrefLang{Lang: code, URL: s.domain + "/" + code + "/"})
+		} else {
+			links = append(links, HrefLang{Lang: code, URL: s.domain + "/" + code + path})
+		}
+	}
+	links = append(links, HrefLang{Lang: "x-default", URL: s.domain + path})
+	return links
+}
+
+// LangPath prefixes a path with the language if not default.
+// Template usage: {{ langPath $.Lang "/discover" }}
+func (s *Helper) LangPath(lang string, path string) string {
+	return s.LangURL(lang, path)
+}
+
+// CanonicalURL returns the full canonical URL for the current page and language.
+// Template usage: {{ canonicalURL $.Lang $.Path }}
+func (s *Helper) CanonicalURL(lang string, path string) string {
+	if lang == i18n.DefaultLang {
+		return s.domain + path
+	}
+	if path == "/" {
+		return s.domain + "/" + lang + "/"
+	}
+	return s.domain + "/" + lang + path
 }

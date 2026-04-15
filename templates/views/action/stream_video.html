@@ -37,7 +37,7 @@
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
             <div class="flex" id="embedded">
                 <div class="flex-1">
-                    <h3 class="font-bold text-lg">Audio</h3>
+                    <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.audio" }}</h3>
                     <ul class="flex flex-wrap">
                         {{ range getAudioTracks .VideoStreamUserData .MediaProbe }}
                         <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="audio cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
@@ -45,7 +45,7 @@
                     </ul>
                 </div>
                 <div class="flex-1">
-                    <h3 class="font-bold text-lg">Subtitles</h3>
+                    <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
                     <ul class="flex flex-wrap">
                         {{ range $otherSubs }}
                         <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
@@ -65,7 +65,7 @@
             </div>
             <div class="modal-action">
                 {{ if $openSubs }}<label for="opensubtitles" class="btn btn-soft-cyan">OpenSubtitles</label>{{ end }}
-                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Close</label>
+                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</label>
             </div>
         </div>
     </div>
@@ -77,10 +77,10 @@
             </div>
             <div class="modal-action">
                 <div class="flex-grow text-sm flex items-center">
-                    <p>See <a class="link" href="https://github.com/webtor-io/embed-sdk-js">embed-sdk</a> for advanced usage</p>
+                    <p>{{ tpHTML $.Lang "action.stream.embedHelp" "Link" (printf "<a class=\"link\" href=\"https://github.com/webtor-io/embed-sdk-js\">%s</a>" (t $.Lang "action.stream.embedLinkText")) }}</p>
                 </div>
-                <label for="embed-checkbox" class="btn btn-soft-cyan copy">Copy</label>
-                <label for="embed-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Close</label>
+                <label for="embed-checkbox" class="btn btn-soft-cyan copy">{{ t $.Lang "action.stream.copy" }}</label>
+                <label for="embed-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</label>
             </div>
         </div>
     </div>
@@ -89,7 +89,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
             </svg>
-            Download
+            {{ t $.Lang "action.stream.download" }}
         </a>
     </div>
 </div>

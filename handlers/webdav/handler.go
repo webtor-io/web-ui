@@ -57,7 +57,7 @@ func (s *Handler) generateUrl(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to generate webdav url"))
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "WebDAV URL generated")
+	web.RedirectWithSuccessAndMessage(c, "toast.webdavUrlGenerated")
 }
 
 func (s *Handler) handleWebDAV(c *gin.Context) {

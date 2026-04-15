@@ -1,7 +1,9 @@
 import av from '../../lib/av';
 import DragDrop from '../../lib/dragAndDrop';
+import { init as initI18n, t, tf } from '../../lib/profile/i18n';
 
 av(async function(){
+    await initI18n();
     // Initialize drag and drop functionality for addon URLs
     new DragDrop({
         listSelector: '#addon-list',
@@ -22,7 +24,7 @@ av(async function(){
         const addonItem = button.closest('.addon-item');
         const addonUrl = addonItem.querySelector('.font-medium').textContent.trim();
         
-        if (confirm(`Are you sure you want to delete this addon?\n\n${addonUrl}`)) {
+        if (confirm(tf('profile.addons.deleteConfirm', addonUrl))) {
             // Track delete event with Umami
             if (window.umami) {
                 window.umami.track('addon-url-delete');
@@ -37,7 +39,7 @@ av(async function(){
             // Remove the element from DOM
             addonItem.remove();
 
-            if (window.toast) window.toast.success('Addon deleted');
+            if (window.toast) window.toast.success(t('profile.addons.deleted'));
             
             // Update the addon order input to remove deleted addon
             const orderInput = document.getElementById('addon_order');

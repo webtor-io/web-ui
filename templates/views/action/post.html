@@ -2,11 +2,11 @@
 {{ if .Err }}
 <div class="progress-alert progress-alert-oneline mb-10 closeable">
     <pre>{{ .Err | log | shortErr }}</pre>
-    <a class="close closeable-close">ok</a>
+    <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
 </div>
 {{ end }}
 {{ if has .Data "Job" }}
-<form class="hidden progress-alert progress-alert-block mt-6 mb-10 closeable" data-async-progress-log="{{ .Data.Job | makeJobLogURL }}" data-async-target="main">
+<form class="hidden progress-alert progress-alert-block mt-6 mb-10 closeable" data-async-progress-log="{{ makeJobLogURL $.Lang .Data.Job }}" data-async-target="main">
   <div class="log-target"></div>
 </form>
 {{ end }}

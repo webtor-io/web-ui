@@ -1,4 +1,4 @@
-{{ define "title" }}Logout{{ end }}
+{{ define "title" }}{{ t $.Lang "auth.logout.title" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-md mx-auto">
@@ -12,15 +12,15 @@
           <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
       </div>
-      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Sign Out</h1>
-      <p class="text-w-sub text-sm">Logging you out of your account</p>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">{{ t $.Lang "auth.logout.title" }}</h1>
+      <p class="text-w-sub text-sm">{{ t $.Lang "auth.logout.subtitle" }}</p>
     </div>
 
     <form class="progress-alert progress-alert-block hidden closeable">
       <div class="log-target"></div>
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
-        <a data-async-target="main" class="close" href="/login">login again</a>
-        <a data-async-target="main" class="close closeable-close" href="/">go home</a>
+        <a data-async-target="main" class="close" href="{{ langPath $.Lang "/login" }}">{{ t $.Lang "auth.logout.loginAgain" }}</a>
+        <a data-async-target="main" class="close closeable-close" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>
       </div>
     </form>
 

@@ -111,7 +111,7 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 		return nil, errors.Wrap(err, "failed to derive session base URL")
 	}
 
-	j.InProgress("creating transcoder session")
+	j.InProgress(s.t("job.creatingTranscoder"))
 	session, err := s.api.CreateTranscoderSession(bufferCtx, baseURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create transcoder session")
@@ -123,7 +123,7 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 		return nil, errors.Wrap(err, "failed to construct session HLS URL")
 	}
 
-	j.InProgress("buffering content")
+	j.InProgress(s.t("job.bufferingContent"))
 
 	masterBody, err := fetchBody(bufferCtx, s.api, hlsURL)
 	if err != nil {

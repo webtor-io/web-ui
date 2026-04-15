@@ -1,8 +1,8 @@
 {{ define "library/sort"}}
-<form class="ml-auto" data-async-target="#list">
+<form action="{{ langPath $.Ctx.Lang $.Ctx.Path }}" class="ml-auto" data-async-target="#list">
     <select class="select select-sm bg-base-300 border-w-line focus:border-w-purple focus:outline-none" name="sort" onchange="this.nextElementSibling.click()">
-        {{ range . }}
-            <option class="capitalize" value="{{ .Value }}" {{if .Selected }}selected{{end}}>{{ .Title }}</option>
+        {{ range $.Data | makeSort }}
+            <option class="capitalize" value="{{ .Value }}" {{if .Selected }}selected{{end}}>{{ t $.Ctx.Lang .Title }}</option>
         {{ end }}
     </select>
     <button type="submit" class="hidden">Submit</button>

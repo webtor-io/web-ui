@@ -64,7 +64,7 @@ func (s *Handler) generateUrl(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to generate stremio addon url"))
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Addon URL generated")
+	web.RedirectWithSuccessAndMessage(c, "toast.addonUrlGenerated")
 }
 
 func (s *Handler) manifest(c *gin.Context) {

@@ -23,15 +23,15 @@
                         {{ if .Active }}
                             <span class="text-w-sub font-medium">/ {{ .Name }}</span>
                         {{ else if $Args.File }}
-                            <span class="hover:text-w-purpleL transition-colors">/ <a href="/{{ $Resource.ID }}?pwd={{ .PathStr }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list">{{ .Name }}</a></span>
+                            <span class="hover:text-w-purpleL transition-colors">/ <a href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ .PathStr }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list">{{ .Name }}</a></span>
                         {{ else }}
-                            <span class="hover:text-w-purpleL transition-colors">/ <a href="/{{ $Resource.ID }}?pwd={{ .PathStr }}" data-async-target="main">{{ .Name }}</a></span>
+                            <span class="hover:text-w-purpleL transition-colors">/ <a href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ .PathStr }}" data-async-target="main">{{ .Name }}</a></span>
                         {{ end }}
                     {{ end }}
                     </span>
                 </div>
                 {{ with makeDirDownload $ . }}
-                <form class="{{ .Action }}" action="{{ .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
+                <form class="{{ .Action }}" action="{{ langPath $.Lang .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
                     <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
                     <input type="hidden" name="item-id" value="{{ .ItemID }}" />
                     <button type="submit" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="{{ .Action }}" onclick="document.getElementById('progress-modal-{{ .ID }}').showModal()">
@@ -48,7 +48,7 @@
             <div class="divide-y divide-w-line">
                 {{ range .List.Items }}
                     {{ if and ($Args.File) (eq .Type "directory") }}
-                        <a href="/{{ $Resource.ID }}?pwd={{ .PathStr }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list"
+                        <a href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ .PathStr }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list"
                            class="flex items-center gap-4 px-4 py-3.5 hover:bg-base-300/30 transition-colors group">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-w-muted shrink-0">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
@@ -59,7 +59,7 @@
                             </svg>
                         </a>
                     {{ else if and (not $Args.File) (eq .Type "directory") }}
-                        <a href="/{{ $Resource.ID }}?pwd={{ .PathStr }}" data-async-target="main"
+                        <a href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ .PathStr }}" data-async-target="main"
                            class="flex items-center gap-4 px-4 py-3.5 hover:bg-base-300/30 transition-colors group">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-w-muted shrink-0">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
@@ -86,14 +86,14 @@
                             <div class="flex items-center gap-2 shrink-0 pl-2">
                                 {{ if $action }}
                                     {{ if $watched }}
-                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.UnmarkURL }}" data-async-target="main" data-async-no-scroll="true">
-                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-green-500 hover:bg-green-500/10" title="Mark as unwatched" data-umami-event="unmark-file-watched">
+                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang $action.UnmarkURL }}" data-async-target="main" data-async-no-scroll="true">
+                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-green-500 hover:bg-green-500/10" title="{{ t $.Lang "library.unmarkWatched" }}" data-umami-event="unmark-file-watched">
                                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                         </button>
                                     </form>
                                     {{ else }}
-                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.MarkURL }}" data-async-target="main" data-async-no-scroll="true">
-                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-base-content" title="Watched" data-umami-event="mark-file-watched">
+                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang $action.MarkURL }}" data-async-target="main" data-async-no-scroll="true">
+                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-base-content" title="{{ t $.Lang "library.markWatched" }}" data-umami-event="mark-file-watched">
                                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
                                         </button>
                                     </form>
@@ -108,7 +108,7 @@
                         {{ $action := index $PathActions .PathStr }}
                         {{ $watched := and $WatchedPaths (index $WatchedPaths .PathStr) }}
                         <div class="flex items-center px-4 hover:bg-base-300/30 transition-colors group">
-                            <a href="/{{ $Resource.ID }}?pwd={{ $List.ListItem.PathStr }}&file={{ .PathStr }}{{ if not (eq $Args.Page 1) }}&page={{ $Args.Page }}{{ end }}" data-async-target="main"
+                            <a href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ $List.ListItem.PathStr }}&file={{ .PathStr }}{{ if not (eq $Args.Page 1) }}&page={{ $Args.Page }}{{ end }}" data-async-target="main"
                                class="flex items-center gap-4 py-3.5 flex-1 min-w-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-w-muted shrink-0">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -118,14 +118,14 @@
                             <div class="flex items-center gap-2 shrink-0 pl-2">
                                 {{ if $action }}
                                     {{ if $watched }}
-                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.UnmarkURL }}" data-async-target="#list">
-                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-green-500 hover:bg-green-500/10" title="Mark as unwatched" data-umami-event="unmark-file-watched">
+                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang $action.UnmarkURL }}" data-async-target="#list">
+                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-green-500 hover:bg-green-500/10" title="{{ t $.Lang "library.unmarkWatched" }}" data-umami-event="unmark-file-watched">
                                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                         </button>
                                     </form>
                                     {{ else }}
-                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ $action.MarkURL }}" data-async-target="#list">
-                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-base-content" title="Watched" data-umami-event="mark-file-watched">
+                                    <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang $action.MarkURL }}" data-async-target="#list">
+                                        <button type="submit" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-base-content" title="{{ t $.Lang "library.markWatched" }}" data-umami-event="mark-file-watched">
                                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
                                         </button>
                                     </form>
@@ -145,7 +145,7 @@
             <div class="flex items-center gap-1 px-4 py-3 border-t border-w-line/50">
                 {{ range makePagination .List .Args.Page .Args.PageSize }}
                 {{ if .Active }}
-                <a class="btn btn-sm btn-ghost min-w-[2rem]" href="/{{ $Resource.ID }}?pwd={{ $List.ListItem.PathStr }}&page={{ .Page }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list">
+                <a class="btn btn-sm btn-ghost min-w-[2rem]" href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ $List.ListItem.PathStr }}&page={{ .Page }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list">
                 {{ else if .Number }}
                 <span class="btn btn-sm min-w-[2rem] bg-base-300/60 text-w-text border-none pointer-events-none">
                 {{ else }}
@@ -170,7 +170,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 text-w-cyan">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
-                    Preparing Download
+                    {{ t $.Lang "resource.preparingDownload" }}
                 </h3>
                 <div id="log-{{ .List.ID }}" class="mt-4" data-async-layout="{{`{{ template "main" . }}`}}">
                     <div class="flex justify-center py-4">

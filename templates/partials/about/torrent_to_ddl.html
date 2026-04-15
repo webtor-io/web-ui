@@ -4,31 +4,31 @@
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            How it works
+            {{ t $.Lang "tool.about.badges.howItWorks" }}
         </div>
-        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to download torrents with Webtor.io</h2>
-        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Convert your torrent file or magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.</p>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.steps.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">{{ tHTML $.Lang "tool.torrentToDdl.about.steps.subtitle" }}</p>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
                 <div class="card-body">
                     <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
-                    <h3 class="card-title text-[1.15rem] mt-3">Locate your torrent</h3>
-                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Find the .torrent file on your computer or copy a magnet link from any source.</p>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.torrentToDdl.about.steps.step1.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.steps.step1.text" }}</p>
                 </div>
             </div>
             <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
                 <div class="card-body">
                     <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
-                    <h3 class="card-title text-[1.15rem] mt-3">Upload to Webtor.io</h3>
-                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Drop the file into the upload area or paste the magnet link, then click Search.</p>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.torrentToDdl.about.steps.step2.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.steps.step2.text" }}</p>
                 </div>
             </div>
             <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
                 <div class="card-body">
                     <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
-                    <h3 class="card-title text-[1.15rem] mt-3">Click to download</h3>
-                    <p class="text-[0.92rem] text-w-sub leading-relaxed">Browse the file list and click any file to get a direct HTTP download link.</p>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.torrentToDdl.about.steps.step3.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.steps.step3.text" }}</p>
                 </div>
             </div>
         </div>
@@ -40,20 +40,12 @@
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Explained
+            {{ t $.Lang "tool.about.badges.explained" }}
         </div>
-        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">What is torrent to DDL and how does it work?</h2>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.explained.title" }}</h2>
         <div class="max-w-[700px]">
-            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">
-                Torrent to DDL is a method of converting a torrent file into a
-                <strong>direct download link (DDL)</strong> that works over standard HTTP or HTTPS.
-                Instead of connecting to peers through a torrent client, the torrent is processed
-                on a server and the files become available as regular downloadable links.
-            </p>
-            <p class="text-[1.05rem] text-w-sub leading-relaxed">
-                This approach removes the need to install torrent software and makes downloading
-                or streaming files easier on any device, including mobile phones and tablets.
-            </p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ tHTML $.Lang "tool.torrentToDdl.about.explained.p1" }}</p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.explained.p2" }}</p>
         </div>
     </div>
 </section>
@@ -63,56 +55,53 @@
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>
-            Comparison
+            {{ t $.Lang "tool.about.badges.comparison" }}
         </div>
-        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Torrent vs DDL: what's the difference?</h2>
-        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">Torrents and direct download links both deliver files, but they use very different technologies.</p>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.compare.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">{{ t $.Lang "tool.torrentToDdl.about.compare.subtitle" }}</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="card bg-base-300 border border-w-line">
                 <div class="card-body">
-                    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL text-xs font-semibold tracking-widest uppercase mb-3">Torrent</div>
+                    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL text-xs font-semibold tracking-widest uppercase mb-3">{{ t $.Lang "tool.torrentToDdl.about.compare.torrent.label" }}</div>
                     <ul class="space-y-3">
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Uses peer-to-peer connections
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.torrent.item1" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Requires a torrent client
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.torrent.item2" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Speed depends on available peers
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.torrent.item3" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> Streaming is often unreliable
+                            <span class="shrink-0 mt-0.5 text-w-pink">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.torrent.item4" }}
                         </li>
                     </ul>
                 </div>
             </div>
             <div class="card bg-base-300 border border-w-line">
                 <div class="card-body">
-                    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-xs font-semibold tracking-widest uppercase mb-3">DDL</div>
+                    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-xs font-semibold tracking-widest uppercase mb-3">{{ t $.Lang "tool.torrentToDdl.about.compare.ddl.label" }}</div>
                     <ul class="space-y-3">
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Uses standard HTTP/HTTPS
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.ddl.item1" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Works directly in the browser
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.ddl.item2" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> More stable and predictable speed
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.ddl.item3" }}
                         </li>
                         <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
-                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> Streaming works instantly
+                            <span class="shrink-0 mt-0.5 text-w-cyan">&#x2022;</span> {{ t $.Lang "tool.torrentToDdl.about.compare.ddl.item4" }}
                         </li>
                     </ul>
                 </div>
             </div>
         </div>
 
-        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">
-            Torrent to DDL is often preferred when you want simplicity, stability,
-            and quick access to files without dealing with torrent clients.
-        </p>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">{{ t $.Lang "tool.torrentToDdl.about.compare.footer" }}</p>
     </div>
 </section>
 
@@ -121,16 +110,11 @@
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Safety
+            {{ t $.Lang "tool.about.badges.safety" }}
         </div>
-        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Is torrent to DDL safe? Do I need a VPN?</h2>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.safety.title" }}</h2>
         <div class="max-w-[700px]">
-            <p class="text-[1.05rem] text-w-sub leading-relaxed">
-                Torrent to DDL is generally safer than using a traditional torrent client
-                because you do not connect directly to the torrent swarm.
-                Your IP address is not exposed to other peers in the same way.
-                All traffic between you and <strong>Webtor.io</strong> travels over HTTPS, so no VPN is required.
-            </p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.safety.text" }}</p>
         </div>
     </div>
 </section>
@@ -140,37 +124,31 @@
     <div class="max-w-[1100px] mx-auto">
         <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Video streaming
+            {{ t $.Lang "tool.about.badges.videoStreaming" }}
         </div>
-        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Why torrent to DDL is better for video files</h2>
-        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">
-            Video torrents are often inconvenient with classic torrent clients: you may need to wait for enough pieces to download
-            before playback works smoothly. With <strong>torrent to DDL</strong>, video files can be streamed over HTTP,
-            so you can start watching instantly without downloading the entire file first.
-        </p>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.video.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">{{ tHTML $.Lang "tool.torrentToDdl.about.video.subtitle" }}</p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
             <div class="flex items-start gap-3">
                 <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                <span class="text-[0.95rem] text-w-sub leading-relaxed">Movies and TV episodes</span>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.video.item1" }}</span>
             </div>
             <div class="flex items-start gap-3">
                 <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                <span class="text-[0.95rem] text-w-sub leading-relaxed">Large MKV / MP4 files</span>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.video.item2" }}</span>
             </div>
             <div class="flex items-start gap-3">
                 <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                <span class="text-[0.95rem] text-w-sub leading-relaxed">Mobile devices and tablets</span>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.video.item3" }}</span>
             </div>
             <div class="flex items-start gap-3">
                 <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                <span class="text-[0.95rem] text-w-sub leading-relaxed">Quick previews before downloading</span>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.torrentToDdl.about.video.item4" }}</span>
             </div>
         </div>
 
-        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">
-            If your torrent contains video content, streaming is usually faster and more convenient than downloading everything upfront.
-        </p>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">{{ t $.Lang "tool.torrentToDdl.about.video.footer" }}</p>
     </div>
 </section>
 {{ end }}

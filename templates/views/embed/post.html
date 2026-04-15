@@ -25,7 +25,7 @@
         {{ end }} 
         {{ with .Data }}
         {{ if has . "Job" }}
-        <form class="hidden progress-alert progress-alert-block mb-10 closeable bg-black/50" data-async-progress-log="{{ .Job | makeJobLogURL }}">
+        <form class="hidden progress-alert progress-alert-block mb-10 closeable bg-black/50" data-async-progress-log="{{ makeJobLogURL $.Lang .Job }}">
             <div class="log-target"></div>
         </form>
         {{ end }}

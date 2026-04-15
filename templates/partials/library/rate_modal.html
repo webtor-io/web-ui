@@ -1,5 +1,5 @@
 {{ define "library/rate_modal" }}
-{{ if .RateForm }}
+{{ if .Data }}
 <dialog class="modal" open>
     <div class="modal-box max-w-sm bg-w-card border border-w-line/50 rounded-2xl">
         <div class="flex flex-col items-center pt-2 pb-3 gap-1">
@@ -7,29 +7,29 @@
                 {{ range $i := seq 1 10 }}
                 <input type="radio" name="lib-rating" value="{{ $i }}"
                        class="mask mask-star-2 bg-yellow-400"
-                       {{ if eq $.RateForm.CurrentRating $i }}checked{{ end }} />
+                       {{ if eq $.Data.CurrentRating $i }}checked{{ end }} />
                 {{ end }}
             </div>
-            <span id="lib-rate-label" class="text-sm font-semibold text-yellow-400 h-5">{{ if gt .RateForm.CurrentRating 0 }}{{ .RateForm.CurrentRating }}/10{{ end }}</span>
+            <span id="lib-rate-label" class="text-sm font-semibold text-yellow-400 h-5">{{ if gt .Data.CurrentRating 0 }}{{ .Data.CurrentRating }}/10{{ end }}</span>
         </div>
         <div class="modal-action mt-0 justify-center">
-            <form action="/library/{{ .RateForm.Type }}/{{ .RateForm.VideoID }}/rate" method="post"
+            <form action="{{ langPath .Ctx.Lang (printf "/library/%s/%s/rate" .Data.Type .Data.VideoID) }}" method="post"
                   data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
-                <input type="hidden" name="rating" value="{{ .RateForm.CurrentRating }}" id="lib-rate-value" />
+                <input type="hidden" name="rating" value="{{ .Data.CurrentRating }}" id="lib-rate-value" />
                 <button type="submit" class="btn btn-soft">
-                    Rate
+                    {{ t .Ctx.Lang "library.rateAction" }}
                 </button>
             </form>
-            {{ if gt .RateForm.CurrentRating 0 }}
-            <form action="/library/{{ .RateForm.Type }}/{{ .RateForm.VideoID }}/unrate" method="post"
+            {{ if gt .Data.CurrentRating 0 }}
+            <form action="{{ langPath .Ctx.Lang (printf "/library/%s/%s/unrate" .Data.Type .Data.VideoID) }}" method="post"
                   data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
                 <button type="submit" class="btn btn-ghost text-w-sub">
-                    Drop
+                    {{ t .Ctx.Lang "library.drop" }}
                 </button>
             </form>
             {{ end }}
             <form method="dialog">
-                <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Cancel</button>
+                <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t .Ctx.Lang "library.cancel" }}</button>
             </form>
         </div>
     </div>
@@ -42,7 +42,7 @@
     var stars = document.querySelectorAll('#lib-rate-stars input[name="lib-rating"]');
     var hidden = document.getElementById('lib-rate-value');
     var label = document.getElementById('lib-rate-label');
-    var selected = {{ .RateForm.CurrentRating }};
+    var selected = {{ .Data.CurrentRating }};
 
     function paint(upTo, bright, dim) {
         for (var i = 0; i < stars.length; i++) {

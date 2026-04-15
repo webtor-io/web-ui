@@ -4,30 +4,30 @@
         {{ range $i := seq 1 10 }}
         <input type="radio" name="rating" value="{{ $i }}"
                class="mask mask-star-2 bg-yellow-400"
-               {{ if eq $.CurrentRating $i }}checked{{ end }}
+               {{ if eq $.Data.CurrentRating $i }}checked{{ end }}
                data-umami-event="rate-star-clicked" />
         {{ end }}
     </div>
-    <span id="rate-label" class="text-sm font-semibold text-yellow-400 h-5">{{ if gt .CurrentRating 0 }}{{ .CurrentRating }}/10{{ end }}</span>
+    <span id="rate-label" class="text-sm font-semibold text-yellow-400 h-5">{{ if gt .Data.CurrentRating 0 }}{{ .Data.CurrentRating }}/10{{ end }}</span>
 </div>
 <div class="modal-action mt-0 justify-center">
-    <form action="/library/{{ .Type }}/{{ .VideoID }}/rate" method="post"
+    <form action="{{ langPath .Ctx.Lang (printf "/library/%s/%s/rate" .Data.Type .Data.VideoID) }}" method="post"
           data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
-        <input type="hidden" name="rating" value="{{ .CurrentRating }}" id="rate-value" />
+        <input type="hidden" name="rating" value="{{ .Data.CurrentRating }}" id="rate-value" />
         <button type="submit" class="btn btn-soft" data-umami-event="rate-confirmed">
-            Rate
+            {{ t .Ctx.Lang "library.rateAction" }}
         </button>
     </form>
-    {{ if gt .CurrentRating 0 }}
-    <form action="/library/{{ .Type }}/{{ .VideoID }}/unrate" method="post"
+    {{ if gt .Data.CurrentRating 0 }}
+    <form action="{{ langPath .Ctx.Lang (printf "/library/%s/%s/unrate" .Data.Type .Data.VideoID) }}" method="post"
           data-async-target="main" data-async-no-scroll="true" data-async-push-state="false">
         <button type="submit" class="btn btn-ghost text-w-sub" data-umami-event="rate-removed">
-            Drop
+            {{ t .Ctx.Lang "library.drop" }}
         </button>
     </form>
     {{ end }}
     <form method="dialog">
-        <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="rate-cancelled">Cancel</button>
+        <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="rate-cancelled">{{ t .Ctx.Lang "library.cancel" }}</button>
     </form>
 </div>
 <script>
@@ -35,7 +35,7 @@
     var stars = document.querySelectorAll('#rate-stars input[name="rating"]');
     var hidden = document.getElementById('rate-value');
     var label = document.getElementById('rate-label');
-    var selected = {{ .CurrentRating }};
+    var selected = {{ .Data.CurrentRating }};
 
     function paint(upTo, bright, dim) {
         for (var i = 0; i < stars.length; i++) {

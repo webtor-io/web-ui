@@ -1,12 +1,12 @@
 {{ define "vault/pledge-modal" }}
-{{ if or .VaultPledgeAddForm .VaultPledgeRemoveForm }}
+{{ if or .Data.VaultPledgeAddForm .Data.VaultPledgeRemoveForm }}
 <dialog class="modal" open>
     <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl">
-        {{ if .VaultPledgeAddForm }}
-            {{ template "vault/pledge-modal/add" .VaultPledgeAddForm }}
+        {{ if .Data.VaultPledgeAddForm }}
+            {{ template "vault/pledge-modal/add" withContext .Ctx .Data.VaultPledgeAddForm }}
         {{ end }}
-        {{ if .VaultPledgeRemoveForm }}
-            {{ template "vault/pledge-modal/remove" .VaultPledgeRemoveForm }}
+        {{ if .Data.VaultPledgeRemoveForm }}
+            {{ template "vault/pledge-modal/remove" withContext .Ctx .Data.VaultPledgeRemoveForm }}
         {{ end }}
     </div>
     <form method="dialog" class="modal-backdrop">

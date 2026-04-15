@@ -1,4 +1,4 @@
-{{ define "title" }}Library{{ end }}
+{{ define "title" }}{{ t $.Lang "library.title" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
@@ -8,18 +8,18 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"/>
       </svg>
-      Library
+      {{ t $.Lang "library.badge" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Library</h1>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Your saved torrents, movies, and series — all in one place.</p>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "library.title" }}</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "library.subtitle" }}</p>
 
     <!-- Menu + Filters + Sort -->
     <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
       {{ template "library/menu" . }}
       <div class="flex items-center gap-2 ml-auto">
-        {{ template "library/watched_filter" . }}
-        {{ template "library/sort" .Data.Args | makeSort }}
+        {{ template "library/watched_filter" (withContext $ .Data.Args) }}
+        {{ template "library/sort" (withContext $ .Data.Args) }}
       </div>
     </div>
 
@@ -32,9 +32,9 @@
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-w-muted/40 mx-auto mb-4">
           <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
         </svg>
-        <p class="text-lg font-semibold text-w-sub mb-2">No torrents yet</p>
-        <p class="text-sm text-w-muted mb-6">Hit "Add to Library" under any loaded torrent to get started.</p>
-        <a class="btn btn-soft" href="/" data-async-target="main">Browse torrents</a>
+        <p class="text-lg font-semibold text-w-sub mb-2">{{ t $.Lang "library.noTorrents" }}</p>
+        <p class="text-sm text-w-muted mb-6">{{ t $.Lang "library.noTorrentsHint" }}</p>
+        <a class="btn btn-soft" href="{{ langPath $.Lang "/" }}" data-async-target="main">{{ t $.Lang "library.browseTorrents" }}</a>
       </div>
     {{ end }}
 

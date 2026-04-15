@@ -2,32 +2,32 @@
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            Addon URL
+            {{ t .Ctx.Lang "profile.stremio.addonUrl" }}
         </h2>
-        {{ if eq .Data.StremioAddonURL "" }}
-            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/url/generate" data-async-target="#stremio">
+        {{ if eq .Data "" }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath .Ctx.Lang "/stremio/url/generate" }}" data-async-target="#stremio">
                 <button type="submit" class="btn btn-soft" data-umami-event="stremio-generate-addon-url">
-                    Generate addon URL
+                    {{ t .Ctx.Lang "profile.stremio.generate" }}
                 </button>
             </form>
         {{ else }}
             <script>
-                var stremioAddonUrl = "{{ domain }}{{ .Data.StremioAddonURL }}";
+                var stremioAddonUrl = "{{ domain }}{{ .Data }}";
                 function copyStremioAddonUrl(form, e) {
                     e.preventDefault();
                     navigator.clipboard.writeText(stremioAddonUrl);
-                    if (window.toast) window.toast.success('Copied!');
+                    if (window.toast) window.toast.success('{{ t .Ctx.Lang "profile.stremio.copied" }}');
                     return false;
                 }
             </script>
             <form onsubmit="copyStremioAddonUrl(this, event)" class="join w-full mb-4">
-                <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data.StremioAddonURL }}" />
-                <button type="submit" class="btn btn-soft join-item" data-umami-event="stremio-copy-addon-url">Copy URL</button>
+                <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data }}" />
+                <button type="submit" class="btn btn-soft join-item" data-umami-event="stremio-copy-addon-url">{{ t .Ctx.Lang "profile.stremio.copyUrl" }}</button>
             </form>
             <div class="flex items-center justify-between">
-                <a href="/instructions/stremio" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-stremio" target="_blank">How to connect to Stremio?</a>
-                {{ if not (eq .Data.StremioAddonURL "") }}
-                    <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="stremio://{{ domainWithoutProtocol }}{{ .Data.StremioAddonURL }}" data-umami-event="stremio-install-addon" target="_blank">Install in Stremio</a>
+                <a href="{{ langPath .Ctx.Lang "/instructions/stremio" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-stremio" target="_blank">{{ t .Ctx.Lang "profile.stremio.howTo" }}</a>
+                {{ if not (eq .Data "") }}
+                    <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="stremio://{{ domainWithoutProtocol }}{{ .Data }}" data-umami-event="stremio-install-addon" target="_blank">{{ t .Ctx.Lang "profile.stremio.install" }}</a>
                 {{ end }}
             </div>
         {{ end }}

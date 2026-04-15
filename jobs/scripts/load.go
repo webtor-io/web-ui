@@ -10,6 +10,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -26,13 +27,19 @@ type LoadArgs struct {
 
 type LoadScript struct {
 	api  *api.Api
+	i18n *i18n.Service
 	args *LoadArgs
 	c    *web.Context
 }
 
-func NewLoadScript(api *api.Api, c *web.Context, args *LoadArgs) *LoadScript {
+func (s *LoadScript) t(key string) string {
+	return i18n.TranslateWithLocalizer(s.i18n.Localizer(s.c.Lang), key)
+}
+
+func NewLoadScript(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *LoadArgs) *LoadScript {
 	return &LoadScript{
 		api:  api,
+		i18n: i18nSvc,
 		c:    c,
 		args: args,
 	}
@@ -56,7 +63,7 @@ func (s *LoadScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (res *ra.ResourceResponse, err error) {
-	j.InProgress("uploading file")
+	j.InProgress(s.t("job.uploadingFile"))
 	apiCtx, apiCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer apiCancel()
 	res, err = s.api.StoreResource(apiCtx, s.c.ApiClaims, file)
@@ -68,7 +75,7 @@ func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (re
 }
 
 func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (res *ra.ResourceResponse, err error) {
-	j.InProgress("checking magnet")
+	j.InProgress(s.t("job.checkingMagnet"))
 	sha1Hash := common.SHA1R.Find([]byte(query))
 	if sha1Hash == nil {
 		return nil, errors.Wrap(err, "wrong resource provided")
@@ -88,8 +95,8 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		return
 	}
 	j.Done()
-	j.Info("sadly, we don't have torrent, so we have to magnetize it from peers")
-	j.InProgress("magnetizing")
+	j.Info(s.t("job.magnetizing.info"))
+	j.InProgress(s.t("job.magnetizing"))
 	magnetizeCtx, magnetizeCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer magnetizeCancel()
 	res, err = s.api.StoreResource(magnetizeCtx, s.c.ApiClaims, []byte(query))
@@ -100,7 +107,7 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 	return
 }
 
-func Load(api *api.Api, c *web.Context, args *LoadArgs) (r job.Runnable, hash string, err error) {
+func Load(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *LoadArgs) (r job.Runnable, hash string, err error) {
 	if args.Query != "" {
 		sha1Hash := common.SHA1R.Find([]byte(args.Query))
 		if sha1Hash == nil {
@@ -115,6 +122,6 @@ func Load(api *api.Api, c *web.Context, args *LoadArgs) (r job.Runnable, hash st
 		}
 		hash = mi.HashInfoBytes().HexString()
 	}
-	r = NewLoadScript(api, c, args)
+	r = NewLoadScript(api, i18nSvc, c, args)
 	return
 }

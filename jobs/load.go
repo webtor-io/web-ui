@@ -2,6 +2,8 @@ package j
 
 import (
 	"context"
+	"crypto/sha1"
+	"fmt"
 	"time"
 
 	"github.com/webtor-io/web-ui/jobs/scripts"
@@ -11,19 +13,20 @@ import (
 )
 
 func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err error) {
-	ls, hash, err := scripts.Load(s.api, c, args)
+	ls, hash, err := scripts.Load(s.api, s.i18n, c, args)
 	if err != nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, hash, job.NewScript(func(j *job.Job) (err error) {
+	id := fmt.Sprintf("%x", sha1.Sum([]byte(hash+"/"+c.Lang)))
+	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
 		err = ls.Run(ctx, j)
 		if err != nil {
 			return
 		}
 		rID := j.Context.Value("respID").(string)
 		if s.enricher.HasMappers() {
-			j.InProgress("enriching content")
+			j.InProgress(s.T(c, "job.enrichingContent"))
 			enrichErr := s.enricher.Enrich(ctx, rID, c.ApiClaims, false, args.HintVideoID)
 			if enrichErr != nil {
 				j.Warn(enrichErr)
@@ -31,7 +34,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 				j.Done()
 			}
 		}
-		j.Redirect("/" + rID)
+		j.Redirect(web.LangURL(c.Lang, "/"+rID), s.T(c, "job.redirecting"))
 		return
 	}), false)
 	return

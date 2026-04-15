@@ -1,8 +1,10 @@
 import av from '../../lib/av';
 import DragDrop from '../../lib/dragAndDrop';
 import DeleteFromList from '../../lib/deleteFromList';
+import { init as initI18n, t, tf } from '../../lib/profile/i18n';
 
 av(async function(){
+    await initI18n();
     // Initialize drag and drop functionality for streaming backends
     new DragDrop({
         listSelector: '#backend-list',
@@ -21,9 +23,9 @@ av(async function(){
         orderInputId: 'backend_order',
         emptyStateId: 'backend-empty-state',
         itemNameSelector: '.text-lg.font-medium',
-        confirmMessage: (name) => `Are you sure you want to delete this ${name} backend?`,
+        confirmMessage: (name) => tf('profile.backends.deleteConfirm', name),
         umamiEventName: 'streaming-backend-delete',
-        toastMessage: 'Backend deleted'
+        toastMessage: t('profile.backends.deleted')
     });
 });
 

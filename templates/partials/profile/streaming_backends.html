@@ -2,20 +2,20 @@
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
-            Streaming Backends
+            {{ t $.Lang "profile.backends.title" }}
         </h2>
 
         <!-- Add New Backend Form -->
         <div class="mb-7">
-            <form method="post" data-async-push-state="false" action="/streaming/backends/create" data-async-target="#streaming-backends" class="join w-full">
+            <form method="post" data-async-push-state="false" action="{{ langPath $.Lang "/streaming/backends/create" }}" data-async-target="#streaming-backends" class="join w-full">
                 <select name="type" class="select bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" required>
-                    <option value="">Select backend type</option>
+                    <option value="">{{ t $.Lang "profile.backends.selectType" }}</option>
                     {{ range .Data.AvailableBackendTypes }}
                     <option value="{{ .Type }}">{{ .DisplayName }}</option>
                     {{ end }}
                 </select>
-                <input type="password" required name="access_token" class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item" placeholder="Enter API token">
-                <button type="submit" class="btn btn-soft join-item" data-umami-event="streaming-backend-add">Add</button>
+                <input type="password" required name="access_token" class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full join-item" placeholder="{{ t $.Lang "profile.backends.enterToken" }}">
+                <button type="submit" class="btn btn-soft join-item" data-umami-event="streaming-backend-add">{{ t $.Lang "profile.backends.add" }}</button>
             </form>
 
             {{ if ne .Data.Error nil }}
@@ -26,9 +26,9 @@
         </div>
 
         <!-- Streaming Backends List -->
-        <form method="post" data-async-push-state="false" action="/streaming/backends/update" data-async-target="#streaming-backends">
-            <h3 class="text-sm font-semibold mb-2">Your Streaming Backends</h3>
-            <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+        <form method="post" data-async-push-state="false" action="{{ langPath $.Lang "/streaming/backends/update" }}" data-async-target="#streaming-backends">
+            <h3 class="text-sm font-semibold mb-2">{{ t $.Lang "profile.backends.yourBackends" }}</h3>
+            <p class="text-xs text-w-muted mb-3">{{ t $.Lang "profile.backends.dragHint" }}</p>
 
             <ul id="backend-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
                 <!-- User's Custom Backends -->
@@ -55,14 +55,14 @@
                         </div>
                         <div class="text-xs text-w-muted">
                             {{ if $backend.LastStatus }}
-                            Status: <span class="
+                            {{ t $.Lang "profile.backends.status" }} <span class="
                                 {{ if eq $backend.LastStatus "ok" }}text-success
                                 {{ else if eq $backend.LastStatus "invalid_credentials" }}text-error
                                 {{ else if eq $backend.LastStatus "rate_limited" }}text-warning
                                 {{ else }}text-w-sub{{ end }}">{{ $backend.LastStatus }}</span>
                             {{ end }}
                             {{ if $backend.LastCheckedAt }}
-                            {{ if $backend.LastStatus }} | {{ end }}Last checked: {{ $backend.LastCheckedAt.Format "2006-01-02 15:04" }}
+                            {{ if $backend.LastStatus }} | {{ end }}{{ t $.Lang "profile.backends.lastChecked" }} {{ $backend.LastCheckedAt.Format "2006-01-02 15:04" }}
                             {{ end }}
                         </div>
                     </div>
@@ -70,7 +70,7 @@
                     <div class="flex items-center gap-2">
                         <label class="label cursor-pointer gap-2">
                             <input type="checkbox" name="backend_{{ $backend.ID }}_enabled" class="toggle toggle-soft" {{ if $backend.Enabled }}checked{{ end }}>
-                            <span class="label-text text-xs">Enabled</span>
+                            <span class="label-text text-xs">{{ t $.Lang "profile.backends.enabled" }}</span>
                         </label>
 
                         <!-- Delete Button -->
@@ -96,10 +96,10 @@
 
                     <div class="flex-1">
                         <div class="flex items-center gap-2">
-                            <div class="font-medium">Webtor</div>
+                            <div class="font-medium">{{ t $.Lang "profile.backends.webtor" }}</div>
                         </div>
                         <div class="text-xs text-w-muted">
-                            Built-in streaming backend
+                            {{ t $.Lang "profile.backends.webtorBuiltin" }}
                         </div>
                     </div>
 
@@ -107,7 +107,7 @@
                         <label class="label cursor-pointer gap-2">
                             <input type="checkbox" name="webtor_enabled" class="toggle toggle-soft"
                             {{ if .Claims | isPaid }}checked{{ end }} disabled>
-                            <span class="label-text text-xs">Enabled</span>
+                            <span class="label-text text-xs">{{ t $.Lang "profile.backends.enabled" }}</span>
                         </label>
                     </div>
                 </li>
@@ -115,18 +115,17 @@
 
                 <!-- Empty state message - always present, hidden with CSS when backends exist -->
                 <li class="p-8 text-center empty-state {{ if $backends }}hidden{{ end }}" id="backends-empty-state">
-                    <p class="text-w-muted">No additional streaming backends configured.</p>
-                    <p class="text-xs text-w-muted mt-2">Add Real-Debrid or Torbox accounts above to get started.</p>
+                    <p class="text-w-muted">{{ t $.Lang "profile.backends.noBackends" }}</p>
+                    <p class="text-xs text-w-muted mt-2">{{ t $.Lang "profile.backends.noBackendsHint" }}</p>
                 </li>
 
             </ul>
             {{ if not (.Claims | isPaid) }}
                 <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4 text-center">
                     <p class="text-sm text-w-sub">
-                        Webtor streaming backend is available for premium users.
-                        But you can still use it with ads in Webtor's UI.
+                        {{ t $.Lang "profile.backends.premiumNote" }}
                     </p>
-                    <a href="/donate" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" target="_blank" data-umami-event="donate-streaming-backend">Upgrade your tier to unlock it!</a>
+                    <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" target="_blank" data-umami-event="donate-streaming-backend">{{ t $.Lang "profile.backends.upgrade" }}</a>
                 </div>
             {{ end }}
 
@@ -134,7 +133,7 @@
             <input type="hidden" name="deleted_backends" id="deleted_backends" value="">
 
             <div class="mt-4 flex justify-end">
-                <button type="submit" class="btn btn-soft" data-umami-event="streaming-backend-save">Save</button>
+                <button type="submit" class="btn btn-soft" data-umami-event="streaming-backend-save">{{ t $.Lang "profile.backends.save" }}</button>
             </div>
         </form>
     </div>

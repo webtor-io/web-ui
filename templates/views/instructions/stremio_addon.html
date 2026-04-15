@@ -1,5 +1,5 @@
 {{ define "title" }}
-    How to connect Stremio Addon
+    {{ t $.Lang "instructions.stremioAddon.title" }}
 {{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
@@ -8,30 +8,30 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      Guide
+      {{ t $.Lang "instructions.guide" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">How to connect Stremio Addon</h1>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "instructions.stremioAddon.heading" }}</h1>
 
     <img src="/pub/stremio-addon.gif" alt="Stremio Addon" class="w-full rounded-xl border border-w-line my-6">
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Want to add more content to your Stremio experience? Follow these simple steps to connect external Stremio addons to expand your streaming library:</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.stremioAddon.intro" }}</p>
 
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>Go to <a href="https://stremio-addons.com/" class="text-w-pinkL hover:underline" target="_blank">https://stremio-addons.com/</a></li>
-        <li>Browse and select the addon you want to install</li>
-        <li>Copy the addon's manifest URL with "Copy link" button</li>
-        <li>Paste the URL in the "Stremio Addons" section at your <a href="/profile" class="text-w-pinkL hover:underline">profile page</a> and click "Add Addon"</li>
+        <li>{{ tHTML $.Lang "instructions.stremioAddon.step1" }}</li>
+        <li>{{ t $.Lang "instructions.stremioAddon.step2" }}</li>
+        <li>{{ t $.Lang "instructions.stremioAddon.step3" }}</li>
+        <li>{{ tpHTML $.Lang "instructions.stremioAddon.step4" "ProfileURL" (langPath $.Lang "/profile") }}</li>
     </ol>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Once added, the addon content will be available through your Stremio integration, expanding your streaming options with additional sources and catalogs.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ t $.Lang "instructions.stremioAddon.result" }}</p>
 
     <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-6 text-sm text-w-sub">
-      <strong>Note:</strong> This feature is available only for <strong>paid users</strong>.
+      <strong>{{ t $.Lang "instructions.note" }}</strong> {{ tHTML $.Lang "instructions.paidOnly" }}
     </div>
 
     <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-4 text-sm text-w-sub">
-      <strong>Note:</strong> Gathering streaming URLs can take some time (up to 10 seconds). Be patient.
+      <strong>{{ t $.Lang "instructions.note" }}</strong> {{ t $.Lang "instructions.stremioAddon.noteGathering" }}
     </div>
   </div>
 </section>

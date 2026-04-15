@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	csrf "github.com/utrack/gin-csrf"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/i18n"
 	vault "github.com/webtor-io/web-ui/services/vault"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -22,6 +23,7 @@ type TorrentStatus struct {
 	State    string  `json:"state"`    // idle, caching, cached, vaulting, vaulted
 	Progress float64 `json:"progress"` // 0-100 for caching/vaulting
 	Seeders  int     `json:"seeders"`  // seed count for caching
+	Label    string  `json:"label"`    // translated state label
 }
 
 // TorrentStatsData holds the relevant fields from a torrent stats event.
@@ -155,6 +157,7 @@ func (s *Handler) status(c *gin.Context) {
 			if !ok {
 				return false
 			}
+			status.Label = i18n.TranslateWithLocalizer(i18n.GetLocalizer(c), "resource.status."+status.State)
 			c.SSEvent("message", status)
 			return status.State != "vaulted"
 		}

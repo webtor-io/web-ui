@@ -1,6 +1,14 @@
 import { useMemo, useCallback } from 'preact/hooks';
 import { getSearchResultsForType } from './discoverReducer';
 import { chipClass } from './discoverUtils';
+import { t } from '../i18n';
+
+function typeLabel(type) {
+    const key = `discover.type.${type.toLowerCase()}`;
+    const translated = t(key);
+    if (translated !== key) return translated;
+    return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
 export function TypeTabs({ types, selectedType, onSelect }) {
     if (!types.length) return null;
@@ -12,7 +20,7 @@ export function TypeTabs({ types, selectedType, onSelect }) {
                     class={chipClass(type === selectedType)}
                     onClick={() => onSelect(type)}
                 >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                    {typeLabel(type)}
                 </button>
             ))}
         </div>
@@ -21,11 +29,11 @@ export function TypeTabs({ types, selectedType, onSelect }) {
 
 export function SearchTabs({ searchResults, searchTypes, searchType, onSelect }) {
     const tabs = useMemo(() => [
-        { key: 'all', label: 'All', count: searchResults.length },
-        ...searchTypes.map(t => ({
-            key: t,
-            label: t.charAt(0).toUpperCase() + t.slice(1),
-            count: getSearchResultsForType(searchResults, t).length,
+        { key: 'all', label: t('discover.allTab'), count: searchResults.length },
+        ...searchTypes.map(st => ({
+            key: st,
+            label: typeLabel(st),
+            count: getSearchResultsForType(searchResults, st).length,
         })),
     ], [searchResults, searchTypes]);
 

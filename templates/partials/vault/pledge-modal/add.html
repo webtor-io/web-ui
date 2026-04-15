@@ -1,74 +1,74 @@
 {{ define "vault/pledge-modal/add" }}
 <h3 class="text-xl font-bold tracking-tight flex items-center gap-2 w-full">
 	<svg class="w-5 h-5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-	Keep This Torrent Available
+	{{ t .Ctx.Lang "vault.keepAvailable" }}
 </h3>
-	{{ if eq .Status "success" }}
+	{{ if eq .Data.Status "success" }}
 		{{ template "vault/pledge-modal/add/success" . }}
-	{{ else if eq .Status "error" }}
+	{{ else if eq .Data.Status "error" }}
 		<p class="pt-4 pb-2 text-sm text-w-sub">
-			Unfortunately, your pledge could not be saved due to an error:
+			{{ t .Ctx.Lang "vault.error" }}
 		</p>
-		{{ if .Err }}
+		{{ if .Data.Err }}
 			<div class="progress-alert progress-alert-oneline closeable mb-4">
-				<pre>{{ .Err | log | shortErr }}</pre>
+				<pre>{{ .Data.Err | log | shortErr }}</pre>
 			</div>
 		{{ end }}
 		<div class="modal-action justify-center">
 			<form method="dialog">
-				<button class="btn btn-soft" data-umami-event="vault-pledge-error-confirmed">Ok</button>
+				<button class="btn btn-soft" data-umami-event="vault-pledge-error-confirmed">{{ t .Ctx.Lang "vault.ok" }}</button>
 			</form>
 		</div>
-	{{ else if .Funded }}
+	{{ else if .Data.Funded }}
 		{{ template "vault/pledge-modal/add/success" . }}
 	{{ else }}
-		{{ if .Available }}
-			{{ if ge (derefFloat64 .Available) .Required }}
+		{{ if .Data.Available }}
+			{{ if ge (derefFloat64 .Data.Available) .Data.Required }}
 				<p class="pt-4 pb-2 text-sm text-w-sub">
-					You have enough Vault Points to store this torrent in the Vault.
+					{{ t .Ctx.Lang "vault.hasPoints" }}
 				</p>
 			{{ else }}
 				<p class="pt-4 pb-1 text-sm text-w-sub">
-					You don't have enough Vault Points to store this torrent.
+					{{ t .Ctx.Lang "vault.noPoints" }}
 				</p>
 				<p class="pb-2 text-sm text-w-sub">
-					Try upgrading your subscription to the next tier to get more Vault Points.
+					{{ t .Ctx.Lang "vault.upgradeHint" }}
 				</p>
 				<p class="pb-2">
-					<a href="/donate" target="_blank" class="text-sm text-w-pinkL hover:underline" data-umami-event="vault-upgrade-clicked">Upgrade subscription</a>
+					<a href="/donate" target="_blank" class="text-sm text-w-pinkL hover:underline" data-umami-event="vault-upgrade-clicked">{{ t .Ctx.Lang "vault.upgradeSubscription" }}</a>
 				</p>
 			{{ end }}
 		{{ else }}
 			<p class="pt-4 pb-2 text-sm text-w-sub">
-				You have unlimited Vault Points. You can store this torrent in the Vault.
+				{{ t .Ctx.Lang "vault.unlimitedPoints" }}
 			</p>
 		{{ end }}
 		<div class="bg-base-200/50 rounded-xl p-4 my-3">
 			<table class="table w-full text-sm">
 				<tbody>
 					<tr>
-						<td class="text-left font-semibold text-w-sub">Torrent Size GB</td>
-						<td class="text-right text-w-text">{{ printf "%.2f" .TorrentSizeGB }}</td>
+						<td class="text-left font-semibold text-w-sub">{{ t .Ctx.Lang "vault.torrentSize" }}</td>
+						<td class="text-right text-w-text">{{ printf "%.2f" .Data.TorrentSizeGB }}</td>
 					</tr>
 					<tr>
-						<td class="text-left font-semibold text-w-sub">Required VP</td>
-						<td class="text-right text-w-text">{{ printf "%.2f" .Required }}</td>
+						<td class="text-left font-semibold text-w-sub">{{ t .Ctx.Lang "vault.requiredVP" }}</td>
+						<td class="text-right text-w-text">{{ printf "%.2f" .Data.Required }}</td>
 					</tr>
 					<tr>
-						<td class="text-left font-semibold text-w-sub">Your Available VP</td>
+						<td class="text-left font-semibold text-w-sub">{{ t .Ctx.Lang "vault.availableVP" }}</td>
 						<td class="text-right text-w-text">
-							{{ if .Available }}
-								{{ printf "%.2f" (derefFloat64 .Available) }}
+							{{ if .Data.Available }}
+								{{ printf "%.2f" (derefFloat64 .Data.Available) }}
 							{{ else }}
 								<span class="text-xl">&#8734;</span>
 							{{ end }}
 						</td>
 					</tr>
 					<tr>
-						<td class="text-left font-semibold text-w-sub">Your Total VP</td>
+						<td class="text-left font-semibold text-w-sub">{{ t .Ctx.Lang "vault.totalVP" }}</td>
 						<td class="text-right text-w-text">
-							{{ if .Total }}
-								{{ printf "%.2f" (derefFloat64 .Total) }}
+							{{ if .Data.Total }}
+								{{ printf "%.2f" (derefFloat64 .Data.Total) }}
 							{{ else }}
 								<span class="text-xl">&#8734;</span>
 							{{ end }}
@@ -78,20 +78,20 @@
 			</table>
 		</div>
 		<div class="text-left w-full mt-1 mb-2">
-			<a href="/instructions/vault" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">What is Vault?</a>
+			<a href="{{ langPath .Ctx.Lang "/instructions/vault" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">{{ t .Ctx.Lang "vault.whatIs" }}</a>
 		</div>
 
 		<div class="modal-action justify-center">
-			{{ if or (not .Available) (ge (derefFloat64 .Available) .Required) }}
-				<form action="/vault/pledge/add" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
-					<input type="hidden" name="resource_id" value="{{ .ResourceID }}" />
+			{{ if or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
+				<form action="{{ langPath .Ctx.Lang "/vault/pledge/add" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
+					<input type="hidden" name="resource_id" value="{{ .Data.ResourceID }}" />
 					<button type="submit" class="btn btn-soft" data-umami-event="vault-store-confirmed">
-						Store in Vault
+						{{ t .Ctx.Lang "vault.storeInVault" }}
 					</button>
 				</form>
 			{{ end }}
 			<form method="dialog">
-				<button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-cancelled">Cancel</button>
+				<button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-cancelled">{{ t .Ctx.Lang "vault.cancel" }}</button>
 			</form>
 		</div>
 	{{ end }}

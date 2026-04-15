@@ -1,6 +1,6 @@
-{{ define "title" }}Speed Test — {{ .Data.SpeedDisplay }} Mbps{{ end }}
+{{ define "title" }}{{ printf (t $.Lang "speedtest.titleResult") .Data.SpeedDisplay }}{{ end }}
 {{ define "description" }}
-    <meta name="description" content="Your Webtor connection speed: {{ .Data.SpeedDisplay }} Mbps.">
+    <meta name="description" content="{{ printf (t $.Lang "speedtest.descResult") .Data.SpeedDisplay }}">
 {{ end }}
 {{ define "main" }}
 {{ "speedtest.js" | asset }}
@@ -12,23 +12,23 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
       </svg>
-      Speed Test
+      {{ t $.Lang "speedtest.badge" }}
     </div>
 
     <!-- Hero -->
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Connection Speed Test</h1>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Measure your download speed from Webtor servers to find out what video quality you can stream without buffering.</p>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "speedtest.title" }}</h1>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "speedtest.subtitle" }}</p>
 
     <!-- Speed -->
     {{ if .Data.HasPremium }}
     <div class="grid grid-cols-2 gap-6 mb-8">
       <div class="text-center">
-        <div class="text-w-sub text-xs font-semibold tracking-widest uppercase mb-2">Standard</div>
+        <div class="text-w-sub text-xs font-semibold tracking-widest uppercase mb-2">{{ t $.Lang "speedtest.standard" }}</div>
         <div class="text-4xl font-extrabold text-w-cyan tabular-nums">{{ .Data.SpeedDisplay }}</div>
         <div class="text-w-sub text-sm mt-1">Mbps</div>
       </div>
       <div class="text-center">
-        <div class="text-w-purpleL text-xs font-semibold tracking-widest uppercase mb-2">Premium</div>
+        <div class="text-w-purpleL text-xs font-semibold tracking-widest uppercase mb-2">{{ t $.Lang "speedtest.premium" }}</div>
         <div class="text-4xl font-extrabold text-w-purpleL tabular-nums">{{ .Data.PremiumSpeedDisplay }}</div>
         <div class="text-w-sub text-sm mt-1">Mbps</div>
       </div>
@@ -39,12 +39,12 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
-        {{ .Data.SpeedBoost }} faster with Premium
+        {{ printf (t $.Lang "speedtest.fasterWithPremium") .Data.SpeedBoost }}
       </div>
     </div>
     {{ end }}
     <div class="text-center text-w-sub text-xs mb-8">
-      With a paid subscription, content is served through premium servers for faster streaming.
+      {{ t $.Lang "speedtest.premiumNote" }}
     </div>
     {{ else }}
     <div class="text-center mb-8">
@@ -54,7 +54,7 @@
     {{ end }}
 
     <!-- Quality tiers -->
-    <h2 class="text-lg font-bold mb-3">Video Quality</h2>
+    <h2 class="text-lg font-bold mb-3">{{ t $.Lang "speedtest.videoQuality" }}</h2>
     <div class="space-y-2 mb-8">
       {{ range .Data.Quality }}
       <div class="flex items-center gap-3 p-3 rounded-lg {{ if .Ok }}bg-base-200{{ else }}bg-base-200/50 opacity-50{{ end }}">
@@ -64,13 +64,13 @@
         <span class="text-w-muted text-lg">&#10007;</span>
         {{ end }}
         <span class="flex-1 font-medium">{{ .Name }}</span>
-        <span class="text-w-sub text-sm">needs {{ printf "%.1f" .MinSpeed }} Mbps</span>
+        <span class="text-w-sub text-sm">{{ printf (t $.Lang "speedtest.needs") (printf "%.1f" .MinSpeed) }}</span>
       </div>
       {{ end }}
     </div>
 
     <!-- Plan recommendations -->
-    <h2 class="text-lg font-bold mb-3">Plan Recommendations</h2>
+    <h2 class="text-lg font-bold mb-3">{{ t $.Lang "speedtest.planRecommendations" }}</h2>
     <div class="space-y-2 mb-8">
       {{ range .Data.Plans }}
       <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 {{ if .IsCurrent }}ring-2 ring-w-cyan bg-w-cyan/5{{ end }}">
@@ -82,9 +82,9 @@
         <span class="flex-1 font-medium">{{ .Name }}</span>
         <span class="text-w-sub text-sm">{{ .Label }}</span>
         {{ if .IsCurrent }}
-        <span class="badge badge-sm bg-w-cyan/20 text-w-cyan border-0">Your plan</span>
+        <span class="badge badge-sm bg-w-cyan/20 text-w-cyan border-0">{{ t $.Lang "speedtest.yourPlan" }}</span>
         {{ else if .Supported }}
-        <a href="/donate" class="link text-w-cyan text-xs" target="_blank" data-umami-event="donate-speedtest">Upgrade</a>
+        <a href="/donate" class="link text-w-cyan text-xs" target="_blank" data-umami-event="donate-speedtest">{{ t $.Lang "speedtest.upgrade" }}</a>
         {{ end }}
       </div>
       {{ end }}
@@ -92,26 +92,26 @@
 
     {{ if .Data.RateLimited }}
     <div class="alert bg-w-purple/10 text-w-purpleL text-sm mb-8">
-      Your speed may be limited by your current plan ({{ .Data.RateLimit }} Mbps). Consider upgrading for faster streaming.
+      {{ printf (t $.Lang "speedtest.rateLimited") .Data.RateLimit }}
     </div>
     {{ end }}
 
     <!-- Actions -->
     <div class="flex gap-3">
-      <a href="/speedtest?again" data-async-target="main" class="btn btn-ghost border border-w-line flex-1">
+      <a href="{{ langPath $.Lang "/speedtest" }}?again" data-async-target="main" class="btn btn-ghost border border-w-line flex-1">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M1 4v6h6M23 20v-6h-6"/>
           <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
         </svg>
-        Run Again
+        {{ t $.Lang "speedtest.runAgain" }}
       </a>
       {{ if .Data.ShareURL }}
-      <button class="btn btn-soft-cyan flex-1" onclick="navigator.clipboard.writeText(location.origin+'{{ .Data.ShareURL }}').then(function(){var b=event.target.closest('button');b.querySelector('.share-label').textContent='Copied!';setTimeout(function(){b.querySelector('.share-label').textContent='Share Result'},2000)})" data-umami-event="speedtest-share">
+      <button class="btn btn-soft-cyan flex-1" onclick="navigator.clipboard.writeText(location.origin+'{{ .Data.ShareURL }}').then(function(){var b=event.target.closest('button');b.querySelector('.share-label').textContent='{{ t $.Lang "speedtest.copied" }}';setTimeout(function(){b.querySelector('.share-label').textContent='{{ t $.Lang "speedtest.shareResult" }}'},2000)})" data-umami-event="speedtest-share">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
           <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
         </svg>
-        <span class="share-label">Share Result</span>
+        <span class="share-label">{{ t $.Lang "speedtest.shareResult" }}</span>
       </button>
       {{ end }}
     </div>

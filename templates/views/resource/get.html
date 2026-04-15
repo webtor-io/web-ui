@@ -68,7 +68,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
         </svg>
-        {{ if . | isEnrichedMovie }}Movie{{ else if . | isEnrichedSeries }}Series{{ else }}Torrent{{ end }}
+        {{ if . | isEnrichedMovie }}{{ t $.Lang "resource.movie" }}{{ else if . | isEnrichedSeries }}{{ t $.Lang "resource.series" }}{{ else }}{{ t $.Lang "resource.torrent" }}{{ end }}
     </div>
 
     <!-- Torrent header card -->
@@ -77,13 +77,13 @@
         <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         <dialog id="share-dialog" class="modal">
             <div class="modal-box max-w-sm bg-w-card border border-w-line">
-                <h3 class="font-bold text-lg mb-4">Share</h3>
+                <h3 class="font-bold text-lg mb-4">{{ t $.Lang "resource.share" }}</h3>
                 <div class="flex gap-2">
                     <input id="share-url" type="text" readonly class="input input-bordered input-sm flex-1 bg-base-200 text-w-sub" />
-                    <button type="button" class="btn btn-sm btn-soft" onclick="copyShareUrl()">Copy</button>
+                    <button type="button" class="btn btn-sm btn-soft" onclick="copyShareUrl()">{{ t $.Lang "resource.copy" }}</button>
                 </div>
                 <div class="modal-action">
-                    <form method="dialog"><button class="btn btn-sm btn-ghost">Close</button></form>
+                    <form method="dialog"><button class="btn btn-sm btn-ghost">{{ t $.Lang "resource.close" }}</button></form>
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -107,7 +107,7 @@
         function copyShareUrl(){
             var input=document.getElementById('share-url');
             navigator.clipboard.writeText(input.value).then(function(){
-                if(window.toast)window.toast.success('Link copied!');
+                if(window.toast)window.toast.success('{{ t $.Lang "resource.linkCopied" }}');
                 if(typeof umami!=='undefined')umami.track('share-copy-url');
                 document.getElementById('share-dialog').close();
             });
@@ -140,7 +140,7 @@
                         {{ printf "%.1f" (. | getEnrichedRating) }}
                     </span>
                     {{ end }}
-                    {{ if . | isEnrichedSeries }}<span class="badge badge-sm bg-w-cyan/10 text-w-cyan border-0">Series</span>{{ end }}
+                    {{ if . | isEnrichedSeries }}<span class="badge badge-sm bg-w-cyan/10 text-w-cyan border-0">{{ t $.Lang "resource.series" }}</span>{{ end }}
                 </div>
                 {{ if or .Movie .Series }}
                 <div class="flex items-center gap-2 mt-2 mb-3">
@@ -160,20 +160,20 @@
                 <div class="flex items-center gap-2 mb-3">
                     {{ if .TorrentStatus }}
                     <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
-                        <div id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</div>
+                        <div id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</div>
                         {{ "resource/status.js" | asset }}
                     </div>
                     {{ end }}
                     <span class="text-xs text-w-muted truncate" title="{{ .Resource.Name }}">{{ .Resource.Name }}</span>
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
+                    <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
                         {{ if and ($.User | hasAuth) .Vault }}
-                            {{ template "vault/button" .VaultButton }}
+                            {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
-                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" $ }}`}}">
-                        {{ template "library/button" $ }}
+                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
+                        {{ template "library/button" (withContext $ .Resource) }}
                     </div>
                     <div class="sm:ml-auto shrink-0">
                         <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
@@ -193,13 +193,13 @@
         <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         <dialog id="share-dialog" class="modal">
             <div class="modal-box max-w-sm bg-w-card border border-w-line">
-                <h3 class="font-bold text-lg mb-4">Share</h3>
+                <h3 class="font-bold text-lg mb-4">{{ t $.Lang "resource.share" }}</h3>
                 <div class="flex gap-2">
                     <input id="share-url" type="text" readonly class="input input-bordered input-sm flex-1 bg-base-200 text-w-sub" />
-                    <button type="button" class="btn btn-sm btn-soft" onclick="copyShareUrl()">Copy</button>
+                    <button type="button" class="btn btn-sm btn-soft" onclick="copyShareUrl()">{{ t $.Lang "resource.copy" }}</button>
                 </div>
                 <div class="modal-action">
-                    <form method="dialog"><button class="btn btn-sm btn-ghost">Close</button></form>
+                    <form method="dialog"><button class="btn btn-sm btn-ghost">{{ t $.Lang "resource.close" }}</button></form>
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -223,7 +223,7 @@
         function copyShareUrl(){
             var input=document.getElementById('share-url');
             navigator.clipboard.writeText(input.value).then(function(){
-                if(window.toast)window.toast.success('Link copied!');
+                if(window.toast)window.toast.success('{{ t $.Lang "resource.linkCopied" }}');
                 if(typeof umami!=='undefined')umami.track('share-copy-url');
                 document.getElementById('share-dialog').close();
             });
@@ -241,19 +241,19 @@
             {{ if .TorrentStatus }}
             <div class="mb-4">
                 <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
-                    <span id="torrent-status-badge">{{ template "resource/status" .TorrentStatus }}</span>
+                    <span id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</span>
                     {{ "resource/status.js" | asset }}
                 </div>
             </div>
             {{ end }}
             <div class="flex flex-wrap items-center gap-2">
-                <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" .Data.VaultButton }}`}}" data-async-get="">
+                <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
                     {{ if and ($.User | hasAuth) .Vault }}
-                        {{ template "vault/button" .VaultButton }}
+                        {{ template "vault/button" (withContext $ .VaultButton) }}
                     {{ end }}
                 </div>
-                <div id="library-button" data-async-layout="{{`{{ template "library/button" $ }}`}}">
-                    {{ template "library/button" $ }}
+                <div id="library-button" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
+                    {{ template "library/button" (withContext $ .Resource) }}
                 </div>
                 <div class="ml-auto">
                     <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
@@ -276,7 +276,7 @@
 
     <!-- Content divider -->
     <div class="flex items-center gap-3 mt-6 mb-4">
-        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Content</h2>
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "resource.content" }}</h2>
         <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
 
@@ -296,13 +296,13 @@
     </div>
     {{ end }}
     {{ if and ($.User | hasAuth) .Vault }}
-        <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" .Data }}`}}">
-            {{ template "vault/pledge-modal" . }}
+        <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" (withContext $ .Data) }}`}}">
+            {{ template "vault/pledge-modal" (withContext $ .) }}
         </div>
     {{ end }}
     {{ if and ($.User | hasAuth) (or .Movie .Series) }}
-        <div id="rate-modal" data-async-layout="{{`{{ template "user_video_status/rate-modal" .Data }}`}}">
-            {{ template "user_video_status/rate-modal" . }}
+        <div id="rate-modal" data-async-layout="{{`{{ template "user_video_status/rate-modal" (withContext $ .Data) }}`}}">
+            {{ template "user_video_status/rate-modal" (withContext $ .) }}
         </div>
     {{ end }}
     {{ end }}

@@ -1,19 +1,26 @@
 {{ define "vault/button" }}
+{{/*
+	action defaults to document URL, which the browser-side middleware would
+	already redirect to the prefixed URL — but that's an extra hop. Passing
+	an explicit prefixed action via langPath avoids the 302 and guarantees
+	the submit goes to /{lang}/... no matter what the browser thinks of
+	the current document URL.
+*/}}
 <div>
-	{{ if and .Funded }}
-		<form method="get" data-async-target="#pledge-modal" data-async-push-state="false">
+	{{ if and .Data.Funded }}
+		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
 			<input type="hidden" name="pledge-form" value="true" />
 			<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-supporting-clicked">
 				<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-				You're Supporting This Torrent
+				{{ t .Ctx.Lang "vault.supporting" }}
 			</button>
 		</form>
 	{{ else }}
-		<form method="get" data-async-target="#pledge-modal" data-async-push-state="false">
+		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
 			<input type="hidden" name="pledge-form" value="true" />
 			<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-clicked">
 				<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-				Keep This Torrent Available
+				{{ t .Ctx.Lang "vault.keepAvailable" }}
 			</button>
 		</form>
 	{{ end }}

@@ -6,6 +6,7 @@ import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { Controls } from './Controls';
 import { LoadingSpinner } from './icons';
+import { init as initI18n, t, tf } from './i18n';
 import '../../../styles/player.css';
 
 let _currentPlayer = null;
@@ -355,11 +356,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleResume(); }}
                             class="wt-resume-btn wt-resume-btn--primary">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" /></svg>
-                            Continue from {formatTime(resumePosition)}
+                            {tf('player.continueFrom', formatTime(resumePosition))}
                         </button>
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleStartOver(); }}
                             class="wt-resume-btn wt-resume-btn--ghost">
-                            Start from beginning
+                            {t('player.startOver')}
                         </button>
                     </div>
                 </div>
@@ -375,7 +376,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             {/* Big play button — shown when paused, regardless of loading state */}
             {showControls && isVideo && !state.playing && !sessionSeeking && !showResumePrompt && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
-                    <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); state.togglePlay(); }} aria-label="Play">
+                    <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); state.togglePlay(); }} aria-label={t('player.play')}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
                             <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
                         </svg>
@@ -443,9 +444,12 @@ function parseFeatures(settings, isVideo, duration, isSession) {
  * Initialize player on a target container that contains a <video> or <audio> with class="player".
  * Called from action/stream.js.
  */
-export function initPlayer(target) {
+export async function initPlayer(target) {
     const videoEl = target.querySelector('.player');
     if (!videoEl) return;
+
+    // Load player translations before rendering (sync t() reads from cached instance)
+    await initI18n();
 
     let settings = {};
     if (videoEl.dataset.settings) {
@@ -599,7 +603,7 @@ function wireEmbedCopy(container) {
         const textarea = container.querySelector('#embed textarea');
         if (!textarea) return;
         navigator.clipboard.writeText(textarea.value).then(() => {
-            if (window.toast) window.toast.success('Copied!');
+            if (window.toast) window.toast.success(t('player.copied'));
         });
     });
 }

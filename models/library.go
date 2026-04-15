@@ -19,18 +19,20 @@ const (
 	SortTypeRating
 )
 
+// String returns the i18n message key for this sort type.
+// Resolved in templates via {{ t $.Lang .Title }}.
 func (s SortType) String() string {
 	switch s {
 	case SortTypeRecentlyAdded:
-		return "Recently Added"
+		return "library.sort.recentlyAdded"
 	case SortTypeName:
-		return "Name (A-Z)"
+		return "library.sort.name"
 	case SortTypeYear:
-		return "Year"
+		return "library.sort.year"
 	case SortTypeRating:
-		return "Rating"
+		return "library.sort.rating"
 	default:
-		return "Unknown"
+		return "library.sort.unknown"
 	}
 }
 

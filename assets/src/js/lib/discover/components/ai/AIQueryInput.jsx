@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'preact/hooks';
-import { currentLocale } from '../../aiClient';
+import { t } from '../../i18n';
 
 // Free-form query input used for both the initial recommend call and the
 // refine bar. The input and the submit button share a single rounded
@@ -10,25 +10,8 @@ import { currentLocale } from '../../aiClient';
 //   initial → "Pitch me" / "Предложи"   (as if asking an agent for a pitch)
 //   refine  → "Remix"    / "Пересобрать" (retake the same list with new criteria)
 
-const PLACEHOLDERS = {
-    initial: {
-        en: 'Describe what you want to watch…',
-        ru: 'Опиши, что хочешь посмотреть…',
-    },
-    refine: {
-        en: 'More thrillers, fewer sequels…',
-        ru: 'Добавь триллеров, убери продолжения…',
-    },
-};
-
-const SUBMIT_LABEL = {
-    initial: { en: 'Pitch me', ru: 'Предложи' },
-    refine:  { en: 'Remix',    ru: 'Пересобрать' },
-};
-
 export function AIQueryInput({ mode = 'initial', initialValue = '', disabled, onSubmit, maxLength = 500 }) {
     const [value, setValue] = useState(initialValue);
-    const locale = currentLocale();
     const trimmed = value.trim();
 
     const handleSubmit = useCallback((e) => {
@@ -46,7 +29,7 @@ export function AIQueryInput({ mode = 'initial', initialValue = '', disabled, on
                 type="text"
                 value={value}
                 onInput={(e) => setValue(e.target.value)}
-                placeholder={PLACEHOLDERS[mode][locale]}
+                placeholder={t(mode === 'initial' ? 'discover.ai.initialPlaceholder' : 'discover.ai.refinePlaceholder')}
                 maxLength={maxLength}
                 disabled={disabled}
                 class="flex-1 min-w-0 bg-transparent px-4 py-2.5 text-w-text placeholder:text-w-muted/70 focus:outline-none text-sm sm:text-base disabled:opacity-60"
@@ -61,7 +44,7 @@ export function AIQueryInput({ mode = 'initial', initialValue = '', disabled, on
                 disabled={disabled || !trimmed}
                 class="px-4 sm:px-5 bg-w-cyan/15 hover:bg-w-cyan/25 text-w-cyan font-semibold text-sm transition-colors border-l border-w-line/60 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
             >
-                {SUBMIT_LABEL[mode][locale]}
+                {t(mode === 'initial' ? 'discover.ai.pitchMe' : 'discover.ai.remix')}
             </button>
         </form>
     );

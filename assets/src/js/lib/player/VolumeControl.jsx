@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState } from 'preact/hooks';
 import { VolumeUpIcon, VolumeOffIcon } from './icons';
+import { t } from './i18n';
 
 /**
  * Volume button + horizontal slider.
@@ -59,7 +60,7 @@ export function VolumeControl({ volume, muted, onVolumeChange, onToggleMute }) {
                 type="button"
                 class="wt-player-btn"
                 onClick={onToggleMute}
-                aria-label={muted ? 'Unmute' : 'Mute'}
+                aria-label={muted ? t('player.unmute') : t('player.mute')}
             >
                 {muted || volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
             </button>
@@ -70,7 +71,7 @@ export function VolumeControl({ volume, muted, onVolumeChange, onToggleMute }) {
                     onPointerDown={handleSliderDown}
                     onMouseMove={handleMouseMove}
                     role="slider"
-                    aria-label="Volume"
+                    aria-label={t('player.volume')}
                     aria-valuenow={Math.round(displayVolume * 100)}
                     aria-valuemin={0}
                     aria-valuemax={100}

@@ -12,6 +12,21 @@
 | Модели в models/, не в handlers | Чёткое разделение DB-логики. Handlers никогда не делают SQL-запросы напрямую |
 | Two-level handler pattern | HTTP-слой отделён от бизнес-логики. Упрощает тестирование и переиспользование |
 | 4K стриминг отключён | Транскодирование 4K слишком ресурсозатратно, стриминг больших файлов нестабилен |
+| go-i18n + path prefix routing | SEO (каждый язык — отдельный URL), обратная совместимость (EN без префикса), HTTP middleware до Gin routing |
+| `withContext` для sub-templates | Lang не протекает в domain structs. Контекст передаётся отдельно через wrapper |
+| Translation keys в Go коде | Tool titles, sort labels, button names, job messages — ключи вместо строк, перевод в шаблоне/runtime |
+
+## Internationalization (i18n)
+
+- **Full guide**: `docs/i18n.md` — архитектура, паттерны, правила переводов
+- **Languages**: EN (default, no prefix), RU (`/ru/`), ES (`/es/`), DE (`/de/`)
+- **Locale files**: `locales/{en,ru,es,de}.json` — flat key-value JSON
+- **Template translation**: `{{ t $.Lang "key" }}`, `{{ tp $.Lang "key" "Param" value }}`
+- **Links**: всегда `{{ langPath $.Lang "/path" }}`
+- **Sub-templates с чужими данными**: `{{ template "name" withContext $ data }}`
+- **Job messages**: `i18n.Service` пробрасывается через `Jobs` → скрипты, `s.t("key")`
+- **Не переводим**: brand names (Vault, Discover, Stremio), technical terms, legal pages
+- **Русский**: "Смотрите" вместо "Стримьте", "Вклад" вместо "Залог"
 
 ## Documentation
 

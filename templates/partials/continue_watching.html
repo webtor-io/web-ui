@@ -1,19 +1,19 @@
 {{ define "continue_watching" }}
-{{ if .ContinueWatching }}
+{{ if .Data }}
 <div class="mt-12 relative z-10 w-full" id="continue-watching-ribbon">
     <div class="max-w-[1100px] mx-auto overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between mb-5 gap-3">
             <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 text-xs font-semibold tracking-widest uppercase">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Continue Watching
+                {{ t .Ctx.Lang "library.continueWatching" }}
             </div>
         </div>
 
         <!-- Card Ribbon -->
         <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-none">
-            {{ range .ContinueWatching }}
-            <a href="/{{ .ResourceID }}?file={{ .Path }}#action=stream" data-async-target="main" data-umami-event="continue-watching-click" class="shrink-0 w-[140px] group cursor-pointer">
+            {{ range .Data }}
+            <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}?file={{ .Path }}#action=stream" data-async-target="main" data-umami-event="continue-watching-click" class="shrink-0 w-[140px] group cursor-pointer">
                 <div class="relative aspect-[2/3] rounded-xl overflow-hidden border border-w-line group-hover:border-w-pink/30 group-hover:shadow-[0_0_20px_rgba(232,67,147,0.1)] transition-all duration-300">
                     {{ if .PosterURL }}
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

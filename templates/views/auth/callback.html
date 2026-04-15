@@ -1,5 +1,5 @@
 {{ define "title" }}Callback{{ end }}
 {{ define "main" }}
-{{ template "auth/form" . }}
+{{ template "auth/form" (withContext $ .Data) }}
 {{ "auth/callback.js" | asset }}
 {{ end }}

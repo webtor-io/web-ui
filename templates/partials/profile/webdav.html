@@ -2,13 +2,13 @@
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            WebDAV
+            {{ t $.Lang "profile.webdav.title" }}
         </h2>
         {{ if .Claims | isPaid }}
             {{ if eq .Data.WebDAVURL "" }}
-                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/webdav/url/generate" data-async-target="#webdav">
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/webdav/url/generate" }}" data-async-target="#webdav">
                     <button type="submit" class="btn btn-soft" data-umami-event="webdav-generate-url">
-                        Generate WebDAV URL
+                        {{ t $.Lang "profile.webdav.generate" }}
                     </button>
                 </form>
             {{ else }}
@@ -17,27 +17,27 @@
                     function copyWebDAVUrl(form, e) {
                         e.preventDefault();
                         navigator.clipboard.writeText(webdavUrl);
-                        if (window.toast) window.toast.success('Copied!');
+                        if (window.toast) window.toast.success('{{ t $.Lang "profile.webdav.copied" }}');
                         return false;
                     }
                 </script>
                 <form onsubmit="copyWebDAVUrl(this, event)" class="join w-full mb-4">
                     <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
-                    <button type="submit" class="btn btn-soft join-item" data-umami-event="webdav-copy-url">Copy URL</button>
+                    <button type="submit" class="btn btn-soft join-item" data-umami-event="webdav-copy-url">{{ t $.Lang "profile.webdav.copyUrl" }}</button>
                 </form>
                 <div class="mt-2">
-                    <a href="/instructions/webdav" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-webdav" target="_blank">How to connect via WebDAV?</a>
+                    <a href="{{ langPath $.Lang "/instructions/webdav" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-webdav" target="_blank">{{ t $.Lang "profile.webdav.howTo" }}</a>
                 </div>
             {{ end }}
         {{ else }}
             <button disabled class="btn bg-base-300 text-w-muted border-w-line cursor-not-allowed">
-                Generate WebDAV URL
+                {{ t $.Lang "profile.webdav.generate" }}
             </button>
             <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4">
                 <p class="text-sm text-w-sub">
-                    WebDAV integration is available for premium users.
+                    {{ t $.Lang "profile.webdav.premiumOnly" }}
                 </p>
-                <a href="/donate" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" target="_blank" data-umami-event="donate-webdav">Upgrade your tier to unlock it!</a>
+                <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" target="_blank" data-umami-event="donate-webdav">{{ t $.Lang "profile.webdav.upgrade" }}</a>
             </div>
         {{ end }}
     </div>

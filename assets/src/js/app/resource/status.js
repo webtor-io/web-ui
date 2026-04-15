@@ -4,7 +4,6 @@ const BADGE_CONFIG = {
     idle: {
         classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-        label: 'Idle',
     },
     caching: {
         classes: 'badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5 px-3 py-2',
@@ -13,7 +12,6 @@ const BADGE_CONFIG = {
     cached: {
         classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-        label: 'Cached',
     },
     vaulting: {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
@@ -22,7 +20,6 @@ const BADGE_CONFIG = {
     vaulted: {
         classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>',
-        label: 'Vaulted',
     },
 };
 
@@ -34,12 +31,10 @@ function renderBadge(status) {
     const config = BADGE_CONFIG[status.state];
     if (!config) return '';
 
-    let label = config.label || '';
+    let label = status.label || '';
     let peers = '';
-    if (status.state === 'caching') {
-        label = `Caching ${Math.round(status.progress)}%`;
-    } else if (status.state === 'vaulting') {
-        label = `Vaulting ${Math.round(status.progress)}%`;
+    if (status.state === 'caching' || status.state === 'vaulting') {
+        label = `${label} ${Math.round(status.progress)}%`;
     }
     // Show peers for non-terminal states
     if (status.state !== 'cached' && status.state !== 'vaulted' && status.seeders > 0) {
@@ -63,7 +58,9 @@ av(async function() {
     const csrfToken = container.dataset.csrf;
     if (!csrfToken) return;
 
-    const source = new EventSource(`/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}`);
+    const lang = document.documentElement.lang;
+    const langPrefix = lang && lang !== 'en' ? `/${lang}` : '';
+    const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}`);
     container._statusSource = source;
 
     source.onmessage = (e) => {

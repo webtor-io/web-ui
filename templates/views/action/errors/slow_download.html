@@ -1,18 +1,18 @@
 {{ define "main" }}
     <pre class="error-summary"><span class="line">{{- if .Data.IsRateLimited -}}
-<strong>streaming is not possible</strong>
-your plan ({{ .Data.TierName }}) limits speed to {{ printf "%.1f" .Data.RateLimitMbps }} Mbps
-this file requires at least {{ printf "%.1f" .Data.RequiredSpeedMbps }} Mbps for smooth playback
-consider <a href="/donate" class="link" target="_blank" data-umami-event="donate-slow-download">upgrading your plan</a> for faster speeds
+<strong>{{ t $.Lang "action.slow.notPossible" }}</strong>
+{{ tp $.Lang "action.slow.planLimit" "Tier" .Data.TierName "Rate" (printf "%.1f" .Data.RateLimitMbps) }}
+{{ tp $.Lang "action.slow.fileRequires" "Rate" (printf "%.1f" .Data.RequiredSpeedMbps) }}
+<a href="/donate" class="link" target="_blank" data-umami-event="donate-slow-download">{{ t $.Lang "action.slow.upgrade" }}</a>
 {{- else -}}
-<strong>streaming is not possible — download speed too slow</strong>
-download speed: {{ printf "%.1f" .Data.MeasuredSpeedMbps }} Mbps, required: {{ printf "%.1f" .Data.RequiredSpeedMbps }} Mbps
+<strong>{{ t $.Lang "action.slow.tooSlow" }}</strong>
+{{ tp $.Lang "action.slow.speedInfo" "Measured" (printf "%.1f" .Data.MeasuredSpeedMbps) "Required" (printf "%.1f" .Data.RequiredSpeedMbps) }}
 {{- end }}
-try a smaller file, pre-download, use Vault, or find a torrent with more seeders</span></pre>
+{{ t $.Lang "action.slow.suggestions" }}</span></pre>
     <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end">
         {{- if .Data.IsRateLimited }}
-        <a class="btn btn-sm btn-soft uppercase" data-umami-event="donate-slow-download" href="/donate" target="_blank">upgrade plan</a>
+        <a class="btn btn-sm btn-soft uppercase" data-umami-event="donate-slow-download" href="/donate" target="_blank">{{ t $.Lang "action.slow.upgradePlan" }}</a>
         {{- end }}
-        <a class="close closeable-close">Got it!</a>
+        <a class="close closeable-close">{{ t $.Lang "action.slow.gotIt" }}</a>
     </div>
 {{ end }}

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as aiClient from '../../aiClient';
-import { currentLocale } from '../../aiClient';
 import { AIChipsRow } from './AIChipsRow';
 import { AIQueryInput } from './AIQueryInput';
 import { AIRecsGrid } from './AIRecsGrid';
+import { t, tf } from '../../i18n';
 
 // AISection is the self-contained AI recommendations UI mounted above the
 // regular catalog browser on /discover. It owns no catalog state — it just
@@ -12,80 +12,6 @@ import { AIRecsGrid } from './AIRecsGrid';
 //
 // The section hides itself entirely when the feature flag is off (the
 // server returns 404 on /discover/ai/chips and we flip to `disabled`).
-
-const COPY = {
-    en: {
-        title: 'AI Recommendations',
-        betaBadge: 'Beta',
-        refresh: 'Refresh chips',
-        tryThese: 'Or try one of these:',
-        loadingChips: 'Brewing suggestions…',
-        // Both phases say the same "Finding films…" line — the only
-        // visible difference is the running counter once items start
-        // arriving. Keeps the loading copy continuous instead of jumping
-        // from a Claude-specific message to a different label.
-        streamingClaude: 'Finding films…',
-        streamingResolve: (got, expected) =>
-            expected > 0 ? `Finding films… (${got}/${expected})` : `Finding films… (${got})`,
-        showingFor: 'Showing results for:',
-        newSearch: '← New search',
-        noResults: 'No matching films found. Try a different query.',
-        quotaFreeTitle: 'Daily AI quota reached',
-        quotaFreeBody: 'You\u2019ve used today\u2019s free AI request.',
-        quotaPaidTitle: 'Daily AI quota reached',
-        quotaPaidBody: 'You\u2019ve hit your daily cap. Try again tomorrow.',
-        quotaFreeCTA: 'Become a supporter',
-        // Microcopy under the CTA — concrete numbers + value prop. Falls
-        // back to a generic line if the backend hasn't sent upgrade_quota
-        // yet (older deploy / paid user shouldn't see this anyway).
-        quotaFreeCTAHint: (n) => n > 0
-            ? `Unlock ${n} requests per day and a smarter model`
-            : 'Unlock more daily requests and a smarter model',
-        retry: 'Try again',
-        errorGeneric: 'Something went wrong. Try again in a moment.',
-        // n / total — total may be null until the first chips load lands;
-        // in that case fall back to "n left today".
-        remainingQuota: (n, total) => (total != null && total > 0)
-            ? `${n}/${total} left today`
-            : `${n} left today`,
-        // Used inside the quota-exceeded card; explicit "0 / N" so the
-        // user understands the cap, not just that they're blocked.
-        quotaCounter: (total) => (total != null && total > 0) ? `0 / ${total}` : '0',
-        quotaResetIn: (rel) => `Resets ${rel}`,
-        quotaResetSoon: 'Resets in less than a minute',
-        quotaResetNow: 'Resetting now…',
-    },
-    ru: {
-        title: 'AI-рекомендации',
-        betaBadge: 'Beta',
-        refresh: 'Обновить чипсы',
-        tryThese: 'Или попробуй:',
-        loadingChips: 'Подбираю идеи…',
-        streamingClaude: 'Подбираю фильмы…',
-        streamingResolve: (got, expected) =>
-            expected > 0 ? `Подбираю фильмы… (${got}/${expected})` : `Подбираю фильмы… (${got})`,
-        showingFor: 'Показываю:',
-        newSearch: '← Новый поиск',
-        noResults: 'Ничего не нашлось. Попробуй другой запрос.',
-        quotaFreeTitle: 'Дневной лимит AI исчерпан',
-        quotaFreeBody: 'Бесплатная рекомендация на сегодня использована.',
-        quotaPaidTitle: 'Дневной лимит AI исчерпан',
-        quotaPaidBody: 'Лимит на сегодня закончился. Попробуй завтра.',
-        quotaFreeCTA: 'Поддержать проект',
-        quotaFreeCTAHint: (n) => n > 0
-            ? `${n} запросов в день и более умная модель`
-            : 'Больше запросов в день и более умная модель',
-        retry: 'Попробовать снова',
-        errorGeneric: 'Что-то пошло не так. Попробуй ещё раз.',
-        remainingQuota: (n, total) => (total != null && total > 0)
-            ? `Осталось: ${n}/${total}`
-            : `Осталось: ${n}`,
-        quotaCounter: (total) => (total != null && total > 0) ? `0 / ${total}` : '0',
-        quotaResetIn: (rel) => `Сбросится ${rel}`,
-        quotaResetSoon: 'Сбросится меньше чем через минуту',
-        quotaResetNow: 'Уже сбрасывается…',
-    },
-};
 
 // formatRelativeReset turns a future unix-seconds timestamp into a
 // localised "in 10h 30m" / "через 10ч 30мин" string. Returns:
@@ -97,24 +23,17 @@ const COPY = {
 // We deliberately stop at hours+minutes precision; days don't happen for
 // the daily-quota use case (max horizon is ~24h), and seconds would just
 // look jittery on the once-a-minute tick.
-function formatRelativeReset(resetAt, locale) {
+function formatRelativeReset(resetAt) {
     if (!resetAt || typeof resetAt !== 'number') return null;
     const deltaMs = resetAt * 1000 - Date.now();
     if (deltaMs <= 0) return null;
     if (deltaMs < 60_000) return 'soon';
-
     const totalMinutes = Math.floor(deltaMs / 60_000);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-
-    if (locale === 'ru') {
-        if (hours > 0 && minutes > 0) return `через ${hours}ч ${minutes}мин`;
-        if (hours > 0) return `через ${hours}ч`;
-        return `через ${minutes}мин`;
-    }
-    if (hours > 0 && minutes > 0) return `in ${hours}h ${minutes}m`;
-    if (hours > 0) return `in ${hours}h`;
-    return `in ${minutes}m`;
+    if (hours > 0 && minutes > 0) return tf('discover.ai.relativeTimeHM', hours, minutes);
+    if (hours > 0) return tf('discover.ai.relativeTimeH', hours);
+    return tf('discover.ai.relativeTimeM', minutes);
 }
 
 // Skeleton used while chips are loading. Four pill shapes matching the
@@ -166,8 +85,6 @@ export function AISection({
     onToggleWatched,
     onRate,
 }) {
-    const locale = currentLocale();
-    const t = COPY[locale];
     const abortRef = useRef(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -423,14 +340,14 @@ export function AISection({
             <header class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">✨</span>
-                    <h2 class="text-lg font-semibold text-w-text">{t.title}</h2>
+                    <h2 class="text-lg font-semibold text-w-text">{t('discover.ai.title')}</h2>
                     <span class="inline-block px-2 py-0.5 rounded bg-w-cyan/10 text-w-cyan text-[10px] font-semibold uppercase tracking-wider">
-                        {t.betaBadge}
+                        {t('discover.ai.beta')}
                     </span>
                 </div>
                 <div class="flex items-center gap-3 text-xs text-w-muted">
                     {showQuotaCounter && (
-                        <span class="tabular-nums">{t.remainingQuota(aiState.remainingQuota, aiState.dailyQuota)}</span>
+                        <span class="tabular-nums">{(aiState.dailyQuota != null && aiState.dailyQuota > 0) ? tf('discover.ai.remainingQuota', aiState.remainingQuota, aiState.dailyQuota) : tf('discover.ai.remainingQuotaSimple', aiState.remainingQuota)}</span>
                     )}
                     {/*
                         Manual chip refresh is intentionally hidden from the
@@ -446,12 +363,12 @@ export function AISection({
                             onClick={handleRefreshChips}
                             disabled={busy}
                             class="inline-flex items-center gap-1 text-w-cyan hover:text-w-cyan/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={t.refresh}
+                            title={t('discover.ai.refresh')}
                         >
                             <svg class={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                             </svg>
-                            <span class="hidden sm:inline">{t.refresh}</span>
+                            <span class="hidden sm:inline">{t('discover.ai.refresh')}</span>
                         </button>
                     )}
                     */}
@@ -479,21 +396,21 @@ export function AISection({
 
             {aiState.phase === 'chipsError' && (
                 <div class="mt-3 text-sm text-w-muted">
-                    {t.errorGeneric}
+                    {t('discover.ai.errorGeneric')}
                     {' '}
                     <button
                         type="button"
                         onClick={handleRetry}
                         class="text-w-cyan underline cursor-pointer"
                     >
-                        {t.retry}
+                        {t('discover.ai.tryAgain')}
                     </button>
                 </div>
             )}
 
             {aiState.phase === 'chipsReady' && aiState.chips.length > 0 && (
                 <>
-                    <p class="mt-3 text-xs text-w-muted">{t.tryThese}</p>
+                    <p class="mt-3 text-xs text-w-muted">{t('discover.ai.tryThese')}</p>
                     <AIChipsRow chips={aiState.chips} onSelect={handleChipClick} disabled={busy} />
                 </>
             )}
@@ -509,7 +426,7 @@ export function AISection({
                 <>
                     <div class="mt-3 flex items-center justify-between flex-wrap gap-2">
                         <p class="text-xs text-w-muted italic line-clamp-2 min-w-0 flex-1">
-                            {t.showingFor} <span class="text-w-cyan not-italic">{aiState.currentQuery}</span>
+                            {t('discover.ai.showingFor')} <span class="text-w-cyan not-italic">{aiState.currentQuery}</span>
                         </p>
                         {aiState.phase === 'recsReady' && (
                             <button
@@ -517,7 +434,7 @@ export function AISection({
                                 onClick={handleNewSearch}
                                 class="text-xs text-w-cyan hover:underline cursor-pointer"
                             >
-                                {t.newSearch}
+                                {t('discover.ai.newSearch')}
                             </button>
                         )}
                     </div>
@@ -532,8 +449,10 @@ export function AISection({
                             </svg>
                             <span>
                                 {aiState.phase === 'streamingClaude'
-                                    ? t.streamingClaude
-                                    : t.streamingResolve(aiState.recommendations.length, aiState.streamExpected)}
+                                    ? t('discover.ai.findingFilms')
+                                    : aiState.streamExpected > 0
+                                        ? tf('discover.ai.findingFilmsProgress', aiState.recommendations.length, aiState.streamExpected)
+                                        : tf('discover.ai.findingFilmsCount', aiState.recommendations.length)}
                             </span>
                         </div>
                     )}
@@ -561,7 +480,7 @@ export function AISection({
                     )}
 
                     {aiState.phase === 'recsReady' && aiState.recommendations.length === 0 && (
-                        <p class="mt-4 text-sm text-w-muted text-center py-8">{t.noResults}</p>
+                        <p class="mt-4 text-sm text-w-muted text-center py-8">{t('discover.ai.noResults')}</p>
                     )}
 
                     {aiState.phase === 'recsReady' && (
@@ -578,13 +497,13 @@ export function AISection({
 
             {aiState.phase === 'recsError' && (
                 <div class="mt-4 text-center py-6">
-                    <p class="text-sm text-w-muted mb-3">{t.errorGeneric}</p>
+                    <p class="text-sm text-w-muted mb-3">{t('discover.ai.errorGeneric')}</p>
                     <button
                         type="button"
                         onClick={handleRetry}
                         class="btn btn-soft-cyan cursor-pointer"
                     >
-                        {t.retry}
+                        {t('discover.ai.tryAgain')}
                     </button>
                 </div>
             )}
@@ -594,23 +513,23 @@ export function AISection({
                 // us once a minute via the effect above, so the line stays
                 // accurate while the card is visible.
                 void nowTick;
-                const rel = formatRelativeReset(aiState.quotaResetAt, locale);
+                const rel = formatRelativeReset(aiState.quotaResetAt);
                 let resetLine = null;
                 if (aiState.quotaResetAt) {
-                    if (rel === 'soon') resetLine = t.quotaResetSoon;
-                    else if (rel === null) resetLine = t.quotaResetNow;
-                    else resetLine = t.quotaResetIn(rel);
+                    if (rel === 'soon') resetLine = t('discover.ai.quotaResetSoon');
+                    else if (rel === null) resetLine = t('discover.ai.quotaResetNow');
+                    else resetLine = tf('discover.ai.quotaResetIn', rel);
                 }
                 return (
                     <div class="mt-4 rounded-xl border border-w-cyan/30 bg-w-cyan/5 p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-3 min-h-[200px]">
                         <div class="text-3xl sm:text-4xl font-bold tabular-nums text-w-cyan">
-                            {t.quotaCounter(aiState.dailyQuota)}
+                            {(aiState.dailyQuota != null && aiState.dailyQuota > 0) ? `0 / ${aiState.dailyQuota}` : '0'}
                         </div>
                         <h3 class="text-base sm:text-lg font-semibold text-w-text">
-                            {aiState.tier === 'free' ? t.quotaFreeTitle : t.quotaPaidTitle}
+                            {t('discover.ai.quotaTitle')}
                         </h3>
                         <p class="text-sm text-w-muted max-w-[420px]">
-                            {aiState.tier === 'free' ? t.quotaFreeBody : t.quotaPaidBody}
+                            {aiState.tier === 'free' ? t('discover.ai.quotaFreeBody') : t('discover.ai.quotaPaidBody')}
                         </p>
                         {resetLine && (
                             <p class="text-xs text-w-cyan/80 tabular-nums">{resetLine}</p>
@@ -624,10 +543,10 @@ export function AISection({
                                     class="btn btn-soft-cyan cursor-pointer"
                                     onClick={() => window.umami?.track?.('ai-upgrade-clicked')}
                                 >
-                                    {t.quotaFreeCTA}
+                                    {t('discover.ai.becomeSupporterCTA')}
                                 </a>
                                 <p class="text-[11px] text-w-muted">
-                                    {t.quotaFreeCTAHint(aiState.upgradeQuota)}
+                                    {aiState.upgradeQuota > 0 ? tf('discover.ai.unlockRequests', aiState.upgradeQuota) : t('discover.ai.unlockRequestsGeneric')}
                                 </p>
                             </div>
                         )}

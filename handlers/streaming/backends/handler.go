@@ -51,7 +51,7 @@ func (s *Handler) createBackend(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Backend added")
+	web.RedirectWithSuccessAndMessage(c, "toast.backendAdded")
 }
 
 func (s *Handler) addStreamingBackend(ctx context.Context, backendType models.StreamingBackendType, accessToken string, enabled bool, user *auth.User) error {
@@ -115,7 +115,7 @@ func (s *Handler) updateBackends(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Settings saved")
+	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }
 
 func (s *Handler) updateStreamingBackends(deletedBackendsStr, backendOrder string, c *gin.Context, user *auth.User) error {

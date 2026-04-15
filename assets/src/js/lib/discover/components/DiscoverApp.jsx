@@ -16,6 +16,7 @@ import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults } from './EmptyStates';
 import { AISection } from './ai/AISection';
+import { t, langPath } from '../i18n';
 
 export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
@@ -75,7 +76,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             });
         } catch (e) {
             if (e.name === 'AbortError') return;
-            dispatch({ type: 'CATALOG_ERROR', message: 'Failed to load catalog. Please try again.' });
+            dispatch({ type: 'CATALOG_ERROR', message: t('discover.catalogLoadError') });
         }
     }, [client]);
 
@@ -150,7 +151,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 }
             } catch (e) {
                 if (!cancelled) {
-                    dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
+                    dispatch({ type: 'INIT_ERROR', message: t('discover.manifestLoadError') });
                 }
             }
         })();
@@ -342,7 +343,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         }
 
         if (type === 'series') {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: 'Loading episodes...', itemType: type, itemId: id, ...cardMeta } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: item.name, poster: item.poster, subtitle: t('discover.loadingEpisodes'), itemType: type, itemId: id, ...cardMeta } });
             try {
                 const meta = await client.fetchMeta(type, id);
                 enrichFromMeta(meta);
@@ -474,7 +475,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             formData.append('_csrf', window._CSRF);
             const metaId = state.modal?.metaId;
             if (metaId) formData.append('hint_video_id', metaId);
-            const response = await fetch('/', {
+            const response = await fetch(langPath('/'), {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -494,7 +495,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         } catch (e) {
             dispatch({ type: 'SHOW_MODAL', modal: {
                 view: 'streams', title: currentTitle, poster: currentPoster, streams: [],
-                error: 'Failed to prepare the resource. Please try again.',
+                error: t('discover.resourcePrepError'),
                 backToEpisodes: currentBackToEpisodes,
             }});
         }

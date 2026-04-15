@@ -1,5 +1,5 @@
 {{ define "title" }}
-    Vault
+    {{ t $.Lang "instructions.vault.title" }}
 {{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
@@ -8,55 +8,55 @@
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      Guide
+      {{ t $.Lang "instructions.guide" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Vault</h1>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "instructions.vault.title" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Vault is a storage system in Webtor that allows you to:</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.vault.intro" }}</p>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>save torrents for a long time,</li>
-        <li>watch content without waiting for seeders,</li>
-        <li>support needed torrents with points,</li>
-        <li>have guaranteed access to files.</li>
+        <li>{{ t $.Lang "instructions.vault.feature1" }}</li>
+        <li>{{ t $.Lang "instructions.vault.feature2" }}</li>
+        <li>{{ t $.Lang "instructions.vault.feature3" }}</li>
+        <li>{{ t $.Lang "instructions.vault.feature4" }}</li>
     </ul>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Vault Points (VP)</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.vpTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li><strong>1 Vault Point = 1 GB</strong></li>
-        <li>Points are provided as part of your subscription or other activities (the amount depends on your subscription tier)</li>
+        <li>{{ tHTML $.Lang "instructions.vault.vpUnit" }}</li>
+        <li>{{ t $.Lang "instructions.vault.vpSource" }}</li>
     </ul>
 
     {{ with .Data.Vault }}
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">How saving to Vault works</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.howTitle" }}</h2>
 
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>Click the <strong>"Keep This Torrent Available"</strong> button next to the torrent you want to save.</li>
-        <li>Confirm the number of points required (for example, if the torrent is 10 GB, you need to deposit 10 VP).</li>
-        <li>The funded points are frozen for <strong>{{ .FreezePeriod | duration }}</strong> after the pledge is created.</li>
-        <li>Webtor transfers the torrent to the Vault (if the transfer fails within <strong>{{ .TransferTimeoutPeriod | duration }}</strong>, VP is returned).</li>
+        <li>{{ tHTML $.Lang "instructions.vault.howStep1" }}</li>
+        <li>{{ t $.Lang "instructions.vault.howStep2" }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.howStep3" "FreezePeriod" (.FreezePeriod | duration) }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.howStep4" "TransferTimeout" (.TransferTimeoutPeriod | duration) }}</li>
     </ol>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">Claiming Vault Points back</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.claimTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>Points can be claimed back if they are not frozen.</li>
-        <li>If after claiming points back the amount is less than required to keep the torrent, it will be marked as expired and deleted after <strong>{{ .ExpirePeriod | duration }}</strong>.</li>
-        <li>When a torrent is deleted, all pledges associated with it are also deleted.</li>
+        <li>{{ t $.Lang "instructions.vault.claimItem1" }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.claimItem2" "ExpirePeriod" (.ExpirePeriod | duration) }}</li>
+        <li>{{ t $.Lang "instructions.vault.claimItem3" }}</li>
     </ul>
 
-    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">What if my subscription expires</h2>
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.expireTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>Points that were invested in torrents lose their power and the torrent is marked as expired and deleted after <strong>{{ .ExpirePeriod | duration }}</strong>.</li>
-        <li>If the subscription is renewed, the points become active again and the torrents funded by them are no longer expired.</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.expireItem1" "ExpirePeriod" (.ExpirePeriod | duration) }}</li>
+        <li>{{ t $.Lang "instructions.vault.expireItem2" }}</li>
     </ul>
     {{ end }}
 
     <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-6 text-sm text-w-sub">
-      <strong>Important:</strong> If a torrent is blocked by copyright holders or removed from public sources, it may disappear – Vault does not guarantee preservation in such cases.
+      <strong>{{ t $.Lang "instructions.important" }}</strong> {{ t $.Lang "instructions.vault.disclaimer" }}
     </div>
   </div>
 </section>

@@ -1,15 +1,16 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks';
+import { t, tf } from '../i18n';
 
 const OFFICIAL_API = 'https://api.strem.io/addonscollection.json';
 const COMMUNITY_API = 'https://stremio-addons.net/api/addon_catalog/all/stremio-addons.net.json';
 const GITHUB_ISSUES_API = 'https://api.github.com/repos/Stremio-Community/stremio-addons-list/issues';
 
 const SOURCES = {
-    official: { label: 'Official Stremio', desc: 'Curated addons from the Stremio team', api: OFFICIAL_API },
-    community: { label: 'Community', desc: 'Community-curated addons from stremio-addons.net', api: COMMUNITY_API },
+    official: { label: 'Official Stremio', descKey: 'discover.officialDesc', api: OFFICIAL_API },
+    community: { label: 'Community', descKey: 'discover.communityDesc', api: COMMUNITY_API },
 };
 
-const TYPE_LABELS = { movie: 'Movie', series: 'Series', channel: 'Channel', tv: 'TV', anime: 'Anime', other: 'Other' };
+function typeLabel(type) { return t('discover.type.' + type) || type; }
 
 async function fetchAddonCatalog(sourceKey) {
     const src = SOURCES[sourceKey];
@@ -283,7 +284,7 @@ export function AddonWizard({ onComplete, onSkip }) {
 
     const handleAdultToggle = useCallback(() => {
         if (!showAdult) {
-            if (window.confirm('Are you 18 or older?')) {
+            if (window.confirm(t('discover.confirm18'))) {
                 setShowAdult(true);
             }
         } else {
@@ -313,7 +314,7 @@ export function AddonWizard({ onComplete, onSkip }) {
                 },
                 body: JSON.stringify({ urls }),
             });
-            if (!res.ok) throw new Error('Failed to save addons');
+            if (!res.ok) throw new Error(t('discover.failedToSaveAddons'));
             const data = await res.json();
             window.umami?.track('discover-wizard-installed', { count: urls.length });
             onComplete(urls, data);
@@ -376,8 +377,8 @@ function Step1({ sources, onToggle, onToggleAll, allSources, anySources, onNext,
                 class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content"
                 onClick={onSkip}
             >&#10005;</button>
-            <h3 class="text-lg font-bold mb-1">Set up your addons</h3>
-            <p class="text-sm text-w-sub mb-5">Choose addon sources to browse</p>
+            <h3 class="text-lg font-bold mb-1">{t('discover.setupAddons')}</h3>
+            <p class="text-sm text-w-sub mb-5">{t('discover.chooseAddonSources')}</p>
 
             <label class="flex items-center gap-2 mb-3 cursor-pointer text-sm text-w-sub">
                 <input
@@ -386,26 +387,26 @@ function Step1({ sources, onToggle, onToggleAll, allSources, anySources, onNext,
                     checked={allSources}
                     onChange={onToggleAll}
                 />
-                Select all
+                {t('discover.selectAll')}
             </label>
 
             <div class="flex flex-col gap-3 mb-6">
                 <SourceCard
                     label={SOURCES.official.label}
-                    desc={SOURCES.official.desc}
+                    desc={t(SOURCES.official.descKey)}
                     checked={sources.official}
                     onChange={() => onToggle('official')}
                 />
                 <SourceCard
                     label={SOURCES.community.label}
-                    desc={SOURCES.community.desc}
+                    desc={t(SOURCES.community.descKey)}
                     checked={sources.community}
                     onChange={() => onToggle('community')}
                 />
             </div>
 
             <div class="flex justify-end">
-                <button class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan px-6" disabled={!anySources} onClick={onNext}>Next</button>
+                <button class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan px-6" disabled={!anySources} onClick={onNext}>{t('discover.next')}</button>
             </div>
 
             <Disclaimer />
@@ -442,7 +443,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
-                Sources
+                {t('discover.sources')}
             </button>
             <button
                 class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content"
@@ -459,7 +460,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                 <input
                     type="text"
                     class="input input-sm input-bordered w-full pl-9 bg-w-surface border-w-line focus:border-w-cyan focus:outline-none"
-                    placeholder="Search addons..."
+                    placeholder={t('discover.searchAddons')}
                     value={search}
                     onInput={(e) => onSearchChange(e.target.value)}
                 />
@@ -475,7 +476,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                             checked={torrentOnly}
                             onChange={onTorrentOnlyToggle}
                         />
-                        Torrent only
+                        {t('discover.torrentOnly')}
                     </label>
                     {adultCount > 0 && (
                         <label class="flex items-center gap-2 cursor-pointer text-sm text-w-muted">
@@ -485,11 +486,11 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                                 checked={showAdult}
                                 onChange={onAdultToggle}
                             />
-                            18+ ({adultCount})
+                            {tf('discover.adult', adultCount)}
                         </label>
                     )}
                 </div>
-                <span class="text-xs text-w-muted">{selectedCount} of {addons.length} selected</span>
+                <span class="text-xs text-w-muted">{tf('discover.selectedCount', selectedCount, addons.length)}</span>
             </div>
 
             {error && <p class="text-xs text-error mb-2">{error}</p>}
@@ -497,12 +498,12 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
             {loading ? (
                 <div class="text-center py-12">
                     <span class="loading loading-spinner loading-md text-w-cyan"></span>
-                    <p class="text-w-sub text-sm mt-3">Loading addon catalogs...</p>
+                    <p class="text-w-sub text-sm mt-3">{t('discover.loadingAddonCatalogs')}</p>
                 </div>
             ) : (
                 <div class="flex flex-col gap-1.5 max-h-[350px] overflow-y-auto mb-4">
                     {addons.length === 0 && !loading && (
-                        <p class="text-w-muted text-sm text-center py-8">No addons found.</p>
+                        <p class="text-w-muted text-sm text-center py-8">{t('discover.noAddonsFound')}</p>
                     )}
                     {addons.map(addon => (
                         <AddonRow
@@ -524,7 +525,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                     {saving ? (
                         <span class="loading loading-spinner loading-xs"></span>
                     ) : (
-                        `Install (${selectedCount})`
+                        tf('discover.install', selectedCount)
                     )}
                 </button>
             </div>
@@ -538,8 +539,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
 function Disclaimer() {
     return (
         <p class="text-[10px] text-w-muted/60 text-center mt-4 leading-relaxed">
-            All addon sources and addons listed here are third-party services not affiliated with Webtor.
-            Ratings and metadata are provided by third-party sources and are not generated by Webtor.
+            {t('discover.addonDisclaimer')}
         </p>
     );
 }
@@ -548,7 +548,7 @@ function AddonRow({ addon, checked, onToggle }) {
     const [imgError, setImgError] = useState(false);
     const m = addon.manifest;
     const types = (m.types || []).slice(0, 4);
-    const sourceLabel = addon.source === 'official' ? 'Official' : 'Community';
+    const sourceLabel = addon.source === 'official' ? t('discover.official') : t('discover.community');
 
     return (
         <label class={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${checked ? 'border-w-cyan/30 bg-w-cyan/5' : 'border-w-line hover:border-w-cyan/20'}`}>
@@ -577,7 +577,7 @@ function AddonRow({ addon, checked, onToggle }) {
                         {sourceLabel}
                     </span>
                     {addon.votes > 0 && (
-                        <span class="text-[10px] text-w-muted flex-shrink-0" title="Community votes">
+                        <span class="text-[10px] text-w-muted flex-shrink-0" title={t('discover.communityVotes')}>
                             👍 {addon.votes >= 1000 ? `${(addon.votes / 1000).toFixed(1)}k` : addon.votes}
                         </span>
                     )}
@@ -585,8 +585,8 @@ function AddonRow({ addon, checked, onToggle }) {
                 <div class="text-xs text-w-sub line-clamp-1">{m.description || ''}</div>
                 {types.length > 0 && (
                     <div class="flex gap-1 mt-0.5">
-                        {types.map(t => (
-                            <span key={t} class="text-[9px] px-1 py-px rounded bg-w-surface text-w-muted">{TYPE_LABELS[t] || t}</span>
+                        {types.map(tp => (
+                            <span key={tp} class="text-[9px] px-1 py-px rounded bg-w-surface text-w-muted">{typeLabel(tp)}</span>
                         ))}
                     </div>
                 )}

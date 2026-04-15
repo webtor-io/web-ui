@@ -1,12 +1,12 @@
 {{ define "library/list"}}
     {{ if eq .Data.Args.Section "torrents" }}
-    <div id="list" data-async-layout="{{`{{ template "library/torrent_list" .Data.Items }}`}}">
-        {{ template "library/torrent_list" .Data.Items }}
+    <div id="list" data-async-layout="{{`{{ template "library/torrent_list" (withContext $ .Data.Items) }}`}}">
+        {{ template "library/torrent_list" (withContext $ .Data.Items) }}
     </div>
     {{ else }}
-        <div id="list" data-async-layout="{{`{{ template "library/video_list" .Data.Items }}`}}">
-            {{ template "library/video_list" .Data.Items }}
+        <div id="list" data-async-layout="{{`{{ template "library/video_list" (withContext $ .Data.Items) }}`}}">
+            {{ template "library/video_list" (withContext $ .Data.Items) }}
         </div>
-        {{ template "library/rate_modal" .Data }}
+        {{ if .Data.RateForm }}{{ template "library/rate_modal" (withContext $ .Data.RateForm) }}{{ end }}
     {{ end }}
 {{ end }}

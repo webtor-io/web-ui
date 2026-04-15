@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from 'preact/hooks';
+import { t } from './i18n';
 
 /**
  * Full-width progress/seek bar with buffered and available indicators.
@@ -60,7 +61,7 @@ export function ProgressBar({ currentTime, duration, buffered, onSeek, disabled 
             onMouseMove={(e) => { setHovering(true); handleMouseMove(e); }}
             onMouseLeave={() => { if (!dragging) setHovering(false); }}
             role="slider"
-            aria-label="Seek"
+            aria-label={t('player.seek')}
             aria-valuenow={Math.floor(currentTime)}
             aria-valuemin={0}
             aria-valuemax={Math.floor(duration)}

@@ -57,7 +57,7 @@ func (s *Handler) add(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Domain added")
+	web.RedirectWithSuccessAndMessage(c, "toast.domainAdded")
 }
 
 func (s *Handler) delete(c *gin.Context) {
@@ -70,7 +70,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Domain deleted")
+	web.RedirectWithSuccessAndMessage(c, "toast.domainDeleted")
 }
 
 func (s *Handler) addDomain(ctx context.Context, domain string, user *auth.User) (err error) {

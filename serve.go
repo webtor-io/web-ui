@@ -1,11 +1,13 @@
 package main
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/webtor-io/web-ui/handlers/about"
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	hi18n "github.com/webtor-io/web-ui/handlers/i18n"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
 	"github.com/webtor-io/web-ui/handlers/donate"
@@ -43,6 +45,7 @@ import (
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
+	si18n "github.com/webtor-io/web-ui/services/i18n"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
@@ -128,11 +131,16 @@ func serve(c *cli.Context) error {
 	re := multitemplate.NewRenderer()
 
 	// Setting TemplateManager
+	// Setting i18n (must be before template manager for helper registration)
+	locales, _ := fs.Sub(localeFS, "locales")
+	i18nSvc := si18n.New(locales)
+
 	tm := template.NewManager[*w.Context](re).
 		WithHelper(w.NewHelper(c)).
 		WithHelper(umami.NewHelper(c)).
 		WithHelper(geoip.NewHelper()).
-		WithHelper(rec.NewHelper(c))
+		WithHelper(rec.NewHelper(c)).
+		WithHelper(si18n.NewHelper(i18nSvc))
 
 	var servers []cs.Servable
 	// Setting Probe
@@ -161,6 +169,9 @@ func serve(c *cli.Context) error {
 	}
 	servers = append(servers, web)
 	defer web.Close()
+
+	// Setting i18n handler (HTTP middleware + Gin middleware)
+	hi18n.RegisterHandler(r, web, i18nSvc)
 
 	// Setting URL Alias
 	ual := ua.New(pg, r)
@@ -254,7 +265,7 @@ func serve(c *cli.Context) error {
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)

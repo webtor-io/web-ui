@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -108,7 +109,7 @@ func (s *Handler) post(c *gin.Context) {
 
 	if c.GetHeader("Accept") == "application/json" {
 		c.JSON(http.StatusAccepted, gin.H{
-			"job_log_url": fmt.Sprintf("/queue/%v/job/%v/log", loadJob.Queue, loadJob.ID),
+			"job_log_url": web.LangURL(i18n.GetLang(c), fmt.Sprintf("/queue/%v/job/%v/log", loadJob.Queue, loadJob.ID)),
 		})
 		return
 	}

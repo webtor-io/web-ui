@@ -2,16 +2,16 @@
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Settings
+            {{ t .Ctx.Lang "profile.settings.title" }}
         </h2>
 
-        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="/stremio/settings/update" data-async-target="#stremio-settings">
-            {{ $resolutions := .Data.StremioSettings.PreferredResolutions }}
+        <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath .Ctx.Lang "/stremio/settings/update" }}" data-async-target="#stremio-settings">
+            {{ $resolutions := .Data.PreferredResolutions }}
 
             <input type="hidden" name="resolution_order" id="resolution_order" value="{{ range $i, $r := $resolutions }}{{ if $i }},{{ end }}{{ $r.Resolution }}{{ end }}">
 
-            <h3 class="text-sm font-semibold mb-2">Preferred Resolutions</h3>
-            <p class="text-xs text-w-muted mb-3">Drag to reorder by preference</p>
+            <h3 class="text-sm font-semibold mb-2">{{ t .Ctx.Lang "profile.settings.resolutions" }}</h3>
+            <p class="text-xs text-w-muted mb-3">{{ t .Ctx.Lang "profile.settings.dragHint" }}</p>
 
             <ul id="resolution-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
                 {{ range $i, $r := $resolutions }}
@@ -32,26 +32,22 @@
             <div class="mt-6 pt-5 border-t border-w-line/30">
                 <div class="flex items-start gap-4">
                     <div class="flex-1">
-                        <h3 class="text-sm font-semibold mb-1">Discover Only</h3>
+                        <h3 class="text-sm font-semibold mb-1">{{ t .Ctx.Lang "profile.settings.discoverOnly" }}</h3>
                         <p class="text-xs text-w-muted leading-relaxed">
-                            When enabled, your configured addons are only used on the
-                            <a href="/discover" class="link link-hover text-w-sub">Discover</a> page
-                            for browsing and adding content to your library.
-                            The Stremio app will show streams only from your <strong class="text-w-sub">Library</strong> — torrents you have already added.
+                            {{ t .Ctx.Lang "profile.settings.discoverOnlyDesc" }}
                         </p>
                         <p class="text-xs text-w-muted leading-relaxed mt-1.5">
-                            Useful when you browse and collect content via Discover on the web,
-                            then play it on your TV through Stremio without extra addon results cluttering the list.
+                            {{ t .Ctx.Lang "profile.settings.discoverOnlyHint" }}
                         </p>
                     </div>
                     <label class="cursor-pointer pt-0.5">
-                        <input type="checkbox" name="discover_only" class="toggle toggle-soft" {{ if .Data.StremioSettings.DiscoverOnly }}checked{{ end }} />
+                        <input type="checkbox" name="discover_only" class="toggle toggle-soft" {{ if .Data.DiscoverOnly }}checked{{ end }} />
                     </label>
                 </div>
             </div>
 
             <div class="mt-4 flex justify-end">
-                <button type="submit" class="btn btn-soft" data-umami-event="stremio-settings-save">Save</button>
+                <button type="submit" class="btn btn-soft" data-umami-event="stremio-settings-save">{{ t .Ctx.Lang "profile.settings.save" }}</button>
             </div>
         </form>
     </div>

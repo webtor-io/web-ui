@@ -23,7 +23,7 @@ func (s *Handler) remove(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to remove from library"))
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Removed from library")
+	web.RedirectWithSuccessAndMessage(c, "toast.removedFromLibrary")
 }
 
 func (s *Handler) removeFromLibrary(ctx context.Context, c *gin.Context, u *auth.User) (err error) {

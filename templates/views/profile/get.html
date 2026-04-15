@@ -1,4 +1,4 @@
-{{ define "title" }}Profile{{ end }}
+{{ define "title" }}{{ t $.Lang "profile.badge" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
@@ -7,30 +7,30 @@
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
         <circle cx="12" cy="7" r="4"/>
       </svg>
-      Profile
+      {{ t $.Lang "profile.badge" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Your Profile</h1>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "profile.title" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">Manage your account settings, integrations, and preferences.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "profile.subtitle" }}</p>
 
     <div id="tier">
         {{ template "profile/tier" $ }}
     </div>
     {{ if .Data.VaultStats }}
-    <div id="vault" data-async-layout="{{`{{ template "profile/vault" $ }}`}}">
-        {{ template "profile/vault" $ }}
+    <div id="vault" data-async-layout="{{`{{ template "profile/vault" (withContext $ .Data.VaultStats) }}`}}">
+        {{ template "profile/vault" (withContext $ .Data.VaultStats) }}
     </div>
     {{ end }}
 
     <!-- Stremio -->
     <div class="flex items-center gap-3 mt-10 mb-4">
-        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Stremio</h2>
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.stremio" }}</h2>
         <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
 
-    <div id="stremio" data-async-layout="{{`{{ template "profile/stremio" $ }}`}}">
-        {{ template "profile/stremio" $ }}
+    <div id="stremio" data-async-layout="{{`{{ template "profile/stremio" (withContext $ .Data.StremioAddonURL) }}`}}">
+        {{ template "profile/stremio" (withContext $ .Data.StremioAddonURL) }}
     </div>
     <div id="streaming-backends" data-async-layout="{{`{{ template "profile/streaming_backends" $ }}`}}">
         {{ template "profile/streaming_backends" $ }}
@@ -38,13 +38,13 @@
     <div id="addon-urls" data-async-layout="{{`{{ template "profile/addon_urls" $ }}`}}">
         {{ template "profile/addon_urls" $ }}
     </div>
-    <div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" $ }}`}}">
-        {{ template "profile/stremio_settings" $ }}
+    <div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}`}}">
+        {{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}
     </div>
 
     <!-- Integrations -->
     <div class="flex items-center gap-3 mt-10 mb-4">
-        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">Integrations</h2>
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.integrations" }}</h2>
         <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
 
@@ -54,18 +54,18 @@
     </div>
     {{ end }}
     {{ if not .Data.DisableEmbed }}
-    <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" $ }}`}}">
-        {{ template "profile/embed_domains" $ }}
+    <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" (withContext $ .Data) }}`}}">
+        {{ template "profile/embed_domains" (withContext $ .Data) }}
     </div>
     {{ end }}
 
     <div class="text-center mt-12 flex flex-col items-center gap-3">
-        <a href="/logout" class="btn btn-ghost text-w-muted hover:text-error text-sm" data-async-target="main" data-umami-event="logout">Log out</a>
-        <form method="post" action="/profile/delete" data-async-target="main">
+        <a href="{{ langPath $.Lang "/logout" }}" class="btn btn-ghost text-w-muted hover:text-error text-sm" data-async-target="main" data-umami-event="logout">{{ t $.Lang "profile.logout" }}</a>
+        <form method="post" action="{{ langPath $.Lang "/profile/delete" }}" data-async-target="main">
             <button type="submit" class="btn btn-ghost text-w-muted hover:text-error text-xs"
                 data-umami-event="profile-delete"
-                onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone. All your data, settings, and integrations will be permanently removed.')">
-                Delete Account
+                onclick="return confirm('{{ t $.Lang "profile.deleteConfirm" }}')">
+                {{ t $.Lang "profile.deleteAccount" }}
             </button>
         </form>
     </div>

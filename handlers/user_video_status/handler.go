@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/i18n"
 	uvs "github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -101,7 +102,7 @@ func (h *Handler) markMovie(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	redirectWithRatePrompt(c, "Marked as watched")
+	redirectWithRatePrompt(c, "toast.markedAsWatched")
 }
 
 func (h *Handler) doMarkMovie(ctx context.Context, user *auth.User, videoID string) error {
@@ -121,7 +122,7 @@ func (h *Handler) unmarkMovie(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Unmarked")
+	web.RedirectWithSuccessAndMessage(c, "toast.unmarked")
 }
 
 func (h *Handler) doUnmarkMovie(ctx context.Context, user *auth.User, videoID string) error {
@@ -143,7 +144,7 @@ func (h *Handler) markSeries(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	redirectWithRatePrompt(c, "Marked as watched")
+	redirectWithRatePrompt(c, "toast.markedAsWatched")
 }
 
 func (h *Handler) doMarkSeries(ctx context.Context, user *auth.User, videoID string) error {
@@ -163,7 +164,7 @@ func (h *Handler) unmarkSeries(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Unmarked")
+	web.RedirectWithSuccessAndMessage(c, "toast.unmarked")
 }
 
 func (h *Handler) doUnmarkSeries(ctx context.Context, user *auth.User, videoID string) error {
@@ -190,7 +191,7 @@ func (h *Handler) markEpisode(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Marked as watched")
+	web.RedirectWithSuccessAndMessage(c, "toast.markedAsWatched")
 }
 
 func (h *Handler) doMarkEpisode(ctx context.Context, user *auth.User, videoID string, season, episode int16) error {
@@ -215,7 +216,7 @@ func (h *Handler) unmarkEpisode(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Unmarked")
+	web.RedirectWithSuccessAndMessage(c, "toast.unmarked")
 }
 
 func (h *Handler) doUnmarkEpisode(ctx context.Context, user *auth.User, videoID string, season, episode int16) error {
@@ -242,7 +243,7 @@ func (h *Handler) rateMovie(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Rating saved")
+	web.RedirectWithSuccessAndMessage(c, "toast.ratingSaved")
 }
 
 func (h *Handler) doRateMovie(ctx context.Context, user *auth.User, videoID string, rating int16) error {
@@ -259,7 +260,7 @@ func (h *Handler) unrateMovie(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Rating removed")
+	web.RedirectWithSuccessAndMessage(c, "toast.ratingRemoved")
 }
 
 func (h *Handler) doUnrateMovie(ctx context.Context, user *auth.User, videoID string) error {
@@ -281,7 +282,7 @@ func (h *Handler) rateSeries(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Rating saved")
+	web.RedirectWithSuccessAndMessage(c, "toast.ratingSaved")
 }
 
 func (h *Handler) doRateSeries(ctx context.Context, user *auth.User, videoID string, rating int16) error {
@@ -298,7 +299,7 @@ func (h *Handler) unrateSeries(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	web.RedirectWithSuccessAndMessage(c, "Rating removed")
+	web.RedirectWithSuccessAndMessage(c, "toast.ratingRemoved")
 }
 
 func (h *Handler) doUnrateSeries(ctx context.Context, user *auth.User, videoID string) error {
@@ -320,10 +321,11 @@ func parseRating(c *gin.Context) (int16, error) {
 // success status and rate-form=true, so the rating modal auto-opens after
 // marking as watched.
 func redirectWithRatePrompt(c *gin.Context, message string) {
+	translated := i18n.T(c, message)
 	if web.WantsJSON(c) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "success",
-			"message":   message,
+			"message":   translated,
 			"rate-form": true,
 		})
 		return
@@ -336,7 +338,7 @@ func redirectWithRatePrompt(c *gin.Context, message string) {
 	q := u.Query()
 	q.Set("status", "success")
 	q.Set("from", c.Request.URL.Path)
-	q.Set("message", message)
+	q.Set("message", translated)
 	q.Set("rate-form", "true")
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())

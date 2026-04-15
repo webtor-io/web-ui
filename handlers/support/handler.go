@@ -35,11 +35,11 @@ type Cause int
 var hashRegexp = regexp.MustCompile("[0-9a-f]{40}")
 
 var CauseTypes = map[int]string{
-	-1: "Select cause...",
-	0:  "Illegal content",
-	1:  "Malware",
-	2:  "Site error",
-	3:  "Question",
+	-1: "support.selectCause",
+	0:  "support.illegalContent",
+	1:  "support.malware",
+	2:  "support.siteError",
+	3:  "support.question",
 }
 
 type Form struct {

@@ -28,11 +28,18 @@ async function runTest(root) {
     const speedInput = root.querySelector('#speedtest-speed-input');
     const premiumSpeedInput = root.querySelector('#speedtest-premium-speed-input');
 
+    const i18n = window._speedtestI18n || {};
+    i18n.gettingServer = i18n.gettingServer || 'Getting test server...';
+    i18n.measuring = i18n.measuring || 'Measuring speed...';
+    i18n.testingPremium = i18n.testingPremium || 'Testing premium server...';
+    i18n.premiumServer = i18n.premiumServer || 'Premium Server';
+    i18n.standardServer = i18n.standardServer || 'Standard Server';
+
     controls.classList.add('hidden');
     progress.classList.remove('hidden');
     speedEl.textContent = '0.0';
     bar.value = 0;
-    statusEl.textContent = 'Getting test server...';
+    statusEl.textContent = i18n.gettingServer;
     if (phaseEl) phaseEl.textContent = '';
 
     try {
@@ -50,14 +57,12 @@ async function runTest(root) {
             const isPremium = entry.type === 'premium';
 
             if (phaseEl) {
-                phaseEl.textContent = isPremium ? 'Premium Server' : 'Standard Server';
+                phaseEl.textContent = isPremium ? i18n.premiumServer : i18n.standardServer;
                 phaseEl.className = isPremium
                     ? 'text-sm font-semibold text-w-purpleL mb-1'
                     : 'text-sm font-semibold text-w-cyan mb-1';
             }
-            statusEl.textContent = isPremium
-                ? 'Testing premium server...'
-                : 'Measuring speed...';
+            statusEl.textContent = isPremium ? i18n.testingPremium : i18n.measuring;
             speedEl.textContent = '0.0';
             bar.value = 0;
 

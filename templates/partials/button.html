@@ -1,10 +1,10 @@
 {{ define "button" }}
-<form class="{{ .Action }}" action="{{ .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
-    <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
-    <input type="hidden" name="item-id" value="{{ .ItemID }}" />
-    <button type="submit" class="btn btn-soft whitespace-nowrap" data-umami-event="{{ .Action }}">
-        {{ template "icons" .Action }}
-        {{ .Name }}
+<form class="{{ .Data.Action }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .Data.ID }}" data-async-push-state="false">
+    <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
+    <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
+    <button type="submit" class="btn btn-soft whitespace-nowrap" data-umami-event="{{ .Data.Action }}">
+        {{ template "icons" .Data.Action }}
+        {{ t .Ctx.Lang .Data.Name }}{{ if .Data.Size }} [{{ .Data.Size }}]{{ end }}
     </button>
 </form>
 {{ end }}

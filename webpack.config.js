@@ -118,6 +118,13 @@ module.exports = async (env, options) => {
                         'postcss-loader'
                     ],
                 },
+                {
+                    test: /\.json$/,
+                    include: path.resolve(__dirname, 'locales'),
+                    resourceQuery: /prefix=/,
+                    type: 'javascript/auto',
+                    use: [path.resolve(__dirname, 'assets/webpack/locale-filter-loader.js')],
+                },
             ]
         },
         resolve: {

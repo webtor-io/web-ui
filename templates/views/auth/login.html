@@ -1,4 +1,4 @@
-{{ define "title" }}Login{{ end }}
+{{ define "title" }}{{ t $.Lang "auth.login.title" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-md mx-auto">
@@ -10,19 +10,19 @@
           <path d="M20 21C20 19.6044 20 18.9067 19.8278 18.3389C19.44 17.0605 18.4395 16.06 17.1611 15.6722C16.5933 15.5 15.8956 15.5 14.5 15.5H9.5C8.10444 15.5 7.40665 15.5 6.83886 15.6722C5.56045 16.06 4.56004 17.0605 4.17224 18.3389C4 18.9067 4 19.6044 4 21M16.5 7.5C16.5 9.98528 14.4853 12 12 12C9.51472 12 7.5 9.98528 7.5 7.5C7.5 5.01472 9.51472 3 12 3C14.4853 3 16.5 5.01472 16.5 7.5Z"/>
         </svg>
       </div>
-      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">Sign In</h1>
-      <p class="text-w-sub text-sm">Choose a method to access your account</p>
+      <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">{{ t $.Lang "auth.login.title" }}</h1>
+      <p class="text-w-sub text-sm">{{ t $.Lang "auth.login.subtitle" }}</p>
     </div>
 
     <!-- Instruction notices -->
     {{ if eq .Data.Instruction "library" }}
     <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
-      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> Authorization is required to access your library.</p>
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.libraryNote" }}</p>
     </div>
     {{ end }}
     {{ if eq .Data.Instruction "stremio-configure" }}
     <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
-      <p class="text-sm text-w-sub"><strong class="text-w-cyan">Note:</strong> Authorization is required to access Stremio addon.</p>
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.stremioNote" }}</p>
     </div>
     {{ end }}
 
@@ -34,7 +34,7 @@
           <circle cx="14" cy="8" r="4"></circle>
           <rect x="4" y="4" width="3" height="16"></rect>
         </svg>
-        Continue with Patreon
+        {{ t $.Lang "auth.login.patreon" }}
       </button>
 
       <!-- Google -->
@@ -45,25 +45,25 @@
           <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
           <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
-        Continue with Google
+        {{ t $.Lang "auth.login.google" }}
       </button>
     </div>
 
     <!-- Divider -->
-    <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">Or use email</div>
+    <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">{{ t $.Lang "auth.login.orEmail" }}</div>
 
     <!-- Email Magic Link card -->
     <div class="bg-w-card border border-w-line rounded-2xl p-6">
-      <p class="text-sm text-w-sub text-center mb-1">Enter your email to receive a one-time login link.</p>
-      <p class="text-xs text-w-muted text-center mb-5">No password needed — just click the link in your inbox!</p>
+      <p class="text-sm text-w-sub text-center mb-1">{{ t $.Lang "auth.login.emailPrompt" }}</p>
+      <p class="text-xs text-w-muted text-center mb-5">{{ t $.Lang "auth.login.emailHint" }}</p>
       <form onsubmit="submitLoginForm(this, event)" class="join w-full">
-        <input type="email" name="email" class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" placeholder="Your Email" />
-        <button type="submit" class="btn btn-soft join-item" data-umami-event="login-magic-link">Send</button>
+        <input type="email" name="email" class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none join-item" placeholder="{{ t $.Lang "auth.login.emailPlaceholder" }}" />
+        <button type="submit" class="btn btn-soft join-item" data-umami-event="login-magic-link">{{ t $.Lang "auth.login.send" }}</button>
       </form>
       <form class="hidden progress-alert progress-alert-block mt-5 closeable">
         <div class="log-target"></div>
         <div class="pt-3 flex justify-end hidden alert-close-wrapper">
-          <a class="close closeable-close">got it!</a>
+          <a class="close closeable-close">{{ t $.Lang "auth.gotIt" }}</a>
         </div>
       </form>
     </div>
@@ -72,4 +72,3 @@
 </section>
 {{ "auth/login.js" | asset }}
 {{ end }}
-

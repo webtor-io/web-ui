@@ -1,10 +1,5 @@
 import { AIRecCard } from './AIRecCard';
-import { currentLocale } from '../../aiClient';
-
-const SHOW_MORE_LABEL = {
-    en: (n) => `Show ${n} more`,
-    ru: (n) => `Ещё ${n}`,
-};
+import { tf } from '../../i18n';
 
 // AIRecsGrid — chessboard layout for AI recommendations.
 //
@@ -76,7 +71,6 @@ export function AIRecsGrid({
     const visibleCount = expanded ? items.length : Math.min(initialVisible, items.length);
     const visible = items.slice(0, visibleCount);
     const hidden = items.length - visibleCount;
-    const locale = currentLocale();
 
     return (
         <div class="flex flex-col gap-8 sm:gap-10 mt-6">
@@ -123,7 +117,7 @@ export function AIRecsGrid({
                         onClick={onExpand}
                         class="inline-flex items-center gap-2 rounded-full bg-w-cyan/10 text-w-cyan border border-w-cyan/30 hover:bg-w-cyan/20 hover:border-w-cyan/60 transition-colors px-5 py-2 text-sm font-medium cursor-pointer"
                     >
-                        <span>{(SHOW_MORE_LABEL[locale] || SHOW_MORE_LABEL.en)(hidden)}</span>
+                        <span>{tf('discover.ai.showMore', hidden)}</span>
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="6 9 12 15 18 9" />
                         </svg>

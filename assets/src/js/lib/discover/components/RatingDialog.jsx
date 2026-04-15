@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
+import { t } from '../i18n';
 
 export function RatingDialog({ currentRating, onRate, onUnrate, onClose }) {
     const dialogRef = useRef(null);
@@ -57,15 +58,15 @@ export function RatingDialog({ currentRating, onRate, onUnrate, onClose }) {
                 </div>
                 <div class="modal-action mt-0 justify-center">
                     <button type="button" class="btn btn-soft" onClick={handleSubmit} disabled={selected === 0}>
-                        Rate
+                        {t('discover.rate')}
                     </button>
                     {currentRating > 0 && (
                         <button type="button" class="btn btn-ghost text-w-sub" onClick={onUnrate}>
-                            Drop
+                            {t('discover.dropRating')}
                         </button>
                     )}
                     <button type="button" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" onClick={onClose}>
-                        Cancel
+                        {t('discover.cancel')}
                     </button>
                 </div>
             </div>

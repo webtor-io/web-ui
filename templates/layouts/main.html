@@ -1,11 +1,13 @@
 <!doctype html>
-<html lang="en" data-theme="night" class="scroll-smooth">
+<html lang="{{ $.Lang }}" data-theme="night" class="scroll-smooth">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <title>{{ template "title" . }} | Webtor.io</title>
         {{ block "description" . }}{{ end }}
         {{ block "canonical" . }}{{ end }}
+        {{ range hrefLangs $.Path }}<link rel="alternate" hreflang="{{ .Lang }}" href="{{ .URL }}">
+        {{ end }}
         {{ block "og" . }}
         <meta property="og:type" content="website">
         <meta property="og:site_name" content="Webtor.io">
@@ -39,11 +41,11 @@
             <nav data-async-layout="{{`{{ template "nav" . }}`}}">{{ template "nav" . }}</nav>
         </header>
         <div id="wrapper" class="flex flex-col w-full items-center flex-1">
-            <main id="main" class="w-full" data-async-scroll-top data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}">
+            <main id="main" class="w-full" data-async-scroll-top data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}" data-async-update-footer="{{`{{ template "footer" . }}`}}" data-async-update-lang="{{`{{ $.Lang }}`}}">
             {{ template "main" . }}
             </main>
         </div>
-        <div>
+        <div id="footer" data-async-layout="{{`{{ template "footer" . }}`}}">
             {{ template "footer" . }}
         </div>
         <div id="toast-container" class="toast toast-end toast-bottom z-toast" role="status" aria-live="assertive" aria-atomic="false"></div>
