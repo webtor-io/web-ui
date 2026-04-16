@@ -3,6 +3,7 @@ package recommendations
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,19 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/i18n"
 )
+
+// TestMain bootstraps i18n.SupportedLangs from the real locales/ directory
+// before any test runs. Since `i18n.New` reads the FS to populate the list,
+// tests that touch normalizeLocale or defaultChips would otherwise see an
+// empty SupportedLangs and falsely report every code as unsupported. The
+// path is relative to this package (services/recommendations) — `../../`
+// reaches the project root where locales/ lives.
+func TestMain(m *testing.M) {
+	if _, err := os.Stat("../../locales"); err == nil {
+		i18n.New(os.DirFS("../../locales"))
+	}
+	os.Exit(m.Run())
+}
 
 // decodeBlocks parses raw JSON into a slice of ContentBlockUnion the way
 // the SDK does on the wire. Lets us build realistic fixtures without

@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -7,6 +8,21 @@ const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 const fs = require('fs');
 
 const themes = ['night'];
+
+// Discover supported locales from the filesystem at build time.
+// Mirrors services/i18n/i18n.go discoverLocales(): only 2-letter `xx.json`
+// files count, EN first, others alphabetical. Injected into the JS bundle
+// as a global constant via DefinePlugin so lib/i18n.js doesn't need a
+// hardcoded list — drop a `xx.json` and the JS list updates on next build.
+function discoverSupportedLocales() {
+    const codes = fs.readdirSync('./locales')
+        .filter((f) => /^[a-z]{2}\.json$/.test(f))
+        .map((f) => f.replace(/\.json$/, ''))
+        .sort();
+    const en = codes.filter((c) => c === 'en');
+    const rest = codes.filter((c) => c !== 'en');
+    return [...en, ...rest];
+}
 
 function getEntries(path, ext, prefix = '') {
     return new Promise((resolve) => {
@@ -30,6 +46,11 @@ module.exports = async (env, options) => {
     const devMode = options.mode !== 'production';
     const devEntries = devMode ? await getEntries('./assets/src/js/dev', '.js', 'dev/') : {};
     const plugins = [
+        new webpack.DefinePlugin({
+            // Build-time-derived list of supported locales (see top of file).
+            // Consumed by assets/src/js/lib/i18n.js as the SUPPORTED constant.
+            __SUPPORTED_LOCALES__: JSON.stringify(discoverSupportedLocales()),
+        }),
         new MiniCssExtractPlugin({
             filename: '[name].css',
         }),

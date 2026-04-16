@@ -14,19 +14,19 @@
 //   const mod = await (loaders[getLang()] || loaders.en)();
 //   const { t, tf } = makeI18n(mod.default || mod);
 
-// THE single source of truth for client-side supported locales.
+// THE single source of truth for client-side supported locales — derived
+// at webpack build time from the actual locale files on disk.
 //
-// Mirrors services/i18n/i18n.go SupportedLangs (Go server). Anything not
-// listed here gets clamped to 'en' by getLang() — every other JS module
-// (per-area i18n loaders, aiClient.js) imports SUPPORTED from here so a
-// new locale needs to be added in exactly one place client-side.
+// `__SUPPORTED_LOCALES__` is injected by webpack.config.js DefinePlugin
+// (see discoverSupportedLocales there). It mirrors the Go server's
+// services/i18n.New(), which scans the same `locales/*.json` files at
+// startup. Drop a `xx.json` file and both sides auto-pick it up — no
+// hardcoded list to maintain anywhere.
 //
-// Cross-language sync: when adding a locale, edit BOTH this constant AND
-// services/i18n/i18n.go SupportedLangs. There's no automated check —
-// drift would mean either the Go server renders an unsupported lang in
-// <html lang> (silently clamped to 'en' by getLang) or a JS-known lang
-// the server doesn't know about (404 on /xx/ paths).
-export const SUPPORTED = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it', 'pl', 'tr', 'nl', 'cs'];
+// Display order: DefaultLang ("en") first, others alphabetical.
+//
+// eslint-disable-next-line no-undef
+export const SUPPORTED = __SUPPORTED_LOCALES__;
 
 export function getLang() {
     const lang = document.documentElement.lang || 'en';
