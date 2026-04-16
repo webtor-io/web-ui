@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // decodeBlocks parses raw JSON into a slice of ContentBlockUnion the way
@@ -173,10 +174,10 @@ func TestNormalizeLocale(t *testing.T) {
 }
 
 func TestDefaultChips_PerLocaleCoverage(t *testing.T) {
-	// Every locale registered in supportedLocales must have a chip set —
+	// Every locale registered in i18n.SupportedLangs must have a chip set —
 	// otherwise users on that language fall through to English chips and
 	// see a mismatched locale in their cold-start experience.
-	for loc := range supportedLocales {
+	for _, loc := range i18n.SupportedLangs {
 		chips := defaultChips(loc)
 		if len(chips) == 0 {
 			t.Errorf("locale %q: defaultChips returned empty set", loc)

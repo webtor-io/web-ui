@@ -53,8 +53,9 @@ export function currentClock() {
 }
 
 // currentLocale picks a two-letter code the server understands.
-// Mirrors normalizeLocale + supportedLocales in
-// services/recommendations/context.go.
+// Mirrors normalizeLocale in services/recommendations/context.go, which
+// derives its supported set from services/i18n/i18n.go SupportedLangs —
+// the same list we mirror client-side in lib/i18n.js SUPPORTED.
 //
 // Source priority:
 //   1. document.documentElement.lang — the user's CURRENT UI choice. The
@@ -74,13 +75,13 @@ export function currentClock() {
 //
 // We walk each list and pick the first entry whose 2-letter prefix we
 // actually support on the server.
-const SUPPORTED_LOCALES = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it', 'pl', 'tr', 'nl', 'cs'];
+import { SUPPORTED } from '../i18n';
 
 function firstSupported(tags) {
     for (const raw of tags) {
         if (!raw) continue;
         const prefix = String(raw).toLowerCase().slice(0, 2);
-        if (SUPPORTED_LOCALES.includes(prefix)) return prefix;
+        if (SUPPORTED.includes(prefix)) return prefix;
     }
     return null;
 }

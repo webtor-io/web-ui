@@ -9,6 +9,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // ClientClock describes the user's local moment in time at the instant of a
@@ -180,40 +181,22 @@ func bucketTimeOfDay(hour int) string {
 	}
 }
 
-// supportedLocales lists the 2-letter codes the prompt explicitly teaches
-// Claude how to write reasons in (see prompt.go LOCALE STYLE section). Any
-// other value falls back to English in normalizeLocale.
+// normalizeLocale clamps the locale to a 2-letter prefix we know how to
+// instruct Claude about. Anything we don't recognise falls back to English.
 //
-// Keep this in sync with:
-//   - assets/src/js/lib/discover/aiClient.js SUPPORTED_LOCALES
-//   - default_chips.go defaultChipDefs* maps
-//   - i18n.SupportedLangs (UI-side list)
+// The supported set is sourced from i18n.SupportedLangs — the same list
+// that drives UI translations, so AI Discover never receives a locale the
+// rest of the app can't render. The prompt's LOCALE STYLE section
+// (prompt.go) and default_chips.go defaultChipDefsByLocale must hold an
+// entry for every locale in i18n.SupportedLangs; tests in claude_test.go
+// validate this coverage.
 //
 // Note: "pt" carries Brazilian Portuguese (PT-BR) — see services/i18n/i18n.go
 // for the URL/middleware rationale.
-var supportedLocales = map[string]struct{}{
-	"en": {},
-	"ru": {},
-	"es": {},
-	"de": {},
-	"fr": {},
-	"pt": {},
-	"it": {},
-	"pl": {},
-	"tr": {},
-	"nl": {},
-	"cs": {},
-}
-
-// normalizeLocale clamps the locale to a 2-letter prefix we know how to
-// instruct Claude about. Anything we don't recognise falls back to English.
 func normalizeLocale(locale string) string {
 	locale = strings.ToLower(strings.TrimSpace(locale))
-	if len(locale) >= 2 {
-		prefix := locale[:2]
-		if _, ok := supportedLocales[prefix]; ok {
-			return prefix
-		}
+	if len(locale) >= 2 && i18n.IsSupported(locale[:2]) {
+		return locale[:2]
 	}
 	return "en"
 }

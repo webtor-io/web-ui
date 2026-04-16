@@ -9,13 +9,24 @@
 //   const loaders = {
 //       en: () => import('../../../../locales/en.json?prefix=discover'),
 //       ru: () => import('../../../../locales/ru.json?prefix=discover'),
-//       es: () => import('../../../../locales/es.json?prefix=discover'),
-//       de: () => import('../../../../locales/de.json?prefix=discover'),
+//       // ...one entry per code in SUPPORTED below.
 //   };
 //   const mod = await (loaders[getLang()] || loaders.en)();
 //   const { t, tf } = makeI18n(mod.default || mod);
 
-const SUPPORTED = ['en', 'ru', 'es', 'de'];
+// THE single source of truth for client-side supported locales.
+//
+// Mirrors services/i18n/i18n.go SupportedLangs (Go server). Anything not
+// listed here gets clamped to 'en' by getLang() — every other JS module
+// (per-area i18n loaders, aiClient.js) imports SUPPORTED from here so a
+// new locale needs to be added in exactly one place client-side.
+//
+// Cross-language sync: when adding a locale, edit BOTH this constant AND
+// services/i18n/i18n.go SupportedLangs. There's no automated check —
+// drift would mean either the Go server renders an unsupported lang in
+// <html lang> (silently clamped to 'en' by getLang) or a JS-known lang
+// the server doesn't know about (404 on /xx/ paths).
+export const SUPPORTED = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it', 'pl', 'tr', 'nl', 'cs'];
 
 export function getLang() {
     const lang = document.documentElement.lang || 'en';
