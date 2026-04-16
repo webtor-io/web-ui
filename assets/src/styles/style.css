@@ -385,6 +385,11 @@ input:-webkit-autofill:focus {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  /* tracking-tighter collapses the inline box short of the last glyph's
+     right edge, so background-clip:text cuts the final letter (visible
+     on Cyrillic "е" in hero "торренты в браузере"). Tiny trailing pad
+     gives the gradient paint room for the whole glyph. */
+  padding-right: 0.08em;
 }
 
 .hero-glow {

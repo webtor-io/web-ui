@@ -83,7 +83,7 @@
         {{ t $.Lang "home.toolBadge" }}
     </div>
 
-    <h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
+    <h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance">
         <span class="gradient-text">{{ t $.Lang .Tool.Benefit }}</span>
     </h1>
 
@@ -98,7 +98,8 @@
     </div>
 
     <h1 class="relative z-10 text-[clamp(2.8rem,6vw,4.5rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
-        {{ t $.Lang "home.heading" }}<br><span class="gradient-text">{{ t $.Lang "home.headingAccent" }}</span>
+        <span class="block text-balance">{{ t $.Lang "home.heading" }}</span>
+        <span class="block text-balance gradient-text">{{ t $.Lang "home.headingAccent" }}</span>
     </h1>
 
     <p class="relative z-10 text-lg text-w-sub max-w-[560px] mb-12 leading-relaxed">
