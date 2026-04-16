@@ -150,7 +150,7 @@ Query parameters (browser-supplied):
 
 - `day` — English weekday name (`Intl.DateTimeFormat("en-US", {weekday: "long"})`)
 - `hour` — local hour 0..23
-- `locale` — one of `en`, `ru`, `es`, `de`, `fr`, `pt`, `it` (see Localization below)
+- `locale` — one of `en`, `ru`, `es`, `de`, `fr`, `pt`, `it`, `pl`, `tr`, `nl`, `cs` (see Localization below)
 
 Response:
 
@@ -294,6 +294,10 @@ language, and cold-start chips are served from per-locale curated sets.
 | `fr` | French | Formal "vous" (web convention) |
 | `pt` | Portuguese | **Brazilian Portuguese (PT-BR)** under the bare `pt` code |
 | `it` | Italian | Informal "tu" |
+| `pl` | Polish | Informal "ty" |
+| `tr` | Turkish | Impersonal/imperative forms preferred |
+| `nl` | Dutch | Informal "je"/"jij" |
+| `cs` | Czech | Informal "ty" |
 
 `services/recommendations/context.go` `supportedLocales` is the source of
 truth on the server. The JS client mirrors it via `SUPPORTED_LOCALES` in

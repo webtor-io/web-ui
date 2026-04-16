@@ -199,6 +199,10 @@ var supportedLocales = map[string]struct{}{
 	"fr": {},
 	"pt": {},
 	"it": {},
+	"pl": {},
+	"tr": {},
+	"nl": {},
+	"cs": {},
 }
 
 // normalizeLocale clamps the locale to a 2-letter prefix we know how to

@@ -9,7 +9,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-var SupportedLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it"}
+var SupportedLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"}
 
 var DefaultLang = "en"
 
@@ -28,6 +28,10 @@ var LangNames = map[string]string{
 	"fr": "Français",
 	"pt": "Português",
 	"it": "Italiano",
+	"pl": "Polski",
+	"tr": "Türkçe",
+	"nl": "Nederlands",
+	"cs": "Čeština",
 }
 
 type Service struct {

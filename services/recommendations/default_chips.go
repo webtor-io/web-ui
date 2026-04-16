@@ -261,6 +261,138 @@ var defaultChipDefsIT = []defaultChipDef{
 	},
 }
 
+var defaultChipDefsPL = []defaultChipDef{
+	{
+		Label: "Laureaci ostatniej dekady",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi rozsadzające mózg",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Wolnopalące thrillery",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Perły w obcych językach",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Klasyki sprzed 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Filmy które rujnują pierwszą randkę",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsTR = []defaultChipDef{
+	{
+		Label: "Son on yılın ödüllü filmleri",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Beyni dağıtan bilim kurgu",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Yavaş yanan gerilim filmleri",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Yabancı dilde mücevherler",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "1990 öncesi klasikler",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "İlk randevuyu mahveden filmler",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsNL = []defaultChipDef{
+	{
+		Label: "Prijswinnaars van het laatste decennium",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi die je hoofd ontploft",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Langzaam smeulende thrillers",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Pareltjes in andere talen",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Klassiekers van voor 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Films die een eerste date verpesten",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsCS = []defaultChipDef{
+	{
+		Label: "Oceněné filmy posledního desetiletí",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi co rozhodí mozek",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Pomalu hořící thrillery",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Klenoty v cizích jazycích",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Klasika před rokem 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Filmy které zničí první rande",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
 // defaultChipDefsByLocale maps a normalized locale code to its chip set.
 // Locales not present here fall back to English in defaultChips().
 var defaultChipDefsByLocale = map[string][]defaultChipDef{
@@ -271,6 +403,10 @@ var defaultChipDefsByLocale = map[string][]defaultChipDef{
 	"fr": defaultChipDefsFR,
 	"pt": defaultChipDefsPT,
 	"it": defaultChipDefsIT,
+	"pl": defaultChipDefsPL,
+	"tr": defaultChipDefsTR,
+	"nl": defaultChipDefsNL,
+	"cs": defaultChipDefsCS,
 }
 
 // defaultChips returns the static chip set for the given locale, with stable

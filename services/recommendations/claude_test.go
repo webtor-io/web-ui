@@ -106,7 +106,7 @@ func TestChipsCacheKey_DeterministicAndTimeBucketed(t *testing.T) {
 	// flipping the language switcher would see chips in the previous
 	// locale until the TTL expires.
 	seen := map[string]string{"en": k1}
-	for _, loc := range []string{"ru", "es", "de", "fr", "pt", "it"} {
+	for _, loc := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"} {
 		ucL := &UserContext{Locale: loc, DayOfWeek: "Monday", TimeOfDay: "evening"}
 		k := chipsCacheKey(uid, ucL)
 		for prevLoc, prevKey := range seen {
@@ -134,19 +134,30 @@ func TestNormalizeLocale(t *testing.T) {
 		{"fr", "fr"},
 		{"pt", "pt"},
 		{"it", "it"},
+		{"pl", "pl"},
+		{"tr", "tr"},
+		{"nl", "nl"},
+		{"cs", "cs"},
 		// Country / region subtags get clipped to the 2-letter base.
 		{"en-US", "en"},
 		{"ru-RU", "ru"},
 		{"pt-BR", "pt"},
 		{"pt-PT", "pt"},
 		{"es-419", "es"},
+		{"pl-PL", "pl"},
+		{"tr-TR", "tr"},
+		{"nl-BE", "nl"}, // Flemish subtag still maps to nl
+		{"cs-CZ", "cs"},
 		// Whitespace and case are tolerated.
 		{"  EN  ", "en"},
 		{"De-de", "de"},
+		{"PL", "pl"},
 		// Anything we don't teach Claude about falls back to en.
 		{"zh", "en"},
 		{"ja", "en"},
 		{"ar", "en"},
+		{"uk", "en"}, // Ukrainian — not yet supported, falls back
+		{"sv", "en"}, // Swedish — covered by EN, no own bundle
 		{"", "en"},
 		{"x", "en"}, // too short
 		// Defensive: the prefix matches a supported locale but the full

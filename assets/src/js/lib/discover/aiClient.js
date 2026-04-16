@@ -74,7 +74,7 @@ export function currentClock() {
 //
 // We walk each list and pick the first entry whose 2-letter prefix we
 // actually support on the server.
-const SUPPORTED_LOCALES = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it'];
+const SUPPORTED_LOCALES = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it', 'pl', 'tr', 'nl', 'cs'];
 
 function firstSupported(tags) {
     for (const raw of tags) {
