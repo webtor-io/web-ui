@@ -150,7 +150,7 @@ Query parameters (browser-supplied):
 
 - `day` — English weekday name (`Intl.DateTimeFormat("en-US", {weekday: "long"})`)
 - `hour` — local hour 0..23
-- `locale` — `ru` or `en`
+- `locale` — one of `en`, `ru`, `es`, `de`, `fr`, `pt`, `it` (see Localization below)
 
 Response:
 
@@ -277,6 +277,67 @@ any commentary before the first `{`.
 
 - 0.7 for recommendations (enough variety without going off the rails)
 - 0.9 for chips (witty, unexpected)
+
+## Localization
+
+The recommender is locale-aware. Reasons are written in the user's UI
+language, and cold-start chips are served from per-locale curated sets.
+
+### Supported locales
+
+| Code | Language | Notes |
+|------|----------|-------|
+| `en` | English | Default and fallback for unknown locales |
+| `ru` | Russian | Informal "ты" form |
+| `es` | Spanish | Informal "tú", LATAM–Spain neutral |
+| `de` | German | Informal "du" |
+| `fr` | French | Formal "vous" (web convention) |
+| `pt` | Portuguese | **Brazilian Portuguese (PT-BR)** under the bare `pt` code |
+| `it` | Italian | Informal "tu" |
+
+`services/recommendations/context.go` `supportedLocales` is the source of
+truth on the server. The JS client mirrors it via `SUPPORTED_LOCALES` in
+`assets/src/js/lib/discover/aiClient.js` and must be kept in sync — when
+the JS sends an unsupported value the server normalizes it to `en` and
+serves English chips on a non-English UI, which is jarring.
+
+### How locale flows from UI to Claude
+
+1. The i18n middleware (`services/i18n/middleware.go`) sets the user's
+   active language from URL prefix (`/ru/`, `/fr/`...), the `lang` cookie,
+   or `Accept-Language` on first visit. It writes it into both
+   `<html lang="...">` (server-rendered) and the cookie.
+2. The discover JS reads `document.documentElement.lang` first
+   (`aiClient.js currentLocale()`). It is the user's CURRENT explicit
+   choice and trumps `navigator.languages`, which would otherwise overrule
+   a switcher click. Browser preferences only matter as a fallback when
+   the script runs outside the normal Webtor layout.
+3. Each XHR/SSE request includes `locale=<code>` as a query param. The
+   handler runs `normalizeLocale` to clamp it.
+4. The locale is stamped into `UserContext`, used as part of the chips
+   cache key (so locales don't share slots), and printed verbatim into
+   the prompt's `Response locale: <code>` line.
+
+### Cold-start chips per locale
+
+`services/recommendations/default_chips.go` holds a `defaultChipDefs<XX>`
+slice for every supported locale. To add a new locale:
+
+1. Add the 2-letter code to `supportedLocales` in `context.go`.
+2. Add a `defaultChipDefs<XX>` slice — translate the 6 EN labels and
+   re-use the EN queries verbatim. The queries stay English on purpose:
+   Claude reads the locale from `UserContext` and writes reasons in the
+   right language regardless of input query language. Keeping queries in
+   one language avoids vocabulary drift across cold-start sets.
+3. Register the slice in `defaultChipDefsByLocale`.
+4. Add a `<XX>` entry to `SUPPORTED_LOCALES` in `aiClient.js`.
+5. Add a few-shot example for the locale in `systemPromptNDJSON`
+   (Examples A–H block) — Claude leans heavily on these to land the
+   right tone and avoid drifting into formal/marketing register on
+   languages it sees less in our prompt.
+
+The chip-cache key is salted with locale, so locale switches naturally
+yield fresh chips — no manual invalidation required.
 
 ## Streaming pipeline internals
 

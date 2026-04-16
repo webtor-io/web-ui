@@ -102,13 +102,90 @@ func TestChipsCacheKey_DeterministicAndTimeBucketed(t *testing.T) {
 		t.Fatal("morning and evening must get different cache slots")
 	}
 
-	uc3 := &UserContext{Locale: "ru", DayOfWeek: "Monday", TimeOfDay: "evening"}
-	if chipsCacheKey(uid, uc3) == k1 {
-		t.Fatal("en and ru must get different cache slots")
+	// Each supported locale must get its own cache slot — otherwise a user
+	// flipping the language switcher would see chips in the previous
+	// locale until the TTL expires.
+	seen := map[string]string{"en": k1}
+	for _, loc := range []string{"ru", "es", "de", "fr", "pt", "it"} {
+		ucL := &UserContext{Locale: loc, DayOfWeek: "Monday", TimeOfDay: "evening"}
+		k := chipsCacheKey(uid, ucL)
+		for prevLoc, prevKey := range seen {
+			if k == prevKey {
+				t.Fatalf("locales %q and %q must get different cache slots, both got %q", loc, prevLoc, k)
+			}
+		}
+		seen[loc] = k
 	}
 
 	if chipsCacheKey(uuid.NewV4(), uc) == k1 {
 		t.Fatal("different users must get different cache slots")
+	}
+}
+
+func TestNormalizeLocale(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		// Direct hits for each supported locale.
+		{"en", "en"},
+		{"ru", "ru"},
+		{"es", "es"},
+		{"de", "de"},
+		{"fr", "fr"},
+		{"pt", "pt"},
+		{"it", "it"},
+		// Country / region subtags get clipped to the 2-letter base.
+		{"en-US", "en"},
+		{"ru-RU", "ru"},
+		{"pt-BR", "pt"},
+		{"pt-PT", "pt"},
+		{"es-419", "es"},
+		// Whitespace and case are tolerated.
+		{"  EN  ", "en"},
+		{"De-de", "de"},
+		// Anything we don't teach Claude about falls back to en.
+		{"zh", "en"},
+		{"ja", "en"},
+		{"ar", "en"},
+		{"", "en"},
+		{"x", "en"}, // too short
+		// Defensive: the prefix matches a supported locale but the full
+		// string is some weird tag — we still take the prefix.
+		{"english", "en"},
+	}
+	for _, c := range cases {
+		got := normalizeLocale(c.in)
+		if got != c.want {
+			t.Errorf("normalizeLocale(%q): want %q, got %q", c.in, c.want, got)
+		}
+	}
+}
+
+func TestDefaultChips_PerLocaleCoverage(t *testing.T) {
+	// Every locale registered in supportedLocales must have a chip set —
+	// otherwise users on that language fall through to English chips and
+	// see a mismatched locale in their cold-start experience.
+	for loc := range supportedLocales {
+		chips := defaultChips(loc)
+		if len(chips) == 0 {
+			t.Errorf("locale %q: defaultChips returned empty set", loc)
+			continue
+		}
+		// Sanity: labels must be non-empty and queries must be present.
+		for i, c := range chips {
+			if c.Label == "" {
+				t.Errorf("locale %q chip[%d]: empty label", loc, i)
+			}
+			if c.Query == "" {
+				t.Errorf("locale %q chip[%d]: empty query", loc, i)
+			}
+		}
+	}
+
+	// Unknown locale falls back to English (not empty, not a panic).
+	chips := defaultChips("zz")
+	if len(chips) == 0 {
+		t.Error("unknown locale fallback returned empty set")
 	}
 }
 

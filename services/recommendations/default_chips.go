@@ -16,8 +16,14 @@ package recommendations
 //
 // Each set contains 6 entries — the same count Claude is asked to produce —
 // chosen for genre and mood diversity (mirrors the AI prompt diversity rules).
+//
+// To add a new locale: register it in services/recommendations/context.go
+// supportedLocales, add a defaultChipDefs<XX> slice here, and add a case to
+// defaultChipsByLocale. Labels translate the EN concepts; queries are copied
+// verbatim — Claude reads the locale from UserContext and writes reasons in
+// the right language regardless of query language.
 
-// defaultChipDef is the static spec for a chip in defaultChipsRU/EN.
+// defaultChipDef is the static spec for a chip in the per-locale defaultChipDefs* slices.
 type defaultChipDef struct {
 	Label string
 	Icon  string
@@ -90,12 +96,189 @@ var defaultChipDefsRU = []defaultChipDef{
 	},
 }
 
+var defaultChipDefsES = []defaultChipDef{
+	{
+		Label: "Premiadas de la última década",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi que te vuela la cabeza",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Thrillers de fuego lento",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Joyas en otros idiomas",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Clásicos antes de 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Pelis para arruinar una primera cita",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsDE = []defaultChipDef{
+	{
+		Label: "Preisträger des letzten Jahrzehnts",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-Fi für den Kopf",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Langsam brennende Thriller",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Perlen in anderen Sprachen",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Klassiker vor 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Filme, die ein erstes Date ruinieren",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsFR = []defaultChipDef{
+	{
+		Label: "Primés de la dernière décennie",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Science-fiction qui retourne le cerveau",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Thrillers à combustion lente",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Pépites en langue étrangère",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Classiques d'avant 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Films qui sabotent un premier rendez-vous",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsPT = []defaultChipDef{
+	{
+		Label: "Premiados da última década",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi que mexe com a cabeça",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Thrillers de queima lenta",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Joias em outros idiomas",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Clássicos antes de 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Filmes que detonam o primeiro encontro",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+var defaultChipDefsIT = []defaultChipDef{
+	{
+		Label: "Premiati dell'ultimo decennio",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "Sci-fi che ti spacca la testa",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "Thriller a fuoco lento",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "Gemme in altre lingue",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "Classici prima del 1990",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "Film che rovinano un primo appuntamento",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
+// defaultChipDefsByLocale maps a normalized locale code to its chip set.
+// Locales not present here fall back to English in defaultChips().
+var defaultChipDefsByLocale = map[string][]defaultChipDef{
+	"en": defaultChipDefsEN,
+	"ru": defaultChipDefsRU,
+	"es": defaultChipDefsES,
+	"de": defaultChipDefsDE,
+	"fr": defaultChipDefsFR,
+	"pt": defaultChipDefsPT,
+	"it": defaultChipDefsIT,
+}
+
 // defaultChips returns the static chip set for the given locale, with stable
 // chip IDs derived from the labels.
 func defaultChips(locale string) []Chip {
-	defs := defaultChipDefsEN
-	if locale == "ru" {
-		defs = defaultChipDefsRU
+	defs, ok := defaultChipDefsByLocale[locale]
+	if !ok {
+		defs = defaultChipDefsEN
 	}
 	out := make([]Chip, len(defs))
 	for i, d := range defs {

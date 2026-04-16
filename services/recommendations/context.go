@@ -62,7 +62,7 @@ func (c ClientClock) Canonical() ClientClock {
 // pre-rendered history block than with structured JSON, and keeping the
 // rendering out of prompt.go lets us unit-test it without touching Claude.
 type UserContext struct {
-	Locale      string // "ru" or "en"
+	Locale      string // one of recommendations.supportedLocales (see normalizeLocale)
 	DayOfWeek   string // "Monday"..."Sunday" (from client clock)
 	TimeOfDay   string // "morning" | "afternoon" | "evening" | "night"
 	LocalHour   int    // 0..23 from client
@@ -180,14 +180,34 @@ func bucketTimeOfDay(hour int) string {
 	}
 }
 
+// supportedLocales lists the 2-letter codes the prompt explicitly teaches
+// Claude how to write reasons in (see prompt.go LOCALE STYLE section). Any
+// other value falls back to English in normalizeLocale.
+//
+// Keep this in sync with:
+//   - assets/src/js/lib/discover/aiClient.js SUPPORTED_LOCALES
+//   - default_chips.go defaultChipDefs* maps
+//   - i18n.SupportedLangs (UI-side list)
+//
+// Note: "pt" carries Brazilian Portuguese (PT-BR) — see services/i18n/i18n.go
+// for the URL/middleware rationale.
+var supportedLocales = map[string]struct{}{
+	"en": {},
+	"ru": {},
+	"es": {},
+	"de": {},
+	"fr": {},
+	"pt": {},
+	"it": {},
+}
+
 // normalizeLocale clamps the locale to a 2-letter prefix we know how to
 // instruct Claude about. Anything we don't recognise falls back to English.
 func normalizeLocale(locale string) string {
 	locale = strings.ToLower(strings.TrimSpace(locale))
 	if len(locale) >= 2 {
 		prefix := locale[:2]
-		switch prefix {
-		case "ru", "en":
+		if _, ok := supportedLocales[prefix]; ok {
 			return prefix
 		}
 	}

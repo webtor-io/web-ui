@@ -52,27 +52,29 @@ export function currentClock() {
     return { day, hour: now.getHours() };
 }
 
-// currentLocale picks a two-letter code the server understands (ru or en),
-// falling back to en for everything else. Mirrors normalizeLocale in
+// currentLocale picks a two-letter code the server understands.
+// Mirrors normalizeLocale + supportedLocales in
 // services/recommendations/context.go.
 //
 // Source priority:
-//   1. navigator.languages — the ordered list the browser computes from
-//      the user's Accept-Language chain + profile preferences. This is
-//      the authoritative source of "what language does this user want".
-//   2. navigator.language — single value fallback for older browsers
-//      that don't expose the plural form.
-//   3. document.documentElement.lang — last resort. In webtor this is
-//      hardcoded to "en" in templates/layouts/main.html regardless of
-//      the request, so it would steamroll everything else if checked
-//      first — hence its place at the bottom of the list.
+//   1. document.documentElement.lang — the user's CURRENT UI choice. The
+//      i18n middleware (services/i18n/middleware.go) sets this from the
+//      URL prefix (/ru/, /fr/...), the lang cookie, or Accept-Language
+//      detection on first visit; the lang switcher in app/layout.js syncs
+//      it on click. Trusting it means the JS respects an explicit
+//      switch — e.g. a user with browser pref `ru-RU, en` who visited
+//      /en/ gets English chips instead of being overruled by the browser
+//      preference list.
+//   2. navigator.languages — fallback when <html lang> is missing or set
+//      to a value we don't support (shouldn't happen in practice since the
+//      server always renders a supported lang, but keeps the function
+//      robust if the script ever runs on a non-Webtor page).
+//   3. navigator.language — single-value fallback for older browsers.
 //   4. "en" hardcoded default.
 //
-// We walk the first list and pick the first entry whose 2-letter prefix
-// we actually support on the server ("ru" or "en"). That way a user with
-// preferences `fr-FR, ru-RU, en` still lands on Russian instead of being
-// silently bucketed into English.
-const SUPPORTED_LOCALES = ['ru', 'en'];
+// We walk each list and pick the first entry whose 2-letter prefix we
+// actually support on the server.
+const SUPPORTED_LOCALES = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it'];
 
 function firstSupported(tags) {
     for (const raw of tags) {
@@ -84,12 +86,12 @@ function firstSupported(tags) {
 }
 
 export function currentLocale() {
+    const fromHtml = firstSupported([document.documentElement.lang]);
+    if (fromHtml) return fromHtml;
     const fromList = firstSupported(navigator.languages || []);
     if (fromList) return fromList;
     const fromSingle = firstSupported([navigator.language]);
     if (fromSingle) return fromSingle;
-    const fromHtml = firstSupported([document.documentElement.lang]);
-    if (fromHtml) return fromHtml;
     return 'en';
 }
 
