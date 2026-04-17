@@ -32,10 +32,12 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		// Static paths are never language-prefixed.
+		// Static and API paths are never language-prefixed.
 		if strings.HasPrefix(path, "/assets/") ||
 			strings.HasPrefix(path, "/pub/") ||
-			strings.HasPrefix(path, "/s/") {
+			strings.HasPrefix(path, "/s/") ||
+			strings.HasPrefix(path, "/token/") ||
+			strings.HasPrefix(path, "/stremio/") {
 			next.ServeHTTP(w, r)
 			return
 		}
