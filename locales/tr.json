@@ -1010,5 +1010,20 @@
     "aboutPage.osP1": "Webtor, <strong>MIT Lisansı</strong> altında tamamen açık kaynaktır. Her bileşen — backend hizmetlerinden bu web arayüzüne kadar — GitHub'da herkese açık olarak mevcuttur.",
     "aboutPage.osP2": "Şeffaflığın güven inşa ettiğine inanıyoruz. Kodu inceleyebilir, sorunları bildirebilir, özellikler önerebilir veya doğrudan katkıda bulunabilirsin.",
     "aboutPage.ctaText": "Denemeye hazır mısın?",
-    "aboutPage.ctaButton": "Webtor'u dene"
+    "aboutPage.ctaButton": "Webtor'u dene",
+
+    "time.now": "az önce",
+    "time.seconds": "%v saniye önce",
+    "time.minute": "1 dakika önce",
+    "time.minutes": "%v dakika önce",
+    "time.hour": "1 saat önce",
+    "time.hours": "%v saat önce",
+    "time.day": "1 gün önce",
+    "time.days": "%v gün önce",
+    "time.week": "1 hafta önce",
+    "time.weeks": "%v hafta önce",
+    "time.month": "1 ay önce",
+    "time.months": "%v ay önce",
+    "time.year": "1 yıl önce",
+    "time.years": "%v yıl önce"
 }

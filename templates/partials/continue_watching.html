@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <p class="mt-2 text-sm font-medium text-w-text truncate group-hover:text-w-pinkL transition-colors">{{ .DisplayName }}</p>
-                <p class="text-xs text-w-muted">{{ .UpdatedAt | timeAgo }}</p>
+                <p class="text-xs text-w-muted">{{ timeAgoLang $.Ctx.Lang .UpdatedAt }}</p>
             </a>
             {{ end }}
         </div>

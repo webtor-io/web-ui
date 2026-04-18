@@ -53,6 +53,17 @@ type Service struct {
 	Bundle *i18n.Bundle
 }
 
+var globalService *Service
+
+// GlobalService returns the singleton Service instance created by New().
+// Panics if called before New().
+func GlobalService() *Service {
+	if globalService == nil {
+		panic("i18n: GlobalService() called before New()")
+	}
+	return globalService
+}
+
 // New scans localeFS for `xx.json` files (2-letter codes only), populates
 // the package-level SupportedLangs, and loads each one into the i18n bundle.
 // Calling New is the single point that wires the supported-locales list at
@@ -72,7 +83,9 @@ func New(localeFS fs.FS) *Service {
 			log.WithError(err).WithField("lang", lang).Error("failed to load locale file")
 		}
 	}
-	return &Service{Bundle: bundle}
+	svc := &Service{Bundle: bundle}
+	globalService = svc
+	return svc
 }
 
 // discoverLocales lists files in the root of localeFS, keeps only 2-letter

@@ -1010,5 +1010,20 @@
     "aboutPage.osP1": "Webtor je plně open-source pod <strong>licencí MIT</strong>. Každá komponenta — od backend služeb po toto webové rozhraní — je veřejně dostupná na GitHubu.",
     "aboutPage.osP2": "Věříme, že transparentnost buduje důvěru. Můžeš zkoumat kód, hlásit problémy, navrhovat funkce nebo přímo přispívat.",
     "aboutPage.ctaText": "Připraven vyzkoušet?",
-    "aboutPage.ctaButton": "Vyzkoušet Webtor"
+    "aboutPage.ctaButton": "Vyzkoušet Webtor",
+
+    "time.now": "právě teď",
+    "time.seconds": "před %v sekundami",
+    "time.minute": "před 1 minutou",
+    "time.minutes": "před %v minutami",
+    "time.hour": "před 1 hodinou",
+    "time.hours": "před %v hodinami",
+    "time.day": "před 1 dnem",
+    "time.days": "před %v dny",
+    "time.week": "před 1 týdnem",
+    "time.weeks": "před %v týdny",
+    "time.month": "před 1 měsícem",
+    "time.months": "před %v měsíci",
+    "time.year": "před 1 rokem",
+    "time.years": "před %v lety"
 }

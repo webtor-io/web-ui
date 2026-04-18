@@ -8,7 +8,7 @@
         </svg>
         <div class="flex-1 min-w-0">
             <div class="font-medium text-sm truncate group-hover:text-w-purpleL transition-colors">{{ .Torrent.Name }}</div>
-            <div class="text-xs text-w-muted mt-0.5">{{ .Torrent.SizeBytes | bitsForHumans }}{{ if .Torrent.FileCount }} · {{ .Torrent.FileCount }} {{ t $.Ctx.Lang "library.files" }}{{ end }} · {{ .CreatedAt | timeAgo }}</div>
+            <div class="text-xs text-w-muted mt-0.5">{{ .Torrent.SizeBytes | bitsForHumans }}{{ if .Torrent.FileCount }} · {{ .Torrent.FileCount }} {{ t $.Ctx.Lang "library.files" }}{{ end }} · {{ timeAgoLang $.Ctx.Lang .CreatedAt }}</div>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-w-muted/40 group-hover:text-w-purpleL shrink-0 transition-colors">
             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />

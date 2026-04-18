@@ -381,6 +381,46 @@ func (s *Helper) TimeAgo(t time.Time) string {
 	return h.Time(t)
 }
 
+// TimeAgoLang formats a time.Time into a localized relative string.
+// Template usage: {{ timeAgoLang $.Lang .CreatedAt }}
+func (s *Helper) TimeAgoLang(lang string, t time.Time) string {
+	d := time.Since(t)
+	loc := i18n.GlobalService().Localizer(lang)
+	tr := func(key string) string { return i18n.TranslateWithLocalizer(loc, key) }
+
+	var key string
+	var n int
+	switch {
+	case d < time.Minute:
+		return tr("time.now")
+	case d < 2*time.Minute:
+		return tr("time.minute")
+	case d < time.Hour:
+		key, n = "time.minutes", int(d.Minutes())
+	case d < 2*time.Hour:
+		return tr("time.hour")
+	case d < 24*time.Hour:
+		key, n = "time.hours", int(d.Hours())
+	case d < 48*time.Hour:
+		return tr("time.day")
+	case d < 7*24*time.Hour:
+		key, n = "time.days", int(d.Hours()/24)
+	case d < 14*24*time.Hour:
+		return tr("time.week")
+	case d < 30*24*time.Hour:
+		key, n = "time.weeks", int(d.Hours()/(24*7))
+	case d < 60*24*time.Hour:
+		return tr("time.month")
+	case d < 365*24*time.Hour:
+		key, n = "time.months", int(d.Hours()/(24*30))
+	case d < 2*365*24*time.Hour:
+		return tr("time.year")
+	default:
+		key, n = "time.years", int(d.Hours()/(24*365))
+	}
+	return fmt.Sprintf(tr(key), n)
+}
+
 // Deref dereferences a pointer to float64, returning 0 if the pointer is nil
 func (s *Helper) DerefFloat64(f *float64) float64 {
 	if f == nil {

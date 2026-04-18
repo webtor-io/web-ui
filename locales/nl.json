@@ -1010,5 +1010,20 @@
     "aboutPage.osP1": "Webtor is volledig open-source onder de <strong>MIT-licentie</strong>. Elke component — van de backend-services tot deze webinterface — is publiekelijk beschikbaar op GitHub.",
     "aboutPage.osP2": "We geloven dat transparantie vertrouwen opbouwt. Je kunt de code inspecteren, problemen melden, functies voorstellen of direct bijdragen.",
     "aboutPage.ctaText": "Klaar om het te proberen?",
-    "aboutPage.ctaButton": "Probeer Webtor"
+    "aboutPage.ctaButton": "Probeer Webtor",
+
+    "time.now": "zojuist",
+    "time.seconds": "%v seconden geleden",
+    "time.minute": "1 minuut geleden",
+    "time.minutes": "%v minuten geleden",
+    "time.hour": "1 uur geleden",
+    "time.hours": "%v uur geleden",
+    "time.day": "1 dag geleden",
+    "time.days": "%v dagen geleden",
+    "time.week": "1 week geleden",
+    "time.weeks": "%v weken geleden",
+    "time.month": "1 maand geleden",
+    "time.months": "%v maanden geleden",
+    "time.year": "1 jaar geleden",
+    "time.years": "%v jaar geleden"
 }

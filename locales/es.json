@@ -1010,5 +1010,20 @@
     "aboutPage.osP1": "Webtor es completamente de código abierto bajo la licencia <strong>MIT License</strong>. Cada componente — desde los servicios backend hasta esta interfaz web — está disponible públicamente en GitHub.",
     "aboutPage.osP2": "Creemos que la transparencia genera confianza. Puedes inspeccionar el código, reportar problemas, sugerir mejoras o contribuir directamente.",
     "aboutPage.ctaText": "¿Listo para probarlo?",
-    "aboutPage.ctaButton": "Probar Webtor"
+    "aboutPage.ctaButton": "Probar Webtor",
+
+    "time.now": "justo ahora",
+    "time.seconds": "hace %v segundos",
+    "time.minute": "hace 1 minuto",
+    "time.minutes": "hace %v minutos",
+    "time.hour": "hace 1 hora",
+    "time.hours": "hace %v horas",
+    "time.day": "hace 1 día",
+    "time.days": "hace %v días",
+    "time.week": "hace 1 semana",
+    "time.weeks": "hace %v semanas",
+    "time.month": "hace 1 mes",
+    "time.months": "hace %v meses",
+    "time.year": "hace 1 año",
+    "time.years": "hace %v años"
 }

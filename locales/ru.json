@@ -1010,5 +1010,20 @@
     "aboutPage.osP1": "Webtor полностью открыт под лицензией <strong>MIT License</strong>. Каждый компонент — от серверных сервисов до этого веб-интерфейса — публично доступен на GitHub.",
     "aboutPage.osP2": "Мы верим, что прозрачность порождает доверие. Вы можете изучить код, сообщить об ошибках, предложить улучшения или внести вклад напрямую.",
     "aboutPage.ctaText": "Готовы попробовать?",
-    "aboutPage.ctaButton": "Открыть Webtor"
+    "aboutPage.ctaButton": "Открыть Webtor",
+
+    "time.now": "только что",
+    "time.seconds": "%v секунд назад",
+    "time.minute": "1 минуту назад",
+    "time.minutes": "%v минут назад",
+    "time.hour": "1 час назад",
+    "time.hours": "%v часов назад",
+    "time.day": "1 день назад",
+    "time.days": "%v дней назад",
+    "time.week": "1 неделю назад",
+    "time.weeks": "%v недель назад",
+    "time.month": "1 месяц назад",
+    "time.months": "%v месяцев назад",
+    "time.year": "1 год назад",
+    "time.years": "%v лет назад"
 }
