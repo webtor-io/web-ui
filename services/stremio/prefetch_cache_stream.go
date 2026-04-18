@@ -407,7 +407,8 @@ func (s *PrefetchCacheStream) markAsCached(ctx context.Context, stream StreamIte
 		}
 	}
 	if !found {
-		return fmt.Errorf("stream with InfoHash %s not found in inner streams", infoHash)
+		log.WithField("info_hash", infoHash).Debug("skipping cache mark: InfoHash not found in inner streams")
+		return nil
 	}
 	// Get file path from API using fileIdx
 	path, err := s.getFilePathFromInfoHash(ctx, infoHash, fileIdx)
