@@ -1,5 +1,7 @@
 // Stremio addon API client with caching, abort support, and timeouts
 
+import { getLang } from '../i18n';
+
 const FETCH_TIMEOUT = 10000;
 const CACHE_MAX = 100;
 
@@ -12,7 +14,9 @@ function fetchWithTimeout(url, signal, timeout = FETCH_TIMEOUT) {
         signal.addEventListener('abort', () => controller.abort(), { once: true });
     }
 
-    return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+    const headers = { 'Accept-Language': getLang() };
+
+    return fetch(url, { signal: controller.signal, headers }).finally(() => clearTimeout(timeoutId));
 }
 
 class LRUCache {
