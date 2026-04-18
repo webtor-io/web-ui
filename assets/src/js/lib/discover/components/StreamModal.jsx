@@ -414,9 +414,9 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
     const subtitleText = useMemo(() => {
         const total = baseStreams.length;
         if (hasActiveFilters) {
-            return `${visibleCount} of ${total} stream${total !== 1 ? 's' : ''}`;
+            return tf('discover.streamsFiltered', visibleCount, total);
         }
-        return `${total} stream${total !== 1 ? 's' : ''} found`;
+        return tf('discover.streamsFound', total);
     }, [hasActiveFilters, visibleCount, baseStreams.length]);
 
     const toggleSource = useCallback((src) => {
@@ -453,18 +453,18 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
                 <ModalHeader title={title} poster={poster} subtitle={subtitleText} extra={statusButtons} {...headerMeta} />
                 <div class="text-center py-6">
                     <p class="text-w-muted text-sm">
-                        {error || 'No streams available for this title.'}
+                        {error || t('discover.noStreams')}
                     </p>
                     {!hasCustomAddons && (
                         <>
                             <p class="text-w-sub text-xs mt-2 mb-4">
-                                Install streaming addons to get torrent streams.
+                                {t('discover.installAddonsHint')}
                             </p>
                             <button
                                 class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan"
                                 onClick={onSetupAddons}
                             >
-                                Set up addons
+                                {t('discover.setupAddonsBtn')}
                             </button>
                         </>
                     )}
@@ -510,7 +510,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
                     </div>
 
                     {hasActiveFilters && visibleCount === 0 && (
-                        <p class="text-w-muted text-sm text-center py-6">No streams match the selected filters.</p>
+                        <p class="text-w-muted text-sm text-center py-6">{t('discover.noFilterMatch')}</p>
                     )}
                 </>
             )}
@@ -529,32 +529,32 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
                     class="toggle toggle-xs toggle-soft"
                 />
                 <span class="text-xs text-w-sub">
-                    Include 4K
+                    {t('discover.include4k')}
                     <span class="text-w-muted ml-0.5">({count})</span>
                 </span>
                 {!show4k && (
-                    <span class="text-[10px] text-w-muted">(streaming may not work)</span>
+                    <span class="text-[10px] text-w-muted">{t('discover.mayNotWork')}</span>
                 )}
             </label>
 
             {showWarning && (
                 <div class="absolute left-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
-                    <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">4K streaming warning</p>
+                    <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">{t('discover.warning4kTitle')}</p>
                     <p class="text-[11px] text-w-muted mt-0.5 leading-snug">
-                        4K content is very large and video streaming will most likely not work. It may also require transcoding, which is disabled for 4K. Only download is recommended.
+                        {t('discover.warning4kBody')}
                     </p>
                     <div class="flex justify-between gap-1.5 mt-2">
                         <button
                             class="btn btn-ghost btn-xs text-w-muted"
                             onClick={onCancel}
                         >
-                            Cancel
+                            {t('discover.cancel')}
                         </button>
                         <button
                             class="btn btn-xs btn-ghost border border-red-400/30 text-red-400/70 hover:bg-red-400/10 hover:text-red-400"
                             onClick={onConfirm}
                         >
-                            Show 4K
+                            {t('discover.show4k')}
                         </button>
                     </div>
                 </div>
@@ -625,7 +625,7 @@ function StreamRow({ stream, info, onStreamClick }) {
                 ))}
             </div>
             {!infoHash && (
-                <span class="text-xs text-w-muted flex-shrink-0">No torrent</span>
+                <span class="text-xs text-w-muted flex-shrink-0">{t('discover.noTorrent')}</span>
             )}
         </>
     );
@@ -694,7 +694,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
         return (
             <div>
                 <ModalHeader title={title} poster={poster} subtitle={t('discover.selectEpisode')} extra={statusButtons} {...headerMeta} />
-                <p class="text-w-muted text-sm text-center py-6">No episodes found.</p>
+                <p class="text-w-muted text-sm text-center py-6">{t('discover.noEpisodes')}</p>
             </div>
         );
     }
@@ -711,7 +711,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                             class={chipClass(sn === activeSeason, 'xs')}
                             onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
                         >
-                            {sn === 0 ? 'Specials' : `S${sn}`}
+                            {sn === 0 ? t('discover.specials') : `S${sn}`}
                         </button>
                     ))}
                 </div>
@@ -730,7 +730,7 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                             </span>
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-medium line-clamp-1">
-                                    {episode.title || episode.name || `Episode ${episode.episode || '?'}`}
+                                    {episode.title || episode.name || tf('discover.episodeLabel', episode.episode || '?')}
                                 </div>
                                 {(episode.released || episode.overview) && (
                                     <div class="text-xs text-w-muted line-clamp-1">

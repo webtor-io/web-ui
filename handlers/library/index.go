@@ -15,6 +15,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -87,6 +88,19 @@ func (s *Handler) index(c *gin.Context) {
 
 	// Annotate each item with UserWatched flag (bulk prefetch to avoid N+1).
 	s.annotateWatched(ctx, db, u.ID, ls)
+
+	// Localize content metadata (title, plot) to the user's language.
+	if s.enricher != nil {
+		lang := i18n.GetLang(c)
+		for _, item := range ls {
+			switch v := item.(type) {
+			case *models.Movie:
+				s.enricher.Localize(ctx, v.GetMetadata(), lang)
+			case *models.Series:
+				s.enricher.Localize(ctx, v.GetMetadata(), lang)
+			}
+		}
+	}
 
 	tc, mc, sc, err := models.GetLibraryCounts(ctx, db, u.ID)
 	if err != nil {

@@ -47,6 +47,14 @@ type PopularProvider interface {
 	RefreshPopular(ctx context.Context, releaseDateGte string, limit int, force bool) (int, error)
 }
 
+// LocalizableMapper is an optional capability of a MetadataMapper. Mappers
+// that can return localized title/plot for a given language implement this
+// interface. Today only TMDB supports it; OMDB is English-only, Kinopoisk
+// could implement it for Russian in the future.
+type LocalizableMapper interface {
+	Localize(ctx context.Context, videoID string, lang string) (title string, plot string, err error)
+}
+
 func (s *Enricher) HasMappers() bool {
 	return len(s.mappers) > 0
 }
@@ -73,6 +81,38 @@ func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, li
 		}).Info("refreshed popular films")
 	}
 	return nil
+}
+
+// Localize overlays localized title and plot onto md in-place.
+// Skips if lang is "en" or md is nil. Iterates mappers that implement
+// LocalizableMapper and uses the first successful result.
+// Errors are logged but swallowed — English fallback is always safe.
+func (s *Enricher) Localize(ctx context.Context, md *models.VideoMetadata, lang string) {
+	if md == nil || lang == "en" || md.VideoID == "" {
+		return
+	}
+	for _, m := range s.mappers {
+		lm, ok := m.(LocalizableMapper)
+		if !ok {
+			continue
+		}
+		title, plot, err := lm.Localize(ctx, md.VideoID, lang)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", md.VideoID).
+				WithField("lang", lang).
+				Debug("localize: mapper failed, trying next")
+			continue
+		}
+		if title != "" {
+			md.Title = title
+		}
+		if plot != "" {
+			md.Plot = plot
+		}
+		return
+	}
 }
 
 func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper) *Enricher {

@@ -2,21 +2,30 @@ package enrich
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	tm "github.com/webtor-io/web-ui/models/tmdb"
 	"github.com/webtor-io/web-ui/services/tmdb"
 )
 
+type localizedText struct {
+	Title string
+	Plot  string
+}
+
 type TMDB struct {
-	api *tmdb.Api
-	pg  *cs.PG
+	api      *tmdb.Api
+	pg       *cs.PG
+	locCache *lazymap.LazyMap[*localizedText]
 }
 
 func (s *TMDB) GetName() string {
@@ -30,6 +39,10 @@ func NewTMDB(pg *cs.PG, api *tmdb.Api) *TMDB {
 	return &TMDB{
 		pg:  pg,
 		api: api,
+		locCache: lazymap.New[*localizedText](&lazymap.Config{
+			Expire:      10 * time.Minute,
+			ErrorExpire: 30 * time.Second,
+		}),
 	}
 }
 
@@ -327,6 +340,132 @@ func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit 
 	return added, nil
 }
 
+// tmdbLang maps our 2-letter locale code to the TMDB language tag.
+// Special case: our "pt" is PT-BR.
+func tmdbLang(lang string) string {
+	if lang == "pt" {
+		return "pt-BR"
+	}
+	return lang
+}
+
+// Localize returns the localized title and plot for a video ID in the
+// given language. Uses a 3-tier cache: in-memory lazymap → DB
+// (tmdb.localized) → TMDB API.
+func (s *TMDB) Localize(ctx context.Context, videoID string, lang string) (string, string, error) {
+	tmdbID, tmdbType, err := s.resolveLocalizeIDs(ctx, videoID)
+	if err != nil {
+		return "", "", err
+	}
+	if tmdbID == 0 {
+		return "", "", nil
+	}
+
+	tl := tmdbLang(lang)
+	cacheKey := fmt.Sprintf("%d:%s", tmdbID, tl)
+
+	text, err := s.locCache.Get(cacheKey, func() (*localizedText, error) {
+		return s.localizeFromDBOrAPI(ctx, tmdbID, tmdbType, tl)
+	})
+	if err != nil {
+		return "", "", err
+	}
+	if text == nil {
+		return "", "", nil
+	}
+	return text.Title, text.Plot, nil
+}
+
+func (s *TMDB) resolveLocalizeIDs(ctx context.Context, videoID string) (int, tmdb.TmdbType, error) {
+	if strings.HasPrefix(videoID, "tmdb") {
+		id, err := strconv.Atoi(strings.TrimPrefix(videoID, "tmdb"))
+		if err != nil {
+			return 0, "", nil
+		}
+		db := s.pg.Get()
+		if db != nil {
+			info, _ := tm.GetInfoByID(ctx, db, id)
+			if info != nil && info.Type == tm.TmdbTypeSeries {
+				return id, tmdb.TmdbTypeTV, nil
+			}
+		}
+		return id, tmdb.TmdbTypeMovie, nil
+	}
+
+	if strings.HasPrefix(videoID, "tt") {
+		db := s.pg.Get()
+		if db == nil {
+			return 0, "", errors.New("db is nil")
+		}
+		var info tm.Info
+		err := db.Model(&info).
+			Context(ctx).
+			Where("imdb_id = ?", videoID).
+			Limit(1).
+			Select()
+		if err != nil {
+			if errors.Is(err, pg.ErrNoRows) {
+				return 0, "", nil
+			}
+			return 0, "", err
+		}
+		tt := tmdb.TmdbTypeMovie
+		if info.Type == tm.TmdbTypeSeries {
+			tt = tmdb.TmdbTypeTV
+		}
+		return info.TmdbID, tt, nil
+	}
+
+	return 0, "", nil
+}
+
+func (s *TMDB) localizeFromDBOrAPI(ctx context.Context, tmdbID int, tmdbType tmdb.TmdbType, lang string) (*localizedText, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+
+	cached, err := tm.GetLocalized(ctx, db, tmdbID, lang)
+	if err != nil {
+		return nil, errors.Wrap(err, "localize: db lookup failed")
+	}
+	if cached != nil {
+		return &localizedText{Title: cached.Title, Plot: cached.Plot}, nil
+	}
+
+	raw, err := s.api.GetLocalizedDetails(ctx, tmdbID, tmdbType, lang)
+	if err != nil {
+		return nil, errors.Wrap(err, "localize: api call failed")
+	}
+	if raw == nil {
+		return nil, nil
+	}
+
+	var title string
+	if t, ok := raw["title"].(string); ok && t != "" {
+		title = t
+	} else if n, ok := raw["name"].(string); ok && n != "" {
+		title = n
+	}
+
+	var plot string
+	if ov, ok := raw["overview"].(string); ok {
+		plot = ov
+	}
+
+	if title == "" && plot == "" {
+		return nil, nil
+	}
+
+	_, err = tm.UpsertLocalized(ctx, db, tmdbID, lang, title, plot)
+	if err != nil {
+		log.WithError(err).WithField("tmdb_id", tmdbID).WithField("lang", lang).Warn("localize: failed to persist cache")
+	}
+
+	return &localizedText{Title: title, Plot: plot}, nil
+}
+
 var _ MetadataMapper = (*TMDB)(nil)
 var _ DirectMapper = (*TMDB)(nil)
 var _ PopularProvider = (*TMDB)(nil)
+var _ LocalizableMapper = (*TMDB)(nil)

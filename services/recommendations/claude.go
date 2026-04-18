@@ -391,7 +391,7 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 	}()
 
 	recCh := make(chan Recommendation, r2BufferSize)
-	go s.resolver.ResolveStreamFromChannel(ctx, claudeCh, models.ContentTypeMovie, recCh)
+	go s.resolver.ResolveStreamFromChannel(ctx, claudeCh, models.ContentTypeMovie, req.Locale, recCh)
 
 	sentResolving := false
 	sent := 0

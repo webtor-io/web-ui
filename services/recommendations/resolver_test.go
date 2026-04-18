@@ -45,7 +45,7 @@ func TestResolver_DropsNonImdbAndUnresolved(t *testing.T) {
 			"Boom": errors.New("tmdb unavailable"),
 		},
 	}
-	r := NewResolver(f, 3)
+	r := NewResolver(f, nil,3)
 
 	items := []claudeItem{
 		{Title: "Interstellar", Year: 2014, Reason: "you loved Tenet"},
@@ -55,7 +55,7 @@ func TestResolver_DropsNonImdbAndUnresolved(t *testing.T) {
 		{Title: "Boom", Reason: "upstream error"},
 	}
 
-	got := r.Resolve(context.Background(), items, models.ContentTypeMovie)
+	got := r.Resolve(context.Background(),items, models.ContentTypeMovie, "")
 
 	if len(got) != 2 {
 		t.Fatalf("want 2 resolved, got %d: %+v", len(got), got)
@@ -85,17 +85,17 @@ func TestResolver_SeriesType(t *testing.T) {
 			"Breaking Bad": {VideoID: "tt0903747", Title: "Breaking Bad", Year: yearPtr(2008)},
 		},
 	}
-	r := NewResolver(f, 1)
+	r := NewResolver(f, nil,1)
 
-	got := r.Resolve(context.Background(), []claudeItem{{Title: "Breaking Bad", Year: 2008, Reason: "obvious"}}, models.ContentTypeSeries)
+	got := r.Resolve(context.Background(),[]claudeItem{{Title: "Breaking Bad", Year: 2008, Reason: "obvious"}}, models.ContentTypeSeries, "")
 	if len(got) != 1 || got[0].Type != "series" {
 		t.Fatalf("expected series type, got %+v", got)
 	}
 }
 
 func TestResolver_EmptyInput(t *testing.T) {
-	r := NewResolver(&fakeLookup{}, 2)
-	if got := r.Resolve(context.Background(), nil, models.ContentTypeMovie); len(got) != 0 {
+	r := NewResolver(&fakeLookup{}, nil, 2)
+	if got := r.Resolve(context.Background(),nil, models.ContentTypeMovie, ""); len(got) != 0 {
 		t.Fatalf("want empty, got %+v", got)
 	}
 }
@@ -118,7 +118,7 @@ func TestResolver_ConcurrencyLimit(t *testing.T) {
 			atomic.AddInt64(&inflight, -1)
 		},
 	}
-	r := NewResolver(f, 3)
+	r := NewResolver(f, nil,3)
 
 	items := make([]claudeItem, 10)
 	for i := range items {
@@ -128,7 +128,7 @@ func TestResolver_ConcurrencyLimit(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_ = r.Resolve(context.Background(), items, models.ContentTypeMovie)
+		_ = r.Resolve(context.Background(),items, models.ContentTypeMovie, "")
 	}()
 
 	// Let things run briefly to saturate the semaphore, then release.

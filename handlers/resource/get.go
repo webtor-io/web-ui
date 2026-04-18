@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -274,6 +275,17 @@ func (s *Handler) get(c *gin.Context) {
 	if d == nil {
 		web.RedirectWithErrorAndPath(c, "/", errors.New("resource not found"))
 		return
+	}
+
+	// Localize content metadata (title, plot) to the user's language
+	if s.enricher != nil {
+		lang := i18n.GetLang(c)
+		if d.Movie != nil {
+			s.enricher.Localize(ctx, d.Movie.GetMetadata(), lang)
+		}
+		if d.Series != nil {
+			s.enricher.Localize(ctx, d.Series.GetMetadata(), lang)
+		}
 	}
 
 	// Set vault availability

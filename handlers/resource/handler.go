@@ -16,6 +16,7 @@ import (
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
@@ -27,10 +28,11 @@ type Handler struct {
 	tb             template.Builder[*web.Context]
 	pg             *cs.PG
 	vault          *vault.Vault
+	enricher       *enrich.Enricher
 	useDirectLinks bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher) {
 	helper := NewHelper()
 	h := &Handler{
 		api:            api,
@@ -38,6 +40,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		tb:             tm.MustRegisterViews("resource/*").WithHelper(helper).WithLayout("main"),
 		pg:             pg,
 		vault:          v,
+		enricher:       en,
 		useDirectLinks: c.BoolT(common.UseDirectLinks),
 	}
 	r.POST("/", h.post)

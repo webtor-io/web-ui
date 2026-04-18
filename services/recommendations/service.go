@@ -215,6 +215,13 @@ type MetadataLookup interface {
 	LookupByTitleYear(ctx context.Context, title string, year *int16, ct models.ContentType) (*models.VideoMetadata, error)
 }
 
+// ContentLocalizer is an optional capability for localizing metadata (title,
+// plot) into the user's language. In production it is satisfied by
+// *enrich.Enricher. If nil, the resolver skips localization.
+type ContentLocalizer interface {
+	Localize(ctx context.Context, md *models.VideoMetadata, lang string)
+}
+
 // UserHistoryLoader loads the "what has this user watched and rated" picture
 // used to ground Claude's output. Separated from the models package so tests
 // can inject fixtures without touching a real Postgres.

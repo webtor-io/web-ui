@@ -42,23 +42,24 @@ type claudeItem struct {
 // the underlying HTTP client's connection pool.
 type Resolver struct {
 	lookup      MetadataLookup
+	localizer   ContentLocalizer
 	concurrency int
 }
 
 // NewResolver wires a resolver with the given metadata provider. concurrency
-// <= 0 falls back to 5.
-func NewResolver(lookup MetadataLookup, concurrency int) *Resolver {
+// <= 0 falls back to 5. localizer may be nil — localization is skipped.
+func NewResolver(lookup MetadataLookup, localizer ContentLocalizer, concurrency int) *Resolver {
 	if concurrency <= 0 {
 		concurrency = 5
 	}
-	return &Resolver{lookup: lookup, concurrency: concurrency}
+	return &Resolver{lookup: lookup, localizer: localizer, concurrency: concurrency}
 }
 
 // Resolve turns a slice of claudeItems into Recommendation cards, preserving
 // input order and silently dropping unresolvable entries. Never returns an
 // error — a failure to resolve a single item is logged and treated as "not
 // that title", not as a hard failure of the whole batch.
-func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.ContentType) []Recommendation {
+func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.ContentType, lang string) []Recommendation {
 	if len(items) == 0 {
 		return nil
 	}
@@ -93,7 +94,7 @@ func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.Co
 			}
 			defer atomic.AddInt64(&inflight, -1)
 
-			rec := r.resolveOne(ctx, item, ct)
+			rec := r.resolveOne(ctx, item, ct, lang)
 			if rec != nil {
 				out[i] = rec
 			}
@@ -137,7 +138,7 @@ func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.Co
 // abort their TMDB calls (which respect ctx) and exit. Callers MUST drain
 // `out` until it closes, otherwise the goroutines block forever waiting
 // to push their result.
-func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct models.ContentType, out chan<- Recommendation) {
+func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct models.ContentType, lang string, out chan<- Recommendation) {
 	defer close(out)
 	if len(items) == 0 {
 		return
@@ -171,7 +172,7 @@ func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct mod
 			}
 			defer atomic.AddInt64(&inflight, -1)
 
-			rec := r.resolveOne(ctx, item, ct)
+			rec := r.resolveOne(ctx, item, ct, lang)
 			if rec == nil {
 				return
 			}
@@ -211,7 +212,7 @@ func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct mod
 // finished. Cancellation: if ctx is cancelled, in-flight goroutines bail
 // (their TMDB calls inherit the context), and the method drains `in` so
 // upstream producers don't block forever waiting to push their next item.
-func (r *Resolver) ResolveStreamFromChannel(ctx context.Context, in <-chan claudeItem, ct models.ContentType, out chan<- Recommendation) {
+func (r *Resolver) ResolveStreamFromChannel(ctx context.Context, in <-chan claudeItem, ct models.ContentType, lang string, out chan<- Recommendation) {
 	defer close(out)
 
 	start := time.Now()
@@ -251,7 +252,7 @@ func (r *Resolver) ResolveStreamFromChannel(ctx context.Context, in <-chan claud
 			}
 			defer atomic.AddInt64(&inflight, -1)
 
-			rec := r.resolveOne(ctx, item, ct)
+			rec := r.resolveOne(ctx, item, ct, lang)
 			if rec == nil {
 				return
 			}
@@ -285,8 +286,10 @@ func (r *Resolver) logFinished(mode string, itemsIn int, sent int64, peakPar int
 }
 
 // resolveOne performs a single metadata lookup and shapes the result into a
-// Recommendation. Returns nil if the item should be dropped.
-func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.ContentType) *Recommendation {
+// Recommendation. Returns nil if the item should be dropped. When lang is
+// non-empty and a ContentLocalizer is configured, title and plot are
+// translated before building the card.
+func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.ContentType, lang string) *Recommendation {
 	title := strings.TrimSpace(item.Title)
 	if title == "" {
 		return nil
@@ -321,6 +324,10 @@ func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.Co
 			WithField("video_id", md.VideoID).
 			Warn("dropping non-IMDB recommendation")
 		return nil
+	}
+
+	if r.localizer != nil && lang != "" {
+		r.localizer.Localize(ctx, md, lang)
 	}
 
 	rating := 0.0

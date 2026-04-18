@@ -309,7 +309,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm, pg)
@@ -360,7 +360,7 @@ func serve(c *cli.Context) error {
 	// registration entirely — the routes simply don't exist and gin
 	// returns its default 404, which the Discover frontend reads as
 	// "feature disabled" and hides the section.
-	recSvc := rec.New(c, pg, redis, en)
+	recSvc := rec.New(c, pg, redis, en, en)
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}

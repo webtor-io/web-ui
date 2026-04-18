@@ -19,12 +19,12 @@ const resolverConcurrency = 10
 // Returns interface-nil when the feature flag is off or
 // ANTHROPIC_API_KEY is empty — call sites should treat a nil Service as
 // "feature disabled" and skip handler registration entirely.
-func New(c *cli.Context, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup) Service {
+func New(c *cli.Context, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup, localizer ContentLocalizer) Service {
 	cfg := ConfigFromCLI(c)
 
 	historyLoader := NewDBUserHistoryLoader(pg)
 	contextBuilder := NewUserContextBuilder(historyLoader, cfg.HistoryLimit)
-	resolver := NewResolver(lookup, resolverConcurrency)
+	resolver := NewResolver(lookup, localizer, resolverConcurrency)
 	quota := NewRedisQuota(redis.Get(), cfg)
 	chipsCache := NewRedisChipsCache(redis.Get())
 	freshReleases := NewDBFreshReleasesLoader(pg, int16(cfg.FreshReleasesMinYear), cfg.FreshReleasesLimit, cfg.FreshReleasesCacheTTL)

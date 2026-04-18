@@ -216,6 +216,22 @@ func (api *Api) GetDetails(ctx context.Context, tmdbID int, tmdbType TmdbType) (
 	return raw, nil
 }
 
+// GetLocalizedDetails fetches title and overview for a specific language.
+// Unlike GetDetails, it does NOT append credits (lighter response).
+func (api *Api) GetLocalizedDetails(ctx context.Context, tmdbID int, tmdbType TmdbType, lang string) (map[string]any, error) {
+	u, _ := url.Parse(fmt.Sprintf("%s/3/%s/%d", api.url, tmdbType, tmdbID))
+	q := u.Query()
+	q.Set("language", lang)
+	u.RawQuery = q.Encode()
+
+	raw, err := api.doRequest(ctx, u.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "tmdb get localized details")
+	}
+
+	return raw, nil
+}
+
 func (api *Api) GetExternalIDs(ctx context.Context, tmdbID int, tmdbType TmdbType) (map[string]any, error) {
 	u := fmt.Sprintf("%s/3/%s/%d/external_ids", api.url, tmdbType, tmdbID)
 
