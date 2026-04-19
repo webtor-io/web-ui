@@ -155,7 +155,15 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Purple (`bg-w-purple/10 text-w-purpleL`) — comparison sections
 - Cyan (`bg-w-cyan/10 text-w-cyan`) — info, tools, FAQ
 
-**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `loading-elipsis`, `popin`.
+**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `loading-elipsis`, `popin`, `w-card-frame`, `w-card-title`, `w-card-badge`, `w-card-badge-label`, `w-card-badge-ghost`, `w-card-stars-compact`, `w-card-stars-full`.
+
+**Mobile patterns** — see `docs/uikit.html` section 15. Key rules:
+- Hide decorative badges/subtitles on mobile (`hidden sm:inline-flex` / `hidden sm:block`)
+- Use `sticky top-[72px]` for tab bars with `bg-w-bg/90 backdrop-blur-lg`
+- Use `flex-col sm:flex-row` to stack filters below tabs on mobile
+- Use container queries (not media queries) for card-level responsive: `w-card-badge-label`, `w-card-stars-compact/full` switch at 210px card width
+- Use `line-clamp-2` instead of `truncate` for torrent names
+- Touch targets: `w-card-badge-ghost` enlarges to 2.5rem on `@media (hover: none)`
 
 **Typography** (`tailwind.config.js`):
 - `font-sans` — Inter (primary body font)

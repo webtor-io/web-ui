@@ -947,19 +947,22 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 initialQuery={state.searchQuery}
             />
 
-            {state.isSearchMode ? (
-                <SearchTabs
-                    searchResults={state.searchResults}
-                    searchTypes={searchTypes}
-                    searchType={state.searchType}
-                    onSelect={selectSearchType}
-                />
-            ) : (
-                <>
-                    <TypeTabs types={types} selectedType={state.selectedType} onSelect={selectType} />
-                    <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
-                </>
-            )}
+            {/* Sticky tab bar — stays below navbar (72px) on scroll */}
+            <div class="sticky top-[72px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 bg-w-bg/90 backdrop-blur-lg border-b border-w-line/30">
+                {state.isSearchMode ? (
+                    <SearchTabs
+                        searchResults={state.searchResults}
+                        searchTypes={searchTypes}
+                        searchType={state.searchType}
+                        onSelect={selectSearchType}
+                    />
+                ) : (
+                    <>
+                        <TypeTabs types={types} selectedType={state.selectedType} onSelect={selectType} />
+                        <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                    </>
+                )}
+            </div>
 
             {(state.catalogLoading || state.searchLoading) && <LoadingSpinner />}
 

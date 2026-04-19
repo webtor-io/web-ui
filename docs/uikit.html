@@ -468,7 +468,7 @@
             </div>
             <button class="w-card-badge top-2 right-2 text-green-400 uppercase tracking-wider" title="Unmark watched" onclick="event.preventDefault();event.stopPropagation()">
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Watched
+              <span class="w-card-badge-label">Watched</span>
             </button>
             <button class="w-card-badge top-2 left-2 text-yellow-400" title="Change rating" onclick="event.preventDefault();event.stopPropagation()">
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd"/></svg>
@@ -488,16 +488,23 @@
     <div class="uikit-rule">
       <strong>API surface:</strong>
       <ul class="list-disc list-inside mt-2 space-y-1">
-        <li><code>.w-card-frame</code> — card container. Auto-applies purple-themed border + hover. Wrap inside <code>.group</code> parent (the link/clickable wrapper).</li>
+        <li><code>.w-card-frame</code> — card container. Auto-applies purple-themed border + hover. Has <code>container-type: inline-size</code> for container queries. Wrap inside <code>.group</code> parent (the link/clickable wrapper).</li>
         <li><code>.w-card-frame.is-watched</code> — modifier, sets <code>opacity: 0.7</code> for watched items.</li>
         <li><code>.w-card-title</code> — card title. Auto-applies <code>w-purpleL</code> hover color when parent <code>.group:hover</code>.</li>
         <li><code>.w-card-badge</code> — overlay badge with text label. Add positioning (<code>top-2 right-2</code>) and color (<code>text-green-400</code>, <code>text-yellow-400</code>) inline.</li>
-        <li><code>.w-card-badge-ghost</code> — icon-only overlay, hover-revealed on desktop, <code>opacity: 0.5</code> on touch devices. Add positioning + hover color (<code>hover:text-green-400</code>) inline.</li>
+        <li><code>.w-card-badge-label</code> — wrap badge text in this class. Auto-hidden when card &lt; 210px via container query to prevent badge overlap.</li>
+        <li><code>.w-card-badge-ghost</code> — icon-only overlay, hover-revealed on desktop, <code>opacity: 0.5</code> + enlarged to <code>2.5rem</code> on touch devices. Add positioning + hover color (<code>hover:text-green-400</code>) inline.</li>
+        <li><code>.w-card-stars-compact</code> — compact rating display (single star icon + number). Auto-hidden when card &ge; 210px.</li>
+        <li><code>.w-card-stars-full</code> — full 5-star rating row. Auto-hidden when card &lt; 210px.</li>
       </ul>
     </div>
 
     <div class="uikit-note">
       <strong>Convention:</strong> watched = green (<code>text-green-400</code>) at top-right, rating = yellow (<code>text-yellow-400</code>) at top-left. Don't swap colors or sides — both Go template and Preact rely on this.
+    </div>
+
+    <div class="uikit-note">
+      <strong>Container queries (210px threshold):</strong> <code>.w-card-frame</code> has <code>container-type: inline-size</code>. When the card is narrower than 210px, badge text labels (<code>.w-card-badge-label</code>) are hidden and <code>.w-card-badge</code> shrinks to icon-only padding. Stars switch from full (<code>.w-card-stars-full</code>) to compact (<code>.w-card-stars-compact</code>). This is card-width-based, not screen-width-based, so it adapts correctly regardless of the number of grid columns.
     </div>
   </div>
 
@@ -1055,6 +1062,84 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       &bull; Use <code>toast.success()</code> for completed actions (copy, save, add, delete)<br>
       &bull; Use <code>toast.info()</code> for started actions (download starting)<br>
       &bull; Use <code>toast.error()</code> for client-side failures
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <div class="uikit-section" id="mobile">
+    <h2>15. Mobile Patterns</h2>
+    <p class="desc">Rules and patterns for mobile-optimized layouts. These ensure pages stay compact on small screens (320px–480px) while preserving full content on desktop.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Compact Page Headers</h3>
+    <p class="desc">On mobile, decorative elements waste valuable vertical space. Hide non-functional elements to get content above the fold faster.</p>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li>Decorative badges (e.g. "LIBRARY", "DISCOVER"): <code>hidden sm:inline-flex</code></li>
+        <li>Subtitle / description text: <code>hidden sm:block</code></li>
+        <li>Top padding: <code>pt-24 sm:pt-[120px]</code> (96px on mobile vs 120px on desktop — still clears the 72px navbar)</li>
+        <li>Heading margin: <code>mb-2 sm:mb-4</code></li>
+      </ul>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Sticky Tab Bar</h3>
+    <p class="desc">Tab navigation sticks below the navbar on scroll so users can switch sections without scrolling up.</p>
+    <div class="uikit-rule">
+      <strong>Pattern:</strong><br>
+      <code>sticky top-[72px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 bg-w-bg/90 backdrop-blur-lg border-b border-w-line/30</code><br><br>
+      <ul class="list-disc list-inside space-y-1">
+        <li>Negative horizontal margin (<code>-mx-3</code>) stretches the bar edge-to-edge, then <code>px-3</code> restores inner padding</li>
+        <li>Use <code>flex-col sm:flex-row</code> inside the bar: tabs on first row, filters/sort on second row on mobile; all in one row on desktop</li>
+        <li>Filters/sort get <code>sm:ml-auto</code> to push right only on desktop</li>
+      </ul>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Navbar at Narrow Widths (320px)</h3>
+    <p class="desc">At 320px the navbar is very tight with logo + 5 buttons. Use tighter padding and gaps at small widths.</p>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li>Navbar padding: <code>px-2 min-[400px]:px-3 sm:px-6</code></li>
+        <li>Navbar-end gap: <code>gap-0.5 min-[400px]:gap-1 sm:gap-2</code></li>
+        <li>Don't hide nav buttons — all are important. Shrink gaps instead.</li>
+      </ul>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Touch Targets</h3>
+    <p class="desc">Interactive elements on touch devices need larger hit areas.</p>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li><code>.w-card-badge-ghost</code> enlarges from <code>2rem</code> to <code>2.5rem</code> via <code>@media (hover: none)</code></li>
+        <li>Minimum recommended touch target: 40px (2.5rem). Apple guidelines: 44pt.</li>
+      </ul>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Container Queries for Cards</h3>
+    <p class="desc">Card content adapts based on the card's own width (not the viewport), via <code>container-type: inline-size</code> on <code>.w-card-frame</code>. This handles all grid configurations automatically.</p>
+    <div class="uikit-rule">
+      <strong>Threshold: 210px</strong><br><br>
+      <strong>Below 210px (compact mode):</strong>
+      <ul class="list-disc list-inside space-y-1 mb-3">
+        <li><code>.w-card-badge-label</code> — hidden (badge becomes icon-only)</li>
+        <li><code>.w-card-badge</code> — padding shrinks to <code>0.375rem</code> (square pill)</li>
+        <li><code>.w-card-stars-full</code> — hidden</li>
+        <li><code>.w-card-stars-compact</code> — visible (single star icon + number, e.g. "&#9733; 7.6")</li>
+      </ul>
+      <strong>At or above 210px (full mode):</strong>
+      <ul class="list-disc list-inside space-y-1">
+        <li><code>.w-card-badge-label</code> — visible (badge shows text)</li>
+        <li><code>.w-card-stars-full</code> — visible (5-star row)</li>
+        <li><code>.w-card-stars-compact</code> — hidden</li>
+      </ul>
+    </div>
+    <div class="uikit-note">
+      <strong>Why container queries, not media queries?</strong> The same card can appear in a 2-col grid (wide cards) on mobile and a 4-col grid (narrow cards) on desktop. Media queries would show full stars on desktop even when cards are narrow. Container queries adapt to actual card width.
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Torrent List Names</h3>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li>Use <code>line-clamp-2</code> instead of <code>truncate</code> for torrent file names — shows more of the name on narrow screens with minimal height increase</li>
+      </ul>
     </div>
   </div>
 

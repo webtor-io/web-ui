@@ -9,7 +9,7 @@
     {{- end }}
     window._tierUpdated = {{ .TierUpdated }};
 </script>
-<div class="navbar navbar-redesign fixed top-0 inset-x-0 z-navbar backdrop-blur-xl border-b border-w-line px-3 sm:px-6 h-[72px]">
+<div class="navbar navbar-redesign fixed top-0 inset-x-0 z-navbar backdrop-blur-xl border-b border-w-line px-2 min-[400px]:px-3 sm:px-6 h-[72px]">
     <div class="navbar-start">
         <a href="{{ langPath $.Lang "/" }}" data-async-target="main" class="font-logo text-[1.6rem] font-light tracking-tight normal-case no-underline">
             web<span class="text-w-pink">tor</span>
@@ -25,7 +25,7 @@
         </ul>
     </div>
     {{ end }}
-    <div class="navbar-end gap-1 sm:gap-2">
+    <div class="navbar-end gap-0.5 min-[400px]:gap-1 sm:gap-2">
         <div class="dropdown dropdown-end">
             <label tabindex="0" class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-cyan hover:text-base-content cursor-pointer uppercase text-xs tracking-wide px-2 sm:px-3" aria-label="Language">
                 {{ $.Lang }}

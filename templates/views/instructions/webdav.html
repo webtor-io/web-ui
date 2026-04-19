@@ -2,9 +2,9 @@
     {{ t $.Lang "instructions.webdav.title" }}
 {{ end }}
 {{ define "main" }}
-<section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
-    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
@@ -13,7 +13,7 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "instructions.webdav.heading" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.webdav.intro" }}</p>
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.webdav.intro" }}</p>
 
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
         <li>{{ tpHTML $.Lang "instructions.webdav.step1" "ProfileURL" (langPath $.Lang "/profile") }}</li>

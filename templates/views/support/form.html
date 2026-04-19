@@ -1,8 +1,8 @@
 {{ define "title" }}{{ t $.Lang "support.title" }}{{ end }}
 {{ define "main" }}
-<section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
-    <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
@@ -11,7 +11,7 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "support.title" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "support.subtitle" }}</p>
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "support.subtitle" }}</p>
 
     {{ if .ErrKey }}
         <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">

@@ -1,25 +1,27 @@
 {{ define "title" }}{{ t $.Lang "library.title" }}{{ end }}
 {{ define "main" }}
-<section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
 
-    <!-- Badge -->
-    <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+    <!-- Badge (hidden on mobile to save vertical space) -->
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"/>
       </svg>
       {{ t $.Lang "library.badge" }}
     </div>
 
-    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "library.title" }}</h1>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "library.subtitle" }}</p>
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-2 sm:mb-4">{{ t $.Lang "library.title" }}</h1>
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "library.subtitle" }}</p>
 
-    <!-- Menu + Filters + Sort -->
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
-      {{ template "library/menu" . }}
-      <div class="flex items-center gap-2 ml-auto">
-        {{ template "library/watched_filter" (withContext $ .Data.Args) }}
-        {{ template "library/sort" (withContext $ .Data.Args) }}
+    <!-- Menu + Filters + Sort (sticky on scroll) -->
+    <div class="sticky top-[72px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 mb-3 bg-w-bg/90 backdrop-blur-lg border-b border-w-line/30">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+        {{ template "library/menu" . }}
+        <div class="flex items-center gap-2 sm:ml-auto">
+          {{ template "library/watched_filter" (withContext $ .Data.Args) }}
+          {{ template "library/sort" (withContext $ .Data.Args) }}
+        </div>
       </div>
     </div>
 

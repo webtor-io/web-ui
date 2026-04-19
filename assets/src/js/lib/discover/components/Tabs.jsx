@@ -13,7 +13,7 @@ function typeLabel(type) {
 export function TypeTabs({ types, selectedType, onSelect }) {
     if (!types.length) return null;
     return (
-        <div class="flex gap-2 mb-4 flex-wrap">
+        <div class="flex gap-1.5 sm:gap-2 flex-wrap">
             {types.map(type => (
                 <button
                     key={type}
@@ -38,7 +38,7 @@ export function SearchTabs({ searchResults, searchTypes, searchType, onSelect })
     ], [searchResults, searchTypes]);
 
     return (
-        <div class="flex gap-2 mb-4 flex-wrap">
+        <div class="flex gap-1.5 sm:gap-2 flex-wrap">
             {tabs.map(tab => (
                 <button
                     key={tab.key}
@@ -62,7 +62,7 @@ export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
     }, [catalogs, onSelect]);
 
     return (
-        <div class="mb-6">
+        <div class="mt-2">
             <select
                 class="select select-sm bg-w-surface border-w-line text-w-text"
                 onChange={handleChange}

@@ -1,8 +1,8 @@
 {{ define "title" }}{{ t $.Lang "profile.badge" }}{{ end }}
 {{ define "main" }}
-<section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
-    <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
         <circle cx="12" cy="7" r="4"/>
@@ -12,7 +12,7 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "profile.title" }}</h1>
 
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "profile.subtitle" }}</p>
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "profile.subtitle" }}</p>
 
     <div id="tier">
         {{ template "profile/tier" $ }}

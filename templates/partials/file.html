@@ -1,8 +1,8 @@
 {{ define "file" }}
 {{ with .Data }}
-<div class="bg-base-200/40 rounded-2xl p-6 border border-w-line/50 mb-3">
-    <h2 class="text-base font-semibold mb-4 truncate" title="{{ .Item.Name }}">{{ .Item.Name }}</h2>
-    <div class="flex flex-wrap gap-3">
+<div class="bg-base-200/40 rounded-2xl p-4 sm:p-6 border border-w-line/50 mb-3">
+    <h2 class="text-base font-semibold mb-3 sm:mb-4 line-clamp-2" title="{{ .Item.Name }}">{{ .Item.Name }}</h2>
+    <div class="flex flex-wrap gap-2 sm:gap-3">
         {{ template "stream_button" $ }}
         {{ template "button" withContext $ (makeFileDownload $ .) }}
         {{/* Watched toggle for movies / episodes. Shown only for enriched files.
@@ -13,7 +13,7 @@
             {{ $watched := and .WatchedPaths (index .WatchedPaths .Item.PathStr) }}
             {{ if $watched }}
             <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang $action.UnmarkURL }}" data-async-target="main" data-async-no-scroll="true">
-                <button type="submit" class="btn btn-ghost text-green-400 hover:bg-green-500/10 whitespace-nowrap" data-umami-event="unmark-file-watched-preview">
+                <button type="submit" class="btn btn-ghost border border-green-400/30 text-green-400 hover:bg-green-500/10 whitespace-nowrap" data-umami-event="unmark-file-watched-preview">
                     <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     {{ t $.Lang "library.watched" }}
                 </button>
