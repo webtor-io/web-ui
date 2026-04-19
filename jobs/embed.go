@@ -19,6 +19,6 @@ func (s *Jobs) Embed(c *web.Context, cl *http.Client, settings *models.EmbedSett
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	j = s.q.GetOrCreate("embded").Enqueue(ctx, cancel, hash, es, false)
+	j = s.q.GetOrCreate("embded").Enqueue(ctx, cancel, hash, es, false, s.errorFormatter(c))
 	return
 }

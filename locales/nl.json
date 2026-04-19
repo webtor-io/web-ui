@@ -1025,5 +1025,18 @@
     "time.month": "1 maand geleden",
     "time.months": "%v maanden geleden",
     "time.year": "1 jaar geleden",
-    "time.years": "%v jaar geleden"
+    "time.years": "%v jaar geleden",
+
+    "error.forbidden": "Deze content is geblokkeerd op verzoek van de rechthebbende.",
+    "error.not_found": "Bron niet gevonden.",
+    "error.service_unavailable": "De service is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
+    "error.invalid_resource": "Ongeldige link of torrent-bestand.",
+    "error.load_failed": "Kan de inhoud niet laden. Probeer het opnieuw.",
+    "error.quota_exceeded": "Limiet bereikt. Upgrade je abonnement om meer toe te voegen.",
+    "error.already_exists": "Dit item bestaat al.",
+    "error.pledge_frozen": "De Vault-bijdrage is bevroren en kan niet worden verwijderd.",
+    "error.unauthorized": "Log in om door te gaan.",
+    "error.access_denied": "Toegang geweigerd.",
+    "error.validation_failed": "Validatie mislukt. Controleer de ingevoerde gegevens.",
+    "error.generic": "Er is iets misgegaan. Probeer het opnieuw."
 }

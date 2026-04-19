@@ -1025,5 +1025,18 @@
     "time.month": "vor 1 Monat",
     "time.months": "vor %v Monaten",
     "time.year": "vor 1 Jahr",
-    "time.years": "vor %v Jahren"
+    "time.years": "vor %v Jahren",
+
+    "error.forbidden": "Dieser Inhalt wurde auf Anfrage des Rechteinhabers gesperrt.",
+    "error.not_found": "Ressource nicht gefunden.",
+    "error.service_unavailable": "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
+    "error.invalid_resource": "Ungültiger Link oder Torrent-Datei.",
+    "error.load_failed": "Inhalt konnte nicht geladen werden. Bitte versuche es erneut.",
+    "error.quota_exceeded": "Limit erreicht. Upgrade dein Abo, um mehr hinzuzufügen.",
+    "error.already_exists": "Dieses Element existiert bereits.",
+    "error.pledge_frozen": "Der Vault-Beitrag ist eingefroren und kann nicht entfernt werden.",
+    "error.unauthorized": "Bitte melde dich an, um fortzufahren.",
+    "error.access_denied": "Zugriff verweigert.",
+    "error.validation_failed": "Validierungsfehler. Bitte überprüfe deine Eingaben.",
+    "error.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
 }

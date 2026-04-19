@@ -1025,5 +1025,18 @@
     "time.month": "1 month ago",
     "time.months": "%v months ago",
     "time.year": "1 year ago",
-    "time.years": "%v years ago"
+    "time.years": "%v years ago",
+
+    "error.forbidden": "This content has been blocked at the request of the rights holder.",
+    "error.not_found": "Resource not found.",
+    "error.service_unavailable": "Service is temporarily unavailable. Please try again later.",
+    "error.invalid_resource": "Invalid link or torrent file.",
+    "error.load_failed": "Failed to load content. Please try again.",
+    "error.quota_exceeded": "Limit reached. Upgrade your plan to add more.",
+    "error.already_exists": "This item already exists.",
+    "error.pledge_frozen": "Vault pledge is frozen and cannot be removed.",
+    "error.unauthorized": "Please log in to continue.",
+    "error.access_denied": "Access denied.",
+    "error.validation_failed": "Validation failed. Please check your input.",
+    "error.generic": "Something went wrong. Please try again."
 }

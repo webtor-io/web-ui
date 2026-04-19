@@ -36,6 +36,6 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		}
 		j.Redirect(web.LangURL(c.Lang, "/"+rID), s.T(c, "job.redirecting"))
 		return
-	}), false)
+	}), false, s.errorFormatter(c))
 	return
 }

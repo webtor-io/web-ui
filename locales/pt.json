@@ -1025,5 +1025,18 @@
     "time.month": "há 1 mês",
     "time.months": "há %v meses",
     "time.year": "há 1 ano",
-    "time.years": "há %v anos"
+    "time.years": "há %v anos",
+
+    "error.forbidden": "Este conteúdo foi bloqueado a pedido do detentor dos direitos.",
+    "error.not_found": "Recurso não encontrado.",
+    "error.service_unavailable": "O serviço está temporariamente indisponível. Tente novamente mais tarde.",
+    "error.invalid_resource": "Link ou arquivo torrent inválido.",
+    "error.load_failed": "Não foi possível carregar o conteúdo. Tente novamente.",
+    "error.quota_exceeded": "Limite atingido. Atualize seu plano para adicionar mais.",
+    "error.already_exists": "Este item já existe.",
+    "error.pledge_frozen": "A contribuição do Vault está congelada e não pode ser removida.",
+    "error.unauthorized": "Faça login para continuar.",
+    "error.access_denied": "Acesso negado.",
+    "error.validation_failed": "Falha na validação. Verifique os dados inseridos.",
+    "error.generic": "Algo deu errado. Tente novamente."
 }

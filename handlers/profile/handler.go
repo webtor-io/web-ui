@@ -41,8 +41,7 @@ type Data struct {
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
 	VaultStats            *vault.UserStats
-	Error                 error
-	ErrorLong             error
+	ErrKey                string
 	DisableWebDAV         bool
 	DisableEmbed          bool
 }
@@ -182,11 +181,6 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
-	var qErr error
-	if c.Query("err") != "" {
-		qErr = errors.New(c.Query("err"))
-	}
-
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
@@ -196,7 +190,7 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		VaultStats:            vaultStats,
-		Error:                 qErr,
+		ErrKey:                c.Query("err"),
 		DisableWebDAV:         s.disableWebDAV,
 		DisableEmbed:          s.disableEmbed,
 	}))

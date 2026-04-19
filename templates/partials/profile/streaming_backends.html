@@ -18,9 +18,9 @@
                 <button type="submit" class="btn btn-soft join-item" data-umami-event="streaming-backend-add">{{ t $.Lang "profile.backends.add" }}</button>
             </form>
 
-            {{ if ne .Data.Error nil }}
+            {{ if .Data.ErrKey }}
                 <div class="text-sm text-error mt-3">
-                    {{ .Data.Error | longErr }}
+                    {{ t $.Lang .Data.ErrKey }}
                 </div>
             {{ end }}
         </div>

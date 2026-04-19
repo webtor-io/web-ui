@@ -61,8 +61,11 @@ func wantsJSON(c *gin.Context) bool {
 }
 
 func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
+	errKey := ClassifyError(serr)
+	log.WithError(serr).WithField("error_key", errKey).WithField("path", path).Warn("redirect with error")
+
 	if wantsJSON(c) {
-		c.JSON(http.StatusOK, gin.H{"status": "error", "message": serr.Error()})
+		c.JSON(http.StatusOK, gin.H{"status": "error", "message": errKey})
 		return
 	}
 	u, err := url.Parse(path)
@@ -72,7 +75,7 @@ func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
 	}
 	q := u.Query()
 	q.Set("status", "error")
-	q.Set("err", serr.Error())
+	q.Set("err", errKey)
 	q.Set("from", c.Request.URL.Path)
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())

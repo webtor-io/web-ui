@@ -39,6 +39,16 @@ func (s *Jobs) T(c *web.Context, key string) string {
 	return i18n.TranslateWithLocalizer(s.i18n.Localizer(c.Lang), key)
 }
 
+// errorFormatter returns an ErrorFormatter that classifies errors and
+// translates them to the user's language.
+func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
+	loc := s.i18n.Localizer(c.Lang)
+	return func(err error) string {
+		key := web.ClassifyError(err)
+		return i18n.TranslateWithLocalizer(loc, key)
+	}
+}
+
 func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service) *Jobs {
 	return &Jobs{
 		q:                q,

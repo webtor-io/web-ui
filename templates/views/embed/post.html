@@ -17,9 +17,9 @@
         {{ "embed/index.js" | asset }}
     </head>
     <body data-iframe-height class="relative" style="background-color: black;">
-        {{ if .Err }}
+        {{ if .ErrKey }}
         <div class="progress-alert progress-alert-oneline mb-10 closeable relative bg-black/50">
-            <pre>{{ .Err | log | shortErr }}</pre>
+            <pre>{{ t $.Lang $.ErrKey }}</pre>
             <a class="closeable-close close">ok</a>
         </div>
         {{ end }} 

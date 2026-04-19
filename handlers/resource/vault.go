@@ -14,7 +14,7 @@ type VaultPledgeAddForm struct {
 	Required      float64
 	TorrentSizeGB float64
 	Status        string
-	Err           error
+	ErrKey        string
 	Funded        bool
 	Vaulted       bool
 	ResourceID    string
@@ -27,7 +27,7 @@ type VaultButton struct {
 type VaultPledgeRemoveForm struct {
 	Frozen     bool
 	Status     string
-	Err        error
+	ErrKey     string
 	ResourceID string
 }
 
@@ -97,13 +97,9 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 		status := c.Query("status")
 		if status == "error" {
 			vaultForm.Status = "error"
-			errMsg := c.Query("err")
-			if errMsg != "" {
-				vaultForm.Err = errors.New(errMsg)
-			}
+			vaultForm.ErrKey = c.Query("err")
 		} else if status == "success" {
 			vaultForm.Status = "success"
-			vaultForm.Err = nil
 		}
 	}
 
@@ -158,13 +154,9 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 		status := c.Query("status")
 		if status == "error" {
 			form.Status = "error"
-			errMsg := c.Query("err")
-			if errMsg != "" {
-				form.Err = errors.New(errMsg)
-			}
+			form.ErrKey = c.Query("err")
 		} else if status == "success" {
 			form.Status = "success"
-			form.Err = nil
 		}
 		return form, nil
 	}

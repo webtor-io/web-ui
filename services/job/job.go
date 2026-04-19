@@ -50,20 +50,25 @@ func NewObserver() *Observer {
 	}
 }
 
+// ErrorFormatter translates an error into a user-facing message.
+// When set, makeErrorMessage uses it instead of the default split-on-colon logic.
+type ErrorFormatter func(error) string
+
 type Job struct {
-	ID        string
-	Queue     string
-	l         []LogItem
-	lmux      sync.Mutex
-	runnable  Runnable
-	observers map[string]*Observer
-	closed    bool
-	mux       sync.Mutex
-	cur       string
-	Context   context.Context
-	storage   Storage
-	main      bool
-	purge     bool
+	ID             string
+	Queue          string
+	l              []LogItem
+	lmux           sync.Mutex
+	runnable       Runnable
+	observers      map[string]*Observer
+	closed         bool
+	mux            sync.Mutex
+	cur            string
+	Context        context.Context
+	storage        Storage
+	main           bool
+	purge          bool
+	errorFormatter ErrorFormatter
 }
 
 type LogItemLevel string
@@ -109,17 +114,18 @@ type LogItem struct {
 	Timestamp time.Time    `json:"timestamp,omitempty"`
 }
 
-func New(ctx context.Context, id string, queue string, runnable Runnable, storage Storage, purge bool) *Job {
+func New(ctx context.Context, id string, queue string, runnable Runnable, storage Storage, purge bool, ef ErrorFormatter) *Job {
 	return &Job{
-		ID:        id,
-		Queue:     queue,
-		runnable:  runnable,
-		Context:   ctx,
-		l:         []LogItem{},
-		observers: map[string]*Observer{},
-		storage:   storage,
-		main:      true,
-		purge:     purge,
+		ID:             id,
+		Queue:          queue,
+		runnable:       runnable,
+		Context:        ctx,
+		l:              []LogItem{},
+		observers:      map[string]*Observer{},
+		storage:        storage,
+		main:           true,
+		purge:          purge,
+		errorFormatter: ef,
 	}
 }
 
@@ -268,7 +274,7 @@ func (s *Job) Warn(err error) *Job {
 	log.WithError(err).Warn("got job warning")
 	_ = s.log(LogItem{
 		Level:   Warn,
-		Message: makeErrorMessage(err),
+		Message: s.formatError(err),
 		Tag:     s.cur,
 	})
 	return s
@@ -282,11 +288,18 @@ func makeErrorMessage(err error) string {
 	return msg
 }
 
+func (s *Job) formatError(err error) string {
+	if s.errorFormatter != nil {
+		return s.errorFormatter(err)
+	}
+	return makeErrorMessage(err)
+}
+
 func (s *Job) Error(err error) error {
 	log.WithError(err).Error("got job error")
 	_ = s.log(LogItem{
 		Level:   Error,
-		Message: makeErrorMessage(err),
+		Message: s.formatError(err),
 		Tag:     s.cur,
 	})
 	return err
@@ -415,7 +428,7 @@ func newJobs(queue string, storage Storage) *Jobs {
 	}
 }
 
-func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string, r Runnable, purge bool) *Job {
+func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string, r Runnable, purge bool, ef ...ErrorFormatter) *Job {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if existing, ok := s.jobs[id]; ok && !purge {
@@ -425,7 +438,11 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 		log.WithField("ID", id).Info("restarting errored job")
 		purge = true
 	}
-	j := New(ctx, id, s.queue, r, s.storage, purge)
+	var formatter ErrorFormatter
+	if len(ef) > 0 {
+		formatter = ef[0]
+	}
+	j := New(ctx, id, s.queue, r, s.storage, purge, formatter)
 	s.jobs[id] = j
 	go func() {
 		defer cancel()

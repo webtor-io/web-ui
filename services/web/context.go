@@ -15,7 +15,7 @@ type Context struct {
 	Data        any
 	CSRF        string
 	SessionID   string
-	Err         error
+	ErrKey      string
 	User        *auth.User
 	Claims      *claims.Data
 	TierUpdated bool
@@ -31,9 +31,17 @@ func (c *Context) WithData(obj any) *Context {
 	return &nc
 }
 
+// WithErrKey sets an i18n error key directly (e.g. from query params).
+func (c *Context) WithErrKey(key string) *Context {
+	nc := *c
+	nc.ErrKey = key
+	return &nc
+}
+
+// WithErr classifies the error into an i18n key and logs the original.
 func (c *Context) WithErr(err error) *Context {
 	nc := *c
-	nc.Err = err
+	nc.ErrKey = ClassifyError(err)
 	return &nc
 }
 

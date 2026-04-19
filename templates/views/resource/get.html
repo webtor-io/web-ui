@@ -268,9 +268,9 @@
     </div>
     {{ end }}
 
-    {{ if $.Err }}
+    {{ if $.ErrKey }}
     <div class="progress-alert progress-alert-oneline mb-4">
-        <pre class="error">{{ $.Err | shortErr }}</pre>
+        <pre class="error">{{ t $.Lang $.ErrKey }}</pre>
     </div>
     {{ end }}
 

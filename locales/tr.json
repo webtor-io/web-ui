@@ -1025,5 +1025,18 @@
     "time.month": "1 ay önce",
     "time.months": "%v ay önce",
     "time.year": "1 yıl önce",
-    "time.years": "%v yıl önce"
+    "time.years": "%v yıl önce",
+
+    "error.forbidden": "Bu içerik hak sahibinin talebi üzerine engellenmiştir.",
+    "error.not_found": "Kaynak bulunamadı.",
+    "error.service_unavailable": "Hizmet geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+    "error.invalid_resource": "Geçersiz bağlantı veya torrent dosyası.",
+    "error.load_failed": "İçerik yüklenemedi. Lütfen tekrar deneyin.",
+    "error.quota_exceeded": "Limite ulaşıldı. Daha fazla eklemek için planınızı yükseltin.",
+    "error.already_exists": "Bu öğe zaten mevcut.",
+    "error.pledge_frozen": "Vault katkısı dondurulmuş ve kaldırılamaz.",
+    "error.unauthorized": "Devam etmek için giriş yapın.",
+    "error.access_denied": "Erişim engellendi.",
+    "error.validation_failed": "Doğrulama hatası. Lütfen girilen verileri kontrol edin.",
+    "error.generic": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin."
 }

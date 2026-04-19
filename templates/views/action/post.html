@@ -1,7 +1,7 @@
 {{ define "main" }}
-{{ if .Err }}
+{{ if .ErrKey }}
 <div class="progress-alert progress-alert-oneline mb-10 closeable">
-    <pre>{{ .Err | log | shortErr }}</pre>
+    <pre>{{ t $.Lang $.ErrKey }}</pre>
     <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
 </div>
 {{ end }}

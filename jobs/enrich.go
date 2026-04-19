@@ -15,6 +15,6 @@ func (s *Jobs) Enrich(c *web.Context, rID string) (j *job.Job, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	j = s.q.GetOrCreate("enrich").Enqueue(ctx, cancel, hash, job.NewScript(func(j *job.Job) (err error) {
 		return es.Run(ctx, j)
-	}), false)
+	}), false, s.errorFormatter(c))
 	return
 }

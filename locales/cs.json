@@ -1025,5 +1025,18 @@
     "time.month": "před 1 měsícem",
     "time.months": "před %v měsíci",
     "time.year": "před 1 rokem",
-    "time.years": "před %v lety"
+    "time.years": "před %v lety",
+
+    "error.forbidden": "Tento obsah byl zablokován na žádost držitele práv.",
+    "error.not_found": "Zdroj nebyl nalezen.",
+    "error.service_unavailable": "Služba je dočasně nedostupná. Zkuste to prosím později.",
+    "error.invalid_resource": "Neplatný odkaz nebo torrent soubor.",
+    "error.load_failed": "Nepodařilo se načíst obsah. Zkuste to prosím znovu.",
+    "error.quota_exceeded": "Dosažen limit. Upgradujte svůj plán pro přidání dalších.",
+    "error.already_exists": "Tato položka již existuje.",
+    "error.pledge_frozen": "Příspěvek Vault je zmrazen a nelze jej odstranit.",
+    "error.unauthorized": "Pro pokračování se prosím přihlaste.",
+    "error.access_denied": "Přístup odepřen.",
+    "error.validation_failed": "Chyba ověření. Zkontrolujte prosím zadané údaje.",
+    "error.generic": "Něco se pokazilo. Zkuste to prosím znovu."
 }

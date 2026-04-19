@@ -116,9 +116,9 @@
     </form>
     {{ end }}
 
-    {{ if $.Err }}
+    {{ if $.ErrKey }}
     <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]">
-        <pre class="error">{{ $.Err | shortErr }}</pre>
+        <pre class="error">{{ t $.Lang $.ErrKey }}</pre>
         <a class="close" onclick="document.getElementById('index-error').remove()">{{ t $.Lang "home.ok" }}</a>
     </div>
     {{ end }}

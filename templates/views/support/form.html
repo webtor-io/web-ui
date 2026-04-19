@@ -13,9 +13,9 @@
 
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "support.subtitle" }}</p>
 
-    {{ if .Err }}
+    {{ if .ErrKey }}
         <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">
-            <p class="text-sm text-error">{{ .Err | log | shortErr }}</p>
+            <p class="text-sm text-error">{{ t $.Lang $.ErrKey }}</p>
         </div>
     {{ end }}
     {{ with .Data }}

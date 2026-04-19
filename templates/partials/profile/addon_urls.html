@@ -28,9 +28,9 @@
                     {{ t $.Lang "profile.addons.maxReached" }}
                 </div>
             {{ end }}
-            {{ if ne .Data.Error nil }}
+            {{ if .Data.ErrKey }}
                 <div class="text-sm text-error mt-3">
-                    {{ .Data.Error | longErr }}
+                    {{ t $.Lang .Data.ErrKey }}
                 </div>
             {{ end }}
         </div>

@@ -20,9 +20,9 @@
 		<p class="pt-4 pb-2 text-sm text-w-sub">
 			{{ t .Ctx.Lang "vault.removeError" }}
 		</p>
-		{{ if .Data.Err }}
+		{{ if .Data.ErrKey }}
 			<div class="progress-alert progress-alert-oneline closeable mb-4">
-				<pre>{{ .Data.Err | log | shortErr }}</pre>
+				<pre>{{ t .Ctx.Lang .Data.ErrKey }}</pre>
 			</div>
 		{{ end }}
 		<div class="modal-action justify-center">
