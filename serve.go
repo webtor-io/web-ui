@@ -50,6 +50,7 @@ import (
 	"github.com/webtor-io/web-ui/services/notification"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
+	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	uvss "github.com/webtor-io/web-ui/services/user_video_status"
@@ -109,6 +110,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = configureRecommendations(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
 	c.Flags = ci.RegisterFlags(c.Flags)
+	c.Flags = turnstile.RegisterFlags(c.Flags)
 	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
 }
@@ -140,7 +142,8 @@ func serve(c *cli.Context) error {
 		WithHelper(umami.NewHelper(c)).
 		WithHelper(geoip.NewHelper()).
 		WithHelper(rec.NewHelper(c)).
-		WithHelper(si18n.NewHelper(i18nSvc))
+		WithHelper(si18n.NewHelper(i18nSvc)).
+		WithHelper(turnstile.NewHelper(c))
 
 	var servers []cs.Servable
 	// Setting Probe
@@ -273,10 +276,13 @@ func serve(c *cli.Context) error {
 	// Setting AbuseStore
 	asc := as.New(c)
 
+	// Setting Turnstile
+	ts := turnstile.New(c)
+
 	if asc != nil {
 		defer asc.Close()
 		// Setting Support
-		support.RegisterHandler(r, tm, asc)
+		support.RegisterHandler(r, tm, asc, ts)
 
 		// Setting Legal
 		legal.RegisterHandler(r, tm)

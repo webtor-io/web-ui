@@ -1,30 +1,34 @@
 package support
 
 import (
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	proto "github.com/webtor-io/abuse-store/proto"
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/web"
 	"google.golang.org/grpc/status"
-	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Handler struct {
 	tb  template.Builder[*web.Context]
 	asc *abuse_store.Client
+	ts  *turnstile.Service
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abuse_store.Client) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abuse_store.Client, ts *turnstile.Service) {
 	h := &Handler{
 		tb:  tm.MustRegisterViews("support/*").WithLayout("main"),
 		asc: asc,
+		ts:  ts,
 	}
 	r.GET("/support", h.process)
 	r.POST("/support", h.process)
@@ -123,6 +127,13 @@ func (s *Handler) process(c *gin.Context) {
 		return
 	}
 	if c.Request.Method == "POST" {
+		if s.ts != nil {
+			token := c.PostForm("cf-turnstile-response")
+			if err := s.ts.Validate(token, c.ClientIP()); err != nil {
+				tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(errors.Wrap(err, "captcha verification failed")))
+				return
+			}
+		}
 		err = s.sendForm(c, form)
 		if err != nil {
 			tpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(data).WithErr(errors.Wrap(err, "failed to send form")))

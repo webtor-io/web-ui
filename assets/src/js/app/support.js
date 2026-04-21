@@ -28,6 +28,21 @@ function updateForm(select, inputs, submit) {
     }
 }
 
+function renderTurnstile(container) {
+    const el = container.querySelector('.cf-turnstile');
+    if (!el) return;
+    const sitekey = el.dataset.sitekey;
+    if (!sitekey) return;
+    function doRender() {
+        if (typeof turnstile !== 'undefined') {
+            turnstile.render(el, { sitekey });
+        } else {
+            setTimeout(doRender, 100);
+        }
+    }
+    doRender();
+}
+
 av(async function() {
     const form = this.querySelector('form');
     const select = form.querySelector('select');
@@ -37,6 +52,7 @@ av(async function() {
     select.addEventListener('change', () => {
         updateForm(select, inputs, submit);
     });
+    renderTurnstile(form);
 });
 
 export {}
