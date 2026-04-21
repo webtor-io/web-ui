@@ -6,10 +6,10 @@ function setRequired(input) {
     }
 }
 
-function updateForm(select, inputs, submit) {
+function updateForm(select, inputs, actions) {
     if (select.value === '-1') {
         for (const i of inputs) i.classList.add('hidden');
-        submit.classList.add('hidden');
+        actions.classList.add('hidden');
     } else {
         for (const i of inputs) {
             const ds = i.getAttribute('data-select');
@@ -24,7 +24,7 @@ function updateForm(select, inputs, submit) {
                 i.removeAttribute('required');
             }
         }
-        submit.classList.remove('hidden');
+        actions.classList.remove('hidden');
     }
 }
 
@@ -47,10 +47,10 @@ av(async function() {
     const form = this.querySelector('form');
     const select = form.querySelector('select');
     const inputs = form.querySelectorAll('input, textarea');
-    const submit = form.querySelector('button');
-    updateForm(select, inputs, submit);
+    const actions = form.querySelector('[data-support-actions]');
+    updateForm(select, inputs, actions);
     select.addEventListener('change', () => {
-        updateForm(select, inputs, submit);
+        updateForm(select, inputs, actions);
     });
     renderTurnstile(form);
 });

@@ -35,11 +35,11 @@
                 <input name="email" type="email" placeholder="{{ t $.Lang "support.email" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-required value="{{ .Email }}" />
                 <input name="work" type="text" placeholder="{{ t $.Lang "support.work" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0" value="{{ .Work }}" />
             {{ end }}
-            {{ if useTurnstile }}
-            <div class="cf-turnstile mt-4" data-sitekey="{{ turnstileSiteKey }}"></div>
-            {{ end }}
-            <div class="mt-7 flex justify-end">
-                <button type="submit" class="btn btn-soft hidden">{{ t $.Lang "support.submit" }}</button>
+            <div class="mt-7 flex items-center justify-between hidden" data-support-actions>
+                {{ if useTurnstile }}
+                <div class="cf-turnstile" data-sitekey="{{ turnstileSiteKey }}"></div>
+                {{ end }}
+                <button type="submit" class="btn btn-soft ml-auto">{{ t $.Lang "support.submit" }}</button>
             </div>
         </form>
     {{ end }}
