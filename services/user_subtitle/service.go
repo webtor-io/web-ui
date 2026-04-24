@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"hash/fnv"
 	"io"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -84,12 +85,14 @@ func New(c *cli.Context, s3Cl *cs.S3Client, pg *cs.PG) *Service {
 
 // PublicURL is the externally reachable URL of the raw blob endpoint.
 // torrent-http-proxy's external-proxy must be able to fetch this — that's
-// why we prefix with the full public domain and not a relative path.
+// why we prefix with the full public domain and not a relative path. The
+// filename goes through PathEscape so spaces and parens survive the base64
+// round-trip inside /ext/ as a valid URL the proxy can actually fetch.
 func (s *Service) PublicURL(hash, name string) string {
 	if s == nil {
 		return ""
 	}
-	return s.domain + "/user-subtitle/file/" + hash + "/" + name
+	return s.domain + "/user-subtitle/file/" + hash + "/" + url.PathEscape(name)
 }
 
 // Enabled reports whether the feature has the infrastructure to run.
