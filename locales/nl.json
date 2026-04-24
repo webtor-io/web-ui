@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Inloggen",
     "action.stream.mySubtitles.dragHint": "Sleep een ondertitelbestand hierheen of klik om te bladeren",
     "action.stream.mySubtitles.formats": "SRT, VTT of ASS, maximaal 5 MB",
-    "action.stream.mySubtitles.upload": "Uploaden",
     "action.stream.mySubtitles.delete": "Verwijderen",
     "action.stream.mySubtitles.limitReached": "Je hebt de limiet van 10 ondertitels voor dit bestand bereikt. Verwijder er een om meer te uploaden.",
 

@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Entrar",
     "action.stream.mySubtitles.dragHint": "Arraste um arquivo de legenda aqui ou clique para escolher",
     "action.stream.mySubtitles.formats": "SRT, VTT ou ASS, até 5 MB",
-    "action.stream.mySubtitles.upload": "Enviar",
     "action.stream.mySubtitles.delete": "Excluir",
     "action.stream.mySubtitles.limitReached": "Você atingiu o limite de 10 legendas para este arquivo. Exclua uma para enviar mais.",
 

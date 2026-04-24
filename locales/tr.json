@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Giriş yap",
     "action.stream.mySubtitles.dragHint": "Altyazı dosyasını buraya sürükle veya tıklayarak seç",
     "action.stream.mySubtitles.formats": "SRT, VTT veya ASS, en fazla 5 MB",
-    "action.stream.mySubtitles.upload": "Yükle",
     "action.stream.mySubtitles.delete": "Sil",
     "action.stream.mySubtitles.limitReached": "Bu dosya için 10 altyazı sınırına ulaşıldı. Daha fazla yüklemek için birini sil.",
 

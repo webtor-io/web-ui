@@ -83,6 +83,19 @@ func New(c *cli.Context, s3Cl *cs.S3Client, pg *cs.PG) *Service {
 	}
 }
 
+// TrackID is the canonical id used for both the <track> element and the
+// clickable .subtitle row. "us-" namespaces these under UserSubtitle so
+// the player's textTracks matcher can distinguish them from MediaProbe
+// tracks (which use "mp-") and OpenSubtitles ("os-").
+func TrackID(id uuid.UUID) string {
+	return "us-" + id.String()
+}
+
+// DeleteURL is the canonical async-target URL for removing one binding.
+func DeleteURL(id uuid.UUID) string {
+	return "/user-subtitle/delete/" + id.String()
+}
+
 // PublicURL is the externally reachable URL of the raw blob endpoint.
 // torrent-http-proxy's external-proxy must be able to fetch this — that's
 // why we prefix with the full public domain and not a relative path. The

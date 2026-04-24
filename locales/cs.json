@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Přihlásit se",
     "action.stream.mySubtitles.dragHint": "Přetáhněte soubor titulků sem nebo klikněte pro výběr",
     "action.stream.mySubtitles.formats": "SRT, VTT nebo ASS, do 5 MB",
-    "action.stream.mySubtitles.upload": "Nahrát",
     "action.stream.mySubtitles.delete": "Smazat",
     "action.stream.mySubtitles.limitReached": "Dosáhli jste limitu 10 titulků pro tento soubor. Smažte jeden pro nahrání dalších.",
 

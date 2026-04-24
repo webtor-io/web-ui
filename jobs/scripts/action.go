@@ -322,17 +322,15 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			} else {
 				for _, sub := range list {
 					publicURL := s.userSubtitles.PublicURL(sub.Hash, sub.OriginalName)
-					tracks := models.UserSubtitleTrack{
-						ID:           "us-" + sub.UserSubtitleID.String(),
+					sc.UserSubtitles = append(sc.UserSubtitles, models.UserSubtitleTrack{
+						ID:           us.TrackID(sub.UserSubtitleID),
 						Src:          s.api.AttachExternalSubtitle(se, publicURL),
-						RawSrc:       publicURL,
 						Label:        sub.OriginalName,
 						Format:       sub.Format,
 						Size:         sub.Size,
 						OriginalName: sub.OriginalName,
-						DeleteURL:    "/user-subtitle/delete/" + sub.UserSubtitleID.String(),
-					}
-					sc.UserSubtitles = append(sc.UserSubtitles, tracks)
+						DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
+					})
 				}
 			}
 		}

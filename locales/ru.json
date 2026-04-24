@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Войти",
     "action.stream.mySubtitles.dragHint": "Перетащите файл субтитров сюда или выберите вручную",
     "action.stream.mySubtitles.formats": "SRT, VTT или ASS, до 5 МБ",
-    "action.stream.mySubtitles.upload": "Загрузить",
     "action.stream.mySubtitles.delete": "Удалить",
     "action.stream.mySubtitles.limitReached": "Достигнут лимит в 10 субтитров для этого файла. Удалите один, чтобы загрузить ещё.",
 

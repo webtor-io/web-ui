@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Zaloguj się",
     "action.stream.mySubtitles.dragHint": "Przeciągnij plik napisów tutaj lub kliknij, aby wybrać",
     "action.stream.mySubtitles.formats": "SRT, VTT lub ASS, do 5 MB",
-    "action.stream.mySubtitles.upload": "Prześlij",
     "action.stream.mySubtitles.delete": "Usuń",
     "action.stream.mySubtitles.limitReached": "Osiągnięto limit 10 napisów dla tego pliku. Usuń jeden, aby dodać kolejne.",
 

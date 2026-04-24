@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -60,7 +61,6 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], svc *us.
 }
 
 func (s *Handler) upload(c *gin.Context) {
-	applyReturnURLFallback(c)
 	user := auth.GetUserFromContext(c)
 	resourceID := strings.TrimSpace(c.PostForm("resource_id"))
 	path := c.PostForm("path")
@@ -98,7 +98,6 @@ func (s *Handler) upload(c *gin.Context) {
 }
 
 func (s *Handler) delete(c *gin.Context) {
-	applyReturnURLFallback(c)
 	user := auth.GetUserFromContext(c)
 	id, err := uuid.FromString(c.Param("id"))
 	if err != nil {
@@ -206,20 +205,18 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 	ei := ra.ExportItem{URL: eiURL}
 	tracks := make([]models.UserSubtitleTrack, 0, len(list))
 	for _, sub := range list {
-		publicURL := s.svc.PublicURL(sub.Hash, sub.OriginalName)
 		var wrapped string
 		if eiURL != "" && s.sapi != nil {
-			wrapped = s.sapi.AttachExternalSubtitle(ei, publicURL)
+			wrapped = s.sapi.AttachExternalSubtitle(ei, s.svc.PublicURL(sub.Hash, sub.OriginalName))
 		}
 		tracks = append(tracks, models.UserSubtitleTrack{
-			ID:           "us-" + sub.UserSubtitleID.String(),
+			ID:           us.TrackID(sub.UserSubtitleID),
 			Label:        sub.OriginalName,
 			OriginalName: sub.OriginalName,
 			Format:       sub.Format,
 			Size:         sub.Size,
 			Src:          wrapped,
-			RawSrc:       publicURL,
-			DeleteURL:    "/user-subtitle/delete/" + sub.UserSubtitleID.String(),
+			DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
 		})
 	}
 	data := &models.UserSubtitleView{
@@ -234,20 +231,6 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 
 func isAsync(c *gin.Context) bool {
 	return c.GetHeader("X-Requested-With") == "XMLHttpRequest" && c.GetHeader("X-Layout") != ""
-}
-
-// applyReturnURLFallback bridges the gap between standard HTML form submits
-// (which can't send request headers) and web.RedirectWithError/Success,
-// which read X-Return-Url from the request header. Forms include the
-// return path as a hidden field; we promote it to the header if the client
-// hasn't already set one via JS.
-func applyReturnURLFallback(c *gin.Context) {
-	if c.GetHeader("X-Return-Url") != "" {
-		return
-	}
-	if ret := c.PostForm("return_url"); ret != "" {
-		c.Request.Header.Set("X-Return-Url", ret)
-	}
 }
 
 func readMultipart(fh *multipart.FileHeader) ([]byte, error) {
@@ -278,14 +261,5 @@ func translateUploadError(err error) error {
 }
 
 func contentTypeFromName(name string) string {
-	lower := strings.ToLower(name)
-	switch {
-	case strings.HasSuffix(lower, ".vtt"):
-		return us.ContentTypeFor("vtt")
-	case strings.HasSuffix(lower, ".srt"):
-		return us.ContentTypeFor("srt")
-	case strings.HasSuffix(lower, ".ass"):
-		return us.ContentTypeFor("ass")
-	}
-	return "application/octet-stream"
+	return us.ContentTypeFor(strings.TrimPrefix(strings.ToLower(filepath.Ext(name)), "."))
 }

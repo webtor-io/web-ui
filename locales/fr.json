@@ -382,7 +382,6 @@
     "action.stream.mySubtitles.signIn": "Se connecter",
     "action.stream.mySubtitles.dragHint": "Déposez un fichier de sous-titres ici ou cliquez pour parcourir",
     "action.stream.mySubtitles.formats": "SRT, VTT ou ASS, jusqu'à 5 Mo",
-    "action.stream.mySubtitles.upload": "Importer",
     "action.stream.mySubtitles.delete": "Supprimer",
     "action.stream.mySubtitles.limitReached": "Vous avez atteint la limite de 10 sous-titres pour ce fichier. Supprimez-en un pour en ajouter.",
 
