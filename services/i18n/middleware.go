@@ -38,7 +38,8 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 			strings.HasPrefix(path, "/s/") ||
 			strings.HasPrefix(path, "/token/") ||
 			strings.HasPrefix(path, "/embed/") ||
-			strings.HasPrefix(path, "/stremio/") {
+			strings.HasPrefix(path, "/stremio/") ||
+			strings.HasPrefix(path, "/user-subtitle/file/") {
 			next.ServeHTTP(w, r)
 			return
 		}

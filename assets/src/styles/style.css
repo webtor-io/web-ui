@@ -428,9 +428,27 @@ input:-webkit-autofill:focus {
   border: 2px dashed rgba(232, 67, 147, 0.3);
   transition: all 0.3s;
 }
-.upload-dashed:hover {
+.upload-dashed:hover,
+.upload-dashed-active {
   border-color: #e84393;
   background: rgba(232, 67, 147, 0.06);
+}
+
+/* "My Subtitles" selected row: highlight the whole <li> in the purple
+   tone that matches btn-soft-purple, and undo the generic
+   text-primary/underline applied to .subtitle by markTrack — inside
+   this list the active state is row-level, not inline text. */
+#my-subtitles ul > li:has(.subtitle[data-default="true"]) {
+  background-color: rgba(108, 92, 231, 0.12);
+  box-shadow: inset 3px 0 0 #6c5ce7;
+}
+#my-subtitles .subtitle.text-primary,
+#my-subtitles .subtitle.underline {
+  color: inherit;
+  text-decoration: none;
+}
+#my-subtitles ul > li:has(.subtitle[data-default="true"]) .subtitle > div:first-child {
+  color: #a29bfe;
 }
 
 .btn-pink {
@@ -464,6 +482,17 @@ input:-webkit-autofill:focus {
   background-color: rgba(0, 206, 201, 0.20) !important;
   border-color: rgba(0, 206, 201, 0.45) !important;
   color: #00cec9 !important;
+}
+
+.btn-soft-purple {
+  background-color: rgba(108, 92, 231, 0.10) !important;
+  border-color: rgba(108, 92, 231, 0.30) !important;
+  color: #a29bfe !important;
+}
+.btn-soft-purple:hover {
+  background-color: rgba(108, 92, 231, 0.20) !important;
+  border-color: rgba(108, 92, 231, 0.45) !important;
+  color: #a29bfe !important;
 }
 
 .toggle-soft:checked,

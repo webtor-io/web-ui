@@ -7,6 +7,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
+	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -31,6 +32,7 @@ type Jobs struct {
 	api              *api.Api
 	enricher         *enrich.Enricher
 	i18n             *i18n.Service
+	userSubtitles    *us.Service
 	warmupTimeoutMin int
 }
 
@@ -49,13 +51,14 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 	}
 }
 
-func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service) *Jobs {
+func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service) *Jobs {
 	return &Jobs{
 		q:                q,
 		tb:               tm,
 		api:              api,
 		enricher:         enricher,
 		i18n:             i18nSvc,
+		userSubtitles:    userSubtitles,
 		warmupTimeoutMin: c.Int(warmupTimeoutMinFlag),
 	}
 }

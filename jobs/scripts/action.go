@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
+	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
 
 	log "github.com/sirupsen/logrus"
@@ -31,6 +33,14 @@ type StreamContent struct {
 	Item                *ra.ListItem
 	MediaProbe          *api.MediaProbe
 	OpenSubtitles       []api.OpenSubtitleTrack
+	UserSubtitles       []models.UserSubtitleTrack
+	UserSubtitlesEnabled bool
+	// EIURL is the ExportItem "stream" URL — the torrent-http-proxy
+	// origin carrying whatever auth the cluster embeds (subdomain,
+	// path, query). Handed to the upload form as a hidden field so the
+	// async re-render can wrap newly uploaded user subtitles through
+	// /ext/ with the same credentials as the initial render.
+	EIURL               string
 	VideoStreamUserData *models.VideoStreamUserData
 	Settings            *models.StreamSettings
 	ExternalData        *models.ExternalData
@@ -297,7 +307,35 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		sc.SessionSeekURL = result.SeekURL
 	}
 	sc.VideoStreamUserData = vsud
+	sc.UserSubtitlesEnabled = s.userSubtitles.Enabled()
+	sc.EIURL = se.URL
 	if exportResponse.Source.MediaFormat == ra.Video {
+		if s.userSubtitles.Enabled() && c.User != nil && c.User.HasAuth() {
+			usCtx, usCancel := context.WithTimeout(ctx, 10*time.Second)
+			// DB stores bindings keyed by Source.PathStr (matching the
+			// convention used by watch_history and the upload form).
+			// itemID here is ra.ListItem.ID, which is NOT the same.
+			list, listErr := s.userSubtitles.List(usCtx, c.User.ID, resourceID, exportResponse.Source.PathStr)
+			usCancel()
+			if listErr != nil {
+				log.WithError(listErr).Warn("failed to load user subtitles")
+			} else {
+				for _, sub := range list {
+					publicURL := s.userSubtitles.PublicURL(sub.Hash, sub.OriginalName)
+					tracks := models.UserSubtitleTrack{
+						ID:           "us-" + sub.UserSubtitleID.String(),
+						Src:          s.api.AttachExternalSubtitle(se, publicURL),
+						RawSrc:       publicURL,
+						Label:        sub.OriginalName,
+						Format:       sub.Format,
+						Size:         sub.Size,
+						OriginalName: sub.OriginalName,
+						DeleteURL:    "/user-subtitle/delete/" + sub.UserSubtitleID.String(),
+					}
+					sc.UserSubtitles = append(sc.UserSubtitles, tracks)
+				}
+			}
+		}
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
 			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
 				j.InProgress(s.t("job.loadingSubtitles"))
@@ -479,6 +517,7 @@ type ActionScript struct {
 	api              *api.Api
 	c                *web.Context
 	i18n             *i18n.Service
+	userSubtitles    *us.Service
 	resourceId       string
 	itemId           string
 	action           string
@@ -545,12 +584,39 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
+	// Cache key includes the authenticated user's id so two users on the
+	// same file don't share each other's rendered template through the
+	// job-queue cache; and the concatenated hashes of their uploaded
+	// subtitles for this file so an upload or delete invalidates the cache
+	// immediately — otherwise the new <track> element would only appear
+	// after the 10-minute cache bucket rolled over.
+	userKey := ""
+	userSubsKey := ""
+	if c != nil && c.User != nil && c.User.HasAuth() {
+		userKey = c.User.ID.String()
+		if userSubtitles.Enabled() {
+			// Cache-key lookup intentionally scopes to resource, not
+			// (resource, path): ListItem.ID (itemID) and ListItem.PathStr
+			// are different identifiers and we'd need an extra API call
+			// to resolve Source.PathStr here. Hashing by resource is a
+			// slight over-invalidation (a subtitle upload for file A
+			// also invalidates file B's cached render under the same
+			// torrent) but eliminates any id/path mismatch and keeps
+			// this path synchronous.
+			listCtx, listCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if hashes, err := userSubtitles.ListHashesForResource(listCtx, c.User.ID, resourceID); err == nil {
+				sort.Strings(hashes)
+				userSubsKey = strings.Join(hashes, ",")
+			}
+			listCancel()
+		}
+	}
 	cacheKey := fmt.Sprintf("%s%d", now.Format("2006010215"), now.Minute()/10)
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang)))
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey)))
 	return &ErrorWrapperScript{
 		tb: tb,
 		c:  c,
@@ -558,6 +624,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			tb:               tb,
 			api:              api,
 			i18n:             i18nSvc,
+			userSubtitles:    userSubtitles,
 			c:                c,
 			resourceId:       resourceID,
 			itemId:           itemID,

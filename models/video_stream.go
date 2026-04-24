@@ -82,3 +82,33 @@ type ExternalTrack struct {
 	Label   string
 	Default bool
 }
+
+// UserSubtitleTrack is a per-user uploaded subtitle prepared for rendering:
+// Src is wrapped through torrent-http-proxy's /ext/ (plus ~vtt/ for SRT)
+// and drives the static <track> element at initial render. RawSrc is the
+// plain /user-subtitle/file/... URL — JS re-wraps it on the client to
+// create a <track> for subs uploaded after initial render, since those
+// never went through the server-side wrap path. DeleteURL is the
+// canonical path the "My Subtitles" tab POSTs to.
+type UserSubtitleTrack struct {
+	ID           string
+	Src          string
+	RawSrc       string
+	Label        string
+	Format       string
+	Size         int64
+	DeleteURL    string
+	OriginalName string
+}
+
+// UserSubtitleView is the flat data shape consumed by the
+// "user_subtitles_view" partial. Both the initial render (inside the stream
+// modal) and the async reload (after upload/delete) feed this struct to the
+// partial so their outputs are identical.
+type UserSubtitleView struct {
+	ResourceID    string
+	Path          string
+	EIURL         string
+	UserSubtitles []UserSubtitleTrack
+	ErrKey        string
+}

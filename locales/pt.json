@@ -377,6 +377,14 @@
     "action.stream.download": "Baixar",
     "action.stream.embedHelp": "Veja {{.Link}} para uso avançado",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Minhas legendas",
+    "action.stream.mySubtitles.signInPrompt": "Entre para enviar suas próprias legendas.",
+    "action.stream.mySubtitles.signIn": "Entrar",
+    "action.stream.mySubtitles.dragHint": "Arraste um arquivo de legenda aqui ou clique para escolher",
+    "action.stream.mySubtitles.formats": "SRT, VTT ou ASS, até 5 MB",
+    "action.stream.mySubtitles.upload": "Enviar",
+    "action.stream.mySubtitles.delete": "Excluir",
+    "action.stream.mySubtitles.limitReached": "Você atingiu o limite de 10 legendas para este arquivo. Exclua uma para enviar mais.",
 
     "player.play": "Reproduzir",
     "player.pause": "Pausar",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "URL WebDAV gerada",
     "toast.addedToVault": "Adicionado ao vault",
     "toast.removedFromVault": "Removido do vault",
+    "toast.user_subtitle.uploaded": "Legenda enviada",
+    "toast.user_subtitle.deleted": "Legenda excluída",
 
     "speedtest.badge": "Teste de velocidade",
     "speedtest.title": "Teste de velocidade de conexão",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Faça login para continuar.",
     "error.access_denied": "Acesso negado.",
     "error.validation_failed": "Falha na validação. Verifique os dados inseridos.",
+    "error.user_subtitle.no_file": "Nenhum arquivo de legenda foi anexado.",
+    "error.user_subtitle.too_large": "O arquivo de legenda é muito grande (máx. 5 MB).",
+    "error.user_subtitle.read_failed": "Falha ao ler o arquivo enviado.",
+    "error.user_subtitle.unsupported_format": "Formato de legenda não suportado. Use SRT, VTT ou ASS.",
+    "error.user_subtitle.limit_reached": "Você atingiu o limite de 10 legendas para este arquivo.",
+    "error.user_subtitle.empty_file": "O arquivo de legenda está vazio.",
     "error.generic": "Algo deu errado. Tente novamente."
 }

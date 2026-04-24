@@ -377,6 +377,14 @@
     "action.stream.download": "Downloaden",
     "action.stream.embedHelp": "Zie {{.Link}} voor geavanceerd gebruik",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Mijn ondertitels",
+    "action.stream.mySubtitles.signInPrompt": "Log in om je eigen ondertitels te uploaden.",
+    "action.stream.mySubtitles.signIn": "Inloggen",
+    "action.stream.mySubtitles.dragHint": "Sleep een ondertitelbestand hierheen of klik om te bladeren",
+    "action.stream.mySubtitles.formats": "SRT, VTT of ASS, maximaal 5 MB",
+    "action.stream.mySubtitles.upload": "Uploaden",
+    "action.stream.mySubtitles.delete": "Verwijderen",
+    "action.stream.mySubtitles.limitReached": "Je hebt de limiet van 10 ondertitels voor dit bestand bereikt. Verwijder er een om meer te uploaden.",
 
     "player.play": "Afspelen",
     "player.pause": "Pauze",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "WebDAV URL gegenereerd",
     "toast.addedToVault": "Toegevoegd aan vault",
     "toast.removedFromVault": "Verwijderd uit vault",
+    "toast.user_subtitle.uploaded": "Ondertitel geüpload",
+    "toast.user_subtitle.deleted": "Ondertitel verwijderd",
 
     "speedtest.badge": "Snelheidstest",
     "speedtest.title": "Verbindingssnelheidstest",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Log in om door te gaan.",
     "error.access_denied": "Toegang geweigerd.",
     "error.validation_failed": "Validatie mislukt. Controleer de ingevoerde gegevens.",
+    "error.user_subtitle.no_file": "Er is geen ondertitelbestand bijgevoegd.",
+    "error.user_subtitle.too_large": "Ondertitelbestand is te groot (max. 5 MB).",
+    "error.user_subtitle.read_failed": "Kan het geüploade bestand niet lezen.",
+    "error.user_subtitle.unsupported_format": "Niet-ondersteunde ondertitelindeling. Gebruik SRT, VTT of ASS.",
+    "error.user_subtitle.limit_reached": "Je hebt de limiet van 10 ondertitels voor dit bestand bereikt.",
+    "error.user_subtitle.empty_file": "Het ondertitelbestand is leeg.",
     "error.generic": "Er is iets misgegaan. Probeer het opnieuw."
 }

@@ -131,7 +131,10 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return err
 	}
 	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
-	as, _ := Action(s.tb, s.api, s.i18n, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
+	// Pass nil for user-subtitles: the embed flow intentionally omits the
+	// My Subtitles tab (no account context on third-party sites) so the
+	// script never needs the service.
+	as, _ := Action(s.tb, s.api, s.i18n, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err

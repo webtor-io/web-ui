@@ -377,6 +377,14 @@
     "action.stream.download": "Pobierz",
     "action.stream.embedHelp": "Zobacz {{.Link}} dla zaawansowanego użycia",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Moje napisy",
+    "action.stream.mySubtitles.signInPrompt": "Zaloguj się, aby dodać własne napisy.",
+    "action.stream.mySubtitles.signIn": "Zaloguj się",
+    "action.stream.mySubtitles.dragHint": "Przeciągnij plik napisów tutaj lub kliknij, aby wybrać",
+    "action.stream.mySubtitles.formats": "SRT, VTT lub ASS, do 5 MB",
+    "action.stream.mySubtitles.upload": "Prześlij",
+    "action.stream.mySubtitles.delete": "Usuń",
+    "action.stream.mySubtitles.limitReached": "Osiągnięto limit 10 napisów dla tego pliku. Usuń jeden, aby dodać kolejne.",
 
     "player.play": "Odtwarzaj",
     "player.pause": "Pauza",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "URL WebDAV wygenerowany",
     "toast.addedToVault": "Dodano do vault",
     "toast.removedFromVault": "Usunięto z vault",
+    "toast.user_subtitle.uploaded": "Napisy przesłane",
+    "toast.user_subtitle.deleted": "Napisy usunięte",
 
     "speedtest.badge": "Test prędkości",
     "speedtest.title": "Test prędkości połączenia",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Zaloguj się, aby kontynuować.",
     "error.access_denied": "Dostęp zabroniony.",
     "error.validation_failed": "Błąd walidacji. Sprawdź wprowadzone dane.",
+    "error.user_subtitle.no_file": "Nie dołączono pliku napisów.",
+    "error.user_subtitle.too_large": "Plik napisów jest za duży (maks. 5 MB).",
+    "error.user_subtitle.read_failed": "Nie udało się odczytać przesłanego pliku.",
+    "error.user_subtitle.unsupported_format": "Nieobsługiwany format napisów. Użyj SRT, VTT lub ASS.",
+    "error.user_subtitle.limit_reached": "Osiągnięto limit 10 napisów dla tego pliku.",
+    "error.user_subtitle.empty_file": "Plik napisów jest pusty.",
     "error.generic": "Coś poszło nie tak. Spróbuj ponownie."
 }

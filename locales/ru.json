@@ -377,6 +377,14 @@
     "action.stream.download": "Скачать",
     "action.stream.embedHelp": "Смотрите {{.Link}} для продвинутого использования",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Мои субтитры",
+    "action.stream.mySubtitles.signInPrompt": "Войдите, чтобы загружать свои субтитры.",
+    "action.stream.mySubtitles.signIn": "Войти",
+    "action.stream.mySubtitles.dragHint": "Перетащите файл субтитров сюда или выберите вручную",
+    "action.stream.mySubtitles.formats": "SRT, VTT или ASS, до 5 МБ",
+    "action.stream.mySubtitles.upload": "Загрузить",
+    "action.stream.mySubtitles.delete": "Удалить",
+    "action.stream.mySubtitles.limitReached": "Достигнут лимит в 10 субтитров для этого файла. Удалите один, чтобы загрузить ещё.",
 
     "player.play": "Воспроизвести",
     "player.pause": "Пауза",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "WebDAV URL создан",
     "toast.addedToVault": "Добавлено в Vault",
     "toast.removedFromVault": "Удалено из Vault",
+    "toast.user_subtitle.uploaded": "Субтитры загружены",
+    "toast.user_subtitle.deleted": "Субтитры удалены",
 
     "speedtest.badge": "Тест скорости",
     "speedtest.title": "Тест скорости соединения",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Войдите в аккаунт, чтобы продолжить.",
     "error.access_denied": "Доступ запрещён.",
     "error.validation_failed": "Ошибка проверки. Проверьте введённые данные.",
+    "error.user_subtitle.no_file": "Файл субтитров не прикреплён.",
+    "error.user_subtitle.too_large": "Файл субтитров слишком большой (максимум 5 МБ).",
+    "error.user_subtitle.read_failed": "Не удалось прочитать загруженный файл.",
+    "error.user_subtitle.unsupported_format": "Формат не поддерживается. Используйте SRT, VTT или ASS.",
+    "error.user_subtitle.limit_reached": "Достигнут лимит в 10 субтитров для этого файла.",
+    "error.user_subtitle.empty_file": "Файл субтитров пуст.",
     "error.generic": "Что-то пошло не так. Попробуйте ещё раз."
 }

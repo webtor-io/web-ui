@@ -377,6 +377,14 @@
     "action.stream.download": "İndir",
     "action.stream.embedHelp": "İleri kullanım için {{.Link}} adresine bak",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Altyazılarım",
+    "action.stream.mySubtitles.signInPrompt": "Kendi altyazılarını yüklemek için giriş yap.",
+    "action.stream.mySubtitles.signIn": "Giriş yap",
+    "action.stream.mySubtitles.dragHint": "Altyazı dosyasını buraya sürükle veya tıklayarak seç",
+    "action.stream.mySubtitles.formats": "SRT, VTT veya ASS, en fazla 5 MB",
+    "action.stream.mySubtitles.upload": "Yükle",
+    "action.stream.mySubtitles.delete": "Sil",
+    "action.stream.mySubtitles.limitReached": "Bu dosya için 10 altyazı sınırına ulaşıldı. Daha fazla yüklemek için birini sil.",
 
     "player.play": "Oynat",
     "player.pause": "Duraklat",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "WebDAV URL'si oluşturuldu",
     "toast.addedToVault": "Vault'a eklendi",
     "toast.removedFromVault": "Vault'tan kaldırıldı",
+    "toast.user_subtitle.uploaded": "Altyazı yüklendi",
+    "toast.user_subtitle.deleted": "Altyazı silindi",
 
     "speedtest.badge": "Hız testi",
     "speedtest.title": "Bağlantı hızı testi",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Devam etmek için giriş yapın.",
     "error.access_denied": "Erişim engellendi.",
     "error.validation_failed": "Doğrulama hatası. Lütfen girilen verileri kontrol edin.",
+    "error.user_subtitle.no_file": "Altyazı dosyası eklenmedi.",
+    "error.user_subtitle.too_large": "Altyazı dosyası çok büyük (maks. 5 MB).",
+    "error.user_subtitle.read_failed": "Yüklenen dosya okunamadı.",
+    "error.user_subtitle.unsupported_format": "Desteklenmeyen altyazı biçimi. SRT, VTT veya ASS kullanın.",
+    "error.user_subtitle.limit_reached": "Bu dosya için 10 altyazı sınırına ulaşıldı.",
+    "error.user_subtitle.empty_file": "Altyazı dosyası boş.",
     "error.generic": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin."
 }

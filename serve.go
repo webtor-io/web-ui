@@ -35,6 +35,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	ush "github.com/webtor-io/web-ui/handlers/user_subtitle"
 	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
 	wh "github.com/webtor-io/web-ui/handlers/watch_history"
@@ -53,6 +54,7 @@ import (
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	usv "github.com/webtor-io/web-ui/services/user_subtitle"
 	uvss "github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/vault"
 
@@ -113,6 +115,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = turnstile.RegisterFlags(c.Flags)
 	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
+	c.Flags = usv.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -265,10 +268,15 @@ func serve(c *cli.Context) error {
 	// Setting Enricher
 	en := makeEnricher(c, cl, pg, sapi)
 
+	// Setting UserSubtitle service. Returns nil when the deployment is not
+	// configured with USER_SUBTITLE_S3_BUCKET; jobs and handlers then treat
+	// the feature as disabled.
+	userSubtitleSvc := usv.New(c, s3Cl, pg)
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)
@@ -373,6 +381,11 @@ func serve(c *cli.Context) error {
 
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en)
+
+	// Setting UserSubtitle handler. When AWS_USER_SUBTITLE_BUCKET is not
+	// set the service is nil; RegisterHandler skips its routes and the UI
+	// hides the feature.
+	ush.RegisterHandler(r, tm, userSubtitleSvc, sapi)
 
 	// Setting CacheIndex
 	cacheIndex := ci.New(c, pg)

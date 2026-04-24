@@ -377,6 +377,14 @@
     "action.stream.download": "Scarica",
     "action.stream.embedHelp": "Consulta {{.Link}} per l'uso avanzato",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "I miei sottotitoli",
+    "action.stream.mySubtitles.signInPrompt": "Accedi per caricare i tuoi sottotitoli.",
+    "action.stream.mySubtitles.signIn": "Accedi",
+    "action.stream.mySubtitles.dragHint": "Trascina qui un file di sottotitoli o clicca per sceglierlo",
+    "action.stream.mySubtitles.formats": "SRT, VTT o ASS, fino a 5 MB",
+    "action.stream.mySubtitles.upload": "Carica",
+    "action.stream.mySubtitles.delete": "Elimina",
+    "action.stream.mySubtitles.limitReached": "Hai raggiunto il limite di 10 sottotitoli per questo file. Eliminane uno per caricarne altri.",
 
     "player.play": "Riproduci",
     "player.pause": "Pausa",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "URL WebDAV generato",
     "toast.addedToVault": "Aggiunto al vault",
     "toast.removedFromVault": "Rimosso dal vault",
+    "toast.user_subtitle.uploaded": "Sottotitolo caricato",
+    "toast.user_subtitle.deleted": "Sottotitolo eliminato",
 
     "speedtest.badge": "Test di velocità",
     "speedtest.title": "Test della velocità di connessione",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Effettua l'accesso per continuare.",
     "error.access_denied": "Accesso negato.",
     "error.validation_failed": "Validazione fallita. Controlla i dati inseriti.",
+    "error.user_subtitle.no_file": "Nessun file di sottotitoli allegato.",
+    "error.user_subtitle.too_large": "Il file di sottotitoli è troppo grande (max 5 MB).",
+    "error.user_subtitle.read_failed": "Impossibile leggere il file caricato.",
+    "error.user_subtitle.unsupported_format": "Formato di sottotitoli non supportato. Usa SRT, VTT o ASS.",
+    "error.user_subtitle.limit_reached": "Hai raggiunto il limite di 10 sottotitoli per questo file.",
+    "error.user_subtitle.empty_file": "Il file di sottotitoli è vuoto.",
     "error.generic": "Qualcosa è andato storto. Riprova."
 }

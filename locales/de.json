@@ -377,6 +377,14 @@
     "action.stream.download": "Herunterladen",
     "action.stream.embedHelp": "Siehe {{.Link}} für erweiterte Nutzung",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Meine Untertitel",
+    "action.stream.mySubtitles.signInPrompt": "Melde dich an, um eigene Untertitel hochzuladen.",
+    "action.stream.mySubtitles.signIn": "Anmelden",
+    "action.stream.mySubtitles.dragHint": "Lege eine Untertiteldatei hier ab oder klicke zum Auswählen",
+    "action.stream.mySubtitles.formats": "SRT, VTT oder ASS, bis zu 5 MB",
+    "action.stream.mySubtitles.upload": "Hochladen",
+    "action.stream.mySubtitles.delete": "Löschen",
+    "action.stream.mySubtitles.limitReached": "Das Limit von 10 Untertiteln für diese Datei ist erreicht. Lösche einen, um weitere hochzuladen.",
 
     "player.play": "Abspielen",
     "player.pause": "Pause",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "WebDAV-URL erstellt",
     "toast.addedToVault": "Zum Vault hinzugefügt",
     "toast.removedFromVault": "Aus dem Vault entfernt",
+    "toast.user_subtitle.uploaded": "Untertitel hochgeladen",
+    "toast.user_subtitle.deleted": "Untertitel gelöscht",
 
     "speedtest.badge": "Geschwindigkeitstest",
     "speedtest.title": "Verbindungsgeschwindigkeitstest",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Bitte melde dich an, um fortzufahren.",
     "error.access_denied": "Zugriff verweigert.",
     "error.validation_failed": "Validierungsfehler. Bitte überprüfe deine Eingaben.",
+    "error.user_subtitle.no_file": "Es wurde keine Untertiteldatei angehängt.",
+    "error.user_subtitle.too_large": "Die Untertiteldatei ist zu groß (max. 5 MB).",
+    "error.user_subtitle.read_failed": "Die hochgeladene Datei konnte nicht gelesen werden.",
+    "error.user_subtitle.unsupported_format": "Nicht unterstütztes Untertitelformat. Verwende SRT, VTT oder ASS.",
+    "error.user_subtitle.limit_reached": "Das Limit von 10 Untertiteln für diese Datei ist erreicht.",
+    "error.user_subtitle.empty_file": "Die Untertiteldatei ist leer.",
     "error.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
 }

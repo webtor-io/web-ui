@@ -377,6 +377,14 @@
     "action.stream.download": "Descargar",
     "action.stream.embedHelp": "Consulta {{.Link}} para uso avanzado",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Mis subtítulos",
+    "action.stream.mySubtitles.signInPrompt": "Inicia sesión para subir tus propios subtítulos.",
+    "action.stream.mySubtitles.signIn": "Iniciar sesión",
+    "action.stream.mySubtitles.dragHint": "Arrastra un archivo de subtítulos aquí o haz clic para elegir",
+    "action.stream.mySubtitles.formats": "SRT, VTT o ASS, hasta 5 MB",
+    "action.stream.mySubtitles.upload": "Subir",
+    "action.stream.mySubtitles.delete": "Eliminar",
+    "action.stream.mySubtitles.limitReached": "Has alcanzado el límite de 10 subtítulos para este archivo. Elimina uno para subir más.",
 
     "player.play": "Reproducir",
     "player.pause": "Pausar",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "URL WebDAV generada",
     "toast.addedToVault": "Añadido al Vault",
     "toast.removedFromVault": "Eliminado del Vault",
+    "toast.user_subtitle.uploaded": "Subtítulo subido",
+    "toast.user_subtitle.deleted": "Subtítulo eliminado",
 
     "speedtest.badge": "Test de velocidad",
     "speedtest.title": "Test de velocidad de conexión",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Inicia sesión para continuar.",
     "error.access_denied": "Acceso denegado.",
     "error.validation_failed": "Error de validación. Revisa los datos introducidos.",
+    "error.user_subtitle.no_file": "No se adjuntó ningún archivo de subtítulos.",
+    "error.user_subtitle.too_large": "El archivo de subtítulos es demasiado grande (máximo 5 MB).",
+    "error.user_subtitle.read_failed": "No se pudo leer el archivo subido.",
+    "error.user_subtitle.unsupported_format": "Formato de subtítulo no compatible. Usa SRT, VTT o ASS.",
+    "error.user_subtitle.limit_reached": "Has alcanzado el límite de 10 subtítulos para este archivo.",
+    "error.user_subtitle.empty_file": "El archivo de subtítulos está vacío.",
     "error.generic": "Algo salió mal. Inténtalo de nuevo."
 }

@@ -19,7 +19,7 @@ Some features to mention:
   - [x] OpenSubtitles support
   - [x] Chromecast support
   - [x] Embed control
-  - [ ] Subtitle uploading support
+  - [x] Subtitle uploading support
   - [ ] Subtitle size control
 - [x] Authentication
   - [x] Passwordless authentication
@@ -53,6 +53,7 @@ Some features to mention:
   - [x] WebDAV
   - [x] RealDebrid
   - [x] TorBox
+- [x] i18n
 
 ## Setting up connection to Webtor RestAPI
 

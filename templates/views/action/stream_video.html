@@ -21,7 +21,7 @@
         {{ range .ExportTag.Sources }}
         <source src="{{ .Src }}" type="{{ .Type }}">
         {{ end }}
-        {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData }}
+        {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
         {{ if ne .Provider "MediaProbe" }}
         {{ if ne .ID "none" }}
         <track src="{{ .Src }}" id="{{ .ID }}" srclang="{{ .SrcLang }}" label="{{ .Label }}" kind="{{ .Kind }}" {{ if .Default }}default="default"{{ end }}>
@@ -31,11 +31,12 @@
     </video>
     <input type="checkbox" id="subtitles-checkbox" class="modal-toggle" />
     <div class="modal w-full h-full" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}">
-        {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData }}
+        {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
         {{ $openSubs := filterSubtitlesByProvider $subs "OpenSubtitles" false }}
         {{ $otherSubs := filterSubtitlesByProvider $subs "OpenSubtitles" true }}
+        {{ $otherSubs = filterSubtitlesByProvider $otherSubs "UserSubtitle" true }}
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
-            <div class="flex" id="embedded">
+            <div class="flex flex-col sm:flex-row gap-4 sm:gap-0" id="embedded">
                 <div class="flex-1">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.audio" }}</h3>
                     <ul class="flex flex-wrap">
@@ -63,9 +64,20 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-action">
-                {{ if $openSubs }}<label for="opensubtitles" class="btn btn-soft-cyan">OpenSubtitles</label>{{ end }}
-                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</label>
+            {{ if and (not .DomainSettings) .UserSubtitlesEnabled }}
+            {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles }}
+            <div class="flex flex-col hidden" id="my-subtitles" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
+                {{ template "user_subtitles_view" withContext $ $usv }}
+            </div>
+            {{ end }}
+            <div class="modal-action flex-col sm:flex-row">
+                <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:mr-auto">
+                    {{ if $openSubs }}<label for="opensubtitles" class="btn btn-soft-cyan w-full sm:w-auto">OpenSubtitles</label>{{ end }}
+                    {{ if and (not .DomainSettings) .UserSubtitlesEnabled }}
+                    <label for="my-subtitles" class="btn btn-soft-purple w-full sm:w-auto">{{ t $.Lang "action.stream.mySubtitles" }}</label>
+                    {{ end }}
+                </div>
+                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</label>
             </div>
         </div>
     </div>

@@ -502,15 +502,52 @@ export async function initPlayer(target) {
     _currentPlayer = { mountEl, playerContainer, videoEl };
 }
 
+// Ensure a <track> with id=<trackID> exists inside <video>. The server
+// pre-wraps user-subtitle URLs through /ext/ with the correct auth
+// (subdomain/path/query baked in by torrent-http-proxy) and returns
+// them in data-src. For subs uploaded after the initial render, the
+// <video> has no matching <track> yet — create one on first click.
+function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label) {
+    for (const t of video.querySelectorAll('track')) {
+        if (t.id === trackID) return true;
+    }
+    if (!wrappedSrc) return false;
+    const track = document.createElement('track');
+    track.id = trackID;
+    track.kind = 'subtitles';
+    track.src = wrappedSrc;
+    track.label = label || 'Subtitle';
+    video.appendChild(track);
+    return true;
+}
+
 function wireTrackHandlers(container) {
-    // Subtitle click handlers
-    for (const sub of container.querySelectorAll('.subtitle')) {
-        sub.addEventListener('click', (e) => {
-            const target = e.target;
-            markTrack(container, target, 'subtitle');
-            const hls = window.hlsPlayer;
+    // Delegate subtitle clicks on #subtitles so items swapped into
+    // #my-subtitles via async still work without re-binding.
+    const subtitlesModal = container.querySelector('#subtitles');
+    if (subtitlesModal) {
+        subtitlesModal.addEventListener('click', (e) => {
+            const target = e.target.closest('.subtitle');
+            if (!target || !subtitlesModal.contains(target)) return;
             const provider = target.getAttribute('data-provider');
             const id = target.getAttribute('data-id');
+            // User subs uploaded after the initial page render have no
+            // matching <track> yet — create it on first click so the
+            // textTracks mode='showing' loop below finds something to
+            // activate.
+            if (provider === 'UserSubtitle' && id && id !== 'none') {
+                const video = container.querySelector('video.player');
+                if (video) {
+                    ensureUserSubtitleTrack(
+                        video,
+                        id,
+                        target.getAttribute('data-src') || '',
+                        target.getAttribute('data-label') || target.textContent.trim(),
+                    );
+                }
+            }
+            markTrack(container, target, 'subtitle');
+            const hls = window.hlsPlayer;
             const mpId = target.getAttribute('data-mp-id');
 
             if (hls && provider === 'MediaProbe') {
@@ -535,7 +572,7 @@ function wireTrackHandlers(container) {
         });
     }
 
-    // Audio click handlers
+    // Audio click handlers (no async swap — direct binding is enough)
     for (const audio of container.querySelectorAll('.audio')) {
         audio.addEventListener('click', (e) => {
             const target = e.target;
@@ -546,22 +583,68 @@ function wireTrackHandlers(container) {
         });
     }
 
-    // OpenSubtitles toggle
-    const osToggle = container.querySelector('label[for=opensubtitles]');
-    if (osToggle) {
-        osToggle.addEventListener('click', (e) => {
-            const el = container.querySelector('#opensubtitles');
-            const ele = container.querySelector('#embedded');
-            if (!el || !ele) return;
-            const hidden = el.classList.contains('hidden');
-            if (hidden) {
+    // Sync the visual "active" marker on .subtitle items in #my-subtitles:
+    // the <track default> in <video> already drives playback correctly on
+    // reload, but the list items never go through the click path and so
+    // lose their text-primary/underline marker. Re-derive it from the
+    // currently-showing (or default) <track> and re-run on async swap.
+    const syncMySubtitleMark = () => {
+        const video = container.querySelector('video.player');
+        const mySubs = container.querySelector('#my-subtitles');
+        if (!video || !mySubs) return;
+        let activeID = null;
+        for (const t of video.textTracks) {
+            if (t.mode === 'showing' && t.id) { activeID = t.id; break; }
+        }
+        if (!activeID) {
+            const dt = video.querySelector('track[default]');
+            if (dt && dt.id) activeID = dt.id;
+        }
+        if (!activeID) return;
+        for (const item of mySubs.querySelectorAll('.subtitle')) {
+            const isActive = item.getAttribute('data-id') === activeID;
+            item.classList.toggle('text-primary', isActive);
+            item.classList.toggle('underline', isActive);
+            if (isActive) item.setAttribute('data-default', 'true');
+            else item.removeAttribute('data-default');
+        }
+    };
+    syncMySubtitleMark();
+    // loadAsyncView dispatches an 'async' CustomEvent after swapping a
+    // target's innerHTML; re-sync when #my-subtitles content is replaced.
+    const mySubsContainer = container.querySelector('#my-subtitles');
+    if (mySubsContainer) {
+        window.addEventListener('async', (e) => {
+            if (e.detail && e.detail.target === mySubsContainer) syncMySubtitleMark();
+        });
+    }
+
+    // Subtitles modal view toggles — OpenSubtitles and My Subtitles are
+    // alternate views inside the same modal alongside #embedded. Clicking a
+    // toggle shows its view and hides every other; clicking the active one
+    // returns to #embedded.
+    const embedded = container.querySelector('#embedded');
+    const viewIDs = ['opensubtitles', 'my-subtitles'];
+    const views = viewIDs
+        .map((id) => ({ id, el: container.querySelector('#' + id) }))
+        .filter((v) => v.el);
+    for (const v of views) {
+        const toggle = container.querySelector(`label[for=${v.id}]`);
+        if (!toggle) continue;
+        toggle.addEventListener('click', (e) => {
+            const isHidden = v.el.classList.contains('hidden');
+            if (isHidden) {
+                if (embedded) embedded.classList.add('hidden');
+                for (const other of views) {
+                    if (other.id === v.id) continue;
+                    other.el.classList.add('hidden');
+                }
+                v.el.classList.remove('hidden');
                 e.target.classList.remove('btn-outline');
-                el.classList.remove('hidden');
-                ele.classList.add('hidden');
             } else {
+                v.el.classList.add('hidden');
+                if (embedded) embedded.classList.remove('hidden');
                 e.target.classList.add('btn-outline');
-                el.classList.add('hidden');
-                ele.classList.remove('hidden');
             }
         });
     }

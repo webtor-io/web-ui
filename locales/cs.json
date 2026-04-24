@@ -377,6 +377,14 @@
     "action.stream.download": "Stáhnout",
     "action.stream.embedHelp": "Viz {{.Link}} pro pokročilé použití",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Moje titulky",
+    "action.stream.mySubtitles.signInPrompt": "Přihlaste se pro nahrání vlastních titulků.",
+    "action.stream.mySubtitles.signIn": "Přihlásit se",
+    "action.stream.mySubtitles.dragHint": "Přetáhněte soubor titulků sem nebo klikněte pro výběr",
+    "action.stream.mySubtitles.formats": "SRT, VTT nebo ASS, do 5 MB",
+    "action.stream.mySubtitles.upload": "Nahrát",
+    "action.stream.mySubtitles.delete": "Smazat",
+    "action.stream.mySubtitles.limitReached": "Dosáhli jste limitu 10 titulků pro tento soubor. Smažte jeden pro nahrání dalších.",
 
     "player.play": "Přehrát",
     "player.pause": "Pauza",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "WebDAV URL vygenerována",
     "toast.addedToVault": "Přidáno do vault",
     "toast.removedFromVault": "Odebráno z vault",
+    "toast.user_subtitle.uploaded": "Titulky nahrány",
+    "toast.user_subtitle.deleted": "Titulky smazány",
 
     "speedtest.badge": "Test rychlosti",
     "speedtest.title": "Test rychlosti připojení",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Pro pokračování se prosím přihlaste.",
     "error.access_denied": "Přístup odepřen.",
     "error.validation_failed": "Chyba ověření. Zkontrolujte prosím zadané údaje.",
+    "error.user_subtitle.no_file": "Nebyl přiložen žádný soubor titulků.",
+    "error.user_subtitle.too_large": "Soubor titulků je příliš velký (max. 5 MB).",
+    "error.user_subtitle.read_failed": "Nepodařilo se načíst nahraný soubor.",
+    "error.user_subtitle.unsupported_format": "Nepodporovaný formát titulků. Použijte SRT, VTT nebo ASS.",
+    "error.user_subtitle.limit_reached": "Dosáhli jste limitu 10 titulků pro tento soubor.",
+    "error.user_subtitle.empty_file": "Soubor titulků je prázdný.",
     "error.generic": "Něco se pokazilo. Zkuste to prosím znovu."
 }

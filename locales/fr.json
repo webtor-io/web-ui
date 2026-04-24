@@ -377,6 +377,14 @@
     "action.stream.download": "Télécharger",
     "action.stream.embedHelp": "Voir {{.Link}} pour une utilisation avancée",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "Mes sous-titres",
+    "action.stream.mySubtitles.signInPrompt": "Connectez-vous pour importer vos propres sous-titres.",
+    "action.stream.mySubtitles.signIn": "Se connecter",
+    "action.stream.mySubtitles.dragHint": "Déposez un fichier de sous-titres ici ou cliquez pour parcourir",
+    "action.stream.mySubtitles.formats": "SRT, VTT ou ASS, jusqu'à 5 Mo",
+    "action.stream.mySubtitles.upload": "Importer",
+    "action.stream.mySubtitles.delete": "Supprimer",
+    "action.stream.mySubtitles.limitReached": "Vous avez atteint la limite de 10 sous-titres pour ce fichier. Supprimez-en un pour en ajouter.",
 
     "player.play": "Lecture",
     "player.pause": "Pause",
@@ -430,6 +438,8 @@
     "toast.webdavUrlGenerated": "URL WebDAV générée",
     "toast.addedToVault": "Ajouté à vault",
     "toast.removedFromVault": "Retiré de vault",
+    "toast.user_subtitle.uploaded": "Sous-titre importé",
+    "toast.user_subtitle.deleted": "Sous-titre supprimé",
 
     "speedtest.badge": "Test de vitesse",
     "speedtest.title": "Test de vitesse de connexion",
@@ -1038,5 +1048,11 @@
     "error.unauthorized": "Veuillez vous connecter pour continuer.",
     "error.access_denied": "Accès refusé.",
     "error.validation_failed": "Échec de la validation. Veuillez vérifier vos données.",
+    "error.user_subtitle.no_file": "Aucun fichier de sous-titres n'a été joint.",
+    "error.user_subtitle.too_large": "Le fichier de sous-titres est trop volumineux (max. 5 Mo).",
+    "error.user_subtitle.read_failed": "Impossible de lire le fichier importé.",
+    "error.user_subtitle.unsupported_format": "Format de sous-titres non pris en charge. Utilisez SRT, VTT ou ASS.",
+    "error.user_subtitle.limit_reached": "Vous avez atteint la limite de 10 sous-titres pour ce fichier.",
+    "error.user_subtitle.empty_file": "Le fichier de sous-titres est vide.",
     "error.generic": "Une erreur est survenue. Veuillez réessayer."
 }

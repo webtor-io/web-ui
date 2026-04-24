@@ -394,6 +394,14 @@
     "action.stream.download": "Download",
     "action.stream.embedHelp": "See {{.Link}} for advanced usage",
     "action.stream.embedLinkText": "embed-sdk",
+    "action.stream.mySubtitles": "My Subtitles",
+    "action.stream.mySubtitles.signInPrompt": "Sign in to upload your own subtitles.",
+    "action.stream.mySubtitles.signIn": "Sign in",
+    "action.stream.mySubtitles.dragHint": "Drop a subtitle file here or click to browse",
+    "action.stream.mySubtitles.formats": "SRT, VTT or ASS, up to 5 MB",
+    "action.stream.mySubtitles.upload": "Upload",
+    "action.stream.mySubtitles.delete": "Delete",
+    "action.stream.mySubtitles.limitReached": "You've reached the 10-subtitle limit for this file. Delete one to upload more.",
 
     "player.play": "Play",
     "player.pause": "Pause",
@@ -447,6 +455,8 @@
     "toast.webdavUrlGenerated": "WebDAV URL generated",
     "toast.addedToVault": "Added to vault",
     "toast.removedFromVault": "Removed from vault",
+    "toast.user_subtitle.uploaded": "Subtitle uploaded",
+    "toast.user_subtitle.deleted": "Subtitle deleted",
 
     "speedtest.badge": "Speed Test",
     "speedtest.title": "Connection Speed Test",
@@ -1057,5 +1067,11 @@
     "error.unauthorized": "Please log in to continue.",
     "error.access_denied": "Access denied.",
     "error.validation_failed": "Validation failed. Please check your input.",
+    "error.user_subtitle.no_file": "No subtitle file was attached.",
+    "error.user_subtitle.too_large": "Subtitle file is too large (max 5 MB).",
+    "error.user_subtitle.read_failed": "Failed to read the uploaded file.",
+    "error.user_subtitle.unsupported_format": "Unsupported subtitle format. Use SRT, VTT or ASS.",
+    "error.user_subtitle.limit_reached": "You've reached the 10-subtitle limit for this file.",
+    "error.user_subtitle.empty_file": "Subtitle file is empty.",
     "error.generic": "Something went wrong. Please try again."
 }

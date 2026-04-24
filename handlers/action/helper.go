@@ -29,6 +29,19 @@ func NewHelper() *Helper {
 	return &Helper{}
 }
 
+// UserSubtitleView builds the flat data struct the user_subtitles_view
+// partial expects. Called from the stream_video template so that the
+// initial render and the async-reload response (from the /user-subtitle
+// handler) feed the same shape into the same partial.
+func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.UserSubtitleTrack) *models.UserSubtitleView {
+	return &models.UserSubtitleView{
+		ResourceID:    resourceID,
+		Path:          path,
+		EIURL:         eiURL,
+		UserSubtitles: subs,
+	}
+}
+
 func (s *Helper) GetDurationSec(mp *api.MediaProbe) string {
 	return mp.Format.Duration
 }
@@ -155,7 +168,7 @@ func (s *Helper) FilterSubtitlesByProvider(subs []ListItem, provider string, exc
 	return res
 }
 
-func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData) []ListItem {
+func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
 		ID:    "none",
@@ -215,6 +228,15 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Kind:     "subtitles",
 			Src:      t.Src,
 			Provider: "External",
+		})
+	}
+	for _, t := range userSubs {
+		res = append(res, ListItem{
+			ID:       t.ID,
+			Label:    t.Label,
+			Kind:     "subtitles",
+			Src:      t.Src,
+			Provider: "UserSubtitle",
 		})
 	}
 	return s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud)
