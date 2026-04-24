@@ -117,6 +117,45 @@ func isRateLimited(measuredBytesPerSec float64, rateLimitBitsPerSec int64) bool 
 	return measuredBytesPerSec*8 >= float64(rateLimitBitsPerSec)*0.9
 }
 
+func buildSlowDownloadData(c *web.Context, measuredBytesPerSec float64, bitrate int64) SlowDownloadData {
+	sdd := SlowDownloadData{
+		MeasuredSpeedMbps: measuredBytesPerSec * 8 / 1_000_000,
+		RequiredSpeedMbps: float64(bitrate) * bandwidthMultiplier / 1_000_000,
+		BitrateMbps:       float64(bitrate) / 1_000_000,
+	}
+	if c.ApiClaims != nil && c.ApiClaims.Rate != "" {
+		if rateLimitBps := parseRateLimit(c.ApiClaims.Rate); rateLimitBps > 0 && isRateLimited(measuredBytesPerSec, rateLimitBps) {
+			sdd.IsRateLimited = true
+			sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
+		}
+	}
+	if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil {
+		sdd.TierName = c.Claims.Context.Tier.Name
+	}
+	if sdd.TierName == "" {
+		sdd.TierName = "free"
+	}
+	return sdd
+}
+
+// checkCachedRateLimit decides whether a cached stream should raise the
+// slow-download warning based purely on the user's subscription-tier rate cap.
+// Cached content comes from CDN/S3 fast enough to saturate the cap, so the cap
+// itself is the effective throughput — no probe download needed.
+func checkCachedRateLimit(c *web.Context, bitrate int64) (SlowDownloadData, bool) {
+	if c.ApiClaims == nil || c.ApiClaims.Rate == "" {
+		return SlowDownloadData{}, false
+	}
+	rateLimitBps := parseRateLimit(c.ApiClaims.Rate)
+	if rateLimitBps == 0 {
+		return SlowDownloadData{}, false
+	}
+	if float64(rateLimitBps) >= float64(bitrate)*bandwidthMultiplier {
+		return SlowDownloadData{}, false
+	}
+	return buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate), true
+}
+
 func contentProbeURL(downloadURL string) string {
 	if i := strings.IndexByte(downloadURL, '?'); i >= 0 {
 		return downloadURL[:i] + "~cp" + downloadURL[i:]
@@ -223,32 +262,23 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 
-	// Step 3: Bandwidth check (skip for cached/vault content)
-	if !se.Meta.Cache && downloadSpeed > 0 && sc.MediaProbe != nil {
-		j.InProgress(s.t("job.checkingBandwidth"))
+	// Step 3: Bandwidth check. For cached content we skip the probe download
+	// but still gate rate-limited tiers on their plan cap vs required bitrate.
+	if sc.MediaProbe != nil {
 		bitrate := getVideoBitrate(sc.MediaProbe)
-		if bitrate > 0 && downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
-			sdd := SlowDownloadData{
-				MeasuredSpeedMbps: downloadSpeed * 8 / 1_000_000,
-				RequiredSpeedMbps: float64(bitrate) * bandwidthMultiplier / 1_000_000,
-				BitrateMbps:       float64(bitrate) / 1_000_000,
-			}
-			if c.ApiClaims != nil && c.ApiClaims.Rate != "" {
-				rateLimitBps := parseRateLimit(c.ApiClaims.Rate)
-				if rateLimitBps > 0 && isRateLimited(downloadSpeed, rateLimitBps) {
-					sdd.IsRateLimited = true
-					sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
+		if bitrate > 0 {
+			if se.Meta.Cache {
+				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
+					return &SlowDownloadError{Data: sdd}
 				}
+			} else if downloadSpeed > 0 {
+				j.InProgress(s.t("job.checkingBandwidth"))
+				if downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
+					return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+				}
+				j.Done()
 			}
-			if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil {
-				sdd.TierName = c.Claims.Context.Tier.Name
-			}
-			if sdd.TierName == "" {
-				sdd.TierName = "free"
-			}
-			return &SlowDownloadError{Data: sdd}
 		}
-		j.Done()
 	}
 
 	// Step 4: Session transcoder (after bandwidth check)
