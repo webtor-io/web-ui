@@ -716,11 +716,18 @@ func (s *Api) makeSubtitleURL(u string, esub ExtSubtitle) string {
 }
 
 func (*Api) convertToVTT(u string) string {
-	src, _ := url.Parse(u)
-	nameParts := strings.Split(src.Path, "/")
-	name := strings.Join(nameParts[len(nameParts)-1:], "/")
-	src.Path += "~vtt/" + strings.TrimSuffix(name, ".srt") + ".vtt"
-	return src.String()
+	parsed, _ := url.Parse(u)
+	pathParts := strings.Split(parsed.Path, "/")
+	name := pathParts[len(pathParts)-1]
+	newName := strings.TrimSuffix(name, ".srt") + ".vtt"
+	// parsed.EscapedPath() returns the %-encoded path verbatim when
+	// RawPath is a valid encoding of Path, so we don't lose percent
+	// sequences already present in u (e.g. %3D%3D from base64 padding).
+	out := parsed.Scheme + "://" + parsed.Host + parsed.EscapedPath() + "~vtt/" + url.PathEscape(newName)
+	if parsed.RawQuery != "" {
+		out += "?" + parsed.RawQuery
+	}
+	return out
 }
 
 func (s *Api) AttachExternalSubtitle(ei ra.ExportItem, u string) string {
@@ -740,10 +747,18 @@ func (s *Api) AttachExternalSubtitle(ei ra.ExportItem, u string) string {
 func (s *Api) AttachExternalFile(ei ra.ExportItem, u string) string {
 	src, _ := url.Parse(ei.URL)
 	nameParts := strings.Split(u, "/")
-	name := strings.Join(nameParts[len(nameParts)-1:], "/")
-	encodedURL := url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(u)))
-	src.Path = fmt.Sprintf("/ext/%s/%s", encodedURL, name)
-	return src.String()
+	name := nameParts[len(nameParts)-1]
+	// QueryEscape is needed to keep base64's '/' and '=' path-safe,
+	// but if we then store the escaped string in url.URL.Path and call
+	// String(), Go re-percent-encodes the '%' chars (e.g. '%3D%3D' →
+	// '%253D%253D'). Building the URL by string-concat bypasses that
+	// second pass while still giving us a fully-formed, quoted URL.
+	encodedPayload := url.QueryEscape(base64.StdEncoding.EncodeToString([]byte(u)))
+	out := src.Scheme + "://" + src.Host + "/ext/" + encodedPayload + "/" + url.PathEscape(name)
+	if src.RawQuery != "" {
+		out += "?" + src.RawQuery
+	}
+	return out
 }
 
 func getRemoteAddress(c *gin.Context) string {

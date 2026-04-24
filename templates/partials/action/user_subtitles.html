@@ -57,9 +57,6 @@
                 <span class="text-xs text-w-muted">{{ t $lang "action.stream.mySubtitles.formats" }}</span>
                 <input type="file" name="file" accept=".srt,.vtt,.ass,text/vtt,application/x-subrip" class="hidden user-subtitle-input">
             </label>
-            <div class="mt-3 flex justify-end">
-                <button type="submit" class="btn btn-soft-cyan">{{ t $lang "action.stream.mySubtitles.upload" }}</button>
-            </div>
         </form>
     {{ else }}
         <p class="text-sm text-w-sub">{{ t $lang "action.stream.mySubtitles.limitReached" }}</p>
