@@ -268,9 +268,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		bitrate := getVideoBitrate(sc.MediaProbe)
 		if bitrate > 0 {
 			if se.Meta.Cache {
+				j.InProgress(s.t("job.checkingBandwidth"))
 				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
 					return &SlowDownloadError{Data: sdd}
 				}
+				j.Done()
 			} else if downloadSpeed > 0 {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
