@@ -60,6 +60,27 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 	} else {
 		store = cookie.NewStore([]byte(common.SessionSecretFlag))
 	}
+	// SameSite=None + Secure is required so the session cookie survives
+	// POSTs from a cross-origin iframe (embed flow) — without it modern
+	// browsers default to SameSite=Lax which strips the cookie on POST,
+	// breaking CSRF validation on /embed. CSRF still protects us because
+	// the token itself is unguessable. Safari ITP refuses third-party
+	// cookies regardless of SameSite, so the _sessionID form-field
+	// fallback below is kept as a safety net for that case. In debug
+	// mode we stay on Lax because Secure+None is rejected on plain http.
+	sameSite := http.SameSiteNoneMode
+	secure := true
+	if gin.IsDebugging() {
+		sameSite = http.SameSiteLaxMode
+		secure = false
+	}
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 30,
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: sameSite,
+	})
 	r.Use(sessions.Sessions("session", store))
 	r.Use(func(ctx *gin.Context) {
 		id := ctx.GetHeader("X-Session-ID")
