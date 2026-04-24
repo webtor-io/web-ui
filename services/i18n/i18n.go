@@ -76,7 +76,7 @@ func New(localeFS fs.FS) *Service {
 	SupportedLangs = discoverLocales(localeFS)
 
 	bundle := i18n.NewBundle(language.English)
-	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
+	bundle.RegisterUnmarshalFunc("json", unmarshalStrippingAtKeys)
 	for _, lang := range SupportedLangs {
 		_, err := bundle.LoadMessageFileFS(localeFS, lang+".json")
 		if err != nil {
@@ -141,6 +141,34 @@ func discoverLocales(localeFS fs.FS) []string {
 		}
 	}
 	return out
+}
+
+// unmarshalStrippingAtKeys decodes a locale JSON file and removes any keys
+// whose names start with "@". Those keys carry translator context (ARB-style
+// metadata, e.g. "@support.work": "Title of the copyrighted creative work…")
+// and must not be registered as translatable messages with the i18n bundle.
+//
+// go-i18n's loader (ParseMessageFileBytes) passes v as *interface{}; after
+// json.Unmarshal the underlying value is a map[string]interface{} for a JSON
+// object locale file. We mutate that map in place to drop "@" keys.
+func unmarshalStrippingAtKeys(data []byte, v any) error {
+	if err := json.Unmarshal(data, v); err != nil {
+		return err
+	}
+	ptr, ok := v.(*interface{})
+	if !ok {
+		return nil
+	}
+	m, ok := (*ptr).(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	for k := range m {
+		if strings.HasPrefix(k, "@") {
+			delete(m, k)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Localizer(lang string) *i18n.Localizer {
