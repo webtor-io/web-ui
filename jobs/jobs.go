@@ -21,7 +21,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   warmupTimeoutMinFlag,
 			Usage:  "warmup timeout min",
 			EnvVar: "WARMUP_TIMEOUT_MIN",
-			Value:  10,
+			Value:  3,
 		},
 	)
 }

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -72,21 +73,28 @@ func (e *SlowDownloadError) Error() string {
 	return "download speed too slow for streaming"
 }
 
+type NoPeersError struct{}
+
+func (e *NoPeersError) Error() string {
+	return "no peers / nothing downloaded during warmup"
+}
+
 type speedReader struct {
 	r            io.Reader
-	bytesRead    int64
+	bytesRead    atomic.Int64
 	skipBytes    int64
-	measureStart time.Time
-	started      bool
+	measureStart atomic.Int64 // unix nano, set once when started
+	started      atomic.Bool
 }
 
 func (r *speedReader) Read(p []byte) (n int, err error) {
 	n, err = r.r.Read(p)
 	if n > 0 {
-		r.bytesRead += int64(n)
-		if !r.started && r.bytesRead >= r.skipBytes {
-			r.started = true
-			r.measureStart = time.Now()
+		newBytes := r.bytesRead.Add(int64(n))
+		if !r.started.Load() && newBytes >= r.skipBytes {
+			if r.started.CompareAndSwap(false, true) {
+				r.measureStart.Store(time.Now().UnixNano())
+			}
 		}
 	}
 	return
@@ -463,6 +471,9 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	warmupCtx, warmupCancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
 	defer warmupCancel()
 
+	var peerCount atomic.Int32
+	var noPeersFlag atomic.Bool
+
 	if useStatus {
 		j.StatusUpdate(s.t("job.waitingForPeers"))
 		go func() {
@@ -477,6 +488,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 					if !ok {
 						return
 					}
+					peerCount.Store(int32(ev.Peers))
 					j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
 				case <-warmupCtx.Done():
 					return
@@ -485,38 +497,103 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		}()
 	}
 
+	sr := &speedReader{skipBytes: int64(skipBytes)}
+	warmupStart := time.Now()
+
+	// Watchdog: surface no_peers CTA early instead of waiting the full warmup
+	// deadline. Three thresholds:
+	//   - 30s + zero bytes + zero peers — torrent has no peers at all.
+	//   - 60s + zero bytes — peers exist but aren't serving.
+	//   - 60s + bytes < earlyMinBytes — peers serve, but the rate is so low
+	//     (<17 KB/s avg for 1 MB threshold) that probe will hang on its own
+	//     1-min deadline anyway. Surface CTA now instead of waiting.
+	const earlyMinBytes = 1 * 1024 * 1024
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-warmupCtx.Done():
+				return
+			case <-ticker.C:
+				bytes := sr.bytesRead.Load()
+				elapsed := time.Since(warmupStart)
+				if elapsed > 30*time.Second && bytes == 0 && peerCount.Load() == 0 {
+					noPeersFlag.Store(true)
+					warmupCancel()
+					return
+				}
+				if elapsed > 60*time.Second && bytes < earlyMinBytes {
+					noPeersFlag.Store(true)
+					warmupCancel()
+					return
+				}
+			}
+		}
+	}()
+
 	b, err := s.api.DownloadWithRange(warmupCtx, u, 0, limitStart)
 	if err != nil {
+		if noPeersFlag.Load() {
+			return 0, &NoPeersError{}
+		}
 		return 0, errors.Wrap(err, "failed to start download")
 	}
 	defer func(b io.ReadCloser) {
 		_ = b.Close()
 	}(b)
 
-	sr := &speedReader{r: b, skipBytes: int64(skipBytes)}
+	sr.r = b
 	_, err = io.Copy(io.Discard, sr)
-	if sr.started {
-		measured := sr.bytesRead - sr.skipBytes
-		elapsed := time.Since(sr.measureStart)
+	if noPeersFlag.Load() {
+		return 0, &NoPeersError{}
+	}
+	if sr.started.Load() {
+		measured := sr.bytesRead.Load() - sr.skipBytes
+		elapsed := time.Since(time.Unix(0, sr.measureStart.Load()))
 		if elapsed > 0 && measured > 0 {
 			downloadSpeed = float64(measured) / elapsed.Seconds()
 		}
+	} else if bytes := sr.bytesRead.Load(); bytes > 0 {
+		// Hard deadline hit before measurement window opened — rough estimate
+		// over the whole warmup span so the bandwidth-check has *some* number
+		// to classify against.
+		elapsed := time.Since(warmupStart)
+		if elapsed > 0 {
+			downloadSpeed = float64(bytes) / elapsed.Seconds()
+		}
+	}
+
+	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+		// Hard warmup timeout. If we didn't even reach the measurement window
+		// (skipBytes), the torrent is effectively dead — probe will hang on
+		// its own deadline too. Surface no_peers immediately. Otherwise pass
+		// the measured speed to probe + bandwidth-check.
+		bytes := sr.bytesRead.Load()
+		if bytes < int64(skipBytes) {
+			log.WithField("elapsed", time.Since(warmupStart)).
+				WithField("bytes", bytes).
+				Warn("warmup hard timeout, insufficient data — surfacing no_peers")
+			return 0, &NoPeersError{}
+		}
+		log.WithField("elapsed", time.Since(warmupStart)).
+			WithField("bytes", bytes).
+			WithField("speed_bps", downloadSpeed).
+			Warn("warmup hard timeout, continuing with partial measurement")
+		err = nil
+	} else if err != nil {
+		return 0, errors.Wrap(err, "failed to download")
 	}
 
 	if limitEnd > 0 {
-		b2, err := s.api.DownloadWithRange(warmupCtx, u, size-limitEnd, -1)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to start download")
+		b2, err2 := s.api.DownloadWithRange(warmupCtx, u, size-limitEnd, -1)
+		if err2 != nil {
+			// Tail prefetch is best-effort (used for seek warmup); don't fail.
+			log.WithError(err2).Warn("warmup tail download failed")
+		} else {
+			defer func(b2 io.ReadCloser) { _ = b2.Close() }(b2)
+			_, _ = io.Copy(io.Discard, b2)
 		}
-		defer func(b2 io.ReadCloser) {
-			_ = b2.Close()
-		}(b2)
-		_, err = io.Copy(io.Discard, b2)
-	}
-	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
-		return 0, errors.Wrap(err, fmt.Sprintf("failed to download within %v minutes", s.warmupTimeoutMin))
-	} else if err != nil {
-		return 0, errors.Wrap(err, "failed to download")
 	}
 
 	j.Done()
@@ -581,7 +658,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		j.Custom("action/errors/slow_download", strings.TrimSpace(str))
 		return nil
 	}
-	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+	if _, ok := err.(*NoPeersError); ok || errors.Is(errors.Cause(err), context.DeadlineExceeded) {
 		tpl := s.tb.Build("action/errors/no_peers").WithLayoutBody(`{{ template "main" . }}`)
 		tierName := "free"
 		if s.c.Claims != nil && s.c.Claims.Context != nil && s.c.Claims.Context.Tier != nil && s.c.Claims.Context.Tier.Name != "" {
@@ -591,7 +668,8 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		if terr != nil {
 			return terr
 		}
-		_ = j.Error(err)
+		log.WithError(err).Warn("no peers / warmup deadline — surfacing CTA")
+		j.Fail()
 		j.Custom("action/errors/no_peers", strings.TrimSpace(str))
 		return nil
 	}
