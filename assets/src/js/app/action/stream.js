@@ -13,6 +13,9 @@ function initUserSubtitleUpload() {
     const onDragEnter = (e) => { const l = findLabel(e.target); if (!l) return; e.preventDefault(); highlight(l, true); };
     const onDragOver  = (e) => { const l = findLabel(e.target); if (!l) return; e.preventDefault(); highlight(l, true); };
     const onDragLeave = (e) => { const l = findLabel(e.target); if (!l) return; e.preventDefault(); highlight(l, false); };
+    const trackUpload = (source) => {
+        if (window.umami) window.umami.track('user-subtitle-upload', { source });
+    };
     const onDrop = (e) => {
         const l = findLabel(e.target);
         if (!l) return;
@@ -22,12 +25,16 @@ function initUserSubtitleUpload() {
         const input = form && form.querySelector('.user-subtitle-input');
         if (!form || !input || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
         input.files = e.dataTransfer.files;
+        trackUpload('drop');
         form.requestSubmit();
     };
     const onChange = (e) => {
         if (!e.target.classList.contains('user-subtitle-input')) return;
         const form = e.target.closest('.user-subtitle-form');
-        if (form && e.target.files && e.target.files.length) form.requestSubmit();
+        if (form && e.target.files && e.target.files.length) {
+            trackUpload('picker');
+            form.requestSubmit();
+        }
     };
 
     modal.addEventListener('dragenter', onDragEnter);

@@ -22,6 +22,7 @@ type Context struct {
 	Geo         *geoip.Data
 	ApiClaims   *api.Claims
 	Lang        string
+	Path        string
 	ginCtx      *gin.Context
 }
 
@@ -49,11 +50,6 @@ func (s *Context) GetGinContext() *gin.Context {
 	return s.ginCtx
 }
 
-// Path returns the current request path (after language prefix stripping).
-func (c *Context) Path() string {
-	return c.ginCtx.Request.URL.Path
-}
-
 func NewContext(c *gin.Context) *Context {
 	user := auth.GetUserFromContext(c)
 	cl := claims.GetFromContext(c)
@@ -72,6 +68,7 @@ func NewContext(c *gin.Context) *Context {
 		Geo:         geoData,
 		TierUpdated: tu,
 		Lang:        lang,
+		Path:        c.Request.URL.Path,
 		ginCtx:      c,
 	}
 }

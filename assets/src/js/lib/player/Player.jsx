@@ -545,6 +545,7 @@ function wireTrackHandlers(container) {
                         target.getAttribute('data-label') || target.textContent.trim(),
                     );
                 }
+                if (window.umami) window.umami.track('user-subtitle-select');
             }
             markTrack(container, target, 'subtitle');
             const hls = window.hlsPlayer;
