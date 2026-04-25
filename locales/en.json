@@ -8,7 +8,6 @@
     "nav.profile": "Profile",
     "nav.login": "Login",
     "nav.donate": "Donate",
-
     "footer.tools": "Tools",
     "footer.resources": "Resources",
     "footer.about": "About",
@@ -24,7 +23,6 @@
     "footer.description": "An open-source, browser-based torrent platform. Stream, download, and manage torrents without installing anything.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.filmData": "Film data from",
-
     "home.title": "Online Torrent Platform — Stream & Download in Browser",
     "home.description": "Web-based torrent platform to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage",
     "home.ogTitle": "Webtor.io — Stream & Download Torrents in Browser",
@@ -46,12 +44,10 @@
     "home.speedTest": "Speed test",
     "home.gotIt": "got it!",
     "home.ok": "ok",
-
     "about.stats.torrents": "Torrents processed",
     "about.stats.countries": "Countries",
     "about.stats.openSource": "Open-source",
     "about.stats.software": "Software to install",
-
     "about.how.badge": "How it works",
     "about.how.title": "Three steps. That's it.",
     "about.how.subtitle": "Go from magnet link to streaming video or direct download in under a minute.",
@@ -61,7 +57,6 @@
     "about.how.step2.text": "Browse the torrent contents and select the file you want to stream or download.",
     "about.how.step3.title": "Stream or download",
     "about.how.step3.text": "Watch video instantly in the built-in player, or grab a direct HTTP download link.",
-
     "about.features.badge": "Features",
     "about.features.title": "Everything you need, nothing you don't",
     "about.features.subtitle": "A complete torrent toolkit that runs entirely in the cloud and your browser.",
@@ -85,7 +80,6 @@
     "about.features.chrome.text": "Install the extension and every torrent or magnet link you click opens automatically in Webtor.",
     "about.features.sdk.title": "Developer SDK",
     "about.features.sdk.text": "Embed the torrent streaming player on your own site with our open-source JavaScript SDK.",
-
     "about.faq.badge": "FAQ",
     "about.faq.title": "Common questions",
     "about.faq.subtitle": "Quick answers to the things people ask most.",
@@ -116,11 +110,9 @@
     "about.faq.speed.q": "Why is my download or streaming speed slow on Webtor.io?",
     "about.faq.speed.a1": "Speeds may vary due to the number of seeders, file format (some require real-time transcoding), your internet connection, current server load, and your account type. Premium users get higher bandwidth.",
     "about.faq.speed.a2": "Note: bandwidth is measured in Mbps (megabits per second), while file sizes are shown in MB (megabytes). 1 MB = 8 Mb, so a 50 Mbps connection gives roughly 6.25 MB/s download speed. Supporting the project helps unlock better speed and reliability.",
-
     "about.cta.title": "Ready to try?",
     "about.cta.subtitle": "No signup needed. Paste a magnet link and start streaming in seconds.",
     "about.cta.button": "Launch Webtor",
-
     "auth.login.title": "Sign In",
     "auth.login.subtitle": "Choose a method to access your account",
     "auth.login.libraryNote": "Authorization is required to access your library.",
@@ -144,7 +136,6 @@
     "auth.verify.next": "Next",
     "auth.refresh.title": "Refresh token",
     "auth.gotIt": "got it!",
-
     "auth.progress.loggingOut": "logging out",
     "auth.progress.logoutSuccessful": "logout successful",
     "auth.progress.logoutFailed": "logout failed, try to login again",
@@ -160,7 +151,6 @@
     "auth.progress.redirectingTo": "redirecting to %v",
     "auth.progress.redirectFailed": "failed to redirect to %v",
     "auth.progress.unknownError": "unknown error",
-
     "profile.badge": "Profile",
     "profile.title": "Your Profile",
     "profile.subtitle": "Manage your account settings, integrations, and preferences.",
@@ -169,18 +159,15 @@
     "profile.logout": "Log out",
     "profile.deleteAccount": "Delete Account",
     "profile.deleteConfirm": "Are you sure you want to delete your account? This action cannot be undone. All your data, settings, and integrations will be permanently removed.",
-
     "profile.tier.unlimited": "Unlimited bandwidth",
     "profile.tier.mbps": "Mbps",
     "profile.tier.adsEnabled": "Ads enabled",
     "profile.tier.adFree": "Ad-free",
-
     "profile.stremio.addonUrl": "Addon URL",
     "profile.stremio.generate": "Generate addon URL",
     "profile.stremio.copyUrl": "Copy URL",
     "profile.stremio.howTo": "How to connect to Stremio?",
     "profile.stremio.install": "Install in Stremio",
-
     "profile.webdav.title": "WebDAV",
     "profile.webdav.generate": "Generate WebDAV URL",
     "profile.webdav.copyUrl": "Copy URL",
@@ -188,7 +175,6 @@
     "profile.webdav.howTo": "How to connect via WebDAV?",
     "profile.webdav.premiumOnly": "WebDAV integration is available for premium users.",
     "profile.webdav.upgrade": "Upgrade your tier to unlock it!",
-
     "profile.addons.title": "Addons",
     "profile.addons.placeholder": "Enter Stremio addon manifest URL (e.g., https://example.com/manifest.json)",
     "profile.addons.validation": "Please enter a valid Stremio addon manifest URL ending with manifest.json",
@@ -203,7 +189,6 @@
     "profile.addons.save": "Save",
     "profile.addons.deleteConfirm": "Are you sure you want to delete this addon?\n\n%v",
     "profile.addons.deleted": "Addon deleted",
-
     "profile.embedDomains.title": "Embed Domains",
     "profile.embedDomains.placeholder": "Enter domain (e.g., example.com)",
     "profile.embedDomains.validation": "Please enter a valid domain name",
@@ -214,7 +199,6 @@
     "profile.embedDomains.learnSdk": "Learn more about embed-sdk-js",
     "profile.embedDomains.wordpressPlugin": "Also check wordpress-plugin",
     "profile.embedDomains.deleteConfirm": "Are you sure you want to delete this domain?",
-
     "profile.backends.title": "Streaming Backends",
     "profile.backends.selectType": "Select backend type",
     "profile.backends.enterToken": "Enter API token",
@@ -233,7 +217,6 @@
     "profile.backends.save": "Save",
     "profile.backends.deleteConfirm": "Are you sure you want to delete this %v backend?",
     "profile.backends.deleted": "Backend deleted",
-
     "profile.settings.title": "Settings",
     "profile.settings.resolutions": "Preferred Resolutions",
     "profile.settings.dragHint": "Drag to reorder by preference",
@@ -241,7 +224,6 @@
     "profile.settings.discoverOnlyDesc": "When enabled, your configured addons are only used on the Discover page for browsing and adding content to your library. The Stremio app will show streams only from your Library — torrents you have already added.",
     "profile.settings.discoverOnlyHint": "Useful when you browse and collect content via Discover on the web, then play it on your TV through Stremio without extra addon results cluttering the list.",
     "profile.settings.save": "Save",
-
     "profile.vault.title": "Vault Points",
     "profile.vault.total": "Total",
     "@profile.vault.total": "Stat label on the profile Vault Points breakdown: total VP granted by the user's subscription tier.",
@@ -253,12 +235,10 @@
     "@profile.vault.frozen": "Stat label on the profile Vault Points breakdown: VP that were just pledged and are still within the freeze period, so they cannot be reclaimed yet. State/adjective describing the quantity of VP.",
     "profile.vault.whatIs": "What is Vault?",
     "profile.vault.pledges": "Pledges",
-
     "discover.badge": "Discover",
     "discover.title": "Discover",
     "discover.subtitle": "Browse movies and series from Cinemeta and your Stremio addons.",
     "discover.seeMore": "See more",
-
     "library.badge": "Library",
     "library.title": "Your Library",
     "library.subtitle": "Your saved torrents, movies, and series — all in one place.",
@@ -291,7 +271,6 @@
     "library.sort.rating": "Rating",
     "library.sort.unknown": "Unknown",
     "library.continueWatching": "Continue Watching",
-
     "resource.movie": "Movie",
     "resource.series": "Series",
     "resource.torrent": "Torrent",
@@ -314,7 +293,6 @@
     "@resource.status.vaulting": "Torrent-state badge: the torrent is being transferred into Vault long-term storage (in-progress). Coined verb from the noun 'Vault' (brand). Keep Vault untranslated.",
     "resource.status.vaulted": "Vaulted",
     "@resource.status.vaulted": "Torrent-state badge: the torrent is stored in Vault and kept available indefinitely (as long as pledges back it). Adjective/state. Keep Vault untranslated.",
-
     "vault.supporting": "You're Supporting This Torrent",
     "vault.keepAvailable": "Keep This Torrent Available",
     "vault.error": "Unfortunately, your pledge could not be saved due to an error:",
@@ -340,7 +318,6 @@
     "vault.removeError": "Unfortunately, your pledge could not be removed due to an error:",
     "vault.frozen": "Your Vault Points are currently frozen and cannot be removed yet. Please come back later when the freeze period expires.",
     "vault.removeConfirm": "Are you sure you want to remove your pledge for this torrent? This action cannot be undone.",
-
     "vault.pledges.badge": "Vault Pledges",
     "vault.pledges.title": "Your Pledges",
     "vault.pledges.subtitle": "View and manage your Vault point pledges across torrents.",
@@ -360,9 +337,6 @@
     "vault.pledges.expiringDesc": "Pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault",
     "vault.pledges.claimableDesc": "Points that can be claimed back. After claiming, the content they were pledged to may be removed",
     "vault.pledges.backToProfile": "Back to Profile",
-
-    "action.download.speedLimit": "Your current download speed will be limited to {{.Rate}}Mbps, donate to increase your speed and remove ads!",
-    "action.download.donate": "donate",
     "action.download.copyWget": "copy wget cmd",
     "action.download.copyCurl": "copy curl cmd",
     "action.download.copyUrl": "copy url",
@@ -370,23 +344,27 @@
     "action.download.downloadStarting": "Download starting...",
     "action.download.cancel": "cancel",
     "action.download.copied": "Copied!",
-
-    "action.noPeers.title": "important note:",
-    "action.noPeers.noSeeders": "this torrent currently has no active sources (seeders)",
-    "action.noPeers.notPossible": "download and streaming are not possible right now",
-    "action.noPeers.trySearhing": "please try searching for another torrent with more peers",
-    "action.noPeers.gotIt": "Got it!",
-
-    "action.slow.notPossible": "streaming is not possible",
-    "action.slow.planLimit": "your plan ({{.Tier}}) limits speed to {{.Rate}} Mbps",
-    "action.slow.fileRequires": "this file requires at least {{.Rate}} Mbps for smooth playback",
-    "action.slow.upgrade": "upgrading your plan",
-    "action.slow.tooSlow": "streaming is not possible — download speed too slow",
-    "action.slow.speedInfo": "download speed: {{.Measured}} Mbps, required: {{.Required}} Mbps",
-    "action.slow.suggestions": "try a smaller file, pre-download, use Vault, or find a torrent with more seeders",
-    "action.slow.upgradePlan": "upgrade plan",
-    "action.slow.gotIt": "Got it!",
-
+    "action.download.limitedTitle": "Downloading at {{.Rate}} Mbps",
+    "action.download.limitedSub": "A subscription removes the cap and ads",
+    "action.noPeers.title": "This torrent has no active seeders right now",
+    "action.noPeers.vaultPitch": "Vault saves the torrent and grabs it as soon as a seeder appears — included with any paid plan.",
+    "action.noPeers.vaultUse": "Save it to Vault — it'll fetch the file as soon as a seeder shows up.",
+    "action.noPeers.altSearch": "or try another torrent with more seeders",
+    "action.noPeers.gotIt": "Got it",
+    "action.slow.title.rateLimited": "Not enough speed for smooth playback",
+    "action.slow.title.bandwidth": "Download speed is too low for streaming",
+    "action.slow.youHave": "you have",
+    "action.slow.fileNeeds": "file needs",
+    "action.slow.unit": "Mbps",
+    "action.slow.alts.upgrade": "Without upgrading:",
+    "action.slow.alts.bandwidth": "What you can do:",
+    "action.slow.alt.smallerOrSeeders": "pick a smaller file or one with more seeders",
+    "action.slow.alt.smallerFile": "pick a smaller file",
+    "action.slow.alt.preDownload": "pre-download instead of streaming",
+    "action.slow.alt.vault": "save to Vault and let it pre-fetch",
+    "action.slow.gotIt": "Got it",
+    "action.upgrade.free": "Get 50 Mbps",
+    "action.upgrade.paid": "Upgrade plan",
     "action.stream.audio": "Audio",
     "action.stream.subtitles": "Subtitles",
     "action.stream.close": "Close",
@@ -401,7 +379,6 @@
     "action.stream.mySubtitles.formats": "SRT, VTT or ASS, up to 5 MB",
     "action.stream.mySubtitles.delete": "Delete",
     "action.stream.mySubtitles.limitReached": "You've reached the 10-subtitle limit for this file. Delete one to upload more.",
-
     "player.play": "Play",
     "player.pause": "Pause",
     "player.mute": "Mute",
@@ -415,7 +392,6 @@
     "player.copied": "Copied!",
     "player.continueFrom": "Continue from %v",
     "player.startOver": "Start from beginning",
-
     "job.retrievingData": "retrieving resource data",
     "job.retrievingStreamUrl": "retrieving stream url",
     "job.probingMedia": "probing content media info",
@@ -437,7 +413,6 @@
     "job.downloading": "downloading {{.Bytes}}",
     "job.waitingForPeers": "waiting for peers",
     "job.peers": "{{.Peers}} peers",
-
     "toast.domainAdded": "Domain added",
     "toast.domainDeleted": "Domain deleted",
     "toast.addedToLibrary": "Added to library",
@@ -456,7 +431,6 @@
     "toast.removedFromVault": "Removed from vault",
     "toast.user_subtitle.uploaded": "Subtitle uploaded",
     "toast.user_subtitle.deleted": "Subtitle deleted",
-
     "speedtest.badge": "Speed Test",
     "speedtest.title": "Connection Speed Test",
     "speedtest.subtitle": "Measure your download speed from Webtor servers to find out what video quality you can stream without buffering.",
@@ -482,7 +456,6 @@
     "speedtest.copied": "Copied!",
     "speedtest.titleResult": "Speed Test — %v Mbps",
     "speedtest.descResult": "Your Webtor connection speed: %v Mbps.",
-
     "support.badge": "Support",
     "support.title": "Help Center",
     "support.subtitle": "Have a question, found a bug, or need to report content? Fill out the form below and we'll get back to you.",
@@ -501,7 +474,6 @@
     "support.submit": "Submit",
     "support.successMessage": "Your message has been sent successfully!",
     "support.sendAnother": "Send another one",
-
     "discover.search": "Search movies and series...",
     "discover.loadMore": "Load more",
     "discover.loadingCatalogs": "Loading catalogs...",
@@ -598,7 +570,6 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Other",
-
     "discover.streamsFound": "%v stream(s) found",
     "discover.streamsFiltered": "%v of %v stream(s)",
     "discover.noStreams": "No streams available for this title.",
@@ -614,7 +585,6 @@
     "discover.noEpisodes": "No episodes found.",
     "discover.specials": "Specials",
     "discover.episodeLabel": "Episode %v",
-
     "tool.torrentToDdl.title": "Torrent → DDL",
     "tool.torrentToDdl.benefit": "Convert Torrent to Direct Download Link",
     "tool.torrentToDdl.description": "Convert torrents to direct download links in your browser. Download files from torrents with cloud-based processing and no local client required.",
@@ -645,7 +615,6 @@
     "tool.torrentPlayer.title": "Online Torrent Player",
     "tool.torrentPlayer.benefit": "Play Any Torrent Video in Your Browser",
     "tool.torrentPlayer.description": "Free online torrent player that plays video files from torrents directly in the browser. Supports MKV, AVI, MP4, WEBM and more with real-time transcoding.",
-
     "tool.about.badges.howItWorks": "How it works",
     "tool.about.badges.explained": "Explained",
     "tool.about.badges.comparison": "Comparison",
@@ -655,7 +624,6 @@
     "tool.about.badges.benefits": "Benefits",
     "tool.about.badges.devices": "Devices",
     "tool.about.badges.formats": "Formats",
-
     "tool.torrentToDdl.about.steps.title": "How to download torrents with Webtor.io",
     "tool.torrentToDdl.about.steps.subtitle": "Convert your torrent file or magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.",
     "tool.torrentToDdl.about.steps.step1.title": "Locate your torrent",
@@ -689,7 +657,6 @@
     "tool.torrentToDdl.about.video.item3": "Mobile devices and tablets",
     "tool.torrentToDdl.about.video.item4": "Quick previews before downloading",
     "tool.torrentToDdl.about.video.footer": "If your torrent contains video content, streaming is usually faster and more convenient than downloading everything upfront.",
-
     "tool.magnetToDdl.about.steps.title": "How to download magnets with Webtor.io",
     "tool.magnetToDdl.about.steps.subtitle": "Convert your magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.",
     "tool.magnetToDdl.about.steps.step1.title": "Copy your magnet link",
@@ -723,7 +690,6 @@
     "tool.magnetToDdl.about.video.item3": "Mobile devices and tablets",
     "tool.magnetToDdl.about.video.item4": "Quick previews before downloading",
     "tool.magnetToDdl.about.video.footer": "If your magnet link points to video content, streaming is usually faster and more convenient than downloading everything upfront.",
-
     "tool.magnetToTorrent.about.steps.title": "How to convert magnets to torrents with Webtor.io",
     "tool.magnetToTorrent.about.steps.subtitle": "Convert your magnet link into a .torrent file in 3&nbsp;simple steps — no torrent client needed.",
     "tool.magnetToTorrent.about.steps.step1.title": "Copy your magnet link",
@@ -756,7 +722,6 @@
     "tool.magnetToTorrent.about.useCases.item4": "Previewing file lists before downloading",
     "tool.magnetToTorrent.about.safety.title": "Is magnet to torrent safe? Do I need a VPN?",
     "tool.magnetToTorrent.about.safety.text": "Converting a magnet link to a torrent file does not require connecting to the torrent swarm from your device. The metadata resolution happens on the server side, which makes the process simpler and safer for the user. All traffic travels over HTTPS, so no VPN is required.",
-
     "tool.onlineTorrentDownloader.about.steps.title": "How to download torrents with Webtor.io",
     "tool.onlineTorrentDownloader.about.steps.subtitle": "Convert your torrent file or magnet link into a direct download link in 3&nbsp;simple steps — no torrent client needed.",
     "tool.onlineTorrentDownloader.about.steps.step1.title": "Locate your torrent",
@@ -790,7 +755,6 @@
     "tool.onlineTorrentDownloader.about.safety.title": "Downloading vs streaming torrents online",
     "tool.onlineTorrentDownloader.about.safety.p1": "With an online torrent downloader, you can either download files or stream video content directly in your browser.",
     "tool.onlineTorrentDownloader.about.safety.p2": "Streaming is often more convenient for video torrents, while downloading is better when you need to keep the files for offline use. Either way, your device does not connect directly to the torrent swarm — <strong>Webtor.io</strong> handles everything on the server side over HTTPS.",
-
     "tool.streamTorrentOnline.about.steps.title": "How to stream torrents online with Webtor.io",
     "tool.streamTorrentOnline.about.steps.subtitle": "Stream any torrent video directly in your browser in 3&nbsp;simple steps — no software to install, no files to download.",
     "tool.streamTorrentOnline.about.steps.step1.title": "Add your torrent",
@@ -816,7 +780,6 @@
     "tool.streamTorrentOnline.about.devices.item2": "Android phones and tablets",
     "tool.streamTorrentOnline.about.devices.item3": "iPhones and iPads via Safari or Chrome",
     "tool.streamTorrentOnline.about.devices.item4": "Smart TVs via Stremio integration",
-
     "tool.torrentPlayer.about.steps.title": "How to play torrent videos online with Webtor.io",
     "tool.torrentPlayer.about.steps.subtitle": "Play any video from a torrent directly in your browser in 3&nbsp;simple steps — no desktop player or torrent client needed.",
     "tool.torrentPlayer.about.steps.step1.title": "Load your torrent",
@@ -842,7 +805,6 @@
     "tool.torrentPlayer.about.devices.item2": "Android phones and tablets",
     "tool.torrentPlayer.about.devices.item3": "iPhones and iPads via Safari or Chrome",
     "tool.torrentPlayer.about.devices.item4": "Chromebooks and low-powered devices",
-
     "tool.torrentToStream.about.steps.title": "How to convert a torrent to an HLS stream with Webtor.io",
     "tool.torrentToStream.about.steps.subtitle": "Turn any torrent into a streamable HLS video in 3&nbsp;simple steps — real-time cloud transcoding, no download required.",
     "tool.torrentToStream.about.steps.step1.title": "Provide the torrent",
@@ -868,7 +830,6 @@
     "tool.torrentToStream.about.devices.item2": "Android and iOS mobile devices",
     "tool.torrentToStream.about.devices.item3": "Stremio and other HLS-compatible players",
     "tool.torrentToStream.about.devices.item4": "Smart TVs and streaming boxes",
-
     "tool.torrentToZip.about.steps.title": "How to download torrents as ZIP with Webtor.io",
     "tool.torrentToZip.about.steps.subtitle": "Download the content of your torrent as a ZIP archive in 3&nbsp;simple steps — no torrent client needed.",
     "tool.torrentToZip.about.steps.step1.title": "Locate your torrent",
@@ -901,7 +862,6 @@
     "tool.torrentToZip.about.safety.title": "When is torrent to ZIP the best option?",
     "tool.torrentToZip.about.safety.p1": "Torrent to ZIP is the best choice when convenience matters more than speed or selective downloads. It works especially well for torrents with many small files, software distributions or datasets, downloads on phones and tablets, and cases where you need one clean archive.",
     "tool.torrentToZip.about.safety.p2": "Your device does not connect directly to the torrent swarm — <strong>Webtor.io</strong> handles everything on the server side and delivers the ZIP over HTTPS.",
-
     "tool.watchTorrentsIos.about.steps.title": "How to watch torrents on iPhone or iPad",
     "tool.watchTorrentsIos.about.steps.subtitle": "Stream torrent videos on iOS in 3&nbsp;simple steps — no apps required.",
     "tool.watchTorrentsIos.about.steps.step1.title": "Open in Safari",
@@ -928,7 +888,6 @@
     "tool.watchTorrentsIos.about.formats.item4": "No codec packs or extra apps needed",
     "tool.watchTorrentsIos.about.safety.title": "Is it safe to watch torrents on iOS?",
     "tool.watchTorrentsIos.about.safety.text": "When you stream torrents on iOS with <strong>Webtor.io</strong>, your iPhone or iPad does not connect directly to the torrent swarm. Torrent data is processed on the server side and delivered as a video stream over HTTPS. All you need is Safari and a magnet link or torrent file.",
-
     "tool.watchTorrentsOnline.about.steps.title": "How to watch torrents online with Webtor.io",
     "tool.watchTorrentsOnline.about.steps.subtitle": "Stream torrent content online in 3&nbsp;simple steps — no downloads or torrent client needed.",
     "tool.watchTorrentsOnline.about.steps.step1.title": "Upload or paste",
@@ -954,16 +913,12 @@
     "tool.watchTorrentsOnline.about.devices.item2": "Android phones and tablets",
     "tool.watchTorrentsOnline.about.devices.item3": "iPhones and iPads via Safari",
     "tool.watchTorrentsOnline.about.devices.item4": "Smart TVs via Stremio integration",
-
     "resource.preparingDownload": "Preparing Download",
-
     "profile.stremio.copied": "Copied!",
-
     "instructions.guide": "Guide",
     "instructions.note": "Note:",
     "instructions.important": "Important:",
     "instructions.paidOnly": "This feature is available only for <strong>paid users</strong>.",
-
     "instructions.stremio.title": "Stremio Integration",
     "instructions.stremio.heading": "How to connect Webtor to Stremio",
     "instructions.stremio.intro": "You can stream your personal torrent library from Webtor directly in Stremio. Here's how to do it:",
@@ -973,7 +928,6 @@
     "instructions.stremio.step4": "Paste the addon link and press Enter. Done!",
     "instructions.stremio.result": "Once installed, your library will appear in Stremio under the <strong>Webtor.io</strong> addon – ready to stream.",
     "instructions.stremio.noteWarmup": "Streaming via Webtor may differ from regular Stremio addons. It can take some time to warm up the torrent before playback starts.",
-
     "instructions.stremioAddon.title": "How to connect Stremio Addon",
     "instructions.stremioAddon.heading": "How to connect Stremio Addon",
     "instructions.stremioAddon.intro": "Want to add more content to your Stremio experience? Follow these simple steps to connect external Stremio addons to expand your streaming library:",
@@ -983,7 +937,6 @@
     "instructions.stremioAddon.step4": "Paste the URL in the \"Stremio Addons\" section at your <a href='{{.ProfileURL}}' class='text-w-pinkL hover:underline'>profile page</a> and click \"Add Addon\"",
     "instructions.stremioAddon.result": "Once added, the addon content will be available through your Stremio integration, expanding your streaming options with additional sources and catalogs.",
     "instructions.stremioAddon.noteGathering": "Gathering streaming URLs can take some time (up to 10 seconds). Be patient.",
-
     "instructions.webdav.title": "WebDAV Integration",
     "instructions.webdav.heading": "How to connect Webtor via WebDAV",
     "instructions.webdav.intro": "Access your torrent library just like a regular folder. With WebDAV, you can browse, stream, and manage your files directly from your favorite apps.",
@@ -1001,7 +954,6 @@
     "instructions.webdav.folderMovies": "<strong>movies/</strong> – All recognized movies (read-only)",
     "instructions.webdav.folderSeries": "<strong>series/</strong> – TV shows and episodes (read-only)",
     "instructions.webdav.notePaid": "WebDAV access is only available for <strong>paid users</strong>.",
-
     "instructions.vault.title": "Vault",
     "instructions.vault.intro": "Vault is a storage system in Webtor that allows you to:",
     "instructions.vault.feature1": "save torrents for a long time,",
@@ -1024,7 +976,6 @@
     "instructions.vault.expireItem1": "Points that were invested in torrents lose their power and the torrent is marked as expired and deleted after <strong>{{.ExpirePeriod}}</strong>.",
     "instructions.vault.expireItem2": "If the subscription is renewed, the points become active again and the torrents funded by them are no longer expired.",
     "instructions.vault.disclaimer": "If a torrent is blocked by copyright holders or removed from public sources, it may disappear – Vault does not guarantee preservation in such cases.",
-
     "aboutPage.title": "About — Mission & Open Source",
     "aboutPage.description": "Webtor is an open-source, browser-based torrent platform. Learn about our mission to make torrents accessible, private, and easy to use — no installs required.",
     "aboutPage.badge": "About",
@@ -1039,7 +990,6 @@
     "aboutPage.osP2": "We believe that transparency builds trust. You can inspect the code, report issues, suggest features, or contribute directly.",
     "aboutPage.ctaText": "Ready to try it?",
     "aboutPage.ctaButton": "Try Webtor",
-
     "time.now": "just now",
     "time.seconds": "%v seconds ago",
     "time.minute": "1 minute ago",
@@ -1054,7 +1004,6 @@
     "time.months": "%v months ago",
     "time.year": "1 year ago",
     "time.years": "%v years ago",
-
     "error.forbidden": "This content has been blocked at the request of the rights holder.",
     "error.not_found": "Resource not found.",
     "error.service_unavailable": "Service is temporarily unavailable. Please try again later.",

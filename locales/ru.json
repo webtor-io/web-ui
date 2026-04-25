@@ -8,7 +8,6 @@
     "nav.profile": "Профиль",
     "nav.login": "Войти",
     "nav.donate": "Поддержать",
-
     "footer.tools": "Инструменты",
     "footer.resources": "Ресурсы",
     "footer.about": "О проекте",
@@ -23,7 +22,6 @@
     "footer.description": "Открытая торрент-платформа прямо в браузере. Смотрите, скачивайте и управляйте торрентами без установки.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.filmData": "Данные о фильмах от",
-
     "home.title": "Онлайн торрент-платформа — просмотр и скачивание в браузере",
     "home.description": "Веб-платформа для просмотра и скачивания торрентов прямо в браузере. Без установки ПО. Безопасная облачная обработка и хранение",
     "home.ogTitle": "Webtor.io — Просмотр и скачивание торрентов в браузере",
@@ -44,12 +42,10 @@
     "home.speedTest": "Тест скорости",
     "home.gotIt": "понятно!",
     "home.ok": "ок",
-
     "about.stats.torrents": "Торрентов обработано",
     "about.stats.countries": "Стран",
     "about.stats.openSource": "Открытый код",
     "about.stats.software": "Программ для установки",
-
     "about.how.badge": "Как это работает",
     "about.how.title": "Три шага. Всё.",
     "about.how.subtitle": "От магнет-ссылки до просмотра видео или прямого скачивания менее чем за минуту.",
@@ -59,7 +55,6 @@
     "about.how.step2.text": "Просмотрите содержимое торрента и выберите файл для просмотра или скачивания.",
     "about.how.step3.title": "Смотрите или скачивайте",
     "about.how.step3.text": "Смотрите видео прямо во встроенном плеере или получите прямую ссылку для скачивания.",
-
     "about.features.badge": "Возможности",
     "about.features.title": "Всё что нужно, ничего лишнего",
     "about.features.subtitle": "Полный набор инструментов для торрентов, работающий целиком в облаке и вашем браузере.",
@@ -83,7 +78,6 @@
     "about.features.chrome.text": "Установите расширение — каждая торрент- или магнет-ссылка будет автоматически открываться в Webtor.",
     "about.features.sdk.title": "SDK для разработчиков",
     "about.features.sdk.text": "Встройте торрент-плеер на свой сайт с помощью нашего JavaScript SDK с открытым кодом.",
-
     "about.faq.badge": "FAQ",
     "about.faq.title": "Частые вопросы",
     "about.faq.subtitle": "Быстрые ответы на самые популярные вопросы.",
@@ -114,11 +108,9 @@
     "about.faq.speed.q": "Почему скорость скачивания или просмотра низкая?",
     "about.faq.speed.a1": "Скорость зависит от количества сидеров, формата файла (некоторые требуют транскодирования в реальном времени), вашего интернет-соединения, загрузки серверов и типа аккаунта. Премиум-пользователи получают более высокую скорость.",
     "about.faq.speed.a2": "Примечание: скорость измеряется в Мбит/с (мегабитах в секунду), а размеры файлов — в МБ (мегабайтах). 1 МБ = 8 Мбит, поэтому соединение 50 Мбит/с даёт примерно 6,25 МБ/с скорости скачивания. Поддержка проекта помогает получить лучшую скорость.",
-
     "about.cta.title": "Готовы попробовать?",
     "about.cta.subtitle": "Регистрация не нужна. Вставьте магнет-ссылку и начните просмотр за секунды.",
     "about.cta.button": "Запустить Webtor",
-
     "auth.login.title": "Вход",
     "auth.login.subtitle": "Выберите способ входа в аккаунт",
     "auth.login.libraryNote": "Для доступа к библиотеке необходима авторизация.",
@@ -142,7 +134,6 @@
     "auth.verify.next": "Далее",
     "auth.refresh.title": "Обновление токена",
     "auth.gotIt": "понятно!",
-
     "auth.progress.loggingOut": "выходим",
     "auth.progress.logoutSuccessful": "выход выполнен",
     "auth.progress.logoutFailed": "не удалось выйти, попробуйте войти снова",
@@ -158,7 +149,6 @@
     "auth.progress.redirectingTo": "переход к %v",
     "auth.progress.redirectFailed": "не удалось перейти к %v",
     "auth.progress.unknownError": "неизвестная ошибка",
-
     "profile.badge": "Профиль",
     "profile.title": "Ваш профиль",
     "profile.subtitle": "Управляйте настройками аккаунта, интеграциями и предпочтениями.",
@@ -167,18 +157,15 @@
     "profile.logout": "Выйти",
     "profile.deleteAccount": "Удалить аккаунт",
     "profile.deleteConfirm": "Вы уверены, что хотите удалить аккаунт? Это действие необратимо. Все данные, настройки и интеграции будут удалены навсегда.",
-
     "profile.tier.unlimited": "Безлимитная скорость",
     "profile.tier.mbps": "Мбит/с",
     "profile.tier.adsEnabled": "Реклама включена",
     "profile.tier.adFree": "Без рекламы",
-
     "profile.stremio.addonUrl": "URL аддона",
     "profile.stremio.generate": "Сгенерировать URL аддона",
     "profile.stremio.copyUrl": "Копировать URL",
     "profile.stremio.howTo": "Как подключить Stremio?",
     "profile.stremio.install": "Установить в Stremio",
-
     "profile.webdav.title": "WebDAV",
     "profile.webdav.generate": "Сгенерировать WebDAV URL",
     "profile.webdav.copyUrl": "Копировать URL",
@@ -186,7 +173,6 @@
     "profile.webdav.howTo": "Как подключиться через WebDAV?",
     "profile.webdav.premiumOnly": "WebDAV доступен для премиум-пользователей.",
     "profile.webdav.upgrade": "Улучшите подписку чтобы разблокировать!",
-
     "profile.addons.title": "Аддоны",
     "profile.addons.placeholder": "Введите URL манифеста Stremio-аддона (напр., https://example.com/manifest.json)",
     "profile.addons.validation": "Введите корректный URL манифеста Stremio-аддона, оканчивающийся на manifest.json",
@@ -201,7 +187,6 @@
     "profile.addons.save": "Сохранить",
     "profile.addons.deleteConfirm": "Вы уверены, что хотите удалить этот аддон?\n\n%v",
     "profile.addons.deleted": "Аддон удалён",
-
     "profile.embedDomains.title": "Домены для встраивания",
     "profile.embedDomains.placeholder": "Введите домен (напр., example.com)",
     "profile.embedDomains.validation": "Введите корректное имя домена",
@@ -212,7 +197,6 @@
     "profile.embedDomains.learnSdk": "Подробнее о embed-sdk-js",
     "profile.embedDomains.wordpressPlugin": "Также смотрите wordpress-plugin",
     "profile.embedDomains.deleteConfirm": "Вы уверены, что хотите удалить этот домен?",
-
     "profile.backends.title": "Бэкенды стриминга",
     "profile.backends.selectType": "Выберите тип бэкенда",
     "profile.backends.enterToken": "Введите API-токен",
@@ -231,7 +215,6 @@
     "profile.backends.save": "Сохранить",
     "profile.backends.deleteConfirm": "Вы уверены, что хотите удалить бэкенд %v?",
     "profile.backends.deleted": "Бэкенд удалён",
-
     "profile.settings.title": "Настройки",
     "profile.settings.resolutions": "Предпочитаемые разрешения",
     "profile.settings.dragHint": "Перетащите для изменения порядка",
@@ -239,7 +222,6 @@
     "profile.settings.discoverOnlyDesc": "Когда включено, ваши настроенные аддоны используются только на странице Discover для просмотра и добавления контента в библиотеку. Приложение Stremio будет показывать стримы только из вашей библиотеки — торренты, которые вы уже добавили.",
     "profile.settings.discoverOnlyHint": "Полезно, когда вы просматриваете и собираете контент через Discover в браузере, а затем смотрите его на ТВ через Stremio без лишних результатов аддонов.",
     "profile.settings.save": "Сохранить",
-
     "profile.vault.title": "Vault Points",
     "profile.vault.total": "Всего",
     "profile.vault.available": "Доступно",
@@ -247,12 +229,10 @@
     "profile.vault.frozen": "Заморожено",
     "profile.vault.whatIs": "Что такое Vault?",
     "profile.vault.pledges": "Вклады",
-
     "discover.badge": "Discover",
     "discover.title": "Discover",
     "discover.subtitle": "Просматривайте фильмы и сериалы из Cinemeta и ваших аддонов Stremio.",
     "discover.seeMore": "Ещё",
-
     "library.badge": "Библиотека",
     "library.title": "Ваша библиотека",
     "library.subtitle": "Сохранённые торренты, фильмы и сериалы — всё в одном месте.",
@@ -282,7 +262,6 @@
     "library.sort.rating": "Рейтинг",
     "library.sort.unknown": "Неизвестно",
     "library.continueWatching": "Продолжить просмотр",
-
     "resource.movie": "Фильм",
     "resource.series": "Сериал",
     "resource.torrent": "Торрент",
@@ -300,7 +279,6 @@
     "resource.status.vaulting": "Сохранение в Vault",
     "resource.status.vaulted": "В Vault",
     "resource.preview": "Просмотр",
-
     "vault.supporting": "Вы поддерживаете этот торрент",
     "vault.keepAvailable": "Сохранить этот торрент",
     "vault.error": "К сожалению, вклад не удалось сохранить из-за ошибки:",
@@ -326,7 +304,6 @@
     "vault.removeError": "К сожалению, вклад не удалось удалить из-за ошибки:",
     "vault.frozen": "Ваши Vault Points сейчас заморожены и не могут быть удалены. Вернитесь позже когда период заморозки истечёт.",
     "vault.removeConfirm": "Вы уверены, что хотите убрать вклад для этого торрента? Это действие необратимо.",
-
     "vault.pledges.badge": "Вклады Vault",
     "vault.pledges.title": "Ваши вклады",
     "vault.pledges.subtitle": "Просмотр и управление вкладами Vault Points для торрентов.",
@@ -343,9 +320,6 @@
     "vault.pledges.expiringDesc": "Вклад больше не обеспечен очками (происходит когда подписка истекает или тариф понижается). Контент с такими вкладами может быть удалён из Vault",
     "vault.pledges.claimableDesc": "Очки, которые можно вернуть. После возврата контент, на который они были вложены, может быть удалён",
     "vault.pledges.backToProfile": "Назад в профиль",
-
-    "action.download.speedLimit": "Скорость скачивания ограничена до {{.Rate}} Мбит/с, поддержите проект чтобы увеличить скорость и убрать рекламу!",
-    "action.download.donate": "поддержать",
     "action.download.copyWget": "скопировать wget",
     "action.download.copyCurl": "скопировать curl",
     "action.download.copyUrl": "скопировать url",
@@ -353,23 +327,27 @@
     "action.download.downloadStarting": "Скачивание начинается...",
     "action.download.cancel": "отмена",
     "action.download.copied": "Скопировано!",
-
-    "action.noPeers.title": "важное замечание:",
-    "action.noPeers.noSeeders": "у этого торрента сейчас нет активных источников (сидеров)",
-    "action.noPeers.notPossible": "скачивание и просмотр сейчас невозможны",
-    "action.noPeers.trySearhing": "попробуйте найти другой торрент с большим количеством пиров",
-    "action.noPeers.gotIt": "Понятно!",
-
-    "action.slow.notPossible": "просмотр невозможен",
-    "action.slow.planLimit": "ваш тариф ({{.Tier}}) ограничивает скорость до {{.Rate}} Мбит/с",
-    "action.slow.fileRequires": "для этого файла требуется минимум {{.Rate}} Мбит/с для плавного воспроизведения",
-    "action.slow.upgrade": "улучшить тариф",
-    "action.slow.tooSlow": "просмотр невозможен — скорость скачивания слишком низкая",
-    "action.slow.speedInfo": "скорость: {{.Measured}} Мбит/с, требуется: {{.Required}} Мбит/с",
-    "action.slow.suggestions": "попробуйте файл поменьше, предварительное скачивание, Vault или торрент с большим числом сидеров",
-    "action.slow.upgradePlan": "улучшить тариф",
-    "action.slow.gotIt": "Понятно!",
-
+    "action.download.limitedTitle": "Скачивание со скоростью {{.Rate}} Мбит/с",
+    "action.download.limitedSub": "Подписка снимет лимит и уберёт рекламу",
+    "action.noPeers.title": "У торрента сейчас нет активных сидеров",
+    "action.noPeers.vaultPitch": "Vault сохранит торрент и заберёт его, как только появится первый сид. Включён в любую платную подписку.",
+    "action.noPeers.vaultUse": "Сохраните торрент в Vault — он сам догрузит файл, как только появится сид.",
+    "action.noPeers.altSearch": "или поищите другой торрент с большим числом сидеров",
+    "action.noPeers.gotIt": "Понятно",
+    "action.slow.title.rateLimited": "Не хватает скорости для плавного просмотра",
+    "action.slow.title.bandwidth": "Скорость скачивания слишком низкая для стриминга",
+    "action.slow.youHave": "у вас",
+    "action.slow.fileNeeds": "нужно файлу",
+    "action.slow.unit": "Мбит/с",
+    "action.slow.alts.upgrade": "Без апгрейда:",
+    "action.slow.alts.bandwidth": "Что можно сделать:",
+    "action.slow.alt.smallerOrSeeders": "выберите файл поменьше или с большим числом сидеров",
+    "action.slow.alt.smallerFile": "выберите файл поменьше",
+    "action.slow.alt.preDownload": "сначала скачайте, потом смотрите",
+    "action.slow.alt.vault": "сохраните в Vault — он догрузит сам",
+    "action.slow.gotIt": "Понятно",
+    "action.upgrade.free": "Получить 50 Мбит/с",
+    "action.upgrade.paid": "Улучшить тариф",
     "action.stream.audio": "Аудио",
     "action.stream.subtitles": "Субтитры",
     "action.stream.close": "Закрыть",
@@ -384,7 +362,6 @@
     "action.stream.mySubtitles.formats": "SRT, VTT или ASS, до 5 МБ",
     "action.stream.mySubtitles.delete": "Удалить",
     "action.stream.mySubtitles.limitReached": "Достигнут лимит в 10 субтитров для этого файла. Удалите один, чтобы загрузить ещё.",
-
     "player.play": "Воспроизвести",
     "player.pause": "Пауза",
     "player.mute": "Выключить звук",
@@ -398,7 +375,6 @@
     "player.copied": "Скопировано!",
     "player.continueFrom": "Продолжить с %v",
     "player.startOver": "Смотреть с начала",
-
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",
@@ -420,7 +396,6 @@
     "job.downloading": "скачивание {{.Bytes}}",
     "job.waitingForPeers": "ожидание пиров",
     "job.peers": "{{.Peers}} пиров",
-
     "toast.domainAdded": "Домен добавлен",
     "toast.domainDeleted": "Домен удалён",
     "toast.addedToLibrary": "Добавлено в библиотеку",
@@ -439,7 +414,6 @@
     "toast.removedFromVault": "Удалено из Vault",
     "toast.user_subtitle.uploaded": "Субтитры загружены",
     "toast.user_subtitle.deleted": "Субтитры удалены",
-
     "speedtest.badge": "Тест скорости",
     "speedtest.title": "Тест скорости соединения",
     "speedtest.subtitle": "Измерьте скорость загрузки с серверов Webtor и узнайте, какое качество видео доступно без буферизации.",
@@ -465,7 +439,6 @@
     "speedtest.copied": "Скопировано!",
     "speedtest.titleResult": "Тест скорости — %v Мбит/с",
     "speedtest.descResult": "Скорость соединения с Webtor: %v Мбит/с.",
-
     "support.badge": "Поддержка",
     "support.title": "Центр помощи",
     "support.subtitle": "Есть вопрос, нашли ошибку или хотите сообщить о контенте? Заполните форму ниже, и мы вам ответим.",
@@ -483,7 +456,6 @@
     "support.submit": "Отправить",
     "support.successMessage": "Ваше сообщение успешно отправлено!",
     "support.sendAnother": "Отправить ещё",
-
     "discover.search": "Поиск фильмов и сериалов...",
     "discover.loadMore": "Загрузить ещё",
     "discover.loadingCatalogs": "Загрузка каталогов...",
@@ -579,7 +551,6 @@
     "discover.type.tv": "ТВ",
     "discover.type.anime": "Аниме",
     "discover.type.other": "Другое",
-
     "discover.streamsFound": "Найдено стримов: %v",
     "discover.streamsFiltered": "%v из %v стримов",
     "discover.noStreams": "Нет доступных стримов для этого контента.",
@@ -595,7 +566,6 @@
     "discover.noEpisodes": "Эпизоды не найдены.",
     "discover.specials": "Спецвыпуски",
     "discover.episodeLabel": "Эпизод %v",
-
     "tool.torrentToDdl.title": "Торрент → DDL",
     "tool.torrentToDdl.benefit": "Конвертируйте торрент в прямую ссылку для скачивания",
     "tool.torrentToDdl.description": "Конвертируйте торренты в прямые ссылки для скачивания в браузере. Загружайте файлы из торрентов через облачную обработку без установки клиента.",
@@ -626,7 +596,6 @@
     "tool.torrentPlayer.title": "Онлайн торрент-плеер",
     "tool.torrentPlayer.benefit": "Воспроизводите любое торрент-видео в браузере",
     "tool.torrentPlayer.description": "Бесплатный онлайн торрент-плеер для воспроизведения видеофайлов из торрентов прямо в браузере. Поддержка MKV, AVI, MP4, WEBM и других форматов с транскодированием в реальном времени.",
-
     "tool.about.badges.howItWorks": "Как это работает",
     "tool.about.badges.explained": "Объяснение",
     "tool.about.badges.comparison": "Сравнение",
@@ -636,7 +605,6 @@
     "tool.about.badges.benefits": "Преимущества",
     "tool.about.badges.devices": "Устройства",
     "tool.about.badges.formats": "Форматы",
-
     "tool.torrentToDdl.about.steps.title": "Как скачивать торренты через Webtor.io",
     "tool.torrentToDdl.about.steps.subtitle": "Превратите .torrent-файл или магнет-ссылку в прямую ссылку на скачивание за 3&nbsp;простых шага — без торрент-клиента.",
     "tool.torrentToDdl.about.steps.step1.title": "Найдите торрент",
@@ -670,7 +638,6 @@
     "tool.torrentToDdl.about.video.item3": "Мобильные устройства и планшеты",
     "tool.torrentToDdl.about.video.item4": "Быстрый предпросмотр перед скачиванием",
     "tool.torrentToDdl.about.video.footer": "Если торрент содержит видео, смотреть его в потоке обычно быстрее и удобнее, чем сначала скачивать целиком.",
-
     "tool.magnetToDdl.about.steps.title": "Как скачивать магнеты через Webtor.io",
     "tool.magnetToDdl.about.steps.subtitle": "Превратите магнет-ссылку в прямую ссылку на скачивание за 3&nbsp;простых шага — без торрент-клиента.",
     "tool.magnetToDdl.about.steps.step1.title": "Скопируйте магнет-ссылку",
@@ -704,7 +671,6 @@
     "tool.magnetToDdl.about.video.item3": "Мобильные устройства и планшеты",
     "tool.magnetToDdl.about.video.item4": "Быстрый предпросмотр перед скачиванием",
     "tool.magnetToDdl.about.video.footer": "Если магнет-ссылка ведёт на видео, смотреть его в потоке обычно быстрее и удобнее, чем сначала скачивать целиком.",
-
     "tool.magnetToTorrent.about.steps.title": "Как превратить магнет в .torrent через Webtor.io",
     "tool.magnetToTorrent.about.steps.subtitle": "Преобразуйте магнет-ссылку в .torrent-файл за 3&nbsp;простых шага — без торрент-клиента.",
     "tool.magnetToTorrent.about.steps.step1.title": "Скопируйте магнет-ссылку",
@@ -737,7 +703,6 @@
     "tool.magnetToTorrent.about.useCases.item4": "Просмотр списка файлов перед скачиванием",
     "tool.magnetToTorrent.about.safety.title": "Безопасен ли magnet to torrent? Нужен ли VPN?",
     "tool.magnetToTorrent.about.safety.text": "Преобразование магнет-ссылки в torrent-файл не требует подключения устройства к торрент-рою. Получение метаданных происходит на стороне сервера, что делает процесс проще и безопаснее для пользователя. Весь трафик идёт по HTTPS, поэтому VPN не нужен.",
-
     "tool.onlineTorrentDownloader.about.steps.title": "Как скачивать торренты через Webtor.io",
     "tool.onlineTorrentDownloader.about.steps.subtitle": "Превратите .torrent-файл или магнет-ссылку в прямую ссылку на скачивание за 3&nbsp;простых шага — без торрент-клиента.",
     "tool.onlineTorrentDownloader.about.steps.step1.title": "Найдите торрент",
@@ -771,7 +736,6 @@
     "tool.onlineTorrentDownloader.about.safety.title": "Скачивание или просмотр торрентов онлайн",
     "tool.onlineTorrentDownloader.about.safety.p1": "Через онлайн-загрузчик торрентов можно как скачивать файлы, так и смотреть видео прямо в браузере.",
     "tool.onlineTorrentDownloader.about.safety.p2": "Для видео-торрентов часто удобнее просмотр, а скачивание лучше подходит, когда файлы нужно сохранить офлайн. В любом случае ваше устройство не подключается к торрент-рою напрямую — <strong>Webtor.io</strong> всё делает на стороне сервера через HTTPS.",
-
     "tool.streamTorrentOnline.about.steps.title": "Как смотреть торренты онлайн через Webtor.io",
     "tool.streamTorrentOnline.about.steps.subtitle": "Смотрите любое торрент-видео прямо в браузере за 3&nbsp;простых шага — ничего устанавливать и скачивать не нужно.",
     "tool.streamTorrentOnline.about.steps.step1.title": "Добавьте торрент",
@@ -797,7 +761,6 @@
     "tool.streamTorrentOnline.about.devices.item2": "Android-смартфоны и планшеты",
     "tool.streamTorrentOnline.about.devices.item3": "iPhone и iPad через Safari или Chrome",
     "tool.streamTorrentOnline.about.devices.item4": "Smart TV через интеграцию со Stremio",
-
     "tool.torrentPlayer.about.steps.title": "Как воспроизводить торрент-видео онлайн через Webtor.io",
     "tool.torrentPlayer.about.steps.subtitle": "Воспроизводите любое видео из торрента прямо в браузере за 3&nbsp;простых шага — без десктопного плеера и торрент-клиента.",
     "tool.torrentPlayer.about.steps.step1.title": "Загрузите торрент",
@@ -823,7 +786,6 @@
     "tool.torrentPlayer.about.devices.item2": "Android-смартфоны и планшеты",
     "tool.torrentPlayer.about.devices.item3": "iPhone и iPad через Safari или Chrome",
     "tool.torrentPlayer.about.devices.item4": "Chromebook и слабые устройства",
-
     "tool.torrentToStream.about.steps.title": "Как превратить торрент в HLS-поток через Webtor.io",
     "tool.torrentToStream.about.steps.subtitle": "Превратите любой торрент в HLS-видео для просмотра за 3&nbsp;простых шага — облачное транскодирование в реальном времени, без скачивания.",
     "tool.torrentToStream.about.steps.step1.title": "Укажите торрент",
@@ -849,7 +811,6 @@
     "tool.torrentToStream.about.devices.item2": "Мобильные устройства на Android и iOS",
     "tool.torrentToStream.about.devices.item3": "Stremio и другие HLS-совместимые плееры",
     "tool.torrentToStream.about.devices.item4": "Smart TV и приставки",
-
     "tool.torrentToZip.about.steps.title": "Как скачивать торренты в ZIP через Webtor.io",
     "tool.torrentToZip.about.steps.subtitle": "Скачайте содержимое торрента одним ZIP-архивом за 3&nbsp;простых шага — без торрент-клиента.",
     "tool.torrentToZip.about.steps.step1.title": "Найдите торрент",
@@ -882,7 +843,6 @@
     "tool.torrentToZip.about.safety.title": "Когда torrent to ZIP — лучший вариант?",
     "tool.torrentToZip.about.safety.p1": "Torrent to ZIP подходит, когда удобство важнее скорости или выборочного скачивания. Это особенно удобно для торрентов с большим числом мелких файлов, дистрибутивов ПО или наборов данных, загрузок на телефон и планшет, а также когда нужен один аккуратный архив.",
     "tool.torrentToZip.about.safety.p2": "Ваше устройство не подключается к торрент-рою напрямую — <strong>Webtor.io</strong> всё делает на сервере и отдаёт ZIP по HTTPS.",
-
     "tool.watchTorrentsIos.about.steps.title": "Как смотреть торренты на iPhone или iPad",
     "tool.watchTorrentsIos.about.steps.subtitle": "Смотрите торрент-видео на iOS за 3&nbsp;простых шага — без установки приложений.",
     "tool.watchTorrentsIos.about.steps.step1.title": "Откройте в Safari",
@@ -909,7 +869,6 @@
     "tool.watchTorrentsIos.about.formats.item4": "Без кодек-паков и лишних приложений",
     "tool.watchTorrentsIos.about.safety.title": "Безопасно ли смотреть торренты на iOS?",
     "tool.watchTorrentsIos.about.safety.text": "Когда вы смотрите торренты на iOS через <strong>Webtor.io</strong>, ваш iPhone или iPad не подключается к торрент-рою напрямую. Данные торрента обрабатываются на сервере и отдаются как видеопоток по HTTPS. Всё, что нужно, — это Safari и магнет-ссылка или torrent-файл.",
-
     "tool.watchTorrentsOnline.about.steps.title": "Как смотреть торренты онлайн через Webtor.io",
     "tool.watchTorrentsOnline.about.steps.subtitle": "Смотрите торрент-контент онлайн за 3&nbsp;простых шага — без скачивания и торрент-клиента.",
     "tool.watchTorrentsOnline.about.steps.step1.title": "Загрузите или вставьте",
@@ -935,16 +894,12 @@
     "tool.watchTorrentsOnline.about.devices.item2": "Android-смартфоны и планшеты",
     "tool.watchTorrentsOnline.about.devices.item3": "iPhone и iPad через Safari",
     "tool.watchTorrentsOnline.about.devices.item4": "Smart TV через интеграцию со Stremio",
-
     "resource.preparingDownload": "Подготовка загрузки",
-
     "profile.stremio.copied": "Скопировано!",
-
     "instructions.guide": "Руководство",
     "instructions.note": "Примечание:",
     "instructions.important": "Важно:",
     "instructions.paidOnly": "Эта функция доступна только для <strong>платных пользователей</strong>.",
-
     "instructions.stremio.title": "Интеграция со Stremio",
     "instructions.stremio.heading": "Как подключить Webtor к Stremio",
     "instructions.stremio.intro": "Вы можете смотреть торренты из личной библиотеки Webtor прямо в Stremio. Вот как это сделать:",
@@ -954,7 +909,6 @@
     "instructions.stremio.step4": "Вставьте ссылку на аддон и нажмите Enter. Готово!",
     "instructions.stremio.result": "После установки ваша библиотека появится в Stremio в аддоне <strong>Webtor.io</strong> — готовая к просмотру.",
     "instructions.stremio.noteWarmup": "Просмотр через Webtor может отличаться от обычных аддонов Stremio. Для начала воспроизведения может потребоваться некоторое время на загрузку торрента.",
-
     "instructions.stremioAddon.title": "Как подключить аддон Stremio",
     "instructions.stremioAddon.heading": "Как подключить аддон Stremio",
     "instructions.stremioAddon.intro": "Хотите расширить контент в Stremio? Следуйте этим простым шагам, чтобы подключить внешние аддоны Stremio и расширить вашу библиотеку:",
@@ -964,7 +918,6 @@
     "instructions.stremioAddon.step4": "Вставьте URL в раздел \"Stremio Addons\" на <a href='{{.ProfileURL}}' class='text-w-pinkL hover:underline'>странице профиля</a> и нажмите \"Add Addon\"",
     "instructions.stremioAddon.result": "После добавления контент аддона будет доступен через интеграцию со Stremio, расширяя ваши возможности просмотра дополнительными источниками и каталогами.",
     "instructions.stremioAddon.noteGathering": "Сбор ссылок на потоки может занять некоторое время (до 10 секунд). Подождите.",
-
     "instructions.webdav.title": "Интеграция с WebDAV",
     "instructions.webdav.heading": "Как подключить Webtor через WebDAV",
     "instructions.webdav.intro": "Получите доступ к библиотеке торрентов как к обычной папке. С WebDAV вы можете просматривать, смотреть и управлять файлами прямо из любимых приложений.",
@@ -982,7 +935,6 @@
     "instructions.webdav.folderMovies": "<strong>movies/</strong> – Все распознанные фильмы (только чтение)",
     "instructions.webdav.folderSeries": "<strong>series/</strong> – Сериалы и эпизоды (только чтение)",
     "instructions.webdav.notePaid": "Доступ через WebDAV доступен только для <strong>платных пользователей</strong>.",
-
     "instructions.vault.title": "Vault",
     "instructions.vault.intro": "Vault — это система хранения в Webtor, которая позволяет:",
     "instructions.vault.feature1": "хранить торренты длительное время,",
@@ -1005,7 +957,6 @@
     "instructions.vault.expireItem1": "Очки, вложенные в торренты, теряют силу, и торрент помечается как истёкший и удаляется через <strong>{{.ExpirePeriod}}</strong>.",
     "instructions.vault.expireItem2": "При продлении подписки очки снова становятся активными, и торренты, обеспеченные ими, больше не считаются истёкшими.",
     "instructions.vault.disclaimer": "Если торрент заблокирован правообладателями или удалён из публичных источников, он может исчезнуть — Vault не гарантирует сохранность в таких случаях.",
-
     "aboutPage.title": "О проекте — Миссия и открытый код",
     "aboutPage.description": "Webtor — платформа с открытым исходным кодом для торрентов в браузере. Узнайте о нашей миссии сделать торренты доступными, приватными и простыми в использовании.",
     "aboutPage.badge": "О проекте",
@@ -1020,7 +971,6 @@
     "aboutPage.osP2": "Мы верим, что прозрачность порождает доверие. Вы можете изучить код, сообщить об ошибках, предложить улучшения или внести вклад напрямую.",
     "aboutPage.ctaText": "Готовы попробовать?",
     "aboutPage.ctaButton": "Открыть Webtor",
-
     "time.now": "только что",
     "time.seconds": "%v секунд назад",
     "time.minute": "1 минуту назад",
@@ -1035,7 +985,6 @@
     "time.months": "%v месяцев назад",
     "time.year": "1 год назад",
     "time.years": "%v лет назад",
-
     "error.forbidden": "Этот контент заблокирован по запросу правообладателя.",
     "error.not_found": "Ресурс не найден.",
     "error.service_unavailable": "Сервис временно недоступен. Попробуйте позже.",

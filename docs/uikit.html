@@ -768,6 +768,381 @@ log
       <p class="text-sm text-w-sub"><strong class="text-w-pinkL">Important:</strong> This is a warning/important note using pink theme.</p>
     </div>
     <div class="uikit-label">bg-w-pink/5 border border-w-pink/20 rounded-xl p-4</div>
+
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.07);margin:2rem 0">
+
+    <!-- 9.10 Upgrade Nudge (Slow Stream) -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Upgrade Nudge (Slow Stream)</h3>
+    <p class="desc">
+      Inline component shown inside a <code>progress-alert</code> when streaming bandwidth is insufficient.
+      Three states based on <code>IsRateLimited</code> + <code>TierName</code>:
+      free rate-limited (trial pitch) &middot; paid rate-limited (generic upgrade) &middot; genuinely slow (no upsell).
+      Source: <code>templates/views/action/errors/slow_download.html</code>.
+    </p>
+
+    <!-- State A: Free + rate-limited -->
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user, plan caps speed &mdash; trial pitch with concrete number ("Get 50 Mbps")</div>
+    <div class="progress-alert mb-2" style="max-width:600px">
+      <pre class="done"><span class="line">resource data fetched</span></pre>
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="done"><span class="line">media probe analyzed</span></pre>
+      <pre class="error"><span class="line">speed check</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex items-start gap-3 flex-1 min-w-[200px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            <h3 class="font-semibold text-base text-base-content leading-snug">Not enough speed for smooth playback</h3>
+          </div>
+          <a class="btn btn-sm btn-soft shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            Get 50 Mbps
+          </a>
+        </div>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
+          <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
+            <div class="text-2xl font-bold text-w-sub leading-none">5.0</div>
+            <div class="text-[11px] text-w-muted mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-muted mt-1">you have &middot; free</div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 text-w-muted">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+          <div class="text-center p-3 rounded-lg bg-w-pink/10 border border-w-pink/30">
+            <div class="text-2xl font-bold gradient-text leading-none">6.9</div>
+            <div class="text-[11px] text-w-pinkL mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-pinkL/80 mt-1">file needs</div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-w-muted mb-2">Without upgrading:</p>
+          <ul class="text-sm text-w-sub space-y-1.5">
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pick a smaller file</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pre-download instead of streaming</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+        <a class="close">Got it</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Free + IsRateLimited &mdash; Vault bullet hidden (Vault is paid-only) &middot; "more seeders" hint also hidden (the bottleneck is the user's pipe, not BT) &middot; CTA inside card top-right names the upsell ("Get 50 Mbps", trial pitch)
+    </div>
+
+    <!-- State B: Paid + rate-limited -->
+    <div class="uikit-label mb-2"><strong>B.</strong> Paid user still capped &mdash; generic upgrade, Vault offered as alternative</div>
+    <div class="progress-alert mb-2" style="max-width:600px">
+      <pre class="done"><span class="line">resource data fetched</span></pre>
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="done"><span class="line">media probe analyzed</span></pre>
+      <pre class="error"><span class="line">speed check</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex items-start gap-3 flex-1 min-w-[200px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            <h3 class="font-semibold text-base text-base-content leading-snug">Not enough speed for smooth playback</h3>
+          </div>
+          <a class="btn btn-sm btn-soft shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            Upgrade plan
+          </a>
+        </div>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
+          <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
+            <div class="text-2xl font-bold text-w-sub leading-none">10.0</div>
+            <div class="text-[11px] text-w-muted mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-muted mt-1">you have &middot; basic</div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 text-w-muted">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+          <div class="text-center p-3 rounded-lg bg-w-pink/10 border border-w-pink/30">
+            <div class="text-2xl font-bold gradient-text leading-none">22.0</div>
+            <div class="text-[11px] text-w-pinkL mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-pinkL/80 mt-1">file needs</div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-w-muted mb-2">Without upgrading:</p>
+          <ul class="text-sm text-w-sub space-y-1.5">
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pick a smaller file</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pre-download instead of streaming</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>save to Vault and let it pre-fetch</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+        <a class="close">Got it</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Paid (non-free) + IsRateLimited &mdash; Vault bullet visible (already accessible) &middot; "more seeders" hint omitted (BT is not the bottleneck under a plan cap) &middot; CTA inside card top-right is generic ("Upgrade plan")
+    </div>
+
+    <!-- State C: Genuinely slow (BitTorrent bottleneck, not rate cap) -->
+    <div class="uikit-label mb-2"><strong>C.</strong> BitTorrent bottleneck &mdash; upgrade won't help, no upsell</div>
+    <div class="progress-alert mb-2" style="max-width:600px">
+      <pre class="done"><span class="line">resource data fetched</span></pre>
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="done"><span class="line">media probe analyzed</span></pre>
+      <pre class="error"><span class="line">speed check</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex items-start gap-3 flex-1 min-w-[200px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            <h3 class="font-semibold text-base text-base-content leading-snug">Download speed is too low for streaming</h3>
+          </div>
+        </div>
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
+          <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
+            <div class="text-2xl font-bold text-w-sub leading-none">3.2</div>
+            <div class="text-[11px] text-w-muted mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-muted mt-1">you have</div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 text-w-muted">
+            <path d="M5 12h14M13 6l6 6-6 6"/>
+          </svg>
+          <div class="text-center p-3 rounded-lg bg-w-pink/10 border border-w-pink/30">
+            <div class="text-2xl font-bold gradient-text leading-none">6.9</div>
+            <div class="text-[11px] text-w-pinkL mt-1.5 uppercase tracking-wide">Mbps</div>
+            <div class="text-xs text-w-pinkL/80 mt-1">file needs</div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-w-muted mb-2">What you can do:</p>
+          <ul class="text-sm text-w-sub space-y-1.5">
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pick a smaller file or one with more seeders</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>pre-download instead of streaming</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">&bull;</span><span>save to Vault and let it pre-fetch</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+        <a class="close">Got it</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      !IsRateLimited &mdash; alternative header changes to "What you can do", upgrade button hidden (network bottleneck, not paywall) &middot; Vault shown for non-free, omitted for free
+    </div>
+
+    <div class="uikit-rule mb-8">
+      <strong>Decision matrix:</strong><br>
+      <code>IsRateLimited && TierName=="free"</code> &rarr; trial pitch CTA <code>action.upgrade.free</code> ("Get 50 Mbps")<br>
+      <code>IsRateLimited && TierName!="free"</code> &rarr; generic CTA <code>action.upgrade.paid</code> ("Upgrade plan")<br>
+      <code>!IsRateLimited</code> &rarr; no upgrade CTA at all (network won't be helped by a higher cap)<br>
+      <strong>Vault bullet</strong> hidden when <code>TierName=="free"</code> (Vault is a paid feature)<br>
+      <strong>"More seeders" bullet</strong> only shown when <code>!IsRateLimited</code> &mdash; under a plan cap, extra seeders don't help because the user's pipe is the bottleneck, not BT<br>
+      <strong>Bolt icon</strong> in header &amp; CTA from heroicons (BoltIcon, 24x24)<br>
+      <strong>Right card</strong> uses <code>gradient-text</code> + <code>bg-w-pink/10 border-w-pink/30</code> to anchor the gap visually<br>
+      <strong>Umami</strong>: <code>data-umami-event="donate-slow-download"</code> + <code>data-umami-event-tier</code> for funnel split<br>
+      <strong>CTA placement</strong>: <em>inside</em> the card's header row, right of the title (wraps below on narrow viewports via <code>flex-wrap</code> + <code>min-w-[200px]</code> on the title block) &mdash; consistent with 9.11 download_file and 9.12 no_peers
+    </div>
+
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.07);margin:2rem 0">
+
+    <!-- 9.11 Download Ready (with optional upgrade nudge) -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Download Ready (with optional Upgrade Nudge)</h3>
+    <p class="desc">
+      Action panel shown after a download link is ready. For ad-supported tiers (<code>HasAds</code>),
+      a compact horizontal nudge appears above the actions. Action row groups copy chips on the left
+      (tertiary) and primary download CTA on the right with a ghost dismiss between.
+      Source: <code>templates/views/action/download_file.html</code>.
+    </p>
+
+    <!-- State A: Free + ads -->
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user with ads &mdash; horizontal nudge offers trial speed; clean action row below</div>
+    <div class="progress-alert mb-2" style="max-width:680px">
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="done"><span class="line">warming up</span></pre>
+      <pre class="done"><span class="line">download ready</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-center gap-4 flex-wrap">
+        <div class="flex items-start gap-3 flex-1 min-w-[240px]">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+          </svg>
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-base-content leading-snug">Downloading at 5 Mbps</div>
+            <div class="text-xs text-w-muted mt-0.5">A subscription removes the cap and ads</div>
+          </div>
+        </div>
+        <a class="btn btn-sm btn-soft shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+          </svg>
+          Get 50 Mbps
+        </a>
+      </div>
+
+      <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
+        <div class="flex flex-wrap gap-1.5 mr-auto">
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            wget
+          </a>
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            curl
+          </a>
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            URL
+          </a>
+        </div>
+        <a class="btn btn-sm btn-ghost text-w-muted">cancel</a>
+        <a class="btn btn-sm btn-soft-cyan gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          start download
+        </a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Nudge inline-horizontal &mdash; icon + 2-line text on left, CTA on right &middot;
+      Action row: copy chips group (<code>btn-xs btn-ghost</code> with copy-icon) on the left via <code>mr-auto</code>,
+      cancel as ghost text, primary download as <code>btn-sm btn-soft-cyan</code> with download arrow icon
+    </div>
+
+    <!-- State B: No ads (paid) -->
+    <div class="uikit-label mb-2"><strong>B.</strong> Paid user (no ads) &mdash; nudge omitted entirely, just clean action row</div>
+    <div class="progress-alert mb-2" style="max-width:680px">
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="done"><span class="line">warming up</span></pre>
+      <pre class="done"><span class="line">download ready</span></pre>
+
+      <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
+        <div class="flex flex-wrap gap-1.5 mr-auto">
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            wget
+          </a>
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            curl
+          </a>
+          <a class="btn btn-xs btn-ghost border border-w-line text-w-sub gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            URL
+          </a>
+        </div>
+        <a class="btn btn-sm btn-ghost text-w-muted">cancel</a>
+        <a class="btn btn-sm btn-soft-cyan gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          start download
+        </a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      <code>!HasAds</code> &rarr; nudge skipped &middot; same action row pattern, no upsell
+    </div>
+
+    <div class="uikit-rule mb-8">
+      <strong>Hierarchy:</strong> primary download (<code>btn-soft-cyan</code> with download icon) on far right &middot;
+      cancel as ghost text just before it &middot;
+      copy chips (<code>btn-xs btn-ghost border</code>) grouped on the left via <code>mr-auto</code><br>
+      <strong>Copy chips</strong>: hover transitions to cyan border &amp; text (<code>hover:border-w-cyan/50 hover:text-w-cyan</code>) &middot;
+      title attr carries full label for a11y, visible label is just the protocol name<br>
+      <strong>Nudge sub-text</strong> ("subscription removes cap and ads") names the second value (no ads) &mdash; cap alone isn't always the strongest hook<br>
+      <strong>Same Bolt/CTA</strong> pattern as 9.10 keeps the upgrade visual consistent across slow_download &amp; download_file
+    </div>
+
+    <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.07);margin:2rem 0">
+
+    <!-- 9.12 No Peers (tier-aware Vault pitch) -->
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">No Peers (tier-aware Vault pitch)</h3>
+    <p class="desc">
+      Shown when stream/download warm-up times out (no active seeders). Two-card structure:
+      free user gets a Vault-as-value pitch + upgrade CTA; paid user gets the action prompt to use Vault directly (no upsell).
+      Uses the clock icon to convey "wait for peers" rather than a paywall framing.
+      Source: <code>templates/views/action/errors/no_peers.html</code>.
+    </p>
+
+    <!-- State A: Free + no peers -->
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user &mdash; Vault is the value prop, "Get 50 Mbps" CTA bundles it</div>
+    <div class="progress-alert mb-2" style="max-width:680px">
+      <pre class="done"><span class="line">resource data fetched</span></pre>
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="error"><span class="line">warming up</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex items-start gap-3 flex-1 min-w-[200px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <h3 class="font-semibold text-base text-base-content leading-snug">This torrent has no active seeders right now</h3>
+          </div>
+          <a class="btn btn-sm btn-soft shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            Get 50 Mbps
+          </a>
+        </div>
+        <p class="text-sm text-w-sub mt-3 leading-relaxed">Vault saves the torrent and grabs it as soon as a seeder appears &mdash; included with any paid plan.</p>
+        <p class="text-xs text-w-muted mt-3">or try another torrent with more seeders</p>
+      </div>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+        <a class="close">Got it</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Free + no peers &mdash; Vault narrative leads ("saves the torrent, grabs it when a seeder appears") &middot; CTA inside card top-right bundles trial speed + Vault access
+    </div>
+
+    <!-- State B: Paid + no peers -->
+    <div class="uikit-label mb-2"><strong>B.</strong> Paid user &mdash; instructional message, no upsell, just "Got it"</div>
+    <div class="progress-alert mb-2" style="max-width:680px">
+      <pre class="done"><span class="line">resource data fetched</span></pre>
+      <pre class="done"><span class="line">stream link ready</span></pre>
+      <pre class="error"><span class="line">warming up</span></pre>
+
+      <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="flex items-start gap-3 flex-1 min-w-[200px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <h3 class="font-semibold text-base text-base-content leading-snug">This torrent has no active seeders right now</h3>
+          </div>
+        </div>
+        <p class="text-sm text-w-sub mt-3 leading-relaxed">Save it to Vault &mdash; it'll fetch the file as soon as a seeder shows up.</p>
+        <p class="text-xs text-w-muted mt-3">or try another torrent with more seeders</p>
+      </div>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+        <a class="close">Got it</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Paid + no peers &mdash; same shell, different copy: imperative ("Save it to Vault") instead of value-prop &middot; no upgrade button (already paid; Vault is already accessible from the resource page)
+    </div>
+
+    <div class="uikit-rule mb-8">
+      <strong>Decision matrix:</strong><br>
+      <code>TierName=="free"</code> &rarr; <code>vaultPitch</code> copy + upgrade CTA <code>action.upgrade.free</code><br>
+      <code>TierName!="free"</code> &rarr; <code>vaultUse</code> copy + dismiss-only<br>
+      <strong>Icon</strong>: clock from feather icons (24x24, 1.8 stroke, in <code>text-w-pinkL</code>) &mdash; "wait for peers" framing rather than warning/paywall<br>
+      <strong>Alt suggestion</strong> ("or try another torrent with more seeders") shown to both tiers as a soft secondary in <code>text-xs text-w-muted</code><br>
+      <strong>Umami</strong>: <code>data-umami-event="donate-no-peers"</code> + <code>data-umami-event-tier</code>
+    </div>
   </div>
 
   <hr class="uikit-divider">

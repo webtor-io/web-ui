@@ -8,7 +8,6 @@
     "nav.profile": "Profil",
     "nav.login": "Giriş",
     "nav.donate": "Bağış yap",
-
     "footer.tools": "Araçlar",
     "footer.resources": "Kaynaklar",
     "footer.about": "Hakkında",
@@ -23,7 +22,6 @@
     "footer.description": "Tarayıcı tabanlı, açık kaynak torrent platformu. Hiçbir şey yüklemeden torrent izle, indir ve yönet.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.filmData": "Film verileri",
-
     "home.title": "Online torrent platformu — Tarayıcıda izle ve indir",
     "home.description": "Kendi torrentlerini doğrudan tarayıcıda izlemek ve indirmek için web tabanlı torrent platformu. Yazılım gerekmez. Güvenli bulut işleme ve depolama.",
     "home.ogTitle": "Webtor.io — Tarayıcıda torrent izle ve indir",
@@ -44,12 +42,10 @@
     "home.speedTest": "Hız testi",
     "home.gotIt": "anladım!",
     "home.ok": "tamam",
-
     "about.stats.torrents": "İşlenen torrent",
     "about.stats.countries": "Ülke",
     "about.stats.openSource": "Açık kaynak",
     "about.stats.software": "Yazılım kurulumu",
-
     "about.how.badge": "Nasıl çalışır",
     "about.how.title": "Üç adım. Bu kadar.",
     "about.how.subtitle": "Magnet linkten streaming videoya veya doğrudan indirmeye bir dakikadan az sürede.",
@@ -59,7 +55,6 @@
     "about.how.step2.text": "Torrent içeriğini gez ve izlemek veya indirmek istediğin dosyayı seç.",
     "about.how.step3.title": "İzle veya indir",
     "about.how.step3.text": "Yerleşik oynatıcıda hemen videoyu izle veya doğrudan HTTP indirme linki al.",
-
     "about.features.badge": "Özellikler",
     "about.features.title": "İhtiyacın olan her şey, gereksiz hiçbir şey",
     "about.features.subtitle": "Tamamen bulutta ve tarayıcında çalışan eksiksiz bir torrent araç seti.",
@@ -83,7 +78,6 @@
     "about.features.chrome.text": "Eklentiyi yükle ve tıkladığın her torrent veya magnet linki otomatik olarak Webtor'da açılsın.",
     "about.features.sdk.title": "Geliştirici SDK'sı",
     "about.features.sdk.text": "Açık kaynak JavaScript SDK'mızla torrent streaming oynatıcısını kendi sitende göm.",
-
     "about.faq.badge": "SSS",
     "about.faq.title": "Sık sorulan sorular",
     "about.faq.subtitle": "İnsanların en çok sorduğu şeylere hızlı yanıtlar.",
@@ -114,11 +108,9 @@
     "about.faq.speed.q": "Webtor.io'da indirme veya streaming hızım neden yavaş?",
     "about.faq.speed.a1": "Hızlar seeder sayısı, dosya formatı (bazıları gerçek zamanlı transkodlama gerektirir), internet bağlantın, mevcut sunucu yükü ve hesap türüne bağlı olarak değişebilir. Premium kullanıcılar daha yüksek bant genişliği alır.",
     "about.faq.speed.a2": "Not: bant genişliği Mbps (saniyede megabit) olarak ölçülür, dosya boyutları MB (megabayt) olarak gösterilir. 1 MB = 8 Mb, yani 50 Mbps bağlantı yaklaşık 6,25 MB/s indirme hızı verir. Projeyi desteklemek daha iyi hız ve güvenilirliğin kilidini açmaya yardımcı olur.",
-
     "about.cta.title": "Denemeye hazır mısın?",
     "about.cta.subtitle": "Kayıt gerekmez. Magnet linki yapıştır ve saniyeler içinde streaming'e başla.",
     "about.cta.button": "Webtor'u başlat",
-
     "auth.login.title": "Giriş yap",
     "auth.login.subtitle": "Hesabına erişmek için bir yöntem seç",
     "auth.login.libraryNote": "Kütüphaneye erişim için yetkilendirme gerekli.",
@@ -142,7 +134,6 @@
     "auth.verify.next": "İleri",
     "auth.refresh.title": "Token yenile",
     "auth.gotIt": "anladım!",
-
     "auth.progress.loggingOut": "çıkış yapılıyor",
     "auth.progress.logoutSuccessful": "çıkış başarılı",
     "auth.progress.logoutFailed": "çıkış başarısız, tekrar giriş yapmayı dene",
@@ -158,7 +149,6 @@
     "auth.progress.redirectingTo": "%v adresine yönlendiriliyor",
     "auth.progress.redirectFailed": "%v adresine yönlendirme başarısız",
     "auth.progress.unknownError": "bilinmeyen hata",
-
     "profile.badge": "Profil",
     "profile.title": "Profilin",
     "profile.subtitle": "Hesap ayarlarını, entegrasyonlarını ve tercihlerini yönet.",
@@ -167,18 +157,15 @@
     "profile.logout": "Çıkış yap",
     "profile.deleteAccount": "Hesabı sil",
     "profile.deleteConfirm": "Hesabını silmek istediğinden emin misin? Bu işlem geri alınamaz. Tüm verilerin, ayarların ve entegrasyonların kalıcı olarak silinecek.",
-
     "profile.tier.unlimited": "Sınırsız bant genişliği",
     "profile.tier.mbps": "Mbps",
     "profile.tier.adsEnabled": "Reklamlar etkin",
     "profile.tier.adFree": "Reklamsız",
-
     "profile.stremio.addonUrl": "Addon URL'si",
     "profile.stremio.generate": "Addon URL'si oluştur",
     "profile.stremio.copyUrl": "URL'yi kopyala",
     "profile.stremio.howTo": "Stremio'ya nasıl bağlanılır?",
     "profile.stremio.install": "Stremio'ya yükle",
-
     "profile.webdav.title": "WebDAV",
     "profile.webdav.generate": "WebDAV URL'si oluştur",
     "profile.webdav.copyUrl": "URL'yi kopyala",
@@ -186,7 +173,6 @@
     "profile.webdav.howTo": "WebDAV ile nasıl bağlanılır?",
     "profile.webdav.premiumOnly": "WebDAV entegrasyonu premium kullanıcılar için kullanılabilir.",
     "profile.webdav.upgrade": "Açmak için planını yükselt!",
-
     "profile.addons.title": "Addonlar",
     "profile.addons.placeholder": "Stremio addon manifest URL'sini gir (örn., https://example.com/manifest.json)",
     "profile.addons.validation": "manifest.json ile biten geçerli bir Stremio addon manifest URL'si gir",
@@ -201,7 +187,6 @@
     "profile.addons.save": "Kaydet",
     "profile.addons.deleteConfirm": "Bu addon'u silmek istediğine emin misin?\n\n%v",
     "profile.addons.deleted": "Addon silindi",
-
     "profile.embedDomains.title": "Embed alan adları",
     "profile.embedDomains.placeholder": "Alan adı gir (örn., example.com)",
     "profile.embedDomains.validation": "Geçerli bir alan adı gir",
@@ -212,7 +197,6 @@
     "profile.embedDomains.learnSdk": "embed-sdk-js hakkında daha fazla bilgi al",
     "profile.embedDomains.wordpressPlugin": "wordpress-plugin'e de göz at",
     "profile.embedDomains.deleteConfirm": "Bu alan adını silmek istediğine emin misin?",
-
     "profile.backends.title": "Streaming backend'leri",
     "profile.backends.selectType": "Backend türünü seç",
     "profile.backends.enterToken": "API token'ını gir",
@@ -231,7 +215,6 @@
     "profile.backends.save": "Kaydet",
     "profile.backends.deleteConfirm": "Bu %v backend'ini silmek istediğine emin misin?",
     "profile.backends.deleted": "Backend silindi",
-
     "profile.settings.title": "Ayarlar",
     "profile.settings.resolutions": "Tercih edilen çözünürlükler",
     "profile.settings.dragHint": "Tercih sırasına göre yeniden düzenlemek için sürükle",
@@ -239,7 +222,6 @@
     "profile.settings.discoverOnlyDesc": "Etkinleştirildiğinde, yapılandırılmış addonların yalnızca Discover sayfasında içeriği gözden geçirmek ve kütüphaneye eklemek için kullanılır. Stremio uygulaması yalnızca kütüphanenden — daha önce eklediğin torrentlerden — streamler gösterir.",
     "profile.settings.discoverOnlyHint": "İçeriğe webde Discover'dan göz atıp topladığında ve sonra Stremio üzerinden TV'de izlerken listeyi karıştıran ek addon sonuçları olmadan kullanışlı.",
     "profile.settings.save": "Kaydet",
-
     "profile.vault.title": "Vault Points",
     "profile.vault.total": "Toplam",
     "profile.vault.available": "Kullanılabilir",
@@ -247,12 +229,10 @@
     "profile.vault.frozen": "Donmuş",
     "profile.vault.whatIs": "Vault nedir?",
     "profile.vault.pledges": "Taahhütler",
-
     "discover.badge": "Discover",
     "discover.title": "Discover",
     "discover.subtitle": "Cinemeta ve Stremio addonlarından filmler ve dizilere göz at.",
     "discover.seeMore": "Daha fazla gör",
-
     "library.badge": "Kütüphane",
     "library.title": "Kütüphanen",
     "library.subtitle": "Kayıtlı torrentlerin, filmlerin ve dizilerin — hepsi tek yerde.",
@@ -282,7 +262,6 @@
     "library.sort.rating": "Puan",
     "library.sort.unknown": "Bilinmiyor",
     "library.continueWatching": "İzlemeye devam et",
-
     "resource.movie": "Film",
     "resource.series": "Dizi",
     "resource.torrent": "Torrent",
@@ -300,7 +279,6 @@
     "resource.status.cached": "Önbelleğe alındı",
     "resource.status.vaulting": "Vault'a kaydediliyor",
     "resource.status.vaulted": "Vault'ta",
-
     "vault.supporting": "Bu torrenti destekliyorsun",
     "vault.keepAvailable": "Bu torrenti kullanılabilir tut",
     "vault.error": "Maalesef, taahhüdün bir hata nedeniyle kaydedilemedi:",
@@ -326,7 +304,6 @@
     "vault.removeError": "Maalesef, taahhüdün bir hata nedeniyle kaldırılamadı:",
     "vault.frozen": "Vault Points'lerin şu anda donmuş ve henüz kaldırılamaz. Donma süresi dolduğunda lütfen geri dön.",
     "vault.removeConfirm": "Bu torrent için taahhüdünü kaldırmak istediğine emin misin? Bu işlem geri alınamaz.",
-
     "vault.pledges.badge": "Vault taahhütleri",
     "vault.pledges.title": "Taahhütlerin",
     "vault.pledges.subtitle": "Torrentlere yaptığın Vault Points taahhütlerini görüntüle ve yönet.",
@@ -343,9 +320,6 @@
     "vault.pledges.expiringDesc": "Taahhüt artık puanlarla desteklenmiyor (abonelik sona erdiğinde veya seviye düşürüldüğünde olur). Böyle taahhütlü içerikler Vault'tan kaldırılabilir",
     "vault.pledges.claimableDesc": "Geri alınabilen puanlar. Geri aldıktan sonra, taahhüt edildikleri içerik kaldırılabilir",
     "vault.pledges.backToProfile": "Profile dön",
-
-    "action.download.speedLimit": "Mevcut indirme hızın {{.Rate}} Mbps ile sınırlandırılacak, hızı artırmak ve reklamları kaldırmak için bağış yap!",
-    "action.download.donate": "bağış yap",
     "action.download.copyWget": "wget komutunu kopyala",
     "action.download.copyCurl": "curl komutunu kopyala",
     "action.download.copyUrl": "url'yi kopyala",
@@ -353,23 +327,27 @@
     "action.download.downloadStarting": "İndirme başlıyor...",
     "action.download.cancel": "iptal",
     "action.download.copied": "Kopyalandı!",
-
-    "action.noPeers.title": "önemli not:",
-    "action.noPeers.noSeeders": "bu torrentin şu anda aktif kaynağı (seeder) yok",
-    "action.noPeers.notPossible": "indirme ve streaming şu anda mümkün değil",
-    "action.noPeers.trySearhing": "lütfen daha fazla peer'i olan başka bir torrent aramayı dene",
-    "action.noPeers.gotIt": "Anladım!",
-
-    "action.slow.notPossible": "streaming mümkün değil",
-    "action.slow.planLimit": "planın ({{.Tier}}) hızı {{.Rate}} Mbps ile sınırlıyor",
-    "action.slow.fileRequires": "bu dosya akıcı oynatma için en az {{.Rate}} Mbps gerektiriyor",
-    "action.slow.upgrade": "planını yükselt",
-    "action.slow.tooSlow": "streaming mümkün değil — indirme hızı çok yavaş",
-    "action.slow.speedInfo": "indirme hızı: {{.Measured}} Mbps, gereken: {{.Required}} Mbps",
-    "action.slow.suggestions": "daha küçük dosya dene, önceden indir, Vault kullan veya daha fazla seeder'i olan torrent bul",
-    "action.slow.upgradePlan": "planı yükselt",
-    "action.slow.gotIt": "Anladım!",
-
+    "action.download.limitedTitle": "İndirme {{.Rate}} Mbps",
+    "action.download.limitedSub": "Abonelik sınırı ve reklamları kaldırır",
+    "action.noPeers.title": "Bu torrentin şu an aktif seeder'i yok",
+    "action.noPeers.vaultPitch": "Vault torrenti saklar ve seeder göründüğü anda indirir — her ücretli planda var.",
+    "action.noPeers.vaultUse": "Torrenti Vault'a kaydet — seeder göründüğünde dosyayı indirir.",
+    "action.noPeers.altSearch": "veya daha fazla seeder'i olan başka bir torrent dene",
+    "action.noPeers.gotIt": "Anladım",
+    "action.slow.title.rateLimited": "Akıcı oynatma için hız yetersiz",
+    "action.slow.title.bandwidth": "İndirme hızı yayın için çok düşük",
+    "action.slow.youHave": "sende",
+    "action.slow.fileNeeds": "dosya için",
+    "action.slow.unit": "Mbps",
+    "action.slow.alts.upgrade": "Yükseltmeden:",
+    "action.slow.alts.bandwidth": "Yapabileceklerin:",
+    "action.slow.alt.smallerOrSeeders": "daha küçük dosya veya daha çok seeder'i olan birini seç",
+    "action.slow.alt.smallerFile": "daha küçük bir dosya seç",
+    "action.slow.alt.preDownload": "önce indir, sonra izle",
+    "action.slow.alt.vault": "Vault'a kaydet — kendisi önceden yükler",
+    "action.slow.gotIt": "Anladım",
+    "action.upgrade.free": "50 Mbps al",
+    "action.upgrade.paid": "Planı yükselt",
     "action.stream.audio": "Ses",
     "action.stream.subtitles": "Altyazı",
     "action.stream.close": "Kapat",
@@ -384,7 +362,6 @@
     "action.stream.mySubtitles.formats": "SRT, VTT veya ASS, en fazla 5 MB",
     "action.stream.mySubtitles.delete": "Sil",
     "action.stream.mySubtitles.limitReached": "Bu dosya için 10 altyazı sınırına ulaşıldı. Daha fazla yüklemek için birini sil.",
-
     "player.play": "Oynat",
     "player.pause": "Duraklat",
     "player.mute": "Sustur",
@@ -398,7 +375,6 @@
     "player.copied": "Kopyalandı!",
     "player.continueFrom": "%v noktasından devam et",
     "player.startOver": "Baştan başla",
-
     "job.retrievingData": "kaynak verisi alınıyor",
     "job.retrievingStreamUrl": "stream URL'si alınıyor",
     "job.probingMedia": "içerik medya bilgisi inceleniyor",
@@ -420,7 +396,6 @@
     "job.downloading": "{{.Bytes}} indiriliyor",
     "job.waitingForPeers": "peer'ler bekleniyor",
     "job.peers": "{{.Peers}} peer",
-
     "toast.domainAdded": "Alan adı eklendi",
     "toast.domainDeleted": "Alan adı silindi",
     "toast.addedToLibrary": "Kütüphaneye eklendi",
@@ -439,7 +414,6 @@
     "toast.removedFromVault": "Vault'tan kaldırıldı",
     "toast.user_subtitle.uploaded": "Altyazı yüklendi",
     "toast.user_subtitle.deleted": "Altyazı silindi",
-
     "speedtest.badge": "Hız testi",
     "speedtest.title": "Bağlantı hızı testi",
     "speedtest.subtitle": "Tampon yapmadan hangi video kalitesinde streaming yapabileceğini öğrenmek için Webtor sunucularından indirme hızını ölç.",
@@ -465,7 +439,6 @@
     "speedtest.copied": "Kopyalandı!",
     "speedtest.titleResult": "Hız testi — %v Mbps",
     "speedtest.descResult": "Webtor bağlantı hızın: %v Mbps.",
-
     "support.badge": "Destek",
     "support.title": "Yardım merkezi",
     "support.subtitle": "Bir sorun var, hata mı buldun veya içerik mi bildirmek istiyorsun? Aşağıdaki formu doldur, sana geri döneriz.",
@@ -483,7 +456,6 @@
     "support.submit": "Gönder",
     "support.successMessage": "Mesajın başarıyla gönderildi!",
     "support.sendAnother": "Başka bir tane gönder",
-
     "discover.search": "Film ve dizi ara...",
     "discover.loadMore": "Daha fazla yükle",
     "discover.loadingCatalogs": "Kataloglar yükleniyor...",
@@ -579,7 +551,6 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Diğer",
-
     "discover.streamsFound": "%v yayın bulundu",
     "discover.streamsFiltered": "%v / %v yayın",
     "discover.noStreams": "Bu başlık için yayın bulunamadı.",
@@ -595,7 +566,6 @@
     "discover.noEpisodes": "Bölüm bulunamadı.",
     "discover.specials": "Özel bölümler",
     "discover.episodeLabel": "Bölüm %v",
-
     "tool.torrentToDdl.title": "Torrent → DDL",
     "tool.torrentToDdl.benefit": "Torrenti doğrudan indirme linkine dönüştür",
     "tool.torrentToDdl.description": "Tarayıcında torrentleri doğrudan indirme linklerine dönüştür. Bulut tabanlı işleme ile torrentlerden dosya indir, yerel istemci gerekmez.",
@@ -626,7 +596,6 @@
     "tool.torrentPlayer.title": "Online torrent oynatıcı",
     "tool.torrentPlayer.benefit": "Tarayıcında herhangi bir torrent video oynat",
     "tool.torrentPlayer.description": "Torrentlerden video dosyalarını doğrudan tarayıcıda oynatan ücretsiz online torrent oynatıcı. MKV, AVI, MP4, WEBM ve daha fazlasını gerçek zamanlı transkodlama ile destekler.",
-
     "tool.about.badges.howItWorks": "Nasıl çalışır",
     "tool.about.badges.explained": "Açıklandı",
     "tool.about.badges.comparison": "Karşılaştırma",
@@ -636,7 +605,6 @@
     "tool.about.badges.benefits": "Avantajlar",
     "tool.about.badges.devices": "Cihazlar",
     "tool.about.badges.formats": "Formatlar",
-
     "tool.torrentToDdl.about.steps.title": "Webtor.io ile torrentleri nasıl indirilir",
     "tool.torrentToDdl.about.steps.subtitle": "Torrent dosyanı veya magnet linkini 3&nbsp;basit adımda doğrudan indirme linkine dönüştür — torrent istemcisi gerekmez.",
     "tool.torrentToDdl.about.steps.step1.title": "Torrentini bul",
@@ -670,7 +638,6 @@
     "tool.torrentToDdl.about.video.item3": "Mobil cihazlar ve tabletler",
     "tool.torrentToDdl.about.video.item4": "İndirmeden önce hızlı önizlemeler",
     "tool.torrentToDdl.about.video.footer": "Torrentin video içeriği içeriyorsa, streaming genellikle her şeyi önceden indirmekten daha hızlı ve daha kullanışlıdır.",
-
     "tool.magnetToDdl.about.steps.title": "Webtor.io ile magnet nasıl indirilir",
     "tool.magnetToDdl.about.steps.subtitle": "Magnet linkini 3&nbsp;basit adımda doğrudan indirme linkine dönüştür — torrent istemcisi gerekmez.",
     "tool.magnetToDdl.about.steps.step1.title": "Magnet linkini kopyala",
@@ -704,7 +671,6 @@
     "tool.magnetToDdl.about.video.item3": "Mobil cihazlar ve tabletler",
     "tool.magnetToDdl.about.video.item4": "İndirmeden önce hızlı önizlemeler",
     "tool.magnetToDdl.about.video.footer": "Magnet linkin video içeriğine işaret ediyorsa, streaming genellikle her şeyi önceden indirmekten daha hızlı ve daha kullanışlıdır.",
-
     "tool.magnetToTorrent.about.steps.title": "Webtor.io ile magnet'i torrent'e nasıl dönüştürülür",
     "tool.magnetToTorrent.about.steps.subtitle": "Magnet linkini 3&nbsp;basit adımda .torrent dosyasına dönüştür — torrent istemcisi gerekmez.",
     "tool.magnetToTorrent.about.steps.step1.title": "Magnet linkini kopyala",
@@ -737,7 +703,6 @@
     "tool.magnetToTorrent.about.useCases.item4": "İndirmeden önce dosya listelerini önizleme",
     "tool.magnetToTorrent.about.safety.title": "Magnet → torrent güvenli mi? VPN'e ihtiyacım var mı?",
     "tool.magnetToTorrent.about.safety.text": "Magnet linkini torrent dosyasına dönüştürmek cihazından torrent sürüsüne bağlanmayı gerektirmez. Metadata çözümlemesi sunucu tarafında olur, bu da süreci kullanıcı için daha basit ve güvenli kılar. Tüm trafik HTTPS üzerinden gider, bu yüzden VPN gerekmez.",
-
     "tool.onlineTorrentDownloader.about.steps.title": "Webtor.io ile torrentler nasıl indirilir",
     "tool.onlineTorrentDownloader.about.steps.subtitle": "Torrent dosyanı veya magnet linkini 3&nbsp;basit adımda doğrudan indirme linkine dönüştür — torrent istemcisi gerekmez.",
     "tool.onlineTorrentDownloader.about.steps.step1.title": "Torrentini bul",
@@ -771,7 +736,6 @@
     "tool.onlineTorrentDownloader.about.safety.title": "Torrentleri online indirme vs streaming",
     "tool.onlineTorrentDownloader.about.safety.p1": "Online torrent indirici ile dosyaları indirebilir veya video içeriğini doğrudan tarayıcında stream edebilirsin.",
     "tool.onlineTorrentDownloader.about.safety.p2": "Streaming video torrentleri için genellikle daha kullanışlıdır, indirme ise dosyaları çevrimdışı kullanım için tutmak gerektiğinde daha iyidir. Her iki durumda da cihazın torrent sürüsüne doğrudan bağlanmaz — <strong>Webtor.io</strong> her şeyi sunucu tarafında HTTPS üzerinden yönetir.",
-
     "tool.streamTorrentOnline.about.steps.title": "Webtor.io ile online torrentler nasıl stream edilir",
     "tool.streamTorrentOnline.about.steps.subtitle": "Herhangi bir torrent videoyu 3&nbsp;basit adımda doğrudan tarayıcında stream et — yüklenecek yazılım yok, indirilecek dosya yok.",
     "tool.streamTorrentOnline.about.steps.step1.title": "Torrentini ekle",
@@ -797,7 +761,6 @@
     "tool.streamTorrentOnline.about.devices.item2": "Android telefonlar ve tabletler",
     "tool.streamTorrentOnline.about.devices.item3": "Safari veya Chrome ile iPhone ve iPad",
     "tool.streamTorrentOnline.about.devices.item4": "Stremio entegrasyonu ile akıllı TV'ler",
-
     "tool.torrentPlayer.about.steps.title": "Webtor.io ile torrent videoları online nasıl oynatılır",
     "tool.torrentPlayer.about.steps.subtitle": "Bir torrentten herhangi bir videoyu 3&nbsp;basit adımda doğrudan tarayıcında oynat — masaüstü oynatıcı veya torrent istemcisi gerekmez.",
     "tool.torrentPlayer.about.steps.step1.title": "Torrentini yükle",
@@ -823,7 +786,6 @@
     "tool.torrentPlayer.about.devices.item2": "Android telefonlar ve tabletler",
     "tool.torrentPlayer.about.devices.item3": "Safari veya Chrome ile iPhone ve iPad",
     "tool.torrentPlayer.about.devices.item4": "Chromebook'lar ve düşük güçlü cihazlar",
-
     "tool.torrentToStream.about.steps.title": "Webtor.io ile torrent'i HLS streamine nasıl dönüştürülür",
     "tool.torrentToStream.about.steps.subtitle": "Herhangi bir torrenti 3&nbsp;basit adımda stream edilebilir HLS videoya dönüştür — gerçek zamanlı bulut transkodlama, indirme gerekmez.",
     "tool.torrentToStream.about.steps.step1.title": "Torrenti sağla",
@@ -849,7 +811,6 @@
     "tool.torrentToStream.about.devices.item2": "Android ve iOS mobil cihazlar",
     "tool.torrentToStream.about.devices.item3": "Stremio ve diğer HLS uyumlu oynatıcılar",
     "tool.torrentToStream.about.devices.item4": "Akıllı TV'ler ve streaming kutuları",
-
     "tool.torrentToZip.about.steps.title": "Webtor.io ile torrentler ZIP olarak nasıl indirilir",
     "tool.torrentToZip.about.steps.subtitle": "Torrentinin içeriğini 3&nbsp;basit adımda ZIP arşivi olarak indir — torrent istemcisi gerekmez.",
     "tool.torrentToZip.about.steps.step1.title": "Torrentini bul",
@@ -882,7 +843,6 @@
     "tool.torrentToZip.about.safety.title": "Torrent → ZIP ne zaman en iyi seçenek?",
     "tool.torrentToZip.about.safety.p1": "Torrent → ZIP, kullanışlılık hız veya seçici indirmelerden daha önemli olduğunda en iyi seçimdir. Birçok küçük dosya içeren torrentler, yazılım dağıtımları veya veri kümeleri, telefon ve tablet indirmeleri ve tek bir temiz arşive ihtiyaç duyduğun durumlar için özellikle iyi çalışır.",
     "tool.torrentToZip.about.safety.p2": "Cihazın torrent sürüsüne doğrudan bağlanmaz — <strong>Webtor.io</strong> her şeyi sunucu tarafında yönetir ve ZIP'i HTTPS üzerinden teslim eder.",
-
     "tool.watchTorrentsIos.about.steps.title": "iPhone veya iPad'de torrentler nasıl izlenir",
     "tool.watchTorrentsIos.about.steps.subtitle": "iOS'ta torrent videoları 3&nbsp;basit adımda stream et — uygulama gerekmez.",
     "tool.watchTorrentsIos.about.steps.step1.title": "Safari'de aç",
@@ -909,7 +869,6 @@
     "tool.watchTorrentsIos.about.formats.item4": "Codec paketi veya ek uygulama gerekmez",
     "tool.watchTorrentsIos.about.safety.title": "iOS'ta torrent izlemek güvenli mi?",
     "tool.watchTorrentsIos.about.safety.text": "iOS'ta <strong>Webtor.io</strong> ile torrent stream ettiğinde, iPhone veya iPad'in torrent sürüsüne doğrudan bağlanmaz. Torrent verileri sunucu tarafında işlenir ve HTTPS üzerinden video streami olarak teslim edilir. İhtiyacın olan tek şey Safari ve bir magnet linki veya torrent dosyası.",
-
     "tool.watchTorrentsOnline.about.steps.title": "Webtor.io ile online torrentler nasıl izlenir",
     "tool.watchTorrentsOnline.about.steps.subtitle": "Torrent içeriğini 3&nbsp;basit adımda online stream et — indirme veya torrent istemcisi gerekmez.",
     "tool.watchTorrentsOnline.about.steps.step1.title": "Yükle veya yapıştır",
@@ -935,16 +894,12 @@
     "tool.watchTorrentsOnline.about.devices.item2": "Android telefonlar ve tabletler",
     "tool.watchTorrentsOnline.about.devices.item3": "Safari ile iPhone ve iPad",
     "tool.watchTorrentsOnline.about.devices.item4": "Stremio entegrasyonu ile akıllı TV'ler",
-
     "resource.preparingDownload": "İndirme hazırlanıyor",
-
     "profile.stremio.copied": "Kopyalandı!",
-
     "instructions.guide": "Kılavuz",
     "instructions.note": "Not:",
     "instructions.important": "Önemli:",
     "instructions.paidOnly": "Bu özellik yalnızca <strong>ücretli kullanıcılar</strong> için kullanılabilir.",
-
     "instructions.stremio.title": "Stremio entegrasyonu",
     "instructions.stremio.heading": "Webtor'u Stremio'ya nasıl bağlanır",
     "instructions.stremio.intro": "Kişisel torrent kütüphaneni doğrudan Stremio'da Webtor'dan stream edebilirsin. İşte nasıl yapılacağı:",
@@ -954,7 +909,6 @@
     "instructions.stremio.step4": "Addon linkini yapıştır ve Enter'a bas. Bitti!",
     "instructions.stremio.result": "Yüklendikten sonra, kütüphanen Stremio'da <strong>Webtor.io</strong> addon'u altında görünecek — stream etmeye hazır.",
     "instructions.stremio.noteWarmup": "Webtor üzerinden streaming, normal Stremio addonlarından farklı olabilir. Oynatma başlamadan önce torrenti ısıtmak biraz zaman alabilir.",
-
     "instructions.stremioAddon.title": "Stremio addon'u nasıl bağlanır",
     "instructions.stremioAddon.heading": "Stremio addon'u nasıl bağlanır",
     "instructions.stremioAddon.intro": "Stremio deneyimine daha fazla içerik eklemek mi istiyorsun? Streaming kütüphaneni genişletmek için harici Stremio addonlarını bağlamak için bu basit adımları izle:",
@@ -964,7 +918,6 @@
     "instructions.stremioAddon.step4": "URL'yi <a href='{{.ProfileURL}}' class='text-w-pinkL hover:underline'>profil sayfandaki</a> \"Stremio Addons\" bölümüne yapıştır ve \"Add Addon\"a tıkla",
     "instructions.stremioAddon.result": "Eklendiğinde, addon içeriği Stremio entegrasyonun aracılığıyla kullanılabilir hale gelecek ve streaming seçeneklerini ek kaynaklar ve kataloglarla genişletecek.",
     "instructions.stremioAddon.noteGathering": "Streaming URL'lerini toplamak biraz zaman alabilir (10 saniyeye kadar). Sabırlı ol.",
-
     "instructions.webdav.title": "WebDAV entegrasyonu",
     "instructions.webdav.heading": "Webtor'u WebDAV ile nasıl bağlanır",
     "instructions.webdav.intro": "Torrent kütüphanene normal bir klasör gibi eriş. WebDAV ile favori uygulamalarından doğrudan dosyalarını gözden geçirebilir, stream edebilir ve yönetebilirsin.",
@@ -982,7 +935,6 @@
     "instructions.webdav.folderMovies": "<strong>movies/</strong> – Tüm tanınan filmler (salt okunur)",
     "instructions.webdav.folderSeries": "<strong>series/</strong> – TV şovları ve bölümler (salt okunur)",
     "instructions.webdav.notePaid": "WebDAV erişimi yalnızca <strong>ücretli kullanıcılar</strong> için kullanılabilir.",
-
     "instructions.vault.title": "Vault",
     "instructions.vault.intro": "Vault, Webtor'da şunları yapmana izin veren bir depolama sistemidir:",
     "instructions.vault.feature1": "torrentleri uzun süre kaydet,",
@@ -1005,7 +957,6 @@
     "instructions.vault.expireItem1": "Torrentlere yatırılan puanlar gücünü kaybeder ve torrent süresi dolmuş olarak işaretlenir ve <strong>{{.ExpirePeriod}}</strong> sonra silinir.",
     "instructions.vault.expireItem2": "Abonelik yenilenirse, puanlar tekrar aktif hale gelir ve onlarla finanse edilen torrentler artık süresi dolmuş olmaz.",
     "instructions.vault.disclaimer": "Bir torrent telif hakkı sahipleri tarafından engellenirse veya genel kaynaklardan kaldırılırsa, kaybolabilir – Vault bu gibi durumlarda korunmayı garanti etmez.",
-
     "aboutPage.title": "Hakkında — Misyon ve açık kaynak",
     "aboutPage.description": "Webtor, tarayıcı tabanlı, açık kaynak bir torrent platformudur. Torrentleri herkese erişilebilir, gizli ve kullanımı kolay yapma misyonumuzu öğren — yükleme gerekmez.",
     "aboutPage.badge": "Hakkında",
@@ -1020,7 +971,6 @@
     "aboutPage.osP2": "Şeffaflığın güven inşa ettiğine inanıyoruz. Kodu inceleyebilir, sorunları bildirebilir, özellikler önerebilir veya doğrudan katkıda bulunabilirsin.",
     "aboutPage.ctaText": "Denemeye hazır mısın?",
     "aboutPage.ctaButton": "Webtor'u dene",
-
     "time.now": "az önce",
     "time.seconds": "%v saniye önce",
     "time.minute": "1 dakika önce",
@@ -1035,7 +985,6 @@
     "time.months": "%v ay önce",
     "time.year": "1 yıl önce",
     "time.years": "%v yıl önce",
-
     "error.forbidden": "Bu içerik hak sahibinin talebi üzerine engellenmiştir.",
     "error.not_found": "Kaynak bulunamadı.",
     "error.service_unavailable": "Hizmet geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",

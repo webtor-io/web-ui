@@ -6,21 +6,55 @@
         var curlCmd = `curl -o "${file}" -C - --retry 20 "${url}"`;
     </script>
     {{- if .Data.HasAds }}
-    <pre class="warn-summary"><span>{{ tp $.Lang "action.download.speedLimit" "Rate" .Claims.Claims.Connection.Rate }}<a href="/donate" data-umami-event="donate-download" class="link" target="_blank">{{ t $.Lang "action.download.donate" }}</a></span></pre>
-    {{- end }}
-    <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end">
-        {{- if .Data.HasAds }}
-        <a class="btn btn-sm btn-soft uppercase flex-grow" data-umami-event="donate-download" href="/donate" target="_blank">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+    {{ $isFree := eq .Data.TierName "free" }}
+    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-center gap-4 flex-wrap">
+        <div class="flex items-start gap-3 flex-1 min-w-[240px]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
             </svg>
-            {{ t $.Lang "action.download.donate" }}
+            <div class="min-w-0">
+                <div class="text-sm font-semibold text-base-content leading-snug">{{ tp $.Lang "action.download.limitedTitle" "Rate" .Claims.Claims.Connection.Rate }}</div>
+                <div class="text-xs text-w-muted mt-0.5">{{ t $.Lang "action.download.limitedSub" }}</div>
+            </div>
+        </div>
+        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-download" data-umami-event-tier="{{ .Data.TierName }}" href="/donate" target="_blank">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            </svg>
+            {{ if $isFree }}{{ t $.Lang "action.upgrade.free" }}{{ else }}{{ t $.Lang "action.upgrade.paid" }}{{ end }}
         </a>
-        {{- end }}
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">{{ t $.Lang "action.download.copyWget" }}</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">{{ t $.Lang "action.download.copyCurl" }}</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">{{ t $.Lang "action.download.copyUrl" }}</a>
-        <a class="btn btn-sm btn-soft-cyan closeable-close" download href="{{ .Data.URL }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">{{ t $.Lang "action.download.startDownload" }}</a>
-        <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content closeable-close">{{ t $.Lang "action.download.cancel" }}</a>
+    </div>
+    {{- end }}
+    <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
+        <div class="flex flex-wrap gap-1.5 mr-auto">
+            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                wget
+            </a>
+            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                curl
+            </a>
+            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                URL
+            </a>
+        </div>
+        <a class="btn btn-sm btn-ghost text-w-muted closeable-close">{{ t $.Lang "action.download.cancel" }}</a>
+        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" download href="{{ .Data.URL }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            {{ t $.Lang "action.download.startDownload" }}
+        </a>
     </div>
 {{ end }}

@@ -8,7 +8,6 @@
     "nav.profile": "Profil",
     "nav.login": "Přihlásit",
     "nav.donate": "Přispět",
-
     "footer.tools": "Nástroje",
     "footer.resources": "Zdroje",
     "footer.about": "O nás",
@@ -23,7 +22,6 @@
     "footer.description": "Open-source torrentová platforma v prohlížeči. Streamuj, stahuj a spravuj torrenty bez instalace čehokoliv.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.filmData": "Data o filmech od",
-
     "home.title": "Online torrentová platforma — Streamování a stahování v prohlížeči",
     "home.description": "Webová torrentová platforma pro streamování a stahování vlastních torrentů přímo v prohlížeči. Žádný software. Bezpečné cloudové zpracování a úložiště.",
     "home.ogTitle": "Webtor.io — Streamuj a stahuj torrenty v prohlížeči",
@@ -44,12 +42,10 @@
     "home.speedTest": "Test rychlosti",
     "home.gotIt": "rozumím!",
     "home.ok": "ok",
-
     "about.stats.torrents": "Zpracovaných torrentů",
     "about.stats.countries": "Zemí",
     "about.stats.openSource": "Open-source",
     "about.stats.software": "Software k instalaci",
-
     "about.how.badge": "Jak to funguje",
     "about.how.title": "Tři kroky. Tečka.",
     "about.how.subtitle": "Z magnet linku ke streamovanému videu nebo přímému stažení za méně než minutu.",
@@ -59,7 +55,6 @@
     "about.how.step2.text": "Procházej obsah torrentu a vyber soubor pro streamování nebo stažení.",
     "about.how.step3.title": "Streamuj nebo stáhni",
     "about.how.step3.text": "Sleduj video okamžitě v zabudovaném přehrávači nebo získej přímý HTTP odkaz ke stažení.",
-
     "about.features.badge": "Funkce",
     "about.features.title": "Vše co potřebuješ, nic navíc",
     "about.features.subtitle": "Kompletní torrentová sada nástrojů běžící zcela v cloudu a tvém prohlížeči.",
@@ -83,7 +78,6 @@
     "about.features.chrome.text": "Nainstaluj rozšíření a každý torrent nebo magnet link na který klikneš se automaticky otevře ve Webtoru.",
     "about.features.sdk.title": "SDK pro vývojáře",
     "about.features.sdk.text": "Vlož torrent streaming přehrávač na svůj web pomocí našeho open-source JavaScript SDK.",
-
     "about.faq.badge": "FAQ",
     "about.faq.title": "Časté otázky",
     "about.faq.subtitle": "Rychlé odpovědi na nejčastější otázky.",
@@ -114,11 +108,9 @@
     "about.faq.speed.q": "Proč je moje rychlost stahování nebo streamování pomalá na Webtor.io?",
     "about.faq.speed.a1": "Rychlosti se mohou lišit kvůli počtu seederů, formátu souboru (některé vyžadují transkódování v reálném čase), tvému internetovému připojení, aktuální zátěži serveru a typu účtu. Premium uživatelé mají vyšší šířku pásma.",
     "about.faq.speed.a2": "Poznámka: šířka pásma se měří v Mbps (megabity za sekundu), zatímco velikosti souborů se zobrazují v MB (megabajty). 1 MB = 8 Mb, takže 50 Mbps připojení dává zhruba 6,25 MB/s rychlosti stahování. Podpora projektu pomáhá odemknout lepší rychlost a spolehlivost.",
-
     "about.cta.title": "Připraven vyzkoušet?",
     "about.cta.subtitle": "Žádná registrace. Vlož magnet link a začni streamovat za pár sekund.",
     "about.cta.button": "Spustit Webtor",
-
     "auth.login.title": "Přihlášení",
     "auth.login.subtitle": "Vyber metodu pro přístup ke svému účtu",
     "auth.login.libraryNote": "Pro přístup ke knihovně je vyžadována autorizace.",
@@ -142,7 +134,6 @@
     "auth.verify.next": "Další",
     "auth.refresh.title": "Obnovit token",
     "auth.gotIt": "rozumím!",
-
     "auth.progress.loggingOut": "odhlašuji",
     "auth.progress.logoutSuccessful": "odhlášení úspěšné",
     "auth.progress.logoutFailed": "odhlášení selhalo, zkus se znovu přihlásit",
@@ -158,7 +149,6 @@
     "auth.progress.redirectingTo": "přesměrovávám na %v",
     "auth.progress.redirectFailed": "nepodařilo se přesměrovat na %v",
     "auth.progress.unknownError": "neznámá chyba",
-
     "profile.badge": "Profil",
     "profile.title": "Tvůj profil",
     "profile.subtitle": "Spravuj nastavení účtu, integrace a předvolby.",
@@ -167,18 +157,15 @@
     "profile.logout": "Odhlásit",
     "profile.deleteAccount": "Smazat účet",
     "profile.deleteConfirm": "Jsi si jistý, že chceš smazat svůj účet? Tuto akci nelze vrátit. Všechna tvoje data, nastavení a integrace budou trvale odstraněny.",
-
     "profile.tier.unlimited": "Neomezená šířka pásma",
     "profile.tier.mbps": "Mbps",
     "profile.tier.adsEnabled": "Reklamy povoleny",
     "profile.tier.adFree": "Bez reklam",
-
     "profile.stremio.addonUrl": "URL addonu",
     "profile.stremio.generate": "Vygenerovat URL addonu",
     "profile.stremio.copyUrl": "Zkopírovat URL",
     "profile.stremio.howTo": "Jak se připojit ke Stremio?",
     "profile.stremio.install": "Nainstalovat ve Stremio",
-
     "profile.webdav.title": "WebDAV",
     "profile.webdav.generate": "Vygenerovat WebDAV URL",
     "profile.webdav.copyUrl": "Zkopírovat URL",
@@ -186,7 +173,6 @@
     "profile.webdav.howTo": "Jak se připojit přes WebDAV?",
     "profile.webdav.premiumOnly": "WebDAV integrace je dostupná pro premium uživatele.",
     "profile.webdav.upgrade": "Upgraduj svůj plán pro odemknutí!",
-
     "profile.addons.title": "Addony",
     "profile.addons.placeholder": "Zadej URL manifestu Stremio addonu (např. https://example.com/manifest.json)",
     "profile.addons.validation": "Zadej platnou URL Stremio addon manifestu končící na manifest.json",
@@ -201,7 +187,6 @@
     "profile.addons.save": "Uložit",
     "profile.addons.deleteConfirm": "Jsi si jistý, že chceš smazat tento addon?\n\n%v",
     "profile.addons.deleted": "Addon smazán",
-
     "profile.embedDomains.title": "Domény pro embed",
     "profile.embedDomains.placeholder": "Zadej doménu (např. example.com)",
     "profile.embedDomains.validation": "Zadej platný název domény",
@@ -212,7 +197,6 @@
     "profile.embedDomains.learnSdk": "Více o embed-sdk-js",
     "profile.embedDomains.wordpressPlugin": "Vyzkoušej i wordpress-plugin",
     "profile.embedDomains.deleteConfirm": "Jsi si jistý, že chceš smazat tuto doménu?",
-
     "profile.backends.title": "Streamovací backendy",
     "profile.backends.selectType": "Vyber typ backendu",
     "profile.backends.enterToken": "Zadej API token",
@@ -231,7 +215,6 @@
     "profile.backends.save": "Uložit",
     "profile.backends.deleteConfirm": "Jsi si jistý, že chceš smazat tento backend %v?",
     "profile.backends.deleted": "Backend smazán",
-
     "profile.settings.title": "Nastavení",
     "profile.settings.resolutions": "Preferovaná rozlišení",
     "profile.settings.dragHint": "Přetáhni pro změnu pořadí podle preferencí",
@@ -239,7 +222,6 @@
     "profile.settings.discoverOnlyDesc": "Při povolení se tvé nakonfigurované addony používají pouze na stránce Discover pro procházení a přidávání obsahu do knihovny. Aplikace Stremio bude zobrazovat streamy pouze z tvé Knihovny — torrenty které jsi již přidal.",
     "profile.settings.discoverOnlyHint": "Užitečné, když procházíš a sbíráš obsah přes Discover na webu, pak ho přehráváš na TV přes Stremio bez dalších výsledků addonů zaplňujících seznam.",
     "profile.settings.save": "Uložit",
-
     "profile.vault.title": "Vault Points",
     "profile.vault.total": "Celkem",
     "profile.vault.available": "Dostupné",
@@ -247,12 +229,10 @@
     "profile.vault.frozen": "Zmrazené",
     "profile.vault.whatIs": "Co je Vault?",
     "profile.vault.pledges": "Závazky",
-
     "discover.badge": "Discover",
     "discover.title": "Discover",
     "discover.subtitle": "Procházej filmy a seriály z Cinemety a tvých Stremio addonů.",
     "discover.seeMore": "Více",
-
     "library.badge": "Knihovna",
     "library.title": "Tvoje knihovna",
     "library.subtitle": "Tvé uložené torrenty, filmy a seriály — všechno na jednom místě.",
@@ -282,7 +262,6 @@
     "library.sort.rating": "Hodnocení",
     "library.sort.unknown": "Neznámé",
     "library.continueWatching": "Pokračovat ve sledování",
-
     "resource.movie": "Film",
     "resource.series": "Seriál",
     "resource.torrent": "Torrent",
@@ -300,7 +279,6 @@
     "resource.status.cached": "V keši",
     "resource.status.vaulting": "Ukládá se do Vault",
     "resource.status.vaulted": "Ve Vault",
-
     "vault.supporting": "Podporuješ tento torrent",
     "vault.keepAvailable": "Zachovat tento torrent dostupný",
     "vault.error": "Bohužel tvůj závazek nemohl být uložen kvůli chybě:",
@@ -326,7 +304,6 @@
     "vault.removeError": "Bohužel tvůj závazek nemohl být odebrán kvůli chybě:",
     "vault.frozen": "Tvé Vault Points jsou momentálně zmrazené a zatím nemohou být odebrány. Vrať se prosím později, až vyprší období zmrazení.",
     "vault.removeConfirm": "Jsi si jistý, že chceš odebrat svůj závazek pro tento torrent? Tuto akci nelze vrátit.",
-
     "vault.pledges.badge": "Závazky Vaultu",
     "vault.pledges.title": "Tvoje závazky",
     "vault.pledges.subtitle": "Zobraz a spravuj své závazky Vault Points napříč torrenty.",
@@ -343,9 +320,6 @@
     "vault.pledges.expiringDesc": "Závazek již není podpořen body (stane se, když vyprší předplatné nebo se sníží úroveň). Obsah s takovými závazky může být odebrán z Vaultu",
     "vault.pledges.claimableDesc": "Body, které lze získat zpět. Po vyzvednutí může být obsah, ke kterému byly závazky, odebrán",
     "vault.pledges.backToProfile": "Zpět na profil",
-
-    "action.download.speedLimit": "Tvoje aktuální rychlost stahování bude omezena na {{.Rate}} Mbps, přispěj pro zvýšení rychlosti a odstranění reklam!",
-    "action.download.donate": "přispět",
     "action.download.copyWget": "kopírovat příkaz wget",
     "action.download.copyCurl": "kopírovat příkaz curl",
     "action.download.copyUrl": "kopírovat url",
@@ -353,23 +327,27 @@
     "action.download.downloadStarting": "Spouští se stahování...",
     "action.download.cancel": "zrušit",
     "action.download.copied": "Zkopírováno!",
-
-    "action.noPeers.title": "důležitá poznámka:",
-    "action.noPeers.noSeeders": "tento torrent nemá momentálně žádné aktivní zdroje (seedery)",
-    "action.noPeers.notPossible": "stahování a streamování nyní nejsou možné",
-    "action.noPeers.trySearhing": "zkus prosím vyhledat jiný torrent s více peery",
-    "action.noPeers.gotIt": "Rozumím!",
-
-    "action.slow.notPossible": "streamování není možné",
-    "action.slow.planLimit": "tvůj plán ({{.Tier}}) omezuje rychlost na {{.Rate}} Mbps",
-    "action.slow.fileRequires": "tento soubor vyžaduje minimálně {{.Rate}} Mbps pro plynulé přehrávání",
-    "action.slow.upgrade": "upgradovat tvůj plán",
-    "action.slow.tooSlow": "streamování není možné — rychlost stahování je příliš nízká",
-    "action.slow.speedInfo": "rychlost stahování: {{.Measured}} Mbps, vyžadováno: {{.Required}} Mbps",
-    "action.slow.suggestions": "zkus menší soubor, předem stáhnout, použít Vault nebo najít torrent s více seedery",
-    "action.slow.upgradePlan": "upgradovat plán",
-    "action.slow.gotIt": "Rozumím!",
-
+    "action.download.limitedTitle": "Stahování rychlostí {{.Rate}} Mbps",
+    "action.download.limitedSub": "Předplatné odstraní limit a reklamy",
+    "action.noPeers.title": "Tento torrent teď nemá žádné aktivní seedery",
+    "action.noPeers.vaultPitch": "Vault uloží torrent a stáhne ho, jakmile se objeví seeder — v každém placeném plánu.",
+    "action.noPeers.vaultUse": "Ulož torrent do Vaultu — stáhne soubor, jakmile se objeví seeder.",
+    "action.noPeers.altSearch": "nebo zkus jiný torrent s více seedery",
+    "action.noPeers.gotIt": "Rozumím",
+    "action.slow.title.rateLimited": "Nedostatečná rychlost pro plynulé přehrávání",
+    "action.slow.title.bandwidth": "Rychlost stahování je příliš nízká pro streamování",
+    "action.slow.youHave": "máš",
+    "action.slow.fileNeeds": "soubor potřebuje",
+    "action.slow.unit": "Mbps",
+    "action.slow.alts.upgrade": "Bez upgradu:",
+    "action.slow.alts.bandwidth": "Co můžeš udělat:",
+    "action.slow.alt.smallerOrSeeders": "vyber menší soubor nebo s více seedery",
+    "action.slow.alt.smallerFile": "vyber menší soubor",
+    "action.slow.alt.preDownload": "nejdřív stáhni, pak sleduj",
+    "action.slow.alt.vault": "ulož do Vaultu — sám si to natáhne",
+    "action.slow.gotIt": "Rozumím",
+    "action.upgrade.free": "Získat 50 Mbps",
+    "action.upgrade.paid": "Upgradovat plán",
     "action.stream.audio": "Audio",
     "action.stream.subtitles": "Titulky",
     "action.stream.close": "Zavřít",
@@ -384,7 +362,6 @@
     "action.stream.mySubtitles.formats": "SRT, VTT nebo ASS, do 5 MB",
     "action.stream.mySubtitles.delete": "Smazat",
     "action.stream.mySubtitles.limitReached": "Dosáhli jste limitu 10 titulků pro tento soubor. Smažte jeden pro nahrání dalších.",
-
     "player.play": "Přehrát",
     "player.pause": "Pauza",
     "player.mute": "Ztlumit",
@@ -398,7 +375,6 @@
     "player.copied": "Zkopírováno!",
     "player.continueFrom": "Pokračovat od %v",
     "player.startOver": "Spustit od začátku",
-
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",
@@ -420,7 +396,6 @@
     "job.downloading": "stahuji {{.Bytes}}",
     "job.waitingForPeers": "čekám na peery",
     "job.peers": "{{.Peers}} peerů",
-
     "toast.domainAdded": "Doména přidána",
     "toast.domainDeleted": "Doména smazána",
     "toast.addedToLibrary": "Přidáno do knihovny",
@@ -439,7 +414,6 @@
     "toast.removedFromVault": "Odebráno z vault",
     "toast.user_subtitle.uploaded": "Titulky nahrány",
     "toast.user_subtitle.deleted": "Titulky smazány",
-
     "speedtest.badge": "Test rychlosti",
     "speedtest.title": "Test rychlosti připojení",
     "speedtest.subtitle": "Změř svou rychlost stahování ze serverů Webtor a zjisti jakou kvalitu videa můžeš streamovat bez bufferování.",
@@ -465,7 +439,6 @@
     "speedtest.copied": "Zkopírováno!",
     "speedtest.titleResult": "Test rychlosti — %v Mbps",
     "speedtest.descResult": "Rychlost tvého Webtor připojení: %v Mbps.",
-
     "support.badge": "Podpora",
     "support.title": "Centrum nápovědy",
     "support.subtitle": "Máš otázku, našel jsi chybu nebo potřebuješ nahlásit obsah? Vyplň formulář níže a my se ozveme.",
@@ -483,7 +456,6 @@
     "support.submit": "Odeslat",
     "support.successMessage": "Tvá zpráva byla úspěšně odeslána!",
     "support.sendAnother": "Poslat další",
-
     "discover.search": "Hledat filmy a seriály...",
     "discover.loadMore": "Načíst více",
     "discover.loadingCatalogs": "Načítám katalogy...",
@@ -579,7 +551,6 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Ostatní",
-
     "discover.streamsFound": "Nalezeno streamů: %v",
     "discover.streamsFiltered": "%v z %v streamů",
     "discover.noStreams": "Pro tento titul nejsou k dispozici žádné streamy.",
@@ -595,7 +566,6 @@
     "discover.noEpisodes": "Nebyly nalezeny žádné epizody.",
     "discover.specials": "Speciály",
     "discover.episodeLabel": "Epizoda %v",
-
     "tool.torrentToDdl.title": "Torrent → DDL",
     "tool.torrentToDdl.benefit": "Převést torrent na přímý odkaz ke stažení",
     "tool.torrentToDdl.description": "Převeď torrenty na přímé odkazy ke stažení v prohlížeči. Stahuj soubory z torrentů s cloudovým zpracováním a bez lokálního klienta.",
@@ -626,7 +596,6 @@
     "tool.torrentPlayer.title": "Online torrent přehrávač",
     "tool.torrentPlayer.benefit": "Přehraj libovolné torrent video v prohlížeči",
     "tool.torrentPlayer.description": "Bezplatný online torrent přehrávač, který přehrává video soubory z torrentů přímo v prohlížeči. Podporuje MKV, AVI, MP4, WEBM a další s transkódováním v reálném čase.",
-
     "tool.about.badges.howItWorks": "Jak to funguje",
     "tool.about.badges.explained": "Vysvětleno",
     "tool.about.badges.comparison": "Srovnání",
@@ -636,7 +605,6 @@
     "tool.about.badges.benefits": "Výhody",
     "tool.about.badges.devices": "Zařízení",
     "tool.about.badges.formats": "Formáty",
-
     "tool.torrentToDdl.about.steps.title": "Jak stáhnout torrenty s Webtor.io",
     "tool.torrentToDdl.about.steps.subtitle": "Převeď svůj torrent soubor nebo magnet link na přímý odkaz ke stažení ve 3&nbsp;jednoduchých krocích — bez torrent klienta.",
     "tool.torrentToDdl.about.steps.step1.title": "Najdi svůj torrent",
@@ -670,7 +638,6 @@
     "tool.torrentToDdl.about.video.item3": "Mobilní zařízení a tablety",
     "tool.torrentToDdl.about.video.item4": "Rychlé náhledy před stažením",
     "tool.torrentToDdl.about.video.footer": "Pokud tvůj torrent obsahuje video, streamování je obvykle rychlejší a pohodlnější než stahování všeho dopředu.",
-
     "tool.magnetToDdl.about.steps.title": "Jak stáhnout magnety s Webtor.io",
     "tool.magnetToDdl.about.steps.subtitle": "Převeď svůj magnet link na přímý odkaz ke stažení ve 3&nbsp;jednoduchých krocích — bez torrent klienta.",
     "tool.magnetToDdl.about.steps.step1.title": "Zkopíruj svůj magnet link",
@@ -704,7 +671,6 @@
     "tool.magnetToDdl.about.video.item3": "Mobilní zařízení a tablety",
     "tool.magnetToDdl.about.video.item4": "Rychlé náhledy před stažením",
     "tool.magnetToDdl.about.video.footer": "Pokud tvůj magnet link odkazuje na video obsah, streamování je obvykle rychlejší a pohodlnější než stahování všeho dopředu.",
-
     "tool.magnetToTorrent.about.steps.title": "Jak převést magnety na torrenty s Webtor.io",
     "tool.magnetToTorrent.about.steps.subtitle": "Převeď svůj magnet link na .torrent soubor ve 3&nbsp;jednoduchých krocích — bez torrent klienta.",
     "tool.magnetToTorrent.about.steps.step1.title": "Zkopíruj svůj magnet link",
@@ -737,7 +703,6 @@
     "tool.magnetToTorrent.about.useCases.item4": "Náhled seznamu souborů před stažením",
     "tool.magnetToTorrent.about.safety.title": "Je magnet na torrent bezpečný? Potřebuju VPN?",
     "tool.magnetToTorrent.about.safety.text": "Převod magnet linku na torrent soubor nevyžaduje připojení k torrent roji z tvého zařízení. Řešení metadat probíhá na serverové straně, což činí proces jednodušším a bezpečnějším pro uživatele. Veškerý provoz jde přes HTTPS, takže VPN není potřeba.",
-
     "tool.onlineTorrentDownloader.about.steps.title": "Jak stáhnout torrenty s Webtor.io",
     "tool.onlineTorrentDownloader.about.steps.subtitle": "Převeď svůj torrent soubor nebo magnet link na přímý odkaz ke stažení ve 3&nbsp;jednoduchých krocích — bez torrent klienta.",
     "tool.onlineTorrentDownloader.about.steps.step1.title": "Najdi svůj torrent",
@@ -771,7 +736,6 @@
     "tool.onlineTorrentDownloader.about.safety.title": "Stahování vs streamování torrentů online",
     "tool.onlineTorrentDownloader.about.safety.p1": "S online torrent downloaderem můžeš buď stahovat soubory, nebo streamovat video obsah přímo v prohlížeči.",
     "tool.onlineTorrentDownloader.about.safety.p2": "Streamování je často pohodlnější pro video torrenty, zatímco stahování je lepší, když potřebuješ uchovat soubory pro offline použití. Tak či onak se tvé zařízení nepřipojuje k torrent roji přímo — <strong>Webtor.io</strong> spravuje vše na serverové straně přes HTTPS.",
-
     "tool.streamTorrentOnline.about.steps.title": "Jak streamovat torrenty online s Webtor.io",
     "tool.streamTorrentOnline.about.steps.subtitle": "Streamuj libovolné torrent video přímo v prohlížeči ve 3&nbsp;jednoduchých krocích — žádný software k instalaci, žádné soubory ke stažení.",
     "tool.streamTorrentOnline.about.steps.step1.title": "Přidej svůj torrent",
@@ -797,7 +761,6 @@
     "tool.streamTorrentOnline.about.devices.item2": "Android telefony a tablety",
     "tool.streamTorrentOnline.about.devices.item3": "iPhone a iPad přes Safari nebo Chrome",
     "tool.streamTorrentOnline.about.devices.item4": "Chytré TV přes integraci se Stremio",
-
     "tool.torrentPlayer.about.steps.title": "Jak přehrávat torrent videa online s Webtor.io",
     "tool.torrentPlayer.about.steps.subtitle": "Přehraj libovolné video z torrentu přímo v prohlížeči ve 3&nbsp;jednoduchých krocích — žádný desktopový přehrávač nebo torrent klient.",
     "tool.torrentPlayer.about.steps.step1.title": "Načti svůj torrent",
@@ -823,7 +786,6 @@
     "tool.torrentPlayer.about.devices.item2": "Android telefony a tablety",
     "tool.torrentPlayer.about.devices.item3": "iPhone a iPad přes Safari nebo Chrome",
     "tool.torrentPlayer.about.devices.item4": "Chromebooky a méně výkonná zařízení",
-
     "tool.torrentToStream.about.steps.title": "Jak převést torrent na HLS stream s Webtor.io",
     "tool.torrentToStream.about.steps.subtitle": "Proměň libovolný torrent na streamovatelné HLS video ve 3&nbsp;jednoduchých krocích — cloudové transkódování v reálném čase, žádné stažení.",
     "tool.torrentToStream.about.steps.step1.title": "Poskytni torrent",
@@ -849,7 +811,6 @@
     "tool.torrentToStream.about.devices.item2": "Android a iOS mobilní zařízení",
     "tool.torrentToStream.about.devices.item3": "Stremio a další HLS-kompatibilní přehrávače",
     "tool.torrentToStream.about.devices.item4": "Chytré TV a streamovací boxy",
-
     "tool.torrentToZip.about.steps.title": "Jak stáhnout torrenty jako ZIP s Webtor.io",
     "tool.torrentToZip.about.steps.subtitle": "Stáhni obsah svého torrentu jako ZIP archiv ve 3&nbsp;jednoduchých krocích — bez torrent klienta.",
     "tool.torrentToZip.about.steps.step1.title": "Najdi svůj torrent",
@@ -882,7 +843,6 @@
     "tool.torrentToZip.about.safety.title": "Kdy je torrent na ZIP nejlepší volbou?",
     "tool.torrentToZip.about.safety.p1": "Torrent na ZIP je nejlepší volbou, když je pohodlí důležitější než rychlost nebo selektivní stahování. Funguje obzvláště dobře pro torrenty s mnoha malými soubory, softwarové distribuce nebo datasety, stahování na telefonech a tabletech a případy, kdy potřebuješ jeden čistý archiv.",
     "tool.torrentToZip.about.safety.p2": "Tvé zařízení se nepřipojuje k torrent roji přímo — <strong>Webtor.io</strong> spravuje vše na serverové straně a doručuje ZIP přes HTTPS.",
-
     "tool.watchTorrentsIos.about.steps.title": "Jak sledovat torrenty na iPhone nebo iPad",
     "tool.watchTorrentsIos.about.steps.subtitle": "Streamuj torrent videa na iOS ve 3&nbsp;jednoduchých krocích — žádné aplikace.",
     "tool.watchTorrentsIos.about.steps.step1.title": "Otevři v Safari",
@@ -909,7 +869,6 @@
     "tool.watchTorrentsIos.about.formats.item4": "Žádné kodekové balíčky ani další aplikace",
     "tool.watchTorrentsIos.about.safety.title": "Je bezpečné sledovat torrenty na iOS?",
     "tool.watchTorrentsIos.about.safety.text": "Když streamuješ torrenty na iOS s <strong>Webtor.io</strong>, tvůj iPhone nebo iPad se nepřipojuje přímo k torrent roji. Torrent data jsou zpracována na serverové straně a doručena jako video stream přes HTTPS. Vše co potřebuješ je Safari a magnet link nebo torrent soubor.",
-
     "tool.watchTorrentsOnline.about.steps.title": "Jak sledovat torrenty online s Webtor.io",
     "tool.watchTorrentsOnline.about.steps.subtitle": "Streamuj torrent obsah online ve 3&nbsp;jednoduchých krocích — žádné stahování ani torrent klient.",
     "tool.watchTorrentsOnline.about.steps.step1.title": "Nahraj nebo vlož",
@@ -935,16 +894,12 @@
     "tool.watchTorrentsOnline.about.devices.item2": "Android telefony a tablety",
     "tool.watchTorrentsOnline.about.devices.item3": "iPhone a iPad přes Safari",
     "tool.watchTorrentsOnline.about.devices.item4": "Chytré TV přes integraci se Stremio",
-
     "resource.preparingDownload": "Připravuji stažení",
-
     "profile.stremio.copied": "Zkopírováno!",
-
     "instructions.guide": "Průvodce",
     "instructions.note": "Poznámka:",
     "instructions.important": "Důležité:",
     "instructions.paidOnly": "Tato funkce je dostupná pouze pro <strong>platící uživatele</strong>.",
-
     "instructions.stremio.title": "Integrace se Stremio",
     "instructions.stremio.heading": "Jak připojit Webtor ke Stremio",
     "instructions.stremio.intro": "Můžeš streamovat svou osobní torrent knihovnu z Webtoru přímo ve Stremio. Postup:",
@@ -954,7 +909,6 @@
     "instructions.stremio.step4": "Vlož addon link a stiskni Enter. Hotovo!",
     "instructions.stremio.result": "Po instalaci se tvá knihovna objeví ve Stremio pod addonem <strong>Webtor.io</strong> – připravená ke streamování.",
     "instructions.stremio.noteWarmup": "Streamování přes Webtor se může lišit od běžných Stremio addonů. Rozehřátí torrentu před začátkem přehrávání může chvíli trvat.",
-
     "instructions.stremioAddon.title": "Jak připojit Stremio Addon",
     "instructions.stremioAddon.heading": "Jak připojit Stremio Addon",
     "instructions.stremioAddon.intro": "Chceš přidat více obsahu do svého Stremio zážitku? Postupuj podle těchto jednoduchých kroků pro připojení externích Stremio addonů a rozšíření streamovací knihovny:",
@@ -964,7 +918,6 @@
     "instructions.stremioAddon.step4": "Vlož URL do sekce \"Stremio Addons\" na své <a href='{{.ProfileURL}}' class='text-w-pinkL hover:underline'>profilové stránce</a> a klikni na \"Add Addon\"",
     "instructions.stremioAddon.result": "Po přidání bude obsah addonu dostupný přes integraci Stremio, čímž rozšíříš své streamovací možnosti o další zdroje a katalogy.",
     "instructions.stremioAddon.noteGathering": "Sbírání streamovacích URL může chvíli trvat (až 10 sekund). Buď trpělivý.",
-
     "instructions.webdav.title": "Integrace WebDAV",
     "instructions.webdav.heading": "Jak připojit Webtor přes WebDAV",
     "instructions.webdav.intro": "Přistupuj ke své torrent knihovně jako k běžné složce. S WebDAV můžeš procházet, streamovat a spravovat své soubory přímo ze svých oblíbených aplikací.",
@@ -982,7 +935,6 @@
     "instructions.webdav.folderMovies": "<strong>movies/</strong> – Všechny rozpoznané filmy (pouze pro čtení)",
     "instructions.webdav.folderSeries": "<strong>series/</strong> – TV pořady a epizody (pouze pro čtení)",
     "instructions.webdav.notePaid": "WebDAV přístup je dostupný pouze pro <strong>platící uživatele</strong>.",
-
     "instructions.vault.title": "Vault",
     "instructions.vault.intro": "Vault je úložný systém ve Webtoru, který ti umožňuje:",
     "instructions.vault.feature1": "ukládat torrenty na dlouhou dobu,",
@@ -1005,7 +957,6 @@
     "instructions.vault.expireItem1": "Body, které byly investovány do torrentů, ztrácí svou sílu a torrent je označen jako vypršený a smazán po <strong>{{.ExpirePeriod}}</strong>.",
     "instructions.vault.expireItem2": "Pokud je předplatné obnoveno, body se znovu stanou aktivními a torrenty financované jimi již nejsou vypršené.",
     "instructions.vault.disclaimer": "Pokud je torrent zablokován držiteli autorských práv nebo odstraněn z veřejných zdrojů, může zmizet – Vault nezaručuje zachování v takových případech.",
-
     "aboutPage.title": "O nás — Mise & Open Source",
     "aboutPage.description": "Webtor je open-source torrentová platforma v prohlížeči. Seznam se s naší misí učinit torrenty přístupné, soukromé a snadno použitelné — bez instalací.",
     "aboutPage.badge": "O nás",
@@ -1020,7 +971,6 @@
     "aboutPage.osP2": "Věříme, že transparentnost buduje důvěru. Můžeš zkoumat kód, hlásit problémy, navrhovat funkce nebo přímo přispívat.",
     "aboutPage.ctaText": "Připraven vyzkoušet?",
     "aboutPage.ctaButton": "Vyzkoušet Webtor",
-
     "time.now": "právě teď",
     "time.seconds": "před %v sekundami",
     "time.minute": "před 1 minutou",
@@ -1035,7 +985,6 @@
     "time.months": "před %v měsíci",
     "time.year": "před 1 rokem",
     "time.years": "před %v lety",
-
     "error.forbidden": "Tento obsah byl zablokován na žádost držitele práv.",
     "error.not_found": "Zdroj nebyl nalezen.",
     "error.service_unavailable": "Služba je dočasně nedostupná. Zkuste to prosím později.",

@@ -392,8 +392,13 @@ func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, sc *Stre
 }
 
 type FileDownload struct {
-	URL    string
-	HasAds bool
+	URL      string
+	HasAds   bool
+	TierName string
+}
+
+type NoPeersData struct {
+	TierName string
 }
 
 func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
@@ -415,12 +420,19 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	j.DoneWithMessage(s.t("job.downloadReady"))
 	tpl := s.tb.Build("action/download_file").WithLayoutBody(`{{ template "main" . }}`)
 	hasAds := false
-	if c.Claims != nil && c.Claims.Claims != nil {
-		hasAds = !c.Claims.Claims.Site.NoAds
+	tierName := "free"
+	if c.Claims != nil {
+		if c.Claims.Claims != nil {
+			hasAds = !c.Claims.Claims.Site.NoAds
+		}
+		if c.Claims.Context != nil && c.Claims.Context.Tier != nil && c.Claims.Context.Tier.Name != "" {
+			tierName = c.Claims.Context.Tier.Name
+		}
 	}
 	str, err := tpl.ToString(c.WithData(&FileDownload{
-		URL:    de.URL,
-		HasAds: hasAds,
+		URL:      de.URL,
+		HasAds:   hasAds,
+		TierName: tierName,
 	}))
 	if err != nil {
 		return err
@@ -571,7 +583,11 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	}
 	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
 		tpl := s.tb.Build("action/errors/no_peers").WithLayoutBody(`{{ template "main" . }}`)
-		str, terr := tpl.ToString(s.c)
+		tierName := "free"
+		if s.c.Claims != nil && s.c.Claims.Context != nil && s.c.Claims.Context.Tier != nil && s.c.Claims.Context.Tier.Name != "" {
+			tierName = s.c.Claims.Context.Tier.Name
+		}
+		str, terr := tpl.ToString(s.c.WithData(&NoPeersData{TierName: tierName}))
 		if terr != nil {
 			return terr
 		}

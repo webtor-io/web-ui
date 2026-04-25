@@ -8,7 +8,6 @@
     "nav.profile": "Profiel",
     "nav.login": "Inloggen",
     "nav.donate": "Doneer",
-
     "footer.tools": "Tools",
     "footer.resources": "Bronnen",
     "footer.about": "Over ons",
@@ -23,7 +22,6 @@
     "footer.description": "Een open-source torrent platform in de browser. Stream, download en beheer torrents zonder iets te installeren.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.filmData": "Filmgegevens van",
-
     "home.title": "Online torrent platform — Stream & download in je browser",
     "home.description": "Webgebaseerd torrent platform om je eigen torrents direct in je browser te streamen en downloaden. Geen software nodig. Veilige cloud-verwerking en opslag.",
     "home.ogTitle": "Webtor.io — Stream & download torrents in je browser",
@@ -44,12 +42,10 @@
     "home.speedTest": "Snelheidstest",
     "home.gotIt": "begrepen!",
     "home.ok": "ok",
-
     "about.stats.torrents": "Verwerkte torrents",
     "about.stats.countries": "Landen",
     "about.stats.openSource": "Open-source",
     "about.stats.software": "Te installeren software",
-
     "about.how.badge": "Hoe het werkt",
     "about.how.title": "Drie stappen. Meer niet.",
     "about.how.subtitle": "Van magnetlink naar streaming video of directe download in minder dan een minuut.",
@@ -59,7 +55,6 @@
     "about.how.step2.text": "Blader door de torrent-inhoud en selecteer het bestand dat je wilt streamen of downloaden.",
     "about.how.step3.title": "Streamen of downloaden",
     "about.how.step3.text": "Bekijk video meteen in de ingebouwde speler, of pak een directe HTTP-downloadlink.",
-
     "about.features.badge": "Functies",
     "about.features.title": "Alles wat je nodig hebt, niets dat je niet nodig hebt",
     "about.features.subtitle": "Een complete torrent-toolkit die volledig in de cloud en je browser draait.",
@@ -83,7 +78,6 @@
     "about.features.chrome.text": "Installeer de extensie en elke torrent of magnetlink waarop je klikt opent automatisch in Webtor.",
     "about.features.sdk.title": "Developer SDK",
     "about.features.sdk.text": "Embed de torrent streaming-speler op je eigen site met onze open-source JavaScript SDK.",
-
     "about.faq.badge": "FAQ",
     "about.faq.title": "Veelgestelde vragen",
     "about.faq.subtitle": "Snelle antwoorden op de dingen die mensen het meest vragen.",
@@ -114,11 +108,9 @@
     "about.faq.speed.q": "Waarom is mijn download- of streamingsnelheid laag op Webtor.io?",
     "about.faq.speed.a1": "Snelheden kunnen variëren afhankelijk van het aantal seeders, bestandsformaat (sommige vereisen real-time transcoderen), je internetverbinding, huidige serverbelasting en je accounttype. Premium gebruikers krijgen hogere bandbreedte.",
     "about.faq.speed.a2": "Let op: bandbreedte wordt gemeten in Mbps (megabits per seconde), terwijl bestandsgroottes worden weergegeven in MB (megabytes). 1 MB = 8 Mb, dus een 50 Mbps verbinding geeft ongeveer 6,25 MB/s downloadsnelheid. Het project steunen helpt om betere snelheid en betrouwbaarheid te ontgrendelen.",
-
     "about.cta.title": "Klaar om te proberen?",
     "about.cta.subtitle": "Geen aanmelding nodig. Plak een magnetlink en begin binnen seconden te streamen.",
     "about.cta.button": "Start Webtor",
-
     "auth.login.title": "Inloggen",
     "auth.login.subtitle": "Kies een methode om in te loggen op je account",
     "auth.login.libraryNote": "Autorisatie is vereist om toegang te krijgen tot je bibliotheek.",
@@ -142,7 +134,6 @@
     "auth.verify.next": "Volgende",
     "auth.refresh.title": "Token vernieuwen",
     "auth.gotIt": "begrepen!",
-
     "auth.progress.loggingOut": "uitloggen",
     "auth.progress.logoutSuccessful": "uitloggen succesvol",
     "auth.progress.logoutFailed": "uitloggen mislukt, probeer opnieuw in te loggen",
@@ -158,7 +149,6 @@
     "auth.progress.redirectingTo": "doorverwijzen naar %v",
     "auth.progress.redirectFailed": "doorverwijzing naar %v mislukt",
     "auth.progress.unknownError": "onbekende fout",
-
     "profile.badge": "Profiel",
     "profile.title": "Je profiel",
     "profile.subtitle": "Beheer je accountinstellingen, integraties en voorkeuren.",
@@ -167,18 +157,15 @@
     "profile.logout": "Uitloggen",
     "profile.deleteAccount": "Account verwijderen",
     "profile.deleteConfirm": "Weet je zeker dat je je account wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. Al je gegevens, instellingen en integraties worden permanent verwijderd.",
-
     "profile.tier.unlimited": "Onbeperkte bandbreedte",
     "profile.tier.mbps": "Mbps",
     "profile.tier.adsEnabled": "Advertenties ingeschakeld",
     "profile.tier.adFree": "Advertentievrij",
-
     "profile.stremio.addonUrl": "Addon URL",
     "profile.stremio.generate": "Addon URL genereren",
     "profile.stremio.copyUrl": "URL kopiëren",
     "profile.stremio.howTo": "Hoe verbind ik met Stremio?",
     "profile.stremio.install": "Installeer in Stremio",
-
     "profile.webdav.title": "WebDAV",
     "profile.webdav.generate": "WebDAV URL genereren",
     "profile.webdav.copyUrl": "URL kopiëren",
@@ -186,7 +173,6 @@
     "profile.webdav.howTo": "Hoe verbind ik via WebDAV?",
     "profile.webdav.premiumOnly": "WebDAV-integratie is beschikbaar voor premium gebruikers.",
     "profile.webdav.upgrade": "Upgrade je tier om dit te ontgrendelen!",
-
     "profile.addons.title": "Addons",
     "profile.addons.placeholder": "Voer Stremio addon manifest URL in (bijv., https://example.com/manifest.json)",
     "profile.addons.validation": "Voer een geldige Stremio addon manifest URL in die eindigt op manifest.json",
@@ -201,7 +187,6 @@
     "profile.addons.save": "Opslaan",
     "profile.addons.deleteConfirm": "Weet je zeker dat je deze addon wilt verwijderen?\n\n%v",
     "profile.addons.deleted": "Addon verwijderd",
-
     "profile.embedDomains.title": "Embed-domeinen",
     "profile.embedDomains.placeholder": "Voer domein in (bijv., example.com)",
     "profile.embedDomains.validation": "Voer een geldige domeinnaam in",
@@ -212,7 +197,6 @@
     "profile.embedDomains.learnSdk": "Meer info over embed-sdk-js",
     "profile.embedDomains.wordpressPlugin": "Bekijk ook wordpress-plugin",
     "profile.embedDomains.deleteConfirm": "Weet je zeker dat je dit domein wilt verwijderen?",
-
     "profile.backends.title": "Streaming Backends",
     "profile.backends.selectType": "Selecteer backend type",
     "profile.backends.enterToken": "Voer API token in",
@@ -231,7 +215,6 @@
     "profile.backends.save": "Opslaan",
     "profile.backends.deleteConfirm": "Weet je zeker dat je deze %v backend wilt verwijderen?",
     "profile.backends.deleted": "Backend verwijderd",
-
     "profile.settings.title": "Instellingen",
     "profile.settings.resolutions": "Voorkeursresoluties",
     "profile.settings.dragHint": "Sleep om te ordenen op voorkeur",
@@ -239,7 +222,6 @@
     "profile.settings.discoverOnlyDesc": "Wanneer ingeschakeld, worden je geconfigureerde addons alleen gebruikt op de Discover-pagina voor het bladeren en toevoegen van inhoud aan je bibliotheek. De Stremio-app toont alleen streams uit je Bibliotheek — torrents die je al hebt toegevoegd.",
     "profile.settings.discoverOnlyHint": "Handig wanneer je inhoud op het web verzamelt via Discover en het vervolgens op je TV via Stremio afspeelt zonder dat extra addon-resultaten de lijst vol maken.",
     "profile.settings.save": "Opslaan",
-
     "profile.vault.title": "Vault Points",
     "profile.vault.total": "Totaal",
     "profile.vault.available": "Beschikbaar",
@@ -247,12 +229,10 @@
     "profile.vault.frozen": "Bevroren",
     "profile.vault.whatIs": "Wat is Vault?",
     "profile.vault.pledges": "Toezeggingen",
-
     "discover.badge": "Discover",
     "discover.title": "Discover",
     "discover.subtitle": "Blader door films en series van Cinemeta en je Stremio addons.",
     "discover.seeMore": "Meer zien",
-
     "library.badge": "Bibliotheek",
     "library.title": "Je bibliotheek",
     "library.subtitle": "Je opgeslagen torrents, films en series — allemaal op één plek.",
@@ -282,7 +262,6 @@
     "library.sort.rating": "Beoordeling",
     "library.sort.unknown": "Onbekend",
     "library.continueWatching": "Doorgaan met kijken",
-
     "resource.movie": "Film",
     "resource.series": "Serie",
     "resource.torrent": "Torrent",
@@ -300,7 +279,6 @@
     "resource.status.cached": "In cache",
     "resource.status.vaulting": "Naar Vault",
     "resource.status.vaulted": "In Vault",
-
     "vault.supporting": "Je steunt deze torrent",
     "vault.keepAvailable": "Houd deze torrent beschikbaar",
     "vault.error": "Helaas kon je toezegging niet worden opgeslagen door een fout:",
@@ -326,7 +304,6 @@
     "vault.removeError": "Helaas kon je toezegging niet worden verwijderd door een fout:",
     "vault.frozen": "Je Vault Points zijn momenteel bevroren en kunnen nog niet worden verwijderd. Kom later terug wanneer de bevroren periode is verlopen.",
     "vault.removeConfirm": "Weet je zeker dat je je toezegging voor deze torrent wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
-
     "vault.pledges.badge": "Vault-toezeggingen",
     "vault.pledges.title": "Je toezeggingen",
     "vault.pledges.subtitle": "Bekijk en beheer je Vault-puntentoezeggingen voor torrents.",
@@ -343,9 +320,6 @@
     "vault.pledges.expiringDesc": "Toezegging wordt niet meer ondersteund door punten (gebeurt wanneer abonnement verloopt of tier wordt gedowngraded). Inhoud met dergelijke toezeggingen kan uit de Vault worden verwijderd",
     "vault.pledges.claimableDesc": "Punten die kunnen worden teruggevraagd. Na opvraging kan de inhoud waarvoor ze waren toegezegd worden verwijderd",
     "vault.pledges.backToProfile": "Terug naar profiel",
-
-    "action.download.speedLimit": "Je huidige downloadsnelheid wordt beperkt tot {{.Rate}} Mbps, doneer om je snelheid te verhogen en advertenties te verwijderen!",
-    "action.download.donate": "doneren",
     "action.download.copyWget": "wget cmd kopiëren",
     "action.download.copyCurl": "curl cmd kopiëren",
     "action.download.copyUrl": "url kopiëren",
@@ -353,23 +327,27 @@
     "action.download.downloadStarting": "Download wordt gestart...",
     "action.download.cancel": "annuleren",
     "action.download.copied": "Gekopieerd!",
-
-    "action.noPeers.title": "belangrijke notitie:",
-    "action.noPeers.noSeeders": "deze torrent heeft momenteel geen actieve bronnen (seeders)",
-    "action.noPeers.notPossible": "downloaden en streamen zijn nu niet mogelijk",
-    "action.noPeers.trySearhing": "probeer een andere torrent te zoeken met meer peers",
-    "action.noPeers.gotIt": "Begrepen!",
-
-    "action.slow.notPossible": "streamen is niet mogelijk",
-    "action.slow.planLimit": "je plan ({{.Tier}}) beperkt de snelheid tot {{.Rate}} Mbps",
-    "action.slow.fileRequires": "dit bestand vereist minstens {{.Rate}} Mbps voor soepel afspelen",
-    "action.slow.upgrade": "upgrade je plan",
-    "action.slow.tooSlow": "streamen is niet mogelijk — downloadsnelheid te laag",
-    "action.slow.speedInfo": "downloadsnelheid: {{.Measured}} Mbps, vereist: {{.Required}} Mbps",
-    "action.slow.suggestions": "probeer een kleiner bestand, pre-download, gebruik Vault, of vind een torrent met meer seeders",
-    "action.slow.upgradePlan": "plan upgraden",
-    "action.slow.gotIt": "Begrepen!",
-
+    "action.download.limitedTitle": "Downloaden met {{.Rate}} Mbps",
+    "action.download.limitedSub": "Abonnement haalt limiet en advertenties weg",
+    "action.noPeers.title": "Deze torrent heeft op dit moment geen actieve seeders",
+    "action.noPeers.vaultPitch": "Vault bewaart de torrent en pakt 'm zodra er een seeder verschijnt — bij elk betaald plan inbegrepen.",
+    "action.noPeers.vaultUse": "Bewaar de torrent in Vault — hij downloadt zodra er een seeder opduikt.",
+    "action.noPeers.altSearch": "of probeer een andere torrent met meer seeders",
+    "action.noPeers.gotIt": "Begrepen",
+    "action.slow.title.rateLimited": "Onvoldoende snelheid voor soepel afspelen",
+    "action.slow.title.bandwidth": "Downloadsnelheid te laag voor streamen",
+    "action.slow.youHave": "jij hebt",
+    "action.slow.fileNeeds": "bestand vereist",
+    "action.slow.unit": "Mbps",
+    "action.slow.alts.upgrade": "Zonder upgrade:",
+    "action.slow.alts.bandwidth": "Wat je kunt doen:",
+    "action.slow.alt.smallerOrSeeders": "kies een kleiner bestand of een met meer seeders",
+    "action.slow.alt.smallerFile": "kies een kleiner bestand",
+    "action.slow.alt.preDownload": "eerst downloaden, dan kijken",
+    "action.slow.alt.vault": "bewaar in Vault — laadt zichzelf vooruit",
+    "action.slow.gotIt": "Begrepen",
+    "action.upgrade.free": "50 Mbps krijgen",
+    "action.upgrade.paid": "Plan upgraden",
     "action.stream.audio": "Audio",
     "action.stream.subtitles": "Ondertitels",
     "action.stream.close": "Sluiten",
@@ -384,7 +362,6 @@
     "action.stream.mySubtitles.formats": "SRT, VTT of ASS, maximaal 5 MB",
     "action.stream.mySubtitles.delete": "Verwijderen",
     "action.stream.mySubtitles.limitReached": "Je hebt de limiet van 10 ondertitels voor dit bestand bereikt. Verwijder er een om meer te uploaden.",
-
     "player.play": "Afspelen",
     "player.pause": "Pauze",
     "player.mute": "Dempen",
@@ -398,7 +375,6 @@
     "player.copied": "Gekopieerd!",
     "player.continueFrom": "Doorgaan vanaf %v",
     "player.startOver": "Vanaf het begin starten",
-
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",
@@ -420,7 +396,6 @@
     "job.downloading": "{{.Bytes}} downloaden",
     "job.waitingForPeers": "wachten op peers",
     "job.peers": "{{.Peers}} peers",
-
     "toast.domainAdded": "Domein toegevoegd",
     "toast.domainDeleted": "Domein verwijderd",
     "toast.addedToLibrary": "Toegevoegd aan bibliotheek",
@@ -439,7 +414,6 @@
     "toast.removedFromVault": "Verwijderd uit vault",
     "toast.user_subtitle.uploaded": "Ondertitel geüpload",
     "toast.user_subtitle.deleted": "Ondertitel verwijderd",
-
     "speedtest.badge": "Snelheidstest",
     "speedtest.title": "Verbindingssnelheidstest",
     "speedtest.subtitle": "Meet je downloadsnelheid van Webtor servers om te zien welke videokwaliteit je kunt streamen zonder buffering.",
@@ -465,7 +439,6 @@
     "speedtest.copied": "Gekopieerd!",
     "speedtest.titleResult": "Snelheidstest — %v Mbps",
     "speedtest.descResult": "Je Webtor verbindingssnelheid: %v Mbps.",
-
     "support.badge": "Ondersteuning",
     "support.title": "Helpcentrum",
     "support.subtitle": "Heb je een vraag, een bug gevonden of moet je inhoud melden? Vul het formulier hieronder in en we komen bij je terug.",
@@ -483,7 +456,6 @@
     "support.submit": "Versturen",
     "support.successMessage": "Je bericht is verstuurd!",
     "support.sendAnother": "Stuur een andere",
-
     "discover.search": "Zoek films en series...",
     "discover.loadMore": "Meer laden",
     "discover.loadingCatalogs": "Catalogi laden...",
@@ -579,7 +551,6 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Anders",
-
     "discover.streamsFound": "%v stream(s) gevonden",
     "discover.streamsFiltered": "%v van %v stream(s)",
     "discover.noStreams": "Geen streams beschikbaar voor deze titel.",
@@ -595,7 +566,6 @@
     "discover.noEpisodes": "Geen afleveringen gevonden.",
     "discover.specials": "Specials",
     "discover.episodeLabel": "Aflevering %v",
-
     "tool.torrentToDdl.title": "Torrent → DDL",
     "tool.torrentToDdl.benefit": "Converteer torrent naar directe downloadlink",
     "tool.torrentToDdl.description": "Converteer torrents naar directe downloadlinks in je browser. Download bestanden van torrents met cloud-gebaseerde verwerking en geen lokale client nodig.",
@@ -626,7 +596,6 @@
     "tool.torrentPlayer.title": "Online torrent speler",
     "tool.torrentPlayer.benefit": "Speel elke torrent video in je browser",
     "tool.torrentPlayer.description": "Gratis online torrent speler die videobestanden van torrents direct in de browser afspeelt. Ondersteunt MKV, AVI, MP4, WEBM en meer met real-time transcodering.",
-
     "tool.about.badges.howItWorks": "Hoe het werkt",
     "tool.about.badges.explained": "Uitgelegd",
     "tool.about.badges.comparison": "Vergelijking",
@@ -636,7 +605,6 @@
     "tool.about.badges.benefits": "Voordelen",
     "tool.about.badges.devices": "Apparaten",
     "tool.about.badges.formats": "Formaten",
-
     "tool.torrentToDdl.about.steps.title": "Hoe download je torrents met Webtor.io",
     "tool.torrentToDdl.about.steps.subtitle": "Converteer je torrent-bestand of magnetlink naar een directe downloadlink in 3&nbsp;eenvoudige stappen — geen torrent client nodig.",
     "tool.torrentToDdl.about.steps.step1.title": "Vind je torrent",
@@ -670,7 +638,6 @@
     "tool.torrentToDdl.about.video.item3": "Mobiele apparaten en tablets",
     "tool.torrentToDdl.about.video.item4": "Snelle previews voor downloaden",
     "tool.torrentToDdl.about.video.footer": "Als je torrent video-inhoud bevat, is streamen meestal sneller en handiger dan alles vooraf downloaden.",
-
     "tool.magnetToDdl.about.steps.title": "Hoe download je magnets met Webtor.io",
     "tool.magnetToDdl.about.steps.subtitle": "Converteer je magnetlink naar een directe downloadlink in 3&nbsp;eenvoudige stappen — geen torrent client nodig.",
     "tool.magnetToDdl.about.steps.step1.title": "Kopieer je magnetlink",
@@ -704,7 +671,6 @@
     "tool.magnetToDdl.about.video.item3": "Mobiele apparaten en tablets",
     "tool.magnetToDdl.about.video.item4": "Snelle previews voor downloaden",
     "tool.magnetToDdl.about.video.footer": "Als je magnetlink naar video-inhoud verwijst, is streamen meestal sneller en handiger dan alles vooraf downloaden.",
-
     "tool.magnetToTorrent.about.steps.title": "Hoe converteer je magnets naar torrents met Webtor.io",
     "tool.magnetToTorrent.about.steps.subtitle": "Converteer je magnetlink naar een .torrent-bestand in 3&nbsp;eenvoudige stappen — geen torrent client nodig.",
     "tool.magnetToTorrent.about.steps.step1.title": "Kopieer je magnetlink",
@@ -737,7 +703,6 @@
     "tool.magnetToTorrent.about.useCases.item4": "Bestandslijsten previewen voor downloaden",
     "tool.magnetToTorrent.about.safety.title": "Is magnet naar torrent veilig? Heb ik een VPN nodig?",
     "tool.magnetToTorrent.about.safety.text": "Een magnetlink converteren naar een torrent-bestand vereist geen verbinding met de torrent swarm vanaf je apparaat. De metadata-resolutie gebeurt aan de serverkant, wat het proces eenvoudiger en veiliger maakt voor de gebruiker. Al het verkeer gaat over HTTPS, dus geen VPN nodig.",
-
     "tool.onlineTorrentDownloader.about.steps.title": "Hoe download je torrents met Webtor.io",
     "tool.onlineTorrentDownloader.about.steps.subtitle": "Converteer je torrent-bestand of magnetlink naar een directe downloadlink in 3&nbsp;eenvoudige stappen — geen torrent client nodig.",
     "tool.onlineTorrentDownloader.about.steps.step1.title": "Vind je torrent",
@@ -771,7 +736,6 @@
     "tool.onlineTorrentDownloader.about.safety.title": "Downloaden vs streamen van torrents online",
     "tool.onlineTorrentDownloader.about.safety.p1": "Met een online torrent downloader kun je bestanden downloaden of video-inhoud direct in je browser streamen.",
     "tool.onlineTorrentDownloader.about.safety.p2": "Streamen is vaak handiger voor video-torrents, terwijl downloaden beter is wanneer je de bestanden offline wilt bewaren. Hoe dan ook, je apparaat verbindt niet direct met de torrent swarm — <strong>Webtor.io</strong> handelt alles aan de serverkant af over HTTPS.",
-
     "tool.streamTorrentOnline.about.steps.title": "Hoe stream je torrents online met Webtor.io",
     "tool.streamTorrentOnline.about.steps.subtitle": "Stream elke torrent video direct in je browser in 3&nbsp;eenvoudige stappen — geen software te installeren, geen bestanden te downloaden.",
     "tool.streamTorrentOnline.about.steps.step1.title": "Voeg je torrent toe",
@@ -797,7 +761,6 @@
     "tool.streamTorrentOnline.about.devices.item2": "Android telefoons en tablets",
     "tool.streamTorrentOnline.about.devices.item3": "iPhones en iPads via Safari of Chrome",
     "tool.streamTorrentOnline.about.devices.item4": "Smart TV's via Stremio-integratie",
-
     "tool.torrentPlayer.about.steps.title": "Hoe speel je torrent video's online af met Webtor.io",
     "tool.torrentPlayer.about.steps.subtitle": "Speel elke video van een torrent direct in je browser in 3&nbsp;eenvoudige stappen — geen desktop speler of torrent client nodig.",
     "tool.torrentPlayer.about.steps.step1.title": "Laad je torrent",
@@ -823,7 +786,6 @@
     "tool.torrentPlayer.about.devices.item2": "Android telefoons en tablets",
     "tool.torrentPlayer.about.devices.item3": "iPhones en iPads via Safari of Chrome",
     "tool.torrentPlayer.about.devices.item4": "Chromebooks en apparaten met laag vermogen",
-
     "tool.torrentToStream.about.steps.title": "Hoe converteer je een torrent naar een HLS-stream met Webtor.io",
     "tool.torrentToStream.about.steps.subtitle": "Verander elke torrent in een streambare HLS-video in 3&nbsp;eenvoudige stappen — real-time cloud-transcodering, geen download nodig.",
     "tool.torrentToStream.about.steps.step1.title": "Lever de torrent",
@@ -849,7 +811,6 @@
     "tool.torrentToStream.about.devices.item2": "Android en iOS mobiele apparaten",
     "tool.torrentToStream.about.devices.item3": "Stremio en andere HLS-compatibele spelers",
     "tool.torrentToStream.about.devices.item4": "Smart TV's en streamingboxen",
-
     "tool.torrentToZip.about.steps.title": "Hoe download je torrents als ZIP met Webtor.io",
     "tool.torrentToZip.about.steps.subtitle": "Download de inhoud van je torrent als ZIP-archief in 3&nbsp;eenvoudige stappen — geen torrent client nodig.",
     "tool.torrentToZip.about.steps.step1.title": "Vind je torrent",
@@ -882,7 +843,6 @@
     "tool.torrentToZip.about.safety.title": "Wanneer is torrent naar ZIP de beste optie?",
     "tool.torrentToZip.about.safety.p1": "Torrent naar ZIP is de beste keuze wanneer gemak belangrijker is dan snelheid of selectieve downloads. Het werkt vooral goed voor torrents met veel kleine bestanden, software-distributies of datasets, downloads op telefoons en tablets, en gevallen waarin je één schoon archief nodig hebt.",
     "tool.torrentToZip.about.safety.p2": "Je apparaat verbindt niet direct met de torrent swarm — <strong>Webtor.io</strong> handelt alles aan de serverkant af en levert de ZIP over HTTPS.",
-
     "tool.watchTorrentsIos.about.steps.title": "Hoe bekijk je torrents op iPhone of iPad",
     "tool.watchTorrentsIos.about.steps.subtitle": "Stream torrent-video's op iOS in 3&nbsp;eenvoudige stappen — geen apps nodig.",
     "tool.watchTorrentsIos.about.steps.step1.title": "Open in Safari",
@@ -909,7 +869,6 @@
     "tool.watchTorrentsIos.about.formats.item4": "Geen codec packs of extra apps nodig",
     "tool.watchTorrentsIos.about.safety.title": "Is het veilig om torrents op iOS te bekijken?",
     "tool.watchTorrentsIos.about.safety.text": "Wanneer je torrents streamt op iOS met <strong>Webtor.io</strong>, verbindt je iPhone of iPad niet direct met de torrent swarm. Torrent-data wordt aan de serverkant verwerkt en geleverd als videostream over HTTPS. Het enige wat je nodig hebt is Safari en een magnetlink of torrent-bestand.",
-
     "tool.watchTorrentsOnline.about.steps.title": "Hoe bekijk je torrents online met Webtor.io",
     "tool.watchTorrentsOnline.about.steps.subtitle": "Stream torrent-inhoud online in 3&nbsp;eenvoudige stappen — geen downloads of torrent client nodig.",
     "tool.watchTorrentsOnline.about.steps.step1.title": "Upload of plak",
@@ -935,16 +894,12 @@
     "tool.watchTorrentsOnline.about.devices.item2": "Android telefoons en tablets",
     "tool.watchTorrentsOnline.about.devices.item3": "iPhones en iPads via Safari",
     "tool.watchTorrentsOnline.about.devices.item4": "Smart TV's via Stremio-integratie",
-
     "resource.preparingDownload": "Download voorbereiden",
-
     "profile.stremio.copied": "Gekopieerd!",
-
     "instructions.guide": "Gids",
     "instructions.note": "Let op:",
     "instructions.important": "Belangrijk:",
     "instructions.paidOnly": "Deze functie is alleen beschikbaar voor <strong>betalende gebruikers</strong>.",
-
     "instructions.stremio.title": "Stremio-integratie",
     "instructions.stremio.heading": "Hoe verbind je Webtor met Stremio",
     "instructions.stremio.intro": "Je kunt je persoonlijke torrentbibliotheek van Webtor direct in Stremio streamen. Zo doe je het:",
@@ -954,7 +909,6 @@
     "instructions.stremio.step4": "Plak de addon-link en druk op Enter. Klaar!",
     "instructions.stremio.result": "Eenmaal geïnstalleerd verschijnt je bibliotheek in Stremio onder de <strong>Webtor.io</strong> addon — klaar om te streamen.",
     "instructions.stremio.noteWarmup": "Streamen via Webtor kan verschillen van reguliere Stremio-addons. Het kan even duren om de torrent op te warmen voordat het afspelen begint.",
-
     "instructions.stremioAddon.title": "Hoe verbind je een Stremio Addon",
     "instructions.stremioAddon.heading": "Hoe verbind je een Stremio Addon",
     "instructions.stremioAddon.intro": "Wil je meer inhoud toevoegen aan je Stremio-ervaring? Volg deze eenvoudige stappen om externe Stremio-addons te verbinden om je streamingbibliotheek uit te breiden:",
@@ -964,7 +918,6 @@
     "instructions.stremioAddon.step4": "Plak de URL in de \"Stremio Addons\" sectie op je <a href='{{.ProfileURL}}' class='text-w-pinkL hover:underline'>profielpagina</a> en klik op \"Add Addon\"",
     "instructions.stremioAddon.result": "Eenmaal toegevoegd zal de addon-inhoud beschikbaar zijn via je Stremio-integratie, waardoor je streamingopties worden uitgebreid met extra bronnen en catalogi.",
     "instructions.stremioAddon.noteGathering": "Het verzamelen van streaming-URL's kan enige tijd duren (tot 10 seconden). Heb geduld.",
-
     "instructions.webdav.title": "WebDAV-integratie",
     "instructions.webdav.heading": "Hoe verbind je Webtor via WebDAV",
     "instructions.webdav.intro": "Krijg toegang tot je torrentbibliotheek net als een gewone map. Met WebDAV kun je je bestanden bladeren, streamen en beheren direct vanuit je favoriete apps.",
@@ -982,7 +935,6 @@
     "instructions.webdav.folderMovies": "<strong>movies/</strong> – Alle herkende films (alleen-lezen)",
     "instructions.webdav.folderSeries": "<strong>series/</strong> – TV-shows en afleveringen (alleen-lezen)",
     "instructions.webdav.notePaid": "WebDAV-toegang is alleen beschikbaar voor <strong>betalende gebruikers</strong>.",
-
     "instructions.vault.title": "Vault",
     "instructions.vault.intro": "Vault is een opslagsysteem in Webtor waarmee je:",
     "instructions.vault.feature1": "torrents lange tijd kunt opslaan,",
@@ -1005,7 +957,6 @@
     "instructions.vault.expireItem1": "Punten die in torrents zijn geïnvesteerd verliezen hun kracht en de torrent wordt gemarkeerd als verlopen en verwijderd na <strong>{{.ExpirePeriod}}</strong>.",
     "instructions.vault.expireItem2": "Als het abonnement wordt vernieuwd, worden de punten weer actief en zijn de torrents die ermee gefinancierd worden niet meer verlopen.",
     "instructions.vault.disclaimer": "Als een torrent wordt geblokkeerd door rechthebbenden of verwijderd uit openbare bronnen, kan deze verdwijnen – Vault garandeert geen behoud in dergelijke gevallen.",
-
     "aboutPage.title": "Over ons — Missie & Open Source",
     "aboutPage.description": "Webtor is een open-source torrent platform in de browser. Leer over onze missie om torrents toegankelijk, privé en gemakkelijk te maken — geen installs nodig.",
     "aboutPage.badge": "Over ons",
@@ -1020,7 +971,6 @@
     "aboutPage.osP2": "We geloven dat transparantie vertrouwen opbouwt. Je kunt de code inspecteren, problemen melden, functies voorstellen of direct bijdragen.",
     "aboutPage.ctaText": "Klaar om het te proberen?",
     "aboutPage.ctaButton": "Probeer Webtor",
-
     "time.now": "zojuist",
     "time.seconds": "%v seconden geleden",
     "time.minute": "1 minuut geleden",
@@ -1035,7 +985,6 @@
     "time.months": "%v maanden geleden",
     "time.year": "1 jaar geleden",
     "time.years": "%v jaar geleden",
-
     "error.forbidden": "Deze content is geblokkeerd op verzoek van de rechthebbende.",
     "error.not_found": "Bron niet gevonden.",
     "error.service_unavailable": "De service is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
