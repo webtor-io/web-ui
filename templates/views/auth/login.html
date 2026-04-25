@@ -25,6 +25,11 @@
       <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.stremioNote" }}</p>
     </div>
     {{ end }}
+    {{ if eq .Data.Instruction "vault" }}
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
+      <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.vaultNote" }}</p>
+    </div>
+    {{ end }}
 
     <!-- OAuth buttons card -->
     <div class="bg-w-card border border-w-line rounded-2xl p-6 mb-6">

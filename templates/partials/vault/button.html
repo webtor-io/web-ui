@@ -7,22 +7,29 @@
 	the current document URL.
 */}}
 <div>
-	{{ if and .Data.Funded }}
-		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
-			<input type="hidden" name="pledge-form" value="true" />
-			<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-supporting-clicked">
-				<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-				{{ t .Ctx.Lang "vault.supporting" }}
-			</button>
-		</form>
+	{{ if .Ctx.User | hasAuth }}
+		{{ if .Data.Funded }}
+			<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
+				<input type="hidden" name="pledge-form" value="true" />
+				<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-supporting-clicked">
+					<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+					{{ t .Ctx.Lang "vault.supporting" }}
+				</button>
+			</form>
+		{{ else }}
+			<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
+				<input type="hidden" name="pledge-form" value="true" />
+				<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-clicked">
+					<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+					{{ t .Ctx.Lang "vault.keepAvailable" }}
+				</button>
+			</form>
+		{{ end }}
 	{{ else }}
-		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
-			<input type="hidden" name="pledge-form" value="true" />
-			<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-clicked">
-				<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-				{{ t .Ctx.Lang "vault.keepAvailable" }}
-			</button>
-		</form>
+		<a href="{{ langPath .Ctx.Lang "/login" }}?from=vault&return-url={{ langPath .Ctx.Lang .Ctx.Path }}" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-clicked-anonymous" data-async-target="main">
+			<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+			{{ t .Ctx.Lang "vault.keepAvailable" }}
+		</a>
 	{{ end }}
 </div>
 {{ "vault/button.js" | asset }}

@@ -168,7 +168,7 @@
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
-                        {{ if and ($.User | hasAuth) .Vault }}
+                        {{ if .Vault }}
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
@@ -248,7 +248,7 @@
             {{ end }}
             <div class="flex flex-wrap items-center gap-2">
                 <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
-                    {{ if and ($.User | hasAuth) .Vault }}
+                    {{ if .Vault }}
                         {{ template "vault/button" (withContext $ .VaultButton) }}
                     {{ end }}
                 </div>
