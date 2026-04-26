@@ -1,6 +1,7 @@
 import av from '../lib/av';
 import { rebindAsync } from '../lib/async';
 import { CINEMETA_BASE } from '../lib/discover/client';
+import { langPath } from '../lib/i18n';
 
 const CATALOG_URL = `${CINEMETA_BASE}/catalog/movie/top.json`;
 const CARD_COUNT = 7;
@@ -14,7 +15,7 @@ function renderCard(item) {
     const name = item.name || 'Unknown';
     const year = item.releaseInfo || item.year || '';
     const type = item.type || 'movie';
-    const href = '/discover?id=' + encodeURIComponent(item.id) + '&type=' + encodeURIComponent(type);
+    const href = langPath('/discover') + '?id=' + encodeURIComponent(item.id) + '&type=' + encodeURIComponent(type);
 
     const a = document.createElement('a');
     a.href = href;

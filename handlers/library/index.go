@@ -62,11 +62,19 @@ func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
 func (s *Handler) index(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	if !u.HasAuth() {
+		// Preserve the original path + query so /lib/movies?sort=2 lands the
+		// user back on the same view after sign-in, with the lang prefix kept.
+		// The login page renders a contextual info card driven by from=library.
+		lang := i18n.GetLang(c)
+		returnURL := i18n.LangPath(lang, c.Request.URL.Path)
+		if rq := c.Request.URL.RawQuery; rq != "" {
+			returnURL += "?" + rq
+		}
 		v := url.Values{
 			"from":       []string{"library"},
-			"return-url": []string{"/lib/"},
+			"return-url": []string{returnURL},
 		}
-		c.Redirect(http.StatusFound, "/login?"+v.Encode())
+		c.Redirect(http.StatusFound, i18n.LangPath(lang, "/login")+"?"+v.Encode())
 		return
 	}
 	args := s.bindIndexArgs(c)

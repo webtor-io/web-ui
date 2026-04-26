@@ -14,6 +14,61 @@ import (
 
 type LoginData struct {
 	Instruction string
+	// Card is non-nil when Instruction is one of the values that maps to a
+	// rich contextual sign-in card (vault/library/discover). The template
+	// just renders the keys — all routing logic lives here in the handler.
+	Card *LoginCard
+}
+
+// LoginCard carries i18n keys for the contextual info card on /login. The
+// concrete copy is owned by the locales (e.g. vault.signInCard.intro), the
+// handler only decides which set of keys applies to the current `from` value.
+type LoginCard struct {
+	NoteKey     string
+	IntroKey    string
+	FeatureKeys []string
+}
+
+// loginCardFor returns the card descriptor for a given `from` value or nil if
+// the `from` doesn't drive a contextual card. Keep the allowed set explicit so
+// typos in the URL don't silently render an empty card.
+func loginCardFor(from string) *LoginCard {
+	switch from {
+	case "vault":
+		return &LoginCard{
+			NoteKey:  "auth.login.vaultNote",
+			IntroKey: "vault.signInCard.intro",
+			FeatureKeys: []string{
+				"vault.signInCard.feature1",
+				"vault.signInCard.feature2",
+				"vault.signInCard.feature3",
+				"vault.signInCard.feature4",
+			},
+		}
+	case "library":
+		return &LoginCard{
+			NoteKey:  "auth.login.libraryNote",
+			IntroKey: "library.signInCard.intro",
+			FeatureKeys: []string{
+				"library.signInCard.feature1",
+				"library.signInCard.feature2",
+				"library.signInCard.feature3",
+				"library.signInCard.feature4",
+			},
+		}
+	case "discover":
+		return &LoginCard{
+			NoteKey:  "auth.login.discoverNote",
+			IntroKey: "discover.signInCard.intro",
+			FeatureKeys: []string{
+				"discover.signInCard.feature1",
+				"discover.signInCard.feature2",
+				"discover.signInCard.feature3",
+				"discover.signInCard.feature4",
+			},
+		}
+	}
+	return nil
 }
 
 type LogoutData struct{}
@@ -59,6 +114,7 @@ func (s *Handler) login(c *gin.Context) {
 	}
 	ld := LoginData{
 		Instruction: instruction,
+		Card:        loginCardFor(instruction),
 	}
 	if c.Query("return-url") != "" {
 		session := sessions.Default(c)

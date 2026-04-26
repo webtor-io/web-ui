@@ -15,19 +15,18 @@
     </div>
 
     <!-- Instruction notices -->
-    {{ if eq .Data.Instruction "library" }}
-    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
-      <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.libraryNote" }}</p>
-    </div>
-    {{ end }}
     {{ if eq .Data.Instruction "stremio-configure" }}
     <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
       <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.stremioNote" }}</p>
     </div>
     {{ end }}
-    {{ if eq .Data.Instruction "vault" }}
-    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
-      <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.vaultNote" }}</p>
+    {{ with .Data.Card }}
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6">
+      <p class="text-sm text-w-sub mb-3"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang .NoteKey }}</p>
+      <p class="text-xs text-w-muted leading-relaxed mb-2">{{ t $.Lang .IntroKey }}</p>
+      <ul class="list-disc pl-5 space-y-1 text-xs text-w-muted leading-relaxed">
+        {{ range .FeatureKeys }}<li>{{ t $.Lang . }}</li>{{ end }}
+      </ul>
     </div>
     {{ end }}
 

@@ -41,6 +41,19 @@ export function langPath(path) {
     return '/' + lang + path;
 }
 
+// Strip a leading /{lang} prefix from a pathname so it can be compared
+// against canonical (lang-less) paths like '/discover' or '/lib/'. Useful
+// for popstate filters that need to match regardless of which locale the
+// user is viewing. English paths have no prefix so they pass through.
+export function stripLangPrefix(pathname) {
+    const m = pathname.match(/^\/([a-z]{2})(\/|$)/);
+    if (m && SUPPORTED.includes(m[1]) && m[1] !== 'en') {
+        // Drop "/<lang>"; keep the trailing slash so '/ru' → '/' (not '').
+        return pathname.slice(3) || '/';
+    }
+    return pathname;
+}
+
 export function makeI18n(messages) {
     function t(key) {
         return messages[key] || key;

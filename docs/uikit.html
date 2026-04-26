@@ -1523,6 +1523,164 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
   <hr class="uikit-divider">
 
+  <!-- =========================================================
+       16. VAULT PROGRESS ROW
+       ========================================================= -->
+  <div class="uikit-section" id="vault-progress">
+    <h2>16. Vault Progress Row</h2>
+    <p class="desc">
+      Live progress visualisation in the My Vault dashboard table. For resources that are
+      <code>Funded &amp;&amp; !Vaulted &amp;&amp; !Expired</code> (server-side <code>ShowProgress</code>,
+      same predicate as the <code>LoadingCount</code> stat), the row exposes two signals: a
+      <strong>pulsing lightning icon</strong> in the leftmost cell (gentle opacity heartbeat,
+      signals "process is running"), and a <strong>row-wide background fill</strong>
+      that grows left-to-right with the actual <code>progress</code> from the SSE stream
+      (<code>/resources/:id/status</code>, see <code>handlers/resource/status.go</code>).
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">States</h3>
+    <p class="desc">All five rows are static demos &mdash; the lightning icons animate live via the <code>vault-pulse</code> keyframes; the background fills are inlined for illustration.</p>
+
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+      <div class="bg-base-200/50 rounded-xl overflow-hidden">
+        <table class="table w-full table-fixed text-sm">
+          <colgroup>
+            <col class="w-8">
+            <col>
+            <col class="w-24">
+            <col class="w-28">
+          </colgroup>
+          <thead>
+            <tr class="border-b border-w-line">
+              <th></th>
+              <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">Name</th>
+              <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">VP</th>
+              <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- idle: no progress yet -->
+            <tr class="border-b border-w-line/50 transition-colors" style="background-image: linear-gradient(to right, rgba(0,206,201,0.06) 0%, transparent 0%)">
+              <td class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block">
+                  <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                </svg>
+              </td>
+              <td class="text-left">
+                <span class="text-w-pinkL truncate block">idle &mdash; awaiting first stats event</span>
+              </td>
+              <td class="text-center text-w-sub">3.50</td>
+              <td class="text-center">
+                <span class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
+                  <span class="loading loading-dots loading-xs"></span>
+                </span>
+              </td>
+            </tr>
+
+            <!-- caching: 42% cyan -->
+            <tr class="border-b border-w-line/50 transition-colors" style="background-image: linear-gradient(to right, rgba(0,206,201,0.10) 42%, transparent 42%)">
+              <td class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block">
+                  <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                </svg>
+              </td>
+              <td class="text-left">
+                <span class="text-w-pinkL truncate block">Inception.2010.UHD.BluRay.HDR.HEVC.x265-DEMO</span>
+              </td>
+              <td class="text-center text-w-sub">5.00</td>
+              <td class="text-center">
+                <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                  Caching 42%
+                </span>
+              </td>
+            </tr>
+
+            <!-- cached: 100% cyan, awaiting vault step -->
+            <tr class="border-b border-w-line/50 transition-colors" style="background-image: linear-gradient(to right, rgba(0,206,201,0.06) 100%, transparent 100%)">
+              <td class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block">
+                  <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                </svg>
+              </td>
+              <td class="text-left">
+                <span class="text-w-pinkL truncate block">Interstellar.2014.PROPER.1080p.BluRay.x264-AMIABLE</span>
+              </td>
+              <td class="text-center text-w-sub">4.20</td>
+              <td class="text-center">
+                <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                  Cached
+                </span>
+              </td>
+            </tr>
+
+            <!-- vaulting: 78% purple -->
+            <tr class="border-b border-w-line/50 transition-colors" style="background-image: linear-gradient(to right, rgba(108,92,231,0.12) 78%, transparent 78%)">
+              <td class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block">
+                  <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                </svg>
+              </td>
+              <td class="text-left">
+                <span class="text-w-pinkL truncate block">The.Matrix.1999.4K.UHD.BluRay.HDR.HEVC.Atmos</span>
+              </td>
+              <td class="text-center text-w-sub">7.00</td>
+              <td class="text-center">
+                <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+                  Vaulting 78%
+                </span>
+              </td>
+            </tr>
+
+            <!-- vaulted: terminal pink, no fill -->
+            <tr class="last:border-b-0 transition-colors">
+              <td class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
+                  <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                </svg>
+              </td>
+              <td class="text-left">
+                <span class="text-w-pinkL truncate block">Blade.Runner.2049.2017.1080p.BluRay.x264-SPARKS</span>
+              </td>
+              <td class="text-center text-w-sub">6.50</td>
+              <td class="text-center">
+                <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">Claimable</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Lightning Icon Animation</h3>
+    <p class="desc">Single <code>text-w-pinkL</code> SVG with the <code>vault-pulse</code> class &mdash; gentle opacity pulse (<code>1 &rarr; 0.45 &rarr; 1</code>) on a 1.8s ease-in-out infinite loop. No fill animations / glow &mdash; just a soft heartbeat that signals "process is running". JS removes the class on <code>state == "vaulted"</code> so the icon settles to fully opaque.</p>
+    <div class="uikit-card bg-w-surface mb-6">
+      <pre style="color:#94a3b8;font-size:0.78rem;font-family:monospace;white-space:pre-wrap;line-height:1.55">&lt;svg class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon&gt;
+  &lt;path .../&gt;
+&lt;/svg&gt;</pre>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Row Background Fill</h3>
+    <p class="desc">Inline <code>linear-gradient(to right, &lt;tint&gt; &lt;pct&gt;%, transparent &lt;pct&gt;%)</code> on the <code>&lt;tr&gt;</code>. JS swaps the gradient string per SSE message; no CSS transition (gradient interpolation isn't reliable across browsers). Initial SSR value is <strong>0%</strong> so the bar grows from empty &rarr; actual progress instead of collapsing from 100% &rarr; actual.</p>
+    <div class="uikit-rule">
+      <strong>Tints (intentionally low alpha so the row text stays primary):</strong>
+      <ul class="list-disc list-inside space-y-1 mt-2">
+        <li><code>caching</code> &mdash; <code>rgba(0,206,201,0.10)</code> (w-cyan)</li>
+        <li><code>cached</code> / <code>idle</code> &mdash; <code>rgba(0,206,201,0.06)</code></li>
+        <li><code>vaulting</code> &mdash; <code>rgba(108,92,231,0.12)</code> (w-purple)</li>
+        <li><code>vaulted</code> &mdash; <code>rgba(34,197,94,0.08)</code> (terminal flash, then SSE closes)</li>
+      </ul>
+    </div>
+
+    <div class="uikit-note mt-4">
+      <strong>Wiring.</strong> JS module: <code>assets/src/js/app/vault/progress.js</code>. One <code>EventSource</code> per active row pointing at the existing <code>/resources/:id/status</code> endpoint &mdash; no new backend. Inactive rows (Frozen / Expiring / unfunded / vaulted) render statically and don't open SSE.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>

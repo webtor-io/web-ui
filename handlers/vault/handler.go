@@ -21,14 +21,15 @@ type Handler struct {
 }
 
 type PledgeDisplay struct {
-	PledgeID   string
-	ResourceID string
-	Resource   *vaultModels.Resource
-	Amount     float64
-	IsFrozen   bool
-	Funded     bool
-	CreatedAt  string
-	ExpiresIn  time.Duration // time until resource is removed (for unfunded pledges)
+	PledgeID     string
+	ResourceID   string
+	Resource     *vaultModels.Resource
+	Amount       float64
+	IsFrozen     bool
+	Funded       bool
+	CreatedAt    string
+	ExpiresIn    time.Duration // time until resource is removed (for unfunded pledges)
+	ShowProgress bool          // funded but not yet vaulted — wire up live progress SSE
 }
 
 type PledgeListData struct {
@@ -47,10 +48,11 @@ func RegisterHandler(r *gin.Engine, v *vault.Vault, tm *template.Manager[*web.Co
 			WithLayout("main"),
 	}
 	gr := r.Group("/vault")
-	gr.Use(auth.HasAuth)
+	// GET /vault redirects guests to /login?from=vault inside the handler so the
+	// click never dead-ends on a 401. Mutating routes stay gated by middleware.
 	gr.GET("", h.index)
-	gr.POST("/add", h.addPledge)
-	gr.POST("/remove", h.removePledge)
+	gr.POST("/add", auth.HasAuth, h.addPledge)
+	gr.POST("/remove", auth.HasAuth, h.removePledge)
 
 	// Backwards-compat redirect: old /vault/pledge URL was renamed to /vault.
 	// 302 (not 301) so the redirect can be removed later without poisoning

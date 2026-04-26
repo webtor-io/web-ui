@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'preact/hooks';
 import { addPopstateFilter } from '../../async';
+import { stripLangPrefix } from '../../i18n';
 
 function buildUrl(params) {
     const url = new URLSearchParams(window.location.search);
@@ -56,11 +57,14 @@ export function useDiscoverUrl(pathPrefix) {
     }, []);
 
     useEffect(() => {
-        const removeFilter = addPopstateFilter(() =>
-            window.location.pathname.startsWith(pathPrefix)
-        );
+        // pathPrefix is the canonical (lang-less) path like '/discover'. The
+        // browser's pathname carries a /{lang} prefix on non-English locales,
+        // so strip it before comparing — otherwise popstate on /ru/discover
+        // never matches and the filter swallows the event.
+        const matches = () => stripLangPrefix(window.location.pathname).startsWith(pathPrefix);
+        const removeFilter = addPopstateFilter(matches);
         const listener = () => {
-            if (!window.location.pathname.startsWith(pathPrefix)) return;
+            if (!matches()) return;
             if (handlerRef.current) {
                 handlerRef.current(new URLSearchParams(window.location.search));
             }

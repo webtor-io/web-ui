@@ -2,6 +2,8 @@
 
 The Discover page (`/discover`) lets users browse and search movies and series from Cinemeta and their configured Stremio addons. It also hosts the AI-powered recommendation section at the top — see [ai_recommendations.md](./ai_recommendations.md) for the full spec of that feature (Claude-backed chips + free-form query + per-card reasons, opt-in via `AI_RECOMMENDATIONS_ENABLED`).
 
+Auth model: `/discover` requires auth. Anonymous visitors are redirected to `/login?from=discover&return-url=/discover?<RawQuery>` (both lang-prefixed via `i18n.LangPath`) — the handler preserves the original query string so a deep link like `/ru/discover?id=tt12042730&type=movie` round-trips intact through sign-in. The login page renders a contextual info card built from `discover.signInCard.intro` + `discover.signInCard.feature1..4` keys; library and vault use the same pattern. The card descriptor is selected server-side in `handlers/auth/handler.go::loginCardFor`. Client-side, popstate inside the Discover SPA also strips the lang prefix (see `assets/src/js/lib/discover/components/useDiscoverUrl.js`) so back/forward navigation works on /ru/discover.
+
 ## Architecture
 
 Pure frontend feature — no Go backend changes needed for browsing. All catalog and search fetches happen directly from the browser to addon URLs. Addon management uses Go backend endpoints.

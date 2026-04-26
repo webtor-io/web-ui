@@ -252,6 +252,8 @@ Handler: `handlers/vault/handler.go` (registered only if vault service is not ni
 
 Files: `handler.go`, `index.go`, `add.go`, `remove.go`.
 
+Auth model: the route is registered without group middleware so the GET handler can do its own auth check; mutating `POST /vault/add` and `POST /vault/remove` are gated by per-route `auth.HasAuth`. Anonymous GET requests redirect to `/login?from=vault&return-url=/vault` (lang-prefixed via `i18n.LangPath` so `/ru/vault` round-trips correctly). The login page renders a contextual info card built from `vault.signInCard.intro` + `vault.signInCard.feature1..4` keys — the same keys are also rendered on the dedicated `/instructions/vault` page, single source of truth. The `signInCard` namespace is uniform across vault/library/discover; the card descriptor (which keys to render for a given `from`) lives in `handlers/auth/handler.go::loginCardFor` so the template stays declarative.
+
 ### POST /vault/add
 
 Creates a new pledge. Auth required.
@@ -272,9 +274,11 @@ Removes a pledge. Auth required (middleware).
 
 ### GET /vault
 
-"My Vault" dashboard. Auth required (middleware). Renders `templates/views/vault/index.html`.
+"My Vault" dashboard. Anonymous visitors are redirected to `/login?from=vault&return-url=/vault` (handler-level check in `handlers/vault/index.go`); authed users see `templates/views/vault/index.html`.
 
-Shows three blocks:
+Reachable from the top nav via the dedicated Vault button (`templates/partials/nav.html`, layered-diamond icon matching the canonical Vault icon used in profile and the Save-to-Vault button, visible to everyone — `aria-label="Vault"`). The library button next to it shortened from "My Library" → "Library" (key `nav.library`) to make room.
+
+Dashboard shows three blocks:
 1. **Content stats** (primary): Saved (vaulted), Loading (funded, transfer in progress — hidden when 0), Expiring (lost backing). Numbers tinted purple/cyan/pink to mirror the badge palette.
 2. **Vault Points stats** (secondary, compact): Total / Available / Funded / Frozen.
 3. **Active torrents table** with per-pledge status badges; or empty-state illustration with hint pointing back to the "Save to Vault" CTA on resource pages.
@@ -283,14 +287,15 @@ Data structures:
 
 ```go
 type PledgeDisplay struct {
-    PledgeID   string
-    ResourceID string
-    Resource   *vaultModels.Resource
-    Amount     float64
-    IsFrozen   bool   // computed via IsPledgeFrozen
-    Funded     bool   // from DB
-    CreatedAt  string // formatted
-    ExpiresIn  time.Duration // for unfunded pledges with expired resources
+    PledgeID     string
+    ResourceID   string
+    Resource     *vaultModels.Resource
+    Amount       float64
+    IsFrozen     bool          // computed via IsPledgeFrozen
+    Funded       bool          // from DB
+    CreatedAt    string        // formatted
+    ExpiresIn    time.Duration // for unfunded pledges with expired resources
+    ShowProgress bool          // funded but not yet vaulted — wires up live SSE row
 }
 
 type PledgeListData struct {
@@ -304,15 +309,23 @@ type PledgeListData struct {
 
 Per-pledge badges in the table: `Frozen` (cyan), `Expiring` (pink), `Claimable` (purple). These describe **VP claimability**, not the resource's content state — the dashboard subtitle calls this out for users.
 
+### Live progress rows
+
+For pledges with `ShowProgress = true` (funded, not vaulted, not expired) the row becomes a live progress display with two animated signals:
+
+- **Lightning icon (leftmost cell)** — single `text-w-pinkL` SVG with the `vault-pulse` class (gentle opacity pulse `1 → 0.45 → 1` on a 1.8s ease-in-out infinite loop, defined in `assets/src/styles/style.css`). Pure heartbeat — no fill / glow / motion paths. Vaulted rows render the same SVG with `text-w-pinkL` but no `vault-pulse` class. Frozen / Expiring / unfunded rows render no icon.
+- **Row-wide background fill (`<tr>`)** — JS sets `style.backgroundImage = "linear-gradient(to right, <tint> <pct>%, transparent <pct>%)"` on each SSE message. Tints (low alpha, the bar is a wash not a hard fill): `caching` `rgba(0,206,201,0.10)`, `cached`/`idle` `rgba(0,206,201,0.06)`, `vaulting` `rgba(108,92,231,0.12)`, `vaulted` `rgba(34,197,94,0.08)`. SSR ships the row with no `style=` attribute — the row is plain until the first SSE message lands, so there's no SSR/SSE flash.
+- **Status badge** — `<span data-vault-progress-badge>` renders a loading-dots fallback for SSR/no-JS; JS swaps it for a live badge `<state> <pct>%` (with peer count when relevant). Once `state == "vaulted"` the badge falls back to `Claimable` and the SSE source closes.
+- **Wiring** — `assets/src/js/app/vault/progress.js`. One `EventSource` per active row pointing at the existing `/resources/:resource_id/status` endpoint (`handlers/resource/status.go`); no new backend endpoint. Inactive rows stay static and don't open SSE. On `state == "vaulted"` the JS removes the `vault-pulse` class so the icon settles to fully opaque.
+
 ### GET /vault/pledge → 301
 
 Backwards-compat redirect to `/vault`. The page was renamed from "Pledges" to "My Vault" to ditch the financial connotation of "pledge/вклад" and align with the brand-driven CTA "Save to Vault".
 
 ## Future work
 
-- **Resource state column in the pledges table**: today the `Status` column reflects pledge state (Frozen/Claimable/Expiring); a separate "In Vault" column showing resource state (Vaulted/Loading/Expired) would resolve the case where a pledge reads "Claimable" while the underlying resource is still loading.
 - **Clickable stat-cards as filters**: tapping "Expiring: 2" on the dashboard could filter the pledges table to that subset. The stat blocks already carry IDs that would make this cheap.
-- **Auto-refresh for the Loading metric**: while transfers are in flight, polling the dashboard via `data-async-layout` would let users watch the count drop without a manual refresh. Held off because the project has no precedent for timed auto-refresh.
+- **Auto-refresh for the Loading metric**: while transfers are in flight, polling the dashboard via `data-async-layout` would let users watch the count drop without a manual refresh. The per-row progress already covers this for individual rows; the aggregate `Loading` stat still requires a manual refresh.
 
 ## UI Components
 

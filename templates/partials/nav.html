@@ -43,11 +43,19 @@
             </svg>
             <span class="hidden lg:inline">{{ t $.Lang "nav.discover" }}</span>
         </a>
-        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap px-2 sm:px-3" href="{{ langPath $.Lang "/lib/" }}" data-async-target="main" aria-label="My Library">
+        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap px-2 sm:px-3" href="{{ langPath $.Lang "/lib/" }}" data-async-target="main" aria-label="Library">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
             </svg>
             <span class="hidden lg:inline">{{ t $.Lang "nav.library" }}</span>
+        </a>
+        <a class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap px-2 sm:px-3" href="{{ langPath $.Lang "/vault" }}" data-async-target="main" aria-label="Vault">
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+            </svg>
+            <span class="hidden lg:inline">{{ t $.Lang "nav.vault" }}</span>
         </a>
         <div class="join">
             {{ if .User | hasAuth }}

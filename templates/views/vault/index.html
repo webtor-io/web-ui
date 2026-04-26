@@ -94,10 +94,14 @@
             <tbody>
               {{ range .Data.Pledges }}
                 {{ if .Resource }}
-                <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors">
+                <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors"{{ if .ShowProgress }} data-vault-progress data-resource-id="{{ .ResourceID }}" data-csrf="{{ $.CSRF }}"{{ end }}>
                   <td class="text-center">
                     {{ if .Resource.Vaulted }}
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
+                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                      </svg>
+                    {{ else if .ShowProgress }}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon>
                         <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
                       </svg>
                     {{ end }}
@@ -116,6 +120,12 @@
                         <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
                         {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
                       </div>
+                    {{ else if .ShowProgress }}
+                      <span data-vault-progress-badge>
+                        <span class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
+                          <span class="loading loading-dots loading-xs"></span>
+                        </span>
+                      </span>
                     {{ else }}
                       <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">{{ t $.Lang "vault.pledges.claimable" }}</span>
                     {{ end }}
@@ -173,4 +183,5 @@
     </div>
   </div>
 </section>
+{{ "vault/progress.js" | asset }}
 {{ end }}

@@ -25,6 +25,17 @@ var SupportedLangs []string
 // fallback cases throughout the i18n stack.
 var DefaultLang = "en"
 
+// LangPath prefixes a path with the language code if it isn't the default.
+// Mirrors the template helper `langPath` (services/web/helper.go) so handlers
+// can build lang-aware redirect targets without going through templates.
+// Empty or default lang returns the path unchanged.
+func LangPath(lang, path string) string {
+	if lang == "" || lang == DefaultLang {
+		return path
+	}
+	return "/" + lang + path
+}
+
 // LangNames maps a 2-letter locale code to its native display name. This is
 // the one piece of per-locale metadata that cannot be derived from the
 // filesystem — when adding a new locale, add an entry here too. New() will
