@@ -38,6 +38,7 @@ type PledgeListData struct {
 	FreezePeriod          time.Duration
 	ExpirePeriod          time.Duration
 	TransferTimeoutPeriod time.Duration
+	IsFree                bool
 }
 
 func RegisterHandler(r *gin.Engine, v *vault.Vault, tm *template.Manager[*web.Context], pg *cs.PG) {

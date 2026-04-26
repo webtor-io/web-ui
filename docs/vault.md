@@ -281,7 +281,9 @@ Reachable from the top nav via the dedicated Vault button (`templates/partials/n
 Dashboard shows three blocks:
 1. **Content stats** (primary): Saved (vaulted), Loading (funded, transfer in progress — hidden when 0), Expiring (lost backing). Numbers tinted purple/cyan/pink to mirror the badge palette.
 2. **Vault Points stats** (secondary, compact): Total / Available / Funded / Frozen.
-3. **Active torrents table** with per-pledge status badges; or empty-state illustration with hint pointing back to the "Save to Vault" CTA on resource pages.
+3. **Active torrents table** with per-pledge status badges. When the table is empty, what gets rendered depends on tier:
+   - **Free tier** (`Claims.Context.Tier.Id == 0`, mirrors `services/claims.IsPaid`): inline upsell card — vault icon + `vault.dashboard.upsellTitle`/`upsellSub` on the left, `btn-soft` CTA "Get a plan" linking to `/donate` (`data-umami-event="donate-vault"`, `data-umami-event-tier="free"`). Replaces the empty-state hint because a free user has zero VP and can't act on it.
+   - **Paid tier**: empty-state illustration with hint pointing back to the "Save to Vault" CTA on resource pages.
 
 Data structures:
 
@@ -304,6 +306,7 @@ type PledgeListData struct {
     FreezePeriod          time.Duration
     ExpirePeriod          time.Duration
     TransferTimeoutPeriod time.Duration
+    IsFree                bool // tier-id 0 → render upsell instead of empty-state hint
 }
 ```
 

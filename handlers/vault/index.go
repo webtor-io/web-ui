@@ -37,15 +37,28 @@ func (h *Handler) index(c *gin.Context) {
 		return
 	}
 
+	ctx := web.NewContext(c)
 	data := &PledgeListData{
 		Pledges:               buildPledgeDisplay(enriched, h.vault.GetExpirePeriod()),
 		Stats:                 stats,
 		FreezePeriod:          h.vault.GetFreezePeriod(),
 		ExpirePeriod:          h.vault.GetExpirePeriod(),
 		TransferTimeoutPeriod: h.vault.GetTransferTimeoutPeriod(),
+		IsFree:                isFreeTier(ctx),
 	}
 
-	h.tb.Build("vault/index").HTML(http.StatusOK, web.NewContext(c).WithData(data))
+	h.tb.Build("vault/index").HTML(http.StatusOK, ctx.WithData(data))
+}
+
+// isFreeTier returns true when the user has no paid subscription. Free is the
+// default — any unknown/missing claims state is treated as free so the upsell
+// shows instead of a misleading empty Vault for users we can't classify.
+// Tier id 0 mirrors what services/claims.IsPaid uses to gate paid-only routes.
+func isFreeTier(ctx *web.Context) bool {
+	if ctx.Claims == nil || ctx.Claims.Context == nil || ctx.Claims.Context.Tier == nil {
+		return true
+	}
+	return ctx.Claims.Context.Tier.Id == 0
 }
 
 // buildPledgeDisplay converts enriched pledges into display rows for the table
