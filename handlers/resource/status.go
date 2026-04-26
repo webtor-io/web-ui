@@ -135,6 +135,7 @@ func (s *Handler) status(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache,no-store,no-transform")
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("X-Accel-Buffering", "no")
 
 	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()

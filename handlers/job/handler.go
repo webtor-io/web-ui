@@ -39,6 +39,11 @@ func (s *Handler) log(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache,no-store,no-transform")
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
+	// Disable response buffering on nginx-ingress so warmup progress and
+	// no_peers/slow_download CTAs reach the browser as they're emitted —
+	// without this header the ingress holds events in its proxy buffers
+	// and the user sees the status update tens of seconds late.
+	c.Header("X-Accel-Buffering", "no")
 
 	c.Stream(func(w io.Writer) bool {
 		ticker := time.NewTicker(5 * time.Second)
