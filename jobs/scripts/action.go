@@ -489,6 +489,12 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 
 	var peerCount atomic.Int32
 	var noPeersFlag atomic.Bool
+	// statsEverSeen flips on the first SSE statupdate from torrent-web-seeder.
+	// The watchdog requires this before firing the no-peers predicate so a
+	// late SSE stream (cold-started seeder pod, proxy hop) cannot be
+	// misread as "no peers" — absence of stats is not evidence of absence
+	// of peers.
+	var statsEverSeen atomic.Bool
 
 	if useStatus {
 		j.StatusUpdate(s.t("job.waitingForPeers"))
@@ -504,6 +510,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 					if !ok {
 						return
 					}
+					statsEverSeen.Store(true)
 					peerCount.Store(int32(ev.Peers))
 					j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
 				case <-warmupCtx.Done():
@@ -519,7 +526,10 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	// Watchdog: surface no_peers CTA early instead of waiting the full warmup
 	// deadline. Two thresholds (both configurable via env):
 	//   - WARMUP_NO_PEERS_TIMEOUT_SEC + zero bytes + zero peers — torrent has
-	//     no peers at all.
+	//     no peers at all. Gated on statsEverSeen so we don't conflate a slow
+	//     SSE stream (cold-start seeder, premium-edge buffering) with absence
+	//     of peers; if no statupdate has arrived we fall through to the slow
+	//     peers branch which measures throughput directly.
 	//   - WARMUP_SLOW_PEERS_TIMEOUT_SEC + bytes < earlyMinBytes — peers serve,
 	//     but the rate is so low (<17 KB/s avg for 1 MB threshold) that probe
 	//     will hang on its own 1-min deadline anyway. Surface CTA now instead
@@ -537,7 +547,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 			case <-ticker.C:
 				bytes := sr.bytesRead.Load()
 				elapsed := time.Since(warmupStart)
-				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 {
+				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 && statsEverSeen.Load() {
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return
