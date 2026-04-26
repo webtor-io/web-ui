@@ -598,8 +598,9 @@ input:-webkit-autofill:focus {
   display: none;
 }
 
-/* Progress inside modal: hide cancel, remove bottom margin */
-.modal-box .btn-ghost.closeable-close {
+/* Progress inside modal: hide cancel (modal has its own X), remove bottom margin.
+   Scoped to btn-sm without border to spare the wget/curl/URL chips (btn-xs + border). */
+.modal-box .btn-sm.btn-ghost.closeable-close:not(.border) {
   display: none !important;
 }
 .modal-box .progress-alert {
