@@ -2,24 +2,14 @@
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-2 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            {{ t .Ctx.Lang "profile.vault.title" }}
+            {{ t .Ctx.Lang "vault.dashboard.title" }}
         </h2>
         {{ if .Data }}
             <div class="bg-base-200/50 rounded-xl p-4 mb-4">
                 <table class="table w-full text-sm">
                     <tbody>
                         <tr>
-                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.total" }}</td>
-                            <td class="text-center">
-                                {{ if .Data.Total }}
-                                    {{ printf "%.2f" (derefFloat64 .Data.Total) }}
-                                {{ else }}
-                                    <span class="text-xl">&#8734;</span>
-                                {{ end }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.available" }}</td>
+                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.availableVP" }}</td>
                             <td class="text-center">
                                 {{ if .Data.Available }}
                                     {{ printf "%.2f" (derefFloat64 .Data.Available) }}
@@ -29,19 +19,15 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.funded" }}</td>
-                            <td class="text-center">{{ printf "%.2f" .Data.Funded }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.frozen" }}</td>
-                            <td class="text-center">{{ printf "%.2f" .Data.Frozen }}</td>
+                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.vaultedTorrents" }}</td>
+                            <td class="text-center {{ if gt .Data.VaultedCount 0 }}text-w-purpleL font-semibold{{ end }}">{{ .Data.VaultedCount }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             <div class="flex items-center justify-between">
                 <a href="{{ langPath .Ctx.Lang "/instructions/vault" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">{{ t .Ctx.Lang "profile.vault.whatIs" }}</a>
-                <a href="{{ langPath .Ctx.Lang "/vault/pledge" }}" class="btn btn-soft" data-async-target="main">{{ t .Ctx.Lang "profile.vault.pledges" }}</a>
+                <a href="{{ langPath .Ctx.Lang "/vault" }}" class="btn btn-soft" data-async-target="main" data-umami-event="profile-open-vault">{{ t .Ctx.Lang "profile.vault.openVault" }}</a>
             </div>
         {{ end }}
     </div>

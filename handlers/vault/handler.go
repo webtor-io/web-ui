@@ -1,12 +1,14 @@
 package vault
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
@@ -31,6 +33,7 @@ type PledgeDisplay struct {
 
 type PledgeListData struct {
 	Pledges               []PledgeDisplay
+	Stats                 *vault.UserStats
 	FreezePeriod          time.Duration
 	ExpirePeriod          time.Duration
 	TransferTimeoutPeriod time.Duration
@@ -40,12 +43,24 @@ func RegisterHandler(r *gin.Engine, v *vault.Vault, tm *template.Manager[*web.Co
 	h := &Handler{
 		vault: v,
 		pg:    pg,
-		tb: tm.MustRegisterViews("vault/pledge/*").
+		tb: tm.MustRegisterViews("vault/*").
 			WithLayout("main"),
 	}
-	gr := r.Group("/vault/pledge")
+	gr := r.Group("/vault")
 	gr.Use(auth.HasAuth)
 	gr.GET("", h.index)
 	gr.POST("/add", h.addPledge)
 	gr.POST("/remove", h.removePledge)
+
+	// Backwards-compat redirect: old /vault/pledge URL was renamed to /vault.
+	// 302 (not 301) so the redirect can be removed later without poisoning
+	// browser caches — the URL was new and never had time to spread.
+	// The target keeps the language prefix the user came in with.
+	r.GET("/vault/pledge", func(c *gin.Context) {
+		target := "/vault"
+		if lang := i18n.GetLang(c); lang != "" && lang != i18n.DefaultLang {
+			target = "/" + lang + "/vault"
+		}
+		c.Redirect(http.StatusFound, target)
+	})
 }

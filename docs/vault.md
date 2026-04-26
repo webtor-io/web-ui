@@ -164,15 +164,18 @@ Returns `UserStats`:
 
 ```go
 type UserStats struct {
-    Total     *float64 // nil = unlimited
-    Frozen    float64  // VP in frozen+funded pledges
-    Funded    float64  // VP in all funded pledges (>= 0)
-    Available *float64 // Total - Funded, nil if unlimited (>= 0)
-    Claimable float64  // Funded but not frozen
+    Total         *float64 // nil = unlimited
+    Frozen        float64  // VP in frozen+funded pledges
+    Funded        float64  // VP in all funded pledges (>= 0)
+    Available     *float64 // Total - Funded, nil if unlimited (>= 0)
+    Claimable     float64  // Funded but not frozen
+    VaultedCount  int      // resources with vaulted=true
+    LoadingCount  int      // funded but not yet vaulted (transfer in progress)
+    ExpiringCount int      // resources with expired=true
 }
 ```
 
-Always syncs balance first via `UpdateUserVP`.
+Always syncs balance first via `UpdateUserVP`. Pledges are loaded with their resources via `GetUserPledgesWithResources` so content counters can be derived in the same pass as VP totals.
 
 #### CreatePledge
 
@@ -249,7 +252,7 @@ Handler: `handlers/vault/handler.go` (registered only if vault service is not ni
 
 Files: `handler.go`, `index.go`, `add.go`, `remove.go`.
 
-### POST /vault/pledge/add
+### POST /vault/add
 
 Creates a new pledge. Auth required.
 
@@ -258,7 +261,7 @@ Creates a new pledge. Auth required.
 - Calls `GetOrCreateResource` → `CreatePledge`
 - Redirects with `status=success` or `err=<message>`
 
-### POST /vault/pledge/remove
+### POST /vault/remove
 
 Removes a pledge. Auth required (middleware).
 
@@ -267,9 +270,14 @@ Removes a pledge. Auth required (middleware).
 - Calls `RemovePledge`
 - Redirects with `status=success` or `status=error&err=<message>`
 
-### GET /vault/pledge
+### GET /vault
 
-Displays pledge list. Auth required (middleware).
+"My Vault" dashboard. Auth required (middleware). Renders `templates/views/vault/index.html`.
+
+Shows three blocks:
+1. **Content stats** (primary): Saved (vaulted), Loading (funded, transfer in progress — hidden when 0), Expiring (lost backing). Numbers tinted purple/cyan/pink to mirror the badge palette.
+2. **Vault Points stats** (secondary, compact): Total / Available / Funded / Frozen.
+3. **Active torrents table** with per-pledge status badges; or empty-state illustration with hint pointing back to the "Save to Vault" CTA on resource pages.
 
 Data structures:
 
@@ -282,17 +290,29 @@ type PledgeDisplay struct {
     IsFrozen   bool   // computed via IsPledgeFrozen
     Funded     bool   // from DB
     CreatedAt  string // formatted
+    ExpiresIn  time.Duration // for unfunded pledges with expired resources
 }
 
 type PledgeListData struct {
     Pledges               []PledgeDisplay
+    Stats                 *vault.UserStats
     FreezePeriod          time.Duration
     ExpirePeriod          time.Duration
     TransferTimeoutPeriod time.Duration
 }
 ```
 
-Status badges: "Frozen" (green), "Expiring" (red), "Claimable" (yellow).
+Per-pledge badges in the table: `Frozen` (cyan), `Expiring` (pink), `Claimable` (purple). These describe **VP claimability**, not the resource's content state — the dashboard subtitle calls this out for users.
+
+### GET /vault/pledge → 301
+
+Backwards-compat redirect to `/vault`. The page was renamed from "Pledges" to "My Vault" to ditch the financial connotation of "pledge/вклад" and align with the brand-driven CTA "Save to Vault".
+
+## Future work
+
+- **Resource state column in the pledges table**: today the `Status` column reflects pledge state (Frozen/Claimable/Expiring); a separate "In Vault" column showing resource state (Vaulted/Loading/Expired) would resolve the case where a pledge reads "Claimable" while the underlying resource is still loading.
+- **Clickable stat-cards as filters**: tapping "Expiring: 2" on the dashboard could filter the pledges table to that subset. The stat blocks already carry IDs that would make this cheap.
+- **Auto-refresh for the Loading metric**: while transfers are in flight, polling the dashboard via `data-async-layout` would let users watch the count drop without a manual refresh. Held off because the project has no precedent for timed auto-refresh.
 
 ## UI Components
 

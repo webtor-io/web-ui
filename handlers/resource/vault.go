@@ -35,7 +35,7 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 	ctx := c.Request.Context()
 
 	// Get user vault stats
-	stats, err := s.vault.GetUserStats(ctx, args.User)
+	stats, _, err := s.vault.GetUserStats(ctx, args.User)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user vault stats")
 	}
@@ -93,7 +93,7 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 	}
 
 	// Handle redirect from vault handler
-	if c.Query("from") == "/vault/pledge/add" {
+	if c.Query("from") == "/vault/add" {
 		status := c.Query("status")
 		if status == "error" {
 			vaultForm.Status = "error"
@@ -150,7 +150,7 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 	}
 
 	// Handle redirect from vault handler
-	if c.Query("from") == "/vault/pledge/remove" {
+	if c.Query("from") == "/vault/remove" {
 		status := c.Query("status")
 		if status == "error" {
 			form.Status = "error"

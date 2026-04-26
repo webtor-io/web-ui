@@ -83,7 +83,7 @@
 
 		<div class="modal-action justify-center">
 			{{ if or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
-				<form action="{{ langPath .Ctx.Lang "/vault/pledge/add" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
+				<form action="{{ langPath .Ctx.Lang "/vault/add" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 					<input type="hidden" name="resource_id" value="{{ .Data.ResourceID }}" />
 					<button type="submit" class="btn btn-soft" data-umami-event="vault-store-confirmed">
 						{{ t .Ctx.Lang "vault.storeInVault" }}

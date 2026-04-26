@@ -1,81 +1,62 @@
 package vault
 
 import (
-	"context"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
-	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-// index handles HTTP request for displaying user's pledges list (Level 1: HTTP interaction)
+// index handles HTTP request for displaying the My Vault dashboard (Level 1: HTTP interaction).
+// Stats and pledges come back from the same vault.GetUserStats call so the
+// underlying GetUserPledgesWithResources query and per-pledge IsPledgeFrozen
+// checks run only once per request.
 func (h *Handler) index(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 
-	pledges, err := h.getPledgesList(c.Request.Context(), user.ID)
+	stats, enriched, err := h.vault.GetUserStats(c.Request.Context(), user)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	data := &PledgeListData{
-		Pledges:               pledges,
+		Pledges:               buildPledgeDisplay(enriched, h.vault.GetExpirePeriod()),
+		Stats:                 stats,
 		FreezePeriod:          h.vault.GetFreezePeriod(),
 		ExpirePeriod:          h.vault.GetExpirePeriod(),
 		TransferTimeoutPeriod: h.vault.GetTransferTimeoutPeriod(),
 	}
 
-	h.tb.Build("vault/pledge/index").HTML(http.StatusOK, web.NewContext(c).WithData(data))
+	h.tb.Build("vault/index").HTML(http.StatusOK, web.NewContext(c).WithData(data))
 }
 
-// getPledgesList contains the core business logic for fetching user's pledges (Level 2: Business logic)
-func (h *Handler) getPledgesList(ctx context.Context, userID uuid.UUID) ([]PledgeDisplay, error) {
-	db := h.pg.Get()
-	if db == nil {
-		return nil, errors.New("no db")
-	}
-
-	pledges, err := vaultModels.GetUserPledgesWithResources(ctx, db, userID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get user pledges")
-	}
-
-	// Convert pledges to display format with frozen status
-	displayPledges := make([]PledgeDisplay, 0, len(pledges))
-	for _, pledge := range pledges {
-		// Check if pledge is frozen using IsPledgeFrozen method
-		isFrozen, err := h.vault.IsPledgeFrozen(ctx, &pledge)
-		if err != nil {
-			log.WithError(err).WithField("pledgeID", pledge.PledgeID).Warn("failed to check pledge frozen status, skipping")
-			continue
-		}
-
-		// Calculate ExpiresIn for unfunded pledges with expired resource
+// buildPledgeDisplay converts enriched pledges into display rows for the table
+// (Level 2: presentation logic).
+func buildPledgeDisplay(enriched []vault.EnrichedPledge, expirePeriod time.Duration) []PledgeDisplay {
+	display := make([]PledgeDisplay, 0, len(enriched))
+	for _, e := range enriched {
 		var expiresIn time.Duration
-		if !pledge.Funded && pledge.Resource != nil && pledge.Resource.ExpiredAt != nil {
-			remaining := time.Until(pledge.Resource.ExpiredAt.Add(h.vault.GetExpirePeriod()))
+		if !e.Pledge.Funded && e.Pledge.Resource != nil && e.Pledge.Resource.ExpiredAt != nil {
+			remaining := time.Until(e.Pledge.Resource.ExpiredAt.Add(expirePeriod))
 			if remaining > 0 {
 				expiresIn = remaining
 			}
 		}
 
-		displayPledges = append(displayPledges, PledgeDisplay{
-			PledgeID:   pledge.PledgeID.String(),
-			ResourceID: pledge.ResourceID,
-			Resource:   pledge.Resource,
-			Amount:     pledge.Amount,
-			IsFrozen:   isFrozen,
-			Funded:     pledge.Funded,
-			CreatedAt:  pledge.CreatedAt.Format("2006-01-02 15:04:05"),
+		display = append(display, PledgeDisplay{
+			PledgeID:   e.Pledge.PledgeID.String(),
+			ResourceID: e.Pledge.ResourceID,
+			Resource:   e.Pledge.Resource,
+			Amount:     e.Pledge.Amount,
+			IsFrozen:   e.IsFrozen,
+			Funded:     e.Pledge.Funded,
+			CreatedAt:  e.Pledge.CreatedAt.Format("2006-01-02 15:04:05"),
 			ExpiresIn:  expiresIn,
 		})
 	}
-
-	return displayPledges, nil
+	return display
 }

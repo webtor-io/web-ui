@@ -261,32 +261,47 @@ func (s *Vault) UpdateUserVPIfExists(ctx context.Context, user *auth.User) (*vau
 	return s.UpdateUserVP(ctx, user)
 }
 
-// UserStats represents user vault points statistics
-type UserStats struct {
-	Total     *float64 // Total vault points (nil if unlimited)
-	Frozen    float64  // Points in frozen and funded pledges
-	Funded    float64  // Points in funded pledges
-	Available *float64 // Total minus funded (nil if total is nil)
-	Claimable float64  // Funded but not frozen
+// EnrichedPledge bundles a raw pledge with the freeze-status flag.
+// IsPledgeFrozen is mildly expensive and used both for stats counting and
+// per-row badge rendering, so we compute it once and pass it on.
+type EnrichedPledge struct {
+	Pledge   vaultModels.Pledge
+	IsFrozen bool
 }
 
-// GetUserStats returns vault points statistics for a user
-func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, error) {
+// UserStats represents user vault points statistics
+type UserStats struct {
+	Total         *float64 // Total vault points (nil if unlimited)
+	Frozen        float64  // Points in frozen and funded pledges
+	Funded        float64  // Points in funded pledges
+	Available     *float64 // Total minus funded (nil if total is nil)
+	Claimable     float64  // Funded but not frozen
+	VaultedCount  int      // Resources fully saved in Vault (vaulted=true and not expired)
+	LoadingCount  int      // Funded but not yet vaulted (transfer in progress)
+	ExpiringCount int      // Resources whose pledges lost backing (expired=true) — counted regardless of vaulted state
+}
+
+// GetUserStats returns vault points statistics and enriched pledges for a user.
+// The enriched pledges come pre-tagged with IsFrozen so callers that need both
+// stats and per-pledge rendering (the My Vault dashboard) can reuse them
+// without re-running GetUserPledgesWithResources or IsPledgeFrozen.
+// Callers that only need stats can ignore the second return value.
+func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, []EnrichedPledge, error) {
 	db := s.pg.Get()
 	if db == nil {
-		return nil, errors.New("database connection is not available")
+		return nil, nil, errors.New("database connection is not available")
 	}
 
 	// Update user VP first
 	userVP, err := s.UpdateUserVP(ctx, user)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update user vault points")
+		return nil, nil, errors.Wrap(err, "failed to update user vault points")
 	}
 
-	// Fetch all pledges for user in one query
-	pledges, err := vaultModels.GetUserPledges(ctx, db, user.ID)
+	// Fetch all pledges for user with their resources in one query
+	pledges, err := vaultModels.GetUserPledgesWithResources(ctx, db, user.ID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get user pledges")
+		return nil, nil, errors.Wrap(err, "failed to get user pledges")
 	}
 
 	// Calculate statistics in application
@@ -297,15 +312,19 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 		Available: nil,
 		Claimable: 0,
 	}
+	enriched := make([]EnrichedPledge, 0, len(pledges))
 
 	// Process pledges
 	for _, pledge := range pledges {
 		// Check if pledge is frozen using IsPledgeFrozen method
 		isFrozen, err := s.IsPledgeFrozen(ctx, &pledge)
 		if err != nil {
-			// If error checking frozen status, skip this pledge
+			// If error checking frozen status, skip this pledge — broken
+			// data should not contribute to either stats or the rendered list.
 			continue
 		}
+
+		enriched = append(enriched, EnrichedPledge{Pledge: pledge, IsFrozen: isFrozen})
 
 		// Frozen: sum of pledges that are frozen AND funded
 		if isFrozen && pledge.Funded {
@@ -320,6 +339,22 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 		// Claimable: funded but not frozen
 		if pledge.Funded && !isFrozen {
 			stats.Claimable += pledge.Amount
+		}
+
+		// Content state counters (per-resource).
+		// Expired is checked first because a resource can be Vaulted=true && Expired=true
+		// (MarkResourceExpiredAndUnfunded does not clear vaulted) — and from the user's
+		// perspective such a resource is "expiring" and the table badge reads "Expiring",
+		// so the dashboard counter must agree.
+		if pledge.Resource != nil {
+			switch {
+			case pledge.Resource.Expired:
+				stats.ExpiringCount++
+			case pledge.Resource.Vaulted:
+				stats.VaultedCount++
+			case pledge.Resource.Funded:
+				stats.LoadingCount++
+			}
 		}
 	}
 
@@ -338,7 +373,7 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 		stats.Available = &available
 	}
 
-	return stats, nil
+	return stats, enriched, nil
 }
 
 // CreatePledge creates a new pledge for a resource

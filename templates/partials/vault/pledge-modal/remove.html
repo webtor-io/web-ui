@@ -46,7 +46,7 @@
 		</p>
 
 		<div class="modal-action justify-center">
-			<form action="{{ langPath .Ctx.Lang "/vault/pledge/remove" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
+			<form action="{{ langPath .Ctx.Lang "/vault/remove" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 				<input type="hidden" name="resource_id" value="{{ .Data.ResourceID }}" />
 				<button type="submit" class="btn btn-soft" data-umami-event="vault-pledge-remove-confirmed">
 					{{ t .Ctx.Lang "vault.removePledge" }}

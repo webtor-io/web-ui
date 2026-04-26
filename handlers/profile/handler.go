@@ -174,7 +174,7 @@ func (s *Handler) get(c *gin.Context) {
 	// Get vault statistics if vault service is available
 	var vaultStats *vault.UserStats
 	if s.vault != nil {
-		vaultStats, err = s.vault.GetUserStats(c.Request.Context(), u)
+		vaultStats, _, err = s.vault.GetUserStats(c.Request.Context(), u)
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get vault user stats"))
 			return

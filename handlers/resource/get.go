@@ -303,7 +303,7 @@ func (s *Handler) get(c *gin.Context) {
 			return
 		}
 		d.VaultButton = vaultButton
-		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/pledge/add" {
+		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
 			vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
 			if err != nil {
 				_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
@@ -313,7 +313,7 @@ func (s *Handler) get(c *gin.Context) {
 
 			d.VaultPledgeAddForm = vaultPledgeAddForm
 		}
-		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/pledge/remove" {
+		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/remove" {
 			vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
 			if err != nil {
 				_ = c.Error(errors.Wrap(err, "failed to prepare vault pledge remove form"))
