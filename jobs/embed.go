@@ -14,7 +14,7 @@ import (
 )
 
 func (s *Jobs) Embed(c *web.Context, cl *http.Client, settings *models.EmbedSettings, dsd *embed.DomainSettingsData) (j *job.Job, err error) {
-	es, hash, err := scripts.Embed(s.tb, cl, c, s.api, s.i18n, settings, "", dsd, s.warmupTimeoutMin)
+	es, hash, err := scripts.Embed(s.tb, cl, c, s.api, s.i18n, settings, "", dsd, s.warmup)
 	if err != nil {
 		return
 	}

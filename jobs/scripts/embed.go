@@ -28,32 +28,32 @@ var (
 )
 
 type EmbedScript struct {
-	api              *api.Api
-	i18n             *i18n.Service
-	settings         *models.EmbedSettings
-	file             string
-	tb               template.Builder[*web.Context]
-	c                *web.Context
-	cl               *http.Client
-	dsd              *embed.DomainSettingsData
-	warmupTimeoutMin int
+	api      *api.Api
+	i18n     *i18n.Service
+	settings *models.EmbedSettings
+	file     string
+	tb       template.Builder[*web.Context]
+	c        *web.Context
+	cl       *http.Client
+	dsd      *embed.DomainSettingsData
+	warmup   WarmupSettings
 }
 
 type EmbedAdsData struct {
 	DomainSettings *embed.DomainSettingsData
 }
 
-func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmupTimeoutMin int) *EmbedScript {
+func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) *EmbedScript {
 	return &EmbedScript{
-		c:                c,
-		api:              api,
-		i18n:             i18nSvc,
-		settings:         settings,
-		file:             file,
-		tb:               tb,
-		cl:               cl,
-		dsd:              dsd,
-		warmupTimeoutMin: warmupTimeoutMin,
+		c:        c,
+		api:      api,
+		i18n:     i18nSvc,
+		settings: settings,
+		file:     file,
+		tb:       tb,
+		cl:       cl,
+		dsd:      dsd,
+		warmup:   warmup,
 	}
 }
 
@@ -134,7 +134,7 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	// Pass nil for user-subtitles: the embed flow intentionally omits the
 	// My Subtitles tab (no account context on third-party sites) so the
 	// script never needs the service.
-	as, _ := Action(s.tb, s.api, s.i18n, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmupTimeoutMin)
+	as, _ := Action(s.tb, s.api, s.i18n, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmup)
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err
@@ -223,13 +223,13 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 	return
 }
 
-func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmTimeoutMin int) (r job.Runnable, hash string, err error) {
+func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) (r job.Runnable, hash string, err error) {
 	geoHash := ""
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
 	}
 	hourKey := time.Now().UTC().Format("2006010215")
 	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang)))
-	r = NewEmbedScript(tb, cl, c, api, i18nSvc, settings, file, dsd, warmTimeoutMin)
+	r = NewEmbedScript(tb, cl, c, api, i18nSvc, settings, file, dsd, warmup)
 	return
 }

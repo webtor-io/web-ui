@@ -103,7 +103,7 @@ type SessionBufferResult struct {
 }
 
 func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamURL string, bufferDuration time.Duration) (*SessionBufferResult, error) {
-	bufferCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
+	bufferCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmup.TimeoutMin)*time.Minute)
 	defer cancel()
 
 	baseURL, err := sessionBaseURL(streamURL)

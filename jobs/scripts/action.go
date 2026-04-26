@@ -56,6 +56,22 @@ const (
 	bandwidthMultiplier = 1.5
 )
 
+// WarmupSettings groups all torrent warmup tuning knobs so call-sites pass a
+// single value rather than three loose ints. Wired from CLI/env flags in
+// jobs.New() and threaded through Action/Embed scripts unchanged.
+type WarmupSettings struct {
+	// TimeoutMin is the hard warmup deadline (overall context.WithTimeout).
+	TimeoutMin int
+	// NoPeersTimeoutSec is the watchdog cutoff for "no bytes AND no peers" —
+	// when no peers have appeared within this window we surface the no_peers
+	// CTA early instead of waiting the full TimeoutMin.
+	NoPeersTimeoutSec int
+	// SlowPeersTimeoutSec is the watchdog cutoff for "peers exist but the
+	// rate is below the early-min threshold" — surfaces the no_peers CTA
+	// before probe hangs on its own deadline.
+	SlowPeersTimeoutSec int
+}
+
 type SlowDownloadData struct {
 	MeasuredSpeedMbps float64
 	RequiredSpeedMbps float64
@@ -468,7 +484,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	} else {
 		j.InProgress(m)
 	}
-	warmupCtx, warmupCancel := context.WithTimeout(ctx, time.Duration(s.warmupTimeoutMin)*time.Minute)
+	warmupCtx, warmupCancel := context.WithTimeout(ctx, time.Duration(s.warmup.TimeoutMin)*time.Minute)
 	defer warmupCancel()
 
 	var peerCount atomic.Int32
@@ -501,13 +517,16 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	warmupStart := time.Now()
 
 	// Watchdog: surface no_peers CTA early instead of waiting the full warmup
-	// deadline. Three thresholds:
-	//   - 30s + zero bytes + zero peers — torrent has no peers at all.
-	//   - 60s + zero bytes — peers exist but aren't serving.
-	//   - 60s + bytes < earlyMinBytes — peers serve, but the rate is so low
-	//     (<17 KB/s avg for 1 MB threshold) that probe will hang on its own
-	//     1-min deadline anyway. Surface CTA now instead of waiting.
+	// deadline. Two thresholds (both configurable via env):
+	//   - WARMUP_NO_PEERS_TIMEOUT_SEC + zero bytes + zero peers — torrent has
+	//     no peers at all.
+	//   - WARMUP_SLOW_PEERS_TIMEOUT_SEC + bytes < earlyMinBytes — peers serve,
+	//     but the rate is so low (<17 KB/s avg for 1 MB threshold) that probe
+	//     will hang on its own 1-min deadline anyway. Surface CTA now instead
+	//     of waiting.
 	const earlyMinBytes = 1 * 1024 * 1024
+	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
+	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -518,12 +537,12 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 			case <-ticker.C:
 				bytes := sr.bytesRead.Load()
 				elapsed := time.Since(warmupStart)
-				if elapsed > 30*time.Second && bytes == 0 && peerCount.Load() == 0 {
+				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 {
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return
 				}
-				if elapsed > 60*time.Second && bytes < earlyMinBytes {
+				if elapsed > slowPeersAfter && bytes < earlyMinBytes {
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return
@@ -601,18 +620,18 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 }
 
 type ActionScript struct {
-	api              *api.Api
-	c                *web.Context
-	i18n             *i18n.Service
-	userSubtitles    *us.Service
-	resourceId       string
-	itemId           string
-	action           string
-	tb               template.Builder[*web.Context]
-	settings         *models.StreamSettings
-	vsud             *models.VideoStreamUserData
-	dsd              *embed.DomainSettingsData
-	warmupTimeoutMin int
+	api           *api.Api
+	c             *web.Context
+	i18n          *i18n.Service
+	userSubtitles *us.Service
+	resourceId    string
+	itemId        string
+	action        string
+	tb            template.Builder[*web.Context]
+	settings      *models.StreamSettings
+	vsud          *models.VideoStreamUserData
+	dsd           *embed.DomainSettingsData
+	warmup        WarmupSettings
 }
 
 func (s *ActionScript) t(key string) string {
@@ -676,7 +695,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmupTimeoutMin int) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -713,18 +732,18 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 		tb: tb,
 		c:  c,
 		Script: &ActionScript{
-			tb:               tb,
-			api:              api,
-			i18n:             i18nSvc,
-			userSubtitles:    userSubtitles,
-			c:                c,
-			resourceId:       resourceID,
-			itemId:           itemID,
-			action:           action,
-			settings:         settings,
-			vsud:             vsud,
-			dsd:              dsd,
-			warmupTimeoutMin: warmupTimeoutMin,
+			tb:            tb,
+			api:           api,
+			i18n:          i18nSvc,
+			userSubtitles: userSubtitles,
+			c:             c,
+			resourceId:    resourceID,
+			itemId:        itemID,
+			action:        action,
+			settings:      settings,
+			vsud:          vsud,
+			dsd:           dsd,
+			warmup:        warmup,
 		},
 	}, id
 }
