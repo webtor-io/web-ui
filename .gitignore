@@ -33,4 +33,12 @@ templates/partials/extend.html
 
 chart
 
-.claude/skills/deploy*.yaml.gotmpl
+# Symlinks to private infra/helmfile values — see CLAUDE.md
+*.yaml.gotmpl
+
+# Local Claude Code settings & skill symlinks
+.claude/
+
+# Local UI/visual-audit artifacts
+.playwright-mcp/
+.screenshots/
