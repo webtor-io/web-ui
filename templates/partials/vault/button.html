@@ -6,7 +6,7 @@
 	the submit goes to /{lang}/... no matter what the browser thinks of
 	the current document URL.
 */}}
-<div>
+<div data-vault-state="{{ if .Ctx.User | hasAuth }}{{ if .Data.Funded }}funded{{ else }}authed{{ end }}{{ else }}anon{{ end }}">
 	{{ if .Ctx.User | hasAuth }}
 		{{ if .Data.Funded }}
 			<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
