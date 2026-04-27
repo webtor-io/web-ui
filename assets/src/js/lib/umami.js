@@ -233,12 +233,27 @@ export function init(window, config) {
         }
     };
 
+    const resolveDefaults = () => {
+        try {
+            const d = config.defaultData;
+            if (typeof d === 'function') return d() || {};
+            if (d && typeof d === 'object') return d;
+        } catch (e) { /* ignore */ }
+        return {};
+    };
+
+    const mergeData = data => {
+        const defaults = resolveDefaults();
+        if (data && typeof data === 'object') return { ...defaults, ...data };
+        return Object.keys(defaults).length ? defaults : undefined;
+    };
+
     const track = (obj, data) => {
         if (typeof obj === 'string') {
             return send({
                 ...getPayload(),
                 name: obj,
-                data: typeof data === 'object' ? data : undefined,
+                data: mergeData(data),
             });
         } else if (typeof obj === 'object') {
             return send(obj);
@@ -248,7 +263,20 @@ export function init(window, config) {
         return send(getPayload());
     };
 
-    const identify = data => send({ ...getPayload(), data }, 'identify');
+    const identify = (idOrData, maybeData) => {
+        let id;
+        let data;
+        if (typeof idOrData === 'string') {
+            id = idOrData;
+            data = (maybeData && typeof maybeData === 'object') ? maybeData : undefined;
+        } else if (idOrData && typeof idOrData === 'object') {
+            data = idOrData;
+        }
+        const payload = { ...getPayload() };
+        if (id) payload.id = id;
+        if (data) payload.data = data;
+        return send(payload, 'identify');
+    };
 
     /* Start */
 

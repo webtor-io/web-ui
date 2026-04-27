@@ -54,4 +54,16 @@
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
     <a class="close closeable-close">{{ t $.Lang "action.slow.gotIt" }}</a>
 </div>
+<script>
+(function () {
+    if (!window.umami) return;
+    window.umami.track('slow-download-shown', {
+        tier: '{{ .Data.TierName }}',
+        is_rate_limited: {{ if .Data.IsRateLimited }}1{{ else }}0{{ end }},
+        measured_mbps: {{ printf "%.1f" .Data.MeasuredSpeedMbps }},
+        required_mbps: {{ printf "%.1f" .Data.RequiredSpeedMbps }},
+        rate_limit_mbps: {{ printf "%.1f" .Data.RateLimitMbps }}
+    });
+})();
+</script>
 {{ end }}

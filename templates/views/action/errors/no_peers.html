@@ -29,4 +29,12 @@
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
     <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
 </div>
+<script>
+(function () {
+    if (!window.umami) return;
+    window.umami.track('no-peers-shown', {
+        tier: '{{ .Data.TierName }}'
+    });
+})();
+</script>
 {{ end }}

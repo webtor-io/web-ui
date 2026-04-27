@@ -1,7 +1,14 @@
 import av from '../lib/av';
+import { eventDefaults } from '../lib/trackContext';
+
 av(async function() {
     if (window.umami) {
-        if (window._userId) window.umami.identify(window._userId);
+        const sessionData = eventDefaults();
+        if (window._userId) {
+            window.umami.identify(window._userId, sessionData);
+        } else {
+            window.umami.identify(sessionData);
+        }
         if (window._isNewUser) {
             window.umami.track('signup');
         }

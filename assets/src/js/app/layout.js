@@ -49,9 +49,12 @@ function updateDescription(val) {
 }
 
 if (window._umami) {
-    const umami = (await import('../lib/umami')).init(window, window._umami);
+    const { eventDefaults } = await import('../lib/trackContext');
+    const umami = (await import('../lib/umami')).init(window, {
+        ...window._umami,
+        defaultData: eventDefaults,
+    });
     window.umami = umami;
-
 }
 
 window.progress = {
