@@ -52,7 +52,23 @@
 </div>
 
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
+    {{- if and .Data.IsRateLimited .Data.Endpoint }}
+    <form action="{{ langPath $.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data"
+          data-async-target="#log-{{ .Data.LogTargetID }}" data-async-push-state="false">
+        <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
+        <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
+        <input type="hidden" name="force-slow" value="true" />
+        <button type="submit" class="btn btn-soft whitespace-nowrap"
+                data-umami-event="slow-download-continue-slow"
+                data-umami-event-tier="{{ .Data.TierName }}"
+                data-umami-event-is_rate_limited="1">
+            {{ template "icons" "stream" }}
+            {{ t $.Lang "action.slow.continueSlow" }}
+        </button>
+    </form>
+    {{- else }}
     <a class="close closeable-close">{{ t $.Lang "action.slow.gotIt" }}</a>
+    {{- end }}
 </div>
 <script>
 (function () {

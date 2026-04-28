@@ -408,6 +408,7 @@
     "action.slow.alt.preDownload": "pre-download instead of streaming",
     "action.slow.alt.vault": "save to Vault and let it pre-fetch",
     "action.slow.gotIt": "Got it",
+    "action.slow.continueSlow": "Continue at slow speed",
     "action.upgrade.free": "Get 50 Mbps",
     "action.upgrade.paid": "Upgrade plan",
     "action.stream.audio": "Audio",

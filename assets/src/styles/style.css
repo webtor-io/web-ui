@@ -312,6 +312,23 @@
       span.task-status { display: none; }
     }
 
+    &.skip {
+      color: #fbbf24;
+      &::before {
+        content: '»';
+        background: none;
+        width: auto;
+        height: auto;
+        border-radius: 0;
+        margin-top: 0;
+        animation: none;
+        color: #fbbf24;
+        font-weight: 700;
+        line-height: 1.75rem;
+      }
+      span.task-status { display: none; }
+    }
+
     &.warn {
       color: #fd79a8;
       &::before {

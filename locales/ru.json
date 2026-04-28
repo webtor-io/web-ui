@@ -370,6 +370,7 @@
     "action.slow.alt.preDownload": "сначала скачайте, потом смотрите",
     "action.slow.alt.vault": "сохраните в Vault — он догрузит сам",
     "action.slow.gotIt": "Понятно",
+    "action.slow.continueSlow": "Смотреть как есть",
     "action.upgrade.free": "Получить 50 Мбит/с",
     "action.upgrade.paid": "Улучшить тариф",
     "action.stream.audio": "Аудио",

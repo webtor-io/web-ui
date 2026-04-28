@@ -84,6 +84,7 @@ const (
 	RenderTemplate LogItemLevel = "rendertemplate"
 	Custom         LogItemLevel = "custom"
 	StatusUpdate   LogItemLevel = "statusupdate"
+	Skip           LogItemLevel = "skip"
 	Close          LogItemLevel = "close"
 	Open           LogItemLevel = "open"
 )
@@ -100,6 +101,7 @@ var levelMap = map[LogItemLevel]log.Level{
 	StatusUpdate:   log.InfoLevel,
 	RenderTemplate: log.InfoLevel,
 	Custom:         log.InfoLevel,
+	Skip:           log.InfoLevel,
 	Close:          log.InfoLevel,
 }
 
@@ -328,6 +330,16 @@ func (s *Job) Done() *Job {
 	_ = s.log(LogItem{
 		Level: Done,
 		Tag:   s.cur,
+	})
+	return s
+}
+
+func (s *Job) Skip(message string) *Job {
+	s.cur = message
+	_ = s.log(LogItem{
+		Level:   Skip,
+		Message: message,
+		Tag:     s.cur,
 	})
 	return s
 }

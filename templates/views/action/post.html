@@ -6,9 +6,17 @@
 </div>
 {{ end }}
 {{ if has .Data "Job" }}
-<form class="hidden progress-alert progress-alert-block mt-6 mb-10 closeable" data-async-progress-log="{{ makeJobLogURL $.Lang .Data.Job }}" data-async-target="main">
+{{/*
+  div (not form) so custom partials emitted via j.Custom can host their own
+  <form> elements — HTML5 forbids nested forms, and the cap-modal's
+  "Continue at slow speed" form needs to live inside .log-target. Action
+  jobs never emit j.Redirect (only load.go does, for magnet → resource), so
+  the form-only requestSubmit() path in progressLog.js is unused here;
+  redirect emissions still work via the window.location fallback.
+*/}}
+<div class="hidden progress-alert progress-alert-block mt-6 mb-10 closeable" data-async-progress-log="{{ makeJobLogURL $.Lang .Data.Job }}">
   <div class="log-target"></div>
-</form>
+</div>
 {{ end }}
 {{ "action.js" | asset }}
 {{ end }}

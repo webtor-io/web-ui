@@ -79,6 +79,15 @@ type SlowDownloadData struct {
 	IsRateLimited     bool
 	RateLimitMbps     float64
 	TierName          string
+	// Form-resubmit context — populated in ErrorWrapperScript right before
+	// rendering. Lets the "Continue at slow speed" button POST back to the
+	// originating action endpoint with force-slow=true and target the same
+	// progress-log container so the new job replaces the failed one in place.
+	Action      string
+	Endpoint    string
+	ResourceID  string
+	ItemID      string
+	LogTargetID string
 }
 
 type SlowDownloadError struct {
@@ -263,14 +272,20 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	downloadURL := exportResponse.ExportItems["download"].URL
 
-	// Step 1: Torrent warmup (skip for cached/vault content)
+	// Step 1: Torrent warmup (skip for cached/vault content; also skipped on
+	// forceSlow — the user already accepted slow playback, so we save the warmup
+	// budget and let the transcoder pull cold instead).
 	if !se.Meta.Cache {
-		skipBytes := bandwidthSkipSize
-		if warmupSize <= skipBytes {
-			skipBytes = 0
-		}
-		if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
-			return
+		if s.forceSlow {
+			j.Skip(s.t("job.warmingUp"))
+		} else {
+			skipBytes := bandwidthSkipSize
+			if warmupSize <= skipBytes {
+				skipBytes = 0
+			}
+			if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
+				return
+			}
 		}
 	}
 
@@ -298,10 +313,15 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 
 	// Step 3: Bandwidth check. For cached content we skip the probe download
 	// but still gate rate-limited tiers on their plan cap vs required bitrate.
+	// On forceSlow we emit Skip instead of running the gate — the user already
+	// opted into slow playback, re-running the gate would just send them back
+	// to the same modal.
 	if sc.MediaProbe != nil {
 		bitrate := getVideoBitrate(sc.MediaProbe)
 		if bitrate > 0 {
-			if se.Meta.Cache {
+			if s.forceSlow {
+				j.Skip(s.t("job.checkingBandwidth"))
+			} else if se.Meta.Cache {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
 					return &SlowDownloadError{Data: sdd}
@@ -642,6 +662,7 @@ type ActionScript struct {
 	vsud          *models.VideoStreamUserData
 	dsd           *embed.DomainSettingsData
 	warmup        WarmupSettings
+	forceSlow     bool
 }
 
 func (s *ActionScript) t(key string) string {
@@ -669,14 +690,44 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 type ErrorWrapperScript struct {
-	tb     template.Builder[*web.Context]
-	Script job.Runnable
-	c      *web.Context
+	tb         template.Builder[*web.Context]
+	Script     job.Runnable
+	c          *web.Context
+	action     string
+	resourceId string
+	itemId     string
+}
+
+// actionEndpoint maps the internal action id to the public POST route the
+// "Continue at slow speed" form re-submits to. Kept in the wrapper because it
+// is the layer that knows about HTTP route names; ActionScript itself is
+// transport-agnostic.
+func actionEndpoint(action string) string {
+	switch action {
+	case "stream-video":
+		return "/stream-video"
+	case "stream-audio":
+		return "/stream-audio"
+	case "preview-image":
+		return "/preview-image"
+	case "download":
+		return "/download-file"
+	}
+	return ""
 }
 
 func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	err = s.Script.Run(ctx, j)
 	if sde, ok := err.(*SlowDownloadError); ok {
+		sde.Data.Action = s.action
+		sde.Data.Endpoint = actionEndpoint(s.action)
+		sde.Data.ResourceID = s.resourceId
+		sde.Data.ItemID = s.itemId
+		// Streaming buttons (MakeAudio/MakeVideo) wire data-async-target to
+		// "#log-{ItemID}" because MakeButton sets ButtonItem.ID = Item.ID.
+		// Mirroring that here keeps the resubmit landing in the same
+		// progress-log container that just rendered this modal.
+		sde.Data.LogTargetID = s.itemId
 		tpl := s.tb.Build("action/errors/slow_download").WithLayoutBody(`{{ template "main" . }}`)
 		str, terr := tpl.ToString(s.c.WithData(&sde.Data))
 		if terr != nil {
@@ -705,7 +756,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, forceSlow bool) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -737,10 +788,17 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 		}
 	}
 	cacheKey := fmt.Sprintf("%s%d", now.Format("2006010215"), now.Minute()/10)
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey)))
+	forceSlowKey := ""
+	if forceSlow {
+		forceSlowKey = "fs"
+	}
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey)))
 	return &ErrorWrapperScript{
-		tb: tb,
-		c:  c,
+		tb:         tb,
+		c:          c,
+		action:     action,
+		resourceId: resourceID,
+		itemId:     itemID,
 		Script: &ActionScript{
 			tb:            tb,
 			api:           api,
@@ -754,6 +812,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			vsud:          vsud,
 			dsd:           dsd,
 			warmup:        warmup,
+			forceSlow:     forceSlow,
 		},
 	}, id
 }

@@ -1,7 +1,7 @@
 import av from '../lib/av';
 av(async function() {
     const self = this;
-    const progress = self.querySelector('form');
+    const progress = self.querySelector('.progress-alert');
     const el = document.createElement('div');
     const initProgressLog = (await import('../lib/progressLog')).initProgressLog;
     initProgressLog(progress, function(ev) {

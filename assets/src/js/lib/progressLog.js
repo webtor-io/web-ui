@@ -201,8 +201,16 @@ class Renderer {
         }
         if (data.level === 'redirect') {
             this.addSummary(data);
-            this.el.setAttribute('action', data.location);
-            this.el.requestSubmit();
+            // Form-hosted progress logs (homepage magnet load, embed) can
+            // redirect through async-forms by setting action+requestSubmit;
+            // div-hosted ones (action flows that allow nested forms in custom
+            // partials) fall back to a plain location change.
+            if (this.el.tagName === 'FORM') {
+                this.el.setAttribute('action', data.location);
+                this.el.requestSubmit();
+            } else {
+                window.location.href = data.location;
+            }
         }
         if (data.level === 'rendertemplate') {
             data.render = (el) => {
@@ -220,6 +228,9 @@ class Renderer {
             this.addLine(data);
         }
         if (data.level === 'inprogress') {
+            this.addLine(data);
+        }
+        if (data.level === 'skip') {
             this.addLine(data);
         }
         if (data.level === 'done') {

@@ -370,6 +370,7 @@
     "action.slow.alt.preDownload": "önce indir, sonra izle",
     "action.slow.alt.vault": "Vault'a kaydet — kendisi önceden yükler",
     "action.slow.gotIt": "Anladım",
+    "action.slow.continueSlow": "Yine de izle",
     "action.upgrade.free": "50 Mbps al",
     "action.upgrade.paid": "Planı yükselt",
     "action.stream.audio": "Ses",

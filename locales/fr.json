@@ -370,6 +370,7 @@
     "action.slow.alt.preDownload": "téléchargez d'abord, regardez ensuite",
     "action.slow.alt.vault": "enregistrez dans Vault — il pré-charge tout seul",
     "action.slow.gotIt": "Compris",
+    "action.slow.continueSlow": "Continuer quand même",
     "action.upgrade.free": "Obtenir 50 Mbps",
     "action.upgrade.paid": "Améliorer l'offre",
     "action.stream.audio": "Audio",

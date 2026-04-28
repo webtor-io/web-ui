@@ -21,6 +21,7 @@ type PostArgs struct {
 	ApiClaims           *api.Claims
 	UserClaims          *claims.Data
 	Purge               bool
+	ForceSlow           bool
 	VideoStreamUserData *models.VideoStreamUserData
 }
 
@@ -103,6 +104,11 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		purge = true
 	}
 
+	forceSlow := false
+	if v, ok := c.GetPostForm("force-slow"); ok && v == "true" {
+		forceSlow = true
+	}
+
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 
@@ -111,6 +117,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		ItemID:              iID[0],
 		VideoStreamUserData: vsud,
 		Purge:               purge,
+		ForceSlow:           forceSlow,
 	}, nil
 }
 
@@ -139,6 +146,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		&models.StreamSettings{},
 		args.Purge,
 		args.VideoStreamUserData,
+		args.ForceSlow,
 	)
 	if err != nil {
 		postTpl.HTML(
