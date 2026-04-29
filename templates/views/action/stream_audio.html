@@ -9,6 +9,7 @@
        {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
        {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
        {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
+       {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
        controls
        autoplay
        data-settings="{{ .Settings | json }}">

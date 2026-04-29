@@ -48,6 +48,14 @@ type StreamContent struct {
 	DomainSettings      *embed.DomainSettingsData
 	TranscoderSession   *api.TranscoderSession
 	SessionSeekURL      string
+	// GraceDurationSec is non-zero only for free-tier users when grace rules
+	// are enabled. Surfaced to the player JS so it knows when to show the
+	// soft signup CTA after the grace window passes.
+	GraceDurationSec int
+	// GraceFreeRateMbps is the user's plan-cap rate (in Mbps) parsed from
+	// ApiClaims.Rate. Shown on the "Continue at X Mbps" secondary CTA. Zero
+	// when the claim is missing/unparseable — template hides the line.
+	GraceFreeRateMbps int
 }
 
 const (
@@ -243,6 +251,14 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
 	}
+	// Free-tier grace: attach rules to the outgoing primary claims BEFORE
+	// the export call so rest-api carries them into every signed URL token
+	// it returns. THP reads them off the segment-request token. See
+	// docs/grace_token.md.
+	graceMode := s.grace.Enabled && isFreeTier(c)
+	if graceMode {
+		s.applyGraceRules(sc, resourceID, c)
+	}
 	j.InProgress(s.t("job.retrievingData"))
 	resCtx, resCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer resCancel()
@@ -311,23 +327,31 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 
-	// Step 3: Bandwidth check. For cached content we skip the probe download
-	// but still gate rate-limited tiers on their plan cap vs required bitrate.
+	// Step 3: Bandwidth check.
+	//
+	// BT-slow path: when probe is needed (non-cached), we compare measured
+	// download speed against required bitrate. Even under grace mode this is
+	// kept — grace rate won't help if the user's own internet is the bottleneck.
+	//
+	// Cap-modal path (cached content + plan cap below bitrate): kept under
+	// flag-off, skipped under graceMode. Under grace, THP delivers the first
+	// DurationSec at full grace rate, and the soft CTA replaces the upfront
+	// modal as the conversion surface.
+	//
 	// On forceSlow we emit Skip instead of running the gate — the user already
-	// opted into slow playback, re-running the gate would just send them back
-	// to the same modal.
+	// opted into slow playback.
 	if sc.MediaProbe != nil {
 		bitrate := getVideoBitrate(sc.MediaProbe)
 		if bitrate > 0 {
 			if s.forceSlow {
 				j.Skip(s.t("job.checkingBandwidth"))
-			} else if se.Meta.Cache {
+			} else if se.Meta.Cache && !graceMode {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
 					return &SlowDownloadError{Data: sdd}
 				}
 				j.Done()
-			} else if downloadSpeed > 0 {
+			} else if !se.Meta.Cache && downloadSpeed > 0 {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
 					return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
@@ -404,6 +428,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			Default: v.Default != nil,
 		})
 	}
+
 	err = s.renderActionTemplate(j, c, sc, template)
 	if err != nil {
 		return errors.Wrap(err, "failed to render resource")
@@ -662,6 +687,7 @@ type ActionScript struct {
 	vsud          *models.VideoStreamUserData
 	dsd           *embed.DomainSettingsData
 	warmup        WarmupSettings
+	grace         GraceSettings
 	forceSlow     bool
 }
 
@@ -756,7 +782,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, forceSlow bool) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -812,6 +838,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			vsud:          vsud,
 			dsd:           dsd,
 			warmup:        warmup,
+			grace:         grace,
 			forceSlow:     forceSlow,
 		},
 	}, id

@@ -1,9 +1,5 @@
 {{ define "main" }}
 {{ $isFree := eq .Data.TierName "free" }}
-{{ $title := "action.slow.title.bandwidth" }}
-{{ if .Data.IsRateLimited }}{{ $title = "action.slow.title.rateLimited" }}{{ end }}
-{{ $altsHeader := "action.slow.alts.bandwidth" }}
-{{ if .Data.IsRateLimited }}{{ $altsHeader = "action.slow.alts.upgrade" }}{{ end }}
 
 <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
     <div class="flex items-start gap-3 flex-wrap">
@@ -11,23 +7,15 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
             </svg>
-            <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang $title }}</h3>
+            <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang "action.slow.title.bandwidth" }}</h3>
         </div>
-        {{- if .Data.IsRateLimited }}
-        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-slow-download" data-umami-event-tier="{{ .Data.TierName }}" href="/donate" target="_blank">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
-                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-            </svg>
-            {{ if $isFree }}{{ t $.Lang "action.upgrade.free" }}{{ else }}{{ t $.Lang "action.upgrade.paid" }}{{ end }}
-        </a>
-        {{- end }}
     </div>
 
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
         <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
-            <div class="text-2xl font-bold text-w-sub leading-none">{{ if .Data.IsRateLimited }}{{ printf "%.1f" .Data.RateLimitMbps }}{{ else }}{{ printf "%.1f" .Data.MeasuredSpeedMbps }}{{ end }}</div>
+            <div class="text-2xl font-bold text-w-sub leading-none">{{ printf "%.1f" .Data.MeasuredSpeedMbps }}</div>
             <div class="text-[11px] text-w-muted mt-1.5 uppercase tracking-wide">{{ t $.Lang "action.slow.unit" }}</div>
-            <div class="text-xs text-w-muted mt-1">{{ t $.Lang "action.slow.youHave" }}{{ if .Data.IsRateLimited }} · {{ .Data.TierName }}{{ end }}</div>
+            <div class="text-xs text-w-muted mt-1">{{ t $.Lang "action.slow.youHave" }}</div>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 text-w-muted">
             <path d="M5 12h14M13 6l6 6-6 6"/>
@@ -40,9 +28,9 @@
     </div>
 
     <div class="mt-4">
-        <p class="text-xs text-w-muted mb-2">{{ t $.Lang $altsHeader }}</p>
+        <p class="text-xs text-w-muted mb-2">{{ t $.Lang "action.slow.alts.bandwidth" }}</p>
         <ul class="text-sm text-w-sub space-y-1.5">
-            <li class="flex gap-2"><span class="text-w-muted">•</span><span>{{ if .Data.IsRateLimited }}{{ t $.Lang "action.slow.alt.smallerFile" }}{{ else }}{{ t $.Lang "action.slow.alt.smallerOrSeeders" }}{{ end }}</span></li>
+            <li class="flex gap-2"><span class="text-w-muted">•</span><span>{{ t $.Lang "action.slow.alt.smallerOrSeeders" }}</span></li>
             <li class="flex gap-2"><span class="text-w-muted">•</span><span>{{ t $.Lang "action.slow.alt.preDownload" }}</span></li>
             {{ if not $isFree }}
             <li class="flex gap-2"><span class="text-w-muted">•</span><span>{{ t $.Lang "action.slow.alt.vault" }}</span></li>
@@ -52,33 +40,15 @@
 </div>
 
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
-    {{- if and .Data.IsRateLimited .Data.Endpoint }}
-    <form action="{{ langPath $.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data"
-          data-async-target="#log-{{ .Data.LogTargetID }}" data-async-push-state="false">
-        <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
-        <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
-        <input type="hidden" name="force-slow" value="true" />
-        <button type="submit" class="btn btn-soft whitespace-nowrap"
-                data-umami-event="slow-download-continue-slow"
-                data-umami-event-tier="{{ .Data.TierName }}"
-                data-umami-event-is_rate_limited="1">
-            {{ template "icons" "stream" }}
-            {{ t $.Lang "action.slow.continueSlow" }}
-        </button>
-    </form>
-    {{- else }}
     <a class="close closeable-close">{{ t $.Lang "action.slow.gotIt" }}</a>
-    {{- end }}
 </div>
 <script>
 (function () {
     if (!window.umami) return;
     window.umami.track('slow-download-shown', {
         tier: '{{ .Data.TierName }}',
-        is_rate_limited: {{ if .Data.IsRateLimited }}1{{ else }}0{{ end }},
         measured_mbps: {{ printf "%.1f" .Data.MeasuredSpeedMbps }},
-        required_mbps: {{ printf "%.1f" .Data.RequiredSpeedMbps }},
-        rate_limit_mbps: {{ printf "%.1f" .Data.RateLimitMbps }}
+        required_mbps: {{ printf "%.1f" .Data.RequiredSpeedMbps }}
     });
 })();
 </script>

@@ -182,6 +182,16 @@ type Claims struct {
 	Domain        string `json:"domain"`
 	Agent         string `json:"agent"`
 	RemoteAddress string `json:"remoteAddress"`
+	// Hash binds the primary token to a specific torrent infohash. THP's
+	// generic claim-hash check (web.go: boundHash != src.InfoHash → 403)
+	// covers any token carrying this field. Set whenever Rules is set so
+	// the manifest request itself fails fast on cross-content replay,
+	// instead of only the inner grace-token check on segments.
+	Hash string `json:"hash,omitempty"`
+	// Rules ride inside the X-Token header to rest-api, which copies the
+	// header verbatim into the ?token= of every signed export URL. THP
+	// then reads them off the segment-request token. See docs/grace_token.md.
+	Rules []Rule `json:"rules,omitempty"`
 }
 
 type Api struct {
@@ -196,6 +206,7 @@ type Api struct {
 	useInternalTorrentHTTPProxy bool
 	torrentHTTPProxyHost        string
 	torrentHTTPProxyPort        int
+	secret                      string
 }
 
 type ListResourceContentOutputType string
@@ -295,6 +306,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		useInternalTorrentHTTPProxy: c.Bool(useInternalTorrentHTTPProxyFlag),
 		torrentHTTPProxyHost:        c.String(torrentHTTPProxyHostFlag),
 		torrentHTTPProxyPort:        c.Int(torrentHTTPProxyPortFlag),
+		secret:                      secret,
 	}
 }
 

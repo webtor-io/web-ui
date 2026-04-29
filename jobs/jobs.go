@@ -16,6 +16,9 @@ const (
 	warmupTimeoutMinFlag          = "warmup-timeout-min"
 	warmupNoPeersTimeoutSecFlag   = "warmup-no-peers-timeout-sec"
 	warmupSlowPeersTimeoutSecFlag = "warmup-slow-peers-timeout-sec"
+	graceRulesEnabledFlag         = "grace-rules-enabled"
+	graceDurationSecFlag          = "grace-duration-sec"
+	graceRateFlag                 = "grace-rate"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -38,6 +41,23 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			EnvVar: "WARMUP_SLOW_PEERS_TIMEOUT_SEC",
 			Value:  120,
 		},
+		cli.BoolFlag{
+			Name:   graceRulesEnabledFlag,
+			Usage:  "enable grace rules",
+			EnvVar: "GRACE_RULES_ENABLED",
+		},
+		cli.IntFlag{
+			Name:   graceDurationSecFlag,
+			Usage:  "grace duration",
+			EnvVar: "GRACE_DURATION_SEC",
+			Value:  1200,
+		},
+		cli.StringFlag{
+			Name:   graceRateFlag,
+			Usage:  "grace rate",
+			EnvVar: "GRACE_RATE",
+			Value:  "50M",
+		},
 	)
 }
 
@@ -49,6 +69,7 @@ type Jobs struct {
 	i18n          *i18n.Service
 	userSubtitles *us.Service
 	warmup        scripts.WarmupSettings
+	grace         scripts.GraceSettings
 }
 
 // T translates a message key using the language from web.Context.
@@ -78,6 +99,11 @@ func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api 
 			TimeoutMin:          c.Int(warmupTimeoutMinFlag),
 			NoPeersTimeoutSec:   c.Int(warmupNoPeersTimeoutSecFlag),
 			SlowPeersTimeoutSec: c.Int(warmupSlowPeersTimeoutSecFlag),
+		},
+		grace: scripts.GraceSettings{
+			Enabled:     c.Bool(graceRulesEnabledFlag),
+			DurationSec: c.Int(graceDurationSecFlag),
+			Rate:        c.String(graceRateFlag),
 		},
 	}
 }

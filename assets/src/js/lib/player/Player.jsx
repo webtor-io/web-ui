@@ -31,6 +31,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const sessionSeekUrl = videoEl.dataset.sessionSeekUrl;
     const sessionDeletePath = videoEl.dataset.sessionDeletePath;
     const isSession = !!sessionId;
+    const graceDurationSec = videoEl.dataset.graceDurationSec ? parseInt(videoEl.dataset.graceDurationSec, 10) : 0;
+    const graceShownRef = useRef(false);
     const poster = videoEl.getAttribute('poster');
     const resourceID = videoEl.dataset.resourceId;
     const path = videoEl.dataset.path;
@@ -127,6 +129,33 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => {
         if (!state.playing) setControlsVisible(true);
     }, [state.playing]);
+
+    // Grace soft CTA — fires once when movie-time crosses the grace window.
+    // The popup is server-rendered by the action template (stream_video.html)
+    // as a sibling of the player container, NOT inside containerRef — so we
+    // search globally. CTA is a per-page singleton (one player per action page).
+    // If the user is in fullscreen, exit first — the CTA lives outside the
+    // fullscreen element and would be invisible otherwise.
+    useEffect(() => {
+        if (!graceDurationSec || graceShownRef.current) return;
+        if (state.currentTime < graceDurationSec) return;
+        const el = document.querySelector('#grace-cta');
+        if (!el) return;
+        graceShownRef.current = true;
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+        el.classList.remove('hidden');
+        if (window.umami) window.umami.track('grace-soft-cta-shown');
+        const hide = (action) => {
+            el.classList.add('hidden');
+            if (window.umami) window.umami.track('grace-soft-cta-click', { action });
+        };
+        const closeBtn = el.querySelector('.grace-cta-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => hide('dismiss'), { once: true });
+        const contBtn = el.querySelector('.grace-cta-continue');
+        if (contBtn) contBtn.addEventListener('click', () => hide('continue'), { once: true });
+    }, [state.currentTime, graceDurationSec]);
 
     // Keyboard shortcuts
     useEffect(() => {

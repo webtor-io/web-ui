@@ -12,6 +12,7 @@
            {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
            {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
            {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
+           {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
            {{ if .Settings | hasControls }}controls{{ end }}
            {{ if .Settings.Width }}width="{{ .Settings.Width }}"{{ end }}
            {{ if .Settings.Height }}height="{{ .Settings.Height }}"{{ end }}
@@ -96,6 +97,32 @@
             </div>
         </div>
     </div>
+    {{ if .GraceDurationSec }}
+    <div id="grace-cta" class="absolute bottom-20 left-1/2 -translate-x-1/2 hidden z-modal w-[calc(100%-2rem)] max-w-sm">
+        <div class="relative rounded-xl border border-w-line/60 bg-w-card/95 backdrop-blur-md shadow-2xl p-4">
+            <button type="button" class="grace-cta-close absolute top-2 right-2 text-w-muted hover:text-base-content" aria-label="{{ t $.Lang "action.grace.dismiss" }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h4 class="font-semibold text-base text-base-content pr-6 mb-1">{{ t $.Lang "action.grace.title" }}</h4>
+            <p class="text-sm text-w-sub mb-3">{{ t $.Lang "action.grace.body" }}</p>
+            <div class="flex flex-wrap gap-2 items-center">
+                <a class="btn btn-sm btn-soft" href="/donate" target="_blank"
+                   data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                    </svg>
+                    {{ t $.Lang "action.upgrade.free" }}
+                </a>
+                <button type="button" class="grace-cta-continue btn btn-sm btn-ghost text-w-sub hover:text-base-content"
+                        data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
+                    {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
+                </button>
+            </div>
+        </div>
+    </div>
+    {{ end }}
     <div class="absolute right-0 top-0 p-2 hidden z-modal" id="logo">
         <a type="submit" class="btn btn-soft-cyan btn-sm" data-umami-event="embed-download" href="{{ domain }}/{{ .VideoStreamUserData.ResourceID }}?pwd={{ .Item.PathStr | pwd }}&file={{ .Item.PathStr }}#action=download" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
