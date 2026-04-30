@@ -196,3 +196,8 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Test API without RapidAPI: port-forward `rest-api` from K8s or set `REST_API_SERVICE_HOST/PORT`
 - Asset path issues: use `--assets-path` or `WEB_ASSETS_HOST` for CDN
 - Ad testing: set cookie `test-ads` or query param `test-ads`
+- **Streaming-error modals (dev-only)** — append `&debug=<error>` to the resource hash to short-circuit `streamContent` and render the error template without any rest-api work. Gated by `gin.Mode() != gin.ReleaseMode` in `handlers/action/handler.go` so it's a no-op under `GIN_MODE=release`. Values:
+    - `debug=slow_download` — cap-modal (`IsRateLimited=true`, fake 5/10/15 Mbps, rate=5M). Useful because under grace=ON this branch is otherwise unreachable for free users.
+    - `debug=slow_download_bt` — BT-slow variant (`IsRateLimited=false`, 1/10/15 Mbps).
+    - `debug=no_peers` — no_peers modal with the real tier from claims.
+  - Example: `http://localhost:8083/<hash>?file=...#action=stream&debug=no_peers`. Implementation: hash parsed in `assets/src/js/app/resource/get.js`, posted as `debug` form-field, branched in `jobs/scripts/action.go` `streamContent` before grace setup. Cache-key includes the debug value so a real run isn't masked by a cached debug result.

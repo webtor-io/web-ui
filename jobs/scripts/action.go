@@ -59,9 +59,8 @@ type StreamContent struct {
 }
 
 const (
-	bandwidthTestSize   = 50 * 1024 * 1024 // 50MB
-	bandwidthSkipSize   = 10 * 1024 * 1024 // 10MB — skip for speed measurement
-	bandwidthMultiplier = 1.5
+	bandwidthTestSize = 50 * 1024 * 1024 // 50MB
+	bandwidthSkipSize = 10 * 1024 * 1024 // 10MB — skip for speed measurement
 )
 
 // WarmupSettings groups all torrent warmup tuning knobs so call-sites pass a
@@ -171,7 +170,7 @@ func isRateLimited(measuredBytesPerSec float64, rateLimitBitsPerSec int64) bool 
 func buildSlowDownloadData(c *web.Context, measuredBytesPerSec float64, bitrate int64) SlowDownloadData {
 	sdd := SlowDownloadData{
 		MeasuredSpeedMbps: measuredBytesPerSec * 8 / 1_000_000,
-		RequiredSpeedMbps: float64(bitrate) * bandwidthMultiplier / 1_000_000,
+		RequiredSpeedMbps: float64(bitrate) / 1_000_000,
 		BitrateMbps:       float64(bitrate) / 1_000_000,
 	}
 	if c.ApiClaims != nil && c.ApiClaims.Rate != "" {
@@ -201,7 +200,7 @@ func checkCachedRateLimit(c *web.Context, bitrate int64) (SlowDownloadData, bool
 	if rateLimitBps == 0 {
 		return SlowDownloadData{}, false
 	}
-	if float64(rateLimitBps) >= float64(bitrate)*bandwidthMultiplier {
+	if float64(rateLimitBps) >= float64(bitrate) {
 		return SlowDownloadData{}, false
 	}
 	return buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate), true
@@ -250,6 +249,47 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		Settings:       settings,
 		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
+	}
+	// Dev-only short-circuit: render the slow_download / no_peers error
+	// modals without any rest-api work. Wired from the resource-page hash
+	// (`#action=stream&debug=slow_download|slow_download_bt|no_peers`);
+	// the handler gates on gin.Mode != release so this never fires in
+	// prod even if a client posts the field.
+	switch s.debug {
+	case "slow_download":
+		// Cap-modal variant (IsRateLimited=true) — under grace=ON this
+		// branch is unreachable for free; debug is the only way to see it.
+		// Rate is force-pinned to 5 Mbps so the modal renders even for
+		// paid tiers whose real cap sits above the synthetic bitrate.
+		// TierName still comes from real claims so the rendered tier
+		// label matches the logged-in user.
+		sdd := SlowDownloadData{
+			MeasuredSpeedMbps: 5,
+			RequiredSpeedMbps: 10,
+			BitrateMbps:       10,
+			IsRateLimited:     true,
+			RateLimitMbps:     5,
+			TierName:          "free",
+		}
+		if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil && c.Claims.Context.Tier.Name != "" {
+			sdd.TierName = c.Claims.Context.Tier.Name
+		}
+		return &SlowDownloadError{Data: sdd}
+	case "slow_download_bt":
+		// BT-slow variant (IsRateLimited=false) — swarm-bottleneck path.
+		sdd := SlowDownloadData{
+			MeasuredSpeedMbps: 1,
+			RequiredSpeedMbps: 10,
+			BitrateMbps:       10,
+			IsRateLimited:     false,
+			TierName:          "free",
+		}
+		if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil && c.Claims.Context.Tier.Name != "" {
+			sdd.TierName = c.Claims.Context.Tier.Name
+		}
+		return &SlowDownloadError{Data: sdd}
+	case "no_peers":
+		return &NoPeersError{}
 	}
 	// Free-tier grace: attach rules to the outgoing primary claims BEFORE
 	// the export call so rest-api carries them into every signed URL token
@@ -353,7 +393,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				j.Done()
 			} else if !se.Meta.Cache && downloadSpeed > 0 {
 				j.InProgress(s.t("job.checkingBandwidth"))
-				if downloadSpeed*8 < float64(bitrate)*bandwidthMultiplier {
+				if downloadSpeed*8 < float64(bitrate) {
 					return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
 				}
 				j.Done()
@@ -689,6 +729,7 @@ type ActionScript struct {
 	warmup        WarmupSettings
 	grace         GraceSettings
 	forceSlow     bool
+	debug         string
 }
 
 func (s *ActionScript) t(key string) string {
@@ -782,7 +823,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -818,7 +859,11 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	if forceSlow {
 		forceSlowKey = "fs"
 	}
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey)))
+	debugKey := ""
+	if debug != "" {
+		debugKey = "dbg-" + debug
+	}
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey)))
 	return &ErrorWrapperScript{
 		tb:         tb,
 		c:          c,
@@ -840,6 +885,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			warmup:        warmup,
 			grace:         grace,
 			forceSlow:     forceSlow,
+			debug:         debug,
 		},
 	}, id
 }

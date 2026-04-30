@@ -22,6 +22,7 @@ type PostArgs struct {
 	UserClaims          *claims.Data
 	Purge               bool
 	ForceSlow           bool
+	Debug               string
 	VideoStreamUserData *models.VideoStreamUserData
 }
 
@@ -109,6 +110,16 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		forceSlow = true
 	}
 
+	// Dev-only: lets the client force a specific error path via
+	// `?debug=slow_download|no_peers` on the resource hash. Ignored in
+	// release builds so the parameter can't be abused in prod.
+	debug := ""
+	if gin.Mode() != gin.ReleaseMode {
+		if v, ok := c.GetPostForm("debug"); ok {
+			debug = v
+		}
+	}
+
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 
@@ -118,6 +129,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		VideoStreamUserData: vsud,
 		Purge:               purge,
 		ForceSlow:           forceSlow,
+		Debug:               debug,
 	}, nil
 }
 
@@ -147,6 +159,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		args.Purge,
 		args.VideoStreamUserData,
 		args.ForceSlow,
+		args.Debug,
 	)
 	if err != nil {
 		postTpl.HTML(

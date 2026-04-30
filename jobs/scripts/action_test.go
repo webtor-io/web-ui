@@ -63,8 +63,8 @@ func TestBuildSlowDownloadData_RateLimited(t *testing.T) {
 	if !almostEqual(sdd.MeasuredSpeedMbps, 9.6) {
 		t.Errorf("MeasuredSpeedMbps = %v, want 9.6", sdd.MeasuredSpeedMbps)
 	}
-	if !almostEqual(sdd.RequiredSpeedMbps, 12) {
-		t.Errorf("RequiredSpeedMbps = %v, want 12 (8Mbit*1.5)", sdd.RequiredSpeedMbps)
+	if !almostEqual(sdd.RequiredSpeedMbps, 8) {
+		t.Errorf("RequiredSpeedMbps = %v, want 8 (= bitrate)", sdd.RequiredSpeedMbps)
 	}
 	if sdd.TierName != "free" {
 		t.Errorf("TierName = %q, want free", sdd.TierName)
@@ -107,19 +107,19 @@ func TestCheckCachedRateLimit_NoCap(t *testing.T) {
 }
 
 func TestCheckCachedRateLimit_CapSufficient(t *testing.T) {
-	// Cap=20M, bitrate=8M, required=12M. Cap > required => not limited.
+	// Cap=20M, bitrate=8M. Cap > bitrate => not limited.
 	c := ctxWith("20M", "basic")
 	if _, limited := checkCachedRateLimit(c, 8_000_000); limited {
-		t.Error("cap well above required bitrate should not raise warning")
+		t.Error("cap above bitrate should not raise warning")
 	}
 }
 
 func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
-	// Cap=5M, bitrate=8M, required=12M. Cap < required => warn.
+	// Cap=5M, bitrate=8M. Cap < bitrate => warn.
 	c := ctxWith("5M", "free")
 	sdd, limited := checkCachedRateLimit(c, 8_000_000)
 	if !limited {
-		t.Fatal("cap below required bitrate should raise warning")
+		t.Fatal("cap below bitrate should raise warning")
 	}
 	if !sdd.IsRateLimited {
 		t.Error("SlowDownloadData.IsRateLimited should be true on cached path")
@@ -131,8 +131,8 @@ func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
 	if !almostEqual(sdd.MeasuredSpeedMbps, 5) {
 		t.Errorf("MeasuredSpeedMbps = %v, want 5 (== cap)", sdd.MeasuredSpeedMbps)
 	}
-	if !almostEqual(sdd.RequiredSpeedMbps, 12) {
-		t.Errorf("RequiredSpeedMbps = %v, want 12", sdd.RequiredSpeedMbps)
+	if !almostEqual(sdd.RequiredSpeedMbps, 8) {
+		t.Errorf("RequiredSpeedMbps = %v, want 8 (= bitrate)", sdd.RequiredSpeedMbps)
 	}
 	if sdd.TierName != "free" {
 		t.Errorf("TierName = %q, want free", sdd.TierName)
@@ -140,9 +140,9 @@ func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
 }
 
 func TestCheckCachedRateLimit_CapEqualsRequirement(t *testing.T) {
-	// Boundary: cap exactly at required speed (bitrate*1.5) — treat as sufficient.
-	c := ctxWith("12M", "basic")
+	// Boundary: cap exactly at bitrate — treat as sufficient.
+	c := ctxWith("8M", "basic")
 	if _, limited := checkCachedRateLimit(c, 8_000_000); limited {
-		t.Error("cap == required should not raise warning")
+		t.Error("cap == bitrate should not raise warning")
 	}
 }

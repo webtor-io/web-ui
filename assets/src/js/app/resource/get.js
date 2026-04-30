@@ -11,6 +11,7 @@ av( async function() {
     const action = urlParams.get('action');
     const modal = urlParams.get('modal');
     const purge = urlParams.get('purge');
+    const debug = urlParams.get('debug');
     if (!action) return;
     let form = document.querySelector('form.' + action);
     // "stream" is a shorthand — try stream-video first, then stream-audio
@@ -24,6 +25,13 @@ av( async function() {
         purgeInput.setAttribute('name', 'purge');
         purgeInput.setAttribute('value', 'true');
         form.appendChild(purgeInput);
+    }
+    if (debug) {
+        const debugInput = document.createElement('input');
+        debugInput.setAttribute('type', 'hidden');
+        debugInput.setAttribute('name', 'debug');
+        debugInput.setAttribute('value', debug);
+        form.appendChild(debugInput);
     }
     form.requestSubmit();
     if (modal) {
