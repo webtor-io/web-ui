@@ -3,9 +3,8 @@ package stremio
 import "github.com/urfave/cli"
 
 const (
-	StremioUserAgentFlag     = "stremio-addon-user-agent"
-	StremioProxyFlag         = "stremio-addon-proxy"
-	StremioCacheAddonURLFlag = "stremio-cache-addon-url"
+	StremioUserAgentFlag = "stremio-addon-user-agent"
+	StremioProxyFlag     = "stremio-addon-proxy"
 )
 
 func RegisterClientFlags(f []cli.Flag) []cli.Flag {
@@ -19,12 +18,6 @@ func RegisterClientFlags(f []cli.Flag) []cli.Flag {
 			Name:   StremioProxyFlag,
 			Usage:  "proxy URL for stremio addon http client (e.g., http://proxy:8080 or socks5://proxy:1080)",
 			EnvVar: "STREMIO_ADDON_PROXY",
-		},
-		cli.StringFlag{
-			Name:   StremioCacheAddonURLFlag,
-			Usage:  "base URL for cache checking addon (e.g., Torrentio)",
-			Value:  "https://torrentio.strem.fun",
-			EnvVar: "STREMIO_CACHE_ADDON_URL",
 		},
 	)
 }

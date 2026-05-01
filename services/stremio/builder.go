@@ -11,7 +11,6 @@ import (
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
-	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
@@ -26,12 +25,10 @@ type Builder struct {
 	cl               *http.Client
 	userAgent        string
 	secret           string
-	cacheIndex       *ci.CacheIndex
-	cacheAddonURL    string
 	requestURLMapper *rum.RequestURLMapper
 }
 
-func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, cacheIndex *ci.CacheIndex, requestURLMapper *rum.RequestURLMapper) *Builder {
+func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, requestURLMapper *rum.RequestURLMapper) *Builder {
 	return &Builder{
 		pg: pg,
 		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
@@ -43,8 +40,6 @@ func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, cache
 		rapi:             rapi,
 		cl:               cl,
 		userAgent:        c.String(StremioUserAgentFlag),
-		cacheIndex:       cacheIndex,
-		cacheAddonURL:    c.String(StremioCacheAddonURLFlag),
 		requestURLMapper: requestURLMapper,
 	}
 }
@@ -98,9 +93,7 @@ func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.
 	ds := NewDedupStream(cs)
 	ps := NewPreferredStream(ds, db, u, cla)
 	lfs := NewLangFilterStream(ps, db, u)
-	prs := NewPrefetchResourceStream(lfs, s.rapi, apiClaims)
-	pcs := NewPrefetchCacheStream(prs, s.cl, s.pg, u, s.cacheIndex, s.cacheAddonURL, s.userAgent, s.rapi, apiClaims)
-	es := NewEnrichStream(pcs, s.rapi, lr, u, apiClaims, cla, s.domain, token, s.secret)
+	es := NewEnrichStream(lfs, lr, u, cla, s.domain, token, s.secret)
 
 	return es, nil
 }

@@ -10,9 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -21,11 +19,17 @@ import (
 	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
 
-// EnrichStream wraps another StreamsService to enrich streams with URLs
+// EnrichStream wraps another StreamsService to enrich streams with URLs.
+//
+// Enrichment is intentionally lightweight: per stream we issue a single
+// hash-only availability check (Postgres) and emit a redirect URL whose
+// JWT carries the file's filename (or fileIdx). The expensive bits — making
+// sure rest-api knows the magnet, listing its contents, picking the path —
+// are deferred to /stremio/resolve, which only runs when the user actually
+// clicks the stream. This keeps /stream's tail latency dominated by the
+// inner addon HTTP fan-out rather than per-stream rest-api round-trips.
 type EnrichStream struct {
 	inner        StreamsService
-	api          *api.Api
-	claims       *api.Claims
 	linkResolver *lr.LinkResolver
 	u            *auth.User
 	cla          *claims.Data
@@ -35,11 +39,9 @@ type EnrichStream struct {
 }
 
 // NewEnrichStream creates a new EnrichStream service
-func NewEnrichStream(inner StreamsService, api *api.Api, lr *lr.LinkResolver, u *auth.User, claims *api.Claims, cla *claims.Data, domain, token, secret string) *EnrichStream {
+func NewEnrichStream(inner StreamsService, lr *lr.LinkResolver, u *auth.User, cla *claims.Data, domain, token, secret string) *EnrichStream {
 	return &EnrichStream{
 		inner:        inner,
-		api:          api,
-		claims:       claims,
 		linkResolver: lr,
 		u:            u,
 		cla:          cla,
@@ -56,7 +58,6 @@ func (s *EnrichStream) GetName() string {
 
 // GetStreams gets streams from the inner service and enriches them with URLs
 func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID string) (*StreamsResponse, error) {
-	// Get streams from inner service
 	response, err := s.inner.GetStreams(ctx, contentType, contentID)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,6 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 		return response, nil
 	}
 
-	// Enrich streams in parallel while preserving order
 	enrichedStreams := make([]*StreamItem, len(response.Streams))
 	var wg sync.WaitGroup
 
@@ -78,7 +78,6 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 		go func(index int, si *StreamItem) {
 			defer wg.Done()
 
-			// Create a copy of the stream to avoid potential shared memory issues
 			streamCopy := *si
 			enriched, err := s.enrichStream(eCtx, &streamCopy)
 			if err != nil {
@@ -90,17 +89,14 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 			if enriched == nil {
 				return
 			}
-			enriched = &streamCopy
 			enrichedStreams[index] = enriched
 		}(i, &stream)
 	}
 
 	wg.Wait()
 
-	// Filter out empty streams (those that were dropped due to timeout)
 	var finalStreams []StreamItem
 	for _, stream := range enrichedStreams {
-		// Check if stream was dropped (empty InfoHash indicates dropped stream)
 		if stream != nil {
 			finalStreams = append(finalStreams, *stream)
 		}
@@ -138,7 +134,6 @@ func sortVaultFirstByResolution(streams []StreamItem) {
 			return ti.Resolution
 		}
 	}
-	// Locate contiguous runs of the same resolution and sort within each.
 	start := 0
 	currentRes := resolutionOf(streams[0].Name)
 	for i := 1; i <= len(streams); i++ {
@@ -159,23 +154,16 @@ func sortVaultFirstByResolution(streams []StreamItem) {
 	}
 }
 
-// enrichStream enriches a single stream with URL if needed
+// enrichStream sets the redirect URL and ⚡ marker for a single stream.
 func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*StreamItem, error) {
-	// Step 1: Check if there is URL in stream
 	if stream.Url != "" {
 		return stream, nil
 	}
-
-	// Check if we have InfoHash
 	if stream.InfoHash == "" {
 		return nil, errors.New("stream has no InfoHash")
 	}
 
-	p, err := s.getFilePathFromStream(ctx, stream)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to convert idx to path")
-	}
-	availability, err := s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, p, true)
+	availability, err := s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, stream.FileIdx, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check availability")
 	}
@@ -184,60 +172,18 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 		stream.Cached = true
 	}
 
-	stream.Url = s.generateRedirectURL(stream.InfoHash, p)
+	stream.Url = s.generateRedirectURL(stream)
 	return stream, nil
 }
 
-func (s *EnrichStream) getFilePathFromStream(ctx context.Context, stream *StreamItem) (string, error) {
-	listArgs := &api.ListResourceContentArgs{
-		Limit:  100,
-		Offset: 0,
-	}
-
-	var targetItem *ra.ListItem
-	var idx int
-
-	// Paginate through results to find the file at the specified index
-	for {
-		resp, err := s.api.ListResourceContentCached(ctx, s.claims, stream.InfoHash, listArgs)
-		if err != nil {
-			return "", err
-		}
-
-		for _, item := range resp.Items {
-			if item.Type == ra.ListTypeFile {
-				if (stream.BehaviorHints != nil && stream.BehaviorHints.Filename != "" && item.Name == stream.BehaviorHints.Filename) ||
-					((stream.BehaviorHints == nil || stream.BehaviorHints.Filename == "") && idx == int(stream.FileIdx)) {
-					targetItem = &item
-					break
-				}
-				idx++
-			}
-		}
-
-		if targetItem != nil {
-			break
-		}
-
-		// Check if we've reached the end
-		if (resp.Count - int(listArgs.Offset)) == len(resp.Items) {
-			break
-		}
-
-		listArgs.Offset += listArgs.Limit
-	}
-
-	if targetItem == nil {
-		return "", fmt.Errorf("file at index %d not found", stream.FileIdx)
-	}
-
-	return targetItem.PathStr, nil
-}
-
-func (s *EnrichStream) generateRedirectURL(hash string, p string) string {
+// generateRedirectURL builds the /stremio/resolve URL. The JWT carries
+// only the minimum needed to identify the file at click time: the
+// torrent's infohash and the file index inside it. /resolve resolves the
+// idx to a full path against rest-api lazily.
+func (s *EnrichStream) generateRedirectURL(stream *StreamItem) string {
 	clms := jwt.MapClaims{
-		"hash": hash,
-		"path": p,
+		"hash": stream.InfoHash,
+		"idx":  stream.FileIdx,
 		"exp":  time.Now().Add(12 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, clms)

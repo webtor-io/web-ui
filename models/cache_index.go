@@ -13,7 +13,7 @@ type CacheIndex struct {
 	ID          uuid.UUID            `pg:"cache_index_id,pk,type:uuid,default:uuid_generate_v4()"`
 	BackendType StreamingBackendType `pg:"backend_type,notnull"`
 	ResourceID  string               `pg:"resource_id,notnull"`
-	Path        string               `pg:"path,notnull"`
+	FileIdx     int                  `pg:"file_idx,notnull"`
 	LastSeenAt  time.Time            `pg:"last_seen_at,default:now()"`
 	CreatedAt   time.Time            `pg:"created_at,default:now()"`
 	UpdatedAt   time.Time            `pg:"updated_at,default:now()"`
@@ -26,28 +26,29 @@ type CacheIndexResult struct {
 }
 
 // MarkAsCached updates the last_seen_at for a cache entry, or creates it if it doesn't exist
-func MarkAsCached(ctx context.Context, db *pg.DB, backendType StreamingBackendType, resourceID, path string) error {
+func MarkAsCached(ctx context.Context, db *pg.DB, backendType StreamingBackendType, resourceID string, fileIdx int) error {
 	now := time.Now()
 	cache := &CacheIndex{
 		BackendType: backendType,
 		ResourceID:  resourceID,
-		Path:        path,
+		FileIdx:     fileIdx,
 		LastSeenAt:  now,
 	}
 
 	_, err := db.Model(cache).
 		Context(ctx).
-		Column("backend_type", "resource_id", "path", "last_seen_at").
-		OnConflict("(resource_id, path, backend_type) DO UPDATE").
+		Column("backend_type", "resource_id", "file_idx", "last_seen_at").
+		OnConflict("(resource_id, file_idx, backend_type) DO UPDATE").
 		Set("last_seen_at = EXCLUDED.last_seen_at").
 		Insert()
 
 	return err
 }
 
-// IsCached returns a list of backend types and their last seen times for a given resource and path
-// Only returns entries that were seen within the expiration window
-func IsCached(ctx context.Context, db *pg.DB, resourceID, path string, expiration time.Duration) ([]CacheIndexResult, error) {
+// IsCached returns a list of backend types and their last seen times for a
+// given resource and file index. Only entries seen within the expiration
+// window are returned.
+func IsCached(ctx context.Context, db *pg.DB, resourceID string, fileIdx int, expiration time.Duration) ([]CacheIndexResult, error) {
 	var results []CacheIndexResult
 	cutoffTime := time.Now().Add(-expiration)
 
@@ -55,7 +56,7 @@ func IsCached(ctx context.Context, db *pg.DB, resourceID, path string, expiratio
 		Context(ctx).
 		Column("backend_type", "last_seen_at").
 		Where("resource_id = ?", resourceID).
-		Where("path = ?", path).
+		Where("file_idx = ?", fileIdx).
 		Where("last_seen_at >= ?", cutoffTime).
 		Select(&results)
 

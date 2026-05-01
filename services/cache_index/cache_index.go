@@ -51,20 +51,21 @@ func New(c *cli.Context, pg *cs.PG) *CacheIndex {
 	}
 }
 
-// MarkAsCached updates the last_seen_at for a cache entry via LazyMap
-func (s *CacheIndex) MarkAsCached(ctx context.Context, backendType models.StreamingBackendType, path, resourceID string) error {
-	key := fmt.Sprintf("mark:%s:%s:%s", backendType, resourceID, path)
+// MarkAsCached records that the file (resourceID, fileIdx) is currently
+// streamable on the given backend.
+func (s *CacheIndex) MarkAsCached(ctx context.Context, backendType models.StreamingBackendType, resourceID string, fileIdx int) error {
+	key := fmt.Sprintf("mark:%s:%s:%d", backendType, resourceID, fileIdx)
 	_, err := s.markCachedMap.Get(key, func() (bool, error) {
 		db := s.pg.Get()
 		if db == nil {
 			return false, errors.New("database connection not available")
 		}
-		err := models.MarkAsCached(ctx, db, backendType, resourceID, path)
+		err := models.MarkAsCached(ctx, db, backendType, resourceID, fileIdx)
 		if err != nil {
 			return false, errors.Wrap(err, "failed to mark as cached")
 		}
 		defer func() {
-			isCacheKey := fmt.Sprintf("is:%s:%s", resourceID, path)
+			isCacheKey := fmt.Sprintf("is:%s:%d", resourceID, fileIdx)
 			s.isCachedMap.Drop(isCacheKey)
 		}()
 		return true, nil
@@ -72,15 +73,16 @@ func (s *CacheIndex) MarkAsCached(ctx context.Context, backendType models.Stream
 	return err
 }
 
-// IsCached returns a list of backend types and their last seen times for a given resource and path
-func (s *CacheIndex) IsCached(ctx context.Context, resourceID, path string) ([]models.CacheIndexResult, error) {
-	key := fmt.Sprintf("is:%s:%s", resourceID, path)
+// IsCached returns a list of backend types and their last seen times for the
+// given resource + file index.
+func (s *CacheIndex) IsCached(ctx context.Context, resourceID string, fileIdx int) ([]models.CacheIndexResult, error) {
+	key := fmt.Sprintf("is:%s:%d", resourceID, fileIdx)
 	return s.isCachedMap.Get(key, func() ([]models.CacheIndexResult, error) {
 		db := s.pg.Get()
 		if db == nil {
 			return nil, errors.New("database connection not available")
 		}
-		results, err := models.IsCached(ctx, db, resourceID, path, s.cacheExpire)
+		results, err := models.IsCached(ctx, db, resourceID, fileIdx, s.cacheExpire)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if cached")
 		}

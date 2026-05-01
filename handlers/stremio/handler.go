@@ -184,32 +184,28 @@ func (s *Handler) resolve(c *gin.Context) {
 		return
 	}
 
-	// Step 4: Extract hash and path from claims
+	// Step 4: Extract claims. JWT shape: {hash, idx, exp}. Path resolution
+	// (when needed by user backends) and resource registration are handled
+	// inside LinkResolver / Webtor backend.
 	hash, ok := jwtClaims["hash"].(string)
 	if !ok || hash == "" {
 		log.Warn("missing or invalid hash in JWT claims")
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+	fileIdxF, _ := jwtClaims["idx"].(float64)
+	fileIdx := int(fileIdxF)
 
-	path, ok := jwtClaims["path"].(string)
-	if !ok || path == "" {
-		log.Warn("missing or invalid path in JWT claims")
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	// Step 5: Get user context
 	user := auth.GetUserFromContext(c)
 	apiClaims := api.GetClaimsFromContext(c)
 	userClaims := claims.GetFromContext(c)
 
-	// Step 6: Resolve link using LinkResolver
-	linkResult, err := s.lr.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, path, true)
+	// Step 5: Resolve link using LinkResolver
+	linkResult, err := s.lr.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, fileIdx, true)
 	if err != nil {
 		log.WithError(err).
 			WithField("hash", hash).
-			WithField("path", path).
+			WithField("file_idx", fileIdx).
 			Error("failed to resolve link")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -218,7 +214,7 @@ func (s *Handler) resolve(c *gin.Context) {
 	// Step 7: Check if URL was generated
 	if linkResult == nil || linkResult.URL == "" {
 		log.WithField("hash", hash).
-			WithField("path", path).
+			WithField("file_idx", fileIdx).
 			Warn("no URL generated for resolve")
 		c.AbortWithStatus(http.StatusNotFound)
 		return

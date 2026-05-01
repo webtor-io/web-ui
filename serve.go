@@ -399,7 +399,7 @@ func serve(c *cli.Context) error {
 
 	// Setting StremioBuilder
 	stremioAddonCl := stremios.NewClient(c)
-	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, cacheIndex, requestURLMapper)
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper)
 
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
