@@ -11,6 +11,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
+	vmodels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -203,6 +204,24 @@ func (s *LinkResolver) CheckAvailability(ctx context.Context, id uuid.UUID, cla 
 		if cir.BackendType == models.StreamingBackendTypeWebtor {
 			cached = true
 			break
+		}
+	}
+	// Fallback: a resource that is vaulted (vault.resource.vaulted=true) is
+	// guaranteed to be in Webtor's hot storage. The cacheIndex only learns
+	// about this after a play has gone through ResolveLink, so a freshly
+	// vaulted file would otherwise miss the ⚡ marker until first stream.
+	// One indexed row read on vault.resource closes that gap cheaply.
+	if !cached {
+		if db := s.pg.Get(); db != nil {
+			res, verr := vmodels.GetResource(ctx, db, hash)
+			if verr != nil {
+				log.WithError(verr).WithField("hash", hash).Debug("vault resource lookup failed")
+			} else if res != nil && res.Vaulted {
+				cached = true
+				if merr := s.cacheIndex.MarkAsCached(ctx, models.StreamingBackendTypeWebtor, p, hash); merr != nil {
+					log.WithError(merr).WithField("hash", hash).Debug("failed to mark vaulted resource as cached")
+				}
+			}
 		}
 	}
 	return &co.CheckAvailabilityResult{
