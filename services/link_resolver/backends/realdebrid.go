@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -76,34 +75,38 @@ func (s *RealDebrid) getAvailableHost(ctx context.Context, client *rd.Client) (s
 	return hosts[0].ID, nil
 }
 
-// findMatchingFile searches for a file matching the given path in the torrent files
-// and verifies that the file is selected (Selected == 1)
-func (s *RealDebrid) findMatchingFile(files []rd.TorrentFile, path string, selected bool) (*rd.TorrentFile, bool) {
-	basePath := filepath.Base(path)
-	for _, file := range files {
-		// Match by exact path or basename, and ensure file is selected
-		if (file.Path == path || filepath.Base(file.Path) == basePath || file.Path == basePath) && (file.Selected == 1 || !selected) {
-			return &file, true
-		}
+// fileAtIdx returns the file at the given torrent-natural-order index.
+// RealDebrid's TorrentFile slice mirrors the order produced by bencode
+// decoding (the same convention Stremio addons use for fileIdx), so a
+// direct index lookup avoids matching by path. When `selected` is true
+// we also require the file to be marked Selected — caller uses this to
+// decide whether the torrent needs re-adding with a new selection.
+func (s *RealDebrid) fileAtIdx(files []rd.TorrentFile, fileIdx int, selected bool) (*rd.TorrentFile, bool) {
+	if fileIdx < 0 || fileIdx >= len(files) {
+		return nil, false
 	}
-	return nil, false
+	f := &files[fileIdx]
+	if selected && f.Selected != 1 {
+		return nil, false
+	}
+	return f, true
 }
 
 // ResolveLink generates a direct link using RealDebrid with caching
 // Returns the direct download URL and cached status (always true for RealDebrid cached content)
-func (s *RealDebrid) ResolveLink(ctx context.Context, token, hash, path string) (string, bool, error) {
-	cacheKey := fmt.Sprintf("%s:%s:%s", token, hash, path)
+func (s *RealDebrid) ResolveLink(ctx context.Context, token, hash string, fileIdx int) (string, bool, error) {
+	cacheKey := fmt.Sprintf("%s:%s:%d", token, hash, fileIdx)
 
 	log.WithFields(log.Fields{
 		"hash":      hash,
-		"path":      path,
+		"file_idx":  fileIdx,
 		"cache_key": cacheKey,
 	}).Debug("resolving realdebrid link with cache")
 
 	result, err := s.linkCache.Get(cacheKey, func() (*resolveLinkResult, error) {
 		log.WithFields(log.Fields{
-			"hash": hash,
-			"path": path,
+			"hash":     hash,
+			"file_idx": fileIdx,
 		}).Debug("cache miss, performing actual link resolution")
 
 		client, err := s.getClient(token)
@@ -111,16 +114,16 @@ func (s *RealDebrid) ResolveLink(ctx context.Context, token, hash, path string) 
 			return nil, errors.Wrap(err, "failed to create realdebrid client")
 		}
 
-		url, cached, err := s.resolveLink(ctx, client, hash, path)
+		url, cached, err := s.resolveLink(ctx, client, hash, fileIdx)
 		if err != nil {
 			return nil, err
 		}
 
 		log.WithFields(log.Fields{
-			"hash":   hash,
-			"path":   path,
-			"url":    url,
-			"cached": cached,
+			"hash":     hash,
+			"file_idx": fileIdx,
+			"url":      url,
+			"cached":   cached,
 		}).Debug("link resolution completed, caching result")
 
 		return &resolveLinkResult{
@@ -137,7 +140,7 @@ func (s *RealDebrid) ResolveLink(ctx context.Context, token, hash, path string) 
 }
 
 // resolveLink performs the actual link resolution logic
-func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, path string) (string, bool, error) {
+func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash string, fileIdx int) (string, bool, error) {
 	upperHash := strings.ToUpper(hash)
 
 	// Step 1: Check if user already has torrent with this infohash
@@ -164,7 +167,7 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 		if torrent.Status == "downloaded" || torrent.Status == "waiting_files_selection" {
 			// Find the file matching the path
 			var found bool
-			file, found = s.findMatchingFile(torrent.Files, path, true)
+			file, found = s.fileAtIdx(torrent.Files, fileIdx, true)
 			if !found {
 				err = client.DeleteTorrent(ctx, torrent.ID)
 				if err != nil {
@@ -222,7 +225,7 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 				}
 
 				var found bool
-				file, found = s.findMatchingFile(addedTorrent.Files, path, false)
+				file, found = s.fileAtIdx(addedTorrent.Files, fileIdx, false)
 
 				if !found {
 					return "", false, nil
@@ -258,10 +261,10 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 				}
 			}
 			log.WithFields(log.Fields{
-				"hash":    hash,
-				"path":    path,
-				"file_id": file.ID,
-				"status":  torrent.Status,
+				"hash":     hash,
+				"file_idx": fileIdx,
+				"file_id":  file.ID,
+				"status":   torrent.Status,
 			}).Debug("torrent already in library and downloaded")
 		} else {
 			// Torrent exists but not downloaded
@@ -301,7 +304,7 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 		}
 
 		var found bool
-		file, found = s.findMatchingFile(torrent.Files, path, false)
+		file, found = s.fileAtIdx(torrent.Files, fileIdx, false)
 
 		if !found {
 			return "", false, nil
@@ -329,11 +332,11 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 		}
 
 		log.WithFields(log.Fields{
-			"hash":    hash,
-			"path":    path,
-			"file_id": file.ID,
-			"status":  torrent.Status,
-			"cached":  true,
+			"hash":     hash,
+			"file_idx": fileIdx,
+			"file_id":  file.ID,
+			"status":   torrent.Status,
+			"cached":   true,
 		}).Debug("torrent cached and downloaded")
 	}
 
@@ -344,7 +347,7 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 	}
 
 	// Verify the file is selected
-	file, found := s.findMatchingFile(torrent.Files, path, true)
+	file, found := s.fileAtIdx(torrent.Files, fileIdx, true)
 	if !found {
 		return "", false, nil
 	}
@@ -374,10 +377,10 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash, p
 	}
 
 	log.WithFields(log.Fields{
-		"hash":   hash,
-		"path":   path,
-		"url":    download.Download,
-		"cached": true,
+		"hash":     hash,
+		"file_idx": fileIdx,
+		"url":      download.Download,
+		"cached":   true,
 	}).Info("generated realdebrid link")
 
 	return download.Download, true, nil

@@ -399,34 +399,15 @@ func (s *Handler) getBestItem(ctx context.Context, l *ra.ListResponse, args *Get
 }
 
 func (s *Handler) resolveFileIdx(ctx context.Context, args *GetArgs, fileIdx int) (string, error) {
-	const maxFileIdxIterations = 1000
-	listArgs := &api.ListResourceContentArgs{
-		Limit:  100,
-		Offset: 0,
+	// rest-api accepts a numeric content_id as a torrent-natural-order
+	// file index (see rest-api commit 1baa13f), so we can grab the file's
+	// path in one round-trip instead of paginating /list.
+	resp, err := s.api.ExportResourceContent(ctx, args.Claims, args.ID, strconv.Itoa(fileIdx), "")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to export resource content for file-idx resolution")
 	}
-	var idx int
-	var iterations int
-	for {
-		iterations++
-		if iterations > maxFileIdxIterations {
-			return "", fmt.Errorf("exceeded max iterations (%d) resolving file index %d", maxFileIdxIterations, fileIdx)
-		}
-		resp, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, listArgs)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to list resource content for file-idx resolution")
-		}
-		for _, item := range resp.Items {
-			if item.Type == ra.ListTypeFile {
-				if idx == fileIdx {
-					return item.PathStr, nil
-				}
-				idx++
-			}
-		}
-		if int(listArgs.Offset)+len(resp.Items) >= resp.Count {
-			break
-		}
-		listArgs.Offset += listArgs.Limit
+	if resp == nil || resp.Source.PathStr == "" {
+		return "", fmt.Errorf("file at index %d not found", fileIdx)
 	}
-	return "", fmt.Errorf("file at index %d not found", fileIdx)
+	return resp.Source.PathStr, nil
 }

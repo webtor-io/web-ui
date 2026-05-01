@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -64,34 +63,32 @@ func (s *Torbox) getClient(token string) (*tb.Client, error) {
 	return tb.NewClient(s.cl, "https://api.torbox.app", token), nil
 }
 
-// findMatchingFile searches for a file matching the given path in the torrent files
-func (s *Torbox) findMatchingFile(files []tb.File, path string) (*tb.File, bool) {
-	basePath := filepath.Base(path)
-	for _, file := range files {
-		// Match by exact name, basename, or short name
-		if file.Name == path || filepath.Base(file.Name) == basePath ||
-			file.ShortName == path || file.ShortName == basePath {
-			return &file, true
-		}
+// fileAtIdx returns the file at the given torrent-natural-order index.
+// Torbox's File slice mirrors the order produced by bencode decoding
+// (the same convention Stremio addons use for fileIdx), so a direct
+// index lookup avoids matching by path.
+func (s *Torbox) fileAtIdx(files []tb.File, fileIdx int) (*tb.File, bool) {
+	if fileIdx < 0 || fileIdx >= len(files) {
+		return nil, false
 	}
-	return nil, false
+	return &files[fileIdx], true
 }
 
 // ResolveLink generates a direct link using Torbox with caching
 // Returns the direct download URL and cached status
-func (s *Torbox) ResolveLink(ctx context.Context, token, hash, path string) (string, bool, error) {
-	cacheKey := fmt.Sprintf("%s:%s:%s", token, hash, path)
+func (s *Torbox) ResolveLink(ctx context.Context, token, hash string, fileIdx int) (string, bool, error) {
+	cacheKey := fmt.Sprintf("%s:%s:%d", token, hash, fileIdx)
 
 	log.WithFields(log.Fields{
 		"hash":      hash,
-		"path":      path,
+		"file_idx":  fileIdx,
 		"cache_key": cacheKey,
 	}).Debug("resolving torbox link with cache")
 
 	result, err := s.linkCache.Get(cacheKey, func() (*resolveLinkResultTorbox, error) {
 		log.WithFields(log.Fields{
-			"hash": hash,
-			"path": path,
+			"hash":     hash,
+			"file_idx": fileIdx,
 		}).Debug("cache miss, performing actual link resolution")
 
 		client, err := s.getClient(token)
@@ -99,16 +96,16 @@ func (s *Torbox) ResolveLink(ctx context.Context, token, hash, path string) (str
 			return nil, errors.Wrap(err, "failed to create torbox client")
 		}
 
-		url, cached, err := s.resolveLink(ctx, client, hash, path)
+		url, cached, err := s.resolveLink(ctx, client, hash, fileIdx)
 		if err != nil {
 			return nil, err
 		}
 
 		log.WithFields(log.Fields{
-			"hash":   hash,
-			"path":   path,
-			"url":    url,
-			"cached": cached,
+			"hash":     hash,
+			"file_idx": fileIdx,
+			"url":      url,
+			"cached":   cached,
 		}).Debug("link resolution completed, caching result")
 
 		return &resolveLinkResultTorbox{
@@ -125,7 +122,7 @@ func (s *Torbox) ResolveLink(ctx context.Context, token, hash, path string) (str
 }
 
 // resolveLink performs the actual link resolution logic
-func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash, path string) (string, bool, error) {
+func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash string, fileIdx int) (string, bool, error) {
 	cached, err := client.CheckCached(ctx, []string{hash}, "", true)
 	if err != nil {
 		return "", false, errors.Wrap(err, "failed to check cached status")
@@ -136,9 +133,7 @@ func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash, path 
 		return "", false, nil
 	}
 
-	var found bool
-	_, found = s.findMatchingFile(cached[0].Files, path)
-	if !found {
+	if _, found := s.fileAtIdx(cached[0].Files, fileIdx); !found {
 		return "", false, nil
 	}
 
@@ -162,15 +157,14 @@ func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash, path 
 	// If torrent exists in library and is downloaded
 	if torrent != nil {
 		if torrent.DownloadFinished {
-			// Find the file matching the path
 			var found bool
-			file, found = s.findMatchingFile(torrent.Files, path)
+			file, found = s.fileAtIdx(torrent.Files, fileIdx)
 			if !found {
 				return "", false, nil
 			}
 			log.WithFields(log.Fields{
 				"hash":              hash,
-				"path":              path,
+				"file_idx":          fileIdx,
 				"file_id":           file.ID,
 				"download_finished": torrent.DownloadFinished,
 			}).Debug("torrent already in library and downloaded")
@@ -226,16 +220,17 @@ func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash, path 
 		}
 
 		// Find the file in the created torrent
-		file, found = s.findMatchingFile(torrent.Files, path)
+		var found bool
+		file, found = s.fileAtIdx(torrent.Files, fileIdx)
 		if !found {
 			return "", false, nil
 		}
 
 		log.WithFields(log.Fields{
-			"hash":    hash,
-			"path":    path,
-			"file_id": file.ID,
-			"cached":  true,
+			"hash":     hash,
+			"file_idx": fileIdx,
+			"file_id":  file.ID,
+			"cached":   true,
 		}).Debug("torrent cached and downloaded")
 	}
 
@@ -251,10 +246,10 @@ func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash, path 
 	}
 
 	log.WithFields(log.Fields{
-		"hash":   hash,
-		"path":   path,
-		"url":    downloadURL,
-		"cached": true,
+		"hash":     hash,
+		"file_idx": fileIdx,
+		"url":      downloadURL,
+		"cached":   true,
 	}).Info("generated torbox link")
 
 	return downloadURL, true, nil

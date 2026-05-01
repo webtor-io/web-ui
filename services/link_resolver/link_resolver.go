@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
-	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	vmodels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
@@ -24,7 +23,6 @@ import (
 // by checking content availability and generating direct download URLs
 type LinkResolver struct {
 	pg                   *cs.PG
-	api                  *api.Api
 	cacheIndex           *ci.CacheIndex
 	userBackends         map[models.StreamingBackendType]co.Backend
 	webtorBackend        *backends.Webtor
@@ -35,7 +33,6 @@ type LinkResolver struct {
 func New(cl *http.Client, pg *cs.PG, apiService *api.Api, cacheIndex *ci.CacheIndex) *LinkResolver {
 	return &LinkResolver{
 		pg:         pg,
-		api:        apiService,
 		cacheIndex: cacheIndex,
 		userBackends: map[models.StreamingBackendType]co.Backend{
 			models.StreamingBackendTypeRealDebrid: backends.NewRealDebrid(cl),
@@ -82,10 +79,9 @@ func (s *LinkResolver) getUserEnabledBackends(ctx context.Context, userID uuid.U
 }
 
 // ResolveLink resolves a streaming link for the file at (hash, fileIdx).
-// User backends (RD/Torbox) work in terms of file paths, so we resolve
-// idx → path lazily against rest-api when at least one user backend is
-// enabled. The Webtor backend speaks idx natively (rest-api takes a
-// numeric content_id) — no extra round-trip needed there.
+// All backends speak fileIdx directly: Webtor passes it through as a
+// numeric content_id to rest-api, RD/Torbox use it as the index into
+// their own torrent.Files slice. No path lookup is needed anywhere.
 // Returns nil if content is not available or user doesn't have access.
 func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiClaims *api.Claims, userClaims *claims.Data, hash string, fileIdx int, requiresPayment bool) (*co.LinkResult, error) {
 	log.WithFields(log.Fields{
@@ -98,45 +94,34 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 		return nil, errors.Wrap(err, "failed to load user enabled backends")
 	}
 
-	if len(enabledBackends) > 0 {
-		// User backends need a real path. Make sure rest-api is aware of
-		// the resource first (Webtor.EnsureResource is idempotent — the
-		// later Webtor.ResolveLink reuses the in-flight result via lazymap).
-		if err := s.webtorBackend.EnsureResource(ctx, apiClaims, hash); err != nil {
-			log.WithError(err).WithField("hash", hash).Warn("failed to ensure resource for path lookup")
-		} else if path, perr := s.resolveFilePath(ctx, apiClaims, hash, fileIdx); perr != nil {
-			log.WithError(perr).WithField("hash", hash).WithField("file_idx", fileIdx).Warn("failed to resolve file path for user backends")
-		} else {
-			for _, userBackend := range enabledBackends {
-				backend, ok := s.userBackends[userBackend.Type]
-				if !ok {
-					log.WithField("backend_type", userBackend.Type).Warn("backend implementation not found")
-					continue
-				}
-				url, cached, berr := backend.ResolveLink(ctx, userBackend.AccessToken, hash, path)
-				if berr != nil {
-					log.WithError(berr).WithField("backend_type", userBackend.Type).Warn("failed to generate link from backend")
-					continue
-				}
-				if !cached {
-					log.WithField("backend_type", userBackend.Type).Warn("link is not cached")
-					continue
-				}
-				if merr := s.cacheIndex.MarkAsCached(ctx, userBackend.Type, hash, fileIdx); merr != nil {
-					return nil, errors.Wrap(merr, "failed to mark as cached in cache index")
-				}
-				log.WithFields(log.Fields{
-					"url":          url,
-					"cached":       cached,
-					"backend_type": userBackend.Type,
-				}).Info("generated streaming link from backend")
-				return &co.LinkResult{
-					URL:         url,
-					ServiceType: userBackend.Type,
-					Cached:      cached,
-				}, nil
-			}
+	for _, userBackend := range enabledBackends {
+		backend, ok := s.userBackends[userBackend.Type]
+		if !ok {
+			log.WithField("backend_type", userBackend.Type).Warn("backend implementation not found")
+			continue
 		}
+		url, cached, berr := backend.ResolveLink(ctx, userBackend.AccessToken, hash, fileIdx)
+		if berr != nil {
+			log.WithError(berr).WithField("backend_type", userBackend.Type).Warn("failed to generate link from backend")
+			continue
+		}
+		if !cached {
+			log.WithField("backend_type", userBackend.Type).Warn("link is not cached")
+			continue
+		}
+		if merr := s.cacheIndex.MarkAsCached(ctx, userBackend.Type, hash, fileIdx); merr != nil {
+			return nil, errors.Wrap(merr, "failed to mark as cached in cache index")
+		}
+		log.WithFields(log.Fields{
+			"url":          url,
+			"cached":       cached,
+			"backend_type": userBackend.Type,
+		}).Info("generated streaming link from backend")
+		return &co.LinkResult{
+			URL:         url,
+			ServiceType: userBackend.Type,
+			Cached:      cached,
+		}, nil
 	}
 
 	// Fallback to webtor. Free users hit the paywall here.
@@ -163,34 +148,6 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 		ServiceType: models.StreamingBackendTypeWebtor,
 		Cached:      cached,
 	}, nil
-}
-
-// resolveFilePath returns the full path of the file at the given index
-// within the resource — counting only files (skipping directories) in
-// the order rest-api lists them.
-func (s *LinkResolver) resolveFilePath(ctx context.Context, apiClaims *api.Claims, hash string, fileIdx int) (string, error) {
-	listArgs := &api.ListResourceContentArgs{Limit: 100, Offset: 0}
-	var idx int
-	for {
-		resp, err := s.api.ListResourceContentCached(ctx, apiClaims, hash, listArgs)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to list resource content")
-		}
-		for _, item := range resp.Items {
-			if item.Type != ra.ListTypeFile {
-				continue
-			}
-			if idx == fileIdx {
-				return item.PathStr, nil
-			}
-			idx++
-		}
-		if (resp.Count - int(listArgs.Offset)) == len(resp.Items) {
-			break
-		}
-		listArgs.Offset += listArgs.Limit
-	}
-	return "", errors.Errorf("file at idx %d not found in resource %s", fileIdx, hash)
 }
 
 // isPaidUser checks if the user has paid tier
