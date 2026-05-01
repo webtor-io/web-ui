@@ -13,7 +13,7 @@ type CacheIndex struct {
 	ID          uuid.UUID            `pg:"cache_index_id,pk,type:uuid,default:uuid_generate_v4()"`
 	BackendType StreamingBackendType `pg:"backend_type,notnull"`
 	ResourceID  string               `pg:"resource_id,notnull"`
-	FileIdx     int                  `pg:"file_idx,notnull"`
+	FileIdx     int                  `pg:"file_idx,notnull,use_zero"`
 	LastSeenAt  time.Time            `pg:"last_seen_at,default:now()"`
 	CreatedAt   time.Time            `pg:"created_at,default:now()"`
 	UpdatedAt   time.Time            `pg:"updated_at,default:now()"`
