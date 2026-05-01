@@ -3,6 +3,7 @@ package stremio
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	sv "github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/link_resolver/common"
+	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
 
 // EnrichStream wraps another StreamsService to enrich streams with URLs
@@ -104,7 +106,57 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 		}
 	}
 
+	// Within each resolution bucket put cached (⚡) entries first so users
+	// see Vault hits at the top without disturbing the global resolution
+	// order set by PreferredStream.
+	sortVaultFirstByResolution(finalStreams)
+
 	return &StreamsResponse{Streams: finalStreams}, nil
+}
+
+// sortVaultFirstByResolution stable-sorts cached items to the front of
+// each resolution group while preserving every other relative order.
+func sortVaultFirstByResolution(streams []StreamItem) {
+	if len(streams) < 2 {
+		return
+	}
+	parser := ptn.NewCompoundParser([]ptn.Parser{ptn.GetFieldParser(ptn.FieldTypeResolution)})
+	resolutionOf := func(name string) string {
+		ms := ptn.Matches{}
+		ms, err := parser.Parse(name, ms)
+		if err != nil {
+			return "other"
+		}
+		ti := &ptn.TorrentInfo{}
+		ti.Map(ms)
+		switch ti.Resolution {
+		case "":
+			return "other"
+		case "2160p":
+			return "4k"
+		default:
+			return ti.Resolution
+		}
+	}
+	// Locate contiguous runs of the same resolution and sort within each.
+	start := 0
+	currentRes := resolutionOf(streams[0].Name)
+	for i := 1; i <= len(streams); i++ {
+		var res string
+		if i < len(streams) {
+			res = resolutionOf(streams[i].Name)
+		}
+		if i == len(streams) || res != currentRes {
+			if i-start > 1 {
+				bucket := streams[start:i]
+				sort.SliceStable(bucket, func(a, b int) bool {
+					return bucket[a].Cached && !bucket[b].Cached
+				})
+			}
+			start = i
+			currentRes = res
+		}
+	}
 }
 
 // enrichStream enriches a single stream with URL if needed
@@ -128,6 +180,9 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 		return nil, errors.Wrap(err, "failed to check availability")
 	}
 	stream.Name = s.updateStreamName(stream.Name, availability)
+	if availability != nil && availability.Cached {
+		stream.Cached = true
+	}
 
 	stream.Url = s.generateRedirectURL(stream.InfoHash, p)
 	return stream, nil

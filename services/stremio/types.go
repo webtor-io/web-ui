@@ -17,6 +17,11 @@ type StreamItem struct {
 	ExternalUrl   string               `json:"externalUrl,omitempty"`
 	BehaviorHints *StreamBehaviorHints `json:"behaviorHints,omitempty"`
 	Sources       []string             `json:"sources,omitempty"`
+	// Cached is set by EnrichStream when the underlying file is already
+	// available in the user's Vault (or any debrid backend). Used by the
+	// post-enrichment sort to surface "⚡" entries first within each
+	// resolution bucket. Not serialised to Stremio.
+	Cached bool `json:"-"`
 }
 
 type StreamsResponse struct {

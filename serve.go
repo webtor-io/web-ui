@@ -146,7 +146,8 @@ func serve(c *cli.Context) error {
 		WithHelper(geoip.NewHelper()).
 		WithHelper(rec.NewHelper(c)).
 		WithHelper(si18n.NewHelper(i18nSvc)).
-		WithHelper(turnstile.NewHelper(c))
+		WithHelper(turnstile.NewHelper(c)).
+		WithHelper(stremios.NewHelper())
 
 	var servers []cs.Servable
 	// Setting Probe

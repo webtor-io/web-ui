@@ -19,6 +19,9 @@ type ResolutionSetting struct {
 type StremioSettingsData struct {
 	PreferredResolutions []ResolutionSetting `json:"preferred_resolutions"`
 	DiscoverOnly         bool                `json:"discover_only"`
+	// PreferredLanguage is a 2-letter ISO code (e.g. "en", "ru") used to
+	// filter Stremio addon stream titles. Empty string disables filtering.
+	PreferredLanguage string `json:"preferred_language,omitempty"`
 }
 
 type StremioSettings struct {

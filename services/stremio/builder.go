@@ -97,7 +97,8 @@ func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.
 	cs := NewCompositeStream(services)
 	ds := NewDedupStream(cs)
 	ps := NewPreferredStream(ds, db, u, cla)
-	prs := NewPrefetchResourceStream(ps, s.rapi, apiClaims)
+	lfs := NewLangFilterStream(ps, db, u)
+	prs := NewPrefetchResourceStream(lfs, s.rapi, apiClaims)
 	pcs := NewPrefetchCacheStream(prs, s.cl, s.pg, u, s.cacheIndex, s.cacheAddonURL, s.userAgent, s.rapi, apiClaims)
 	es := NewEnrichStream(pcs, s.rapi, lr, u, apiClaims, cla, s.domain, token, s.secret)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -80,6 +81,14 @@ func (s *Handler) updateSettings(c *gin.Context) {
 
 	settingsData.PreferredResolutions = orderedQualities
 	settingsData.DiscoverOnly = c.PostForm("discover_only") == "on"
+
+	// Validate preferred language against the canonical list. Unknown codes
+	// (and the explicit "any" sentinel) collapse to empty string = no filter.
+	if lang := strings.TrimSpace(c.PostForm("preferred_language")); lang != "" {
+		if stremio.LanguageByCode(lang) != nil {
+			settingsData.PreferredLanguage = lang
+		}
+	}
 
 	// Get database connection
 	db := s.pg.Get()

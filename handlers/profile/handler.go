@@ -15,6 +15,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	"github.com/webtor-io/web-ui/services/vault"
@@ -157,11 +158,22 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
-	// Get Stremio settings
-	ss, err := stremio.GetUserSettingsDataByClaims(c.Request.Context(), db, u.ID)
+	// Get Stremio settings. When the user has never saved settings, prefill
+	// the preferred language with the current UI language so the dropdown
+	// shows a sensible default — saving the form locks it in.
+	existingSS, err := models.GetUserStremioSettings(c.Request.Context(), db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get stremio settings"))
 		return
+	}
+	var ss *models.StremioSettingsData
+	if existingSS == nil {
+		ss = models.GetDefaultStremioSettings()
+		if l := stremio.LanguageByCode(i18n.GetLang(c)); l != nil {
+			ss.PreferredLanguage = l.Code
+		}
+	} else {
+		ss = existingSS.Settings
 	}
 
 	// Get user streaming backends
