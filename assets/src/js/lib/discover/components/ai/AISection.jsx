@@ -392,7 +392,17 @@ export function AISection({
             )}
 
             {/* Phase-specific content. */}
-            {aiState.phase === 'loadingChips' && <ChipsSkeleton />}
+            {aiState.phase === 'loadingChips' && (
+                <>
+                    <div class="mt-3 flex items-center gap-2 text-sm text-w-cyan">
+                        <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" stroke-dasharray="60 20" />
+                        </svg>
+                        <span>{t('discover.ai.loadingChips')}</span>
+                    </div>
+                    <ChipsSkeleton />
+                </>
+            )}
 
             {aiState.phase === 'chipsError' && (
                 <div class="mt-3 text-sm text-w-muted">
