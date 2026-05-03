@@ -9,9 +9,10 @@ import (
 
 // Operation types for transaction log
 const (
-	OpTypeChangeTier int16 = 1 // Change tier - can be positive or negative
-	OpTypeFund       int16 = 2 // Fund pledge - always negative
-	OpTypeClaim      int16 = 3 // Claim pledge - always positive
+	OpTypeChangeTier   int16 = 1 // Change tier - can be positive or negative
+	OpTypeFund         int16 = 2 // Fund pledge - always negative
+	OpTypeClaim        int16 = 3 // Claim pledge - always positive
+	OpTypeAbuseRefund  int16 = 4 // Refund issued by the abuse-store cleanup flow - always positive
 )
 
 type TxLog struct {

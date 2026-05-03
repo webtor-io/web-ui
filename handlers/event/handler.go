@@ -51,6 +51,10 @@ func (h *Handler) Serve() error {
 	if err != nil {
 		return err
 	}
+	err = h.subscribe(js, "common", "resource.banned", "web-ui-resource-banned", h.resourceBanned)
+	if err != nil {
+		return err
+	}
 	err = h.subscribe(js, "common", "user.updated", "web-ui-user-updated", h.userUpdated)
 	if err != nil {
 		return err
