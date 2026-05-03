@@ -17,9 +17,10 @@ function loadAsyncView(target, body, options) {
 }
 function renderBody(target, body, options) {
     // SAFETY: `body` is always same-origin server-rendered HTML from our own Go/Gin
-    // templates — fetched via XMLHttpRequest from the app's own endpoints (async.js),
-    // from same-origin SSE messages (progressLog.js), or from same-origin response
-    // headers (layout.js nav updates). No external or user-supplied HTML reaches here.
+    // templates — extracted from <template data-async-fragment> blocks in AJAX
+    // responses (async.js, then dispatched to layout.js for nav/footer), or from
+    // same-origin SSE messages (progressLog.js). No external or user-supplied
+    // HTML reaches here.
     target.innerHTML = body;
     executeScriptElements(target);
     const detail = {

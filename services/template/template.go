@@ -3,7 +3,6 @@ package template
 import (
 	"bytes"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"html/template"
@@ -334,20 +333,21 @@ type GinContext interface {
 }
 
 func (s *Template[K]) HTML(code int, ctx K) {
-	var name string
-	var rerr error
 	c := ctx.GetGinContext()
 	if c.GetHeader("X-Requested-With") == "XMLHttpRequest" {
+		var buf bytes.Buffer
 		if c.GetHeader("X-Layout") != "" {
-			name, rerr = s.tm.RenderViewByNameAndLayoutBody(s.name, c.GetHeader("X-Layout"))
+			mainTpl := s.tm.Build(s.name).WithLayoutBody(c.GetHeader("X-Layout"))
+			str, rerr := mainTpl.ToString(ctx)
 			if rerr != nil {
-				log.WithError(rerr).Error("failed to render view by name and layout body")
+				log.WithError(rerr).Error("failed to render main view")
 				c.String(http.StatusInternalServerError, "Internal Server Error")
 				return
 			}
+			writeFragment(&buf, "main", str)
 		}
-		for name, vals := range c.Request.Header {
-			if !strings.HasPrefix(name, "X-Update") {
+		for headerName, vals := range c.Request.Header {
+			if !strings.HasPrefix(headerName, "X-Update-") {
 				continue
 			}
 			tpl := s.tm.Build(s.name).WithLayoutBody(vals[0])
@@ -357,19 +357,31 @@ func (s *Template[K]) HTML(code int, ctx K) {
 				c.String(http.StatusInternalServerError, "Internal Server Error")
 				return
 			}
-			encoded := base64.StdEncoding.EncodeToString([]byte(str))
-			c.Header(name, encoded)
+			fragName := strings.ToLower(strings.TrimPrefix(headerName, "X-Update-"))
+			writeFragment(&buf, fragName, str)
 		}
-
-	} else {
-		name, rerr = s.tm.RenderViewByNameAndLayout(s.name, s.layout)
-		if rerr != nil {
-			log.WithError(rerr).Error("failed to render view by name and layout")
-			c.String(http.StatusInternalServerError, "Internal Server Error")
-			return
-		}
+		c.Data(code, "text/html; charset=utf-8", buf.Bytes())
+		return
+	}
+	name, rerr := s.tm.RenderViewByNameAndLayout(s.name, s.layout)
+	if rerr != nil {
+		log.WithError(rerr).Error("failed to render view by name and layout")
+		c.String(http.StatusInternalServerError, "Internal Server Error")
+		return
 	}
 	c.HTML(code, name, ctx)
+}
+
+// writeFragment emits one <template data-async-fragment="name">…</template>
+// block. Fragment names come from a fixed allow-list driven by
+// data-async-update-* attributes (lowercased ASCII), so they're safe to
+// embed without escaping.
+func writeFragment(buf *bytes.Buffer, name, body string) {
+	buf.WriteString(`<template data-async-fragment="`)
+	buf.WriteString(name)
+	buf.WriteString(`">`)
+	buf.WriteString(body)
+	buf.WriteString(`</template>`)
 }
 
 func (s *Template[K]) ToString(obj K) (res string, err error) {

@@ -51,23 +51,25 @@ async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     }
     const res = await fetchFunc(url, fetchParams);
     const text = await res.text();
-    loadAsyncView(target, text, options);
+    const fragments = parseFragments(text);
+    loadAsyncView(target, fragments.main ?? text, options);
     for (const f of updateFields) {
-        let updated = false;
-        for (const [h, val] of res.headers.entries()) {
-            if (!h.startsWith('x-update-')) continue;
-            const key = h.replace('x-update-', '');
-            if (key !== f) continue;
-            let decodedBytes = new Uint8Array([...atob(val)].map(c => c.charCodeAt(0)));
-            let decodedHeader = new TextDecoder("utf-8").decode(decodedBytes);
-            params.update(key, decodedHeader);
-            updated = true;
-        }
-        if (!updated) {
-            params.update(f, null);
-        }
+        params.update(f, f in fragments ? fragments[f] : null);
     }
     return res;
+}
+
+// Parse the AJAX response body into a {name: html} map.
+// Wire format: a series of <template data-async-fragment="NAME">…</template>
+// blocks, one per layout slot (main, title, description, nav, footer, lang…).
+// See services/template/template.go HTML() for the producer side.
+function parseFragments(text) {
+    const out = {};
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    for (const tpl of doc.querySelectorAll('template[data-async-fragment]')) {
+        out[tpl.getAttribute('data-async-fragment')] = tpl.innerHTML;
+    }
+    return out;
 }
 
 async function async(selector, params = {}, scope = null) {
