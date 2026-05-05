@@ -25,7 +25,17 @@ var fieldParsers = FieldParsers{
 	{FieldTypeSeason, NewRegexpMatcher(`(?i)(s?([0-9]{1,2}))[ex]`, `(?i)(s?([0-9]{1,2}))\se`), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
 	{FieldTypeEpisode, NewRegexpMatcher(`(-\s+([0-9]{1,})(?:[^0-9]|$))`, `(?i)([ex]([0-9]{2})(?:[^0-9]|$))`), nil},
-	{FieldTypeYear, NewRegexpMatcherLast(`\b(((?:19[0-9]|20[0-9])[0-9]))\b`), nil},
+	// Year-range patterns (e.g. "S01-S12.2007-2019" on long-running series)
+	// must be consumed before the single-year matcher, otherwise its `last`
+	// policy picks the END of the run as the canonical year — which neither
+	// TMDB nor OMDB indexes (the show is filed under its premiere year).
+	// Group 2 captures the FIRST year in the range; group 1 captures the
+	// whole "YYYY-YYYY" segment so it gets stripped from the title. Single
+	// years still fall through to the second pattern.
+	{FieldTypeYear, NewRegexpMatcherLast(
+		`\b((19\d{2}|20\d{2})\s*[-–—]\s*(?:19\d{2}|20\d{2}))\b`,
+		`\b(((?:19[0-9]|20[0-9])[0-9]))\b`,
+	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
 	{FieldTypeSBS, NewRegexpMatcher(`(?i)\b(((?:Half-)?SBS))\b`), nil},

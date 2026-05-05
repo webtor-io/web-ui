@@ -116,6 +116,21 @@ func (s *TMDB) Map(ctx context.Context, m *models.VideoContent, mt models.Conten
 	if err != nil {
 		return nil, err
 	}
+	if sr == nil && m.Year != nil {
+		// The year extracted from a torrent name is often noisy: a remaster
+		// release year, a year buried in a codec tag, or the END of a
+		// year-range that makes it past the parser. TMDB indexes shows
+		// under their premiere year only, so a year-constrained miss with
+		// a valid title is usually fixable by dropping the year filter.
+		// We retry exactly once and let the result, if any, persist under
+		// the original (title, year) cache key so future torrents with the
+		// same wrong year resolve from cache.
+		log.Infof("no tmdb match for title %v with year %v, retrying without year", m.Title, *m.Year)
+		sr, err = s.api.Search(ctx, m.Title, nil, searchType)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if sr == nil {
 		log.Infof("no tmdb found for title %v and year %v", m.Title, m.Year)
 		_, err = tm.InsertQueryIgnoreConflict(ctx, db, m.Title, m.Year, ttype, nil)
