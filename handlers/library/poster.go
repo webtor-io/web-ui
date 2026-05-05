@@ -35,6 +35,12 @@ const (
 	PosterJPEGQuality = 85
 )
 
+// errPosterNotFound is returned when no poster URL can be resolved for the
+// requested video — distinct from real internal errors (db down, S3 cache
+// failure, image decode failure). The HTTP layer maps it to 404 so absent
+// posters don't pollute the 5xx error budget.
+var errPosterNotFound = errors.New("poster not found")
+
 type PosterArgs struct {
 	t      models.ContentType
 	imdbID string
@@ -87,6 +93,10 @@ func (s *Handler) poster(c *gin.Context) {
 	b, err := s.getResizedJPEGPosterWithCache(ctx, db, s.s3Cl, pa)
 
 	if err != nil {
+		if errors.Is(err, errPosterNotFound) {
+			_ = c.AbortWithError(http.StatusNotFound, err)
+			return
+		}
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get resized image"))
 		return
 	}
@@ -118,7 +128,7 @@ func (s *Handler) getResizedPoster(ctx context.Context, db *pg.DB, args *PosterA
 		return nil, err
 	}
 	if md == nil || md.PosterURL == "" {
-		return nil, errors.Errorf("no poster found for %s %s", args.t, args.imdbID)
+		return nil, errors.Wrapf(errPosterNotFound, "%s %s", args.t, args.imdbID)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", md.PosterURL, nil)
@@ -181,12 +191,28 @@ func (s *Handler) getResizedJPEGPoster(ctx context.Context, db *pg.DB, args *Pos
 	return &buf, nil
 }
 
-func (s *Handler) getPosterMetadata(ctx context.Context, _ *pg.DB, t models.ContentType, videoID string) (md *models.VideoMetadata, err error) {
-	// Delegate entirely to the enricher's DirectMapper chain (currently
-	// TMDB MapByID). It checks tmdb.info cache first; on a miss it calls
-	// the TMDB API, upserts the result, and returns the metadata with a
-	// poster URL. This covers both torrent-enriched films and AI/discover-
-	// enriched ones through a single code path.
+func (s *Handler) getPosterMetadata(ctx context.Context, db *pg.DB, t models.ContentType, videoID string) (md *models.VideoMetadata, err error) {
+	// First, try the persisted enrichment record. If a torrent has been
+	// enriched, the poster URL is already in series_metadata/movie_metadata
+	// and we can return it directly. This keeps the served poster from the
+	// same source that produced the video_id (an invariant — see migration
+	// 51 and the Kinopoisk Unofficial mapper for the historical reason).
+	switch t {
+	case models.ContentTypeMovie:
+		mm, mmErr := models.GetMovieMetadataByVideoID(ctx, db, videoID)
+		if mmErr == nil && mm != nil && mm.VideoMetadata != nil && mm.PosterURL != "" {
+			return mm.VideoMetadata, nil
+		}
+	case models.ContentTypeSeries:
+		sm, smErr := models.GetSeriesMetadataByVideoID(ctx, db, videoID)
+		if smErr == nil && sm != nil && sm.VideoMetadata != nil && sm.PosterURL != "" {
+			return sm.VideoMetadata, nil
+		}
+	}
+
+	// Fallback: AI/discover writes only into mapper-specific caches
+	// (tmdb.info, kpu.info) without ever populating series_metadata /
+	// movie_metadata. The mapper chain resolves those.
 	if s.enricher != nil {
 		md, err = s.enricher.LookupByVideoID(ctx, videoID, t)
 		if err == nil && md != nil && md.PosterURL != "" {

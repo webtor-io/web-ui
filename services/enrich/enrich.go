@@ -301,10 +301,15 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 }
 
 // LookupByVideoID iterates through mappers that implement DirectMapper and
-// returns the first match for the given video ID (typically an IMDB tt* id).
-// Used by the poster proxy when a film exists in tmdb.info (via AI/discover
-// enrichment) but not yet in movie_metadata (which is populated through
-// the torrent enrichment flow).
+// returns the first match for the given video ID (typically an IMDB tt* id
+// or our internal kp{id}). Used by the poster proxy when a film exists
+// in tmdb.info / kpu.info (via AI/discover enrichment) but not yet in
+// movie_metadata (which is populated through the torrent enrichment flow).
+//
+// A mapper-result without a poster URL is treated as a miss and the loop
+// continues — otherwise a thin response (e.g. OMDB returning "Poster":"N/A"
+// for a marginal id) would short-circuit the chain and prevent another
+// mapper from supplying a usable poster.
 func (s *Enricher) LookupByVideoID(ctx context.Context, videoID string, ct models.ContentType) (*models.VideoMetadata, error) {
 	for _, m := range s.mappers {
 		dm, ok := m.(DirectMapper)
@@ -316,7 +321,7 @@ func (s *Enricher) LookupByVideoID(ctx context.Context, videoID string, ct model
 			log.WithError(err).WithField("mapper", m.GetName()).WithField("video_id", videoID).Warn("direct lookup failed")
 			continue
 		}
-		if md != nil {
+		if md != nil && md.PosterURL != "" {
 			return md, nil
 		}
 	}

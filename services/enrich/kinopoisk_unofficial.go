@@ -41,13 +41,16 @@ func (s *KinopoiskUnofficial) makeVideoMetadata(mi *km.Info) *models.VideoMetada
 	if ratingFloat != 0 {
 		rating = &ratingFloat
 	}
-	imdbID := mi.ImdbID
-	if imdbID == nil {
-		fakeID := fmt.Sprintf("kp%v", mi.KpID)
-		imdbID = &fakeID
-	}
+	// Always identify the record by our internal kp{id}, never by the
+	// imdbId Kinopoisk Unofficial advertises in their response. Their
+	// imdbId field is unreliable: it can point to a different film with
+	// the same English title (e.g. kp=306084 "Теория большого взрыва"
+	// → tt1147717, which is actually a 2007 short, not the CBS sitcom
+	// tt0898266). Routing posters via that id then breaks because TMDB
+	// has no record for it. Keeping id and poster from the same source
+	// is an invariant — see migration 51 for the historical cleanup.
 	return &models.VideoMetadata{
-		VideoID:   *imdbID,
+		VideoID:   fmt.Sprintf("kp%v", mi.KpID),
 		Title:     mi.Title,
 		Year:      mi.Year,
 		Plot:      description,
