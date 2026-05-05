@@ -335,6 +335,15 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         const restoreSeason = modalSeasonRef.current;
         modalSeasonRef.current = null;
 
+        // Watchlist conversion telemetry: a click that originates from the
+        // watchlist view is the only signal we have today that "saved → opened
+        // to stream" — without this we cannot answer whether Watchlist drives
+        // any retention. Fired before any async work so a fetch failure still
+        // counts the intent.
+        if (stateRef.current?.watchlistFilterEnabled) {
+            window.umami?.track?.('stream-from-watchlist');
+        }
+
         if (url.isPopstate.current) {
             url.replace({ id, season: restoreSeason ?? null, episode: null });
         } else {

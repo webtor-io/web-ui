@@ -216,6 +216,7 @@ Events tracked:
 - `watchlist-added` — heart icon clicked on a card not yet in the list (`id`, `source`)
 - `watchlist-removed` — heart icon clicked on a card already in the list (`id`, `source`)
 - `ai-watchlist-toggled` — heart icon clicked on an AI recommendation card (`id`, `on`)
+- `stream-from-watchlist` — a card was clicked while the Watchlist view was active (no params; bare counter so the conversion ratio is `count(stream-from-watchlist) / count(watchlist-added)`)
 
 ## Addon Protocol
 
