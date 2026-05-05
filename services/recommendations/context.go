@@ -69,6 +69,12 @@ type UserContext struct {
 	LocalHour   int    // 0..23 from client
 	HistoryText string // pre-rendered multi-line block; empty for new users
 	HistorySize int    // number of rows actually rendered
+	// WatchlistText is a pre-rendered block of titles the user has explicitly
+	// bookmarked (movies + series merged, newest first). Treated as a strong
+	// taste signal and as an exclusion list — Claude is told not to recommend
+	// anything already on it.
+	WatchlistText string
+	WatchlistSize int
 }
 
 // DBUserHistoryLoader is the production UserHistoryLoader, backed by the
@@ -100,6 +106,85 @@ func (l *DBUserHistoryLoader) FilterWatchedVideoIDs(ctx context.Context, userID 
 		return nil, errors.New("db is nil")
 	}
 	return models.FilterWatchedMovieIDs(ctx, db, userID, videoIDs)
+}
+
+// ListUserWatchlist merges the movie + series watchlist into a single
+// newest-first slice of WatchlistTitle entries, capped at limit. Items
+// without cached metadata are skipped — Claude can't ground a card it
+// doesn't have a title for.
+func (l *DBUserHistoryLoader) ListUserWatchlist(ctx context.Context, userID uuid.UUID, limit int) ([]WatchlistTitle, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	db := l.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+	movies, err := models.ListMovieWatchlistItems(ctx, db, userID)
+	if err != nil {
+		return nil, err
+	}
+	series, err := models.ListSeriesWatchlistItems(ctx, db, userID)
+	if err != nil {
+		return nil, err
+	}
+	// Both inputs are already ordered DESC by created_at. Merge them into a
+	// single DESC stream by repeatedly picking the larger created_at; cap
+	// once we hit limit so we don't waste tokens on a 200-item paid list.
+	out := make([]WatchlistTitle, 0, limit)
+	i, j := 0, 0
+	for len(out) < limit && (i < len(movies) || j < len(series)) {
+		var pick models.WatchlistItem
+		switch {
+		case j >= len(series):
+			pick = movies[i]
+			i++
+		case i >= len(movies):
+			pick = series[j]
+			j++
+		case movies[i].CreatedAt >= series[j].CreatedAt:
+			pick = movies[i]
+			i++
+		default:
+			pick = series[j]
+			j++
+		}
+		out = append(out, WatchlistTitle{
+			VideoID: pick.VideoID,
+			Title:   pick.Title,
+			Year:    pick.Year,
+			Type:    pick.Type,
+		})
+	}
+	return out, nil
+}
+
+// FilterWatchlistVideoIDs returns the subset of videoIDs already on the
+// user's watchlist (movie or series). Combines the two parallel tables in
+// a single round-trip per type.
+func (l *DBUserHistoryLoader) FilterWatchlistVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
+	if len(videoIDs) == 0 {
+		return nil, nil
+	}
+	db := l.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+	movies, err := models.FilterMovieWatchlistVideoIDs(ctx, db, userID, videoIDs)
+	if err != nil {
+		return nil, err
+	}
+	series, err := models.FilterSeriesWatchlistVideoIDs(ctx, db, userID, videoIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(movies) == 0 {
+		return series, nil
+	}
+	if len(series) == 0 {
+		return movies, nil
+	}
+	return append(movies, series...), nil
 }
 
 // UserContextBuilder assembles a UserContext for a given (user, clock).
@@ -162,6 +247,17 @@ func (b *UserContextBuilder) Build(ctx context.Context, userID uuid.UUID, locale
 	}
 	uc.HistoryText = renderHistory(rows)
 	uc.HistorySize = len(rows)
+
+	// Watchlist is a separate signal — soft-fail the same way: an error here
+	// must not poison a request that already has rated history. Reuse the
+	// same limit; the watchlist block costs roughly the same per row as the
+	// rated-history block.
+	wl, werr := b.history.ListUserWatchlist(ctx, userID, b.limit)
+	if werr != nil {
+		return uc, errors.Wrap(werr, "failed to load user watchlist")
+	}
+	uc.WatchlistText = renderWatchlist(wl)
+	uc.WatchlistSize = len(wl)
 	return uc, nil
 }
 
@@ -211,6 +307,42 @@ func normalizeLocale(locale string) string {
 //	- Tenet (2020) [disliked]
 //	- Arrival (2016) [watched]
 //	- Dune (2021) [queued]
+// renderWatchlist mirrors renderHistory for watchlist entries. Format is a
+// dash-prefixed line per title with the content type tagged in brackets so
+// Claude can tell movies from series at a glance.
+//
+// Example:
+//
+//	- Severance (2022) [series]
+//	- Past Lives (2023) [movie]
+//	- Foundation (2021) [series]
+func renderWatchlist(rows []WatchlistTitle) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, r := range rows {
+		title := strings.TrimSpace(r.Title)
+		if title == "" {
+			continue
+		}
+		sb.WriteString("- ")
+		sb.WriteString(title)
+		if r.Year != nil {
+			sb.WriteString(fmt.Sprintf(" (%d)", *r.Year))
+		}
+		typ := r.Type
+		if typ == "" {
+			typ = "movie"
+		}
+		sb.WriteString(" [")
+		sb.WriteString(typ)
+		sb.WriteString("]")
+		sb.WriteByte('\n')
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
 func renderHistory(rows []models.RatedMovie) string {
 	if len(rows) == 0 {
 		return ""

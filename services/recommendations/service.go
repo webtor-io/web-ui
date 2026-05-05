@@ -222,6 +222,19 @@ type ContentLocalizer interface {
 	Localize(ctx context.Context, md *models.VideoMetadata, lang string)
 }
 
+// WatchlistTitle is the prompt-shaped projection of a watchlist row — just
+// enough fields for Claude to ground its picks. Loaded by ListUserWatchlist
+// alongside the rated-history block so the model sees both what the user has
+// watched and what they have explicitly bookmarked.
+type WatchlistTitle struct {
+	VideoID string
+	Title   string
+	Year    *int16
+	// Type is "movie" or "series" — Claude treats a saved series differently
+	// (cue similar shows, not similar films).
+	Type string
+}
+
 // UserHistoryLoader loads the "what has this user watched and rated" picture
 // used to ground Claude's output. Separated from the models package so tests
 // can inject fixtures without touching a real Postgres.
@@ -229,11 +242,20 @@ type UserHistoryLoader interface {
 	// ListUserRatedMovies returns the user's recent watch/rate history for
 	// prompt grounding.
 	ListUserRatedMovies(ctx context.Context, userID uuid.UUID, limit int) ([]models.RatedMovie, error)
+	// ListUserWatchlist returns the user's recent watchlist entries (movies
+	// + series merged, newest first), capped at limit. Surfaced to Claude as
+	// a strong taste signal: titles the user explicitly bookmarked.
+	ListUserWatchlist(ctx context.Context, userID uuid.UUID, limit int) ([]WatchlistTitle, error)
 	// FilterWatchedVideoIDs returns the subset of the given video_ids that
 	// the user has already marked as watched. Used to hide already-seen
 	// titles from AI recommendations — Claude is asked to do this in the
 	// prompt, but we don't trust the model to respect it perfectly.
 	FilterWatchedVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error)
+	// FilterWatchlistVideoIDs returns the subset of the given video_ids that
+	// are already in the user's watchlist (movies + series). Mirror of the
+	// watched filter — the user already knows about a bookmarked title, so
+	// recommending it is wasted real estate.
+	FilterWatchlistVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error)
 }
 
 // Quota guards spend against the Anthropic API. Implementations live in

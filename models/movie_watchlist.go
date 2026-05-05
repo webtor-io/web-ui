@@ -101,6 +101,30 @@ func ListMovieWatchlistVideoIDs(ctx context.Context, db *pg.DB, userID uuid.UUID
 	return out, nil
 }
 
+// FilterMovieWatchlistVideoIDs returns the subset of videoIDs that are
+// already in the user's movie watchlist. Cheap PK-only lookup used by the
+// AI recommender to skip already-bookmarked titles before showing them.
+func FilterMovieWatchlistVideoIDs(ctx context.Context, db *pg.DB, userID uuid.UUID, videoIDs []string) ([]string, error) {
+	if len(videoIDs) == 0 {
+		return nil, nil
+	}
+	var rows []*MovieWatchlist
+	err := db.Model(&rows).
+		Context(ctx).
+		Column("video_id").
+		Where("user_id = ?", userID).
+		Where("video_id IN (?)", pg.In(videoIDs)).
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to filter movie watchlist ids")
+	}
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.VideoID
+	}
+	return out, nil
+}
+
 // ListMovieWatchlistItems returns the user's watchlist with metadata joined,
 // ready for the grid. Items whose metadata isn't (yet) in our cache are
 // skipped — the client can't render a useful card without at least a title.

@@ -408,3 +408,115 @@ func TestRenderHistory_EmptyReturnsEmpty(t *testing.T) {
 		t.Fatal("expected empty string for nil rows")
 	}
 }
+
+// --- Watchlist rendering & prompt surfacing ---
+
+func TestRenderWatchlist_TitlesYearAndType(t *testing.T) {
+	y2022 := int16(2022)
+	y2023 := int16(2023)
+	rows := []WatchlistTitle{
+		{VideoID: "tt1", Title: "Severance", Year: &y2022, Type: "series"},
+		{VideoID: "tt2", Title: "Past Lives", Year: &y2023, Type: "movie"},
+		// Missing type defaults to "movie" — older rows might not carry the
+		// tag but Claude still needs *something* in brackets.
+		{VideoID: "tt3", Title: "Untyped", Year: &y2023},
+	}
+	out := renderWatchlist(rows)
+	for _, needle := range []string{"Severance", "(2022)", "[series]", "Past Lives", "[movie]", "Untyped"} {
+		if !strings.Contains(out, needle) {
+			t.Errorf("missing %q:\n%s", needle, out)
+		}
+	}
+}
+
+func TestRenderWatchlist_EmptyReturnsEmpty(t *testing.T) {
+	if renderWatchlist(nil) != "" {
+		t.Fatal("expected empty string for nil rows")
+	}
+}
+
+func TestUserPromptForRecommend_IncludesWatchlistBlock(t *testing.T) {
+	uc := &UserContext{
+		Locale: "en", DayOfWeek: "Friday", TimeOfDay: "evening", LocalHour: 20,
+		WatchlistText: "- Severance (2022) [series]\n- Past Lives (2023) [movie]",
+		WatchlistSize: 2,
+	}
+	p := userPromptForRecommend(uc, "something to chew on", 6, 8)
+	for _, needle := range []string{"Watchlist", "Severance", "Past Lives"} {
+		if !strings.Contains(p, needle) {
+			t.Errorf("prompt missing %q:\n%s", needle, p)
+		}
+	}
+}
+
+func TestUserPromptForRecommend_OmitsWatchlistWhenEmpty(t *testing.T) {
+	// A new user with empty watchlist should not see a placeholder block —
+	// every token costs money on Sonnet.
+	uc := &UserContext{Locale: "en", DayOfWeek: "Friday", TimeOfDay: "evening", LocalHour: 20}
+	p := userPromptForRecommend(uc, "anything", 6, 8)
+	if strings.Contains(p, "Watchlist") {
+		t.Errorf("cold-start prompt should not mention Watchlist:\n%s", p)
+	}
+}
+
+// stubHistory is a minimal UserHistoryLoader for testing the Build pipeline
+// without spinning up Postgres. Each field controls the response of the
+// matching interface method.
+type stubHistory struct {
+	rated     []models.RatedMovie
+	ratedErr  error
+	wl        []WatchlistTitle
+	wlErr     error
+	watched   []string
+	watchedFn func(ids []string) []string
+	wlFilter  []string
+}
+
+func (s *stubHistory) ListUserRatedMovies(ctx context.Context, userID uuid.UUID, limit int) ([]models.RatedMovie, error) {
+	return s.rated, s.ratedErr
+}
+func (s *stubHistory) ListUserWatchlist(ctx context.Context, userID uuid.UUID, limit int) ([]WatchlistTitle, error) {
+	return s.wl, s.wlErr
+}
+func (s *stubHistory) FilterWatchedVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
+	if s.watchedFn != nil {
+		return s.watchedFn(videoIDs), nil
+	}
+	return s.watched, nil
+}
+func (s *stubHistory) FilterWatchlistVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error) {
+	return s.wlFilter, nil
+}
+
+func TestUserContextBuilder_Build_PopulatesWatchlist(t *testing.T) {
+	y := int16(2022)
+	stub := &stubHistory{
+		wl: []WatchlistTitle{
+			{VideoID: "tt1", Title: "Severance", Year: &y, Type: "series"},
+			{VideoID: "tt2", Title: "Past Lives", Year: &y, Type: "movie"},
+		},
+	}
+	b := NewUserContextBuilder(stub, 40)
+	uc, err := b.Build(context.Background(), uuid.NewV4(), "en", ClientClock{DayOfWeek: "Friday", Hour: 20})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if uc.WatchlistSize != 2 {
+		t.Fatalf("WatchlistSize: want 2, got %d", uc.WatchlistSize)
+	}
+	if !strings.Contains(uc.WatchlistText, "Severance") || !strings.Contains(uc.WatchlistText, "[series]") {
+		t.Errorf("WatchlistText missing entries:\n%s", uc.WatchlistText)
+	}
+}
+
+func TestUserPromptForChips_IncludesWatchlistBlock(t *testing.T) {
+	uc := &UserContext{
+		Locale: "en", DayOfWeek: "Saturday", TimeOfDay: "afternoon", LocalHour: 14,
+		WatchlistText: "- Severance (2022) [series]",
+		WatchlistSize: 1,
+	}
+	p := userPromptForChips(uc, 6)
+	if !strings.Contains(p, "Severance") {
+		t.Errorf("chips prompt missing watchlist title:\n%s", p)
+	}
+}

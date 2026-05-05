@@ -15,17 +15,22 @@ cards, each with a short personalized reason explaining why it fits.
 Discover mount
   └→ GET /discover/ai/chips                  (Redis 4h TTL, no quota)
      └→ 6 chips appear
-        │  • zero-history user → static set from default_chips.go
-        │  • everyone else     → Claude-generated, then cached
+        │  • cold-start user (no history AND empty watchlist) → static set
+        │    from default_chips.go
+        │  • everyone else                                    → Claude-
+        │    generated, then cached
         └→ user taps chip OR types custom query
            └→ EventSource: GET /discover/ai/recommend/stream
               ├→ consume 1 quota unit (Redis Lua INCR, atomic)
               ├→ load watch history (movie_status ⋈ movie_metadata)
+              ├→ load watchlist     (movie_watchlist + series_watchlist
+              │                      merged newest-first, capped at limit)
               ├→ open Claude streaming Messages.NewStreaming
               │  └→ stream NDJSON {title, year, reason} per token
               ├→ resolver fans out concurrent TMDB → OMDB → KP lookups
               │  └→ each resolved card emits an SSE 'item' event
-              ├→ already-watched filter drops anything the user has seen
+              ├→ already-known filter drops anything the user has watched
+              │  OR already saved to their watchlist
               └→ terminal SSE 'done' with quota / tier
            └→ user taps card
               └→ existing StreamModal flow (fetchMeta + fetchStreams via Stremio addons)
@@ -84,6 +89,13 @@ call and we want Anthropic-side schema validation on the chip array shape.
   `ListUserRatedMovies(ctx, db, userID, limit)` joining `movie_status`
   with `movie_metadata` for prompt grounding, and `FilterWatchedMovieIDs`
   for the post-resolver dedup.
+- **`models/movie_watchlist.go` / `models/series_watchlist.go`** —
+  `ListMovieWatchlistItems` / `ListSeriesWatchlistItems` joined with
+  `*_metadata` are merged in `DBUserHistoryLoader.ListUserWatchlist` to
+  feed Claude a unified "user has bookmarked these" block. The matching
+  `FilterMovieWatchlistVideoIDs` / `FilterSeriesWatchlistVideoIDs`
+  helpers back the post-resolver `isAlreadyKnown` filter so a Claude
+  hallucination doesn't slip an already-saved title back into the grid.
 
 ### Handler
 
@@ -225,6 +237,21 @@ The refine prompt **re-renders the user's current watch-history block**
 (see `userPromptForRefine` in `prompt.go`) so freshly-watched titles are
 honoured — without this, refine would only know "Claude's previous
 suggestions", not "what the user has actually watched / rated since".
+The watchlist block is re-rendered on the same path for the same reason —
+a title bookmarked mid-conversation is excluded from the next refine
+turn without waiting for cache invalidation.
+
+### Watchlist as taste signal
+
+Alongside the rated-history block, the prompt carries a "user has
+bookmarked these titles" block populated from `movie_watchlist` +
+`series_watchlist` (merged newest-first, capped at `HistoryLimit`).
+Claude treats it both as exclusion (don't recommend something the user
+already saved) and as taste grounding (e.g. a saved series shifts later
+picks toward similar shows). A user with empty watch history but a
+populated watchlist is no longer a cold-start case — chips skip the
+static fallback and call Claude with the watchlist as the only personal
+signal.
 
 ## Prompting strategy
 

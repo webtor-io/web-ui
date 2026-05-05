@@ -72,6 +72,29 @@ func ListSeriesWatchlistVideoIDs(ctx context.Context, db *pg.DB, userID uuid.UUI
 	return out, nil
 }
 
+// FilterSeriesWatchlistVideoIDs mirrors FilterMovieWatchlistVideoIDs for the
+// series table.
+func FilterSeriesWatchlistVideoIDs(ctx context.Context, db *pg.DB, userID uuid.UUID, videoIDs []string) ([]string, error) {
+	if len(videoIDs) == 0 {
+		return nil, nil
+	}
+	var rows []*SeriesWatchlist
+	err := db.Model(&rows).
+		Context(ctx).
+		Column("video_id").
+		Where("user_id = ?", userID).
+		Where("video_id IN (?)", pg.In(videoIDs)).
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to filter series watchlist ids")
+	}
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.VideoID
+	}
+	return out, nil
+}
+
 func ListSeriesWatchlistItems(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]WatchlistItem, error) {
 	var out []WatchlistItem
 	_, err := db.QueryContext(ctx, &out, `

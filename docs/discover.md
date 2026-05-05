@@ -182,6 +182,10 @@ There is no FK on `movie_metadata` / `series_metadata`: a user can bookmark befo
 
 `source` records the entry point (`ai`, `search`, `catalog`, `streamy`) — used as a future signal for the recommendation engine and to measure CTR per surface.
 
+### AI cross-feed
+
+The watchlist is fed into the AI Discover prompt alongside the rated-history block: see `services/recommendations/context.go` (`UserContextBuilder.Build` calls `ListUserWatchlist`) and the "Watchlist as taste signal" section in `docs/ai_recommendations.md`. Claude uses it both as a strong taste hint and as an exclusion list, and the `isAlreadyKnown` post-filter drops any Claude-leaked duplicate (matched against `FilterMovieWatchlistVideoIDs` / `FilterSeriesWatchlistVideoIDs`). A user with no watch history but a populated watchlist now gets Claude-generated chips instead of the static cold-start set.
+
 ### Free-tier limit
 
 Combined movie + series watchlist size is capped at **200** for free users (`FreeTierWatchlistLimit` in `handlers/discover_watchlist/handler.go`). Paid users are unlimited. The limit is a soft anti-abuse cap, not a billing lever — it only kicks in on add. Hitting it returns 402 with `{ code: "limit_exceeded", limit }`. The Preact app surfaces a toast and rolls back the optimistic insert.

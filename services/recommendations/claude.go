@@ -162,14 +162,14 @@ func (s *ClaudeService) GenerateChips(ctx context.Context, req ChipsRequest) (*C
 		log.WithError(err).WithField("feature", "ai_rec").Warn("user context partial failure")
 	}
 
-	// Cold-start optimisation: a user with zero watch history gives Claude
-	// no personal signal, so calling the model would burn tokens for a
-	// generic prompt we can hand-write once. Serve a curated static set
-	// instead. We deliberately skip Redis here too — the static path is
-	// dirt cheap, and skipping the cache means the moment the user marks
-	// their first film as watched, the next chip load will go through the
-	// real AI path without waiting for a 4h TTL.
-	if uc.HistorySize == 0 {
+	// Cold-start optimisation: a user with zero watch history AND empty
+	// watchlist gives Claude no personal signal, so calling the model would
+	// burn tokens for a generic prompt we can hand-write once. Serve a
+	// curated static set instead. We deliberately skip Redis here too — the
+	// static path is dirt cheap, and skipping the cache means the moment the
+	// user marks their first film as watched (or bookmarks one), the next
+	// chip load will go through the real AI path without waiting for a 4h TTL.
+	if uc.HistorySize == 0 && uc.WatchlistSize == 0 {
 		log.WithField("feature", "ai_rec").
 			WithField("locale", uc.Locale).
 			WithField("tier", req.Tier.String()).
@@ -404,11 +404,12 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 			sentResolving = true
 		}
 
-		// Per-item watched filter. Single-row index lookup, ~1ms in pg.
-		// We deliberately do this per item rather than batching at the end:
-		// the whole point of streaming is "show what you've got". Holding
-		// items back to do a batch query would defeat the purpose.
-		if s.isWatched(ctx, req.UserID, rec.VideoID) {
+		// Per-item watched + watchlist filter. Two single-row index lookups,
+		// ~1-2ms in pg total. We deliberately do this per item rather than
+		// batching at the end: the whole point of streaming is "show what
+		// you've got". Holding items back to do a batch query would defeat
+		// the purpose.
+		if s.isAlreadyKnown(ctx, req.UserID, rec.VideoID) {
 			continue
 		}
 		if !send(StreamEvent{Type: "item", Data: rec}) {
@@ -455,16 +456,25 @@ const claudeChannelBuffer = 8
 // blocking goroutines, but small enough that cancel propagates fast.
 const r2BufferSize = 4
 
-// isWatched is a single-id wrapper around the batch FilterWatchedVideoIDs
-// helper, used by the streaming pipeline. Soft-fails to "not watched" on
-// DB error so a transient blip never blocks a recommendation.
-func (s *ClaudeService) isWatched(ctx context.Context, userID uuid.UUID, videoID string) bool {
-	watched, err := s.context.History().FilterWatchedVideoIDs(ctx, userID, []string{videoID})
+// isAlreadyKnown reports whether the user has already engaged with the given
+// videoID via either the watched-list or the watchlist. Used by the streaming
+// pipeline to drop hallucinated duplicates Claude leaks past the prompt-side
+// exclusion. Soft-fails to "unknown" on DB error so a transient blip never
+// blocks a recommendation.
+func (s *ClaudeService) isAlreadyKnown(ctx context.Context, userID uuid.UUID, videoID string) bool {
+	hist := s.context.History()
+	watched, err := hist.FilterWatchedVideoIDs(ctx, userID, []string{videoID})
 	if err != nil {
-		log.WithError(err).WithField("feature", "ai_rec").Warn("isWatched lookup failed — assuming unwatched")
+		log.WithError(err).WithField("feature", "ai_rec").Warn("watched lookup failed — assuming unwatched")
+	} else if len(watched) > 0 {
+		return true
+	}
+	saved, err := hist.FilterWatchlistVideoIDs(ctx, userID, []string{videoID})
+	if err != nil {
+		log.WithError(err).WithField("feature", "ai_rec").Warn("watchlist lookup failed — assuming not bookmarked")
 		return false
 	}
-	return len(watched) > 0
+	return len(saved) > 0
 }
 
 // --- Claude wire-level ---
