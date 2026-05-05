@@ -10,6 +10,32 @@ export function chipClass(active, size = 'sm') {
         : `btn ${sizeClass} btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan`;
 }
 
+// Pink-themed chip used by the Watchlist side of the Catalog | Watchlist
+// mode switcher and (xs variant) by the Watchlist join-button in the stream
+// modal. Active = subtle pink fill + pink border + pinkL text. Inactive =
+// ghost with line border, hover lights border + text in pink — keeps the
+// palette aligned with btn-soft and other heart-flavoured surfaces in the
+// product, no separate token needed.
+//
+// Sizes: 'sm' for the sticky-bar switcher, 'xs' to align with the modal's
+// btn-xs join-group (Watched / Rated badges).
+export function watchlistChipClass(active, size = 'sm') {
+    const sizeClass = size === 'xs' ? 'btn-xs' : 'btn-sm';
+    return active
+        ? `btn ${sizeClass} join-item bg-w-pink/15 border border-w-pink/40 text-w-pinkL hover:bg-w-pink/20 hover:border-w-pink/50`
+        : `btn ${sizeClass} join-item btn-ghost border border-w-line text-w-sub hover:border-w-pink/40 hover:text-w-pinkL`;
+}
+
+// Cyan-themed chip for the Catalog side of the mode switcher. Mirrors
+// chipClass() but always emits join-item so it sits inside the same join
+// group as watchlistChipClass.
+export function catalogChipClass(active, size = 'sm') {
+    const sizeClass = size === 'xs' ? 'btn-xs' : 'btn-sm';
+    return active
+        ? `btn ${sizeClass} join-item bg-w-cyan/15 border border-w-cyan/30 text-w-cyan hover:bg-w-cyan/20 hover:border-w-cyan/40`
+        : `btn ${sizeClass} join-item btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan`;
+}
+
 // Dedup: modal restore logic used in two effects
 export function restoreModalFromUrl(id, url, openModalById, modalEpisodeRef) {
     if (modalEpisodeRef.current) {

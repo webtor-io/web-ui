@@ -9,7 +9,8 @@ import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
-import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo } from './discoverUtils';
+import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass } from './discoverUtils';
+import { fetchWatchlistIds, fetchWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlistClient';
 import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
@@ -148,6 +149,16 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     }
                     // Trigger actual search
                     searchAfterInit.current = urlSearch;
+                } else if (urlParams.get('watchlist') === '1') {
+                    // Restore watchlist mode from URL. Items load via the
+                    // mount-time prefetch effect below + a lazy fetch on
+                    // first open; doing the fetch from here would race the
+                    // INIT_SUCCESS dispatch above.
+                    dispatch({ type: 'WATCHLIST_FILTER_SET', enabled: true });
+                    const wlType = urlParams.get('watchlist-type');
+                    if (wlType && wlType !== 'all') {
+                        dispatch({ type: 'SELECT_WATCHLIST_TYPE', watchlistType: wlType });
+                    }
                 }
             } catch (e) {
                 if (!cancelled) {
@@ -527,8 +538,30 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         const catalogId = urlParams.get('catalog-id');
         const search = urlParams.get('search');
         const searchType = urlParams.get('search-type');
+        const watchlist = urlParams.get('watchlist') === '1';
+        const watchlistType = urlParams.get('watchlist-type');
 
         const cur = stateRef.current;
+
+        // Handle watchlist mode toggle. We do this before search so back
+        // navigation from a search-while-watchlist-open lands correctly.
+        if (watchlist !== cur.watchlistFilterEnabled) {
+            url.withPopstate(() => setMode(watchlist ? 'watchlist' : 'catalog', { skipUrl: true }));
+        }
+        if (watchlist) {
+            const targetWlType = watchlistType || 'all';
+            if (targetWlType !== (cur.watchlistType || 'all')) {
+                dispatch({ type: 'SELECT_WATCHLIST_TYPE', watchlistType: targetWlType });
+            }
+            // No catalog/search restoration applies to the watchlist view —
+            // bail out so the rest of the handler doesn't try.
+            if (id && modalRef.current?.itemId !== id) {
+                url.withPopstate(() => openModalByIdRef.current(id));
+            } else if (!id && modalRef.current) {
+                dispatch({ type: 'CLOSE_MODAL' });
+            }
+            return;
+        }
 
         // Handle search mode
         if (search) {
@@ -673,6 +706,9 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         if (state.isSearchMode) {
             if (state.searchQuery) params.search = state.searchQuery;
             if (state.searchType && state.searchType !== 'all') params['search-type'] = state.searchType;
+        } else if (state.watchlistFilterEnabled) {
+            params.watchlist = '1';
+            if (state.watchlistType && state.watchlistType !== 'all') params['watchlist-type'] = state.watchlistType;
         } else {
             if (state.selectedType) params.type = state.selectedType;
             if (state.selectedCatalog) {
@@ -687,7 +723,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         ['id', 'season', 'episode'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
 
         url.replaceAll(params);
-    }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.page]);
+    }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
 
     const retry = useCallback(() => {
         dispatch({ type: 'SET_PHASE', phase: 'loading' });
@@ -864,6 +900,115 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         });
     }, [handleOpenRating]);
 
+    // --- Watchlist ---
+    // Cheap prefetch on mount: ids only, for bookmark-badge highlighting on
+    // every IMDB card across catalog / search / AI grids. We don't pull the
+    // full items here — that's lazy on toggle-on (loadWatchlistItems below).
+    useEffect(() => {
+        let cancelled = false;
+        fetchWatchlistIds().then(({ ids, limit }) => {
+            if (cancelled) return;
+            dispatch({ type: 'WATCHLIST_IDS_LOADED', ids, limit });
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    const loadWatchlistItems = useCallback(async () => {
+        const data = await fetchWatchlist();
+        dispatch({ type: 'WATCHLIST_ITEMS_LOADED', items: data.items, ids: data.ids, limit: data.limit });
+    }, []);
+
+    // If the watchlist view is active (either via direct URL or popstate)
+    // and items aren't loaded yet, fetch them. Covers the init-from-URL
+    // path where setMode wasn't the trigger.
+    useEffect(() => {
+        if (!state.watchlistFilterEnabled) return;
+        if (state.watchlistItemsLoaded) return;
+        loadWatchlistItems();
+    }, [state.watchlistFilterEnabled, state.watchlistItemsLoaded, loadWatchlistItems]);
+
+    // setMode flips between the catalog grid and the watchlist grid. It is
+    // the single entry point used by the Catalog | Watchlist switcher and
+    // by popstate (so back/forward navigation restores the correct view).
+    // Lazy-loads watchlist items the first time the user opens the view;
+    // subsequent switches just flip the boolean.
+    //
+    // skipUrl is set by the popstate handler so we don't push a redundant
+    // history entry while we're consuming the URL state.
+    const setMode = useCallback((mode, { skipUrl = false } = {}) => {
+        const wantWatchlist = mode === 'watchlist';
+        if (wantWatchlist === state.watchlistFilterEnabled) return;
+        window.umami?.track?.('watchlist-mode-changed', { mode });
+        if (!skipUrl) {
+            // Switching modes is a navigation event — push history so back
+            // returns to the previous view. Clear catalog and modal params
+            // when entering watchlist (they don't apply); on the way out
+            // they get restored from prefs by the catalog effect.
+            url.push(wantWatchlist
+                ? { watchlist: '1', 'catalog-base': null, 'catalog-id': null, type: null, page: null, id: null, season: null, episode: null }
+                : { watchlist: null, id: null, season: null, episode: null });
+        }
+        dispatch({ type: 'WATCHLIST_FILTER_SET', enabled: wantWatchlist });
+        if (wantWatchlist && !state.watchlistItemsLoaded) {
+            loadWatchlistItems();
+        }
+    }, [state.watchlistFilterEnabled, state.watchlistItemsLoaded, loadWatchlistItems]);
+
+    // handleToggleWatchlist accepts a Cinemeta-shape item ({id, type, name,
+    // poster, ...}) OR an AI shape ({video_id, title, poster, type, ...})
+    // and normalises before calling the server. Both shapes flow through
+    // the same code path because catalog + AI cards use the same toggle
+    // affordance.
+    const handleToggleWatchlist = useCallback(async (rawItem) => {
+        if (!rawItem) return;
+        const videoId = rawItem.id || rawItem.video_id;
+        if (!videoId || !videoId.startsWith('tt')) return;
+        const type = rawItem.type || state.selectedType || 'movie';
+        if (type !== 'movie' && type !== 'series') return;
+
+        const inList = state.watchlistIds.has(videoId);
+        // Determine source bucket for analytics: AI cards have video_id,
+        // catalog/search cards have id.
+        const source = rawItem.video_id ? 'ai' : (state.isSearchMode ? 'search' : 'catalog');
+
+        // Toast text always comes from the server response — server-side
+        // i18n.T(c, key) keeps the locale aligned with the page even when
+        // the user changes language mid-session. We only fall back to a
+        // generic English message when the server didn't respond at all
+        // (network failure → empty message), which mirrors the apiPost
+        // pattern in discoverUtils.js.
+        if (inList) {
+            const snapshot = state.watchlistItems.find(it => it.id === videoId);
+            dispatch({ type: 'WATCHLIST_REMOVE', videoId });
+            window.umami?.track?.('watchlist-removed', { id: videoId, source });
+            const result = await removeFromWatchlist(videoId, type);
+            if (!result.ok) {
+                if (snapshot) dispatch({ type: 'WATCHLIST_ADD', item: snapshot });
+                if (window.toast) window.toast.error(result.message || t('discover.networkError'));
+            } else if (window.toast && result.message) {
+                window.toast.success(result.message);
+            }
+        } else {
+            const item = {
+                id: videoId,
+                type,
+                name: rawItem.name || rawItem.title || '',
+                year: rawItem.year,
+                poster: rawItem.poster || `/lib/${type}/poster/${videoId}/500.jpg`,
+                imdbRating: rawItem.imdbRating != null ? rawItem.imdbRating : (rawItem.rating || undefined),
+            };
+            dispatch({ type: 'WATCHLIST_ADD', item });
+            window.umami?.track?.('watchlist-added', { id: videoId, source });
+            const result = await addToWatchlist(videoId, type, source);
+            if (!result.ok) {
+                dispatch({ type: 'WATCHLIST_REMOVE', videoId });
+                if (window.toast) window.toast.error(result.message || t('discover.networkError'));
+            } else if (window.toast && result.message) {
+                window.toast.success(result.message);
+            }
+        }
+    }, [state.watchlistIds, state.watchlistItems, state.selectedType, state.isSearchMode]);
+
     const handleRate = useCallback(async (rating) => {
         if (!ratingTarget) return;
         const { item, type } = ratingTarget;
@@ -901,13 +1046,30 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     const catalogsForType = useMemo(() => getCatalogsForType(state.catalogs, state.selectedType), [state.catalogs, state.selectedType]);
 
     const searchTypes = useMemo(() => getSearchTypes(state.searchResults), [state.searchResults]);
-    const displayItems = useMemo(() => {
-        if (!state.isSearchMode) return state.items;
-        if (state.searchType === 'all') return state.searchResults;
-        return getSearchResultsForType(state.searchResults, state.searchType);
-    }, [state.isSearchMode, state.items, state.searchResults, state.searchType]);
+    const watchlistTypes = useMemo(() => getSearchTypes(state.watchlistItems), [state.watchlistItems]);
 
-    const showBadges = useMemo(() => state.isSearchMode && state.searchType === 'all', [state.isSearchMode, state.searchType]);
+    const displayItems = useMemo(() => {
+        if (state.isSearchMode) {
+            if (state.searchType === 'all') return state.searchResults;
+            return getSearchResultsForType(state.searchResults, state.searchType);
+        }
+        if (state.watchlistFilterEnabled) {
+            if (state.watchlistType === 'all') return state.watchlistItems;
+            return getSearchResultsForType(state.watchlistItems, state.watchlistType);
+        }
+        return state.items;
+    }, [state.isSearchMode, state.items, state.searchResults, state.searchType,
+        state.watchlistFilterEnabled, state.watchlistItems, state.watchlistType]);
+
+    const showBadges = useMemo(() => {
+        if (state.isSearchMode) return state.searchType === 'all';
+        if (state.watchlistFilterEnabled) return state.watchlistType === 'all';
+        return false;
+    }, [state.isSearchMode, state.searchType, state.watchlistFilterEnabled, state.watchlistType]);
+
+    const selectWatchlistType = useCallback((wt) => {
+        dispatch({ type: 'SELECT_WATCHLIST_TYPE', watchlistType: wt });
+    }, []);
 
     // --- Render ---
     if (state.phase === 'loading') {
@@ -936,8 +1098,10 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 dispatch={dispatch}
                 onCardClick={handleAICardClick}
                 userStatuses={state.userStatuses}
+                watchlistIds={state.watchlistIds}
                 onToggleWatched={handleAIToggleWatched}
                 onRate={handleAIOpenRating}
+                onToggleWatchlist={handleToggleWatchlist}
             />
 
             <SearchBar
@@ -958,8 +1122,57 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     />
                 ) : (
                     <>
-                        <TypeTabs types={types} selectedType={state.selectedType} onSelect={selectType} />
-                        <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                        {/* Type tabs on the left, mode switcher on the right.
+                            justify-between keeps them on opposite ends; on
+                            tight screens flex-wrap drops the switcher to a
+                            new line where it stays right-aligned via
+                            ml-auto on its row. */}
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <div class="min-w-0">
+                                {state.watchlistFilterEnabled ? (
+                                    <SearchTabs
+                                        searchResults={state.watchlistItems}
+                                        searchTypes={watchlistTypes}
+                                        searchType={state.watchlistType}
+                                        onSelect={selectWatchlistType}
+                                    />
+                                ) : (
+                                    <TypeTabs types={types} selectedType={state.selectedType} onSelect={selectType} />
+                                )}
+                            </div>
+                            <div class="join ml-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('catalog')}
+                                    class={catalogChipClass(!state.watchlistFilterEnabled)}
+                                    title={t('discover.modeCatalog')}
+                                    aria-label={t('discover.modeCatalog')}
+                                >
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{t('discover.modeCatalog')}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('watchlist')}
+                                    class={watchlistChipClass(state.watchlistFilterEnabled)}
+                                    title={t('discover.watchlist.label')}
+                                    aria-label={t('discover.watchlist.label')}
+                                >
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill={state.watchlistFilterEnabled ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                                    </svg>
+                                    <span class="hidden sm:inline">{t('discover.watchlist.label')}</span>
+                                    {state.watchlistIds.size > 0 && (
+                                        <span class="text-xs opacity-70 ml-1 tabular-nums">{state.watchlistIds.size}</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        {!state.watchlistFilterEnabled && (
+                            <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                        )}
                     </>
                 )}
             </div>
@@ -970,13 +1183,34 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 <NoResults query={state.searchQuery} />
             )}
 
-            {!state.catalogLoading && !state.searchLoading && !state.isSearchMode && state.items.length === 0 && state.phase === 'ready' && !state.hasMore && (
+            {!state.catalogLoading && !state.searchLoading && !state.isSearchMode && !state.watchlistFilterEnabled && state.items.length === 0 && state.phase === 'ready' && !state.hasMore && (
                 <p class="text-w-muted text-center col-span-full py-8">No items found.</p>
             )}
 
-            <ItemGrid items={displayItems} showBadges={showBadges} userStatuses={state.userStatuses} onClick={cardClick} onToggleWatched={handleToggleWatched} onRate={handleOpenRating} />
+            {!state.isSearchMode && state.watchlistFilterEnabled && state.watchlistItemsLoaded && state.watchlistItems.length === 0 && (
+                <div class="text-center py-12 max-w-md mx-auto">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-w-pink/10 text-w-pinkL mb-4">
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-semibold text-w-text mb-2">{t('discover.watchlist.emptyTitle')}</h3>
+                    <p class="text-sm text-w-muted">{t('discover.watchlist.emptyHint')}</p>
+                </div>
+            )}
 
-            {!state.isSearchMode && !state.catalogLoading && state.hasMore && state.items.length > 0 && (
+            <ItemGrid
+                items={displayItems}
+                showBadges={showBadges}
+                userStatuses={state.userStatuses}
+                watchlistIds={state.watchlistIds}
+                onClick={cardClick}
+                onToggleWatched={handleToggleWatched}
+                onRate={handleOpenRating}
+                onToggleWatchlist={handleToggleWatchlist}
+            />
+
+            {!state.isSearchMode && !state.watchlistFilterEnabled && !state.catalogLoading && state.hasMore && state.items.length > 0 && (
                 <LoadMore onLoadMore={loadMore} />
             )}
 
@@ -991,8 +1225,10 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     hasCustomAddons={hasCustomAddons || addonsInstalled}
                     onSetupAddons={onSetupAddons}
                     userStatuses={state.userStatuses}
+                    watchlistIds={state.watchlistIds}
                     onToggleWatched={handleToggleWatched}
                     onRate={handleOpenRating}
+                    onToggleWatchlist={handleToggleWatchlist}
                 />
             )}
 

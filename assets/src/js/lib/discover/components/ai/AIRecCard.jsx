@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'preact/hooks';
-import { WatchedBadge, RatingBadge } from '../ItemGrid';
+import { WatchedBadge, RatingBadge, WatchlistBadge } from '../ItemGrid';
 
 // AIRecCard — the poster-only half of an AI recommendation. Title, year,
 // rating, plot, and the Claude-generated reason all live in the sibling
@@ -23,7 +23,7 @@ function PosterGradient({ name }) {
     );
 }
 
-export function AIRecCard({ item, onClick, watched, rating, onToggleWatched, onRate }) {
+export function AIRecCard({ item, onClick, watched, rating, inWatchlist, onToggleWatched, onRate, onToggleWatchlist }) {
     const [imgError, setImgError] = useState(false);
     const onImgError = useCallback(() => setImgError(true), []);
     const handleClick = useCallback(() => onClick(item), [item, onClick]);
@@ -39,6 +39,12 @@ export function AIRecCard({ item, onClick, watched, rating, onToggleWatched, onR
         e.preventDefault();
         onRate?.();
     }, [onRate]);
+
+    const handleWatchlistClick = useCallback((e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggleWatchlist?.();
+    }, [onToggleWatchlist]);
 
     return (
         <div
@@ -65,6 +71,9 @@ export function AIRecCard({ item, onClick, watched, rating, onToggleWatched, onR
             )}
             {onRate && (
                 <RatingBadge rating={rating} onClick={handleRateClick} />
+            )}
+            {onToggleWatchlist && (
+                <WatchlistBadge inWatchlist={inWatchlist} onClick={handleWatchlistClick} />
             )}
         </div>
     );

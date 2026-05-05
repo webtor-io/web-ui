@@ -117,6 +117,21 @@ export const initialState = {
     // User statuses — accumulated map of IMDB id → { watched, rating }.
     // Additive-only during a session.
     userStatuses: {},
+    // Watchlist slice — ids in Set form for O(1) bookmark-badge lookups in
+    // every card, items in adapted Cinemeta shape for the filtered grid.
+    // The toggle UI flips watchlistFilterEnabled; AI/catalog/search results
+    // remain visible (and bookmark-aware) regardless. itemsLoaded gates the
+    // lazy fetch so we don't refetch the grid every time the toggle is
+    // turned on. Limit comes from the server (free-tier soft cap, -1 means
+    // unlimited for paid).
+    watchlistIds: new Set(),
+    watchlistItems: [],
+    watchlistItemsLoaded: false,
+    watchlistFilterEnabled: false,
+    watchlistLimit: -1,
+    // 'all' | 'movie' | 'series' — mirrors searchType so we can reuse the
+    // SearchTabs component (counts + chip styling) for the watchlist view.
+    watchlistType: 'all',
     // AI recommendations slice
     ai: initialAIState,
 };
@@ -149,7 +164,9 @@ export function discoverReducer(state, action) {
                 ? { ...state, catalogLoading: false }
                 : { ...state, catalogLoading: false, phase: 'error', errorMessage: action.message };
         case 'SEARCH_START':
-            return { ...state, isSearchMode: true, searchQuery: action.query, searchResults: [], searchLoading: true, searchType: 'all' };
+            // Search always exits the watchlist filter — search runs against
+            // Cinemeta + the user's catalogs, not the local saved list.
+            return { ...state, isSearchMode: true, searchQuery: action.query, searchResults: [], searchLoading: true, searchType: 'all', watchlistFilterEnabled: false };
         case 'SEARCH_RESULTS':
             return { ...state, searchLoading: false, searchResults: action.results };
         case 'SELECT_SEARCH_TYPE':
@@ -171,6 +188,53 @@ export function discoverReducer(state, action) {
         case 'USER_STATUSES_MERGED': {
             if (!action.statuses || Object.keys(action.statuses).length === 0) return state;
             return { ...state, userStatuses: { ...state.userStatuses, ...action.statuses } };
+        }
+
+        // --- Watchlist slice ---
+        case 'WATCHLIST_IDS_LOADED': {
+            // Initial / cheap prefetch: just the ids, used for bookmark
+            // badge highlighting on every IMDB card. Doesn't unblock the
+            // filter view — that needs full items.
+            const ids = new Set(action.ids || []);
+            return { ...state, watchlistIds: ids, watchlistLimit: action.limit ?? state.watchlistLimit };
+        }
+        case 'WATCHLIST_ITEMS_LOADED': {
+            const ids = new Set(action.ids || []);
+            return {
+                ...state,
+                watchlistIds: ids,
+                watchlistItems: action.items || [],
+                watchlistItemsLoaded: true,
+                watchlistLimit: action.limit ?? state.watchlistLimit,
+            };
+        }
+        case 'WATCHLIST_FILTER_TOGGLE':
+            // Reset the type filter when leaving the view so a fresh open
+            // starts from "All" — mirrors how SearchTabs behaves on a new
+            // search.
+            return { ...state, watchlistFilterEnabled: !state.watchlistFilterEnabled, watchlistType: 'all' };
+        case 'WATCHLIST_FILTER_SET':
+            return { ...state, watchlistFilterEnabled: !!action.enabled, watchlistType: 'all' };
+        case 'SELECT_WATCHLIST_TYPE':
+            return { ...state, watchlistType: action.watchlistType };
+        case 'WATCHLIST_ADD': {
+            // Optimistic insert on the user's bookmark click. The full item
+            // (id + type) lands at the top of the grid so the watchlist
+            // view feels instant, even before the server responds.
+            const ids = new Set(state.watchlistIds);
+            ids.add(action.item.id);
+            const exists = state.watchlistItems.some(it => it.id === action.item.id);
+            const items = exists ? state.watchlistItems : [action.item, ...state.watchlistItems];
+            return { ...state, watchlistIds: ids, watchlistItems: items };
+        }
+        case 'WATCHLIST_REMOVE': {
+            // Optimistic delete: drop from both the id set and the items
+            // grid. If the server later 5xxs, the parent can dispatch
+            // WATCHLIST_ADD to roll back.
+            const ids = new Set(state.watchlistIds);
+            ids.delete(action.videoId);
+            const items = state.watchlistItems.filter(it => it.id !== action.videoId);
+            return { ...state, watchlistIds: ids, watchlistItems: items };
         }
 
         // --- AI recommendations slice ---

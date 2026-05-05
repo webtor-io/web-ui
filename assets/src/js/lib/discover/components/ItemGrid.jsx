@@ -46,12 +46,13 @@ function StarRating({ rating }) {
     );
 }
 
-export function ItemGrid({ items, showBadges, userStatuses, onClick, onToggleWatched, onRate }) {
+export function ItemGrid({ items, showBadges, userStatuses, watchlistIds, onClick, onToggleWatched, onRate, onToggleWatchlist }) {
     if (!items.length) return null;
     return (
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {items.map(item => {
                 const status = userStatuses && userStatuses[item.id];
+                const inWatchlist = !!(watchlistIds && watchlistIds.has && watchlistIds.has(item.id));
                 return (
                     <ItemCard
                         key={item.id}
@@ -59,9 +60,11 @@ export function ItemGrid({ items, showBadges, userStatuses, onClick, onToggleWat
                         showBadge={showBadges}
                         watched={status ? status.watched : false}
                         rating={status ? status.rating : 0}
+                        inWatchlist={inWatchlist}
                         onClick={onClick}
                         onToggleWatched={onToggleWatched}
                         onRate={onRate}
+                        onToggleWatchlist={onToggleWatchlist}
                     />
                 );
             })}
@@ -113,6 +116,45 @@ export function WatchedBadge({ watched, onClick }) {
     );
 }
 
+// WatchlistBadge is the heart toggle in the bottom-right of every IMDB card.
+// Heart was chosen over bookmark to signal a positive, low-friction
+// "interested in this" gesture — closer in feel to "like" than to a stiff
+// reading-list bookmark. Pink (w-pinkL) is the Watchlist family colour,
+// shared with btn-soft and the Delete-style ghost buttons.
+export function WatchlistBadge({ inWatchlist, onClick }) {
+    if (inWatchlist) {
+        return (
+            <button
+                type="button"
+                onClick={onClick}
+                class="w-card-badge bottom-2 right-2 text-w-pinkL"
+                title={t('discover.removeFromWatchlist')}
+            >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z"/></svg>
+            </button>
+        );
+    }
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            // !opacity-100 keeps the heart's circular pill always visible —
+            // the regular w-card-badge-ghost pattern (Watched / Rated) hides
+            // until card-hover, but for Watchlist we want the affordance to
+            // be a constant invitation. The black backdrop on the ghost
+            // pseudo-element gives the icon enough contrast over light
+            // posters even at full opacity. Bang prefix beats the
+            // .w-card-badge-ghost { opacity: 0 } base rule.
+            class="w-card-badge-ghost bottom-2 right-2 !opacity-100 hover:text-w-pinkL"
+            title={t('discover.addToWatchlist')}
+        >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+            </svg>
+        </button>
+    );
+}
+
 export function RatingBadge({ rating, onClick }) {
     if (rating > 0) {
         return (
@@ -141,7 +183,7 @@ export function RatingBadge({ rating, onClick }) {
     );
 }
 
-function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, onRate }) {
+function ItemCard({ item, showBadge, watched, rating, inWatchlist, onClick, onToggleWatched, onRate, onToggleWatchlist }) {
     const handleClick = useCallback(() => onClick(item), [item, onClick]);
     const [imgError, setImgError] = useState(false);
     const onImgError = useCallback(() => setImgError(true), []);
@@ -157,6 +199,12 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
         e.preventDefault();
         if (onRate) onRate(item);
     }, [item, onRate]);
+
+    const handleWatchlistClick = useCallback((e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (onToggleWatchlist) onToggleWatchlist(item);
+    }, [item, onToggleWatchlist]);
 
     const isImdb = item.id && item.id.startsWith('tt');
 
@@ -179,6 +227,9 @@ function ItemCard({ item, showBadge, watched, rating, onClick, onToggleWatched, 
                         <>
                             <WatchedBadge watched={watched} onClick={handleWatchedClick} />
                             <RatingBadge rating={rating} onClick={handleRateClick} />
+                            {onToggleWatchlist && (
+                                <WatchlistBadge inWatchlist={inWatchlist} onClick={handleWatchlistClick} />
+                            )}
                         </>
                     )}
                 </figure>

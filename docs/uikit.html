@@ -1318,8 +1318,13 @@ log
           </tr>
           <tr>
             <td><code class="text-w-purpleL">w-card-badge</code> / <code class="text-w-purpleL">w-card-badge-ghost</code></td>
-            <td>Overlay badges on poster cards (watched/rate)</td>
+            <td>Overlay badges on poster cards (watched/rate/watchlist)</td>
             <td>Anywhere outside <code>.w-card-frame</code> figures</td>
+          </tr>
+          <tr>
+            <td><code class="text-w-pinkL">watchlistChipClass()</code> / <code class="text-w-pinkL">catalogChipClass()</code></td>
+            <td>Discover mode switcher and Watchlist surfaces (heart badge, modal pill, empty state). Catalog side uses cyan, Watchlist side uses pink (<code>w-pink</code>/<code>w-pinkL</code>) — same family as <code>btn-soft</code>.</td>
+            <td>Open-coded chip classes in JSX &mdash; always go through the helpers so the Watchlist palette stays consistent.</td>
           </tr>
         </tbody>
       </table>
@@ -1676,6 +1681,139 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
     <div class="uikit-note mt-4">
       <strong>Wiring.</strong> JS module: <code>assets/src/js/app/vault/progress.js</code>. One <code>EventSource</code> per active row pointing at the existing <code>/resources/:id/status</code> endpoint &mdash; no new backend. Inactive rows (Frozen / Expiring / unfunded / vaulted) render statically and don't open SSE.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       17. DISCOVER WATCHLIST
+       ========================================================= -->
+  <div class="uikit-section" id="discover-watchlist">
+    <h2>17. Discover Watchlist</h2>
+    <p class="desc">
+      The Discover page exposes a per-user "save for later" surface. Two visual elements drive it:
+      a <strong>card-level heart toggle</strong> and a <strong>page-level mode switcher</strong>
+      (Catalog | Watchlist). Catalog uses the discover cyan accent; Watchlist uses a pink
+      (<code>w-pink</code> / <code>w-pinkL</code>) reserved exclusively for this family. Brand pink
+      stays CTA-only.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Heart Badge (card corner)</h3>
+    <p class="desc">
+      Lives in the <strong>bottom-right</strong> of every IMDB card across catalog, search, AI
+      recommendations and the stream modal poster. Top corners are taken by the green
+      <code>WatchedBadge</code> (top-right) and yellow <code>RatingBadge</code> (top-left); pink
+      heart at the bottom keeps the four-quadrant layout legible. Filled heart = saved, outlined
+      heart with hover-to-red = not saved.
+    </p>
+    <div class="uikit-row mb-4">
+      <div class="relative w-[140px] aspect-[2/3] rounded-xl overflow-hidden bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 border border-w-line/30">
+        <button class="w-card-badge bottom-2 right-2 text-w-pinkL" type="button" title="Remove from Watchlist">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z"/></svg>
+        </button>
+      </div>
+      <div class="relative w-[140px] aspect-[2/3] rounded-xl overflow-hidden bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 border border-w-line/30">
+        <button class="w-card-badge-ghost bottom-2 right-2 hover:text-w-pinkL" type="button" title="Add to Watchlist">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">Active: <code>w-card-badge bottom-2 right-2 text-w-pinkL</code> &middot; Empty: <code>w-card-badge-ghost bottom-2 right-2 hover:text-w-pinkL</code></div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Mode Switcher (sticky bar, right side)</h3>
+    <p class="desc">
+      Two-button join group anchored to the right of the type tabs. Catalog uses the cyan
+      <code>chipClass</code> family (matches type/search tabs and the rest of discover).
+      Watchlist uses the pink Watchlist family. Each button always hover-lights into its own
+      colour so the user reads "I will activate this side".
+    </p>
+    <div class="uikit-row mb-4">
+      <!-- Catalog active -->
+      <div class="join">
+        <button type="button" class="btn btn-sm join-item bg-w-cyan/15 border border-w-cyan/30 text-w-cyan hover:bg-w-cyan/20 hover:border-w-cyan/40">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
+          <span>Catalog</span>
+        </button>
+        <button type="button" class="btn btn-sm join-item btn-ghost border border-w-line text-w-sub hover:border-w-pink/40 hover:text-w-pinkL">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+          <span>Watchlist</span>
+        </button>
+      </div>
+      <!-- Watchlist active -->
+      <div class="join">
+        <button type="button" class="btn btn-sm join-item btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
+          <span>Catalog</span>
+        </button>
+        <button type="button" class="btn btn-sm join-item bg-w-pink/15 border border-w-pink/40 text-w-pinkL hover:bg-w-pink/20 hover:border-w-pink/50">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+          <span>Watchlist</span>
+          <span class="text-xs opacity-70 ml-1 tabular-nums">12</span>
+        </button>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Catalog active: <code>btn btn-sm join-item bg-w-cyan/15 border border-w-cyan/30 text-w-cyan hover:bg-w-cyan/20</code><br>
+      Watchlist active: <code>btn btn-sm join-item bg-w-pink/15 border border-w-pink/40 text-w-pinkL hover:bg-w-pink/20</code><br>
+      Inactive (each side hover-lights into its own colour): <code>hover:border-w-cyan/30 hover:text-w-cyan</code> for Catalog, <code>hover:border-w-pink/40 hover:text-w-pinkL</code> for Watchlist.<br>
+      <strong>Counter:</strong> shows raw count only (e.g. <code>12</code>), never <code>X/N</code> — the soft cap (200 for free) stays internal and surfaces only as a 402 toast when the user hits it. Avoids vanity-metric "you have 23/200" pressure.<br>
+      <strong>Mobile:</strong> labels collapse to icon-only via <code>&lt;span class="hidden sm:inline"&gt;</code>. Counter stays visible alongside the heart. Icon stays at <code>w-4 h-4</code>. Buttons keep <code>title</code> + <code>aria-label</code> for accessibility.
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Status Pill (modal join group)</h3>
+    <p class="desc">
+      Inside the stream modal the Watchlist toggle joins a three-button group with
+      <strong>Watched</strong> (green) and <strong>Rated</strong> (yellow). Each follows the same
+      shape: ghost with line border + coloured hover when off, ghost with thin coloured border +
+      hover-fill when on. Sibling colours stay distinct (green / yellow / pink) so the same
+      join group can hold all three states without ambiguity.
+    </p>
+    <div class="uikit-row mb-4">
+      <div class="join">
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-w-line text-w-sub hover:border-green-500/40 hover:text-green-400 whitespace-nowrap">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+          Watched
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-w-line text-w-sub hover:border-yellow-500/40 hover:text-yellow-400 whitespace-nowrap">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
+          Rate
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-w-line text-w-sub hover:border-w-pink/40 hover:text-w-pinkL whitespace-nowrap">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+          Watchlist
+        </button>
+      </div>
+      <div class="join">
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-green-500/20 text-green-400 hover:bg-green-500/10 whitespace-nowrap">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Watched
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/10 whitespace-nowrap">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
+          8
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs join-item border border-w-pink/30 text-w-pinkL hover:bg-w-pink/10 hover:border-w-pink/40 whitespace-nowrap">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z"/></svg>
+          Watchlist
+        </button>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">
+      Off (any): <code>btn btn-ghost btn-xs join-item border border-w-line text-w-sub hover:border-{color}/40 hover:text-{color}</code><br>
+      On (any): <code>btn btn-ghost btn-xs join-item border border-{color}/20-30 text-{color} hover:bg-{color}/10 hover:border-{color}/40</code><br>
+      Colours: green-500/green-400 (Watched), yellow-500/yellow-400 (Rate), w-pink/w-pinkL (Watchlist).
+    </div>
+
+    <div class="uikit-rule mb-4">
+      <strong>Rules:</strong><br>
+      &bull; Pink (<code>w-pink</code>/<code>w-pinkL</code>) is shared between brand CTAs (<code>btn-pink</code>) and the Watchlist family. The two contexts don't visually collide because Watchlist always sits inside a chip / heart / join group with its own border-and-fill pattern, never a solid CTA.<br>
+      &bull; Mode switcher: Catalog hover-lights cyan, Watchlist hover-lights pink. Each side stays in its own colour family even when inactive so the left/right pair always reads correctly.<br>
+      &bull; Badge corner mapping is fixed: green top-right (Watched), yellow top-left (Rated), pink bottom-right (Watchlist). Changing positions breaks card scan order.<br>
+      &bull; Active modal pills: <code>btn-ghost border border-{color}/20-30 text-{color} hover:bg-{color}/10</code>. Inactive: <code>btn-ghost border border-w-line text-w-sub hover:border-{color}/40 hover:text-{color}</code>. Adding a new state colour means picking a hue distinct from green / yellow / pink.<br>
+      &bull; Helpers: <code>chipClass()</code> (cyan, type/search tabs), <code>catalogChipClass()</code> (cyan, mode switcher Catalog), <code>watchlistChipClass()</code> (pink, mode switcher Watchlist). All live in <code>assets/src/js/lib/discover/components/discoverUtils.js</code> &mdash; don't open-code the chip classes.
     </div>
   </div>
 

@@ -57,8 +57,10 @@ export function AIRecsGrid({
     items,
     onCardClick,
     userStatuses,
+    watchlistIds,
     onToggleWatched,
     onRate,
+    onToggleWatchlist,
     initialVisible = 4,
     expanded = false,
     onExpand,
@@ -81,12 +83,14 @@ export function AIRecsGrid({
                 const posterFirst = i % 2 === 0;
 
                 const status = (userStatuses && userStatuses[item.video_id]) || {};
+                const inWatchlist = !!(watchlistIds && watchlistIds.has && watchlistIds.has(item.video_id));
                 // Shim the AI item shape into the {id, type} shape the
                 // parent handlers were designed for. The closures capture
                 // the item so AIRecCard doesn't need to know about the
                 // translation — it just calls onToggleWatched()/onRate().
                 const toggleWatched = onToggleWatched ? () => onToggleWatched(item) : undefined;
                 const rate = onRate ? () => onRate(item) : undefined;
+                const toggleWatchlist = onToggleWatchlist ? () => onToggleWatchlist(item) : undefined;
 
                 return (
                     <article
@@ -99,8 +103,10 @@ export function AIRecsGrid({
                                 onClick={onCardClick}
                                 watched={!!status.watched}
                                 rating={status.rating || 0}
+                                inWatchlist={inWatchlist}
                                 onToggleWatched={toggleWatched}
                                 onRate={rate}
+                                onToggleWatchlist={toggleWatchlist}
                             />
                         </div>
                         <div class={posterFirst ? '' : 'sm:col-start-1 sm:row-start-1'}>

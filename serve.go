@@ -10,6 +10,7 @@ import (
 	hi18n "github.com/webtor-io/web-ui/handlers/i18n"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
+	"github.com/webtor-io/web-ui/handlers/discover_watchlist"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	we "github.com/webtor-io/web-ui/handlers/embed"
 	wee "github.com/webtor-io/web-ui/handlers/embed/example"
@@ -379,6 +380,9 @@ func serve(c *cli.Context) error {
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}
+
+	// Setting Discover Watchlist
+	discover_watchlist.RegisterHandler(r, pg, en)
 
 	// Setting Library
 	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en)

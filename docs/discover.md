@@ -35,13 +35,16 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/components/ai/` — AI recommendations UI: `AISection.jsx`, `AIChipsRow.jsx`, `AIQueryInput.jsx`, `AIRecsGrid.jsx`, `AIRecCard.jsx`
 - `handlers/discover_ai/handler.go` — Go handler for AI recommendations (chips, recommend, refine)
 - `services/recommendations/` — Claude-backed recommendation pipeline: prompt, context, resolver, quota, cache
+- `assets/src/js/lib/discover/watchlistClient.js` — fetch wrapper for `/discover/watchlist/*` endpoints (add/remove/list)
+- `handlers/discover_watchlist/handler.go` — Go handler for the watchlist (GET/POST/DELETE)
+- `models/movie_watchlist.go`, `models/series_watchlist.go` — DB models, joined with `*_metadata` for the list view
 
 ### Key Components
 
 - **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, modal state, and addon wizard flow.
 - **StreamModal** — dialog modal driven by `modal` state from reducer. Views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list), `progress` (torrent processing).
 - **AddonWizard** — two-step guided wizard for discovering and installing Stremio addons. Step 1: source selection (Official Stremio, Community). Step 2: addon browsing with search, filters, and batch install.
-- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`.
+- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`, `WATCHLIST_IDS_LOADED`, `WATCHLIST_ITEMS_LOADED`, `WATCHLIST_FILTER_TOGGLE`, `WATCHLIST_ADD`, `WATCHLIST_REMOVE`, `SELECT_WATCHLIST_TYPE`.
 - **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls.
 - **useDiscoverUrl** — custom hook managing browser history (`pushState`/`replaceState`) and `popstate` events for back/forward navigation.
 
@@ -145,6 +148,55 @@ When opened from the streams modal ("Set up addons" button), the wizard:
 
 Both wizard steps display a disclaimer: all addon sources and addons are third-party services not affiliated with Webtor.
 
+## Watchlist
+
+The watchlist is the discover-level "save for later" surface. It is intentionally distinct from `library` (which tracks downloaded torrents) and `vault` (long-term hosting pledges) — watchlist entries are intent-only, IMDB-keyed, with no torrent attached.
+
+### Surface
+
+- A heart icon sits in the bottom-right of every IMDB card across catalog grids, search results, AI recommendations, and inside the stream modal. Click toggles add / remove, optimistically updating the UI and showing a success toast.
+- A two-button switcher `[Catalog | Watchlist]` in the sticky tab bar (anchored next to the type tabs on the same row) flips between the catalog grid and the saved-list grid. The switcher is hidden during search — search always queries Cinemeta + addon catalogs, never the local list, and starting a search exits watchlist mode.
+- Inside the watchlist view, the regular `SearchTabs` component is reused for the `All / Movies / Series` segment with live counts. The `CatalogSelector` is hidden in this mode.
+- An empty Watchlist view shows a hint to bookmark cards from any other surface.
+
+### URL state and navigation
+
+The active mode is reflected in the URL so back/forward navigation works:
+
+- `?watchlist=1` — Watchlist view active
+- `?watchlist=1&watchlist-type=movie` — Watchlist view filtered to movies/series
+- No `watchlist` param — Catalog view (default)
+
+The Preact app pushes a history entry on each switcher click and listens to `popstate` so the user can navigate between catalog → watchlist → modal → catalog with the browser controls. Direct links to `/discover?watchlist=1` open the Watchlist view immediately and lazy-load items on first paint.
+
+The browser's bookmark badge state persists server-side and is rehydrated on every page load via `GET /discover/watchlist/ids` — independently of the URL `watchlist` flag.
+
+### Data model
+
+Two parallel tables, symmetric to `movie_status` / `series_status`:
+
+- `public.movie_watchlist (user_id, video_id, source, created_at)` — PK `(user_id, video_id)`
+- `public.series_watchlist (user_id, video_id, source, created_at)` — PK `(user_id, video_id)`
+
+There is no FK on `movie_metadata` / `series_metadata`: a user can bookmark before metadata is cached. The handler triggers `Enricher.LookupByVideoID` + `UpsertXxxMetadata` on insert so the next list call has a full card.
+
+`source` records the entry point (`ai`, `search`, `catalog`, `streamy`) — used as a future signal for the recommendation engine and to measure CTR per surface.
+
+### Free-tier limit
+
+Combined movie + series watchlist size is capped at **200** for free users (`FreeTierWatchlistLimit` in `handlers/discover_watchlist/handler.go`). Paid users are unlimited. The limit is a soft anti-abuse cap, not a billing lever — it only kicks in on add. Hitting it returns 402 with `{ code: "limit_exceeded", limit }`. The Preact app surfaces a toast and rolls back the optimistic insert.
+
+### HTTP contract
+
+```
+GET    /discover/watchlist             → 200 { items, video_ids, limit }
+GET    /discover/watchlist/ids         → 200 { video_ids, limit }
+POST   /discover/watchlist             → 200 { added }   |   402 { code, limit }
+DELETE /discover/watchlist/:type/:vid  → 200 { removed }
+```
+
+`items` are returned in Cinemeta-shape (`id, type, name, year, poster, imdbRating`) so the same `ItemGrid` renders both modes without source-of-truth branching. `type` is `movie` or `series`; ordering is newest-first, movies and series merged by `created_at`.
+
 ## Analytics (Umami)
 
 Events tracked:
@@ -156,6 +208,10 @@ Events tracked:
 - `discover-wizard-installed` — addons installed via wizard (`count`)
 - `discover-ribbon-click` — homepage ribbon clicked
 - `discover-see-more-click` — "See more" link clicked on homepage
+- `watchlist-mode-changed` — Catalog | Watchlist switcher flipped (`mode`: `'catalog'`|`'watchlist'`)
+- `watchlist-added` — heart icon clicked on a card not yet in the list (`id`, `source`)
+- `watchlist-removed` — heart icon clicked on a card already in the list (`id`, `source`)
+- `ai-watchlist-toggled` — heart icon clicked on an AI recommendation card (`id`, `on`)
 
 ## Addon Protocol
 

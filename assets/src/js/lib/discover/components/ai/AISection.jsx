@@ -82,8 +82,10 @@ export function AISection({
     dispatch,
     onCardClick,
     userStatuses,
+    watchlistIds,
     onToggleWatched,
     onRate,
+    onToggleWatchlist,
 }) {
     const abortRef = useRef(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -124,6 +126,13 @@ export function AISection({
         window.umami?.track?.('ai-rate-opened', { id: aiItem.video_id });
         onRate(aiItem);
     }, [onRate]);
+
+    const trackedToggleWatchlist = useCallback((aiItem) => {
+        if (!onToggleWatchlist) return;
+        const willBeIn = !(watchlistIds && watchlistIds.has && watchlistIds.has(aiItem.video_id));
+        window.umami?.track?.('ai-watchlist-toggled', { id: aiItem.video_id, on: willBeIn });
+        onToggleWatchlist(aiItem);
+    }, [onToggleWatchlist, watchlistIds]);
 
     // Abort any in-flight request on unmount.
     useEffect(() => () => abortRef.current?.abort?.(), []);
@@ -479,8 +488,10 @@ export function AISection({
                             items={aiState.recommendations}
                             onCardClick={trackedCardClick}
                             userStatuses={userStatuses}
+                            watchlistIds={watchlistIds}
                             onToggleWatched={trackedToggleWatched}
                             onRate={trackedRate}
+                            onToggleWatchlist={onToggleWatchlist ? trackedToggleWatchlist : undefined}
                             expanded={aiState.recsExpanded}
                             onExpand={() => {
                                 window.umami?.track?.('ai-show-more');

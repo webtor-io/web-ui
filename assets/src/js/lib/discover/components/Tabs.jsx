@@ -64,7 +64,7 @@ export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
     return (
         <div class="mt-2">
             <select
-                class="select select-sm bg-w-surface border-w-line text-w-text"
+                class="select select-sm bg-w-surface border-w-line text-w-text w-full sm:w-auto"
                 onChange={handleChange}
                 value={selectedCatalog ? `${selectedCatalog.baseUrl}::${selectedCatalog.id}` : ''}
             >
