@@ -104,6 +104,24 @@ var testData = []string{
 	"Этернавт - The Eternaut S01 E01 (Ночь игры в труко) WEB-DL 1080p (2025).mkv",
 	"www.1TamilBlasters.moi - Havoc (2025) [1080p HD AVC - x264 - [Tam + Tel + Hin + Eng] - DDP 5.1 (768Kbps) ATMOS - 8.2GB - ESub].mkv",
 	"[designcode.io]",
+	// Year-range pattern: long-running series tagged "S01-S12.2007-2019".
+	// Year matcher must take the FIRST year of the range (premiere year)
+	// rather than the last. Regression test for the BBT-trilogy bug.
+	"The.Big.Bang.Theory.S01-S12.2007-2019.BDRip-AVC",
+	// Movie filename with size/release-year/codec tags after dashes —
+	// "(1990 - 1997)" and "- 1080p" must NOT leak into Episode. Year
+	// matcher runs first and consumes the range; episode regex's 1-3
+	// digit cap blocks 1080.
+	"www.1TamilMV.kiwi - Home Alone Trilogy (1990 - 1997) BluRay - 1080p - x264 - [Tam + Hin + Eng] - AAC - 5.5GB - ESub",
+	// Trailing "- NNNN" tag on a movie filename used to flip the torrent
+	// into series (episode=1046). Cap-to-3-digits keeps it as a plain
+	// movie release.
+	"Interestelar (2014) IMAX 1080p 6ch BrRip Dual Audio - 1046",
+	// Multi-movie compilation with single-digit "part" markers. Episode
+	// extraction is correct on this name in isolation; the classifier
+	// fix elsewhere ensures sameTitle=false packs don't get treated as
+	// SeriesSingleSeason.
+	"Le Hobbit - 1 - Un Voyage Inattendu - 1080p.mkv",
 }
 
 func TestParser(t *testing.T) {

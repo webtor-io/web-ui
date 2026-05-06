@@ -43,6 +43,11 @@ const (
 	MediaInfoMediaTypeSeriesSingleSeason
 	MediaInfoMediaTypeSeriesMultipleSeasons
 	MediaInfoMediaTypeSeriesCompilation
+	// MovieMultiple is a torrent that bundles several distinct films
+	// (e.g. a "Home Alone Trilogy" pack). Each file is its own movie
+	// with its own title and year — the enricher splits them into
+	// separate movie rows so each can be matched against TMDB.
+	MediaInfoMediaTypeMovieMultiple
 )
 
 func (s MediaInfoMediaType) String() string {
@@ -57,6 +62,8 @@ func (s MediaInfoMediaType) String() string {
 		return "SeriesMultipleSeasons"
 	case MediaInfoMediaTypeSeriesCompilation:
 		return "SeriesCompilation"
+	case MediaInfoMediaTypeMovieMultiple:
+		return "MovieMultiple"
 	default:
 		return "Unknown"
 	}

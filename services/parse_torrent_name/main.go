@@ -22,20 +22,39 @@ var fieldParsers = FieldParsers{
 	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|[hx]\.?26[45]))\b`), nil},
 	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((MP3|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?))\b`), nil},
 	{FieldTypeWebsite, NewRegexpMatcher(`^((www\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}))`, `^(\[ ?([^\]]+?) ?\])`), nil},
-	{FieldTypeSeason, NewRegexpMatcher(`(?i)(s?([0-9]{1,2}))[ex]`, `(?i)(s?([0-9]{1,2}))\se`), nil},
-	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
-	{FieldTypeEpisode, NewRegexpMatcher(`(-\s+([0-9]{1,})(?:[^0-9]|$))`, `(?i)([ex]([0-9]{2})(?:[^0-9]|$))`), nil},
+	// Year is matched BEFORE Season/Episode so 4-digit year-shaped numbers
+	// are consumed first. Otherwise the `(-\s+\d+)` episode pattern below
+	// would happily eat "- 1997)" out of "(1990 - 1997)" and write it into
+	// Episode, leaving Year to pick up the leftover. Same for "2026x29"
+	// where the season/episode regex would otherwise match "26x29" against
+	// the year's last two digits.
+	//
 	// Year-range patterns (e.g. "S01-S12.2007-2019" on long-running series)
-	// must be consumed before the single-year matcher, otherwise its `last`
-	// policy picks the END of the run as the canonical year — which neither
-	// TMDB nor OMDB indexes (the show is filed under its premiere year).
-	// Group 2 captures the FIRST year in the range; group 1 captures the
-	// whole "YYYY-YYYY" segment so it gets stripped from the title. Single
-	// years still fall through to the second pattern.
+	// must be consumed before the single-year matcher — its `last` policy
+	// would otherwise pick the END of the run as the canonical year, which
+	// neither TMDB nor OMDB indexes (the show is filed under its premiere
+	// year). Group 2 captures the FIRST year in the range; group 1 captures
+	// the whole "YYYY-YYYY" segment so it gets stripped from the title.
 	{FieldTypeYear, NewRegexpMatcherLast(
 		`\b((19\d{2}|20\d{2})\s*[-–—]\s*(?:19\d{2}|20\d{2}))\b`,
 		`\b(((?:19[0-9]|20[0-9])[0-9]))\b`,
 	), nil},
+	// First alternative captures season ranges like "S01-S12" so they
+	// get stripped from the title — otherwise long-running series leak
+	// the range into the title ("The Big Bang Theory S01-S12") and
+	// TMDB Search is run on garbage. Group 2 is the FIRST season number.
+	{FieldTypeSeason, NewRegexpMatcher(
+		`(?i)\b(s(\d{1,2})\s*[-–—]\s*s\d{1,2})\b`,
+		`(?i)(s?([0-9]{1,2}))[ex]`,
+		`(?i)(s?([0-9]{1,2}))\se`,
+	), nil},
+	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
+	// Episode digit count capped at 3. Anything longer (4+ digits) is
+	// always a year, size, codec tag, or some other false-positive — there
+	// are no real shows with 1000+ episodes packaged into a single torrent.
+	// Without the cap, "- 1997" / "- 1046" / "- 1080p" off a movie filename
+	// would write into Episode and flip the whole torrent into series.
+	{FieldTypeEpisode, NewRegexpMatcher(`(-\s+([0-9]{1,3})(?:[^0-9]|$))`, `(?i)([ex]([0-9]{2})(?:[^0-9]|$))`), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
 	{FieldTypeSBS, NewRegexpMatcher(`(?i)\b(((?:Half-)?SBS))\b`), nil},

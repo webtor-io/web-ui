@@ -204,22 +204,27 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	log.Infof("got media type %v for hash %v", mt, hash)
 
 	var series *models.Series
-	var movie *models.Movie
+	var movies []*models.Movie
 
-	if mt == models.MediaInfoMediaTypeMovieSingle {
-		movie, err = s.makeMovie(torrentInfos, hash)
+	switch mt {
+	case models.MediaInfoMediaTypeMovieSingle:
+		movie, err := s.makeMovie(torrentInfos, hash)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to make movie for hash %s", hash)
 		}
-	} else {
+		if movie != nil {
+			movies = append(movies, movie)
+		}
+	case models.MediaInfoMediaTypeMovieMultiple:
+		movies, err = s.makeMovies(torrentInfos, hash)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to make movies for hash %s", hash)
+		}
+	default:
 		series, err = s.makeSeriesWithEpisodes(torrentInfos, hash, mt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to make series for hash %s", hash)
 		}
-	}
-	var movies []*models.Movie
-	if movie != nil {
-		movies = append(movies, movie)
 	}
 
 	err = models.ReplaceMoviesForResource(ctx, db, hash, movies)
@@ -537,17 +542,40 @@ func (s *Enricher) getMediaType(infos []*TorrentInfo) models.MediaInfoMediaType 
 		}
 		title = info.Title
 	}
-	if len(infos) < 3 && sameTitle && !hasEpisodes && !hasScenes && !hasSeasones {
+	// MovieSingle on small torrents without ANY structural series markers
+	// (no season, no scene). A parser-extracted "episode" alone is not
+	// trustworthy — single-digit "Movie - 1.mkv" pack titles, multi-CD
+	// movies, and odd codec tags can all leak an episode number out of a
+	// movie filename. With <3 files and a consistent title, treating it as
+	// a movie recovers far more cases than it breaks.
+	if len(infos) < 3 && sameTitle && !hasScenes && !hasSeasones {
 		return models.MediaInfoMediaTypeMovieSingle
-	} else if hasSeasones && hasEpisodes && hasDifferentSeasones {
-		return models.MediaInfoMediaTypeSeriesMultipleSeasons
-	} else if hasEpisodes && !hasDifferentSeasones {
-		return models.MediaInfoMediaTypeSeriesSingleSeason
-	} else if hasScenes && !hasDifferentSeasones {
-		return models.MediaInfoMediaTypeSeriesSplitScenes
-	} else {
-		return models.MediaInfoMediaTypeSeriesCompilation
 	}
+	if hasSeasones && hasEpisodes && hasDifferentSeasones {
+		return models.MediaInfoMediaTypeSeriesMultipleSeasons
+	}
+	// SeriesSingleSeason fires when EITHER an explicit season tag is
+	// present, OR the pack looks like a season-less anime/fansub release
+	// (consistent title across >=3 files, all parsed as episodes). This
+	// blocks Le-Hobbit-style multi-movie compilations (sameTitle=false
+	// because each movie has a different title) from being mislabelled as
+	// a series and falling through to KPU.
+	hasSequentialEpisodes := sameTitle && len(infos) >= 3 && hasEpisodes && !hasDifferentSeasones
+	if (hasSeasones || hasSequentialEpisodes) && hasEpisodes && !hasDifferentSeasones {
+		return models.MediaInfoMediaTypeSeriesSingleSeason
+	}
+	if hasScenes && !hasDifferentSeasones {
+		return models.MediaInfoMediaTypeSeriesSplitScenes
+	}
+	// MovieMultiple — distinct titles across files with no season/scene
+	// markers. Typical case: a movie-trilogy or franchise pack (e.g.
+	// "Home Alone 1/2/3", "Le Hobbit + LOTR"). Each file is its own
+	// movie; downstream we group by parsed title so a duplicated title
+	// (multi-disc / multi-audio of the same film) collapses to one row.
+	if !sameTitle && !hasSeasones && !hasScenes {
+		return models.MediaInfoMediaTypeMovieMultiple
+	}
+	return models.MediaInfoMediaTypeSeriesCompilation
 }
 
 func (s *Enricher) makeMovie(infos []*TorrentInfo, hash string) (*models.Movie, error) {
@@ -569,6 +597,29 @@ func (s *Enricher) makeMovie(infos []*TorrentInfo, hash string) (*models.Movie, 
 	}
 	movie.Metadata = metadata
 	return movie, nil
+}
+
+// makeMovies builds one Movie per distinct parsed title from a multi-movie
+// torrent pack. Multi-disc / multi-audio variants of the same film share
+// a parsed title and collapse into a single Movie (the first occurrence
+// wins for path/metadata). The output preserves the input order of first
+// occurrences so subsequent enrichment is deterministic.
+func (s *Enricher) makeMovies(infos []*TorrentInfo, hash string) ([]*models.Movie, error) {
+	seen := make(map[string]bool, len(infos))
+	var movies []*models.Movie
+	for _, ti := range infos {
+		key := ti.Title
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		movie, err := s.makeMovie([]*TorrentInfo{ti}, hash)
+		if err != nil {
+			return nil, err
+		}
+		movies = append(movies, movie)
+	}
+	return movies, nil
 }
 
 func (s *Enricher) makeSeriesWithEpisodes(infos []*TorrentInfo, hash string, mt models.MediaInfoMediaType) (*models.Series, error) {
