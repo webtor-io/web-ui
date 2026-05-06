@@ -483,16 +483,54 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 		}
 		log.Infof("no mapper handled hint %v, falling back to title+year", hintVideoID)
 	}
-	for _, m := range s.mappers {
+	for i, m := range s.mappers {
 		md, err = m.Map(ctx, vc, t, f)
 		if err != nil {
 			return nil, errors.Wrapf(err, "got \"%v\" mapper error", m.GetName())
 		}
 		if md != nil {
+			// Try to upgrade through higher-priority mappers using the
+			// videoID just resolved. The most common payoff is the
+			// Kinopoisk-only-resolvable Russian-titled torrents whose
+			// canonical imdbId TMDB knows by external_id even when its
+			// Search-by-title misses (Russian title, weird codec tags
+			// etc.). KPU (lowest priority) advertises its claimed imdbId
+			// as the videoID exactly so this loop can run; if the imdbId
+			// is bogus, MapByID type-filtering at TMDB and OMDB rejects
+			// it and we keep the lower-priority result intact.
+			if upgraded := s.tryUpgrade(ctx, md, t, i); upgraded != nil {
+				return upgraded, nil
+			}
 			return
 		}
 	}
 	return
+}
+
+// tryUpgrade walks the mappers ABOVE `current` (more authoritative ones)
+// and returns the first MapByID hit with a usable poster. Each mapper's
+// MapByID is expected to type-filter on its own — we do not enforce the
+// content-type match at this layer.
+func (s *Enricher) tryUpgrade(ctx context.Context, md *models.VideoMetadata, t models.ContentType, current int) *models.VideoMetadata {
+	if md == nil || md.VideoID == "" {
+		return nil
+	}
+	for j := 0; j < current; j++ {
+		dm, ok := s.mappers[j].(DirectMapper)
+		if !ok {
+			continue
+		}
+		up, err := dm.MapByID(ctx, md.VideoID, t, false)
+		if err != nil {
+			log.WithError(err).WithField("mapper", s.mappers[j].GetName()).WithField("video_id", md.VideoID).Warn("upgrade lookup failed")
+			continue
+		}
+		if up != nil && up.PosterURL != "" {
+			log.Infof("upgraded metadata for %v via mapper %q", md.VideoID, s.mappers[j].GetName())
+			return up
+		}
+	}
+	return nil
 }
 
 func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string, claims *api.Claims) ([]ra.ListItem, error) {

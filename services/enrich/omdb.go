@@ -176,6 +176,20 @@ func (s *OMDB) MapByID(ctx context.Context, videoID string, ct models.ContentTyp
 		return nil, nil
 	}
 
+	// Reject cross-type matches before persisting. OMDB does have records
+	// (e.g. tt1147717 = a 2007 short film called "The Big Bang Theory")
+	// that share an imdb_id with a totally different sitcom in upstream
+	// indexes — without this filter the orchestrator's KPU→OMDB upgrade
+	// path would happily overwrite a series enrichment with a movie's
+	// metadata. Type comes back as a string ("movie"/"series"/"episode").
+	wantOmdbType := omdb.OmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		wantOmdbType = omdb.OmdbTypeSeries
+	}
+	if omData.Type != wantOmdbType {
+		return nil, nil
+	}
+
 	otype := om.OmdbTypeMovie
 	if ct == models.ContentTypeSeries {
 		otype = om.OmdbTypeSeries
