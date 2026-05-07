@@ -431,6 +431,13 @@
     font-variant-numeric: tabular-nums;
     transition: left 250ms ease-out;
   }
+
+  /* Below FLIP_PCT the fill is too narrow to host the indicator on its left
+     side (it would clip past the row's left edge), so it sits to the right of
+     the gradient edge instead. */
+  .vault-progress-pct.vault-progress-pct--right {
+    transform: translateX(0);
+  }
 }
 
 input:-webkit-autofill,
