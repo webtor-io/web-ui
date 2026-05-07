@@ -100,13 +100,9 @@ function renderBadge(status, savedLabel) {
     // For the vaulted state we override the server label ('В Vault'/'Vaulted') with
     // the vault-page label ('Сохранён'/'Saved') passed via data-vault-saved-label.
     const label = (status.state === 'vaulted' && savedLabel) ? savedLabel : (status.label || '');
-    let peers = '';
-    if ((status.state === 'caching' || status.state === 'vaulting') && status.seeders > 0) {
-        peers = `<span class="opacity-70">(${status.seeders})</span>`;
-    }
     // status.label is a server-translated i18n string (closed set of state keys);
     // safe to interpolate as HTML.
-    const inner = [config.icon, label, peers].filter(Boolean).join(' ');
+    const inner = [config.icon, label].filter(Boolean).join(' ');
     return `<span class="${config.classes}">${inner}</span>`;
 }
 
