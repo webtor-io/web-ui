@@ -13,6 +13,9 @@ const TINTS = {
 // Floor for caching/vaulting widths so 0–1 % progress is still visible.
 const MIN_VISIBLE_PCT = 2;
 
+// Tabler-style snowflake — used to mark a frozen pledge once vaulting completes.
+const SNOWFLAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>';
+
 const BADGE_CONFIG = {
     idle: {
         classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5',
@@ -31,9 +34,13 @@ const BADGE_CONFIG = {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
         icon: '',
     },
-    vaulted: {
-        // no gap-1.5: label-only, no leading icon
-        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
+    // vaulted (post-save) variants — pick by row's frozen flag
+    vaultedFrozen: {
+        classes: 'badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1',
+        icon: SNOWFLAKE_SVG,
+    },
+    vaultedClaimable: {
+        classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400',
         icon: '',
     },
 };
@@ -87,9 +94,16 @@ function settleVaultedIcon(row) {
     if (icon) icon.classList.remove('vault-pulse');
 }
 
-function renderBadge(status) {
-    const config = BADGE_CONFIG[status.state] || BADGE_CONFIG.idle;
-    const label = status.label || '';
+function renderBadge(status, ctx) {
+    let config;
+    if (status.state === 'vaulted') {
+        config = ctx.frozen ? BADGE_CONFIG.vaultedFrozen : BADGE_CONFIG.vaultedClaimable;
+    } else {
+        config = BADGE_CONFIG[status.state] || BADGE_CONFIG.idle;
+    }
+    // For the vaulted state we override the server label ('В Vault'/'Vaulted') with
+    // the vault-page label ('Сохранён'/'Saved') passed via data-vault-saved-label.
+    const label = (status.state === 'vaulted' && ctx.savedLabel) ? ctx.savedLabel : (status.label || '');
     let peers = '';
     if ((status.state === 'caching' || status.state === 'vaulting') && status.seeders > 0) {
         peers = `<span class="opacity-70">(${status.seeders})</span>`;
@@ -105,6 +119,10 @@ function attachRow(row) {
     const csrf = row.dataset.csrf;
     if (!resourceId || !csrf) return null;
 
+    const ctx = {
+        frozen: row.dataset.vaultFrozen === 'true',
+        savedLabel: row.dataset.vaultSavedLabel || '',
+    };
     const badge = row.querySelector('[data-vault-progress-badge]');
 
     const url = `${langPath(`/${resourceId}/status`)}?_csrf=${encodeURIComponent(csrf)}`;
@@ -118,7 +136,7 @@ function attachRow(row) {
             return;
         }
         applyRowFill(row, status);
-        if (badge) badge.innerHTML = renderBadge(status);
+        if (badge) badge.innerHTML = renderBadge(status, ctx);
         if (status.state === 'vaulted') {
             settleVaultedIcon(row);
             source.close();

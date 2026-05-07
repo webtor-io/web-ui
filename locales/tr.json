@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Donmuş",
     "vault.pledges.expiring": "Süresi doluyor",
     "vault.pledges.claimable": "Geri alınabilir",
+    "vault.pledges.saved": "Kaydedildi",
     "vault.pledges.statusGuide": "Durum kılavuzu",
     "vault.pledges.frozenDesc": "Puanlar taahhütten hemen sonra donar ve donma süresi dolduğunda çözülür",
     "vault.pledges.expiringDesc": "Taahhüt artık puanlarla desteklenmiyor (abonelik sona erdiğinde veya seviye düşürüldüğünde olur). Böyle taahhütlü içerikler Vault'tan kaldırılabilir",

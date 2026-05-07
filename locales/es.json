@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Congelado",
     "vault.pledges.expiring": "Expirando",
     "vault.pledges.claimable": "Reclamable",
+    "vault.pledges.saved": "Guardado",
     "vault.pledges.statusGuide": "Guía de estados",
     "vault.pledges.frozenDesc": "Los puntos se congelan inmediatamente después del compromiso y se descongelan cuando expira el período de congelación",
     "vault.pledges.expiringDesc": "El compromiso ya no está respaldado por puntos (ocurre cuando la suscripción expira o el nivel se reduce). El contenido con estos compromisos puede ser eliminado del Vault",

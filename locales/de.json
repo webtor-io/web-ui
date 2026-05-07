@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Eingefroren",
     "vault.pledges.expiring": "Auslaufend",
     "vault.pledges.claimable": "Einlösbar",
+    "vault.pledges.saved": "Gespeichert",
     "vault.pledges.statusGuide": "Status-Leitfaden",
     "vault.pledges.frozenDesc": "Punkte werden sofort nach der Zusage eingefroren und nach Ablauf der Sperrfrist wieder freigegeben",
     "vault.pledges.expiringDesc": "Die Zusage ist nicht mehr durch Punkte gedeckt (passiert wenn das Abo ausläuft oder die Stufe herabgesetzt wird). Inhalte mit solchen Zusagen können aus dem Vault entfernt werden",

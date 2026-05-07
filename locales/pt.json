@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Congelados",
     "vault.pledges.expiring": "Expirando",
     "vault.pledges.claimable": "Recuperáveis",
+    "vault.pledges.saved": "Salvo",
     "vault.pledges.statusGuide": "Guia de status",
     "vault.pledges.frozenDesc": "Os pontos ficam congelados logo após o compromisso e são liberados quando o período de congelamento expira",
     "vault.pledges.expiringDesc": "O compromisso não é mais coberto por pontos (acontece quando a assinatura expira ou o plano é rebaixado). O conteúdo com esse status pode sair do Vault",

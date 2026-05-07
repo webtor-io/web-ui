@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Bevroren",
     "vault.pledges.expiring": "Verloopt",
     "vault.pledges.claimable": "Opvraagbaar",
+    "vault.pledges.saved": "Opgeslagen",
     "vault.pledges.statusGuide": "Status-gids",
     "vault.pledges.frozenDesc": "Punten worden direct na toezegging bevroren en ontdooien wanneer de bevriezingsperiode verloopt",
     "vault.pledges.expiringDesc": "Toezegging wordt niet meer ondersteund door punten (gebeurt wanneer abonnement verloopt of tier wordt gedowngraded). Inhoud met dergelijke toezeggingen kan uit de Vault worden verwijderd",

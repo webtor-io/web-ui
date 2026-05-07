@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Gelés",
     "vault.pledges.expiring": "Expirant",
     "vault.pledges.claimable": "Récupérables",
+    "vault.pledges.saved": "Sauvegardé",
     "vault.pledges.statusGuide": "Guide des statuts",
     "vault.pledges.frozenDesc": "Les points sont gelés juste après l'engagement et dégèlent à la fin de la période de gel",
     "vault.pledges.expiringDesc": "L'engagement n'est plus couvert par des points (quand l'abonnement expire ou que l'offre est rétrogradée). Le contenu lié peut être retiré de Vault.",

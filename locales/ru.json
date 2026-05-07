@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Заморожен",
     "vault.pledges.expiring": "Истекает",
     "vault.pledges.claimable": "Доступен",
+    "vault.pledges.saved": "Сохранён",
     "vault.pledges.statusGuide": "Гид по статусам",
     "vault.pledges.frozenDesc": "Очки замораживаются сразу после сохранения в Vault и размораживаются после истечения периода заморозки",
     "vault.pledges.expiringDesc": "Торрент больше не обеспечен очками (происходит когда подписка истекает или тариф понижается). Такой торрент может быть удалён из Vault",

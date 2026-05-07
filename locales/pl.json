@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Zamrożone",
     "vault.pledges.expiring": "Wygasające",
     "vault.pledges.claimable": "Do odzyskania",
+    "vault.pledges.saved": "Zapisane",
     "vault.pledges.statusGuide": "Przewodnik po statusach",
     "vault.pledges.frozenDesc": "Punkty są zamrażane od razu po zobowiązaniu i odmrażają się po wygaśnięciu okresu zamrożenia",
     "vault.pledges.expiringDesc": "Zobowiązanie nie jest już pokryte punktami (zdarza się przy wygaśnięciu subskrypcji lub obniżeniu poziomu). Powiązana zawartość może zostać usunięta z Vault",

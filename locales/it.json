@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Congelati",
     "vault.pledges.expiring": "In scadenza",
     "vault.pledges.claimable": "Recuperabili",
+    "vault.pledges.saved": "Salvato",
     "vault.pledges.statusGuide": "Guida agli stati",
     "vault.pledges.frozenDesc": "I punti vengono congelati subito dopo l'impegno e si scongelano allo scadere del periodo di congelamento",
     "vault.pledges.expiringDesc": "L'impegno non è più coperto da punti (succede quando l'abbonamento scade o viene declassato). I contenuti collegati possono essere rimossi dal Vault",

@@ -380,6 +380,8 @@
     "@vault.pledges.expiring": "Per-pledge status badge: the pledge lost its backing (user's subscription expired or their tier was downgraded below the pledged amount). The torrent it funded may be removed from Vault soon. State/adjective, not an active verb.",
     "vault.pledges.claimable": "Claimable",
     "@vault.pledges.claimable": "Per-pledge status badge: these VP are past the freeze period and the user can claim them back (reverse the pledge). After claiming, the torrent may be removed from Vault. NOT 'available' in a generic sense — specifically 'can be taken back by the user'.",
+    "vault.pledges.saved": "Saved",
+    "@vault.pledges.saved": "Per-row torrent state in the vault list: the torrent finished uploading to Vault. Parallels 'Vaulting'/'Saving' which is the in-progress state. Past participle — short and uniform with sibling badges.",
     "vault.pledges.statusGuide": "Status Guide",
     "vault.pledges.frozenDesc": "Points become frozen immediately after pledge and unfreeze after the freeze period expires",
     "vault.pledges.expiringDesc": "Pledge is no longer backed by points (happens when subscription expires or tier is downgraded). Content with such pledges may be removed from Vault",

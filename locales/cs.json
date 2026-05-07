@@ -342,6 +342,7 @@
     "vault.pledges.frozen": "Zmrazené",
     "vault.pledges.expiring": "Vyprší",
     "vault.pledges.claimable": "Vyzvednutelné",
+    "vault.pledges.saved": "Uloženo",
     "vault.pledges.statusGuide": "Průvodce stavy",
     "vault.pledges.frozenDesc": "Body se zmrazí ihned po závazku a rozmrznou po skončení období zmrazení",
     "vault.pledges.expiringDesc": "Závazek již není podpořen body (stane se, když vyprší předplatné nebo se sníží úroveň). Obsah s takovými závazky může být odebrán z Vaultu",
