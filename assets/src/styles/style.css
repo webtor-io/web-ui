@@ -420,10 +420,10 @@
 
   .vault-progress-pct {
     position: absolute;
-    top: 50%;
-    transform: translate(-100%, -50%);
-    padding: 0 0.5rem;
-    font-size: 0.65rem;
+    bottom: 1px;
+    transform: translateX(-100%);
+    padding: 0 0.4rem;
+    font-size: 0.6rem;
     font-weight: 500;
     line-height: 1;
     color: #a29bfe;
