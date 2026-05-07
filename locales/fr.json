@@ -295,7 +295,7 @@
     "resource.status.idle": "Inactif",
     "resource.status.caching": "Mise en cache",
     "resource.status.cached": "En cache",
-    "resource.status.vaulting": "Stockage en Vault",
+    "resource.status.vaulting": "Sauvegarde",
     "resource.status.vaulted": "Dans Vault",
     "vault.supporting": "Enregistré dans Vault",
     "vault.keepAvailable": "Enregistrer dans Vault",

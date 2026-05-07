@@ -37,13 +37,28 @@ const BADGE_CONFIG = {
     },
 };
 
+function ensureIndicator(row) {
+    let el = row.querySelector('[data-vault-progress-pct]');
+    if (el) return el;
+    const host = row.cells && row.cells[0];
+    if (!host) return null;
+    el = document.createElement('span');
+    el.dataset.vaultProgressPct = '';
+    el.className = 'vault-progress-pct hidden';
+    host.appendChild(el);
+    return el;
+}
+
 function applyRowFill(row, status) {
     const color = TINTS[status.state] || TINTS.idle;
+    const rawPct = Math.round(status.progress || 0);
     let pct;
+    let showPct = false;
     switch (status.state) {
         case 'caching':
         case 'vaulting':
-            pct = Math.max(MIN_VISIBLE_PCT, Math.round(status.progress));
+            pct = Math.max(MIN_VISIBLE_PCT, rawPct);
+            showPct = true;
             break;
         case 'cached':
             pct = 100;
@@ -54,6 +69,16 @@ function applyRowFill(row, status) {
             break;
     }
     row.style.backgroundImage = `linear-gradient(to right, ${color} ${pct}%, transparent ${pct}%)`;
+
+    const indicator = ensureIndicator(row);
+    if (!indicator) return;
+    if (showPct) {
+        indicator.textContent = `${rawPct}%`;
+        indicator.style.left = `${pct}%`;
+        indicator.classList.remove('hidden');
+    } else {
+        indicator.classList.add('hidden');
+    }
 }
 
 function settleVaultedIcon(row) {
@@ -63,10 +88,7 @@ function settleVaultedIcon(row) {
 
 function renderBadge(status) {
     const config = BADGE_CONFIG[status.state] || BADGE_CONFIG.idle;
-    let label = status.label || '';
-    if (status.state === 'caching' || status.state === 'vaulting') {
-        label = `${label} ${Math.round(status.progress)}%`;
-    }
+    const label = status.label || '';
     let peers = '';
     if ((status.state === 'caching' || status.state === 'vaulting') && status.seeders > 0) {
         peers = `<span class="opacity-70">(${status.seeders})</span>`;

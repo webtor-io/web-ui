@@ -294,7 +294,7 @@
     "resource.status.idle": "Inactivo",
     "resource.status.caching": "Almacenando",
     "resource.status.cached": "En caché",
-    "resource.status.vaulting": "Guardando en Vault",
+    "resource.status.vaulting": "Guardando",
     "resource.status.vaulted": "En Vault",
     "resource.preview": "Vista previa",
     "vault.supporting": "Guardado en Vault",

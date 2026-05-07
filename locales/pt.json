@@ -295,7 +295,7 @@
     "resource.status.idle": "Inativo",
     "resource.status.caching": "Em cache",
     "resource.status.cached": "Em cache",
-    "resource.status.vaulting": "Salvando no Vault",
+    "resource.status.vaulting": "Salvando",
     "resource.status.vaulted": "No Vault",
     "vault.supporting": "Salvo no Vault",
     "vault.keepAvailable": "Salvar no Vault",

@@ -295,7 +295,7 @@
     "resource.status.idle": "Boşta",
     "resource.status.caching": "Önbelleğe alınıyor",
     "resource.status.cached": "Önbelleğe alındı",
-    "resource.status.vaulting": "Vault'a kaydediliyor",
+    "resource.status.vaulting": "Kaydediliyor",
     "resource.status.vaulted": "Vault'ta",
     "vault.supporting": "Vault'a kaydedildi",
     "vault.keepAvailable": "Vault'a kaydet",

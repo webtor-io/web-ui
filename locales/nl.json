@@ -295,7 +295,7 @@
     "resource.status.idle": "Inactief",
     "resource.status.caching": "Cachen",
     "resource.status.cached": "In cache",
-    "resource.status.vaulting": "Naar Vault",
+    "resource.status.vaulting": "Opslaan",
     "resource.status.vaulted": "In Vault",
     "vault.supporting": "Opgeslagen in Vault",
     "vault.keepAvailable": "Opslaan in Vault",

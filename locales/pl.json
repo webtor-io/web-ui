@@ -295,7 +295,7 @@
     "resource.status.idle": "Bezczynny",
     "resource.status.caching": "Cachowanie",
     "resource.status.cached": "W cache",
-    "resource.status.vaulting": "Zapisywanie do Vault",
+    "resource.status.vaulting": "Zapisywanie",
     "resource.status.vaulted": "W Vault",
     "vault.supporting": "Zapisano w Vault",
     "vault.keepAvailable": "Zapisz w Vault",

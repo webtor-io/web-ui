@@ -410,6 +410,27 @@
   .vault-pulse {
     animation: vault-pulse 1.8s ease-in-out infinite;
   }
+
+  /* Progress row hosts an absolutely-positioned percent indicator that rides
+     the right edge of the gradient fill. position:relative on the <tr> makes
+     the indicator escape its host <td> and align to the row width. */
+  tr[data-vault-progress] {
+    position: relative;
+  }
+
+  .vault-progress-pct {
+    position: absolute;
+    top: 50%;
+    transform: translate(-100%, -50%);
+    padding: 0 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 500;
+    line-height: 1;
+    color: #a29bfe;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    transition: left 250ms ease-out;
+  }
 }
 
 input:-webkit-autofill,

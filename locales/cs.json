@@ -295,7 +295,7 @@
     "resource.status.idle": "Nečinné",
     "resource.status.caching": "Kešuje se",
     "resource.status.cached": "V keši",
-    "resource.status.vaulting": "Ukládá se do Vault",
+    "resource.status.vaulting": "Ukládá se",
     "resource.status.vaulted": "Ve Vault",
     "vault.supporting": "Uloženo do Vault",
     "vault.keepAvailable": "Uložit do Vault",
