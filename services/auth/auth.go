@@ -225,16 +225,18 @@ func (s *Auth) Init() error {
 							},
 							Override: func(originalImplementation *tpmodels.TypeProvider) *tpmodels.TypeProvider {
 								originalImplementation.GetUserInfo = func(oAuthTokens map[string]interface{}, userContext *map[string]interface{}) (tpmodels.TypeUserInfo, error) {
-									accessToken := oAuthTokens["access_token"].(string)
+									accessToken, _ := oAuthTokens["access_token"].(string)
 									identityURL := "https://www.patreon.com/api/oauth2/v2/identity?fields[user]=email"
 									req, err := http.NewRequest("GET", identityURL, nil)
-									req.Header.Set("Authorization", "Bearer "+accessToken)
-									req.Header.Set("Content-Type", "application/json")
 									if err != nil {
+										log.WithError(err).Error("patreon identity: build request failed")
 										return tpmodels.TypeUserInfo{}, err
 									}
+									req.Header.Set("Authorization", "Bearer "+accessToken)
+									req.Header.Set("Content-Type", "application/json")
 									res, err := s.cl.Do(req)
 									if err != nil {
+										log.WithError(err).Error("patreon identity: http call failed")
 										return tpmodels.TypeUserInfo{}, err
 									}
 									defer func(Body io.ReadCloser) {
@@ -242,12 +244,25 @@ func (s *Auth) Init() error {
 									}(res.Body)
 									body, err := io.ReadAll(res.Body)
 									if err != nil {
+										log.WithError(err).WithField("status", res.StatusCode).Error("patreon identity: read body failed")
 										return tpmodels.TypeUserInfo{}, err
 									}
+									bodyPreview := string(body)
+									if len(bodyPreview) > 1024 {
+										bodyPreview = bodyPreview[:1024]
+									}
+									if res.StatusCode < 200 || res.StatusCode >= 300 {
+										log.WithField("status", res.StatusCode).WithField("body", bodyPreview).Error("patreon identity: non-2xx response")
+										return tpmodels.TypeUserInfo{}, fmt.Errorf("patreon identity: status %d", res.StatusCode)
+									}
 									var data PatreonIdentityResponse
-									err = json.Unmarshal(body, &data)
-									if err != nil {
+									if err := json.Unmarshal(body, &data); err != nil {
+										log.WithError(err).WithField("body", bodyPreview).Error("patreon identity: unmarshal failed")
 										return tpmodels.TypeUserInfo{}, err
+									}
+									if data.Data.ID == "" || data.Data.Attributes.Email == "" {
+										log.WithField("has_id", data.Data.ID != "").WithField("has_email", data.Data.Attributes.Email != "").WithField("body", bodyPreview).Error("patreon identity: empty id or email")
+										return tpmodels.TypeUserInfo{}, fmt.Errorf("patreon identity: missing id or email")
 									}
 									return tpmodels.TypeUserInfo{
 										ThirdPartyUserId: data.Data.ID,
