@@ -13,20 +13,50 @@ export function sortByPriority(types, priority) {
     });
 }
 
-export function buildCatalogs(manifests) {
+// Build the flat catalog list shown in the type-tab + selector. Accepts the
+// per-addon status list (from StremioClient.fetchAllManifests). Catalogs
+// from addons that are currently unreachable but have a cached manifest
+// are kept in the list but marked `disabled: true` — the selector renders
+// them so the user sees what's missing instead of catalogs vanishing.
+export function buildCatalogs(addonStatuses) {
     const catalogs = [];
-    for (const m of manifests) {
-        for (const cat of (m.manifest.catalogs || [])) {
+    for (const a of addonStatuses) {
+        if (!a.manifest) continue;
+        const disabled = a.status !== 'ok';
+        for (const cat of (a.manifest.catalogs || [])) {
             catalogs.push({
                 id: cat.id,
                 type: cat.type,
                 name: cat.name || cat.id,
-                addonName: m.manifest.name || 'Unknown',
-                baseUrl: m.baseUrl,
+                addonName: a.manifest.name || 'Unknown',
+                baseUrl: a.baseUrl,
+                disabled,
+                addonStatus: a.status,
             });
         }
     }
     return catalogs;
+}
+
+// Compact addon descriptor used by the AddonHealthChip and elsewhere in
+// the UI. Pulled from per-addon status (manifest may be cached or absent).
+export function buildAddons(addonStatuses) {
+    return addonStatuses.map(a => {
+        let host = a.baseUrl;
+        try { host = new URL(a.baseUrl).hostname; } catch { /* keep raw */ }
+        const m = a.manifest;
+        const resources = (m?.resources || []).map(r => typeof r === 'string' ? r : r?.name).filter(Boolean);
+        return {
+            baseUrl: a.baseUrl,
+            host,
+            name: m?.name || host,
+            status: a.status,
+            source: a.source,
+            capabilities: resources,
+            lastSuccessAt: a.lastSuccessAt || null,
+            error: a.error || null,
+        };
+    });
 }
 
 export function getCatalogsForType(catalogs, type) {
@@ -99,6 +129,11 @@ export const initialState = {
     errorMessage: '',
     manifests: [],
     catalogs: [],
+    // Per-addon health (centralised — see buildAddons / AddonHealthChip).
+    // Same source of truth used by the chip on the page header, the
+    // disabled groups in CatalogSelector, and the post-fetch failure
+    // surface in StreamModal.
+    addons: [],
     selectedType: null,
     selectedCatalog: null,
     items: [],
@@ -139,9 +174,11 @@ export const initialState = {
 export function discoverReducer(state, action) {
     switch (action.type) {
         case 'INIT_SUCCESS': {
-            const { manifests, catalogs, selectedType, selectedCatalog } = action;
-            return { ...state, phase: 'ready', manifests, catalogs, selectedType, selectedCatalog };
+            const { manifests, catalogs, selectedType, selectedCatalog, addons } = action;
+            return { ...state, phase: 'ready', manifests, catalogs, addons: addons || state.addons, selectedType, selectedCatalog };
         }
+        case 'ADDONS_UPDATED':
+            return { ...state, addons: action.addons };
         case 'INIT_ERROR':
             return { ...state, phase: 'error', errorMessage: action.message };
         case 'SET_PHASE':

@@ -52,11 +52,39 @@
                         </svg>
                     </span>
 
-                    <div class="flex-1">
-                        <div class="font-medium text-sm break-all">{{ $addon.Url }}</div>
+                    {{ $addonName := deref $addon.Name }}
+                    {{ $addonLogo := deref $addon.ManifestLogo }}
+                    {{ $initial := "?" }}
+                    {{ if $addonName }}{{ $initial = slice $addonName 0 1 }}{{ end }}
+                    <div class="addon-logo relative flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden border border-w-line/40 bg-w-surface flex items-center justify-center text-w-sub text-sm font-semibold uppercase" data-initial="{{ $initial }}">
+                        <span class="logo-initial absolute inset-0 flex items-center justify-center">{{ $initial }}</span>
+                        {{ if $addonLogo }}
+                            <img src="{{ $addonLogo }}" alt="" class="relative w-full h-full object-contain bg-base-200" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();" />
+                        {{ end }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        {{ if $addonName }}
+                            <div class="font-semibold text-sm truncate">{{ $addonName }}</div>
+                            <div class="text-xs text-w-muted truncate">{{ $addon.Url }}</div>
+                        {{ else }}
+                            <div class="font-medium text-sm break-all">{{ $addon.Url }}</div>
+                        {{ end }}
+                        {{ if $addon.ManifestResources }}
+                            <div class="flex flex-wrap gap-1 mt-1.5">
+                                {{ range $addon.ManifestResources }}
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">{{ . }}</span>
+                                {{ end }}
+                            </div>
+                        {{ end }}
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button type="button" class="btn btn-ghost btn-sm btn-square text-w-muted hover:text-w-cyan refresh-addon" data-addon-id="{{ $addon.ID }}" title="{{ t $.Lang "profile.addons.refresh" }}" aria-label="{{ t $.Lang "profile.addons.refresh" }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        </button>
+
                         <label class="label cursor-pointer gap-2">
                             <input type="checkbox" name="addon_{{ $addon.ID }}_enabled" class="toggle toggle-soft" {{ if $addon.Enabled }}checked{{ end }}>
                             <span class="label-text text-xs">{{ t $.Lang "profile.addons.enabled" }}</span>

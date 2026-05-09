@@ -29,7 +29,11 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/components/SearchBar.jsx` — search input component
 - `assets/src/js/lib/discover/components/ItemGrid.jsx` — card grid display
 - `assets/src/js/lib/discover/components/Tabs.jsx` — type tabs, search tabs, catalog selector
-- `assets/src/js/lib/discover/components/EmptyStates.jsx` — loading, error, no-results states
+- `assets/src/js/lib/discover/components/EmptyStates.jsx` — loading, error, no-results, **catalog-unavailable** states
+- `assets/src/js/lib/discover/components/AddonHealthChip.jsx` — page-level addon health surface (warning chip + per-addon status drawer + retry)
+- `assets/src/js/lib/discover/manifestCache.js` — `localStorage` fallback for manifests, used to render disabled catalogs from currently-unreachable addons
+- `assets/src/js/lib/discover/addonsApi.js` — fetch wrapper around `/stremio/addon-url/:id/refresh-snapshot` (lazy backfill + profile refresh)
+- `migrations/52_add_addon_manifest_snapshot.up.sql` — snapshot columns on `stremio_addon_url`
 - `assets/src/js/lib/discover/prefs.js` — localStorage persistence for user selections
 - `assets/src/js/lib/discover/aiClient.js` — thin fetch wrapper for `/discover/ai/*` endpoints (AI recommendations)
 - `assets/src/js/lib/discover/components/ai/` — AI recommendations UI: `AISection.jsx`, `AIChipsRow.jsx`, `AIQueryInput.jsx`, `AIRecsGrid.jsx`, `AIRecCard.jsx`
@@ -44,8 +48,9 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, modal state, and addon wizard flow.
 - **StreamModal** — dialog modal driven by `modal` state from reducer. Views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list), `progress` (torrent processing).
 - **AddonWizard** — two-step guided wizard for discovering and installing Stremio addons. Step 1: source selection (Official Stremio, Community). Step 2: addon browsing with search, filters, and batch install.
-- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`, `WATCHLIST_IDS_LOADED`, `WATCHLIST_ITEMS_LOADED`, `WATCHLIST_FILTER_TOGGLE`, `WATCHLIST_ADD`, `WATCHLIST_REMOVE`, `SELECT_WATCHLIST_TYPE`.
-- **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls.
+- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `ADDONS_UPDATED`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`, `WATCHLIST_IDS_LOADED`, `WATCHLIST_ITEMS_LOADED`, `WATCHLIST_FILTER_TOGGLE`, `WATCHLIST_ADD`, `WATCHLIST_REMOVE`, `SELECT_WATCHLIST_TYPE`.
+- **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls. `fetchAllManifests()` returns full per-addon health (status / source / error) — see [Addon Health](#addon-health).
+- **AddonHealthChip** — page-level surface for addon outages: hidden when everything is `ok`, otherwise renders a warning chip with retry + a per-addon drawer. See [Addon Health](#addon-health).
 - **useDiscoverUrl** — custom hook managing browser history (`pushState`/`replaceState`) and `popstate` events for back/forward navigation.
 
 ### Build Configuration
@@ -217,6 +222,155 @@ Events tracked:
 - `watchlist-removed` — heart icon clicked on a card already in the list (`id`, `source`)
 - `ai-watchlist-toggled` — heart icon clicked on an AI recommendation card (`id`, `on`)
 - `stream-from-watchlist` — a card was clicked while the Watchlist view was active (no params; bare counter so the conversion ratio is `count(stream-from-watchlist) / count(watchlist-added)`)
+
+## Addon Health
+
+When a user's Stremio addon (Torrentio, MediaFusion, …) is down, Discover used to degrade silently: failed manifests were filtered out by `Promise.allSettled` and the user saw the same "no streams" / smaller-catalog list as if their selection genuinely had no content. The fix is a centralised per-addon health model surfaced in three places, backed by a server-side manifest snapshot.
+
+### Server-side snapshot (migration #52)
+
+`stremio_addon_url` carries a snapshot of the manifest fields we want to surface even when the addon is currently unreachable:
+
+```
+manifest_id          text         -- manifest.id
+name                 text         -- manifest.name (used by chip / profile)
+manifest_version     text         -- manifest.version
+manifest_resources   jsonb        -- string[] of resource names
+manifest_types       jsonb        -- string[] of supported types
+manifest_logo        text         -- manifest.logo URL (rendered as profile addon icon)
+manifest_fetched_at  timestamptz  -- when the snapshot was last refreshed
+```
+
+The logo is stored as a third-party URL (no proxying). The profile UI loads it as `<img src referrerpolicy="no-referrer">` with a first-letter initial behind it as fallback — if the image 404s or the addon's CDN dies, the initial keeps the row visually grounded.
+
+All columns are nullable. Pre-existing rows (added before migration #52) carry NULLs and are picked up by the lazy backfill below.
+
+**Capture sites:**
+- `POST /stremio/addon-url/add` and `/batch-add` — `AddonValidator.ValidateAndFetch` parses the manifest once and persists the snapshot together with the URL. Failures inside `batch-add` are tolerated (snapshot left NULL); single-add still fails the request because that's the user's only feedback signal.
+- `POST /stremio/addon-url/:id/refresh-snapshot` — server-side re-fetch + persist. Returns the new snapshot in JSON. Used by:
+  1. The lazy backfill from the Discover client (when `fetchAllManifests` succeeds for an addon whose snapshot is missing or older than 7 days).
+  2. The per-addon "Refresh" button in the profile UI.
+
+The 7-day staleness threshold lives in `assets/src/js/lib/discover/addonsApi.js::isSnapshotStale`. Refresh requests are fire-and-forget — failures don't surface to the user beyond an optional toast in the profile.
+
+### Client bootstrap
+
+`handlers/discover/handler.go` serializes the rich shape into `window._addons`:
+
+```js
+{ id, url, name, manifestId, version, resources[], types[], fetchedAt }
+```
+
+`assets/src/js/app/discover.js` prepends a synthetic Cinemeta seed (we never persist it server-side because Cinemeta is hardcoded) and hands the seeds to `StremioClient`. The chip and selector get names and capabilities up front; the manifest fetch fills in catalogs and confirms health.
+
+### Status model
+
+`StremioClient.fetchAllManifests()` (`assets/src/js/lib/discover/client.js`) returns one record per addon URL — never silently drops failures:
+
+```js
+{
+    baseUrl,
+    manifest,         // null when addon is unreachable AND no cache hit AND no seed
+    status,           // 'ok' | 'unreachable' | 'misconfigured'
+    source,           // 'fresh' | 'cache' | 'seed' | null
+    error,            // string from the fetch failure (optional)
+    lastSuccessAt,    // unix-ms (only when source is cache or seed)
+}
+```
+
+Failure buckets:
+
+- `unreachable` — network error, timeout, 5xx, malformed JSON. User-facing copy: "not responding". Action: retry.
+- `misconfigured` — 401/403/404. User-facing copy: "check the addon URL". Action: open profile.
+
+**Fallback chain** on fetch failure:
+1. localStorage cache (`manifestCache.read`) — overwritten on every successful fetch, 30-day sanity cap.
+2. Server seed (the snapshot from `window._addons`) — survives across browsers and private windows because it lives in PostgreSQL.
+3. Nothing — addon shows as host only.
+
+The classification lives in `client.js::classifyError`.
+
+### Status model
+
+`StremioClient.fetchAllManifests()` (`assets/src/js/lib/discover/client.js`) returns one record per addon URL — never silently drops failures:
+
+```js
+{
+    baseUrl,
+    manifest,         // null when addon is unreachable AND no cache hit
+    status,           // 'ok' | 'unreachable' | 'misconfigured'
+    source,           // 'fresh' | 'cache' | null
+    error,            // string from the fetch failure (optional)
+    lastSuccessAt,    // unix-ms (only when source === 'cache')
+}
+```
+
+Failure buckets:
+
+- `unreachable` — network error, timeout, 5xx, malformed JSON. User-facing copy: "not responding". Action: retry.
+- `misconfigured` — 401/403/404. User-facing copy: "check the addon URL". Action: open profile.
+
+The classification lives in `client.js::classifyError`. On any failure we read `manifestCache.read(baseUrl)`; if there's a hit, we keep the cached manifest and tag the entry `source: 'cache'` so the UI can still render the addon's catalogs (disabled).
+
+### Manifest cache (`manifestCache.js`)
+
+`localStorage`-backed, key prefix `stremio.manifest.`. Overwrite-on-success only — a failing fetch never invalidates the stored copy. 30-day sanity cap drops genuinely abandoned entries. `prune(activeBaseUrls)` runs once per `StremioClient` construction to drop entries whose addon URL is no longer in the user's profile, plus anything past the cap. Single-entry size guard at 200 KB to prevent one oversized manifest from blowing the storage quota.
+
+This is a per-browser fallback. The server-side snapshot is the cross-browser one — both work together, with the localStorage hit checked first in the fallback chain.
+
+### Centralised state
+
+`state.addons` in the reducer (`discoverReducer.js`) is a flat array built by `buildAddons(addonStatuses)`:
+
+```js
+{ baseUrl, host, name, status, source, capabilities, lastSuccessAt, error }
+```
+
+Catalogs built by `buildCatalogs(addonStatuses)` carry `disabled: status !== 'ok'` and `addonStatus`. The same source feeds three UI surfaces:
+
+1. **`AddonHealthChip`** in the Discover sticky header. Hidden when every addon is `ok`. Otherwise renders a yellow warning row ("N of M addons unavailable" or "All addons unavailable") with an inline retry button and an expandable drawer listing every addon with its status, capabilities, and a "Manage addons" link to `/profile`.
+2. **`CatalogSelector`** (`Tabs.jsx`) groups options by addon when multiple addons are present. Disabled catalogs sit in an `<optgroup label="Torrentio · unavailable">` with `<option disabled>` and a `⚠` prefix — the user sees their previously-available catalogs, just greyed out, instead of having them silently vanish.
+3. **`StreamModal` `StreamContent`** (`StreamModal.jsx`) — the modal carries `failedAddons` from `loadStreams`. Two new branches:
+    - `streams.length === 0 && failedAddons.length > 0` → dedicated empty-state with explicit attribution ("Torrentio isn't responding") plus the retry button. Different copy from the generic `discover.noStreams`.
+    - `streams.length > 0 && failedAddons.length > 0` → thin yellow banner above the list ("Torrentio didn't respond — list may be incomplete") with retry.
+
+`failedAddons` combines two sources: addons whose stream fetch errored mid-flight, plus addons we couldn't even probe (manifest is unreachable AND its capabilities either include `stream` from cache or are unknown). Without the inferred branch, an addon that was already down at page load wouldn't appear in the modal at all.
+
+### Retry paths
+
+- `retryAddons` (chip retry) — re-fetches manifests, updates `state.addons` and `state.catalogs`. Does **not** drop the page back into the loading view; preserves the user's current type/catalog selection.
+- `retryStreams` (modal retry) — `retryAddons` + re-issues `loadStreams` for the currently-open modal. Re-uses URL params to reconstruct the stream id (handles series episodes via `tt:season:episode`).
+- `retry` (full-page error retry, pre-existing) — only used when init itself throws.
+
+### Pre-selected disabled catalog
+
+When the URL points at a catalog whose addon is currently down (e.g. `?catalog-base=torrentio.strem.fun&catalog-id=top`), `loadCatalog` short-circuits on `catalog.disabled` and the grid renders `CatalogUnavailable` (`EmptyStates.jsx`) — explicit attribution to the addon, retry button, and a copy that nudges the user to pick another catalog. The chip is still visible and still works.
+
+### What's intentionally NOT done
+
+- **Active health-check** (background ping). Too costly in upstream addon load and in trust assumptions. Health is observed when used, not polled.
+- **Differentiation beyond `unreachable` / `misconfigured`**. Granular HTTP-code-specific copy adds maintenance overhead without changing what the user can do.
+- **Server-side addon health endpoint**. All current consumers (chip, selector, modal) live in the same Discover SPA and read the same client-side state. Cross-feature signals (profile, dashboard) would justify it later.
+
+### Profile UI (per-addon snapshot)
+
+`templates/partials/profile/addon_urls.html` renders each addon row with the snapshot when present:
+- 36×36 logo from `manifest_logo` with a first-letter initial behind it as fallback (visible if the image fails to load or there's no logo URL).
+- Addon name (bold) over the URL (muted) when `name` is set; otherwise the URL alone.
+- Capability pills derived from `manifest_resources` (e.g. `catalog`, `stream`, `meta`).
+- Per-addon "Refresh" icon button → `POST /stremio/addon-url/:id/refresh-snapshot`. The row's logo + name + pills are re-rendered inline from the JSON response. Toast feedback via `profile.addons.refreshed` / `profile.addons.refreshFailed`.
+
+### i18n keys
+
+All copy goes through `t/tf` with translations in `locales/{en,ru,es,de,fr,pt,it,pl,tr,nl,cs}.json`:
+
+- `discover.allAddonsDown`, `discover.addonsPartialDown`, `discover.addonGroupUnavailable`
+- `discover.addonReady`, `discover.addonUnreachable`, `discover.addonUnreachableCached`, `discover.addonMisconfigured`
+- `discover.manageAddons`, `discover.collapse`, `discover.expand`
+- `discover.catalogTemporarilyUnavailable`, `discover.catalogUnavailableBody`, `discover.catalogUnavailableBodyGeneric`
+- `discover.streamsFailedTitle`, `discover.streamsFailedOne`, `discover.streamsFailedMany`, `discover.streamsFailedBody`
+- `discover.streamsPartialFailureOne`, `discover.streamsPartialFailureMany`
+- `profile.addons.refresh`, `profile.addons.refreshed`, `profile.addons.refreshFailed`
 
 ## Addon Protocol
 

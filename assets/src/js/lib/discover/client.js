@@ -1,6 +1,13 @@
-// Stremio addon API client with caching, abort support, and timeouts
+// Stremio addon API client with caching, abort support, and timeouts.
+//
+// Manifest fetch is special: failures don't drop the addon from the list,
+// they get reported with a status so the UI can show "addon unavailable"
+// while still rendering the addon's last-known catalogs (from
+// manifestCache) as disabled options. See manifestCache.js.
 
 import { getLang } from '../i18n';
+import * as manifestCache from './manifestCache';
+import { refreshSnapshot, isSnapshotStale } from './addonsApi';
 
 const FETCH_TIMEOUT = 10000;
 const CACHE_MAX = 100;
@@ -47,30 +54,139 @@ class LRUCache {
 
 export const CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
 
+// Map an HTTP status / fetch error into one of the two failure buckets we
+// surface to the user. 4xx (except 408/429) means the addon is responding
+// but rejecting our request — likely a stale URL or revoked auth — so the
+// fix is in the user's profile. Everything else (network, timeout, 5xx,
+// malformed JSON) is treated as a temporary outage.
+function classifyError(httpStatus, raw) {
+    if (httpStatus === 401 || httpStatus === 403 || httpStatus === 404) {
+        return 'misconfigured';
+    }
+    return 'unreachable';
+}
+
 export class StremioClient {
-    constructor(addonUrls) {
+    // addonSeeds is the per-addon snapshot the server bootstraps into
+    // window._addons. Each seed: { id, url, name, manifestId, version,
+    // resources, types, fetchedAt }. Used as a fallback for the addon's
+    // human-readable name + capabilities when its manifest is currently
+    // unreachable AND we have no localStorage cache (e.g. new browser /
+    // private window). The lazy refresh below pings the server when a
+    // fresh manifest arrives and the seed is missing or stale.
+    constructor(addonUrls, addonSeeds = []) {
         this.addonUrls = addonUrls.map(u => u.replace(/\/manifest\.json$/, ''));
         this.cache = new LRUCache();
-        this.manifests = null;
+        // addonStatuses is the source of truth for per-addon health, see
+        // fetchAllManifests below. Each entry:
+        //   { baseUrl, manifest, status: 'ok'|'unreachable'|'misconfigured',
+        //     source: 'fresh'|'cache'|'seed'|null, error?: string }
+        this.addonStatuses = null;
+        this.seedsByUrl = new Map();
+        for (const s of addonSeeds || []) {
+            const baseUrl = (s.url || '').replace(/\/manifest\.json$/, '');
+            if (baseUrl) this.seedsByUrl.set(baseUrl, s);
+        }
+        manifestCache.prune(this.addonUrls);
+    }
+
+    // Build a synthetic manifest from a server seed so the UI can render
+    // a name + capabilities for an addon whose live manifest fetch just
+    // failed. Catalogs are intentionally absent — we never persist them
+    // server-side because addons mutate their catalog list far more
+    // often than name/version/resources.
+    seedToManifest(seed) {
+        if (!seed) return null;
+        return {
+            id: seed.manifestId || '',
+            name: seed.name || '',
+            version: seed.version || '',
+            resources: seed.resources || [],
+            types: seed.types || [],
+            catalogs: [],
+        };
+    }
+
+    // Backward-compat alias: callers that previously expected the live
+    // manifest list now read addonStatuses (only entries that have a
+    // manifest, live or cached). Used by buildCatalogs in the reducer.
+    get manifests() {
+        if (!this.addonStatuses) return null;
+        return this.addonStatuses.filter(a => a.manifest);
+    }
+
+    set manifests(_) {
+        // Mutating the manifest list directly is a holdover from earlier
+        // code paths; the new flow always goes through fetchAllManifests.
+        // We accept the assignment to keep the existing reset-then-refetch
+        // helpers (retry, wizard) working without a wider refactor.
+        if (_ === null) this.addonStatuses = null;
     }
 
     async fetchManifest(baseUrl) {
         const url = `${baseUrl}/manifest.json`;
-        const res = await fetchWithTimeout(url);
-        if (!res.ok) throw new Error(`Failed to fetch manifest from ${url}`);
-        return res.json();
+        let res;
+        try {
+            res = await fetchWithTimeout(url);
+        } catch (e) {
+            const err = new Error(`Failed to reach ${url}`);
+            err.kind = 'unreachable';
+            throw err;
+        }
+        if (!res.ok) {
+            const err = new Error(`Manifest fetch returned ${res.status} for ${url}`);
+            err.kind = classifyError(res.status);
+            throw err;
+        }
+        try {
+            return await res.json();
+        } catch (e) {
+            const err = new Error(`Malformed manifest at ${url}`);
+            err.kind = 'unreachable';
+            throw err;
+        }
     }
 
+    // Returns full per-addon status, never silently filters failures.
+    // Fallback chain on fetch failure: localStorage cache → server seed
+    // (whatever the server captured at add-time) → null. On success,
+    // also fires off a lazy backfill request so the server-side snapshot
+    // catches up if it's missing or older than 7 days.
     async fetchAllManifests() {
-        const results = await Promise.allSettled(
-            this.addonUrls.map(async (url) => {
+        const tasks = this.addonUrls.map(async (url) => {
+            const seed = this.seedsByUrl.get(url);
+            try {
                 const manifest = await this.fetchManifest(url);
-                return { baseUrl: url, manifest };
-            })
-        );
-        return results
-            .filter(r => r.status === 'fulfilled')
-            .map(r => r.value);
+                manifestCache.write(url, manifest);
+                // Lazy backfill — server captures snapshots at add-time,
+                // but old rows from before migration #52 carry NULLs and
+                // long-lived addons may have evolved their manifest. We
+                // ping the server to update on any successful client-side
+                // fetch when its copy looks stale. Fire-and-forget; errors
+                // are silently dropped by addonsApi.refreshSnapshot.
+                if (seed?.id && isSnapshotStale(seed.fetchedAt)) {
+                    refreshSnapshot(seed.id);
+                }
+                return { baseUrl: url, manifest, status: 'ok', source: 'fresh' };
+            } catch (e) {
+                const cached = manifestCache.read(url);
+                const status = e?.kind || 'unreachable';
+                if (cached) {
+                    return { baseUrl: url, manifest: cached.manifest, status, source: 'cache', error: e?.message, lastSuccessAt: cached.lastSuccessAt };
+                }
+                if (seed) {
+                    const seedManifest = this.seedToManifest(seed);
+                    if (seedManifest) {
+                        const lastSuccessAt = seed.fetchedAt ? Date.parse(seed.fetchedAt) : null;
+                        return { baseUrl: url, manifest: seedManifest, status, source: 'seed', error: e?.message, lastSuccessAt };
+                    }
+                }
+                return { baseUrl: url, manifest: null, status, source: null, error: e?.message };
+            }
+        });
+        const results = await Promise.all(tasks);
+        this.addonStatuses = results;
+        return results;
     }
 
     async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal } = {}) {
@@ -99,16 +215,16 @@ export class StremioClient {
             }
         } catch (e) { /* fall through to user addons */ }
 
-        // Fall back to user's meta-capable addons
-        const metaAddons = this.manifests
-            ? this.manifests.filter(m => {
-                const resources = m.manifest.resources || [];
-                return resources.some(r =>
-                    (typeof r === 'string' && r === 'meta') ||
-                    (r && r.name === 'meta')
-                );
-            })
-            : [];
+        // Fall back to user's meta-capable addons (status='ok' only — no
+        // point hammering an addon we already know is unreachable).
+        const okAddons = (this.addonStatuses || []).filter(a => a.status === 'ok' && a.manifest);
+        const metaAddons = okAddons.filter(m => {
+            const resources = m.manifest.resources || [];
+            return resources.some(r =>
+                (typeof r === 'string' && r === 'meta') ||
+                (r && r.name === 'meta')
+            );
+        });
 
         const results = await Promise.allSettled(
             metaAddons.map(async (addon) => {
@@ -132,9 +248,9 @@ export class StremioClient {
     }
 
     getSearchCatalogs() {
-        if (!this.manifests) return [];
+        const okAddons = (this.addonStatuses || []).filter(a => a.status === 'ok' && a.manifest);
         const catalogs = [];
-        for (const m of this.manifests) {
+        for (const m of okAddons) {
             for (const cat of (m.manifest.catalogs || [])) {
                 const hasSearch =
                     cat.extraSupported?.includes('search') ||
@@ -162,8 +278,8 @@ export class StremioClient {
     }
 
     getStreamAddons() {
-        if (!this.manifests) return [];
-        return this.manifests.filter(m => {
+        const okAddons = (this.addonStatuses || []).filter(a => a.status === 'ok' && a.manifest);
+        return okAddons.filter(m => {
             const resources = m.manifest.resources || [];
             return resources.some(r =>
                 (typeof r === 'string' && r === 'stream') ||

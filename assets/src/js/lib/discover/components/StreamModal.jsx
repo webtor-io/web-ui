@@ -7,7 +7,7 @@ import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
 import { t, tf } from '../i18n';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -55,7 +55,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     </button>
                 </div>
                 <div class="overflow-y-auto px-3 sm:px-6 pb-4 sm:pb-6">
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -65,7 +65,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
     const videoId = modal.metaId || modal.itemId;
     const videoType = modal.itemType;
     const isImdb = videoId && videoId.startsWith('tt') && !videoId.includes(':');
@@ -107,7 +107,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} statusButtons={statusButtons} headerMeta={headerMeta} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} />;
     }
 
     return null;
@@ -318,8 +318,16 @@ function is4kStream(parsedInfo) {
     return parsedInfo.labels.some(l => l === '4K');
 }
 
-function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, statusButtons, headerMeta }) {
-    const { title, poster, streams, error } = modal;
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta }) {
+    const { title, poster, streams, error, failedAddons } = modal;
+    const failed = failedAddons || [];
+    const [retrying, setRetrying] = useState(false);
+    const handleRetry = useCallback(async (e) => {
+        e?.stopPropagation?.();
+        if (retrying || !onRetryStreams) return;
+        setRetrying(true);
+        try { await onRetryStreams(); } finally { setRetrying(false); }
+    }, [onRetryStreams, retrying]);
 
     const [show4k, setShow4k] = useState(() => {
         const prefs = loadPrefs();
@@ -489,6 +497,45 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
     }, []);
 
     if (streams.length === 0) {
+        // When the empty result is caused (or partly caused) by addon
+        // failures, surface that explicitly instead of the generic
+        // "no streams" copy. Without this the user can't tell whether
+        // the title genuinely has no streams or their Torrentio is down.
+        if (failed.length > 0) {
+            const onlyFailure = failed[0];
+            const headline = failed.length === 1
+                ? tf('discover.streamsFailedOne', onlyFailure.name || onlyFailure.host)
+                : tf('discover.streamsFailedMany', failed.length);
+            return (
+                <div>
+                    <ModalHeader title={title} poster={poster} subtitle={t('discover.streamsFailedTitle')} extra={statusButtons} {...headerMeta} />
+                    <div class="text-center py-4">
+                        <svg class="w-12 h-12 text-yellow-400/50 mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                        </svg>
+                        <p class="text-sm text-w-text mb-1">{headline}</p>
+                        <p class="text-xs text-w-muted mb-4">{t('discover.streamsFailedBody')}</p>
+                        {failed.length > 1 && (
+                            <ul class="text-xs text-w-sub mb-4 inline-block text-left">
+                                {failed.map(f => (
+                                    <li key={f.host}>· {f.name || f.host}</li>
+                                ))}
+                            </ul>
+                        )}
+                        <div class="flex justify-center gap-2">
+                            <button
+                                class="btn btn-soft-cyan btn-sm"
+                                onClick={handleRetry}
+                                disabled={retrying}
+                            >
+                                {retrying && <span class="loading loading-spinner loading-xs"></span>}
+                                {t('discover.retry')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div>
                 <ModalHeader title={title} poster={poster} subtitle={subtitleText} extra={statusButtons} {...headerMeta} />
@@ -523,6 +570,27 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, s
                         showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
                 ) : undefined}
             />
+
+            {failed.length > 0 && (
+                <div class="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+                    <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                    </svg>
+                    <span class="text-xs text-yellow-100/85 flex-1 min-w-0">
+                        {failed.length === 1
+                            ? tf('discover.streamsPartialFailureOne', failed[0].name || failed[0].host)
+                            : tf('discover.streamsPartialFailureMany', failed.length)}
+                    </span>
+                    <button
+                        class="btn btn-ghost btn-xs text-yellow-100/85 hover:bg-yellow-500/10 hover:text-yellow-100 flex-shrink-0"
+                        onClick={handleRetry}
+                        disabled={retrying}
+                    >
+                        {retrying && <span class="loading loading-spinner loading-xs"></span>}
+                        {t('discover.retry')}
+                    </button>
+                </div>
+            )}
 
             {hasFilters && (
                 <FilterChips

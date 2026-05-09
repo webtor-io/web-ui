@@ -441,6 +441,15 @@ func (s *Helper) DerefInt16(p *int16) int {
 	return int(*p)
 }
 
+// Deref dereferences a pointer to string, returning "" if nil. Lets
+// templates use `{{ if deref .Name }}` for nullable string columns.
+func (s *Helper) Deref(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 // Seq returns a slice of consecutive integers [from..to] inclusive.
 // Used in templates for star-rating loops: {{ range seq 1 10 }}.
 func (s *Helper) Seq(from, to int) []int {

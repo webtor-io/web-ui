@@ -1,7 +1,7 @@
 {{ define "title" }}{{ t $.Lang "discover.title" }}{{ end }}
 {{ define "main" }}
 <script>
-    window._addonUrls = {{ .Data.AddonUrls | json }};
+    window._addons = {{ .Data.Addons | json }};
 </script>
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6" id="discover-page">
   <div class="max-w-[900px] mx-auto">

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -48,6 +49,7 @@ func RegisterHandler(c *cli.Context, av *stremio.AddonValidator, r *gin.Engine, 
 	gr.POST("/batch-add", h.batchAdd)
 	gr.POST("/delete/:id", h.delete)
 	gr.POST("/update", h.update)
+	gr.POST("/:id/refresh-snapshot", h.refreshSnapshot)
 	return nil
 }
 
@@ -151,8 +153,19 @@ func (s *Handler) batchAddAddonUrls(ctx context.Context, urls []string, user *au
 			continue
 		}
 
-		// Create
-		if err := models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl); err != nil {
+		// Snapshot the manifest so the UI gets a name + capabilities up
+		// front without waiting for a client-side fetch. Failures are
+		// tolerated here: wizard items come from curated lists, and a
+		// transient outage shouldn't block the user from binding the
+		// addon to their account. The lazy refresh on Discover will
+		// pick the snapshot up once the addon recovers.
+		snapshot, snapErr := s.validator.ValidateAndFetch(addonUrl)
+		if snapErr != nil {
+			log.WithError(snapErr).WithField("url", addonUrl).Warn("batch-add: addon manifest unreachable, saving URL without snapshot")
+			snapshot = nil
+		}
+
+		if err := models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl, snapshot); err != nil {
 			return nil, errors.Wrap(err, "failed to create addon URL")
 		}
 		resp.Added++
@@ -201,8 +214,10 @@ func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.U
 		return errors.New("cannot add Webtor's own manifest URL")
 	}
 
-	// Validate addon URL availability and manifest structure
-	if err := s.validator.ValidateURL(addonUrl); err != nil {
+	// Validate addon URL availability and manifest structure, capturing
+	// the snapshot so we don't waste the work the validator already did.
+	snapshot, err := s.validator.ValidateAndFetch(addonUrl)
+	if err != nil {
 		return err
 	}
 
@@ -234,7 +249,7 @@ func (s *Handler) addAddonUrl(ctx context.Context, addonUrl string, user *auth.U
 	}
 
 	// Create new addon URL
-	return models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl)
+	return models.CreateStremioAddonUrl(ctx, db, user.ID, addonUrl, snapshot)
 }
 
 func (s *Handler) update(c *gin.Context) {
@@ -343,6 +358,79 @@ func (s *Handler) updateAddonUrls(deletedAddonsStr, addonOrder string, c *gin.Co
 
 	log.WithField("user_id", user.ID).Info("addon URLs updated successfully")
 	return nil
+}
+
+// refreshSnapshot re-fetches an addon's manifest server-side and updates
+// the cached fields. Used by:
+//   - the lazy backfill from the Discover client (POST after a fresh
+//     manifest fetch lands on an addon with stale or NULL fields)
+//   - the per-addon "Refresh" button in the profile UI
+//
+// Returns the new snapshot in JSON so the caller can update its UI
+// without an extra round-trip. 404 if the addon doesn't belong to the
+// user; 502 if the upstream manifest fetch fails (so the client can keep
+// the existing snapshot rather than nuking it).
+type refreshSnapshotResponse struct {
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Logo              string    `json:"logo"`
+	ManifestID        string    `json:"manifestId"`
+	ManifestVersion   string    `json:"manifestVersion"`
+	ManifestResources []string  `json:"resources"`
+	ManifestTypes     []string  `json:"types"`
+	ManifestFetchedAt time.Time `json:"fetchedAt"`
+}
+
+func (s *Handler) refreshSnapshot(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	idStr := c.Param("id")
+	addonID, err := uuid.FromString(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid addon id"})
+		return
+	}
+
+	db := s.pg.Get()
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no db"})
+		return
+	}
+
+	addon, err := models.GetStremioAddonUrlByID(c.Request.Context(), db, addonID)
+	if err != nil {
+		log.WithError(err).Error("failed to load addon for refresh-snapshot")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
+		return
+	}
+	if addon == nil || addon.UserID != user.ID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+
+	snapshot, err := s.validator.ValidateAndFetch(addon.Url)
+	if err != nil {
+		log.WithError(err).WithField("addon_id", addonID).Info("refresh-snapshot: upstream manifest fetch failed")
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := models.UpdateStremioAddonUrlSnapshot(c.Request.Context(), db, addonID, user.ID, snapshot); err != nil {
+		log.WithError(err).Error("refresh-snapshot: db update failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+
+	now := time.Now()
+	c.JSON(http.StatusOK, refreshSnapshotResponse{
+		ID:                addonID.String(),
+		Name:              snapshot.Name,
+		Logo:              snapshot.Logo,
+		ManifestID:        snapshot.ID,
+		ManifestVersion:   snapshot.Version,
+		ManifestResources: snapshot.Resources,
+		ManifestTypes:     snapshot.Types,
+		ManifestFetchedAt: now,
+	})
 }
 
 func (s *Handler) deleteAddonUrl(ctx context.Context, idStr string, user *auth.User) (err error) {

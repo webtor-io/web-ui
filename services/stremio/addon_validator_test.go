@@ -215,6 +215,88 @@ func TestAddonValidator_ValidateAddonURL(t *testing.T) {
 	}
 }
 
+func TestAddonValidator_ValidateAndFetch_Snapshot(t *testing.T) {
+	// Manifest with both string and object resource shapes — exercises
+	// both branches in extractResourceNames.
+	manifest := `{
+		"id": "com.example.snap",
+		"version": "2.1.0",
+		"name": "Snapshot Test",
+		"description": "Captures snapshot fields",
+		"resources": [
+			"catalog",
+			{"name": "stream", "types": ["movie"]},
+			{"name": "meta"}
+		],
+		"types": ["movie", "series"],
+		"logo": "https://example.com/logo.png"
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write([]byte(manifest))
+	}))
+	defer server.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	validator := NewAddonValidator(createMockContext(), client)
+	snapshot, err := validator.ValidateAndFetch(server.URL + "/manifest.json")
+	if err != nil {
+		t.Fatalf("ValidateAndFetch returned unexpected error: %v", err)
+	}
+	if snapshot == nil {
+		t.Fatal("snapshot is nil")
+	}
+	if snapshot.ID != "com.example.snap" {
+		t.Errorf("ID = %q, want com.example.snap", snapshot.ID)
+	}
+	if snapshot.Name != "Snapshot Test" {
+		t.Errorf("Name = %q, want Snapshot Test", snapshot.Name)
+	}
+	if snapshot.Version != "2.1.0" {
+		t.Errorf("Version = %q, want 2.1.0", snapshot.Version)
+	}
+	wantResources := []string{"catalog", "stream", "meta"}
+	if len(snapshot.Resources) != len(wantResources) {
+		t.Fatalf("Resources len = %d, want %d (%v)", len(snapshot.Resources), len(wantResources), snapshot.Resources)
+	}
+	for i, r := range wantResources {
+		if snapshot.Resources[i] != r {
+			t.Errorf("Resources[%d] = %q, want %q", i, snapshot.Resources[i], r)
+		}
+	}
+	wantTypes := []string{"movie", "series"}
+	if len(snapshot.Types) != len(wantTypes) {
+		t.Fatalf("Types len = %d, want %d", len(snapshot.Types), len(wantTypes))
+	}
+	for i, ty := range wantTypes {
+		if snapshot.Types[i] != ty {
+			t.Errorf("Types[%d] = %q, want %q", i, snapshot.Types[i], ty)
+		}
+	}
+	if snapshot.Logo != "https://example.com/logo.png" {
+		t.Errorf("Logo = %q, want https://example.com/logo.png", snapshot.Logo)
+	}
+}
+
+func TestAddonValidator_ValidateAndFetch_FailureReturnsNilSnapshot(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+	}))
+	defer server.Close()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	validator := NewAddonValidator(createMockContext(), client)
+	snapshot, err := validator.ValidateAndFetch(server.URL + "/manifest.json")
+	if err == nil {
+		t.Fatal("expected error from 503 response")
+	}
+	if snapshot != nil {
+		t.Errorf("expected nil snapshot on error, got %+v", snapshot)
+	}
+}
+
 func TestAddonValidator_ValidateAddonURL_Timeout(t *testing.T) {
 	// Create a server that doesn't respond quickly
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

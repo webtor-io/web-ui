@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'preact/hooks';
 import { getSearchResultsForType } from './discoverReducer';
 import { chipClass } from './discoverUtils';
-import { t } from '../i18n';
+import { t, tf } from '../i18n';
 
 function typeLabel(type) {
     const key = `discover.type.${type.toLowerCase()}`;
@@ -53,13 +53,33 @@ export function SearchTabs({ searchResults, searchTypes, searchType, onSelect })
 }
 
 export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
-    if (catalogs.length <= 1) return null;
-
     const handleChange = useCallback((e) => {
         const parts = e.target.value.split('::');
-        const match = catalogs.find(c => c.baseUrl === parts[0] && c.id === parts[1]);
+        const match = catalogs.find(c => c.baseUrl === parts[0] && c.id === parts[1] && !c.disabled);
         if (match) onSelect(match);
     }, [catalogs, onSelect]);
+
+    // Group by addon so disabled (unreachable) addons can be visually
+    // separated from live ones. The selector renders one <optgroup> per
+    // addon when there's more than one addon represented; for a single
+    // addon we keep the flat list to match the previous look.
+    const groups = useMemo(() => {
+        const m = new Map();
+        for (const cat of catalogs) {
+            const k = cat.baseUrl;
+            if (!m.has(k)) m.set(k, { addonName: cat.addonName, baseUrl: cat.baseUrl, disabled: !!cat.disabled, items: [] });
+            m.get(k).items.push(cat);
+        }
+        return [...m.values()];
+    }, [catalogs]);
+
+    // Match the legacy guard: nothing to choose when there's a single
+    // catalog. The guard intentionally counts even disabled options so
+    // the selector still renders when an addon is down — the user needs
+    // to see why their previously-available catalogs are greyed out.
+    if (catalogs.length <= 1) return null;
+
+    const useGroups = groups.length > 1;
 
     return (
         <div class="mt-2">
@@ -68,11 +88,34 @@ export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
                 onChange={handleChange}
                 value={selectedCatalog ? `${selectedCatalog.baseUrl}::${selectedCatalog.id}` : ''}
             >
-                {catalogs.map(cat => (
-                    <option key={`${cat.baseUrl}::${cat.id}`} value={`${cat.baseUrl}::${cat.id}`}>
-                        {cat.name} ({cat.addonName})
-                    </option>
-                ))}
+                {useGroups
+                    ? groups.map(g => (
+                        <optgroup
+                            key={g.baseUrl}
+                            label={g.disabled
+                                ? tf('discover.addonGroupUnavailable', g.addonName)
+                                : g.addonName}
+                        >
+                            {g.items.map(cat => (
+                                <option
+                                    key={`${cat.baseUrl}::${cat.id}`}
+                                    value={`${cat.baseUrl}::${cat.id}`}
+                                    disabled={cat.disabled || undefined}
+                                >
+                                    {cat.disabled ? `⚠ ${cat.name}` : cat.name}
+                                </option>
+                            ))}
+                        </optgroup>
+                    ))
+                    : catalogs.map(cat => (
+                        <option
+                            key={`${cat.baseUrl}::${cat.id}`}
+                            value={`${cat.baseUrl}::${cat.id}`}
+                            disabled={cat.disabled || undefined}
+                        >
+                            {cat.disabled ? `⚠ ${cat.name} (${cat.addonName})` : `${cat.name} (${cat.addonName})`}
+                        </option>
+                    ))}
             </select>
         </div>
     );

@@ -15,11 +15,12 @@ import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
-import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults } from './EmptyStates';
+import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, CatalogUnavailable } from './EmptyStates';
+import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
 import { t, langPath } from '../i18n';
 
-export function DiscoverApp({ addonUrls, hasCustomAddons }) {
+export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
     const [showWizard, setShowWizard] = useState(false);
     const [addonsInstalled, setAddonsInstalled] = useState(false);
@@ -43,7 +44,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
 
     // Create client once
     if (!clientRef.current) {
-        clientRef.current = new StremioClient(addonUrls);
+        clientRef.current = new StremioClient(addonUrls, addonSeeds);
     }
     const client = clientRef.current;
 
@@ -57,6 +58,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
     // --- Load catalog ---
     const loadCatalog = useCallback(async (catalog, skip, currentItems) => {
         if (!catalog) return;
+        // Skip the fetch for catalogs whose addon is currently down — the
+        // UI renders CatalogUnavailable for these so users see why nothing
+        // loads. Without this short-circuit we'd hit the network and the
+        // generic "Failed to load catalog" toast would mask the real cause.
+        if (catalog.disabled) return;
         dispatch({ type: 'CATALOG_LOADING' });
         abortCatalog();
         abortRef.current = new AbortController();
@@ -86,10 +92,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         let cancelled = false;
         (async () => {
             try {
-                const { manifests, catalogs, types } = await loadManifests(client);
+                const { manifests, catalogs, types, addons } = await loadManifests(client);
                 if (cancelled) return;
 
                 if (!types.length) {
+                    dispatch({ type: 'ADDONS_UPDATED', addons });
                     dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
                     return;
                 }
@@ -130,7 +137,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     if (match) selectedCatalog = match;
                 }
 
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
 
                 // Store page/modal restore targets
                 if (urlPage > 0) restoredPageRef.current = urlPage;
@@ -299,8 +306,29 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         const description = item.description;
         const addons = client.getStreamAddons();
         const itemMeta = { year, releaseInfo, imdbRating, description };
+
+        // Addons we couldn't even probe for streams because their manifest
+        // is unreachable or returned a 4xx. Without surfacing these, an
+        // empty stream list reads as "no content" when the real cause is
+        // an outage on the user's stream addon.
+        const inferredFailures = (client.addonStatuses || [])
+            .filter(a => a.status !== 'ok')
+            .filter(a => {
+                if (!a.manifest) return true; // unknown capabilities — assume it might serve streams
+                const resources = a.manifest.resources || [];
+                return resources.some(r =>
+                    (typeof r === 'string' && r === 'stream') ||
+                    (r && r.name === 'stream')
+                );
+            })
+            .map(a => {
+                let host;
+                try { host = new URL(a.baseUrl).hostname; } catch { host = a.baseUrl; }
+                return { name: a.manifest?.name || host, host, status: 'error', kind: a.status };
+            });
+
         if (!addons.length) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: [], ...modalExtra } });
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: [], failedAddons: inferredFailures, ...modalExtra } });
             return;
         }
 
@@ -325,8 +353,15 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         });
 
         await Promise.allSettled(promises);
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: allStreams, ...modalExtra } });
-        window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length });
+        // Carry per-addon statuses into the streams view so the modal can
+        // surface "Torrentio failed" instead of degrading silently to the
+        // generic "no streams" empty-state. Combines fetch-time errors
+        // with addons whose manifest was already unreachable when we
+        // started — both are equally meaningful to the user.
+        const failedFromFetch = addonStatuses.filter(s => s.status === 'error');
+        const failedAddons = [...failedFromFetch, ...inferredFailures];
+        dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: allStreams, addons: [...addonStatuses], failedAddons, ...modalExtra } });
+        window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length, failedAddons: failedAddons.length });
     }, [client]);
 
     const cardClick = useCallback(async (item) => {
@@ -740,18 +775,88 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
         prevCatalogRef.current = null;
         (async () => {
             try {
-                const { catalogs, types } = await loadManifests(client);
+                const { manifests, catalogs, types, addons } = await loadManifests(client);
                 if (!types.length) {
+                    dispatch({ type: 'ADDONS_UPDATED', addons });
                     dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
                     return;
                 }
                 const selectedType = types[0];
                 const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
-                dispatch({ type: 'INIT_SUCCESS', manifests: client.manifests, catalogs, selectedType, selectedCatalog });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
             } catch (e) {
-                dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
+                dispatch({ type: 'INIT_ERROR', message: t('discover.manifestLoadError') });
             }
         })();
+    }, [client]);
+
+    // Re-fetches streams for the currently-open modal. Used by the
+    // "Retry" button in StreamModal when one or more addons failed during
+    // the initial fetch. We refresh manifests first so newly-recovered
+    // addons are picked up; then re-issue loadStreams using the same
+    // identifiers we got from the URL on first load.
+    const retryStreams = useCallback(async () => {
+        const m = stateRef.current?.modal;
+        if (!m) return;
+        try {
+            const { manifests, catalogs, types, addons } = await loadManifests(client);
+            // Update health surfaces; keep current page selection.
+            dispatch({ type: 'ADDONS_UPDATED', addons });
+        } catch { /* ignore — retry can still hit live addons */ }
+
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const season = params.get('season');
+        const episode = params.get('episode');
+        if (!id) return;
+        const streamId = (season != null && episode != null) ? `${id}:${season}:${episode}` : id;
+        const type = m.backToEpisodes?.itemType || m.itemType || stateRef.current?.selectedType;
+        const item = {
+            id: streamId,
+            name: m.title,
+            poster: m.poster,
+            year: m.year,
+            releaseInfo: m.releaseInfo,
+            imdbRating: m.imdbRating,
+            description: m.description,
+        };
+        await loadStreams(type, streamId, item, m.backToEpisodes ? { backToEpisodes: m.backToEpisodes } : {});
+    }, [client]);
+
+    // Lightweight retry triggered from the AddonHealthChip — does NOT drop
+    // the user back into the loading view. Re-fetches manifests, updates
+    // addon health + catalog disabled flags, and (if a previously selected
+    // catalog comes back online) reloads it. Used when one or more addons
+    // were down and the user clicks "Retry" inline.
+    const retryAddons = useCallback(async () => {
+        try {
+            client.manifests = null;
+            const { manifests, catalogs, types, addons } = await loadManifests(client);
+            // Preserve the user's current type/catalog selection if it
+            // still exists in the new catalog list, otherwise fall back
+            // to the first available.
+            const cur = stateRef.current;
+            let selectedType = cur?.selectedType;
+            if (!selectedType || !types.includes(selectedType)) selectedType = types[0] || null;
+            let selectedCatalog = cur?.selectedCatalog;
+            if (selectedCatalog) {
+                const match = catalogs.find(c => c.baseUrl === selectedCatalog.baseUrl && c.id === selectedCatalog.id && c.type === selectedType);
+                selectedCatalog = match || (selectedType ? getCatalogsForType(catalogs, selectedType)[0] || null : null);
+            } else if (selectedType) {
+                selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
+            }
+            if (!types.length) {
+                dispatch({ type: 'ADDONS_UPDATED', addons });
+                dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
+                return;
+            }
+            // Force a fresh catalog load when the previous selection
+            // becomes available again or changes.
+            prevCatalogRef.current = null;
+            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
+        } catch (e) {
+            // Keep the page rendered as-is; chip retains failure state.
+        }
     }, [client]);
 
     // --- Wizard callbacks ---
@@ -804,16 +909,17 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
             prevCatalogRef.current = null;
             dispatch({ type: 'SET_PHASE', phase: 'loading' });
             try {
-                const { manifests, catalogs, types } = await loadManifests(client);
+                const { manifests, catalogs, types, addons } = await loadManifests(client);
                 if (!types.length) {
+                    dispatch({ type: 'ADDONS_UPDATED', addons });
                     dispatch({ type: 'SET_PHASE', phase: 'no-catalogs' });
                     return;
                 }
                 const selectedType = types[0];
                 const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
             } catch (e) {
-                dispatch({ type: 'INIT_ERROR', message: 'Failed to load addon manifests. Please try again.' });
+                dispatch({ type: 'INIT_ERROR', message: t('discover.manifestLoadError') });
             }
         }
     }, [client]);
@@ -1122,6 +1228,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
 
             {/* Sticky tab bar — stays below navbar (72px) on scroll */}
             <div class="sticky top-[72px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 bg-w-bg/90 backdrop-blur-lg border-b border-w-line/30">
+                <AddonHealthChip addons={state.addons} onRetry={retryAddons} />
                 {state.isSearchMode ? (
                     <SearchTabs
                         searchResults={state.searchResults}
@@ -1192,7 +1299,11 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                 <NoResults query={state.searchQuery} />
             )}
 
-            {!state.catalogLoading && !state.searchLoading && !state.isSearchMode && !state.watchlistFilterEnabled && state.items.length === 0 && state.phase === 'ready' && !state.hasMore && (
+            {!state.catalogLoading && !state.searchLoading && !state.isSearchMode && !state.watchlistFilterEnabled && state.items.length === 0 && state.phase === 'ready' && state.selectedCatalog?.disabled && (
+                <CatalogUnavailable catalog={state.selectedCatalog} onRetry={retryAddons} />
+            )}
+
+            {!state.catalogLoading && !state.searchLoading && !state.isSearchMode && !state.watchlistFilterEnabled && state.items.length === 0 && state.phase === 'ready' && !state.hasMore && !state.selectedCatalog?.disabled && (
                 <p class="text-w-muted text-center col-span-full py-8">No items found.</p>
             )}
 
@@ -1233,6 +1344,7 @@ export function DiscoverApp({ addonUrls, hasCustomAddons }) {
                     onSeasonChange={onSeasonChange}
                     hasCustomAddons={hasCustomAddons || addonsInstalled}
                     onSetupAddons={onSetupAddons}
+                    onRetryStreams={retryStreams}
                     userStatuses={state.userStatuses}
                     watchlistIds={state.watchlistIds}
                     onToggleWatched={handleToggleWatched}

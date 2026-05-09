@@ -1,4 +1,4 @@
-import { buildCatalogs, getCatalogsForType, getTypes } from './discoverReducer';
+import { buildCatalogs, buildAddons, getCatalogsForType, getTypes } from './discoverReducer';
 import { langPath, t } from '../i18n';
 
 // Shared button chip class for Tabs (btn-sm) and FilterChips (btn-xs)
@@ -51,13 +51,18 @@ export function restoreModalFromUrl(id, url, openModalById, modalEpisodeRef) {
     }
 }
 
-// Dedup: manifest loading shared between init and retry
+// Dedup: manifest loading shared between init and retry. Returns the full
+// per-addon status list so the UI can show health (chip + disabled
+// catalogs) alongside the catalog list itself.
 export async function loadManifests(client) {
-    const manifests = await client.fetchAllManifests();
-    client.manifests = manifests;
-    const catalogs = buildCatalogs(manifests);
+    const addonStatuses = await client.fetchAllManifests();
+    const catalogs = buildCatalogs(addonStatuses);
     const types = getTypes(catalogs);
-    return { manifests, catalogs, types };
+    const addons = buildAddons(addonStatuses);
+    // manifests kept for backward-compat with anything still reading the
+    // old shape (filtered to entries with a manifest, ignoring health).
+    const manifests = addonStatuses.filter(a => a.manifest).map(a => ({ baseUrl: a.baseUrl, manifest: a.manifest }));
+    return { manifests, catalogs, types, addons };
 }
 
 // Queries the server for the subset of the given IMDB ids that this user has

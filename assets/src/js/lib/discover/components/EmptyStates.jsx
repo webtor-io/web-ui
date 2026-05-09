@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useState, useCallback } from 'preact/hooks';
 import { rebindAsync } from '../../async';
 import { t, tf, langPath } from '../i18n';
 
@@ -58,6 +58,35 @@ export function ErrorState({ message, onRetry }) {
             <p class="text-lg font-semibold text-w-sub mb-2">{t('discover.errorTitle')}</p>
             <p class="text-sm text-w-muted mb-6">{message || t('discover.errorDefault')}</p>
             <button class="btn btn-soft-cyan btn-sm px-5" onClick={onRetry}>{t('discover.retry')}</button>
+        </div>
+    );
+}
+
+// Shown in the catalog grid area when the selected catalog belongs to an
+// addon that is currently unreachable. Distinct from generic "No items
+// found" so users see why nothing loads instead of suspecting Webtor.
+export function CatalogUnavailable({ catalog, onRetry }) {
+    const [retrying, setRetrying] = useState(false);
+    const handleRetry = useCallback(async () => {
+        if (retrying || !onRetry) return;
+        setRetrying(true);
+        try { await onRetry(); } finally { setRetrying(false); }
+    }, [onRetry, retrying]);
+    return (
+        <div class="text-center py-16 max-w-md mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 text-yellow-400/40 mx-auto mb-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+            </svg>
+            <p class="text-lg font-semibold text-w-sub mb-2">{t('discover.catalogTemporarilyUnavailable')}</p>
+            <p class="text-sm text-w-muted mb-4">
+                {catalog?.addonName
+                    ? tf('discover.catalogUnavailableBody', catalog.addonName)
+                    : t('discover.catalogUnavailableBodyGeneric')}
+            </p>
+            <button class="btn btn-soft-cyan btn-sm px-5" onClick={handleRetry} disabled={retrying}>
+                {retrying && <span class="loading loading-spinner loading-xs"></span>}
+                {t('discover.retry')}
+            </button>
         </div>
     );
 }
