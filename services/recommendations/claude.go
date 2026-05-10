@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -87,10 +86,16 @@ func (s *ClaudeService) modelFor(tier Tier) anthropic.Model {
 }
 
 // NewClaudeService wires all collaborators. Returns nil (not an error) when
-// the feature flag is off or the Anthropic API key is missing — handlers
-// treat a nil service as "feature disabled" and hide the UI section.
+// the feature flag is off, the shared client is nil (no API key), or any
+// collaborator is missing — handlers treat a nil service as "feature
+// disabled" and hide the UI section.
+//
+// The *anthropic.Client is constructed by services/anthropic_client and
+// passed in so that the prompt-caching beta header and any future
+// transport-level concerns live in exactly one place across the binary.
 func NewClaudeService(
 	cfg Config,
+	client *anthropic.Client,
 	contextBuilder *UserContextBuilder,
 	resolver *Resolver,
 	quota Quota,
@@ -101,8 +106,8 @@ func NewClaudeService(
 		log.Info("ai_rec: feature flag off — recommendations service not started")
 		return nil
 	}
-	if strings.TrimSpace(cfg.AnthropicAPIKey) == "" {
-		log.Warn("ai_rec: enabled but ANTHROPIC_API_KEY is empty — service disabled")
+	if client == nil {
+		log.Warn("ai_rec: enabled but anthropic client is nil (no API key) — service disabled")
 		return nil
 	}
 	if contextBuilder == nil || resolver == nil || quota == nil || chips == nil {
@@ -110,23 +115,13 @@ func NewClaudeService(
 		return nil
 	}
 
-	// Set the prompt-caching beta header at client level. Caching is GA
-	// for the older Claude families but newer models (e.g. claude-sonnet-4-6)
-	// have been observed to silently ignore cache_control unless this
-	// header is present. The header is harmless on models that don't
-	// require it — it just enables a feature flag the server can opt into.
-	client := anthropic.NewClient(
-		option.WithAPIKey(cfg.AnthropicAPIKey),
-		option.WithHeader("anthropic-beta", "prompt-caching-2024-07-31"),
-	)
-
 	freeModel := cfg.ResolveModel(TierFree)
 	paidModel := cfg.ResolveModel(TierPaid)
 	chipsModel := cfg.ResolveChipsModel()
 
 	s := &ClaudeService{
 		cfg:           cfg,
-		client:        &client,
+		client:        client,
 		freeModel:     anthropic.Model(freeModel),
 		paidModel:     anthropic.Model(paidModel),
 		chipsModel:    anthropic.Model(chipsModel),

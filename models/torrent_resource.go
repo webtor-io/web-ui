@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -69,6 +70,9 @@ func GetResourceByID(ctx context.Context, db *pg.DB, id string) (*TorrentResourc
 	var resource TorrentResource
 	err := db.Model(&resource).Context(ctx).Where("resource_id = ?", id).Limit(1).Select()
 
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

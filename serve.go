@@ -50,6 +50,7 @@ import (
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
+	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	"github.com/webtor-io/web-ui/services/turnstile"
@@ -109,6 +110,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = embed.RegisterFlags(c.Flags)
 	c.Flags = rum.RegisterFlags(c.Flags)
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
+	c.Flags = ac.RegisterFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = configureRecommendations(c.Flags)
 	c.Flags = jj.RegisterFlags(c.Flags)
@@ -267,8 +269,12 @@ func serve(c *cli.Context) error {
 		wau.RegisterHandler(r, tm)
 	}
 
+	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).
+	// Consumed by both AI recommendations and AI enrichment.
+	anthropicCl := ac.New(c)
+
 	// Setting Enricher
-	en := makeEnricher(c, cl, pg, sapi)
+	en := makeEnricher(c, cl, pg, sapi, anthropicCl)
 
 	// Setting UserSubtitle service. Returns nil when the deployment is not
 	// configured with USER_SUBTITLE_S3_BUCKET; jobs and handlers then treat
@@ -376,7 +382,7 @@ func serve(c *cli.Context) error {
 	// registration entirely — the routes simply don't exist and gin
 	// returns its default 404, which the Discover frontend reads as
 	// "feature disabled" and hides the section.
-	recSvc := rec.New(c, pg, redis, en, en)
+	recSvc := rec.New(c, anthropicCl, pg, redis, en, en)
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}

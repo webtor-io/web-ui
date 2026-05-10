@@ -22,6 +22,7 @@ type Enricher struct {
 	api            *api.Api
 	mappers        []MetadataMapper
 	episodeMappers []EpisodeMapper
+	aiResolver     *AIResolver
 }
 
 type MetadataMapper interface {
@@ -115,12 +116,13 @@ func (s *Enricher) Localize(ctx context.Context, md *models.VideoMetadata, lang 
 	}
 }
 
-func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper) *Enricher {
+func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper, aiResolver *AIResolver) *Enricher {
 	return &Enricher{
 		pg:             pg,
 		api:            api,
 		mappers:        mappers,
 		episodeMappers: episodeMappers,
+		aiResolver:     aiResolver,
 	}
 }
 
@@ -248,7 +250,11 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	}
 
 	for _, m := range movies {
-		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force, hintVideoID)
+		moviePath := ""
+		if m.Path != nil {
+			moviePath = *m.Path
+		}
+		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force, hintVideoID, moviePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for movie %+v hash %s", m, hash)
 		}
@@ -275,7 +281,11 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	for _, ser := range seriesSlice {
 		var md *models.VideoMetadata
 		if mt != models.MediaInfoMediaTypeSeriesCompilation && mt != models.MediaInfoMediaTypeSeriesSplitScenes {
-			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID)
+			seriesPath, perr := models.GetFirstEpisodePathForSeries(ctx, db, ser.SeriesID)
+			if perr != nil {
+				log.WithError(perr).Warnf("failed to load representative episode path for series %v", ser.SeriesID)
+			}
+			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID, seriesPath)
 		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for hash %s", hash)
@@ -342,12 +352,15 @@ func (s *Enricher) LookupByVideoID(ctx context.Context, videoID string, ct model
 // AI recommendations, manual search). Individual mappers may still cache
 // results in their own tables, which later benefits regular torrent
 // enrichment.
+//
+// AI fallback is NOT triggered here: this path is for non-torrent
+// identifiers and has no filename to feed Claude.
 func (s *Enricher) LookupByTitleYear(ctx context.Context, title string, year *int16, ct models.ContentType) (*models.VideoMetadata, error) {
 	vc := &models.VideoContent{
 		Title: title,
 		Year:  year,
 	}
-	return s.mapMetadata(ctx, vc, ct, false, "")
+	return s.mapMetadata(ctx, vc, ct, false, "", "")
 }
 
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
@@ -466,45 +479,135 @@ func (s *Enricher) mapEpisodeMetadata(ctx context.Context, videoID string, seaso
 	return nil, nil
 }
 
-func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, hintVideoID string) (md *models.VideoMetadata, err error) {
+// mapMetadata resolves metadata for a (title, year) pair through the
+// configured providers in priority order, with two fallback paths.
+//
+// pathHint is the original torrent filename / folder path. When non-empty
+// AND every provider misses, we hand it to the AI resolver — Claude
+// normalizes transliterated / mangled release names into candidate
+// (title, year) tuples that the same mappers can then resolve. The
+// visible metadata still comes from a real provider; Claude only
+// supplies search keys.
+func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, hintVideoID string, pathHint string) (*models.VideoMetadata, error) {
 	if hintVideoID != "" {
-		for _, m := range s.mappers {
-			if dm, ok := m.(DirectMapper); ok {
-				md, err = dm.MapByID(ctx, hintVideoID, t, f)
-				if err != nil {
-					log.WithError(err).Warnf("direct mapper %q failed for hint %v", m.GetName(), hintVideoID)
-					continue
-				}
-				if md != nil {
-					log.Infof("direct mapper %q resolved hint %v", m.GetName(), hintVideoID)
-					return
-				}
-			}
+		if md := s.lookupByHint(ctx, hintVideoID, t, f); md != nil {
+			return md, nil
 		}
-		log.Infof("no mapper handled hint %v, falling back to title+year", hintVideoID)
 	}
-	for i, m := range s.mappers {
-		md, err = m.Map(ctx, vc, t, f)
+	md, firstErr := s.searchAllMappers(ctx, vc, t, f)
+	if md != nil {
+		return md, nil
+	}
+	if s.aiResolver != nil && pathHint != "" {
+		if aiMD := s.tryAIFallback(ctx, vc, t, f, pathHint); aiMD != nil {
+			return aiMD, nil
+		}
+	}
+	// Nothing resolved. If at least one mapper cleanly missed (no errors
+	// anywhere), this is a real "no metadata" outcome — return nil and
+	// let the caller mark the resource Done/NoMedia. Otherwise surface
+	// the original error so the resource lands in Status=Error and
+	// `enrich --force-error` can retry it once the upstream API recovers.
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, nil
+}
+
+// lookupByHint walks every DirectMapper for an externally-provided
+// videoID hint (e.g. an imdbId carried over from AI Discover). Returns
+// the first non-nil match or nil when no mapper recognizes the id.
+func (s *Enricher) lookupByHint(ctx context.Context, hintVideoID string, t models.ContentType, f bool) *models.VideoMetadata {
+	for _, m := range s.mappers {
+		dm, ok := m.(DirectMapper)
+		if !ok {
+			continue
+		}
+		md, err := dm.MapByID(ctx, hintVideoID, t, f)
 		if err != nil {
-			return nil, errors.Wrapf(err, "got \"%v\" mapper error", m.GetName())
+			log.WithError(err).Warnf("direct mapper %q failed for hint %v", m.GetName(), hintVideoID)
+			continue
 		}
 		if md != nil {
-			// Try to upgrade through higher-priority mappers using the
-			// videoID just resolved. The most common payoff is the
-			// Kinopoisk-only-resolvable Russian-titled torrents whose
-			// canonical imdbId TMDB knows by external_id even when its
-			// Search-by-title misses (Russian title, weird codec tags
-			// etc.). KPU (lowest priority) advertises its claimed imdbId
-			// as the videoID exactly so this loop can run; if the imdbId
-			// is bogus, MapByID type-filtering at TMDB and OMDB rejects
-			// it and we keep the lower-priority result intact.
-			if upgraded := s.tryUpgrade(ctx, md, t, i); upgraded != nil {
-				return upgraded, nil
-			}
-			return
+			log.Infof("direct mapper %q resolved hint %v", m.GetName(), hintVideoID)
+			return md
 		}
 	}
-	return
+	log.Infof("no mapper handled hint %v, falling back to title+year", hintVideoID)
+	return nil
+}
+
+// searchAllMappers walks every Map mapper for the given VideoContent.
+// On the first hit it runs tryUpgrade and returns the (possibly
+// upgraded) metadata with a nil error. On all-miss returns (nil, err)
+// where err is the first mapper error encountered, or nil if every
+// mapper cleanly missed.
+//
+// Per-mapper errors are absorbed instead of aborting the chain — a
+// single transient failure on a higher-priority mapper (classic case:
+// free OMDB key hitting its 1000/day rate limit) would otherwise mask
+// every later mapper AND the AI fallback. The first error is surfaced
+// only when every path ultimately fails so retry semantics
+// (`enrich --force-error`) stay intact.
+func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool) (*models.VideoMetadata, error) {
+	var firstErr error
+	for i, m := range s.mappers {
+		md, err := m.Map(ctx, vc, t, f)
+		if err != nil {
+			log.WithError(err).WithField("mapper", m.GetName()).Warn("mapper failed, continuing to next")
+			if firstErr == nil {
+				firstErr = errors.Wrapf(err, "got \"%v\" mapper error", m.GetName())
+			}
+			continue
+		}
+		if md == nil {
+			continue
+		}
+		// Try to upgrade through higher-priority mappers using the
+		// videoID just resolved. The most common payoff is the
+		// Kinopoisk-only-resolvable Russian-titled torrents whose
+		// canonical imdbId TMDB knows by external_id even when its
+		// Search-by-title misses. KPU (lowest priority) advertises its
+		// claimed imdbId as the videoID exactly so this loop can run;
+		// if the imdbId is bogus, MapByID type-filtering at TMDB and
+		// OMDB rejects it and we keep the lower-priority result intact.
+		if upgraded := s.tryUpgrade(ctx, md, t, i); upgraded != nil {
+			return upgraded, nil
+		}
+		return md, nil
+	}
+	return nil, firstErr
+}
+
+// tryAIFallback asks Claude for candidate (title, year) tuples and runs
+// each through the same mapper chain as the original parsed title.
+// Returns the resolved metadata on the first hit, or nil when no
+// candidate produces a match. AI errors are best-effort and swallowed
+// inside the resolver.
+//
+// No caching layer — the per-mapper TMDB.query / KPU.query caches
+// already absorb repeat searches across resources, and an AI-side
+// cache would either survive `--force` (breaking the "user wants
+// Claude to retry" semantic) or duplicate the existing
+// media_info-status gate. See docs/ai_enrichment.md for the rationale.
+func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string) *models.VideoMetadata {
+	candidates := s.aiResolver.SuggestCandidates(ctx, pathHint, vc.Title, vc.Year, t)
+	for _, cand := range candidates {
+		candVC := &models.VideoContent{
+			ResourceID: vc.ResourceID,
+			Title:      cand.Title,
+			Year:       cand.Year,
+		}
+		md, _ := s.searchAllMappers(ctx, candVC, t, f)
+		if md != nil {
+			log.WithFields(log.Fields{
+				"candidate":   cand.Title,
+				"resolved_id": md.VideoID,
+			}).Info("ai_enrich: candidate resolved")
+			return md
+		}
+	}
+	return nil
 }
 
 // tryUpgrade walks the mappers ABOVE `current` (more authoritative ones)

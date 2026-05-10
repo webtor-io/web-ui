@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/services/api"
@@ -17,6 +18,7 @@ func configureEnricher(f []cli.Flag) []cli.Flag {
 	f = tmdb.RegisterFlags(f)
 	f = omdb.RegisterFlags(f)
 	f = ku.RegisterFlags(f)
+	f = enr.RegisterFlags(f)
 	return f
 }
 
@@ -24,7 +26,7 @@ func configureRecommendations(f []cli.Flag) []cli.Flag {
 	return rec.RegisterFlags(f)
 }
 
-func makeEnricher(c *cli.Context, cl *http.Client, pg *cs.PG, sapi *api.Api) *enr.Enricher {
+func makeEnricher(c *cli.Context, cl *http.Client, pg *cs.PG, sapi *api.Api, anthropicCl *anthropic.Client) *enr.Enricher {
 	var mdMappers []enr.MetadataMapper
 	var epMappers []enr.EpisodeMapper
 
@@ -61,6 +63,12 @@ func makeEnricher(c *cli.Context, cl *http.Client, pg *cs.PG, sapi *api.Api) *en
 		mdMappers = append(mdMappers, kpu)
 	}
 
+	// Setting AI Resolver — last-resort identifier when every title-search
+	// provider misses. Returns nil when the feature flag is off or the
+	// shared anthropic client is missing; the Enricher then skips the AI
+	// fallback path entirely.
+	aiResolver := enr.New(c, anthropicCl, pg)
+
 	// Setting Enricher
-	return enr.NewEnricher(pg, sapi, mdMappers, epMappers)
+	return enr.NewEnricher(pg, sapi, mdMappers, epMappers, aiResolver)
 }

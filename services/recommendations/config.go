@@ -2,13 +2,13 @@ package recommendations
 
 import (
 	"github.com/urfave/cli"
+	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 )
 
 // CLI flag names. Kept as exported constants so that tests and handlers can
 // look them up via `c.Bool(FlagEnabled)` etc without stringly-typed typos.
 const (
-	FlagEnabled         = "ai-recommendations-enabled"
-	FlagAnthropicAPIKey = "anthropic-api-key"
+	FlagEnabled = "ai-recommendations-enabled"
 	// FlagModel is the legacy single-model knob. If set, both tiers use it
 	// unless overridden by the tier-specific flags below. Kept for backwards
 	// compatibility with the original Config.
@@ -62,11 +62,6 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   FlagEnabled,
 			Usage:  "enable AI recommendations feature in Discover",
 			EnvVar: "AI_RECOMMENDATIONS_ENABLED",
-		},
-		cli.StringFlag{
-			Name:   FlagAnthropicAPIKey,
-			Usage:  "Anthropic API key (required when AI recommendations are enabled)",
-			EnvVar: "ANTHROPIC_API_KEY",
 		},
 		cli.StringFlag{
 			Name:   FlagModel,
@@ -150,7 +145,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 func ConfigFromCLI(c *cli.Context) Config {
 	return Config{
 		Enabled:         c.Bool(FlagEnabled),
-		AnthropicAPIKey: c.String(FlagAnthropicAPIKey),
+		AnthropicAPIKey: c.String(ac.FlagAnthropicAPIKey),
 		Model:           c.String(FlagModel),
 		FreeModel:       c.String(FlagFreeModel),
 		PaidModel:       c.String(FlagPaidModel),

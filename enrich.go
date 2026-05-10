@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	"github.com/webtor-io/web-ui/services/api"
 )
 
@@ -44,6 +45,7 @@ func configureEnrich(c *cli.Command) {
 	)
 	runCmd.Flags = cs.RegisterPGFlags(runCmd.Flags)
 	runCmd.Flags = api.RegisterFlags(runCmd.Flags)
+	runCmd.Flags = ac.RegisterFlags(runCmd.Flags)
 	runCmd.Flags = configureEnricher(runCmd.Flags)
 
 	popularCmd := cli.Command{
@@ -52,6 +54,7 @@ func configureEnrich(c *cli.Command) {
 		Action: enrichPopular,
 	}
 	popularCmd.Flags = cs.RegisterPGFlags(popularCmd.Flags)
+	popularCmd.Flags = ac.RegisterFlags(popularCmd.Flags)
 	popularCmd.Flags = configureEnricher(popularCmd.Flags)
 	popularCmd.Flags = append(popularCmd.Flags,
 		cli.StringFlag{
@@ -91,8 +94,10 @@ func enrichPopular(c *cli.Context) error {
 	cl := http.DefaultClient
 	// api.Api is not needed for popular — only the enricher's metadata
 	// mappers, which are wired through makeEnricher. We pass a nil api
-	// since popular flow never hits the REST API.
-	en := makeEnricher(c, cl, pg, nil)
+	// since popular flow never hits the REST API. The AI resolver also
+	// stays disabled here: popular cron deals with already-known TMDB
+	// ids by definition.
+	en := makeEnricher(c, cl, pg, nil, ac.New(c))
 
 	log.WithFields(log.Fields{
 		"release_date_gte": releaseDateGte,
@@ -137,8 +142,8 @@ func enrich(c *cli.Context) error {
 	// Setting Webtor API
 	sapi := api.New(c, cl)
 
-	// Setting Enricher
-	en := makeEnricher(c, cl, pg, sapi)
+	// Setting Enricher (with optional AI fallback wired from --ai-enrich-* flags)
+	en := makeEnricher(c, cl, pg, sapi, ac.New(c))
 
 	var resources []*models.TorrentResource
 	ctx := context.Background()
@@ -146,9 +151,16 @@ func enrich(c *cli.Context) error {
 		r, err := models.GetResourceByID(ctx, db, id)
 		if err != nil {
 			return err
-		} else {
-			resources = append(resources, r)
 		}
+		// torrent_resource is only populated when a resource lands in
+		// Library; resources that were only streamed have no row.
+		// Enrichment itself only needs the hash, so synthesize a
+		// minimal TorrentResource and continue.
+		if r == nil {
+			log.WithField("id", id).Info("no torrent_resource row, enriching by hash directly")
+			r = &models.TorrentResource{ResourceID: id}
+		}
+		resources = append(resources, r)
 	} else {
 		if forceError {
 			resources, err = models.GetErrorResources(ctx, db)

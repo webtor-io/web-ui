@@ -1,6 +1,7 @@
 package recommendations
 
 import (
+	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 )
@@ -16,10 +17,12 @@ const resolverConcurrency = 10
 // a *cli.Context. It is the single entry point used by serve.go; tests
 // should call NewClaudeService directly with mocks for each collaborator.
 //
-// Returns interface-nil when the feature flag is off or
-// ANTHROPIC_API_KEY is empty — call sites should treat a nil Service as
-// "feature disabled" and skip handler registration entirely.
-func New(c *cli.Context, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup, localizer ContentLocalizer) Service {
+// Returns interface-nil when the feature flag is off or the shared
+// anthropic client is nil (API key missing) — call sites should treat a
+// nil Service as "feature disabled" and skip handler registration
+// entirely. The shared *anthropic.Client is built by anthropic_client.New
+// and passed in so the prompt-caching beta header lives in one place.
+func New(c *cli.Context, client *anthropic.Client, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup, localizer ContentLocalizer) Service {
 	cfg := ConfigFromCLI(c)
 
 	historyLoader := NewDBUserHistoryLoader(pg)
@@ -29,7 +32,7 @@ func New(c *cli.Context, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup
 	chipsCache := NewRedisChipsCache(redis.Get())
 	freshReleases := NewDBFreshReleasesLoader(pg, int16(cfg.FreshReleasesMinYear), cfg.FreshReleasesLimit, cfg.FreshReleasesCacheTTL)
 
-	svc := NewClaudeService(cfg, contextBuilder, resolver, quota, chipsCache, freshReleases)
+	svc := NewClaudeService(cfg, client, contextBuilder, resolver, quota, chipsCache, freshReleases)
 	if svc == nil {
 		// Explicit interface-nil so callers can do `if svc != nil`.
 		// Without this, returning a typed (*ClaudeService)(nil) would
