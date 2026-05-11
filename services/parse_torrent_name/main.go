@@ -118,7 +118,40 @@ var fieldParsers = FieldParsers{
 	// are no real shows with 1000+ episodes packaged into a single torrent.
 	// Without the cap, "- 1997" / "- 1046" / "- 1080p" off a movie filename
 	// would write into Episode and flip the whole torrent into series.
-	{FieldTypeEpisode, NewRegexpMatcher(`(-\s+([0-9]{1,3})(?:[^0-9]|$))`, `(?i)([ex]([0-9]{2})(?:[^0-9]|$))`), nil},
+	//
+	// Third alternative covers the Russian SATRip/dotted-format convention:
+	// "ShowName.NN.YYYY.Quality.ext" (e.g. "Svati-2.01.2015.SATRip.avi") —
+	// a 20-file release pack that without this pattern produced 20 distinct
+	// movies with no episode, falling into MovieMultiple and firing one AI
+	// call per file. Two-digit minimum prevents "Saw.7.2010" / "Rocky.4.1985"
+	// movie-sequel filenames from false-matching (single-digit sequels are
+	// not zero-padded; episode numbers conventionally are).
+	//
+	// Pattern 2 stays a strict `[ex]NN` form so codec/group letters
+	// trailed by digits (e.g. "hegre 23" — `e` + space + 23) don't
+	// false-fire. The verbose `epNN` / `Episode NN` / `ep 07` anime
+	// conventions get their own alternative (pattern 5) below where the
+	// longer-prefix anchor (`ep` / `episode`) provides enough context
+	// to allow an optional separator. Digit count widened to 2-3 so
+	// long anime runs ("ep123") parse.
+	//
+	// Fourth alternative is the "<NN> - <Title>" form: the episode number
+	// precedes the dash with the episode title trailing
+	// ("Onigashima 20 - Straw Hat Luffy", "Anna Karenina 02 - Серия").
+	// Allows both space- and dot-separated filenames; requires a Unicode
+	// letter (\p{L}) after the dash so any digit-NN-dash-NN combos (e.g.
+	// "11.10.WS") can't false-fire.
+	{FieldTypeEpisode, NewRegexpMatcher(
+		`(-\s+([0-9]{1,3})(?:[^0-9]|$))`,
+		`(?i)([ex]([0-9]{2,3})(?:[^0-9]|$))`,
+		`(\.([0-9]{2,3})\.(?:19|20)[0-9]{2}\b)`,
+		// Order matters: the `ep`/`episode` arm runs BEFORE the generic
+		// "NN-dash-Letter" arm so a release like "ep 07 - Escape from
+		// Side 1" consumes the full "ep 07 " span (leaving title clean)
+		// instead of bottom-up "07 - E" leaving "ep" attached to title.
+		`(?i)((?:episode|ep)[\s.]?([0-9]{2,3})(?:[^0-9]|$))`,
+		`(\b([0-9]{2,3})[\s.]+-[\s.]+\p{L})`,
+	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
 	{FieldTypeSBS, NewRegexpMatcher(`(?i)\b(((?:Half-)?SBS))\b`), nil},

@@ -210,6 +210,39 @@ var testData = []string{
 	"Shingeki no Kyojin S3 Pt. 1",
 	// Bare season tag on a single-file release.
 	"Doctor.Who.S08.E01.Deep.Breath.WEB-DL.1080p.mkv",
+
+	// ----- Russian SATRip dotted format: "ShowName.NN.YYYY.Quality.ext".
+	// Real torrent 5a0bfae401 — pack of 20 episodes of "Сваты-2".
+	// Without the .NN.YYYY episode pattern, all 20 files became distinct
+	// movies in MovieMultiple, firing 20 AI calls. With it, the pack
+	// resolves as SeriesSingleSeason (sameTitle + hasEpisodes).
+	"Svati-2.05.2015.SATRip.avi",
+	"Svati-2.20.2015.SATRip.avi",
+	// Movie sequel negative: "Saw.7.2010" must NOT match the dotted
+	// episode pattern. Single-digit sequel numbers are not zero-padded,
+	// so the 2-digit minimum keeps these clean.
+	"Saw.7.2010.BRRip.x264-YIFY.mkv",
+
+	// ----- Episode-number-before-dash form: "<Show> <NN> - <Episode>".
+	// Real torrent 4d04775f — One Piece "Onigashima Paced" cut where the
+	// parser previously couldn't extract episode (no leading dash, no
+	// [ex]NN, no .NN.YYYY) and 30+ files all got distinct titles, hitting
+	// MovieMultiple + N AI calls.
+	"[1000] Onigashima 20 - Straw Hat Luffy.mp4",
+	"[1009-1010] Onigashima 26 - Conqueror's Haki.mp4",
+	// Dotted-separator variant of the same shape.
+	"Anna.Karenina.02.-.Seriya.mkv",
+
+	// ----- "ep<NN>" / "ep <NN>" anime convention. Real Zeta Gundam pack
+	// names: parser previously couldn't extract these because pattern 2
+	// required `e` or `x` directly followed by digits.
+	"Zeta Gundam - ep46 - Scirocco Rises.mkv",
+	"Zeta Gundam - ep 07 - Escape from Side 1.mkv",
+	"Zeta.Gundam.-.ep.03.-.Inside.the.Capsule.mkv",
+	"Show.Episode.05.Title.mkv",
+	// Negative: "Episode" word in a movie title must NOT trip the pattern
+	// when no digits follow.
+	"Star.Wars.Episode.IV.A.New.Hope.1977.mkv",
 }
 
 func TestParser(t *testing.T) {
