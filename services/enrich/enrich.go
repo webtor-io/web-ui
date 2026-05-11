@@ -171,6 +171,45 @@ func parseItem(item *ra.ListItem) (ti *ptn.TorrentInfo, err error) {
 	return ti, nil
 }
 
+// torrentRoot returns the first non-empty segment of a torrent file
+// path — typically the torrent's root folder name. Used when feeding
+// a series path to the AI enrichment fallback: a per-episode filename
+// like "01 - first joke.mkv" carries no series title, whereas the
+// parent folder ("Stand.Up.S13.Complete") usually does. Returns the
+// path unchanged when there is no separator.
+func torrentRoot(path string) string {
+	for _, part := range strings.Split(path, "/") {
+		if part != "" {
+			return part
+		}
+	}
+	return path
+}
+
+// isAdultPath runs the torrent-name parser over each path segment and
+// returns true as soon as any segment flags adult content. Each level
+// is parsed independently so a clean episode filename under a studio
+// folder (e.g. "Blacked/lana.mp4" or "JAV_uncensored/abp-123.mp4")
+// still trips on the folder. Returns false on an empty path.
+func isAdultPath(pathStr string) bool {
+	if pathStr == "" {
+		return false
+	}
+	for _, part := range strings.Split(pathStr, "/") {
+		if part == "" {
+			continue
+		}
+		ti, err := ptn.Parse(&ptn.TorrentInfo{}, part)
+		if err != nil {
+			continue
+		}
+		if ti.Porn {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool, hintVideoID string) (*models.MediaInfoMediaType, error) {
 
 	items, err := s.retrieveTorrentItems(ctx, hash, claims)
@@ -285,6 +324,13 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 			if perr != nil {
 				log.WithError(perr).Warnf("failed to load representative episode path for series %v", ser.SeriesID)
 			}
+			// Feed AI fallback the torrent ROOT folder, not the first
+			// episode filename. A series packaged as
+			// "Stand.Up.S13.Complete/01 - haunt in inn.mkv" gives Claude
+			// nothing usable from "01 - haunt in inn" but everything it
+			// needs from "Stand.Up.S13.Complete". Top-level torrents
+			// (single-file series, unusual) keep the full path as-is.
+			seriesPath = torrentRoot(seriesPath)
 			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID, seriesPath)
 		}
 		if err != nil {
@@ -591,6 +637,15 @@ func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent
 // Claude to retry" semantic) or duplicate the existing
 // media_info-status gate. See docs/ai_enrichment.md for the rationale.
 func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string) *models.VideoMetadata {
+	// Skip Claude entirely for paths flagged as adult by the torrent-name
+	// parser (studio names, JAV codes, explicit keywords). Adult content
+	// is not resolvable through TMDB/OMDB/KPU and was filling the
+	// ai_enrich.query negative cache with ~30-40% pure waste — see
+	// docs/ai_enrichment.md.
+	if isAdultPath(pathHint) {
+		log.WithField("path", pathHint).Info("ai_enrich: skipping adult path")
+		return nil
+	}
 	candidates := s.aiResolver.SuggestCandidates(ctx, pathHint, vc.Title, vc.Year, t, f)
 	for _, cand := range candidates {
 		candVC := &models.VideoContent{

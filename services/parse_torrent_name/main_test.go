@@ -122,6 +122,79 @@ var testData = []string{
 	// fix elsewhere ensures sameTitle=false packs don't get treated as
 	// SeriesSingleSeason.
 	"Le Hobbit - 1 - Un Voyage Inattendu - 1080p.mkv",
+
+	// ----- Adult content detection (Porn=true). Names below are
+	// representative samples from production ai_enrich.query negative
+	// cache. The downstream AI enrichment fallback should skip these.
+	// Studio names: Blacked, Brazzers, Mylf/Milfy, OnlyFans, Manyvids,
+	// Hegre, Wowgirls, Spankmonster, Momswapped, Maturenl, Mofos,
+	// Voyeur-russian, Stickam, Latinpapixxl, hgshequ (Chinese BBS),
+	// hhd800 (Chinese pirate site).
+	"Blacked.18.03.21.Lana.Rhoades.1080p.mp4",
+	"Brazzers - Wife and Stepdaughter Want Delivery Guy's Package",
+	"Milfy 24 01 24 Richelle Ryan Curvy Fit Mom",
+	"OnlyFans - Jolla and Keiran Lee",
+	"manyvids - latina gets pounded and turns into a super squirter",
+	"hegre 23 08 22 allie asia juicy orgasms",
+	"wowgirls 20 07 08 hayli sanders and anna di fuck us",
+	"spankmonster - milf explosion",
+	"momswapped - tending to our stepmoms garden",
+	"voyeur-russian nudism 130930",
+	"stickam brimarr18 nude",
+	"latinpapixxl latinpapixxl nude leaked onlyfans video coomeri50",
+	"hgshequ cc@（@pdd68868）yinxiangzupaisheying",
+	"hhd800 com@113024-001-carib",
+	// Explicit English keywords without a studio name. Should still flag.
+	"art of zoo - vixen ladys dog story creampie",
+	"My Stepbrother And I Threesome Compilation",
+	"Random.Title.Gangbang.Bukkake.2024.mp4",
+	// "OnlyFans" abbreviated as "of -" at the start of the title.
+	"of – jordan starr feeds john bronco his thick juicy cock",
+	// BBC = "Big Black Cock" — must fire only when paired with an
+	// adult anchor (cock/fuck/addict/etc.). "BBC News" must NOT flag.
+	"tonyropeuk bbc addict british kerry louise",
+	"Wifey - Kitana Collins - Hotwife Worships BBC for Husband",
+	// JAV studio prefix + numeric code, both with and without separator.
+	"IPVR-00265-1",
+	"ABP-123 Uncensored",
+	"[FC2PPV-1311003] Uncensored Leak",
+	// Russian explicit. Cyrillic prefix guard must prevent "страх",
+	// "требует", etc. from matching.
+	"Трахаю мою сводную сестру пока мои родители в следующей комнате",
+	"студентку жестко трахают и заполняют ее киску спермой с кримпаем",
+	"06  партизаны 2026", // RU but NOT adult — guard regex
+	// Chinese adult markers: 无码 (uncensored), 流出 (leaked), 内射, 探花.
+	"乃々果花-无码流出fc2ppv-1202781",
+	"极品女友【依云】冲刺内射极品名器馒头美穴",
+	// ----- Negative cases — these must NOT be flagged as porn:
+	// "Sex and the City" — plain "sex" doesn't trigger.
+	"Sex and the City S01E01 720p HDTV x264",
+	// "BBC News" — BBC without an adult anchor must not flag.
+	"BBC News Special 2024",
+	// "Naughty Dog" — game studio with "naughty" prefix.
+	"Naughty Dog Studios Documentary 2023",
+	// "Analyze This" — "anal" must not false-match "analyze".
+	"Analyze This 1999 720p BrRip x264",
+	// "Stand Up S13" — Russian-popular comedy show, parser sometimes
+	// produces "06 партизаны" parsed_title; the show itself is clean.
+	"Stand Up S13E06 WEB-DL 1080p",
+	// Cyrillic word containing "трах" as substring inside a longer word
+	// (страхование, страх) — must NOT match the adult regex.
+	"Страхование жизни 2020 документальный фильм",
+
+	// ----- Second-pass adult patterns: studios that slipped past the
+	// first pass + bestiality + bate-date cam convention.
+	"julesjordan 18 02 04 whitney wright",
+	"nubilesporn - less hiding and more riding for my swap family",
+	"exploitedcollegegirls addyson 19",
+	"milflicious - slutty housewife creampie",
+	"3 girl and dog sex in brazil getting so wet",
+	"art of zoo dog fuck and semen collect",
+	"alinajellybeana bate 090607 stickam",
+	"brookenashh-bate-091108",
+	// Negative for bate: "Bates Motel" (real series) must NOT match
+	// the bate pattern because it lacks the trailing timestamp.
+	"Bates.Motel.S01E01.HDTV.x264-LOL",
 }
 
 func TestParser(t *testing.T) {

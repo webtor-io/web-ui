@@ -450,12 +450,15 @@ For foreign-language works also suggest the canonical English title TMDB indexes
 
 Year: if the parsed year looks like a re-release / re-encode year rather than production year, prefer year=null over a wrong number.
 
+Parsed-title quality: when "Parsed title" looks like a bare episode index ("01", "01 - haunt in inn", "06  партизаны", numbered course module like "3  the basics"), the parser scraped a per-file filename instead of the series/movie name. Ignore the parsed title and derive candidates from "Torrent path" — typically the parent folder ("Stand.Up.S13.Complete", "Wot eto drama 2026 WEB-DLRip"). Return [] when neither source carries a real title.
+
 Hard rules:
 - Do NOT echo the parsed title back. The pipeline already searched it.
 - Title field is title only — no codec/quality/group/year/language tags.
 - Empty candidates array is a valid answer ("nothing useful to add"). Don't invent candidates to fill slots.
 - Do not hallucinate. "Vot eto drama" → "Вот это драма" is a structural reverse-translit (safe). Inventing an English subtitle the film does not have is NOT (unsafe).
 - language is a 2-letter ISO 639-1 hint, optional.
+- Adult content is OUT OF SCOPE. If the torrent path or parsed title indicates porn, JAV, cam, or other adult material — porn studio names (Brazzers, Blacked, MyLF/Milfy, OnlyFans, Manyvids, Hegre, Stickam, Naughty America, WowGirls, etc.), JAV studio codes (ABP-123, FC2-PPV-1234567, IPVR-00265, SSIS-xxx), explicit keywords (porn, hentai, gangbang, blowjob, stepmom/stepsis, creampie, hotwife, BBC + cock/fuck/treat), Chinese uncensored markers (无码, 流出, 探花, 内射), or Russian explicit verbs (трахн-, ебл-, инцест, шлюх-) — return an empty candidates array. The pipeline does not enrich adult content. Do not attempt to identify or normalize it.
 
 Examples:
   parsed "Vot eto drama" 2026 movie  →  [{"title":"Вот это драма","year":2026,"language":"ru"},{"title":"The Drama","year":2026,"language":"en"}]

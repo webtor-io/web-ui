@@ -13,7 +13,58 @@ var fieldParsers = FieldParsers{
 	{FieldTypeAVC, NewRegexpMatcher(`(?i)\b((AVC))\b`), nil},
 	{FieldTypeDubbing, NewRegexpMatcher(`(?i)\b(([ADM]?VO|DUB))\b`), nil},
 	{FieldTypeSplitScenes, NewRegexpMatcher(`(?i)\b((SPLIT.?SCENES))\b`), nil},
-	{FieldTypePorn, NewRegexpMatcher(`(?i)\b((X{3}))\b`), nil},
+	// FieldTypePorn — adult/erotic content marker. Used downstream to
+	// skip Claude-backed enrichment for the ~30-40% of negative-cache
+	// traffic that is porn/JAV/cam content (see ai_enrich.query telemetry
+	// 2026-05-11). Each pattern is a separate regex so the matcher's
+	// "first hit wins" semantic still works; only the bool flag matters
+	// — the captured content itself is discarded.
+	//
+	// Cyrillic and CJK patterns use a non-capturing `(?:^|[^...])` prefix
+	// guard instead of `\b` because Go's RE2 `\b` only recognizes ASCII
+	// word characters. Without the guard, `трах[...]` would false-match
+	// "страх" (fear) and similar.
+	{FieldTypePorn, NewRegexpMatcher(
+		// Explicit XXX scene tag. Kept first for backwards compatibility
+		// — existing golden_file_083 expects this exact match.
+		`(?i)\b((X{3}))\b`,
+		// English single-occurrence keywords. All of these are
+		// effectively never found in non-adult release names.
+		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty))\b`,
+		// Adult studios / sites (case-insensitive). Curated from
+		// ai_enrich.query — every name here was observed dominating
+		// the negative cache (milfy alone: 106 rows).
+		`(?i)\b((blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com))\b`,
+		// Bestiality phrases — explicit "dog/zoo/horse + sex/fuck/porn"
+		// and the "art of zoo" series of bestiality torrents.
+		`(?i)\b((art\s+of\s+zoo|(?:dog|zoo|horse|animal)\s+(?:sex|fuck|porn|cum)))\b`,
+		// "bate" cam-girl convention: handle + "bate" + 6+ digit
+		// timestamp ("alinajellybeana bate 090607 stickam"). Plain
+		// "bate" alone would clash with "Bates Motel" etc., so require
+		// the trailing date.
+		`(?i)((bate)[\s\-_]\d{6,})`,
+		// "of - " / "of – " — OnlyFans abbreviation at the start of a
+		// title. Standalone "of" is too common to match unanchored.
+		`(?i)^((of\s*[\-–]\s))`,
+		// BBC ("Big Black Cock") paired with an adult anchor word.
+		// Excludes "BBC News", "BBC Earth", etc. — those have neither
+		// these verbs nor matching nouns.
+		`(?i)\b((bbc))\s+(?:cock|fuck|treat|surprise|crave|hungry|addict|obsess|loves?|monster|stretch|hung|breed|breeding|destroy|destroys|stretching|inches|fan|goddess|hotwife|wife|stud|stallion)`,
+		// JAV studio code prefix + numeric serial. Prefix list pruned
+		// to combinations unlikely to collide with English words / years
+		// (so no bare "sw", "jul", "mum", "stars").
+		`(?i)\b((abp|abw|adn|atid|cawd|dasd|ebod|hbad|hmn|hnd|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|sone|ssis|ssni|venu|venx|wanz)[\-_]?\d{2,5})\b`,
+		// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
+		// match the lowercase alternation. Non-Cyrillic prefix guard
+		// prevents false matches like "страх" (fear) → "трах".
+		`(?i)((?:^|[^а-яА-Я])(трах[аеёиоунюя]|еб[аеёилоутю]|инцест|шлюх|минет|дрочи|кримпай|пизд|сперм|порно))`,
+		// Chinese adult markers — uncensored / leaked / explicit body
+		// terms / adult-BBS shorthand. No CJK prefix guard: these tokens
+		// don't appear inside other common Chinese words, and Chinese
+		// titles concatenate ideographs (so "[^CJK]" would block real
+		// hits like "极品...内射" mid-string).
+		`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
+	), nil},
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b(((?:PPV\.)?[HP]DTV|(?:HD)?CAM|B[DR]Rip|(?:HD-?)?TS|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|DVDRip|DVDRIP|CamRip|W[EB]BRip|BluRay|DvDScr|telesync))\b`), nil},
 	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},

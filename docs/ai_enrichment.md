@@ -18,6 +18,7 @@ mapMetadata(title, year, ct, pathHint)
   → OMDB.Map      (parsed title + year)           ── hit ─→ done   ← errors logged + skipped
   → KPU.Map       (parsed title + year)           ── hit ─→ done
   → tryAIFallback(pathHint, parsed title, year, ct)
+        → isAdultPath(pathHint) ── true ─→ nil (no Claude, no cache write)
         → AIResolver.SuggestCandidates → []TitleCandidate{title, year, language}
         → for each candidate:
               for each mapper (TMDB, OMDB, KPU):
@@ -25,6 +26,29 @@ mapMetadata(title, year, ct, pathHint)
                   m.Map(candVC) ── hit ─→ tryUpgrade ─→ done
         → all missed → nil
 ```
+
+For series, `pathHint` is the torrent's **root folder** (first non-empty segment of the representative episode path) rather than the per-episode filename. A pack named `Stand.Up.S13.Complete/01 - first joke.mkv` would otherwise hand Claude `01 - first joke` as both `parsed_title` (via the parser overwriting Title with the last path segment) and `pathHint`. Stripping back to `Stand.Up.S13.Complete` keeps the series-title signal alive even when individual episode filenames are bare numbered indexes.
+
+## Adult-content prefilter
+
+Adult releases (porn studio sites, JAV codes, explicit keywords, Chinese uncensored markers, Russian explicit verbs) are never enrichable through TMDB/OMDB/KPU and were filling the `ai_enrich.query` negative cache with ~30% pure waste (2026-05-11 telemetry: 693 of 2333 cache rows match by `parsed_title` alone, with the full-path Go-side check catching more).
+
+`enrich.isAdultPath` re-runs the torrent-name parser over each path segment and short-circuits `tryAIFallback` when `TorrentInfo.Porn` fires on any segment. This skips **both** the Claude call **and** the `ai_enrich.query` write — the cache stays clean, and a re-run on the same path is just a microsecond-scale regex pass.
+
+The `Porn` flag is set by patterns in `services/parse_torrent_name/main.go`:
+- Adult studios / sites (Blacked, Brazzers, MyLF, OnlyFans, Manyvids, Hegre, JulesJordan, NubilesPorn, Stickam, Voyeur-russian, etc.)
+- Explicit English keywords (porn, hentai, gangbang, stepmom/sis, creampie, hotwife, gloryhole, etc.)
+- JAV studio code + numeric serial (`ABP-123`, `IPVR-00265`, `FC2PPV-1311003`, `SSIS-xxx`)
+- BBC = "Big Black Cock" paired with an adult anchor (`bbc cock`, `bbc hungry`, `bbc treat`) — `BBC News` etc. don't match
+- OnlyFans abbreviation `of - ` at the start of a title
+- Bestiality phrases (`art of zoo`, `dog sex`, `zoo fuck`)
+- Cam-girl "bate" + 6-digit timestamp convention (`bate 090607`)
+- Russian explicit verbs (трах-, еб-, инцест, шлюх-, минет, дрочи, кримпай, пизд-, сперм-) with a non-Cyrillic prefix guard so `страх` (fear) doesn't false-match `трах`
+- Chinese uncensored / leaked markers (`无码`, `無碼`, `流出`, `内射`, `中出`, `探花`, etc.)
+
+Regression coverage: see `services/parse_torrent_name/main_test.go` adult-content section — 35 cases, half positives (one per pattern class), half negatives (Sex and the City, BBC News, Naughty Dog, Analyze This, Bates Motel, Страхование жизни) that must NOT trip.
+
+The system prompt carries a duplicate "adult is out of scope" rule (`services/enrich/ai_resolver.go`) as second-line defense for paths that slip past the parser. Even if the parser misses, Claude returns `candidates: []` and the negative result is cached cheaply.
 
 The mapper loop is fault-tolerant: a single mapper returning an error (e.g. OMDB "Request limit reached!" on a free key) is logged and skipped instead of aborting the chain. Only when **every** path fails does the pipeline surface an error so `enrich --force-error` can retry later.
 
