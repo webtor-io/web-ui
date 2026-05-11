@@ -195,6 +195,21 @@ var testData = []string{
 	// Negative for bate: "Bates Motel" (real series) must NOT match
 	// the bate pattern because it lacks the trailing timestamp.
 	"Bates.Motel.S01E01.HDTV.x264-LOL",
+
+	// ----- Standalone season tag without following [ex] marker.
+	// Real production torrent: 114423c8a3 — pack of all Shingeki No
+	// Kyojin seasons, each in its own subfolder. Without season
+	// extraction the classifier sees sameTitle=false across folders
+	// and falls into MovieMultiple, firing N Claude calls instead of
+	// one SeriesMultipleSeasons resolution.
+	"[Judas] Shingeki no Kyojin S3 - 01.mkv",
+	"[DKB] Shingeki no Kyojin - The Final Season S4 Pt. 1 - 01.mkv",
+	"Shingeki No Kyojin S2 - 01",
+	// Standalone S\d in folder-name form (no episode marker on this
+	// segment — the file part carries it).
+	"Shingeki no Kyojin S3 Pt. 1",
+	// Bare season tag on a single-file release.
+	"Doctor.Who.S08.E01.Deep.Breath.WEB-DL.1080p.mkv",
 }
 
 func TestParser(t *testing.T) {

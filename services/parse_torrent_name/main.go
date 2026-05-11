@@ -94,10 +94,23 @@ var fieldParsers = FieldParsers{
 	// get stripped from the title — otherwise long-running series leak
 	// the range into the title ("The Big Bang Theory S01-S12") and
 	// TMDB Search is run on garbage. Group 2 is the FIRST season number.
+	//
+	// Last alternative is the "bare season tag" form: a release like
+	// "Shingeki.No.Kyojin.S3.WEB-DL.1080p.mkv" carries the season as
+	// just "S3" with no following episode marker. Without this pattern,
+	// "S3" would leak into the title (TMDB then misses because the show
+	// is indexed as "Shingeki no Kyojin", not "Shingeki No Kyojin S3"),
+	// AND the missing season trip hasSeasones=false → media-type
+	// classifier falls into MovieMultiple for what is really one season
+	// per torrent. The `\b` boundaries on both sides prevent matching
+	// codec tags like "x264-S0E5" mid-word; the rule lives LAST so the
+	// existing S01E01 / 01x05 forms still win when an episode marker
+	// is present.
 	{FieldTypeSeason, NewRegexpMatcher(
 		`(?i)\b(s(\d{1,2})\s*[-–—]\s*s\d{1,2})\b`,
 		`(?i)(s?([0-9]{1,2}))[ex]`,
 		`(?i)(s?([0-9]{1,2}))\se`,
+		`(?i)\b(s([0-9]{1,2}))\b`,
 	), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
 	// Episode digit count capped at 3. Anything longer (4+ digits) is
