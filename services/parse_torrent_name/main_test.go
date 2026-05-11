@@ -243,6 +243,19 @@ var testData = []string{
 	// Negative: "Episode" word in a movie title must NOT trip the pattern
 	// when no digits follow.
 	"Star.Wars.Episode.IV.A.New.Hope.1977.mkv",
+
+	// ----- Sample / preview clip detection. Real release torrents bundle
+	// a short preview alongside the main file; without the Sample flag the
+	// enricher creates two distinct movie rows per torrent and fires the
+	// AI fallback twice. See enrich.enrichMediaInfo for the filter.
+	"1922.2017.720p.WEBRip.2CH.sample.mkv",
+	"10bit.sicario.sample.mkv",
+	"12.Years.A.Slave.2013.1080p.BluRay.x264.AC3-ETRG.Sample.mp4",
+	"300 2006 BluRay 1080p DTS-HD MA TrueHD 7.1 Atmos x264-MgB (Sample).mkv",
+	"1 Min Sample.mkv",
+	// Negative: the main release file in a torrent that also contains a
+	// sample must NOT be flagged as Sample.
+	"Sicario.2015.1080p.HQ.10bit.BluRay.8CH.x265.HEVC-PSA.mkv",
 }
 
 func TestParser(t *testing.T) {

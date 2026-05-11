@@ -253,6 +253,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	//series := map[string]*models.Series{}
 	//var movies []*models.Movie
 	var torrentInfos []*TorrentInfo
+	var samples []*TorrentInfo
 
 	for _, item := range items {
 		if item.MediaFormat != ra.Video {
@@ -262,7 +263,22 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to make torrent info for hash %v", hash)
 		}
+		if ti.Sample {
+			samples = append(samples, ti)
+			continue
+		}
 		torrentInfos = append(torrentInfos, ti)
+	}
+	// Drop sample/preview clips when the same torrent already carries the
+	// real release. Without this, "Sicario/sicario.sample.mkv" + the main
+	// "Sicario.2015...mkv" produce two distinct movie rows and two AI
+	// fallback calls. Fall back to processing samples only when nothing
+	// else is present (rare — a torrent that is purely a sample).
+	if len(torrentInfos) == 0 && len(samples) > 0 {
+		log.WithField("hash", hash).Info("only sample files in torrent — processing them as fallback")
+		torrentInfos = samples
+	} else if len(samples) > 0 {
+		log.WithFields(log.Fields{"hash": hash, "dropped": len(samples)}).Info("dropped sample/preview files from enrichment")
 	}
 
 	if len(torrentInfos) == 0 {

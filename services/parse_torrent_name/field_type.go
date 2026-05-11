@@ -34,5 +34,6 @@ const (
 	FieldTypeSplitScenes FieldType = "split_scenes"
 	FieldTypeScene       FieldType = "scene"
 	FieldTypeDubbing     FieldType = "dubbing"
+	FieldTypeSample      FieldType = "sample"
 	FieldTypeUnknown     FieldType = "unknown"
 )

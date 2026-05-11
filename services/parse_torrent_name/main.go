@@ -13,6 +13,13 @@ var fieldParsers = FieldParsers{
 	{FieldTypeAVC, NewRegexpMatcher(`(?i)\b((AVC))\b`), nil},
 	{FieldTypeDubbing, NewRegexpMatcher(`(?i)\b(([ADM]?VO|DUB))\b`), nil},
 	{FieldTypeSplitScenes, NewRegexpMatcher(`(?i)\b((SPLIT.?SCENES))\b`), nil},
+	// Preview-clip marker. Real release torrents commonly bundle a 30-60s
+	// "sample" preview file (e.g. "Movie.2015.sample.mkv", "1 Min Sample.mkv",
+	// "Movie (Sample).mkv"). Downstream enricher drops these from the
+	// movies/series list when the same torrent carries a non-sample file —
+	// otherwise a single torrent produces two movies (the real film and the
+	// preview), each calling AI/TMDB independently.
+	{FieldTypeSample, NewRegexpMatcher(`(?i)\b((sample))\b`), nil},
 	// FieldTypePorn — adult/erotic content marker. Used downstream to
 	// skip Claude-backed enrichment for the ~30-40% of negative-cache
 	// traffic that is porn/JAV/cam content (see ai_enrich.query telemetry
