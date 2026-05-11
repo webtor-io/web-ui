@@ -591,7 +591,7 @@ func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent
 // Claude to retry" semantic) or duplicate the existing
 // media_info-status gate. See docs/ai_enrichment.md for the rationale.
 func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string) *models.VideoMetadata {
-	candidates := s.aiResolver.SuggestCandidates(ctx, pathHint, vc.Title, vc.Year, t)
+	candidates := s.aiResolver.SuggestCandidates(ctx, pathHint, vc.Title, vc.Year, t, f)
 	for _, cand := range candidates {
 		candVC := &models.VideoContent{
 			ResourceID: vc.ResourceID,
