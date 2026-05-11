@@ -50,6 +50,20 @@ Regression coverage: see `services/parse_torrent_name/main_test.go` adult-conten
 
 The system prompt carries a duplicate "adult is out of scope" rule (`services/enrich/ai_resolver.go`) as second-line defense for paths that slip past the parser. Even if the parser misses, Claude returns `candidates: []` and the negative result is cached cheaply.
 
+## Per-resource AI budget
+
+A single `enrichMediaInfo` call can iterate dozens of files (`MovieMultiple` packs, mis-classified episode packs with sameTitle=false). Without a cap, each file with a unique parsed_title fires its own Claude call — for a uniformly-unenrichable pack (5 JAV files in `ipvr00265-1..5`, 17 cartoon episodes mis-classified as movies) that is N tokens spent learning the same negative answer N times.
+
+`resourceAIBudget` is a one-shot exhaustion flag scoped to the enrichMediaInfo run:
+
+- Created once, shared by the movies loop AND the series block.
+- Threaded through `mapMetadata` → `tryAIFallback`.
+- `tryAIFallback` checks `budget.available()` at entry and short-circuits when exhausted.
+- A successful AI hit returns early and never reaches the exhaustion branch (so legitimate multi-resolve packs still get full AI on each file).
+- A miss — empty candidates OR candidates that produced no mapper hit — calls `markExhausted()` so all subsequent files in the same resource skip AI.
+
+The non-torrent flow `LookupByTitleYear` passes `nil` (no path → no AI → budget irrelevant).
+
 The mapper loop is fault-tolerant: a single mapper returning an error (e.g. OMDB "Request limit reached!" on a free key) is logged and skipped instead of aborting the chain. Only when **every** path fails does the pipeline surface an error so `enrich --force-error` can retry later.
 
 ## Why candidates instead of an IMDB id

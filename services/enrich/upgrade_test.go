@@ -96,7 +96,7 @@ func TestMapMetadata_UpgradeChain(t *testing.T) {
 		}
 		en := &Enricher{mappers: []MetadataMapper{tmdb, omdb, kpu}}
 
-		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Псих"}, models.ContentTypeSeries, false, "", "")
+		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Псих"}, models.ContentTypeSeries, false, "", "", nil)
 		if err != nil {
 			t.Fatalf("mapMetadata: %v", err)
 		}
@@ -122,7 +122,7 @@ func TestMapMetadata_UpgradeChain(t *testing.T) {
 		}
 		en := &Enricher{mappers: []MetadataMapper{tmdb, omdb, kpu}}
 
-		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Теория большого взрыва"}, models.ContentTypeSeries, false, "", "")
+		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Теория большого взрыва"}, models.ContentTypeSeries, false, "", "", nil)
 		if err != nil {
 			t.Fatalf("mapMetadata: %v", err)
 		}
@@ -144,7 +144,7 @@ func TestMapMetadata_UpgradeChain(t *testing.T) {
 		}
 		en := &Enricher{mappers: []MetadataMapper{tmdb, omdb, kpu}}
 
-		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Russian-only show"}, models.ContentTypeSeries, false, "", "")
+		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Russian-only show"}, models.ContentTypeSeries, false, "", "", nil)
 		if err != nil {
 			t.Fatalf("mapMetadata: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestMapMetadata_UpgradeChain(t *testing.T) {
 		kpu := &fakeMapper{name: "Kinopoisk"}
 		en := &Enricher{mappers: []MetadataMapper{tmdb, omdbCanary, kpu}}
 
-		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "BBT"}, models.ContentTypeSeries, false, "", "")
+		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "BBT"}, models.ContentTypeSeries, false, "", "", nil)
 		if err != nil {
 			t.Fatalf("mapMetadata: %v", err)
 		}
@@ -190,7 +190,7 @@ func TestMapMetadata_UpgradeChain(t *testing.T) {
 		}
 		en := &Enricher{mappers: []MetadataMapper{tmdb, omdb, kpu}}
 
-		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Кино"}, models.ContentTypeMovie, false, "", "")
+		md, err := en.mapMetadata(context.Background(), &models.VideoContent{Title: "Кино"}, models.ContentTypeMovie, false, "", "", nil)
 		if err != nil {
 			t.Fatalf("mapMetadata: %v", err)
 		}

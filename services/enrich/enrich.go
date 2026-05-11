@@ -186,6 +186,38 @@ func torrentRoot(path string) string {
 	return path
 }
 
+// resourceAIBudget caps the AI fallback to a single miss per
+// enrichMediaInfo run. Multi-file packs (MovieMultiple with N distinct
+// titles, or a mis-classified episode pack) used to fire one Claude
+// call per file — burning N tokens on a torrent that is, in practice,
+// uniformly unenrichable (same release group, same transliteration
+// scheme, same garbage parser output across files). Once any single
+// AI fallback in a resource returns no resolvable metadata, subsequent
+// files in the same resource skip AI entirely. Successful hits do NOT
+// exhaust the budget (we return early on success and never reach the
+// exhaustion branch).
+//
+// Passed as a pointer through mapMetadata → tryAIFallback. nil is the
+// "no budget tracking" signal used by non-torrent flows like
+// LookupByTitleYear (which has no pathHint and thus never runs AI).
+type resourceAIBudget struct {
+	exhausted bool
+}
+
+func (b *resourceAIBudget) available() bool {
+	if b == nil {
+		return true
+	}
+	return !b.exhausted
+}
+
+func (b *resourceAIBudget) markExhausted() {
+	if b == nil {
+		return
+	}
+	b.exhausted = true
+}
+
 // isAdultPath runs the torrent-name parser over each path segment and
 // returns true as soon as any segment flags adult content. Each level
 // is parsed independently so a clean episode filename under a studio
@@ -288,12 +320,17 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 		return nil, errors.Wrapf(err, "failed to get movies for hash %s", hash)
 	}
 
+	// One AI-fallback budget shared by every movie + the series block
+	// below. Stops a MovieMultiple pack of N unenrichable titles from
+	// firing N Claude calls — see resourceAIBudget.
+	budget := &resourceAIBudget{}
+
 	for _, m := range movies {
 		moviePath := ""
 		if m.Path != nil {
 			moviePath = *m.Path
 		}
-		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force, hintVideoID, moviePath)
+		md, err := s.mapMetadata(ctx, m.VideoContent, m.GetContentType(), force, hintVideoID, moviePath, budget)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for movie %+v hash %s", m, hash)
 		}
@@ -331,7 +368,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 			// needs from "Stand.Up.S13.Complete". Top-level torrents
 			// (single-file series, unusual) keep the full path as-is.
 			seriesPath = torrentRoot(seriesPath)
-			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID, seriesPath)
+			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID, seriesPath, budget)
 		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to map metadata for hash %s", hash)
@@ -406,7 +443,9 @@ func (s *Enricher) LookupByTitleYear(ctx context.Context, title string, year *in
 		Title: title,
 		Year:  year,
 	}
-	return s.mapMetadata(ctx, vc, ct, false, "", "")
+	// nil budget — LookupByTitleYear has no pathHint, so AI fallback
+	// is never triggered anyway. Pass nil to keep the call site clean.
+	return s.mapMetadata(ctx, vc, ct, false, "", "", nil)
 }
 
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
@@ -534,7 +573,10 @@ func (s *Enricher) mapEpisodeMetadata(ctx context.Context, videoID string, seaso
 // (title, year) tuples that the same mappers can then resolve. The
 // visible metadata still comes from a real provider; Claude only
 // supplies search keys.
-func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, hintVideoID string, pathHint string) (*models.VideoMetadata, error) {
+//
+// budget is a per-resource cap on AI fallback misses; nil disables it.
+// See resourceAIBudget for the rationale.
+func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, hintVideoID string, pathHint string, budget *resourceAIBudget) (*models.VideoMetadata, error) {
 	if hintVideoID != "" {
 		if md := s.lookupByHint(ctx, hintVideoID, t, f); md != nil {
 			return md, nil
@@ -545,7 +587,7 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 		return md, nil
 	}
 	if s.aiResolver != nil && pathHint != "" {
-		if aiMD := s.tryAIFallback(ctx, vc, t, f, pathHint); aiMD != nil {
+		if aiMD := s.tryAIFallback(ctx, vc, t, f, pathHint, budget); aiMD != nil {
 			return aiMD, nil
 		}
 	}
@@ -636,7 +678,16 @@ func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent
 // cache would either survive `--force` (breaking the "user wants
 // Claude to retry" semantic) or duplicate the existing
 // media_info-status gate. See docs/ai_enrichment.md for the rationale.
-func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string) *models.VideoMetadata {
+func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string, budget *resourceAIBudget) *models.VideoMetadata {
+	// Skip Claude entirely once any AI fallback in this enrichMediaInfo
+	// run has failed. The release-name patterns inside a single torrent
+	// are typically uniform (same group, same transliteration scheme),
+	// so a miss on one file strongly predicts misses on the rest —
+	// running AI N times for an N-file pack just burns tokens.
+	if !budget.available() {
+		log.WithField("path", pathHint).Info("ai_enrich: budget exhausted for this resource, skipping AI fallback")
+		return nil
+	}
 	// Skip Claude entirely for paths flagged as adult by the torrent-name
 	// parser (studio names, JAV codes, explicit keywords). Adult content
 	// is not resolvable through TMDB/OMDB/KPU and was filling the
@@ -662,6 +713,10 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 			return md
 		}
 	}
+	// No candidate produced a metadata hit. Mark the resource budget
+	// exhausted so other files in this same torrent don't repeat the
+	// experiment. Successful runs return above and never reach here.
+	budget.markExhausted()
 	return nil
 }
 
