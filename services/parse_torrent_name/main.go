@@ -203,6 +203,14 @@ var fieldParsers = FieldParsers{
 	{FieldTypeSBS, NewRegexpMatcher(`(?i)\b(((?:Half-)?SBS))\b`), nil},
 	{FieldTypeContainer, NewRegexpMatcher(`(?i)\b((MKV|AVI|MP4|WEBM))\b`), nil},
 	{FieldTypeStudio, NewRegexpMatcher(`(?i)\b((AMZN|NF))\b`, `(\[ ?([^\]]+?)[\s.]?[0-9]{4}\])`), titleTransformer},
+	// "rip by <Name>" Russian release attribution. Aleksan55 SATRip and
+	// similar fan-encoded packs trail every filename with "rip by X",
+	// which otherwise leaks into Title and confuses TMDB/AI matching
+	// ("Партизаны rip by Aleksan55" vs the real show "Партизаны").
+	// Captures the attribution + ripper handle and stores it on RipBy.
+	// Must run AFTER Container so the regex's `\S+` tail doesn't steal
+	// "Aleksan55.mkv" — Container's span trims us back via getAvailable.
+	{FieldTypeRipBy, NewRegexpMatcher(`(?i)(\brip\s+by\s+(\S+))`), nil},
 }
 
 var parser = NewCompoundParser([]Parser{

@@ -40,6 +40,7 @@ type TorrentInfo struct {
 	Scene       int    `json:"scene,omitempty"`
 	Dubbing     string `json:"dubbing,omitempty"`
 	Sample      bool   `json:"sample,omitempty"`
+	RipBy       string `json:"rip_by,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

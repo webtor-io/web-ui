@@ -35,5 +35,6 @@ const (
 	FieldTypeScene       FieldType = "scene"
 	FieldTypeDubbing     FieldType = "dubbing"
 	FieldTypeSample      FieldType = "sample"
+	FieldTypeRipBy       FieldType = "rip_by"
 	FieldTypeUnknown     FieldType = "unknown"
 )
