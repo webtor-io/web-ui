@@ -2,6 +2,29 @@ package parsetorrentname
 
 import "strings"
 
+// Release-quality keywords, split into two groups so the Episode
+// `.NN.<Quality>` anchor (Russian DVDRip pack convention) can opt into
+// the SAFE subset while the Quality field-parser keeps the full list.
+//
+// qualityRipForms — encode-from-source labels (DVDRip, BluRay, WEB-DL,
+// SATRip, etc.). These never appear after an event/sport id in real
+// torrent names, so they're safe to anchor episode digits against.
+//
+// qualityBroadcastForms — broadcast/cam labels (HDTV, PPV.HDTV, CAM,
+// TS, Telesync). PPV events ("UFC.179.PPV.HDTV") put the event id
+// right before these markers, so anchoring `.NN.<broadcast>` would
+// false-fire episode=179 — broadcast forms are deliberately excluded
+// from the episode anchor.
+//
+// qualityAlternation is the union, used by the Quality field-parser.
+// Always referenced inside `(?i)\b(...)\b` or `(?i)(?:...)` to keep
+// case-insensitivity + word boundaries explicit at each call site.
+const (
+	qualityRipForms       = `DVDRip|DVDRIP|BluRay|B[DR]Rip|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|W[EB]BRip|CamRip|DvDScr|SATRip|TVRip`
+	qualityBroadcastForms = `(?:PPV\.)?[HP]DTV|(?:HD)?CAM|(?:HD-?)?TS|telesync`
+	qualityAlternation    = qualityRipForms + `|` + qualityBroadcastForms
+)
+
 var fieldParsers = FieldParsers{
 	{FieldTypeExtended, NewRegexpMatcher(`(?i)\b((EXTENDED(?:.CUT)?))\b`), nil},
 	{FieldTypeHardcoded, NewRegexpMatcher(`(?i)\b((HC))\b`), nil},
@@ -73,7 +96,7 @@ var fieldParsers = FieldParsers{
 		`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
 	), nil},
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
-	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b(((?:PPV\.)?[HP]DTV|(?:HD)?CAM|B[DR]Rip|(?:HD-?)?TS|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|DVDRip|DVDRIP|CamRip|W[EB]BRip|BluRay|DvDScr|telesync))\b`), nil},
+	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
 	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},
 	{FieldTypeBitrate, NewRegexpMatcher(`(?i)\b(([0-9]+[KMGT]bps))\b`), nil},
 	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?))`), nil},
@@ -166,12 +189,14 @@ var fieldParsers = FieldParsers{
 		`(?i)(\b([0-9]{1,3})[\s._]+серия)`,
 		// Show.NN.<Quality> dotted Russian DVDRip convention without a
 		// year anchor — "Грозовые ворота.01.DVDRip-SVAT.avi". The
-		// trailing token must be an enumerated quality keyword so the
-		// pattern doesn't false-fire on date-shaped runs like
-		// "Blacked.18.03.21.Lana" (.21.Lana) or event titles like
-		// "UFC.179.PPV.HDTV" (.179.PPV). Two-digit minimum keeps
-		// single-digit movie sequels ("Saw.7.BluRay") from matching.
-		`(?i)(\.([0-9]{2,3})\.(?:DVDR?ip|BluRay|BDR?ip|BRR?ip|WEB[-_.]?DL(?:Rip)?|HDR?ip|W[EB]BRip|HDTV|HDCAM|CamRip|CAM|SATR?ip|TVR?ip|HDTS|TS|Telesync|DvDScr)\b)`,
+		// trailing token must be a rip-form quality keyword
+		// (qualityRipForms — shared with the Quality field-parser but
+		// excluding broadcast/cam variants). Broadcast forms are
+		// omitted because PPV events ("UFC.179.PPV.HDTV") put the
+		// event id right before the broadcast marker, which would
+		// false-fire episode=179. Two-digit minimum keeps single-digit
+		// movie sequels ("Saw.7.BluRay") from matching.
+		`(?i)(\.([0-9]{2,3})\.(?:` + qualityRipForms + `)\b)`,
 	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
