@@ -256,6 +256,23 @@ var testData = []string{
 	// Negative: the main release file in a torrent that also contains a
 	// sample must NOT be flagged as Sample.
 	"Sicario.2015.1080p.HQ.10bit.BluRay.8CH.x265.HEVC-PSA.mkv",
+
+	// ----- Russian "NN серия <show>" form. Real Aleksan55 torrents
+	// (Партизаны, Грозовые ворота, Дельфин-3, Берлин'23) — every file
+	// in the pack was producing a distinct movie row.
+	"01 серия Грозовые ворота rip by Aleksan55.mkv",
+	"10 серия Партизаны rip by Aleksan55.avi",
+	// Underscore-separator variant (the original SATRip filename uses
+	// underscores; parser converts to spaces, but verify directly too).
+	"01 серия_Дельфин-3_rip by_Aleksan55.mkv",
+
+	// ----- Show.NN.<Quality> form without year. Real torrent 23d3e3658c
+	// — "Грозовые ворота.01.DVDRip-SVAT.avi" pack of 4 episodes.
+	"Грозовые ворота.01.DVDRip-SVAT.avi",
+	"Грозовые ворота.04.DVDRip-SVAT.avi",
+	// Negative: lowercase non-Quality word after `.NN.` must NOT trip
+	// (avoids matching random `.NN.word` noise).
+	"Some.Movie.05.notarealquality.mkv",
 }
 
 func TestParser(t *testing.T) {

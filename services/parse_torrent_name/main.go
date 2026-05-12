@@ -158,6 +158,20 @@ var fieldParsers = FieldParsers{
 		// instead of bottom-up "07 - E" leaving "ep" attached to title.
 		`(?i)((?:episode|ep)[\s.]?([0-9]{2,3})(?:[^0-9]|$))`,
 		`(\b([0-9]{2,3})[\s.]+-[\s.]+\p{L})`,
+		// Russian "NN серия <show>" naming. Aleksan55 rips and similar
+		// Cyrillic SATRip/DVDRip releases put the episode number before
+		// the word "серия" (= "episode"). Pattern matches the digit run
+		// + separator + "серия"; the trailing word is consumed so the
+		// title parser doesn't keep "серия" attached to the show name.
+		`(?i)(\b([0-9]{1,3})[\s._]+серия)`,
+		// Show.NN.<Quality> dotted Russian DVDRip convention without a
+		// year anchor — "Грозовые ворота.01.DVDRip-SVAT.avi". The
+		// trailing token must be an enumerated quality keyword so the
+		// pattern doesn't false-fire on date-shaped runs like
+		// "Blacked.18.03.21.Lana" (.21.Lana) or event titles like
+		// "UFC.179.PPV.HDTV" (.179.PPV). Two-digit minimum keeps
+		// single-digit movie sequels ("Saw.7.BluRay") from matching.
+		`(?i)(\.([0-9]{2,3})\.(?:DVDR?ip|BluRay|BDR?ip|BRR?ip|WEB[-_.]?DL(?:Rip)?|HDR?ip|W[EB]BRip|HDTV|HDCAM|CamRip|CAM|SATR?ip|TVR?ip|HDTS|TS|Telesync|DvDScr)\b)`,
 	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
