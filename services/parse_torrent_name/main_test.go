@@ -320,6 +320,39 @@ var testData = []string{
 	// `\d{2}\.\s+` (dot followed by SPACE), which dotted naming
 	// "12.Years.a.Slave.2013" does not have.
 	"12.Years.a.Slave.2013.1080p.BluRay.mkv",
+
+	// ----- Adult-filter slip-throughs caught in 2026-05-13 ai_enrich.query
+	// telemetry. Each appeared as a row with empty candidates (Claude
+	// correctly refused) but should have been short-circuited by
+	// isAdultPath BEFORE the Claude call.
+	// Adult studios:
+	"Strippers4K - Thea Summers - Curious Schoo Girl (27.02.2026) rq.mp4",
+	"[RKPrime] Megan Rain - Schoolgirl Strip Tease (13.08.2019) rq.mp4",
+	"BackroomCastingCouch - Lacee - Lusty Lacee's Plan B (04.05.2026) 1080p rq.mp4",
+	"angelslove.26.05.10.chanel.x.and.vixi.rafi.lustful.curiosities.1080p.mp4",
+	"beautyangels.24.11.04.dakota.doll.mp4",
+	"CockyBoys - Joe Vanni & Marcus McNeill.mp4",
+	// JAV codes (extended the existing alternation):
+	"AARM-199-UC",
+	"APNS-410",
+	"IMOE-002 Disc 1",
+	"SNOS-195",
+	// English-keyword slip-through:
+	"Bang My Tranny Ass - Joanna Jet & Tiffany Starr.avi",
+	// Negative: "APNS" in tech context (Apple Push Notification Service)
+	// must NOT match the JAV pattern. The required trailing `\d{2,5}`
+	// after a dash/underscore disambiguates — bare "APNS notifications"
+	// stays clean.
+	"iOS Push APNS Tutorial - Building Notifications 2024.mp4",
+	// Accepted FP: "tranny" in car-transmission-rebuild context.
+	// In ai_enrich.query telemetry, the adult use of this word is
+	// dramatically more common than the car-slang sense, so the keyword
+	// stays in. The downstream cost of a false adult flag is skipping
+	// AI enrichment for this one torrent — the file still streams
+	// normally; only the metadata stays empty (which TMDB couldn't
+	// supply for a car tutorial anyway). Documenting as a known
+	// trade-off so future updates don't accidentally tighten it.
+	"Chevy 700R4 Tranny Rebuild Tutorial 2022.mp4",
 }
 
 func TestParser(t *testing.T) {

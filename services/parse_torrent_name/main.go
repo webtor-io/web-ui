@@ -66,11 +66,11 @@ var fieldParsers = FieldParsers{
 		`(?i)\b((X{3}))\b`,
 		// English single-occurrence keywords. All of these are
 		// effectively never found in non-adult release names.
-		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla))\b`,
+		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies))\b`,
 		// Adult studios / sites (case-insensitive). Curated from
 		// ai_enrich.query — every name here was observed dominating
 		// the negative cache (milfy alone: 106 rows).
-		`(?i)\b((blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com))\b`,
+		`(?i)\b((blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys))\b`,
 		// Bestiality phrases — explicit "dog/zoo/horse + sex/fuck/porn"
 		// and the "art of zoo" series of bestiality torrents.
 		`(?i)\b((art\s+of\s+zoo|(?:dog|zoo|horse|animal)\s+(?:sex|fuck|porn|cum)))\b`,
@@ -88,8 +88,11 @@ var fieldParsers = FieldParsers{
 		`(?i)\b((bbc))\s+(?:cock|fuck|treat|surprise|crave|hungry|addict|obsess|loves?|monster|stretch|hung|breed|breeding|destroy|destroys|stretching|inches|fan|goddess|hotwife|wife|stud|stallion)`,
 		// JAV studio code prefix + numeric serial. Prefix list pruned
 		// to combinations unlikely to collide with English words / years
-		// (so no bare "sw", "jul", "mum", "stars").
-		`(?i)\b((abp|abw|adn|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
+		// (so no bare "sw", "jul", "mum", "stars"). The required
+		// trailing `\d{2,5}` is what disambiguates ambiguous prefixes
+		// like APNS (Apple Push Notification Service) — only
+		// "APNS-410" form fires, "APNS notifications" stays clean.
+		`(?i)\b((aarm|abp|abw|adn|apns|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|imoe|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|snos|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
 		// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 		// match the lowercase alternation. Non-Cyrillic prefix guard
 		// prevents false matches like "страх" (fear) → "трах".
