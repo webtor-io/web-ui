@@ -41,8 +41,14 @@ type Query struct {
 	ContentType int16       `pg:"content_type,pk"`
 	Candidates  []Candidate `pg:"candidates,type:jsonb"`
 	Model       *string     `pg:"model"`
-	CreatedAt   time.Time   `pg:"created_at,default:now()"`
-	UpdatedAt   time.Time   `pg:"updated_at,default:now()"`
+	// ResourceID and HintPath are diagnostic-only: the first torrent
+	// hash + full pathHint that triggered this normalization call.
+	// Preserved across re-fires of the same (parsed_title, year, ct)
+	// from different resources so we don't lose the original sample.
+	ResourceID *string   `pg:"resource_id"`
+	HintPath   *string   `pg:"hint_path"`
+	CreatedAt  time.Time `pg:"created_at,default:now()"`
+	UpdatedAt  time.Time `pg:"updated_at,default:now()"`
 }
 
 // YearOrNil returns the cached parsed year as *int16, or nil when the
@@ -96,7 +102,13 @@ func yearOrSentinel(year *int16) int16 {
 // (or nil) `candidates` slice to record a negative cache entry. The
 // title is stored in its normalized form so subsequent GetQuery calls
 // can match without a normalize step on the read path.
-func UpsertQuery(ctx context.Context, db *pg.DB, title string, year *int16, contentType int16, candidates []Candidate, model string) error {
+//
+// resourceID and hintPath are diagnostic-only — the first observed
+// torrent hash and full pathHint that triggered this normalization.
+// On conflict we COALESCE so the original sample is preserved when
+// a later resource hits the same cache key (avoids churn from the
+// 2nd, 3rd, Nth torrent overwriting useful debug context).
+func UpsertQuery(ctx context.Context, db *pg.DB, title string, year *int16, contentType int16, candidates []Candidate, model, resourceID, hintPath string) error {
 	if candidates == nil {
 		candidates = []Candidate{}
 	}
@@ -109,11 +121,22 @@ func UpsertQuery(ctx context.Context, db *pg.DB, title string, year *int16, cont
 	if model != "" {
 		q.Model = &model
 	}
+	if resourceID != "" {
+		q.ResourceID = &resourceID
+	}
+	if hintPath != "" {
+		q.HintPath = &hintPath
+	}
 	_, err := db.Model(q).
 		Context(ctx).
 		OnConflict("(parsed_title, parsed_year, content_type) DO UPDATE").
 		Set("candidates = EXCLUDED.candidates").
 		Set("model = EXCLUDED.model").
+		// Unqualified column on the right of ON CONFLICT SET resolves to
+		// the EXISTING row value — so COALESCE keeps the first sample and
+		// only takes EXCLUDED when nothing was stored before.
+		Set("resource_id = COALESCE(resource_id, EXCLUDED.resource_id)").
+		Set("hint_path = COALESCE(hint_path, EXCLUDED.hint_path)").
 		Set("updated_at = now()").
 		Insert()
 	return err

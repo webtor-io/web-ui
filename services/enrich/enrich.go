@@ -713,7 +713,7 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 		log.WithField("path", pathHint).Info("ai_enrich: skipping adult path")
 		return nil
 	}
-	candidates := s.aiResolver.SuggestCandidates(ctx, pathHint, vc.Title, vc.Year, t, f)
+	candidates := s.aiResolver.SuggestCandidates(ctx, vc.ResourceID, pathHint, vc.Title, vc.Year, t, f)
 	for _, cand := range candidates {
 		candVC := &models.VideoContent{
 			ResourceID: vc.ResourceID,

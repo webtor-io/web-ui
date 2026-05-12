@@ -41,6 +41,11 @@ type TorrentInfo struct {
 	Dubbing     string `json:"dubbing,omitempty"`
 	Sample      bool   `json:"sample,omitempty"`
 	RipBy       string `json:"rip_by,omitempty"`
+	// Kind tags the release-segment type for anime extras: ONA (Original
+	// Net Animation), OVA (Original Video Animation), OAD (Original
+	// Animation DVD), NCOP (Non-Credit Opening), NCED (Non-Credit Ending).
+	// Episode extractor still produces the numeric episode index alongside.
+	Kind string `json:"kind,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

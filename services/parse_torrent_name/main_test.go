@@ -273,6 +273,23 @@ var testData = []string{
 	// Negative: lowercase non-Quality word after `.NN.` must NOT trip
 	// (avoids matching random `.NN.word` noise).
 	"Some.Movie.05.notarealquality.mkv",
+
+	// ----- Anime sub-episode Kind tags (ONA/OVA/OAD/NCOP/NCED). Real
+	// torrent 61fb9a9b — Dies Irae pack with bonus segments in /Extra/.
+	// Kind goes to its own field, digit to Episode, title cleaned.
+	"[Cleo]Dies_Irae_-_ONA_01_(Dual Audio_10bit_BD1080p_x265).mkv",
+	"[Cleo]Dies_Irae_-_OVA_03_(BD1080p_x265).mkv",
+	"Bakemonogatari - NCOP",
+	"Show - NCED 02",
+
+	// ----- Adult-filter slip-throughs caught in 2026-05-12 telemetry:
+	// fetish word, blackzilla / fuckermate brands, JAV start-NNN /
+	// dvaj-NNN codes. All should set Porn=true.
+	"crush-fetish-pamelacrush01.mp4",
+	"blackzilla rises 5 tiny ava hardy.mkv",
+	"fuckermate - chandler & viktor rom - insaciable.mp4",
+	"start-397.mkv",
+	"489155 com@dvaj-741.mp4",
 }
 
 func TestParser(t *testing.T) {

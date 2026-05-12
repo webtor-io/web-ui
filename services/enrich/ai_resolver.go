@@ -166,7 +166,7 @@ func New(c *cli.Context, client *anthropic.Client, pg *cs.PG) *AIResolver {
 // existing mapper chain (TMDB.Map, OMDB.Map, KPU.Map). Whatever the
 // mappers return is the validated metadata; Claude's role is purely to
 // generate alternative search keys.
-func (r *AIResolver) SuggestCandidates(ctx context.Context, pathStr, parsedTitle string, parsedYear *int16, ct models.ContentType, force bool) []TitleCandidate {
+func (r *AIResolver) SuggestCandidates(ctx context.Context, resourceID, pathStr, parsedTitle string, parsedYear *int16, ct models.ContentType, force bool) []TitleCandidate {
 	if pathStr == "" {
 		return nil
 	}
@@ -201,7 +201,7 @@ func (r *AIResolver) SuggestCandidates(ctx context.Context, pathStr, parsedTitle
 	// is the negative cache and is what stops the next torrent with the
 	// same parsed title from re-calling Claude.
 	if db != nil {
-		if err := aem.UpsertQuery(ctx, db, parsedTitle, parsedYear, ctInt, toModelCandidates(candidates), r.model); err != nil {
+		if err := aem.UpsertQuery(ctx, db, parsedTitle, parsedYear, ctInt, toModelCandidates(candidates), r.model, resourceID, pathStr); err != nil {
 			log.WithError(err).Warn("ai_enrich: cache write failed")
 		}
 	}

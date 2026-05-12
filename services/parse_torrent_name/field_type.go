@@ -36,5 +36,6 @@ const (
 	FieldTypeDubbing     FieldType = "dubbing"
 	FieldTypeSample      FieldType = "sample"
 	FieldTypeRipBy       FieldType = "rip_by"
+	FieldTypeKind        FieldType = "kind"
 	FieldTypeUnknown     FieldType = "unknown"
 )

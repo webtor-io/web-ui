@@ -23,6 +23,12 @@ const (
 	qualityRipForms       = `DVDRip|DVDRIP|BluRay|B[DR]Rip|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|W[EB]BRip|CamRip|DvDScr|SATRip|TVRip`
 	qualityBroadcastForms = `(?:PPV\.)?[HP]DTV|(?:HD)?CAM|(?:HD-?)?TS|telesync`
 	qualityAlternation    = qualityRipForms + `|` + qualityBroadcastForms
+
+	// kindAlternation — anime release-segment tags. Shared by the Kind
+	// field-parser (captures the tag word) and the Episode anchor that
+	// extracts the digit trailing the tag ("<show> - ONA 01"). Same
+	// reuse pattern as qualityAlternation.
+	kindAlternation = `ONA|OVA|OAD|NCOP|NCED`
 )
 
 var fieldParsers = FieldParsers{
@@ -60,7 +66,7 @@ var fieldParsers = FieldParsers{
 		`(?i)\b((X{3}))\b`,
 		// English single-occurrence keywords. All of these are
 		// effectively never found in non-adult release names.
-		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty))\b`,
+		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla))\b`,
 		// Adult studios / sites (case-insensitive). Curated from
 		// ai_enrich.query — every name here was observed dominating
 		// the negative cache (milfy alone: 106 rows).
@@ -83,7 +89,7 @@ var fieldParsers = FieldParsers{
 		// JAV studio code prefix + numeric serial. Prefix list pruned
 		// to combinations unlikely to collide with English words / years
 		// (so no bare "sw", "jul", "mum", "stars").
-		`(?i)\b((abp|abw|adn|atid|cawd|dasd|ebod|hbad|hmn|hnd|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|sone|ssis|ssni|venu|venx|wanz)[\-_]?\d{2,5})\b`,
+		`(?i)\b((abp|abw|adn|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
 		// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 		// match the lowercase alternation. Non-Cyrillic prefix guard
 		// prevents false matches like "страх" (fear) → "трах".
@@ -143,6 +149,13 @@ var fieldParsers = FieldParsers{
 		`(?i)\b(s([0-9]{1,2}))\b`,
 	), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
+	// Anime release-segment kind tag — runs BEFORE Episode so the Kind
+	// word gets its own short span. Episode pattern then sees the Kind
+	// span as already-taken and trims its own match to just the trailing
+	// digit. Restricted to unambiguous anime abbreviations
+	// (ONA/OVA/OAD/NCOP/NCED) so movie titles containing "Special" /
+	// "Movie" / "Trailer" don't false-fire.
+	{FieldTypeKind, NewRegexpMatcher(`(?i)\b((` + kindAlternation + `))\b`), nil},
 	// Episode digit count capped at 3. Anything longer (4+ digits) is
 	// always a year, size, codec tag, or some other false-positive — there
 	// are no real shows with 1000+ episodes packaged into a single torrent.
@@ -197,6 +210,12 @@ var fieldParsers = FieldParsers{
 		// false-fire episode=179. Two-digit minimum keeps single-digit
 		// movie sequels ("Saw.7.BluRay") from matching.
 		`(?i)(\.([0-9]{2,3})\.(?:` + qualityRipForms + `)\b)`,
+		// Anime sub-episode types: digit AFTER a Kind tag (ONA/OVA/etc.).
+		// Kind word itself is captured by FieldTypeKind below — this just
+		// extracts the trailing index. Real torrent:
+		// "[Cleo]Dies_Irae_-_ONA_01_(Dual Audio…).mkv" (underscores → spaces
+		// before parsing, so matcher sees "Dies Irae - ONA 01 …").
+		`(?i)(\b(?:` + kindAlternation + `)[\s.]+([0-9]{1,3})(?:[^0-9]|$))`,
 	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
