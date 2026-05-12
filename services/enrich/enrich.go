@@ -186,36 +186,105 @@ func torrentRoot(path string) string {
 	return path
 }
 
-// resourceAIBudget caps the AI fallback to a single miss per
+// maxUniqueAICalls is the hard upper bound on fresh Claude calls per
+// enrichMediaInfo run. Above 5, the cost of N misclassified-as-distinct
+// episodes (Dragon Ball pack: 153 movie rows → 153 Claude calls, all
+// returning "Dragon Ball") exceeds any plausible benefit on a single
+// torrent. Legit multi-work packs (trilogy / box set) where every file
+// is a genuinely-distinct title needing AI normalization rarely exceed
+// 3–4 entries in practice.
+const maxUniqueAICalls = 5
+
+// resourceAIBudget governs the AI fallback within a single
 // enrichMediaInfo run. Multi-file packs (MovieMultiple with N distinct
 // titles, or a mis-classified episode pack) used to fire one Claude
 // call per file — burning N tokens on a torrent that is, in practice,
-// uniformly unenrichable (same release group, same transliteration
-// scheme, same garbage parser output across files). Once any single
-// AI fallback in a resource returns no resolvable metadata, subsequent
-// files in the same resource skip AI entirely. Successful hits do NOT
-// exhaust the budget (we return early on success and never reach the
-// exhaustion branch).
+// uniformly unenrichable OR uniformly enrichable to the same answer
+// (Dragon Ball Clássico 001…153 → 153× "Dragon Ball"). Three signals
+// shut AI down for the remainder of the run:
+//
+//  1. failed — any single AI fallback returned no resolvable metadata.
+//     Subsequent files skip AI entirely. (Original semantics; kept.)
+//  2. locked — two consecutive Claude calls returned the SAME candidate
+//     set. Strong evidence that the parser sees N "different" titles
+//     for one logical work. Remaining files reuse the locked set
+//     through the mapper chain without re-calling Claude. If a locked
+//     run fails to resolve a file, that file gets one more fresh
+//     Claude attempt (so genuinely-distinct trailing entries in a pack
+//     still have a chance).
+//  3. uniqueCalls >= maxUniqueAICalls — hard cap. Beyond 5 fresh
+//     Claude calls per resource we always skip.
 //
 // Passed as a pointer through mapMetadata → tryAIFallback. nil is the
 // "no budget tracking" signal used by non-torrent flows like
 // LookupByTitleYear (which has no pathHint and thus never runs AI).
 type resourceAIBudget struct {
-	exhausted bool
+	failed         bool
+	uniqueCalls    int
+	lastCandidates []TitleCandidate
+	locked         []TitleCandidate
 }
 
+// available reports whether tryAIFallback is allowed to call Claude
+// AGAIN. The locked-candidates path bypasses this check — see
+// tryAIFallback for the order of fallbacks.
 func (b *resourceAIBudget) available() bool {
 	if b == nil {
 		return true
 	}
-	return !b.exhausted
+	if b.failed {
+		return false
+	}
+	return b.uniqueCalls < maxUniqueAICalls
 }
 
-func (b *resourceAIBudget) markExhausted() {
+func (b *resourceAIBudget) markFailed() {
 	if b == nil {
 		return
 	}
-	b.exhausted = true
+	b.failed = true
+}
+
+// recordCall is invoked after each fresh Claude call (regardless of
+// outcome). It increments the call counter and, when the current
+// response is identical to the previous one, locks the budget to that
+// candidate set so the remaining files skip Claude.
+func (b *resourceAIBudget) recordCall(cands []TitleCandidate) {
+	if b == nil {
+		return
+	}
+	b.uniqueCalls++
+	if b.locked != nil {
+		return
+	}
+	if b.lastCandidates != nil && candidatesEqual(b.lastCandidates, cands) {
+		b.locked = cands
+		return
+	}
+	b.lastCandidates = cands
+}
+
+// candidatesEqual compares two candidate slices by (title, year) — the
+// only fields that drive downstream mapper lookups. Language is
+// informational and intentionally ignored.
+func candidatesEqual(a, b []TitleCandidate) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Title != b[i].Title {
+			return false
+		}
+		ay, by := a[i].Year, b[i].Year
+		switch {
+		case ay == nil && by == nil:
+		case ay == nil || by == nil:
+			return false
+		case *ay != *by:
+			return false
+		}
+	}
+	return true
 }
 
 // isAdultPath runs the torrent-name parser over each path segment and
@@ -695,13 +764,9 @@ func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent
 // Claude to retry" semantic) or duplicate the existing
 // media_info-status gate. See docs/ai_enrichment.md for the rationale.
 func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, pathHint string, budget *resourceAIBudget) *models.VideoMetadata {
-	// Skip Claude entirely once any AI fallback in this enrichMediaInfo
-	// run has failed. The release-name patterns inside a single torrent
-	// are typically uniform (same group, same transliteration scheme),
-	// so a miss on one file strongly predicts misses on the rest —
-	// running AI N times for an N-file pack just burns tokens.
-	if !budget.available() {
-		log.WithField("path", pathHint).Info("ai_enrich: budget exhausted for this resource, skipping AI fallback")
+	// Hard stop on prior miss — see resourceAIBudget.failed.
+	if budget != nil && budget.failed {
+		log.WithField("path", pathHint).Info("ai_enrich: budget marked failed for this resource, skipping AI fallback")
 		return nil
 	}
 	// Skip Claude entirely for paths flagged as adult by the torrent-name
@@ -713,8 +778,43 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 		log.WithField("path", pathHint).Info("ai_enrich: skipping adult path")
 		return nil
 	}
+	// Locked candidates — two consecutive Claude calls returned the
+	// SAME set, so the parser is almost certainly seeing N "different"
+	// titles for one logical work (Dragon Ball Clássico 001…153 → all
+	// resolve to "Dragon Ball"). Reuse without re-calling Claude. If
+	// the locked set fails to resolve for THIS file, fall through to a
+	// fresh Claude call below (the file may be a legit-different work
+	// in a multi-movie pack that only happened to overlap on two files).
+	if budget != nil && budget.locked != nil {
+		if md := s.runCandidates(ctx, vc, t, f, budget.locked); md != nil {
+			log.WithField("path", pathHint).Info("ai_enrich: resolved via locked candidates (no Claude call)")
+			return md
+		}
+		// Locked set didn't match this file — fall through.
+	}
+	// Cap on fresh Claude calls per resource. Above the cap, no more
+	// calls regardless of why (success, miss, or locked-fall-through).
+	if !budget.available() {
+		log.WithField("path", pathHint).Info("ai_enrich: budget cap reached for this resource, skipping AI fallback")
+		return nil
+	}
 	candidates := s.aiResolver.SuggestCandidates(ctx, vc.ResourceID, pathHint, vc.Title, vc.Year, t, f)
-	for _, cand := range candidates {
+	budget.recordCall(candidates)
+	if md := s.runCandidates(ctx, vc, t, f, candidates); md != nil {
+		return md
+	}
+	// No candidate produced a metadata hit. Mark the resource budget
+	// failed so other files in this same torrent don't repeat the
+	// experiment. Successful runs return above and never reach here.
+	budget.markFailed()
+	return nil
+}
+
+// runCandidates walks `cands` through the mapper chain and returns the
+// first match. Shared between the locked-candidates fast path and the
+// regular post-Claude path so both behave identically downstream.
+func (s *Enricher) runCandidates(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool, cands []TitleCandidate) *models.VideoMetadata {
+	for _, cand := range cands {
 		candVC := &models.VideoContent{
 			ResourceID: vc.ResourceID,
 			Title:      cand.Title,
@@ -729,10 +829,6 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 			return md
 		}
 	}
-	// No candidate produced a metadata hit. Mark the resource budget
-	// exhausted so other files in this same torrent don't repeat the
-	// experiment. Successful runs return above and never reach here.
-	budget.markExhausted()
 	return nil
 }
 

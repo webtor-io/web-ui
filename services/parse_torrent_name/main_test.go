@@ -290,6 +290,36 @@ var testData = []string{
 	"fuckermate - chandler & viktor rom - insaciable.mp4",
 	"start-397.mkv",
 	"489155 com@dvaj-741.mp4",
+
+	// ----- Trailing-number anime/episode pack. Real torrent 9dd0bf1eaf
+	// — Brazilian-PT Dragon Ball pack with 153 files where each filename
+	// had the episode number embedded BEFORE the [resolution] tag. No
+	// existing Episode pattern caught it (no dash, no S/E, no .NN.YYYY,
+	// no `ep` prefix, no `серия`), so all 153 files became distinct
+	// MovieMultiple rows and fired 153 Claude calls all returning
+	// "Dragon Ball". Pattern needs to anchor on the bracket follow-up.
+	"[AT] Dragon Ball Clássico 001 [480p] (Legendado).mkv",
+	"[AT] Dragon Ball Clássico 042 [480p] (Legendado).mkv",
+	"[AT] Dragon Ball Clássico 153 [480p] (Legendado).mkv",
+	// Negative: movie title ending in a 3-digit numeral that ISN'T an
+	// episode marker — must NOT match the new trailing-number pattern.
+	"300 (2006).BluRay.1080p.x264.mkv",
+	"Apollo 13 (1995) 1080p BluRay x264.mkv",
+
+	// ----- Russian "NN. Title.Year.Quality" prefix form. Real torrents
+	// 1974978dd6 (Дуплет.2025) and e123b05b68 (Сломанная стрела.2025) —
+	// every file in the pack was `NN. Title.Year.WEB-DLRip.Files-x.ext`.
+	// Without an Episode anchor on the `NN. ` prefix, all files got
+	// distinct titles ("01  Дуплет", "02  Дуплет", ...) and the pack
+	// fell into MovieMultiple → N AI calls all returning "Дуплет".
+	"01. Дуплет.2025.WEB-DLRip.Files-x.avi",
+	"05. Дуплет.2025.WEB-DLRip.Files-x.avi",
+	"03. Сломанная стрела.2025.WEB-DLRip.Files-x.avi",
+	// Negative: standalone movie filename starting with a 2-digit
+	// number that ISN'T an episode prefix. The pattern requires
+	// `\d{2}\.\s+` (dot followed by SPACE), which dotted naming
+	// "12.Years.a.Slave.2013" does not have.
+	"12.Years.a.Slave.2013.1080p.BluRay.mkv",
 }
 
 func TestParser(t *testing.T) {

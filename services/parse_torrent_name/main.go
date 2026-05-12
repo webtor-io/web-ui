@@ -216,6 +216,35 @@ var fieldParsers = FieldParsers{
 		// "[Cleo]Dies_Irae_-_ONA_01_(Dual Audio…).mkv" (underscores → spaces
 		// before parsing, so matcher sees "Dies Irae - ONA 01 …").
 		`(?i)(\b(?:` + kindAlternation + `)[\s.]+([0-9]{1,3})(?:[^0-9]|$))`,
+		// Title-trailing 3-digit episode index. Catches the
+		// "<Show> NNN [<Quality>]" convention used by Brazilian-PT
+		// anime fansub releases — real torrent 9dd0bf1eaf (Dragon Ball
+		// Clássico 001…153) had 153 files of shape "[AT] Dragon Ball
+		// Clássico NNN [480p] (Legendado).mkv", none of which any prior
+		// pattern caught, producing 153 distinct MovieMultiple rows
+		// and 153 redundant Claude calls.
+		//
+		// Strictly 3-digit. Two-digit zero-padded forms (0N, 0NN) were
+		// considered but regressed adult release-date packs where the
+		// filename embeds `YY MM DD`: "hegre 23 08 22 allie" would
+		// match " 08 " and corrupt Episode and Title. Real-world
+		// episode packs reach 100+ entries anyway (anime/long-runners),
+		// so the 3-digit restriction keeps the high-volume cases while
+		// dropping the FP-prone short ones — those still get caught
+		// by the existing `\b\d{2}[\s.]+-[\s.]+\p{L}` pattern when the
+		// release format follows the "- 01 - Title" convention.
+		// Anchored on `\s+` both sides so dotted-separator filenames
+		// ("Some.Movie.300.x264.mkv") and immediately-trailing markers
+		// ("1080p" → has 'p' after, no space) are immune.
+		`(\s+([0-9]{3})\s+)`,
+		// "<NN>. <Title>" prefix form used by Russian "Files-x" release
+		// group convention (real torrents 1974978dd6 "Дуплет.2025" and
+		// e123b05b68 "Сломанная стрела.2025" — 8 and 4 files respectively
+		// of shape "NN. Title.Year.Quality.Files-x.ext"). The dot-then-
+		// SPACE separator after the digits is the distinctive signal —
+		// dotted-only filenames ("12.Years.a.Slave.2013") have NO space
+		// after the leading-digit dot and stay immune.
+		`(^([0-9]{2})\.\s+)`,
 	), nil},
 	{FieldTypeRegion, NewRegexpMatcher(`(?i)\b(R([0-9]))\b`), nil},
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
@@ -238,7 +267,24 @@ var parser = NewCompoundParser([]Parser{
 		NewFieldParser(FieldTypeExtraTitle, NewRegexpMatcher(`(\[([^\)]+)\])`), titleTransformer),
 		NewFieldParser(FieldTypeTitle, NewRegexpMatcher(`(([^\[\(\{]*))`), titleTransformer),
 	})),
-	NewFieldParser(FieldTypeGroup, NewRegexpMatcher(`\b(- ?([^-]+(?:-={[^-]+-?$)?))$`), nil),
+	NewFieldParser(FieldTypeGroup, NewRegexpMatcher(
+		// Dotted-format release group with INTERNAL dash. Real torrents
+		// 1974978dd6 (Дуплет.2025) and e123b05b68 (Сломанная стрела.2025)
+		// — Russian "Files-x" group ships every file as
+		// "<NN>. Title.Year.Quality.Files-x.<ext>". The default
+		// dash-prefix regex below splits on the internal dash and
+		// captures only "x", losing the "Files-" prefix.
+		//
+		// Anchored to "Files-" specifically rather than a generic
+		// `\.(\w+-\w+)\.<ext>` because the generic form would false-fire
+		// on quality tags ("WEB-DL.mkv" → group="WEB-DL") and codec tags
+		// ("H264-RARBG" — though that one is dash-prefix not dotted, the
+		// risk of overlap is real). Extend the alternation in this
+		// regex with new known-dash-internal release-group prefixes as
+		// they appear.
+		`(?i)(\.((?:Files)-[a-zA-Z0-9]+))(?:\.[a-z0-9]{2,4})?$`,
+		`\b(- ?([^-]+(?:-={[^-]+-?$)?))$`,
+	), nil),
 })
 
 // Parse breaks up the given filename in TorrentInfo
