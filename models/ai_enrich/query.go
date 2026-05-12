@@ -132,11 +132,13 @@ func UpsertQuery(ctx context.Context, db *pg.DB, title string, year *int16, cont
 		OnConflict("(parsed_title, parsed_year, content_type) DO UPDATE").
 		Set("candidates = EXCLUDED.candidates").
 		Set("model = EXCLUDED.model").
-		// Unqualified column on the right of ON CONFLICT SET resolves to
-		// the EXISTING row value — so COALESCE keeps the first sample and
-		// only takes EXCLUDED when nothing was stored before.
-		Set("resource_id = COALESCE(resource_id, EXCLUDED.resource_id)").
-		Set("hint_path = COALESCE(hint_path, EXCLUDED.hint_path)").
+		// Qualify with target table name on the right of ON CONFLICT
+		// SET — PostgreSQL reports `resource_id is ambiguous` for the
+		// unqualified form because the EXCLUDED pseudo-table is also in
+		// scope. COALESCE keeps the first observed sample and only takes
+		// EXCLUDED when nothing was stored before.
+		Set(`resource_id = COALESCE("query".resource_id, EXCLUDED.resource_id)`).
+		Set(`hint_path = COALESCE("query".hint_path, EXCLUDED.hint_path)`).
 		Set("updated_at = now()").
 		Insert()
 	return err
