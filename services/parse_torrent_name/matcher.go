@@ -13,12 +13,26 @@ type Match struct {
 	End       int
 	Raw       string
 	Content   string
+	// Transient matches are detected and reported (so the matched
+	// FieldType still gets set on the output struct) but their
+	// (Start, End) span is NOT subtracted from the input available
+	// to subsequent matchers. Used for "flag-only" fields like Porn
+	// where we want the side-effect (boolean=true) without ripping
+	// the matched keyword out of the title — "Bang My Tranny Ass"
+	// should still produce Title="Bang My Tranny Ass" + Porn=true,
+	// not Title="Bang My" because `tranny` was consumed mid-string.
+	Transient bool
 }
 
 type Matches []*Match
 
 func (s Matches) getAvailable(start int, end int) (int, int, bool) {
 	for _, m := range s {
+		// Detect-only matches don't claim space — subsequent matchers
+		// (especially the greedy Title regex) see the full string.
+		if m.Transient {
+			continue
+		}
 		if m.Start <= start && m.End >= end {
 			return start, end, false
 		}

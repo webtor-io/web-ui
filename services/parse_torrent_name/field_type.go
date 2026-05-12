@@ -37,5 +37,6 @@ const (
 	FieldTypeSample      FieldType = "sample"
 	FieldTypeRipBy       FieldType = "rip_by"
 	FieldTypeKind        FieldType = "kind"
+	FieldTypeDate        FieldType = "date"
 	FieldTypeUnknown     FieldType = "unknown"
 )

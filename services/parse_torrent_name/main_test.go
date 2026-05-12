@@ -344,6 +344,16 @@ var testData = []string{
 	// after a dash/underscore disambiguates — bare "APNS notifications"
 	// stays clean.
 	"iOS Push APNS Tutorial - Building Notifications 2024.mp4",
+	// ----- Scene-release date extraction. Adult releases commonly
+	// embed YY.MM.DD (Blacked.18.03.21) or DD.MM.YYYY-in-parens
+	// (Studio - Title (27.02.2026)). DateTransformer normalizes both
+	// to "YYYY-MM-DD".
+	"Blacked.18.03.21.Lana.Rhoades.1080p.mp4",
+	"hegre 23 08 22 allie asia juicy orgasms",
+	// Negative: wrestling broadcast date "2014 11 10" must NOT match
+	// — the `\d{2}` requires word-boundary on both sides, so "14"
+	// preceded by "20" (mid-token, no `\b`) doesn't start a match.
+	"WWE Monday Night Raw 2014 11 10 WS PDTV x264-RKOFAN1990",
 	// Accepted FP: "tranny" in car-transmission-rebuild context.
 	// In ai_enrich.query telemetry, the adult use of this word is
 	// dramatically more common than the car-slang sense, so the keyword

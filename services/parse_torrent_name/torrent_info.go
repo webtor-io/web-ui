@@ -46,6 +46,14 @@ type TorrentInfo struct {
 	// Animation DVD), NCOP (Non-Credit Opening), NCED (Non-Credit Ending).
 	// Episode extractor still produces the numeric episode index alongside.
 	Kind string `json:"kind,omitempty"`
+	// Date is the scene-release date extracted from adult / dated-release
+	// filenames. Normalized to "YYYY-MM-DD" regardless of source format:
+	//   - "Blacked.18.03.21.Lana.Rhoades"     → 2018-03-21
+	//   - "hegre 23 08 22 allie"              → 2023-08-22
+	//   - "Studio - Title (27.02.2026) rq"    → 2026-02-27
+	//   - "bex_stormy_daniels_kl040518_480p"  → 2018-05-04 (YYMMDD glued)
+	// Two-digit years assume 20YY (adult-scene convention since ~2000).
+	Date string `json:"date,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

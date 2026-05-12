@@ -1,6 +1,14 @@
 package parsetorrentname
 
-import "strings"
+import (
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+// adultStudioRe is a compiled anchored form of adultStudioAlternation,
+// used by the Website→Studio promotion fixup in Parse.
+var adultStudioRe = regexp.MustCompile(`(?i)^(?:` + adultStudioAlternation + `)$`)
 
 // Release-quality keywords, split into two groups so the Episode
 // `.NN.<Quality>` anchor (Russian DVDRip pack convention) can opt into
@@ -23,6 +31,13 @@ const (
 	qualityRipForms       = `DVDRip|DVDRIP|BluRay|B[DR]Rip|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|W[EB]BRip|CamRip|DvDScr|SATRip|TVRip`
 	qualityBroadcastForms = `(?:PPV\.)?[HP]DTV|(?:HD)?CAM|(?:HD-?)?TS|telesync`
 	qualityAlternation    = qualityRipForms + `|` + qualityBroadcastForms
+
+	// adultStudioAlternation — curated adult-studio / cam-site names
+	// from ai_enrich.query telemetry. Shared by pornMatcher (transient
+	// flag) and the FieldTypeStudio parser (extracts the name into
+	// Studio so the title parser doesn't keep the prefix). Add new
+	// names here in lowercase; the `(?i)` modifier handles mixed-case.
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -49,61 +64,11 @@ var fieldParsers = FieldParsers{
 	// otherwise a single torrent produces two movies (the real film and the
 	// preview), each calling AI/TMDB independently.
 	{FieldTypeSample, NewRegexpMatcher(`(?i)\b((sample))\b`), nil},
-	// FieldTypePorn — adult/erotic content marker. Used downstream to
-	// skip Claude-backed enrichment for the ~30-40% of negative-cache
-	// traffic that is porn/JAV/cam content (see ai_enrich.query telemetry
-	// 2026-05-11). Each pattern is a separate regex so the matcher's
-	// "first hit wins" semantic still works; only the bool flag matters
-	// — the captured content itself is discarded.
-	//
-	// Cyrillic and CJK patterns use a non-capturing `(?:^|[^...])` prefix
-	// guard instead of `\b` because Go's RE2 `\b` only recognizes ASCII
-	// word characters. Without the guard, `трах[...]` would false-match
-	// "страх" (fear) and similar.
-	{FieldTypePorn, NewRegexpMatcher(
-		// Explicit XXX scene tag. Kept first for backwards compatibility
-		// — existing golden_file_083 expects this exact match.
-		`(?i)\b((X{3}))\b`,
-		// English single-occurrence keywords. All of these are
-		// effectively never found in non-adult release names.
-		`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies))\b`,
-		// Adult studios / sites (case-insensitive). Curated from
-		// ai_enrich.query — every name here was observed dominating
-		// the negative cache (milfy alone: 106 rows).
-		`(?i)\b((blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys))\b`,
-		// Bestiality phrases — explicit "dog/zoo/horse + sex/fuck/porn"
-		// and the "art of zoo" series of bestiality torrents.
-		`(?i)\b((art\s+of\s+zoo|(?:dog|zoo|horse|animal)\s+(?:sex|fuck|porn|cum)))\b`,
-		// "bate" cam-girl convention: handle + "bate" + 6+ digit
-		// timestamp ("alinajellybeana bate 090607 stickam"). Plain
-		// "bate" alone would clash with "Bates Motel" etc., so require
-		// the trailing date.
-		`(?i)((bate)[\s\-_]\d{6,})`,
-		// "of - " / "of – " — OnlyFans abbreviation at the start of a
-		// title. Standalone "of" is too common to match unanchored.
-		`(?i)^((of\s*[\-–]\s))`,
-		// BBC ("Big Black Cock") paired with an adult anchor word.
-		// Excludes "BBC News", "BBC Earth", etc. — those have neither
-		// these verbs nor matching nouns.
-		`(?i)\b((bbc))\s+(?:cock|fuck|treat|surprise|crave|hungry|addict|obsess|loves?|monster|stretch|hung|breed|breeding|destroy|destroys|stretching|inches|fan|goddess|hotwife|wife|stud|stallion)`,
-		// JAV studio code prefix + numeric serial. Prefix list pruned
-		// to combinations unlikely to collide with English words / years
-		// (so no bare "sw", "jul", "mum", "stars"). The required
-		// trailing `\d{2,5}` is what disambiguates ambiguous prefixes
-		// like APNS (Apple Push Notification Service) — only
-		// "APNS-410" form fires, "APNS notifications" stays clean.
-		`(?i)\b((aarm|abp|abw|adn|apns|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|imoe|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|snos|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
-		// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
-		// match the lowercase alternation. Non-Cyrillic prefix guard
-		// prevents false matches like "страх" (fear) → "трах".
-		`(?i)((?:^|[^а-яА-Я])(трах[аеёиоунюя]|еб[аеёилоутю]|инцест|шлюх|минет|дрочи|кримпай|пизд|сперм|порно))`,
-		// Chinese adult markers — uncensored / leaked / explicit body
-		// terms / adult-BBS shorthand. No CJK prefix guard: these tokens
-		// don't appear inside other common Chinese words, and Chinese
-		// titles concatenate ideographs (so "[^CJK]" would block real
-		// hits like "极品...内射" mid-string).
-		`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
-	), nil},
+	// FieldTypePorn lives outside the fieldParsers slice — see
+	// pornMatcher / pornParser below. Detected via TransientFieldParser
+	// so the matched keyword is reported (Porn=true) but its span is
+	// NOT consumed, otherwise "Bang My Tranny Ass" yields Title="Bang My"
+	// because `tranny` sits mid-string.
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
 	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},
@@ -112,6 +77,24 @@ var fieldParsers = FieldParsers{
 	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|[hx]\.?26[45]))\b`), nil},
 	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((MP3|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?))\b`), nil},
 	{FieldTypeWebsite, NewRegexpMatcher(`^((www\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}))`, `^(\[ ?([^\]]+?) ?\])`), nil},
+	// Scene-release date. Runs BEFORE Year + Episode so the year-shaped
+	// trailing group in "DD.MM.YYYY" doesn't get split between Year and
+	// Date, and so the 2-digit groups in "YY.MM.DD" don't get eaten by
+	// the Episode `\d{2,3}` patterns.
+	//
+	// Adult releases dominate this pattern (Blacked.18.03.21.Lana,
+	// hegre 23 08 22 allie, Studio - Title (27.02.2026)). The 2-digit
+	// year is unambiguous because `\b` denies matches inside 4-digit
+	// year tokens (so "2014 11 10" wrestling broadcast dates stay
+	// untouched and reach the Year/Episode pipeline).
+	//
+	// The DateTransformer normalizes all three input shapes to
+	// "YYYY-MM-DD" and validates month/day ranges; out-of-range
+	// triplets fall through unmatched.
+	{FieldTypeDate, NewRegexpMatcher(
+		`(\b(\d{2}[.\s_\-]\d{2}[.\s_\-]\d{2})\b)`,
+		`(\((\d{1,2}[.\s_\-]\d{1,2}[.\s_\-]\d{4})\))`,
+	), NewDateTransformer()},
 	// Year is matched BEFORE Season/Episode so 4-digit year-shaped numbers
 	// are consumed first. Otherwise the `(-\s+\d+)` episode pattern below
 	// would happily eat "- 1997)" out of "(1990 - 1997)" and write it into
@@ -253,7 +236,20 @@ var fieldParsers = FieldParsers{
 	{FieldTypeLanguage, NewRegexpMatcher(`(?i)\b((rus\.eng|ita\.eng))\b`), nil},
 	{FieldTypeSBS, NewRegexpMatcher(`(?i)\b(((?:Half-)?SBS))\b`), nil},
 	{FieldTypeContainer, NewRegexpMatcher(`(?i)\b((MKV|AVI|MP4|WEBM))\b`), nil},
-	{FieldTypeStudio, NewRegexpMatcher(`(?i)\b((AMZN|NF))\b`, `(\[ ?([^\]]+?)[\s.]?[0-9]{4}\])`), titleTransformer},
+	// FieldTypeStudio captures:
+	//   1. Streaming-platform tags (AMZN/NF) — dropped from title before
+	//      TMDB search.
+	//   2. Studio-with-year inside brackets ("[Studio YYYY]") for
+	//      anime-fansub release annotations.
+	//   3. Adult studios (shared alternation with the Porn detector —
+	//      see `adultStudioAlternation` above). Extracting these into
+	//      Studio cleans the title and makes the studio name available
+	//      as structured metadata downstream.
+	{FieldTypeStudio, NewRegexpMatcher(
+		`(?i)\b((AMZN|NF))\b`,
+		`(\[ ?([^\]]+?)[\s.]?[0-9]{4}\])`,
+		`(?i)\b((` + adultStudioAlternation + `))\b`,
+	), titleTransformer},
 	// "rip by <Name>" Russian release attribution. Aleksan55 SATRip and
 	// similar fan-encoded packs trail every filename with "rip by X",
 	// which otherwise leaks into Title and confuses TMDB/AI matching
@@ -264,7 +260,72 @@ var fieldParsers = FieldParsers{
 	{FieldTypeRipBy, NewRegexpMatcher(`(?i)(\brip\s+by\s+(\S+))`), nil},
 }
 
+// pornMatcher carries the FieldTypePorn detection regexes. Each pattern
+// is a separate regex so the matcher's "first hit wins" semantic still
+// works; only the bool flag matters — the captured content itself is
+// discarded.
+//
+// Cyrillic and CJK patterns use a non-capturing `(?:^|[^...])` prefix
+// guard instead of `\b` because Go's RE2 `\b` only recognizes ASCII
+// word characters. Without the guard, `трах[...]` would false-match
+// "страх" (fear) and similar.
+//
+// Used downstream to skip Claude-backed enrichment for the ~30-40%
+// of negative-cache traffic that is porn/JAV/cam content (see
+// ai_enrich.query telemetry 2026-05-11).
+var pornMatcher = NewRegexpMatcher(
+	// Explicit XXX scene tag. Kept first for backwards compatibility
+	// — existing golden_file_083 expects this exact match.
+	`(?i)\b((X{3}))\b`,
+	// English single-occurrence keywords. All of these are
+	// effectively never found in non-adult release names.
+	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies))\b`,
+	// Adult studios / sites (case-insensitive). Curated from
+	// ai_enrich.query — every name here was observed dominating
+	// the negative cache (milfy alone: 106 rows). The list itself
+	// lives in `adultStudioAlternation` so FieldTypeStudio can
+	// extract the matched name into Studio without duplicating
+	// the alternation.
+	`(?i)\b((` + adultStudioAlternation + `))\b`,
+	// Bestiality phrases — explicit "dog/zoo/horse + sex/fuck/porn"
+	// and the "art of zoo" series of bestiality torrents.
+	`(?i)\b((art\s+of\s+zoo|(?:dog|zoo|horse|animal)\s+(?:sex|fuck|porn|cum)))\b`,
+	// "bate" cam-girl convention: handle + "bate" + 6+ digit
+	// timestamp ("alinajellybeana bate 090607 stickam"). Plain
+	// "bate" alone would clash with "Bates Motel" etc., so require
+	// the trailing date.
+	`(?i)((bate)[\s\-_]\d{6,})`,
+	// "of - " / "of – " — OnlyFans abbreviation at the start of a
+	// title. Standalone "of" is too common to match unanchored.
+	`(?i)^((of\s*[\-–]\s))`,
+	// BBC ("Big Black Cock") paired with an adult anchor word.
+	// Excludes "BBC News", "BBC Earth", etc. — those have neither
+	// these verbs nor matching nouns.
+	`(?i)\b((bbc))\s+(?:cock|fuck|treat|surprise|crave|hungry|addict|obsess|loves?|monster|stretch|hung|breed|breeding|destroy|destroys|stretching|inches|fan|goddess|hotwife|wife|stud|stallion)`,
+	// JAV studio code prefix + numeric serial. Prefix list pruned
+	// to combinations unlikely to collide with English words / years
+	// (so no bare "sw", "jul", "mum", "stars"). The required
+	// trailing `\d{2,5}` is what disambiguates ambiguous prefixes
+	// like APNS (Apple Push Notification Service) — only
+	// "APNS-410" form fires, "APNS notifications" stays clean.
+	`(?i)\b((aarm|abp|abw|adn|apns|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|imoe|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|snos|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
+	// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
+	// match the lowercase alternation. Non-Cyrillic prefix guard
+	// prevents false matches like "страх" (fear) → "трах".
+	`(?i)((?:^|[^а-яА-Я])(трах[аеёиоунюя]|еб[аеёилоутю]|инцест|шлюх|минет|дрочи|кримпай|пизд|сперм|порно))`,
+	// Chinese adult markers — uncensored / leaked / explicit body
+	// terms / adult-BBS shorthand. No CJK prefix guard: these tokens
+	// don't appear inside other common Chinese words, and Chinese
+	// titles concatenate ideographs (so "[^CJK]" would block real
+	// hits like "极品...内射" mid-string).
+	`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
+)
+
 var parser = NewCompoundParser([]Parser{
+	// Run FIRST so Porn detection sees the unmolested input. Transient
+	// so its matched spans don't truncate Title downstream — see
+	// "Bang My Tranny Ass" trace in parser.go/Match.Transient.
+	NewTransientFieldParser(FieldTypePorn, pornMatcher, nil),
 	NewCompoundParser(fieldParsers.ToParserSlice()),
 	NewScopeParser(NewRegexpMatcher(`((.*))`), NewCompoundParser([]Parser{
 		NewFieldParser(FieldTypeExtraTitle, NewRegexpMatcher(`(\[([^\)]+)\])`), titleTransformer),
@@ -300,6 +361,34 @@ func Parse(tor *TorrentInfo, filename string) (*TorrentInfo, error) {
 	}
 
 	tor.Map(ms)
+
+	// Promote `[<adult-studio>]` from Website to Studio. The Website
+	// parser at line 64 is permissive — it claims ANY `[...]` prefix —
+	// so adult releases like "[RKPrime] Megan Rain - ..." land in
+	// Website even though "RKPrime" is a known studio. Without this
+	// fixup the studio info is in the wrong field for downstream filters.
+	if tor.Studio == "" && tor.Website != "" {
+		if adultStudioRe.MatchString(tor.Website) {
+			tor.Studio = tor.Website
+			tor.Website = ""
+		}
+	}
+
+	// Year-from-Date back-fill. When a scene date is extracted (almost
+	// always from adult/dated releases — see FieldTypeDate above) and
+	// no explicit 4-digit year survives in the filename, copy the
+	// year component over so downstream metadata lookups still have
+	// a year filter. Examples:
+	//   "Blacked.18.03.21.Lana.Rhoades"   → Date=2018-03-21, Year=2018
+	//   "Studio - Title (27.02.2026) rq"  → Date=2026-02-27, Year=2026
+	// Date span has already consumed the surrounding 4-digit year
+	// (when the source carried one), so this branch fires for the
+	// YY-prefix form too.
+	if tor.Year == 0 && len(tor.Date) >= 4 {
+		if y, err := strconv.Atoi(tor.Date[:4]); err == nil {
+			tor.Year = y
+		}
+	}
 
 	return tor, nil
 }
