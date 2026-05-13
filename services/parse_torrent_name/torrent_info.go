@@ -78,6 +78,19 @@ type TorrentInfo struct {
 	// in TorrentInfo.MapField — which goes through strings.Title —
 	// resolves correctly. Same convention as Avc, Sbs.
 	Ppv bool `json:"ppv,omitempty"`
+	// PathTitles is the per-segment Title harvest from a multi-level
+	// torrent file path. parseItem() parses each "/" segment
+	// INDEPENDENTLY and stacks the non-empty `Title` values here in
+	// root-first order. For "/Freaks and Geeks/Season 1/Episode 18 -
+	// Discos and Dragons.mkv" the list ends up as
+	// ["Freaks and Geeks", "Season 1", "Discos and Dragons"] — the
+	// canonical Title field stores just the root entry, but downstream
+	// enrichment can iterate this slice as additional TMDB/OMDB/KPU
+	// search candidates before reaching for AI.
+	//
+	// Populated only by enrich.parseItem on multi-segment paths;
+	// direct callers of ptn.Parse leave it nil.
+	PathTitles []string `json:"path_titles,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

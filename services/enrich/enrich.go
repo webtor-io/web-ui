@@ -3,6 +3,8 @@ package enrich
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -156,19 +158,80 @@ func MakeTorrentInfo(item *ra.ListItem) (*TorrentInfo, error) {
 	}, nil
 }
 
-func parseItem(item *ra.ListItem) (ti *ptn.TorrentInfo, err error) {
-	ti = &ptn.TorrentInfo{}
+// parseItem walks each non-empty segment of the torrent's file path
+// independently, then merges the per-segment TorrentInfo structs.
+//
+// Strategy:
+//
+//  1. Take the FILE segment (last non-empty part) as the base — the
+//     filename normally carries the most fields (Episode, Codec,
+//     Quality, Year, Container, ...).
+//  2. Fill gaps from earlier segments — anything the file didn't set
+//     gets the first non-zero value seen from root → file-1.
+//  3. Series-shape override: when the file has an Episode but NO
+//     Season, the file's Title is almost certainly an episode
+//     subtitle ("Episode 18 - Discos and Dragons"), not the series
+//     name. In that case adopt the ROOT segment's Title instead so
+//     metadata lookup keys on the series. The S01E01-style file
+//     form, where Season is set, leaves Title alone — the parser
+//     already extracted the series name as Title.
+//  4. PathTitles — every segment's non-empty parsed Title, deduped
+//     and root-first. Downstream enrichment can iterate the list as
+//     additional TMDB/OMDB/KPU search candidates before falling
+//     through to the AI resolver.
+//
+// Test fixture: services/enrich/parse_item_test.go.
+func parseItem(item *ra.ListItem) (*ptn.TorrentInfo, error) {
 	pathParts := strings.Split(item.PathStr, "/")
+	segments := make([]*ptn.TorrentInfo, 0, len(pathParts))
 	for _, part := range pathParts {
 		if part == "" {
 			continue
 		}
-		ti, err = ptn.Parse(ti, part)
+		seg, err := ptn.Parse(&ptn.TorrentInfo{}, part)
 		if err != nil {
 			return nil, err
 		}
+		segments = append(segments, seg)
 	}
-	return ti, nil
+	if len(segments) == 0 {
+		return &ptn.TorrentInfo{}, nil
+	}
+	merged := *segments[len(segments)-1] // copy file segment as base
+	for i := 0; i < len(segments)-1; i++ {
+		mergeKeepFirstNonZero(&merged, segments[i])
+	}
+	root := segments[0]
+	file := segments[len(segments)-1]
+	if len(segments) > 1 && file.Episode > 0 && file.Season == 0 &&
+		root.Title != "" && root.Title != file.Title {
+		merged.Title = root.Title
+	}
+	for _, seg := range segments {
+		if seg.Title != "" && !slices.Contains(merged.PathTitles, seg.Title) {
+			merged.PathTitles = append(merged.PathTitles, seg.Title)
+		}
+	}
+	return &merged, nil
+}
+
+// mergeKeepFirstNonZero copies fields from `src` into `dst` only
+// where `dst` is currently a zero value. Slice fields are left alone
+// — they're managed explicitly by parseItem (PathTitles) and never
+// merged across segments.
+func mergeKeepFirstNonZero(dst, src *ptn.TorrentInfo) {
+	dstV := reflect.ValueOf(dst).Elem()
+	srcV := reflect.ValueOf(src).Elem()
+	for i := 0; i < dstV.NumField(); i++ {
+		df := dstV.Field(i)
+		sf := srcV.Field(i)
+		if df.Kind() == reflect.Slice {
+			continue
+		}
+		if df.IsZero() {
+			df.Set(sf)
+		}
+	}
 }
 
 // torrentRoot returns the first non-empty segment of a torrent file
