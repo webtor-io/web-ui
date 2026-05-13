@@ -1,11 +1,110 @@
 package enrich
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"github.com/webtor-io/web-ui/models"
 	ra "github.com/webtor-io/rest-api/services"
 )
+
+// titleAwareMapper returns metadata keyed on the VideoContent.Title
+// it's asked about. Used by TestMapMetadata_PathTitleFallback to
+// verify that mapMetadata walks each parser-harvested path-segment
+// title as a search-key candidate before reaching for the AI fallback.
+type titleAwareMapper struct {
+	name string
+	byT  map[string]*models.VideoMetadata
+}
+
+func (m *titleAwareMapper) GetName() string { return m.name }
+func (m *titleAwareMapper) Map(_ context.Context, vc *models.VideoContent, _ models.ContentType, _ bool) (*models.VideoMetadata, error) {
+	return m.byT[vc.Title], nil
+}
+func (m *titleAwareMapper) MapByID(_ context.Context, _ string, _ models.ContentType, _ bool) (*models.VideoMetadata, error) {
+	return nil, nil
+}
+
+var _ MetadataMapper = (*titleAwareMapper)(nil)
+var _ DirectMapper = (*titleAwareMapper)(nil)
+
+// TestMapMetadata_PathTitleFallback locks in the "try the path-segment
+// titles before falling through to Claude" branch in mapMetadata. The
+// Freaks and Geeks case (real torrent 08b450441e) is the canonical
+// example: the canonical Title ("Discos and Dragons" — the episode
+// subtitle, before parseItem's series-shape fix) misses TMDB, but
+// "Freaks and Geeks" — extracted from the root folder and stored in
+// Metadata["path_titles"] — hits it. With the fallback the resource
+// is enriched WITHOUT a Claude call.
+//
+// Asserts via a no-AI Enricher (aiResolver=nil): the only way the
+// metadata can resolve is through the path-title iteration.
+func TestMapMetadata_PathTitleFallback(t *testing.T) {
+	mapper := &titleAwareMapper{
+		name: "TMDB",
+		byT: map[string]*models.VideoMetadata{
+			"Freaks and Geeks": {
+				VideoID:   "tt0193676",
+				Title:     "Freaks and Geeks",
+				PosterURL: "https://image.tmdb.org/p.jpg",
+			},
+		},
+	}
+	en := &Enricher{mappers: []MetadataMapper{mapper}}
+
+	// Primary Title is the episode subtitle — misses. The path-title
+	// list holds the series name as the root candidate. mapMetadata
+	// must walk to that.
+	vc := &models.VideoContent{
+		Title: "Discos and Dragons",
+		Metadata: map[string]any{
+			"path_titles": []interface{}{
+				"Freaks and Geeks",
+				"Season 1",
+				"Discos and Dragons",
+			},
+		},
+	}
+	md, err := en.mapMetadata(context.Background(), vc, models.ContentTypeSeries, false, "", "", nil)
+	if err != nil {
+		t.Fatalf("mapMetadata: %v", err)
+	}
+	if md == nil {
+		t.Fatal("expected metadata resolved via path-title candidate; got nil")
+	}
+	if md.Title != "Freaks and Geeks" {
+		t.Errorf("Title = %q, want %q", md.Title, "Freaks and Geeks")
+	}
+}
+
+// Sanity: when the primary Title already hits, the path-title loop
+// must NOT run (we don't want to overwrite a primary mapper hit
+// with a candidate match from a different title).
+func TestMapMetadata_PrimaryTitleWins(t *testing.T) {
+	mapper := &titleAwareMapper{
+		name: "TMDB",
+		byT: map[string]*models.VideoMetadata{
+			"Apollo 13":  {VideoID: "tt0112384", Title: "Apollo 13"},
+			"Some Other": {VideoID: "tt9999999", Title: "Some Other"},
+		},
+	}
+	en := &Enricher{mappers: []MetadataMapper{mapper}}
+
+	vc := &models.VideoContent{
+		Title: "Apollo 13",
+		Metadata: map[string]any{
+			"path_titles": []interface{}{"Some Other", "Apollo 13"},
+		},
+	}
+	md, err := en.mapMetadata(context.Background(), vc, models.ContentTypeMovie, false, "", "", nil)
+	if err != nil {
+		t.Fatalf("mapMetadata: %v", err)
+	}
+	if md == nil || md.Title != "Apollo 13" {
+		t.Fatalf("expected Apollo 13 from primary search; got %+v", md)
+	}
+}
 
 // TestParseItem_MultiSegmentPath locks in how the per-path-segment
 // parser merges fields across a torrent file path. Each path level

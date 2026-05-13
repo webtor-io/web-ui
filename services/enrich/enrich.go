@@ -754,6 +754,28 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 	if md != nil {
 		return md, nil
 	}
+	// Path-title candidates: parseItem harvested the Title from every
+	// segment of the source torrent path into Metadata["path_titles"].
+	// Try each as a search key before resorting to Claude — the
+	// existing TMDB.query / KPU.query caches absorb the repeated
+	// per-title lookups so this is cheap even when it misses.
+	for _, pt := range extractPathTitles(vc) {
+		if pt == "" || pt == vc.Title {
+			continue
+		}
+		candVC := &models.VideoContent{
+			ResourceID: vc.ResourceID,
+			Title:      pt,
+			Year:       vc.Year,
+		}
+		if cmd, _ := s.searchAllMappers(ctx, candVC, t, f); cmd != nil {
+			log.WithFields(log.Fields{
+				"candidate":   pt,
+				"resolved_id": cmd.VideoID,
+			}).Info("metadata resolved via path-title candidate (no AI call)")
+			return cmd, nil
+		}
+	}
 	if s.aiResolver != nil && pathHint != "" {
 		if aiMD := s.tryAIFallback(ctx, vc, t, f, pathHint, budget); aiMD != nil {
 			return aiMD, nil
@@ -768,6 +790,33 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 		return nil, firstErr
 	}
 	return nil, nil
+}
+
+// extractPathTitles pulls the parser-harvested per-segment Title
+// candidates back out of VideoContent.Metadata. The values live in
+// the same json blob that StructToMap writes from the underlying
+// TorrentInfo (see makeMovie / makeSeriesWithEpisodes), so no extra
+// transient field on VideoContent is required — DB persistence is
+// a free side effect of the existing metadata round-trip.
+func extractPathTitles(vc *models.VideoContent) []string {
+	if vc == nil || vc.Metadata == nil {
+		return nil
+	}
+	raw, ok := vc.Metadata["path_titles"]
+	if !ok {
+		return nil
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if s, ok := v.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // lookupByHint walks every DirectMapper for an externally-provided
