@@ -1,8 +1,11 @@
 {
-  "title": "Apollo 13",
-  "year": 1995,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "container": "mkv"
+  "input": "Apollo 13 (1995) 1080p BluRay x264.mkv",
+  "want": {
+    "title": "Apollo 13",
+    "year": 1995,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "container": "mkv"
+  }
 }

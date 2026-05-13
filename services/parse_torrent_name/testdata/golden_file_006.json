@@ -1,8 +1,11 @@
 {
-  "title": "Hercules",
-  "year": 2014,
-  "quality": "HDRip",
-  "codec": "XViD",
-  "group": "juggs[ETRG]",
-  "extended": true
+  "input": "Hercules.2014.Extended.Cut.HDRip.XViD-juggs[ETRG]",
+  "want": {
+    "title": "Hercules",
+    "year": 2014,
+    "quality": "HDRip",
+    "codec": "XViD",
+    "group": "juggs[ETRG]",
+    "extended": true
+  }
 }

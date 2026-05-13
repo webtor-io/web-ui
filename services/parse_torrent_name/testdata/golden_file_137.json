@@ -1,8 +1,11 @@
 {
-  "title": "Bates Motel",
-  "season": 1,
-  "episode": 1,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "LOL"
+  "input": "Bates.Motel.S01E01.HDTV.x264-LOL",
+  "want": {
+    "title": "Bates Motel",
+    "season": 1,
+    "episode": 1,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "LOL"
+  }
 }

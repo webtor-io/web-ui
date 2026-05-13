@@ -1,7 +1,10 @@
 {
-  "title": "Грозовые ворота",
-  "episode": 4,
-  "quality": "DVDRip",
-  "group": "SVAT",
-  "container": "avi"
+  "input": "Грозовые ворота.04.DVDRip-SVAT.avi",
+  "want": {
+    "title": "Грозовые ворота",
+    "episode": 4,
+    "quality": "DVDRip",
+    "group": "SVAT",
+    "container": "avi"
+  }
 }

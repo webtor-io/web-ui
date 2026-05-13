@@ -1,8 +1,11 @@
 {
-  "title": "Doctor Who",
-  "season": 8,
-  "episode": 1,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "container": "mkv"
+  "input": "Doctor.Who.S08.E01.Deep.Breath.WEB-DL.1080p.mkv",
+  "want": {
+    "title": "Doctor Who",
+    "season": 8,
+    "episode": 1,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "container": "mkv"
+  }
 }

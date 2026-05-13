@@ -1,10 +1,13 @@
 {
-  "title": "Doctor Who",
-  "season": 8,
-  "episode": 11,
-  "year": 2005,
-  "resolution": "720p",
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "FoV[rartv]"
+  "input": "Doctor.Who.2005.8x11.Dark.Water.720p.HDTV.x264-FoV[rartv]",
+  "want": {
+    "title": "Doctor Who",
+    "season": 8,
+    "episode": 11,
+    "year": 2005,
+    "resolution": "720p",
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "FoV[rartv]"
+  }
 }

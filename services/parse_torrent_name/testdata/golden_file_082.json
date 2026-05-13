@@ -1,8 +1,11 @@
 {
-  "title": "2012",
-  "year": 2009,
-  "resolution": "720p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "audio": "Dual Audio"
+  "input": "2012 2009 x264 720p Esub BluRay 6.0 Dual Audio English Hindi GOPISAHI",
+  "want": {
+    "title": "2012",
+    "year": 2009,
+    "resolution": "720p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "audio": "Dual Audio"
+  }
 }

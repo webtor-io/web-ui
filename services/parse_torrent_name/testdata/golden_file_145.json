@@ -1,8 +1,11 @@
 {
-  "title": "Saw 7",
-  "year": 2010,
-  "quality": "BRRip",
-  "codec": "x264",
-  "group": "YIFY",
-  "container": "mkv"
+  "input": "Saw.7.2010.BRRip.x264-YIFY.mkv",
+  "want": {
+    "title": "Saw 7",
+    "year": 2010,
+    "quality": "BRRip",
+    "codec": "x264",
+    "group": "YIFY",
+    "container": "mkv"
+  }
 }

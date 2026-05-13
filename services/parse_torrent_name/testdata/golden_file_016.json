@@ -1,10 +1,13 @@
 {
-  "title": "The Walking Dead",
-  "season": 5,
-  "episode": 3,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "codec": "H.264",
-  "audio": "DD5.1",
-  "group": "Cyphanix[rartv]"
+  "input": "The.Walking.Dead.S05E03.1080p.WEB-DL.DD5.1.H.264-Cyphanix[rartv]",
+  "want": {
+    "title": "The Walking Dead",
+    "season": 5,
+    "episode": 3,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "codec": "H.264",
+    "audio": "DD5.1",
+    "group": "Cyphanix[rartv]"
+  }
 }

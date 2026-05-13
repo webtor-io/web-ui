@@ -1,10 +1,13 @@
 {
-  "title": "sons of anarchy",
-  "season": 5,
-  "episode": 10,
-  "resolution": "480p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "group": "GAnGSteR",
-  "website": "720pMkv.Com"
+  "input": "[720pMkv.Com]_sons.of.anarchy.s05e10.480p.BluRay.x264-GAnGSteR",
+  "want": {
+    "title": "sons of anarchy",
+    "season": 5,
+    "episode": 10,
+    "resolution": "480p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "group": "GAnGSteR",
+    "website": "720pMkv.Com"
+  }
 }

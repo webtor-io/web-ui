@@ -1,5 +1,8 @@
 {
-  "title": "com@113024-001-carib",
-  "studio": "hhd800",
-  "porn": true
+  "input": "hhd800 com@113024-001-carib",
+  "want": {
+    "title": "com@113024-001-carib",
+    "studio": "hhd800",
+    "porn": true
+  }
 }

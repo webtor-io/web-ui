@@ -1,7 +1,10 @@
 {
-  "title": "Analyze This",
-  "year": 1999,
-  "resolution": "720p",
-  "quality": "BrRip",
-  "codec": "x264"
+  "input": "Analyze This 1999 720p BrRip x264",
+  "want": {
+    "title": "Analyze This",
+    "year": 1999,
+    "resolution": "720p",
+    "quality": "BrRip",
+    "codec": "x264"
+  }
 }

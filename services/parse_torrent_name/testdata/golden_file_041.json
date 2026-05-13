@@ -1,8 +1,11 @@
 {
-  "title": "Sin City A Dame to Kill For",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "group": "SPARKS"
+  "input": "Sin.City.A.Dame.to.Kill.For.2014.1080p.BluRay.x264-SPARKS",
+  "want": {
+    "title": "Sin City A Dame to Kill For",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "group": "SPARKS"
+  }
 }

@@ -1,5 +1,8 @@
 {
-  "title": "Game of Thrones",
-  "season": 4,
-  "episode": 3
+  "input": "Game of Thrones - 4x03 - Breaker of Chains",
+  "want": {
+    "title": "Game of Thrones",
+    "season": 4,
+    "episode": 3
+  }
 }

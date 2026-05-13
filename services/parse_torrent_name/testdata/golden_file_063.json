@@ -1,7 +1,10 @@
 {
-  "title": "Community",
-  "season": 2,
-  "episode": 20,
-  "resolution": "720p",
-  "language": "rus.eng"
+  "input": "Community.s02e20.rus.eng.720p.Kybik.v.Kybe",
+  "want": {
+    "title": "Community",
+    "season": 2,
+    "episode": 20,
+    "resolution": "720p",
+    "language": "rus.eng"
+  }
 }

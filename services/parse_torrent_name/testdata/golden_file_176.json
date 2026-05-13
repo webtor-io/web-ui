@@ -1,7 +1,10 @@
 {
-  "title": "Dragon Ball Clássico",
-  "episode": 42,
-  "resolution": "480p",
-  "container": "mkv",
-  "website": "AT"
+  "input": "[AT] Dragon Ball Clássico 042 [480p] (Legendado).mkv",
+  "want": {
+    "title": "Dragon Ball Clássico",
+    "episode": 42,
+    "resolution": "480p",
+    "container": "mkv",
+    "website": "AT"
+  }
 }

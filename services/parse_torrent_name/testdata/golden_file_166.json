@@ -1,9 +1,12 @@
 {
-  "title": "Dies Irae",
-  "episode": 1,
-  "codec": "x265",
-  "audio": "Dual Audio",
-  "container": "mkv",
-  "website": "Cleo",
-  "kind": "ONA"
+  "input": "[Cleo]Dies_Irae_-_ONA_01_(Dual Audio_10bit_BD1080p_x265).mkv",
+  "want": {
+    "title": "Dies Irae",
+    "episode": 1,
+    "codec": "x265",
+    "audio": "Dual Audio",
+    "container": "mkv",
+    "website": "Cleo",
+    "kind": "ONA"
+  }
 }

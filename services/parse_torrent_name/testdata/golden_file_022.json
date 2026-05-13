@@ -1,8 +1,11 @@
 {
-  "title": "Lucy",
-  "year": 2014,
-  "quality": "HDRip",
-  "codec": "XViD",
-  "group": "juggs[ETRG]",
-  "hardcoded": true
+  "input": "Lucy.2014.HC.HDRip.XViD-juggs[ETRG]",
+  "want": {
+    "title": "Lucy",
+    "year": 2014,
+    "quality": "HDRip",
+    "codec": "XViD",
+    "group": "juggs[ETRG]",
+    "hardcoded": true
+  }
 }

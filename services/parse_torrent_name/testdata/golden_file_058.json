@@ -1,10 +1,13 @@
 {
-  "title": "doctor who",
-  "season": 8,
-  "episode": 12,
-  "year": 2005,
-  "resolution": "720p",
-  "quality": "hdtv",
-  "codec": "x264",
-  "group": "fov"
+  "input": "doctor_who_2005.8x12.death_in_heaven.720p_hdtv_x264-fov",
+  "want": {
+    "title": "doctor who",
+    "season": 8,
+    "episode": 12,
+    "year": 2005,
+    "resolution": "720p",
+    "quality": "hdtv",
+    "codec": "x264",
+    "group": "fov"
+  }
 }

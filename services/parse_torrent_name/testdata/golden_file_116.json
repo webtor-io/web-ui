@@ -1,4 +1,7 @@
 {
-  "title": "ABP-123 Uncensored",
-  "porn": true
+  "input": "ABP-123 Uncensored",
+  "want": {
+    "title": "ABP-123 Uncensored",
+    "porn": true
+  }
 }

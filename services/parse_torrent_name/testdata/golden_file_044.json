@@ -1,6 +1,9 @@
 {
-  "title": "WWE Hell in a Cell",
-  "year": 2014,
-  "quality": "HDTV",
-  "codec": "x264"
+  "input": "WWE Hell in a Cell 2014 HDTV x264 SNHD",
+  "want": {
+    "title": "WWE Hell in a Cell",
+    "year": 2014,
+    "quality": "HDTV",
+    "codec": "x264"
+  }
 }

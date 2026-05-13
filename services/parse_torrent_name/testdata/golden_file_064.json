@@ -1,11 +1,14 @@
 {
-  "title": "The Jungle Book",
-  "year": 2016,
-  "resolution": "1080p",
-  "quality": "BRRip",
-  "codec": "x264",
-  "audio": "AAC",
-  "group": "ETRG",
-  "sbs": "SBS",
-  "3d": true
+  "input": "The.Jungle.Book.2016.3D.1080p.BRRip.SBS.x264.AAC-ETRG",
+  "want": {
+    "title": "The Jungle Book",
+    "year": 2016,
+    "resolution": "1080p",
+    "quality": "BRRip",
+    "codec": "x264",
+    "audio": "AAC",
+    "group": "ETRG",
+    "sbs": "SBS",
+    "3d": true
+  }
 }

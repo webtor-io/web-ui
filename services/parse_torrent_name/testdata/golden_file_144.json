@@ -1,7 +1,10 @@
 {
-  "title": "Svati-2",
-  "episode": 20,
-  "year": 2015,
-  "quality": "SATRip",
-  "container": "avi"
+  "input": "Svati-2.20.2015.SATRip.avi",
+  "want": {
+    "title": "Svati-2",
+    "episode": 20,
+    "year": 2015,
+    "quality": "SATRip",
+    "container": "avi"
+  }
 }

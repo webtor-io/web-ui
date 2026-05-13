@@ -1,5 +1,8 @@
 {
-  "title": "Show",
-  "episode": 2,
-  "kind": "NCED"
+  "input": "Show - NCED 02",
+  "want": {
+    "title": "Show",
+    "episode": 2,
+    "kind": "NCED"
+  }
 }

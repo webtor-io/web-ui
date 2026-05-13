@@ -1,6 +1,9 @@
 {
-  "title": "Onigashima",
-  "episode": 20,
-  "container": "mp4",
-  "website": "1000"
+  "input": "[1000] Onigashima 20 - Straw Hat Luffy.mp4",
+  "want": {
+    "title": "Onigashima",
+    "episode": 20,
+    "container": "mp4",
+    "website": "1000"
+  }
 }

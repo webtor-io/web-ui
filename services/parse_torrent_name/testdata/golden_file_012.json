@@ -1,9 +1,12 @@
 {
-  "title": "Guardians Of The Galaxy",
-  "year": 2014,
-  "resolution": "720p",
-  "quality": "HDCAM",
-  "codec": "x264",
-  "group": "JYK",
-  "region": "6"
+  "input": "Guardians Of The Galaxy 2014 R6 720p HDCAM x264-JYK",
+  "want": {
+    "title": "Guardians Of The Galaxy",
+    "year": 2014,
+    "resolution": "720p",
+    "quality": "HDCAM",
+    "codec": "x264",
+    "group": "JYK",
+    "region": "6"
+  }
 }

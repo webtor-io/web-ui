@@ -1,7 +1,10 @@
 {
-  "title": "12 Years a Slave",
-  "year": 2013,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "container": "mkv"
+  "input": "12.Years.a.Slave.2013.1080p.BluRay.mkv",
+  "want": {
+    "title": "12 Years a Slave",
+    "year": 2013,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "container": "mkv"
+  }
 }

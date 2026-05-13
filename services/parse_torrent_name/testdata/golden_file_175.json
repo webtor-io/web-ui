@@ -1,7 +1,10 @@
 {
-  "title": "Dragon Ball Clássico",
-  "episode": 1,
-  "resolution": "480p",
-  "container": "mkv",
-  "website": "AT"
+  "input": "[AT] Dragon Ball Clássico 001 [480p] (Legendado).mkv",
+  "want": {
+    "title": "Dragon Ball Clássico",
+    "episode": 1,
+    "resolution": "480p",
+    "container": "mkv",
+    "website": "AT"
+  }
 }

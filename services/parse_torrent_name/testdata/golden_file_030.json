@@ -1,9 +1,12 @@
 {
-  "title": "The Simpsons",
-  "season": 26,
-  "episode": 5,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "LOL [eztv]",
-  "proper": true
+  "input": "The Simpsons S26E05 HDTV x264 PROPER-LOL [eztv]",
+  "want": {
+    "title": "The Simpsons",
+    "season": 26,
+    "episode": 5,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "LOL [eztv]",
+    "proper": true
+  }
 }

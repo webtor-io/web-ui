@@ -1,5 +1,8 @@
 {
-  "title": "Star Wars Episode IV A New Hope",
-  "year": 1977,
-  "container": "mkv"
+  "input": "Star.Wars.Episode.IV.A.New.Hope.1977.mkv",
+  "want": {
+    "title": "Star Wars Episode IV A New Hope",
+    "year": 1977,
+    "container": "mkv"
+  }
 }

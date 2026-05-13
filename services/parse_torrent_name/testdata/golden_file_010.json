@@ -1,8 +1,11 @@
 {
-  "title": "Marvels Agents of S H I E L D",
-  "season": 2,
-  "episode": 5,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "KILLERS [eztv]"
+  "input": "Marvels Agents of S H I E L D S02E05 HDTV x264-KILLERS [eztv]",
+  "want": {
+    "title": "Marvels Agents of S H I E L D",
+    "season": 2,
+    "episode": 5,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "KILLERS [eztv]"
+  }
 }

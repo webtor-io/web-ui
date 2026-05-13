@@ -1,7 +1,10 @@
 {
-  "title": "One Shot",
-  "year": 2014,
-  "quality": "DVDRip",
-  "codec": "XViD",
-  "group": "ViCKY"
+  "input": "One Shot [2014] DVDRip XViD-ViCKY",
+  "want": {
+    "title": "One Shot",
+    "year": 2014,
+    "quality": "DVDRip",
+    "codec": "XViD",
+    "group": "ViCKY"
+  }
 }

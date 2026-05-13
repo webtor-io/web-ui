@@ -1,11 +1,14 @@
 {
-  "title": "12 Years A Slave",
-  "year": 2013,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "audio": "AC3",
-  "group": "ETRG",
-  "container": "mp4",
-  "sample": true
+  "input": "12.Years.A.Slave.2013.1080p.BluRay.x264.AC3-ETRG.Sample.mp4",
+  "want": {
+    "title": "12 Years A Slave",
+    "year": 2013,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "audio": "AC3",
+    "group": "ETRG",
+    "container": "mp4",
+    "sample": true
+  }
 }

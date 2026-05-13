@@ -1,8 +1,11 @@
 {
-  "title": "The Hateful Eight",
-  "year": 2015,
-  "resolution": "720p",
-  "quality": "BluRay",
-  "codec": "x265",
-  "size": "999MB"
+  "input": "The Hateful Eight (2015) 720p BluRay - x265 HEVC - 999MB - ShAaN",
+  "want": {
+    "title": "The Hateful Eight",
+    "year": 2015,
+    "resolution": "720p",
+    "quality": "BluRay",
+    "codec": "x265",
+    "size": "999MB"
+  }
 }

@@ -1,8 +1,11 @@
 {
-  "title": "Marvels Agents of S H I E L D",
-  "season": 2,
-  "episode": 6,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "KILLERS[ettv]"
+  "input": "Marvels Agents of S.H.I.E.L.D. S02E06 HDTV x264-KILLERS[ettv]",
+  "want": {
+    "title": "Marvels Agents of S H I E L D",
+    "season": 2,
+    "episode": 6,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "KILLERS[ettv]"
+  }
 }

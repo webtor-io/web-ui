@@ -1,9 +1,12 @@
 {
-  "title": "thomas and friends",
-  "season": 19,
-  "episode": 9,
-  "quality": "hdtv",
-  "codec": "x264",
-  "group": "w4f[eztv]",
-  "container": "mkv"
+  "input": "thomas.and.friends.s19e09_s20e14.convert.hdtv.x264-w4f[eztv].mkv",
+  "want": {
+    "title": "thomas and friends",
+    "season": 19,
+    "episode": 9,
+    "quality": "hdtv",
+    "codec": "x264",
+    "group": "w4f[eztv]",
+    "container": "mkv"
+  }
 }

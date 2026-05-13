@@ -1,9 +1,12 @@
 {
-  "title": "Annabelle",
-  "year": 2014,
-  "quality": "HDRip",
-  "codec": "XViD",
-  "audio": "AC3",
-  "group": "juggs[ETRG]",
-  "hardcoded": true
+  "input": "Annabelle.2014.HC.HDRip.XViD.AC3-juggs[ETRG]",
+  "want": {
+    "title": "Annabelle",
+    "year": 2014,
+    "quality": "HDRip",
+    "codec": "XViD",
+    "audio": "AC3",
+    "group": "juggs[ETRG]",
+    "hardcoded": true
+  }
 }

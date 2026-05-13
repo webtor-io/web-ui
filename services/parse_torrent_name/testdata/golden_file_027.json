@@ -1,7 +1,10 @@
 {
-  "title": "Lucy",
-  "year": 2014,
-  "quality": "WEBRip",
-  "audio": "Dual-Audio",
-  "size": "1400Mb"
+  "input": "Lucy 2014 Dual-Audio WEBRip 1400Mb",
+  "want": {
+    "title": "Lucy",
+    "year": 2014,
+    "quality": "WEBRip",
+    "audio": "Dual-Audio",
+    "size": "1400Mb"
+  }
 }

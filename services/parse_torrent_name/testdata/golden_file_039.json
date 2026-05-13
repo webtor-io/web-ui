@@ -1,7 +1,10 @@
 {
-  "title": "Lucy",
-  "year": 2014,
-  "resolution": "720p",
-  "quality": "WEBRip",
-  "audio": "Dual-Audio"
+  "input": "Lucy 2014 Dual-Audio 720p WEBRip",
+  "want": {
+    "title": "Lucy",
+    "year": 2014,
+    "resolution": "720p",
+    "quality": "WEBRip",
+    "audio": "Dual-Audio"
+  }
 }

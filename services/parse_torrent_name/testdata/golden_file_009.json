@@ -1,6 +1,9 @@
 {
-  "title": "UFC 179",
-  "quality": "PPV.HDTV",
-  "codec": "x264",
-  "group": "Ebi[rartv]"
+  "input": "UFC.179.PPV.HDTV.x264-Ebi[rartv]",
+  "want": {
+    "title": "UFC 179",
+    "quality": "PPV.HDTV",
+    "codec": "x264",
+    "group": "Ebi[rartv]"
+  }
 }

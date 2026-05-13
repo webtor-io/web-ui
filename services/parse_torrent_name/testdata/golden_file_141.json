@@ -1,4 +1,7 @@
 {
-  "title": "Shingeki no Kyojin",
-  "season": 3
+  "input": "Shingeki no Kyojin S3 Pt. 1",
+  "want": {
+    "title": "Shingeki no Kyojin",
+    "season": 3
+  }
 }

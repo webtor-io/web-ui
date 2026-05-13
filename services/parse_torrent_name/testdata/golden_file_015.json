@@ -1,5 +1,8 @@
 {
-  "title": "Guardians of the Galaxy",
-  "year": 2014,
-  "quality": "CamRip"
+  "input": "Guardians of the Galaxy (CamRip / 2014)",
+  "want": {
+    "title": "Guardians of the Galaxy",
+    "year": 2014,
+    "quality": "CamRip"
+  }
 }

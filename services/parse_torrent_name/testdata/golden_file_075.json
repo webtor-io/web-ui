@@ -1,8 +1,11 @@
 {
-  "title": "The Secret Life of Pets",
-  "year": 2016,
-  "quality": "HDRiP",
-  "codec": "x264",
-  "audio": "AAC-LC",
-  "group": "LEGi0N"
+  "input": "The.Secret.Life.of.Pets.2016.HDRiP.AAC-LC.x264-LEGi0N",
+  "want": {
+    "title": "The Secret Life of Pets",
+    "year": 2016,
+    "quality": "HDRiP",
+    "codec": "x264",
+    "audio": "AAC-LC",
+    "group": "LEGi0N"
+  }
 }

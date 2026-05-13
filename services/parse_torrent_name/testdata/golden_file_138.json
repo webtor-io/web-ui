@@ -1,7 +1,10 @@
 {
-  "title": "Shingeki no Kyojin",
-  "season": 3,
-  "episode": 1,
-  "container": "mkv",
-  "website": "Judas"
+  "input": "[Judas] Shingeki no Kyojin S3 - 01.mkv",
+  "want": {
+    "title": "Shingeki no Kyojin",
+    "season": 3,
+    "episode": 1,
+    "container": "mkv",
+    "website": "Judas"
+  }
 }

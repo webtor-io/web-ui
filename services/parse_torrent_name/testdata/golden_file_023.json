@@ -1,9 +1,12 @@
 {
-  "title": "The Flash",
-  "season": 1,
-  "episode": 4,
-  "year": 2014,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "FUM[ettv]"
+  "input": "The Flash 2014 S01E04 HDTV x264-FUM[ettv]",
+  "want": {
+    "title": "The Flash",
+    "season": 1,
+    "episode": 4,
+    "year": 2014,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "FUM[ettv]"
+  }
 }

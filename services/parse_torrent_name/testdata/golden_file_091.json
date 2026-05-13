@@ -1,7 +1,10 @@
 {
-  "title": "The Big Bang Theory",
-  "season": 1,
-  "year": 2007,
-  "quality": "BDRip",
-  "avc": true
+  "input": "The.Big.Bang.Theory.S01-S12.2007-2019.BDRip-AVC",
+  "want": {
+    "title": "The Big Bang Theory",
+    "season": 1,
+    "year": 2007,
+    "quality": "BDRip",
+    "avc": true
+  }
 }

@@ -1,8 +1,11 @@
 {
-  "title": "Downton Abbey",
-  "season": 5,
-  "episode": 6,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "FoV [eztv]"
+  "input": "Downton Abbey 5x06 HDTV x264-FoV [eztv]",
+  "want": {
+    "title": "Downton Abbey",
+    "season": 5,
+    "episode": 6,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "FoV [eztv]"
+  }
 }

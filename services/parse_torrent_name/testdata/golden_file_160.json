@@ -1,6 +1,9 @@
 {
-  "title": "Грозовые ворота",
-  "episode": 1,
-  "container": "mkv",
-  "rip_by": "Aleksan55"
+  "input": "01 серия Грозовые ворота rip by Aleksan55.mkv",
+  "want": {
+    "title": "Грозовые ворота",
+    "episode": 1,
+    "container": "mkv",
+    "rip_by": "Aleksan55"
+  }
 }

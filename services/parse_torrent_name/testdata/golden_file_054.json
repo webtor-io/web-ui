@@ -1,7 +1,10 @@
 {
-  "title": "Guardians of the Galaxy",
-  "year": 2014,
-  "quality": "DVDRip",
-  "audio": "Dual Audio",
-  "container": "AVI"
+  "input": "Guardians of the Galaxy (2014) Dual Audio DVDRip AVI",
+  "want": {
+    "title": "Guardians of the Galaxy",
+    "year": 2014,
+    "quality": "DVDRip",
+    "audio": "Dual Audio",
+    "container": "AVI"
+  }
 }

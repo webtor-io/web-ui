@@ -1,9 +1,12 @@
 {
-  "title": "X-Men Days of Future Past",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "codec": "H264",
-  "audio": "DD5.1",
-  "group": "RARBG"
+  "input": "X-Men.Days.of.Future.Past.2014.1080p.WEB-DL.DD5.1.H264-RARBG",
+  "want": {
+    "title": "X-Men Days of Future Past",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "codec": "H264",
+    "audio": "DD5.1",
+    "group": "RARBG"
+  }
 }

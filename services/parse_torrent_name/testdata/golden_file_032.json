@@ -1,9 +1,12 @@
 {
-  "title": "Two and a Half Men",
-  "season": 12,
-  "episode": 1,
-  "quality": "HDTV",
-  "codec": "x264",
-  "group": "LOL [eztv]",
-  "repack": true
+  "input": "Two and a Half Men S12E01 HDTV x264 REPACK-LOL [eztv]",
+  "want": {
+    "title": "Two and a Half Men",
+    "season": 12,
+    "episode": 1,
+    "quality": "HDTV",
+    "codec": "x264",
+    "group": "LOL [eztv]",
+    "repack": true
+  }
 }

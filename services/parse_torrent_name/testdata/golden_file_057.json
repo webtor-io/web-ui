@@ -1,5 +1,8 @@
 {
-  "title": "Sons of Anarchy",
-  "season": 1,
-  "episode": 3
+  "input": "Sons.of.Anarchy.S01E03",
+  "want": {
+    "title": "Sons of Anarchy",
+    "season": 1,
+    "episode": 3
+  }
 }

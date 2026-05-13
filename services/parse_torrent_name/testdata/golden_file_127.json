@@ -1,7 +1,10 @@
 {
-  "title": "Stand Up",
-  "season": 13,
-  "episode": 6,
-  "resolution": "1080p",
-  "quality": "WEB-DL"
+  "input": "Stand Up S13E06 WEB-DL 1080p",
+  "want": {
+    "title": "Stand Up",
+    "season": 13,
+    "episode": 6,
+    "resolution": "1080p",
+    "quality": "WEB-DL"
+  }
 }

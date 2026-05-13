@@ -1,4 +1,7 @@
 {
-  "title": "APNS-410",
-  "porn": true
+  "input": "APNS-410",
+  "want": {
+    "title": "APNS-410",
+    "porn": true
+  }
 }

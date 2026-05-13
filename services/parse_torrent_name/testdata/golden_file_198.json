@@ -1,8 +1,11 @@
 {
-  "title": "WWE Monday Night Raw",
-  "year": 2014,
-  "quality": "PDTV",
-  "codec": "x264",
-  "group": "RKOFAN1990",
-  "widescreen": true
+  "input": "WWE Monday Night Raw 2014 11 10 WS PDTV x264-RKOFAN1990",
+  "want": {
+    "title": "WWE Monday Night Raw",
+    "year": 2014,
+    "quality": "PDTV",
+    "codec": "x264",
+    "group": "RKOFAN1990",
+    "widescreen": true
+  }
 }

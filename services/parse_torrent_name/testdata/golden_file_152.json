@@ -1,5 +1,8 @@
 {
-  "title": "Show",
-  "episode": 5,
-  "container": "mkv"
+  "input": "Show.Episode.05.Title.mkv",
+  "want": {
+    "title": "Show",
+    "episode": 5,
+    "container": "mkv"
+  }
 }

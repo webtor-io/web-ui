@@ -1,6 +1,9 @@
 {
-  "title": "War Dogs",
-  "year": 2016,
-  "quality": "HDTS",
-  "size": "600MB"
+  "input": "War Dogs (2016) HDTS 600MB - NBY",
+  "want": {
+    "title": "War Dogs",
+    "year": 2016,
+    "quality": "HDTS",
+    "size": "600MB"
+  }
 }

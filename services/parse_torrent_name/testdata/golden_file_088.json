@@ -1,9 +1,12 @@
 {
-  "title": "Этернавт - The Eternaut",
-  "season": 1,
-  "episode": 1,
-  "year": 2025,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "container": "mkv"
+  "input": "Этернавт - The Eternaut S01 E01 (Ночь игры в труко) WEB-DL 1080p (2025).mkv",
+  "want": {
+    "title": "Этернавт - The Eternaut",
+    "season": 1,
+    "episode": 1,
+    "year": 2025,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "container": "mkv"
+  }
 }

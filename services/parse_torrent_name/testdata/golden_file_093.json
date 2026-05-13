@@ -1,7 +1,10 @@
 {
-  "title": "Interestelar",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "BrRip",
-  "audio": "Dual Audio"
+  "input": "Interestelar (2014) IMAX 1080p 6ch BrRip Dual Audio - 1046",
+  "want": {
+    "title": "Interestelar",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "BrRip",
+    "audio": "Dual Audio"
+  }
 }

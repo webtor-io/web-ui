@@ -1,8 +1,11 @@
 {
-  "title": "2012",
-  "year": 2009,
-  "resolution": "1080p",
-  "quality": "BrRip",
-  "codec": "x264",
-  "size": "1.7GB"
+  "input": "2012 (2009) 1080p BrRip x264 - 1.7GB - YIFY",
+  "want": {
+    "title": "2012",
+    "year": 2009,
+    "resolution": "1080p",
+    "quality": "BrRip",
+    "codec": "x264",
+    "size": "1.7GB"
+  }
 }

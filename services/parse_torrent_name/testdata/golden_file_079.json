@@ -1,9 +1,12 @@
 {
-  "title": "Blade Runner 2049",
-  "year": 2017,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "codec": "H264",
-  "audio": "DD5.1",
-  "group": "[rarbg.to]"
+  "input": "Blade.Runner.2049.2017.1080p.WEB-DL.DD5.1.H264-FGT-[rarbg.to]",
+  "want": {
+    "title": "Blade Runner 2049",
+    "year": 2017,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "codec": "H264",
+    "audio": "DD5.1",
+    "group": "[rarbg.to]"
+  }
 }

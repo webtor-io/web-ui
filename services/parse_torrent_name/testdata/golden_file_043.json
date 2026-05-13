@@ -1,6 +1,9 @@
 {
-  "title": "Jack And The Cuckoo-Clock Heart",
-  "year": 2013,
-  "quality": "BRRip",
-  "codec": "XViD"
+  "input": "Jack.And.The.Cuckoo-Clock.Heart.2013.BRRip XViD",
+  "want": {
+    "title": "Jack And The Cuckoo-Clock Heart",
+    "year": 2013,
+    "quality": "BRRip",
+    "codec": "XViD"
+  }
 }

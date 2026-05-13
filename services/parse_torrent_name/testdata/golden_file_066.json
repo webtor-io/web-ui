@@ -1,8 +1,11 @@
 {
-  "title": "Ice Age Collision Course",
-  "year": 2016,
-  "resolution": "720p",
-  "quality": "HDRIP",
-  "codec": "X264",
-  "audio": "AC3"
+  "input": "Ice.Age.Collision.Course.2016.READNFO.720p.HDRIP.X264.AC3.TiTAN",
+  "want": {
+    "title": "Ice Age Collision Course",
+    "year": 2016,
+    "resolution": "720p",
+    "quality": "HDRIP",
+    "codec": "X264",
+    "audio": "AC3"
+  }
 }

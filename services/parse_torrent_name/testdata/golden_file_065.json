@@ -1,11 +1,14 @@
 {
-  "title": "Ant-Man",
-  "year": 2015,
-  "resolution": "1080p",
-  "quality": "BRRip",
-  "codec": "x264",
-  "audio": "AAC",
-  "group": "m2g",
-  "sbs": "Half-SBS",
-  "3d": true
+  "input": "Ant-Man.2015.3D.1080p.BRRip.Half-SBS.x264.AAC-m2g",
+  "want": {
+    "title": "Ant-Man",
+    "year": 2015,
+    "resolution": "1080p",
+    "quality": "BRRip",
+    "codec": "x264",
+    "audio": "AAC",
+    "group": "m2g",
+    "sbs": "Half-SBS",
+    "3d": true
+  }
 }

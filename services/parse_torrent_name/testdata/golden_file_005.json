@@ -1,10 +1,13 @@
 {
-  "title": "Hercules",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "codec": "H264",
-  "audio": "DD5.1",
-  "group": "RARBG",
-  "extended": true
+  "input": "Hercules.2014.EXTENDED.1080p.WEB-DL.DD5.1.H264-RARBG",
+  "want": {
+    "title": "Hercules",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "codec": "H264",
+    "audio": "DD5.1",
+    "group": "RARBG",
+    "extended": true
+  }
 }

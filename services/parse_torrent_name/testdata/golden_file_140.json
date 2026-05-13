@@ -1,5 +1,8 @@
 {
-  "title": "Shingeki No Kyojin",
-  "season": 2,
-  "episode": 1
+  "input": "Shingeki No Kyojin S2 - 01",
+  "want": {
+    "title": "Shingeki No Kyojin",
+    "season": 2,
+    "episode": 1
+  }
 }

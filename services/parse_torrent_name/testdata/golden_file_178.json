@@ -1,8 +1,11 @@
 {
-  "title": "300",
-  "year": 2006,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "container": "mkv"
+  "input": "300 (2006).BluRay.1080p.x264.mkv",
+  "want": {
+    "title": "300",
+    "year": 2006,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "container": "mkv"
+  }
 }

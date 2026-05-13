@@ -1,11 +1,14 @@
 {
-  "title": "Havoc",
-  "year": 2025,
-  "resolution": "1080p",
-  "bitrate": "768Kbps",
-  "codec": "x264",
-  "container": "mkv",
-  "website": "www.1TamilBlasters.moi",
-  "size": "8.2GB",
-  "avc": true
+  "input": "www.1TamilBlasters.moi - Havoc (2025) [1080p HD AVC - x264 - [Tam + Tel + Hin + Eng] - DDP 5.1 (768Kbps) ATMOS - 8.2GB - ESub].mkv",
+  "want": {
+    "title": "Havoc",
+    "year": 2025,
+    "resolution": "1080p",
+    "bitrate": "768Kbps",
+    "codec": "x264",
+    "container": "mkv",
+    "website": "www.1TamilBlasters.moi",
+    "size": "8.2GB",
+    "avc": true
+  }
 }

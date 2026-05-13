@@ -1,6 +1,9 @@
 {
-  "title": "Партизаны",
-  "episode": 10,
-  "container": "avi",
-  "rip_by": "Aleksan55"
+  "input": "10 серия Партизаны rip by Aleksan55.avi",
+  "want": {
+    "title": "Партизаны",
+    "episode": 10,
+    "container": "avi",
+    "rip_by": "Aleksan55"
+  }
 }

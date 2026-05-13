@@ -1,7 +1,10 @@
 {
-  "title": "Dragon Ball Clássico",
-  "episode": 153,
-  "resolution": "480p",
-  "container": "mkv",
-  "website": "AT"
+  "input": "[AT] Dragon Ball Clássico 153 [480p] (Legendado).mkv",
+  "want": {
+    "title": "Dragon Ball Clássico",
+    "episode": 153,
+    "resolution": "480p",
+    "container": "mkv",
+    "website": "AT"
+  }
 }

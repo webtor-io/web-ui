@@ -1,10 +1,13 @@
 {
-  "title": "Home Alone Trilogy",
-  "year": 1990,
-  "resolution": "1080p",
-  "quality": "BluRay",
-  "codec": "x264",
-  "audio": "AAC",
-  "website": "www.1TamilMV.kiwi",
-  "size": "5.5GB"
+  "input": "www.1TamilMV.kiwi - Home Alone Trilogy (1990 - 1997) BluRay - 1080p - x264 - [Tam + Hin + Eng] - AAC - 5.5GB - ESub",
+  "want": {
+    "title": "Home Alone Trilogy",
+    "year": 1990,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "audio": "AAC",
+    "website": "www.1TamilMV.kiwi",
+    "size": "5.5GB"
+  }
 }

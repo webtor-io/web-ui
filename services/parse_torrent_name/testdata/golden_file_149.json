@@ -1,5 +1,8 @@
 {
-  "title": "Zeta Gundam",
-  "episode": 46,
-  "container": "mkv"
+  "input": "Zeta Gundam - ep46 - Scirocco Rises.mkv",
+  "want": {
+    "title": "Zeta Gundam",
+    "episode": 46,
+    "container": "mkv"
+  }
 }

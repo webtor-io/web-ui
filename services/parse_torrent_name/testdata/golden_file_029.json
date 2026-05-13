@@ -1,4 +1,7 @@
 {
-  "title": "Teenage Mutant Ninja Turtles",
-  "year": 2014
+  "input": "Teenage Mutant Ninja Turtles (unknown_release_type / 2014)",
+  "want": {
+    "title": "Teenage Mutant Ninja Turtles",
+    "year": 2014
+  }
 }

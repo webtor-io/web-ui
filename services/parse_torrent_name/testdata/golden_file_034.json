@@ -1,8 +1,11 @@
 {
-  "title": "Teenage Mutant Ninja Turtles",
-  "year": 2014,
-  "quality": "HDRip",
-  "codec": "XviD",
-  "audio": "MP3",
-  "group": "RARBG"
+  "input": "Teenage.Mutant.Ninja.Turtles.2014.HDRip.XviD.MP3-RARBG",
+  "want": {
+    "title": "Teenage Mutant Ninja Turtles",
+    "year": 2014,
+    "quality": "HDRip",
+    "codec": "XviD",
+    "audio": "MP3",
+    "group": "RARBG"
+  }
 }

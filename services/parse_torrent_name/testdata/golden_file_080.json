@@ -1,6 +1,9 @@
 {
-  "title": "2012",
-  "year": 2009,
-  "resolution": "1080p",
-  "audio": "Dual Audio"
+  "input": "2012(2009).1080p.Dual Audio(Hindi+English) 5.1 Audios",
+  "want": {
+    "title": "2012",
+    "year": 2009,
+    "resolution": "1080p",
+    "audio": "Dual Audio"
+  }
 }

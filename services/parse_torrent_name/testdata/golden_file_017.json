@@ -1,9 +1,12 @@
 {
-  "title": "Brave",
-  "year": 2012,
-  "quality": "DVDRip",
-  "codec": "XViD",
-  "audio": "LiNE",
-  "group": "UNiQUE",
-  "region": "5"
+  "input": "Brave.2012.R5.DVDRip.XViD.LiNE-UNiQUE",
+  "want": {
+    "title": "Brave",
+    "year": 2012,
+    "quality": "DVDRip",
+    "codec": "XViD",
+    "audio": "LiNE",
+    "group": "UNiQUE",
+    "region": "5"
+  }
 }

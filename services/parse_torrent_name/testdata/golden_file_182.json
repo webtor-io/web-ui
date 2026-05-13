@@ -1,8 +1,11 @@
 {
-  "title": "Сломанная стрела",
-  "episode": 3,
-  "year": 2025,
-  "quality": "WEB-DLRip",
-  "group": "Files-x",
-  "container": "avi"
+  "input": "03. Сломанная стрела.2025.WEB-DLRip.Files-x.avi",
+  "want": {
+    "title": "Сломанная стрела",
+    "episode": 3,
+    "year": 2025,
+    "quality": "WEB-DLRip",
+    "group": "Files-x",
+    "container": "avi"
+  }
 }

@@ -1,10 +1,13 @@
 {
-  "title": "The Boss",
-  "year": 2016,
-  "resolution": "720p",
-  "quality": "BRRip",
-  "codec": "x264",
-  "audio": "AAC",
-  "group": "ETRG",
-  "unrated": true
+  "input": "The.Boss.2016.UNRATED.720p.BRRip.x264.AAC-ETRG",
+  "want": {
+    "title": "The Boss",
+    "year": 2016,
+    "resolution": "720p",
+    "quality": "BRRip",
+    "codec": "x264",
+    "audio": "AAC",
+    "group": "ETRG",
+    "unrated": true
+  }
 }

@@ -1,9 +1,12 @@
 {
-  "title": "Into The Storm",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "codec": "H264",
-  "audio": "AAC2.0",
-  "group": "RARBG"
+  "input": "Into.The.Storm.2014.1080p.WEB-DL.AAC2.0.H264-RARBG",
+  "want": {
+    "title": "Into The Storm",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "codec": "H264",
+    "audio": "AAC2.0",
+    "group": "RARBG"
+  }
 }

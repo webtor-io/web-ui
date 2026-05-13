@@ -1,7 +1,10 @@
 {
-  "title": "The Shaukeens",
-  "year": 2014,
-  "quality": "DvDScr",
-  "codec": "x264",
-  "audio": "AAC"
+  "input": "The Shaukeens 2014 Hindi (1CD) DvDScr x264 AAC...Hon3y",
+  "want": {
+    "title": "The Shaukeens",
+    "year": 2014,
+    "quality": "DvDScr",
+    "codec": "x264",
+    "audio": "AAC"
+  }
 }

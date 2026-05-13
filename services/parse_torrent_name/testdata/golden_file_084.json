@@ -1,11 +1,14 @@
 {
-  "title": "Deadpool \u0026 Wolverine",
-  "year": 2024,
-  "resolution": "4k",
-  "bitrate": "768Kbps",
-  "quality": "WEB-DL",
-  "color_depth": "SDR",
-  "audio": "AAC",
-  "container": "mkv",
-  "website": "www.1TamilMV.tf"
+  "input": "www.1TamilMV.tf - Deadpool \u0026 Wolverine (2024) English TRUE WEB-DL - 4K SDR - HDR10+ - (DD+5.1 ATMOS - 768Kbps \u0026 AAC).mkv",
+  "want": {
+    "title": "Deadpool \u0026 Wolverine",
+    "year": 2024,
+    "resolution": "4k",
+    "bitrate": "768Kbps",
+    "quality": "WEB-DL",
+    "color_depth": "SDR",
+    "audio": "AAC",
+    "container": "mkv",
+    "website": "www.1TamilMV.tf"
+  }
 }

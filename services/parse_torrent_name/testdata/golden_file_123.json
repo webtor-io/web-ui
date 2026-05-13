@@ -1,8 +1,11 @@
 {
-  "title": "Sex and the City",
-  "season": 1,
-  "episode": 1,
-  "resolution": "720p",
-  "quality": "HDTV",
-  "codec": "x264"
+  "input": "Sex and the City S01E01 720p HDTV x264",
+  "want": {
+    "title": "Sex and the City",
+    "season": 1,
+    "episode": 1,
+    "resolution": "720p",
+    "quality": "HDTV",
+    "codec": "x264"
+  }
 }

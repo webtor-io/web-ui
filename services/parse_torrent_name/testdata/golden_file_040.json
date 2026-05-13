@@ -1,9 +1,12 @@
 {
-  "title": "Into The Storm",
-  "year": 2014,
-  "resolution": "1080p",
-  "quality": "BRRip",
-  "codec": "x264",
-  "audio": "DTS",
-  "group": "JYK"
+  "input": "Into The Storm 2014 1080p BRRip x264 DTS-JYK",
+  "want": {
+    "title": "Into The Storm",
+    "year": 2014,
+    "resolution": "1080p",
+    "quality": "BRRip",
+    "codec": "x264",
+    "audio": "DTS",
+    "group": "JYK"
+  }
 }

@@ -1,8 +1,11 @@
 {
-  "title": "Marvel's Agents of S H I E L D",
-  "season": 2,
-  "episode": 1,
-  "resolution": "1080p",
-  "quality": "WEB-DL",
-  "audio": "DD5.1"
+  "input": "Marvel's.Agents.of.S.H.I.E.L.D.S02E01.Shadows.1080p.WEB-DL.DD5.1",
+  "want": {
+    "title": "Marvel's Agents of S H I E L D",
+    "season": 2,
+    "episode": 1,
+    "resolution": "1080p",
+    "quality": "WEB-DL",
+    "audio": "DD5.1"
+  }
 }

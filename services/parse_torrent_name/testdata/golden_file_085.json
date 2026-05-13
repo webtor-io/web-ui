@@ -1,10 +1,13 @@
 {
-  "title": "Delicious",
-  "year": 2025,
-  "quality": "WEB-DLRip",
-  "codec": "x264",
-  "group": "p3rr3nt",
-  "studio": "NF",
-  "container": "mkv",
-  "dubbing": "MVO"
+  "input": "Delicious.2025.MVO.WEB-DLRip.NF.x264.p3rr3nt.mkv",
+  "want": {
+    "title": "Delicious",
+    "year": 2025,
+    "quality": "WEB-DLRip",
+    "codec": "x264",
+    "group": "p3rr3nt",
+    "studio": "NF",
+    "container": "mkv",
+    "dubbing": "MVO"
+  }
 }
