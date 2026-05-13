@@ -6,6 +6,7 @@
     "codec": "x265",
     "container": "mkv",
     "website": "Cleo",
-    "kind": "OVA"
+    "kind": "OVA",
+    "extra": "BD1080p"
   }
 }

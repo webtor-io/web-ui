@@ -1,5 +1,7 @@
 package parsetorrentname
 
+import "strings"
+
 type Parser interface {
 	Parse(input string, matches Matches) (Matches, error)
 }
@@ -126,6 +128,122 @@ func (e *SeparatorExpander) Parse(input string, matches Matches) (Matches, error
 
 func NewSeparatorExpander() Parser {
 	return &SeparatorExpander{}
+}
+
+// ExtraExtractor runs LAST in the parser chain and emits FieldTypeExtra
+// containing any input bytes that no other parser (including the
+// greedy Title) consumed. Typical sources:
+//
+//   - paren-wrapped tags the Title regex skipped over: "(Legendado)",
+//     "(Original Sub)", "(DUB)"
+//   - dropped release notes like "[XC]" when Group claimed something
+//     else
+//   - language hints, fansub group annotations, etc.
+//
+// Bracket characters and pure-separator runs are stripped; remaining
+// text fragments are joined by a single space.
+//
+// The output match is Transient — it's a SUMMARY field, it doesn't
+// claim space against any other parser. Runs after Group at the
+// chain tail.
+type ExtraExtractor struct{}
+
+func (e *ExtraExtractor) Parse(input string, matches Matches) (Matches, error) {
+	type span struct{ s, e int }
+	var consumed []span
+	for _, m := range matches {
+		if m.Transient || m.Start >= m.End {
+			continue
+		}
+		consumed = append(consumed, span{m.Start, m.End})
+	}
+	for i := 1; i < len(consumed); i++ {
+		for j := i; j > 0 && consumed[j].s < consumed[j-1].s; j-- {
+			consumed[j], consumed[j-1] = consumed[j-1], consumed[j]
+		}
+	}
+	// Merge overlapping spans so the walk below sees clean intervals.
+	merged := consumed[:0]
+	for _, c := range consumed {
+		if len(merged) > 0 && c.s <= merged[len(merged)-1].e {
+			if c.e > merged[len(merged)-1].e {
+				merged[len(merged)-1].e = c.e
+			}
+			continue
+		}
+		merged = append(merged, c)
+	}
+	var parts []string
+	pos := 0
+	emit := func(start, end int) {
+		if start >= end {
+			return
+		}
+		frag := cleanExtraFragment(input[start:end])
+		if frag != "" {
+			parts = append(parts, frag)
+		}
+	}
+	for _, c := range merged {
+		emit(pos, c.s)
+		pos = c.e
+	}
+	emit(pos, len(input))
+	if len(parts) == 0 {
+		return nil, nil
+	}
+	return Matches{&Match{
+		FieldType: FieldTypeExtra,
+		Content:   strings.Join(parts, " "),
+		Transient: true,
+	}}, nil
+}
+
+// cleanExtraFragment normalises a leftover string into something
+// readable: strip surrounding brackets, collapse separator runs into
+// spaces, trim, and reject fragments that are pure punctuation. The
+// trim set is intentionally generous — single-symbol leftovers like
+// "/" between consumed spans of "(CamRip / 2014)" are noise, not
+// metadata.
+const extraTrimChars = " \t.,_-/&+|:;~"
+
+func cleanExtraFragment(s string) string {
+	s = strings.Trim(s, extraTrimChars)
+	// Strip ONE level of wrapping brackets if both sides match.
+	if len(s) >= 2 {
+		first, last := s[0], s[len(s)-1]
+		if (first == '(' && last == ')') ||
+			(first == '[' && last == ']') ||
+			(first == '{' && last == '}') {
+			s = s[1 : len(s)-1]
+			s = strings.TrimSpace(s)
+		}
+	}
+	// Drop interior brackets / replace separators with spaces.
+	s = strings.NewReplacer(
+		".", " ",
+		"_", " ",
+		"(", " ",
+		")", " ",
+		"[", " ",
+		"]", " ",
+		"{", " ",
+		"}", " ",
+		"/", " ",
+	).Replace(s)
+	for strings.Contains(s, "  ") {
+		s = strings.ReplaceAll(s, "  ", " ")
+	}
+	s = strings.TrimSpace(s)
+	// Reject fragments that became empty or are just punctuation.
+	if s == "" || strings.Trim(s, extraTrimChars) == "" {
+		return ""
+	}
+	return s
+}
+
+func NewExtraExtractor() Parser {
+	return &ExtraExtractor{}
 }
 
 var _ Parser = (*FieldParser)(nil)

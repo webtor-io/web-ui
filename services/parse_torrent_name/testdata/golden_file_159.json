@@ -7,6 +7,7 @@
     "quality": "BluRay",
     "codec": "x265",
     "group": "PSA",
-    "container": "mkv"
+    "container": "mkv",
+    "extra": "HQ 10bit 8CH HEVC"
   }
 }

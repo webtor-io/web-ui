@@ -3,6 +3,7 @@
   "want": {
     "title": "Show",
     "episode": 5,
-    "container": "mkv"
+    "container": "mkv",
+    "extra": "Title"
   }
 }

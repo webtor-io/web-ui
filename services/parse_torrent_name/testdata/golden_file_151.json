@@ -3,6 +3,7 @@
   "want": {
     "title": "Zeta Gundam",
     "episode": 3,
-    "container": "mkv"
+    "container": "mkv",
+    "extra": "Inside the Capsule"
   }
 }

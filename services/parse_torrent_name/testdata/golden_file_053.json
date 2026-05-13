@@ -6,6 +6,7 @@
     "quality": "CAM",
     "codec": "x264",
     "audio": "AAC",
-    "group": "CPG"
+    "group": "CPG",
+    "extra": "ENG"
   }
 }

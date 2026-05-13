@@ -6,6 +6,7 @@
     "resolution": "720p",
     "quality": "HDRIP",
     "codec": "X264",
-    "audio": "AC3"
+    "audio": "AC3",
+    "extra": "READNFO TiTAN"
   }
 }

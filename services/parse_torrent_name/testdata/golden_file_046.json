@@ -6,6 +6,7 @@
     "episode": 1,
     "quality": "HDTV",
     "codec": "x264",
-    "group": "FoV [eztv]"
+    "group": "FoV [eztv]",
+    "extra": "Pilot"
   }
 }

@@ -54,6 +54,14 @@ type TorrentInfo struct {
 	//   - "bex_stormy_daniels_kl040518_480p"  → 2018-05-04 (YYMMDD glued)
 	// Two-digit years assume 20YY (adult-scene convention since ~2000).
 	Date string `json:"date,omitempty"`
+	// Extra collects any input bytes that no field parser (nor Title)
+	// claimed — typically content inside `(...)` parens, language tags,
+	// fansub annotations, etc. Bracket characters and pure-separator
+	// runs are trimmed; remaining fragments are joined by a single
+	// space so the field stays readable. Useful both as a debugging
+	// signal ("what didn't we parse out?") and as a place downstream
+	// consumers can look for incidental metadata like dubbing language.
+	Extra string `json:"extra,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

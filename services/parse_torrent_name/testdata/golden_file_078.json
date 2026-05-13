@@ -7,6 +7,7 @@
     "quality": "hdtv",
     "codec": "x264",
     "group": "w4f[eztv]",
-    "container": "mkv"
+    "container": "mkv",
+    "extra": "s20e14 convert"
   }
 }

@@ -9,6 +9,7 @@
     "audio": "DTS",
     "group": "MgB",
     "container": "mkv",
-    "sample": true
+    "sample": true,
+    "extra": "HD MA TrueHD 7 1 Atmos"
   }
 }

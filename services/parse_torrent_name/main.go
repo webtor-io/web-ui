@@ -372,6 +372,12 @@ var parser = NewCompoundParser([]Parser{
 		`(?i)(\.((?:Files)-[a-zA-Z0-9]+))(?:\.[a-z0-9]{2,4})?$`,
 		`\b(- ?([^-]+(?:-={[^-]+-?$)?))$`,
 	), nil),
+	// LAST in the chain — collects any bytes no prior parser claimed
+	// into FieldTypeExtra. Transient match so it doesn't affect any
+	// downstream getAvailable (there are no downstream parsers, but
+	// keeping the field span-neutral matches its semantic role: a
+	// summary of leftovers, not a span-claim of its own).
+	NewExtraExtractor(),
 })
 
 // Parse breaks up the given filename in TorrentInfo

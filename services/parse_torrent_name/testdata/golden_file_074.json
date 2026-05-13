@@ -5,6 +5,7 @@
     "year": 2016,
     "quality": "TELESYNC",
     "codec": "x264",
-    "audio": "AC3"
+    "audio": "AC3",
+    "extra": "MAXPRO"
   }
 }
