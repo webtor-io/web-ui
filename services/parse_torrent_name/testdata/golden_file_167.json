@@ -3,10 +3,10 @@
   "want": {
     "title": "Dies Irae",
     "episode": 3,
+    "resolution": "1080p",
     "codec": "x265",
     "container": "mkv",
     "website": "Cleo",
-    "kind": "OVA",
-    "extra": "BD1080p"
+    "kind": "OVA"
   }
 }

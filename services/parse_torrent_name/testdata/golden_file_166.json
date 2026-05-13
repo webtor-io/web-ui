@@ -3,12 +3,12 @@
   "want": {
     "title": "Dies Irae",
     "episode": 1,
+    "resolution": "1080p",
     "color_depth": "10bit",
     "codec": "x265",
     "audio": "Dual Audio",
     "container": "mkv",
     "website": "Cleo",
-    "kind": "ONA",
-    "extra": "BD1080p"
+    "kind": "ONA"
   }
 }

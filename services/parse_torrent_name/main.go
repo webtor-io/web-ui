@@ -75,7 +75,17 @@ var fieldParsers = FieldParsers{
 	// because `tranny` sits mid-string.
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
-	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},
+	// Resolution. First alternative handles the BD/UHD-prefix anime
+	// release convention: "BD1080p", "UHD2160p". The standard
+	// `\b\d{3,4}p\b` form misses these because there's no word/non-word
+	// boundary between "D" and "1" (both word chars), so "1080p" inside
+	// "BD1080p" leaks. Inner capture stays "1080p" so Resolution.Content
+	// is consistent regardless of source prefix; the outer span eats
+	// the "BD"/"UHD" prefix too, keeping it out of Title/Extra.
+	{FieldTypeResolution, NewRegexpMatcher(
+		`(?i)\b((?:BD|UHD)([0-9]{3,4}p|[248][Kk]))\b`,
+		`\b(([0-9]{3,4}p|[248][Kk]))\b`,
+	), NewLowercaseTransformer()},
 	{FieldTypeBitrate, NewRegexpMatcher(`(?i)\b(([0-9]+[KMGT]bps))\b`), nil},
 	// ColorDepth covers SDR/HDR variants plus the "N-bit" / "Nbit"
 	// suffix common on anime encodes ("10bit", "10-bit", "8-bit").
