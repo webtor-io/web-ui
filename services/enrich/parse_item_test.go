@@ -78,6 +78,68 @@ func TestMapMetadata_PathTitleFallback(t *testing.T) {
 	}
 }
 
+// TestMapMetadata_PathTitleAdultGate locks in the safety net that
+// adult-flagged paths skip the path-title fallback. Without the gate,
+// short site-tokens like "FC2" / "SLR" / "Brazzers" can accidentally
+// hit obscure same-name films in TMDB and stamp wrong metadata onto
+// an adult torrent (observed in prod 2026-05-13: candidate=FC2 →
+// tmdb24376, a 2007 Japanese film unrelated to the JAV resource).
+func TestMapMetadata_PathTitleAdultGate(t *testing.T) {
+	mapper := &titleAwareMapper{
+		name: "TMDB",
+		byT: map[string]*models.VideoMetadata{
+			"FC2":  {VideoID: "tmdb24376", Title: "FC2"},
+			"PPV":  {VideoID: "tmdbXXXX", Title: "Some other film"},
+			"Test": {VideoID: "tmdbYYYY", Title: "Test"},
+		},
+	}
+	en := &Enricher{mappers: []MetadataMapper{mapper}}
+	vc := &models.VideoContent{
+		Title: "nonexistent",
+		Metadata: map[string]any{
+			"path_titles": []interface{}{"FC2", "PPV", "Test"},
+		},
+	}
+	// Adult-flagged path — must NOT resolve via path-title candidates.
+	// "Brazzers" is in the adult-studio alternation so isAdultPath
+	// unambiguously fires on the path segment.
+	md, err := en.mapMetadata(context.Background(), vc, models.ContentTypeMovie, false, "", "/Brazzers/some-scene.mp4", nil)
+	if err != nil {
+		t.Fatalf("mapMetadata: %v", err)
+	}
+	if md != nil {
+		t.Fatalf("expected nil (path-title fallback gated by Adult); got %+v", md)
+	}
+}
+
+// TestMapMetadata_PathTitleMinLength filters out path-segment titles
+// shorter than 3 characters. Single-letter folder names ("D", "X")
+// have TMDB collision risk against obscure shorts.
+func TestMapMetadata_PathTitleMinLength(t *testing.T) {
+	mapper := &titleAwareMapper{
+		name: "TMDB",
+		byT: map[string]*models.VideoMetadata{
+			"D":      {VideoID: "tt0223152", Title: "D"},
+			"Drama":  {VideoID: "tt9999999", Title: "Drama"},
+		},
+	}
+	en := &Enricher{mappers: []MetadataMapper{mapper}}
+	vc := &models.VideoContent{
+		Title: "nothing in mapper",
+		Metadata: map[string]any{
+			// 1-letter "D" must be skipped; "Drama" must be tried.
+			"path_titles": []interface{}{"D", "Drama"},
+		},
+	}
+	md, err := en.mapMetadata(context.Background(), vc, models.ContentTypeMovie, false, "", "/some/path.mkv", nil)
+	if err != nil {
+		t.Fatalf("mapMetadata: %v", err)
+	}
+	if md == nil || md.VideoID != "tt9999999" {
+		t.Fatalf("expected resolution via 'Drama' (>=3 chars); got %+v", md)
+	}
+}
+
 // Sanity: when the primary Title already hits, the path-title loop
 // must NOT run (we don't want to overwrite a primary mapper hit
 // with a candidate match from a different title).

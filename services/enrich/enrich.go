@@ -759,21 +759,32 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 	// Try each as a search key before resorting to Claude — the
 	// existing TMDB.query / KPU.query caches absorb the repeated
 	// per-title lookups so this is cheap even when it misses.
-	for _, pt := range extractPathTitles(vc) {
-		if pt == "" || pt == vc.Title {
-			continue
-		}
-		candVC := &models.VideoContent{
-			ResourceID: vc.ResourceID,
-			Title:      pt,
-			Year:       vc.Year,
-		}
-		if cmd, _ := s.searchAllMappers(ctx, candVC, t, f); cmd != nil {
-			log.WithFields(log.Fields{
-				"candidate":   pt,
-				"resolved_id": cmd.VideoID,
-			}).Info("metadata resolved via path-title candidate (no AI call)")
-			return cmd, nil
+	//
+	// Guarded:
+	//   - Adult / Sport paths are skipped (same rationale as the AI
+	//     fallback — these never resolve through TMDB/OMDB/KPU, and
+	//     short adult-site tokens like "FC2" / "SLR" can accidentally
+	//     match an obscure unrelated film when probed directly).
+	//   - Minimum 3 characters — single-letter and 2-letter path
+	//     segments ("D", "HQ", "NF") have too high a TMDB collision
+	//     rate to be safe candidates.
+	if pathHint == "" || (!isAdultPath(pathHint) && !isSportPath(pathHint)) {
+		for _, pt := range extractPathTitles(vc) {
+			if len(pt) < 3 || pt == vc.Title {
+				continue
+			}
+			candVC := &models.VideoContent{
+				ResourceID: vc.ResourceID,
+				Title:      pt,
+				Year:       vc.Year,
+			}
+			if cmd, _ := s.searchAllMappers(ctx, candVC, t, f); cmd != nil {
+				log.WithFields(log.Fields{
+					"candidate":   pt,
+					"resolved_id": cmd.VideoID,
+				}).Info("metadata resolved via path-title candidate (no AI call)")
+				return cmd, nil
+			}
 		}
 	}
 	if s.aiResolver != nil && pathHint != "" {
