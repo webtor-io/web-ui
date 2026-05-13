@@ -23,6 +23,26 @@ var adultStudioRe = regexp.MustCompile(`(?i)^(?:` + adultStudioAlternation + `)$
 // down to the base source — wrestling/sports PPV is a delivery
 // channel, not a quality tier. The Sport flag (FieldTypeSport)
 // already carries the broadcast context.
+// codecTransformer canonicalises Codec field values to lowercase
+// tokens regardless of source casing. h.264/H264/AVC all describe
+// the same codec — store "x264". HEVC/H265 → "x265". The explicit
+// "X264"/"XViD"/"xvid" entries exist so MapTransformer's case-fold
+// lookup turns mixed-case source forms into the canonical lowercase
+// values (entries with the same key:value are kept for documentation).
+var codecTransformer = NewMapTransformer(map[string]string{
+	"avc":   "x264",
+	"h264":  "x264",
+	"h.264": "x264",
+	"hevc":  "x265",
+	"h265":  "x265",
+	"h.265": "x265",
+	"x264":  "x264",
+	"x265":  "x265",
+	"xvid":  "xvid",
+	"divx":  "divx",
+	"av1":   "av1",
+})
+
 var qualityTransformer = NewMapTransformer(map[string]string{
 	// Disc-based rips
 	"bd":     "BluRay",
@@ -33,23 +53,17 @@ var qualityTransformer = NewMapTransformer(map[string]string{
 	"dvdscr": "DVDScr",
 
 	// Internet/streaming sources
-	"web-dl":        "WEB-DL",
-	"webdl":         "WEB-DL",
-	"web-dlrip":     "WEB-DLRip",
-	"webdlrip":      "WEB-DLRip",
-	"ppv web-dl":    "WEB-DL",
-	"ppv webdl":     "WEB-DL",
-	"ppv web-dlrip": "WEB-DLRip",
-	"ppv webdlrip":  "WEB-DLRip",
-	"webrip":        "WEBRip",
-	"wbbrip":        "WEBRip",
-	"hdrip":         "HDRip",
+	"web-dl":    "WEB-DL",
+	"webdl":     "WEB-DL",
+	"web-dlrip": "WEB-DLRip",
+	"webdlrip":  "WEB-DLRip",
+	"webrip":    "WEBRip",
+	"wbbrip":    "WEBRip",
+	"hdrip":     "HDRip",
 
-	// Off-air capture
-	"hdtv":     "HDTV",
-	"pdtv":     "PDTV",
-	"ppv.hdtv": "HDTV",
-	"ppv.pdtv": "PDTV",
+	// Off-air capture (PPV-prefix forms now go through FieldTypePPV)
+	"hdtv": "HDTV",
+	"pdtv": "PDTV",
 
 	// Other physical sources
 	"satrip": "SATRip",
@@ -83,8 +97,11 @@ var qualityTransformer = NewMapTransformer(map[string]string{
 // Always referenced inside `(?i)\b(...)\b` or `(?i)(?:...)` to keep
 // case-insensitivity + word boundaries explicit at each call site.
 const (
-	qualityRipForms       = `DVDRip|DVDRIP|BluRay|B[DR]Rip|(?:PPV )?WEB-?DL(?:Rip)?|HDRip|W[EB]BRip|CamRip|DvDScr|SATRip|TVRip`
-	qualityBroadcastForms = `(?:PPV\.)?[HP]DTV|(?:HD)?CAM|(?:HD-?)?TS|telesync`
+	// `PPV` prefix is intentionally dropped from these alternations —
+	// it's its own field now (FieldTypePPV) so Quality keeps a clean
+	// source-tier value. See ppvMatcher below.
+	qualityRipForms       = `DVDRip|DVDRIP|BluRay|B[DR]Rip|WEB-?DL(?:Rip)?|HDRip|W[EB]BRip|CamRip|DvDScr|SATRip|TVRip`
+	qualityBroadcastForms = `[HP]DTV|(?:HD)?CAM|(?:HD-?)?TS|telesync`
 	qualityAlternation    = qualityRipForms + `|` + qualityBroadcastForms
 
 	// adultStudioAlternation — curated adult-studio / cam-site names
@@ -128,6 +145,13 @@ var fieldParsers = FieldParsers{
 	// matched keyword is reported (Adult=true) but its span is NOT
 	// consumed, otherwise "Bang My Tranny Ass" yields Title="Bang My"
 	// because `tranny` sits mid-string.
+	// PPV (Pay-Per-View) — wrestling/UFC/boxing event-delivery marker.
+	// Non-transient: consumes the span so the keyword doesn't leak
+	// into Title/Extra (different from Adult/Sport which keep the
+	// matched word visible because their tokens are usually part of
+	// the show title — "Brazzers Scene", "NBA 2026..."). "PPV" is
+	// always a standalone tag, never the title itself.
+	{FieldTypePPV, NewRegexpMatcher(`(?i)\b((PPV))\b`), nil},
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	// Quality. Second alternative handles the BD-prefix combined
 	// marker "BD1080p" / "BD2160p" — common in anime fansub releases.
@@ -155,7 +179,17 @@ var fieldParsers = FieldParsers{
 	// suffix common on anime encodes ("10bit", "10-bit", "8-bit").
 	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?|(?:8|10|12)[\s-]?bit))`), nil},
 	// Codec — added HEVC (H.265 alias) and AV1.
-	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|divx|[hx]\.?26[45]|hevc|av1))\b`), nil},
+	// Codec. First two alternatives consume the combined "x265.HEVC" /
+	// "x264.AVC" / "HEVC.x264" forms so the alias half doesn't leak
+	// into Extra (test 159 = Sicario "...x265.HEVC-PSA.mkv" used to
+	// stash HEVC in Extra). Inner capture stays the canonical name.
+	// MapTransformer normalises h.264 / H265 / HEVC / AVC variants
+	// to "x264" / "x265" so downstream consumers see one stable token.
+	{FieldTypeCodec, NewRegexpMatcher(
+		`(?i)\b(([hx]\.?26[45])[\s.-]?(?:HEVC|AVC))\b`,
+		`(?i)\b((?:HEVC|AVC)[\s.-]?([hx]\.?26[45]))\b`,
+		`(?i)\b((xvid|divx|[hx]\.?26[45]|hevc|av1))\b`,
+	), codecTransformer},
 	// Audio — extended with Atmos/TrueHD/EAC3/FLAC/DDP and channel
 	// counts (7.1/5.1/2CH/6ch) so newer encodes don't leak these
 	// markers into Title or Extra. Order: longer / more specific

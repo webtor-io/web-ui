@@ -69,6 +69,15 @@ type TorrentInfo struct {
 	// to add. Detected via TransientFieldParser so the matched keyword
 	// stays visible in Title/Extra rather than being silently swallowed.
 	Sport bool `json:"sport,omitempty"`
+	// Ppv (Pay-Per-View) marks events that were sold individually —
+	// wrestling specials, UFC numbered events, boxing. Orthogonal to
+	// Sport: most PPV is sport, but the model itself describes a
+	// delivery / commercial channel, not a quality tier. Kept out of
+	// the Quality field so canonical tokens stay clean. Field name
+	// uses Title-case ("Ppv" not "PPV") so reflect.FieldByName lookup
+	// in TorrentInfo.MapField — which goes through strings.Title —
+	// resolves correctly. Same convention as Avc, Sbs.
+	Ppv bool `json:"ppv,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

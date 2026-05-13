@@ -5,6 +5,7 @@
     "quality": "HDTV",
     "codec": "x264",
     "group": "Ebi[rartv]",
-    "sport": true
+    "sport": true,
+    "ppv": true
   }
 }
