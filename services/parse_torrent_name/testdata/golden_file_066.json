@@ -7,6 +7,7 @@
     "quality": "HDRIP",
     "codec": "X264",
     "audio": "AC3",
-    "extra": "READNFO TiTAN"
+    "extra": "READNFO TiTAN",
+    "sport": true
   }
 }

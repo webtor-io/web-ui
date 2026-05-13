@@ -1,0 +1,15 @@
+{
+  "input": "AEW.Collision.2026.05.06.MAX.720p.WEBRip.h264-HEEL.mp4",
+  "want": {
+    "title": "AEW Collision",
+    "year": 2026,
+    "resolution": "720p",
+    "quality": "WEBRip",
+    "codec": "h264",
+    "group": "HEEL",
+    "container": "mp4",
+    "date": "2026-05-06",
+    "extra": "MAX",
+    "sport": true
+  }
+}

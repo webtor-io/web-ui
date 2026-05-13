@@ -1,0 +1,14 @@
+{
+  "input": "UFC 308 Topuria vs Holloway 2024.10.26 720p HDTV.mkv",
+  "want": {
+    "title": "UFC",
+    "episode": 308,
+    "year": 2024,
+    "resolution": "720p",
+    "quality": "HDTV",
+    "container": "mkv",
+    "date": "2024-10-26",
+    "extra": "Topuria vs Holloway",
+    "sport": true
+  }
+}

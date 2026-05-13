@@ -1,0 +1,9 @@
+{
+  "input": "The Sport of Kings (1947) Classic Western.mkv",
+  "want": {
+    "title": "The Sport of Kings",
+    "year": 1947,
+    "container": "mkv",
+    "extra": "Classic Western"
+  }
+}

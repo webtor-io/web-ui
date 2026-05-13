@@ -62,6 +62,13 @@ type TorrentInfo struct {
 	// signal ("what didn't we parse out?") and as a place downstream
 	// consumers can look for incidental metadata like dubbing language.
 	Extra string `json:"extra,omitempty"`
+	// Sport is set when the filename carries a recognised league/event
+	// marker (NBA, NHL, WWE, AEW, UFC, Champions League, КХЛ, etc.).
+	// Downstream enrichment skips AI fallback for these — TMDB/OMDB/
+	// KPU don't index sports broadcasts and Claude has nothing useful
+	// to add. Detected via TransientFieldParser so the matched keyword
+	// stays visible in Title/Extra rather than being silently swallowed.
+	Sport bool `json:"sport,omitempty"`
 }
 
 func (s *TorrentInfo) MapField(fieldType FieldType, val string) {

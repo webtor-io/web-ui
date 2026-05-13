@@ -96,7 +96,25 @@ var fieldParsers = FieldParsers{
 	// "YYYY-MM-DD" and validates month/day ranges; out-of-range
 	// triplets fall through unmatched.
 	{FieldTypeDate, NewRegexpMatcher(
+		// YYYY-MM-DD / "YYYY MM DD" — ISO-style and broadcast convention
+		// (wrestling, NBA, NHL releases all use 4-digit year first).
+		// Anchored to 19/20-prefix year to keep "1080 12 34" resolution
+		// + size combos from false-matching.
+		`(\b((?:19|20)\d{2}[.\s_\-]\d{1,2}[.\s_\-]\d{1,2})\b)`,
+		// DD-MM-YYYY unwrapped (European broadcast convention, e.g.
+		// Russian sports rips "Хоккей НХЛ ... 04.05.2026.mkv").
+		// Anchored to END of filename (optionally followed by a
+		// container extension) so the Russian SATRip episode-pack
+		// convention "Show.NN.YYYY.SATRip.avi" — where NN is the
+		// episode index, not a day-of-month — keeps reading as
+		// Episode + Year via the existing `.NN.YYYY.<rip>` pattern.
+		// Year anchor on 19/20 prefix prevents matches like
+		// "12.04.5060".
+		`(\b(\d{1,2}[.\s_\-]\d{1,2}[.\s_\-](?:19|20)\d{2})\b)(?:\.[a-z0-9]{2,4})?$`,
+		// YY-MM-DD (scene-release shorthand: "Blacked.18.03.21").
 		`(\b(\d{2}[.\s_\-]\d{2}[.\s_\-]\d{2})\b)`,
+		// DD.MM.YYYY in parens (European convention, common inside
+		// adult-release tags: "Studio - Title (27.02.2026) rq.mp4").
 		`(\((\d{1,2}[.\s_\-]\d{1,2}[.\s_\-]\d{4})\))`,
 	), NewDateTransformer()},
 	// Year is matched BEFORE Season/Episode so 4-digit year-shaped numbers
@@ -345,11 +363,41 @@ var adultMatcher = NewRegexpMatcher(
 	`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
 )
 
+// sportMatcher detects FieldTypeSport — used downstream to skip AI
+// enrichment on sports broadcasts (TMDB/OMDB/KPU don't index them
+// and Claude has nothing to add).
+//
+// Three pattern groups:
+//
+//   1. League abbreviations as standalone tokens (NBA, NHL, WWE, ...).
+//      The `\b...\b` word boundary keeps "Mr. NBA" / "NBA documentary"
+//      flagged but skips substrings like "NB" inside "NBNA".
+//   2. Multi-word competition names ("Premier League", "Champions
+//      League", "World Cup"). The `\s+` accommodates the parser's
+//      "underscore→space" preprocessing.
+//   3. Russian Cyrillic markers (НХЛ, КХЛ, РПЛ, хоккей, футбол).
+//      Non-Cyrillic prefix guard prevents false matches inside
+//      compound words.
+//
+// Wrestling-specific show names (Monday Night Raw, SmackDown, NXT,
+// Dynamite, Collision, Rampage) are included because they're 1:1
+// with WWE/AEW programming with no overlap with non-sport titles.
+var sportMatcher = NewRegexpMatcher(
+	`(?i)\b((NBA|NHL|NFL|MLB|MLS|WNBA|WWE|AEW|UFC|ATP|WTA|PGA|MotoGP|NASCAR|F1|IndyCar))\b`,
+	`(?i)\b((Monday\s+Night\s+Raw|SmackDown|NXT|Dynamite|Collision|Rampage|WrestleMania|SummerSlam|Royal\s+Rumble|Survivor\s+Series))\b`,
+	`(?i)\b((Premier\s+League|Champions\s+League|Europa\s+League|La\s+Liga|Bundesliga|Serie\s+A|Ligue\s+1|World\s+Cup|FIFA|UEFA|Stanley\s+Cup|Super\s+Bowl|Eurocup|Euroleague))\b`,
+	`(?i)((?:^|[^а-яА-Я])(НХЛ|КХЛ|РФПЛ|РПЛ|хоккей|футбол|баскетбол|теннис|биатлон|формула[\s\-]*1))`,
+)
+
 var parser = NewCompoundParser([]Parser{
 	// Run FIRST so Adult detection sees the unmolested input. Transient
 	// so its matched spans don't truncate Title downstream — see
 	// "Bang My Tranny Ass" trace in parser.go/Match.Transient.
 	NewTransientFieldParser(FieldTypeAdult, adultMatcher, nil),
+	// Sport — same transient flag-only treatment. Pairs with the
+	// `isSportPath` check in services/enrich/enrich.go to short-
+	// circuit Claude calls for broadcasts (NBA/NHL/UFC/WWE etc.).
+	NewTransientFieldParser(FieldTypeSport, sportMatcher, nil),
 	NewCompoundParser(fieldParsers.ToParserSlice()),
 	// Swallow stray separator characters into the adjacent consumed
 	// spans so the gaps between non-transient matches stop being

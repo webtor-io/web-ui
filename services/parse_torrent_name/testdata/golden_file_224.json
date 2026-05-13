@@ -1,0 +1,11 @@
+{
+  "input": "Friday Night Lights (2004) 1080p BluRay x264.mkv",
+  "want": {
+    "title": "Friday Night Lights",
+    "year": 2004,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "container": "mkv"
+  }
+}

@@ -293,6 +293,26 @@ func candidatesEqual(a, b []TitleCandidate) bool {
 // folder (e.g. "Blacked/lana.mp4" or "JAV_uncensored/abp-123.mp4")
 // still trips on the folder. Returns false on an empty path.
 func isAdultPath(pathStr string) bool {
+	return matchesPathFlag(pathStr, func(ti *ptn.TorrentInfo) bool {
+		return ti.Adult
+	})
+}
+
+// isSportPath returns true when any path segment carries a recognised
+// sport league / event marker (NBA, NHL, WWE, AEW, Premier League,
+// КХЛ, ...). Sports broadcasts have no metadata coverage in
+// TMDB/OMDB/KPU and Claude has nothing to add, so the AI fallback
+// skips them just like adult content does.
+func isSportPath(pathStr string) bool {
+	return matchesPathFlag(pathStr, func(ti *ptn.TorrentInfo) bool {
+		return ti.Sport
+	})
+}
+
+// matchesPathFlag walks each path segment through the parser and
+// returns true if `pick` returns true for any of them. Shared
+// implementation between isAdultPath and isSportPath.
+func matchesPathFlag(pathStr string, pick func(*ptn.TorrentInfo) bool) bool {
 	if pathStr == "" {
 		return false
 	}
@@ -304,7 +324,7 @@ func isAdultPath(pathStr string) bool {
 		if err != nil {
 			continue
 		}
-		if ti.Adult {
+		if pick(ti) {
 			return true
 		}
 	}
@@ -776,6 +796,14 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 	// docs/ai_enrichment.md.
 	if isAdultPath(pathHint) {
 		log.WithField("path", pathHint).Info("ai_enrich: skipping adult path")
+		return nil
+	}
+	// Same rationale for sports broadcasts (NBA, NHL, WWE, AEW, UFC,
+	// Premier League, КХЛ, ...). The metadata DBs index movies/series,
+	// not broadcasts; Claude has nothing to suggest. See the Sport
+	// transient flag in services/parse_torrent_name.
+	if isSportPath(pathHint) {
+		log.WithField("path", pathHint).Info("ai_enrich: skipping sport path")
 		return nil
 	}
 	// Locked candidates — two consecutive Claude calls returned the

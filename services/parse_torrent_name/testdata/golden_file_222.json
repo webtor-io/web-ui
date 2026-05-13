@@ -1,0 +1,11 @@
+{
+  "input": "Premier League Manchester United vs Liverpool 2024-03-17 1080p.mkv",
+  "want": {
+    "title": "Premier League Manchester United vs Liverpool",
+    "year": 2024,
+    "resolution": "1080p",
+    "container": "mkv",
+    "date": "2024-03-17",
+    "sport": true
+  }
+}

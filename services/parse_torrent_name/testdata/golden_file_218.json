@@ -1,0 +1,11 @@
+{
+  "input": "NBA 2026.05.11 DET @ CLE 1080p60 NBC.mkv",
+  "want": {
+    "title": "NBA",
+    "year": 2026,
+    "container": "mkv",
+    "date": "2026-05-11",
+    "extra": "DET @ CLE 1080p60 NBC",
+    "sport": true
+  }
+}
