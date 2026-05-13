@@ -71,6 +71,12 @@ func NewLowercaseTransformer() *LowercaseTransformer {
 // alias / abbreviation normalisation — e.g. the Quality field accepts
 // the "BD" prefix from "BD1080p" but stores the canonical "BluRay".
 //
+// Lookup is CASE-INSENSITIVE: map keys must be lowercase, but inputs
+// like "BLURAY"/"BluRay"/"bluray" all resolve through `lower(val)`.
+// Anything not present in the table passes through unchanged so the
+// transformer is safe to attach to a field even when only a subset
+// of its possible values needs aliasing.
+//
 // Different from ReplaceTransformer (substring-replace) — Map only
 // fires when the WHOLE captured content matches a key, so it can't
 // accidentally rewrite a substring inside a longer field value.
@@ -79,14 +85,21 @@ type MapTransformer struct {
 }
 
 func (t *MapTransformer) Transform(val string) (string, error) {
-	if v, ok := t.m[val]; ok {
+	if v, ok := t.m[strings.ToLower(val)]; ok {
 		return v, nil
 	}
 	return val, nil
 }
 
+// NewMapTransformer builds a MapTransformer from an alias table.
+// Keys are auto-lowercased so callers may write them in any case for
+// readability; the runtime lookup always lowercases the input.
 func NewMapTransformer(m map[string]string) *MapTransformer {
-	return &MapTransformer{m: m}
+	lower := make(map[string]string, len(m))
+	for k, v := range m {
+		lower[strings.ToLower(k)] = v
+	}
+	return &MapTransformer{m: lower}
 }
 
 // DateTransformer normalizes the matched date span to "YYYY-MM-DD".

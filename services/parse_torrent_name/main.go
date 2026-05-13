@@ -10,6 +10,61 @@ import (
 // used by the Website→Studio promotion fixup in Parse.
 var adultStudioRe = regexp.MustCompile(`(?i)^(?:` + adultStudioAlternation + `)$`)
 
+// qualityTransformer canonicalises Quality field values. The regex
+// alternation matches many surface forms ("WEB-DL", "WEBDL",
+// "WEB-DLRip", "BluRay", "BLURAY", "DvDScr", "telesync", ...); the
+// stored value is the canonical token from this table so downstream
+// consumers don't branch on case/punctuation variants.
+//
+// Keys are case-folded by MapTransformer at construction time; write
+// them lowercase here for readability. Values are the canonical form.
+//
+// "PPV"-prefixed broadcast forms ("PPV.HDTV", "PPV WEB-DL") fold
+// down to the base source — wrestling/sports PPV is a delivery
+// channel, not a quality tier. The Sport flag (FieldTypeSport)
+// already carries the broadcast context.
+var qualityTransformer = NewMapTransformer(map[string]string{
+	// Disc-based rips
+	"bd":     "BluRay",
+	"bluray": "BluRay",
+	"bdrip":  "BDRip",
+	"brrip":  "BRRip",
+	"dvdrip": "DVDRip",
+	"dvdscr": "DVDScr",
+
+	// Internet/streaming sources
+	"web-dl":        "WEB-DL",
+	"webdl":         "WEB-DL",
+	"web-dlrip":     "WEB-DLRip",
+	"webdlrip":      "WEB-DLRip",
+	"ppv web-dl":    "WEB-DL",
+	"ppv webdl":     "WEB-DL",
+	"ppv web-dlrip": "WEB-DLRip",
+	"ppv webdlrip":  "WEB-DLRip",
+	"webrip":        "WEBRip",
+	"wbbrip":        "WEBRip",
+	"hdrip":         "HDRip",
+
+	// Off-air capture
+	"hdtv":     "HDTV",
+	"pdtv":     "PDTV",
+	"ppv.hdtv": "HDTV",
+	"ppv.pdtv": "PDTV",
+
+	// Other physical sources
+	"satrip": "SATRip",
+	"tvrip":  "TVRip",
+	"camrip": "CamRip",
+
+	// Cam / telesync (in-theatre recordings)
+	"cam":      "CAM",
+	"hdcam":    "HDCAM",
+	"ts":       "TS",
+	"hdts":     "HDTS",
+	"hd-ts":    "HDTS",
+	"telesync": "TS",
+})
+
 // Release-quality keywords, split into two groups so the Episode
 // `.NN.<Quality>` anchor (Russian DVDRip pack convention) can opt into
 // the SAFE subset while the Quality field-parser keeps the full list.
@@ -77,15 +132,13 @@ var fieldParsers = FieldParsers{
 	// Quality. Second alternative handles the BD-prefix combined
 	// marker "BD1080p" / "BD2160p" — common in anime fansub releases.
 	// Captures just the "BD" span (the resolution part is left for
-	// FieldTypeResolution below). MapTransformer canonicalises the
-	// raw "BD" to "BluRay" so downstream consumers see one stable
-	// Quality token regardless of source naming.
+	// FieldTypeResolution below). The MapTransformer below canonical-
+	// ises every Quality value to a stable token so downstream
+	// consumers don't have to handle case/format variants.
 	{FieldTypeQuality, NewRegexpMatcher(
 		`(?i)\b((` + qualityAlternation + `))\b`,
 		`(?i)\b((BD))(?:[0-9]{3,4}p|[248][Kk])\b`,
-	), NewMapTransformer(map[string]string{
-		"BD": "BluRay",
-	})},
+	), qualityTransformer},
 	// Resolution. First alternative handles the BD/UHD-prefix anime
 	// release convention: "BD1080p", "UHD2160p". The standard
 	// `\b\d{3,4}p\b` form misses these because there's no word/non-word
