@@ -69,6 +69,14 @@ type TorrentInfo struct {
 	// to add. Detected via TransientFieldParser so the matched keyword
 	// stays visible in Title/Extra rather than being silently swallowed.
 	Sport bool `json:"sport,omitempty"`
+	// Course flags pirated-course / tutorial / e-learning content:
+	// Udemy, Coursera, Pluralsight, plus the `[<site>.com]` bracket-
+	// prefix conventions used by pirate course-aggregator sites
+	// (FreeCourseSite, TutsNode, DevCourseWeb, WebToolTip, ...).
+	// Same downstream effect as Sport — AI fallback skips these
+	// because TMDB/OMDB/KPU don't index educational material and
+	// Claude has nothing useful to add.
+	Course bool `json:"course,omitempty"`
 	// Ppv (Pay-Per-View) marks events that were sold individually —
 	// wrestling specials, UFC numbered events, boxing. Orthogonal to
 	// Sport: most PPV is sport, but the model itself describes a

@@ -1,0 +1,13 @@
+{
+  "input": "1By-Day - 2013.06.01 In The Great Tradition [solo] 1080p.mp4",
+  "want": {
+    "title": "In The Great Tradition",
+    "extra_title": "solo",
+    "year": 2013,
+    "resolution": "1080p",
+    "studio": "1By-Day",
+    "container": "mp4",
+    "adult": true,
+    "date": "2013-06-01"
+  }
+}

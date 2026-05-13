@@ -1,0 +1,11 @@
+{
+  "input": "The Course (2024) 1080p BluRay x264.mkv",
+  "want": {
+    "title": "The Course",
+    "year": 2024,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "container": "mkv"
+  }
+}

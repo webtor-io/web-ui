@@ -372,6 +372,17 @@ func isSportPath(pathStr string) bool {
 	})
 }
 
+// isCoursePath returns true for pirated-course / e-learning torrents
+// (Udemy, Coursera, FreeCourseSite, TutsNode, DevCourseWeb, ...).
+// Same skip rationale as Adult/Sport: the metadata DBs index movies
+// and TV, not lectures, so neither path-title fallback nor AI
+// resolution can produce useful enrichment.
+func isCoursePath(pathStr string) bool {
+	return matchesPathFlag(pathStr, func(ti *ptn.TorrentInfo) bool {
+		return ti.Course
+	})
+}
+
 // matchesPathFlag walks each path segment through the parser and
 // returns true if `pick` returns true for any of them. Shared
 // implementation between isAdultPath and isSportPath.
@@ -768,7 +779,7 @@ func (s *Enricher) mapMetadata(ctx context.Context, vc *models.VideoContent, t m
 	//   - Minimum 3 characters — single-letter and 2-letter path
 	//     segments ("D", "HQ", "NF") have too high a TMDB collision
 	//     rate to be safe candidates.
-	if pathHint == "" || (!isAdultPath(pathHint) && !isSportPath(pathHint)) {
+	if pathHint == "" || (!isAdultPath(pathHint) && !isSportPath(pathHint) && !isCoursePath(pathHint)) {
 		for _, pt := range extractPathTitles(vc) {
 			if len(pt) < 3 || pt == vc.Title {
 				continue
@@ -927,6 +938,11 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 	// transient flag in services/parse_torrent_name.
 	if isSportPath(pathHint) {
 		log.WithField("path", pathHint).Info("ai_enrich: skipping sport path")
+		return nil
+	}
+	// Same rationale for pirate-course / e-learning content.
+	if isCoursePath(pathHint) {
+		log.WithField("path", pathHint).Info("ai_enrich: skipping course path")
 		return nil
 	}
 	// Locked candidates — two consecutive Claude calls returned the

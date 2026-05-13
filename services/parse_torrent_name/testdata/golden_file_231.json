@@ -1,0 +1,9 @@
+{
+  "input": "[FreeCourseSite.com] Udemy - Master the Coding Interview Big Tech FAANG Interviews.mp4",
+  "want": {
+    "title": "Udemy - Master the Coding Interview Big Tech FAANG Interviews",
+    "container": "mp4",
+    "website": "FreeCourseSite.com",
+    "course": true
+  }
+}

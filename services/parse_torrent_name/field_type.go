@@ -40,6 +40,7 @@ const (
 	FieldTypeDate        FieldType = "date"
 	FieldTypeExtra       FieldType = "extra"
 	FieldTypeSport       FieldType = "sport"
+	FieldTypeCourse      FieldType = "course"
 	FieldTypePPV         FieldType = "ppv"
 	FieldTypeUnknown     FieldType = "unknown"
 )

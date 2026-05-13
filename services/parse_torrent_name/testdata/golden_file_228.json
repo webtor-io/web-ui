@@ -1,0 +1,10 @@
+{
+  "input": "TamedTeens - Valentina_1080p.mp4",
+  "want": {
+    "title": "Valentina",
+    "resolution": "1080p",
+    "studio": "TamedTeens",
+    "container": "mp4",
+    "adult": true
+  }
+}

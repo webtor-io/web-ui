@@ -113,7 +113,7 @@ const (
 	// Multi-word brands embed `\.?` between tokens so both the dotted
 	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
 	// match — the parser doesn't strip dots before field matching.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals`
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -505,6 +505,26 @@ var sportMatcher = NewRegexpMatcher(
 	`(?i)((?:^|[^а-яА-Я])(НХЛ|КХЛ|РФПЛ|РПЛ|хоккей|футбол|баскетбол|теннис|биатлон|формула[\s\-]*1))`,
 )
 
+// courseMatcher detects FieldTypeCourse — pirated-course / tutorial /
+// e-learning content that has nothing useful to retrieve from
+// TMDB/OMDB/KPU. Downstream enrichment skips both AI fallback and
+// path-title fallback when this flag fires.
+//
+// Two pattern groups, both high-confidence:
+//
+//   1. Mainstream e-learning platforms ("Udemy", "Coursera",
+//      "Pluralsight", ...). These names are essentially never used
+//      as movie / TV titles.
+//   2. Pirate-aggregator bracket prefixes that pirate-course
+//      torrents universally carry — "[FreeCourseSite.com]",
+//      "[TutsNode]", "[DevCourseWeb]", etc. The bracket-with-domain
+//      shape itself is the marker, paired with one of the known
+//      aggregator domains.
+var courseMatcher = NewRegexpMatcher(
+	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books))\b`,
+	`(?i)(\[\s*(freecoursesite|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
+)
+
 var parser = NewCompoundParser([]Parser{
 	// Run FIRST so Adult detection sees the unmolested input. Transient
 	// so its matched spans don't truncate Title downstream — see
@@ -514,6 +534,10 @@ var parser = NewCompoundParser([]Parser{
 	// `isSportPath` check in services/enrich/enrich.go to short-
 	// circuit Claude calls for broadcasts (NBA/NHL/UFC/WWE etc.).
 	NewTransientFieldParser(FieldTypeSport, sportMatcher, nil),
+	// Course — same transient flag for educational content. Pairs
+	// with isCoursePath in services/enrich to skip AI + path-title
+	// fallback for Udemy/Coursera/pirate-aggregator releases.
+	NewTransientFieldParser(FieldTypeCourse, courseMatcher, nil),
 	NewCompoundParser(fieldParsers.ToParserSlice()),
 	// Swallow stray separator characters into the adjacent consumed
 	// spans so the gaps between non-transient matches stop being

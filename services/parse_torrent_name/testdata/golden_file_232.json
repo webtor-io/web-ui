@@ -1,0 +1,9 @@
+{
+  "input": "[ DevCourseWeb.com ] Udemy - Mastering Oracle Data Integrator (ODI).mp4",
+  "want": {
+    "title": "Udemy - Mastering Oracle Data Integrator",
+    "container": "mp4",
+    "website": "DevCourseWeb.com",
+    "course": true
+  }
+}

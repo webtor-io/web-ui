@@ -1,0 +1,9 @@
+{
+  "input": "Coursera - Stanford Machine Learning Andrew Ng 2024.mp4",
+  "want": {
+    "title": "Coursera - Stanford Machine Learning Andrew Ng",
+    "year": 2024,
+    "container": "mp4",
+    "course": true
+  }
+}

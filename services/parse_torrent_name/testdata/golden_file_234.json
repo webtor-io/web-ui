@@ -1,0 +1,8 @@
+{
+  "input": "Pluralsight - Advanced Kubernetes Operators.mp4",
+  "want": {
+    "title": "Pluralsight - Advanced Kubernetes Operators",
+    "container": "mp4",
+    "course": true
+  }
+}
