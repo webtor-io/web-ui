@@ -327,6 +327,12 @@ var parser = NewCompoundParser([]Parser{
 	// "Bang My Tranny Ass" trace in parser.go/Match.Transient.
 	NewTransientFieldParser(FieldTypePorn, pornMatcher, nil),
 	NewCompoundParser(fieldParsers.ToParserSlice()),
+	// Swallow stray separator characters into the adjacent consumed
+	// spans so the gaps between non-transient matches stop being
+	// "first available subrange" candidates for the greedy Title
+	// regex. Without this, "angelslove.26.05.10.chanel.x..." → Title=""
+	// because Title's `[^\[\(\{]*` match returned a one-byte "." gap.
+	NewSeparatorExpander(),
 	NewScopeParser(NewRegexpMatcher(`((.*))`), NewCompoundParser([]Parser{
 		NewFieldParser(FieldTypeExtraTitle, NewRegexpMatcher(`(\[([^\)]+)\])`), titleTransformer),
 		NewFieldParser(FieldTypeTitle, NewRegexpMatcher(`(([^\[\(\{]*))`), titleTransformer),

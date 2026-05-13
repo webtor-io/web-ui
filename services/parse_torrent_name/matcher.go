@@ -27,12 +27,27 @@ type Match struct {
 type Matches []*Match
 
 func (s Matches) getAvailable(start int, end int) (int, int, bool) {
+	// Iterate matches sorted by Start so the left-to-right shrinking
+	// of (start, end) is monotonic. Without sorting, a Studio match at
+	// position 0 arriving LATER in the slice could coincide with an
+	// already-shrunken range and trigger the proper-subset
+	// short-circuit below, returning ok=false even though a real
+	// available subrange exists elsewhere. Insertion sort on a copy —
+	// N is small (handful of fields per filename) and we must not
+	// mutate the caller's slice order.
+	live := make([]*Match, 0, len(s))
 	for _, m := range s {
-		// Detect-only matches don't claim space — subsequent matchers
-		// (especially the greedy Title regex) see the full string.
 		if m.Transient {
 			continue
 		}
+		live = append(live, m)
+	}
+	for i := 1; i < len(live); i++ {
+		for j := i; j > 0 && live[j].Start < live[j-1].Start; j-- {
+			live[j], live[j-1] = live[j-1], live[j]
+		}
+	}
+	for _, m := range live {
 		if m.Start <= start && m.End >= end {
 			return start, end, false
 		}

@@ -5,7 +5,7 @@
   "quality": "BluRay",
   "codec": "x264",
   "audio": "DTS",
-  "group": "MgB (",
+  "group": "MgB",
   "container": "mkv",
   "sample": true
 }
