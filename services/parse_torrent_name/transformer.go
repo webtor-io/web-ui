@@ -66,6 +66,29 @@ func NewLowercaseTransformer() *LowercaseTransformer {
 	return &LowercaseTransformer{}
 }
 
+// MapTransformer rewrites an exact-match input value through a lookup
+// table; values not in the table pass through unchanged. Used for
+// alias / abbreviation normalisation — e.g. the Quality field accepts
+// the "BD" prefix from "BD1080p" but stores the canonical "BluRay".
+//
+// Different from ReplaceTransformer (substring-replace) — Map only
+// fires when the WHOLE captured content matches a key, so it can't
+// accidentally rewrite a substring inside a longer field value.
+type MapTransformer struct {
+	m map[string]string
+}
+
+func (t *MapTransformer) Transform(val string) (string, error) {
+	if v, ok := t.m[val]; ok {
+		return v, nil
+	}
+	return val, nil
+}
+
+func NewMapTransformer(m map[string]string) *MapTransformer {
+	return &MapTransformer{m: m}
+}
+
 // DateTransformer normalizes the matched date span to "YYYY-MM-DD".
 // Accepts three input shapes (any of ` .-_` as separator):
 //   - "YY MM DD"       — scene convention (year first, 2-digit YY → 20YY)

@@ -74,7 +74,18 @@ var fieldParsers = FieldParsers{
 	// consumed, otherwise "Bang My Tranny Ass" yields Title="Bang My"
 	// because `tranny` sits mid-string.
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
-	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
+	// Quality. Second alternative handles the BD-prefix combined
+	// marker "BD1080p" / "BD2160p" — common in anime fansub releases.
+	// Captures just the "BD" span (the resolution part is left for
+	// FieldTypeResolution below). MapTransformer canonicalises the
+	// raw "BD" to "BluRay" so downstream consumers see one stable
+	// Quality token regardless of source naming.
+	{FieldTypeQuality, NewRegexpMatcher(
+		`(?i)\b((` + qualityAlternation + `))\b`,
+		`(?i)\b((BD))(?:[0-9]{3,4}p|[248][Kk])\b`,
+	), NewMapTransformer(map[string]string{
+		"BD": "BluRay",
+	})},
 	// Resolution. First alternative handles the BD/UHD-prefix anime
 	// release convention: "BD1080p", "UHD2160p". The standard
 	// `\b\d{3,4}p\b` form misses these because there's no word/non-word
@@ -83,7 +94,7 @@ var fieldParsers = FieldParsers{
 	// is consistent regardless of source prefix; the outer span eats
 	// the "BD"/"UHD" prefix too, keeping it out of Title/Extra.
 	{FieldTypeResolution, NewRegexpMatcher(
-		`(?i)\b((?:BD|UHD)([0-9]{3,4}p|[248][Kk]))\b`,
+		`(?i)\b((?:BD|UHD|HD)([0-9]{3,4}p|[248][Kk]))\b`,
 		`\b(([0-9]{3,4}p|[248][Kk]))\b`,
 	), NewLowercaseTransformer()},
 	{FieldTypeBitrate, NewRegexpMatcher(`(?i)\b(([0-9]+[KMGT]bps))\b`), nil},
