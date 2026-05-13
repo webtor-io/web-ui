@@ -183,7 +183,14 @@ var fieldParsers = FieldParsers{
 		// Side 1" consumes the full "ep 07 " span (leaving title clean)
 		// instead of bottom-up "07 - E" leaving "ep" attached to title.
 		`(?i)((?:episode|ep|chapter|глава|серия)[\s.\-_]?([0-9]{1,4})(?:[^0-9]|$))`,
-		`(\b([0-9]{2,4})[\s.]+-[\s.]+\p{L})`,
+		// Outer capture deliberately STOPS at the trailing dash —
+		// the `\p{L}` letter requirement stays in the overall regex
+		// to anchor "NN - <Letter>" form but does NOT get consumed
+		// into the match span. Otherwise the first letter of the
+		// following word (e.g. "P" of "Pokémon, I Choose You") got
+		// pulled into Episode's consumed range and corrupted Title/
+		// Extra downstream.
+		`(\b([0-9]{2,4})[\s.]+-)[\s.]+\p{L}`,
 		// Russian "NN серия <show>" naming. Aleksan55 rips and similar
 		// Cyrillic SATRip/DVDRip releases put the episode number before
 		// the word "серия" (= "episode"). Pattern matches the digit run
