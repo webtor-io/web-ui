@@ -1,0 +1,8 @@
+{
+  "input": "MD-80 McDonnell Douglas Documentary 2010.mkv",
+  "want": {
+    "title": "MD-80 McDonnell Douglas Documentary",
+    "year": 2010,
+    "container": "mkv"
+  }
+}

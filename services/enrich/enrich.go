@@ -304,7 +304,7 @@ func isAdultPath(pathStr string) bool {
 		if err != nil {
 			continue
 		}
-		if ti.Porn {
+		if ti.Adult {
 			return true
 		}
 	}

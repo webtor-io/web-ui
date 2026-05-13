@@ -1,0 +1,11 @@
+{
+  "input": "FacialAbuse - Beautiful Disaster (12.04.2024) rq.mp4",
+  "want": {
+    "title": "Beautiful Disaster",
+    "year": 2024,
+    "studio": "FacialAbuse",
+    "container": "mp4",
+    "adult": true,
+    "date": "2024-04-12"
+  }
+}

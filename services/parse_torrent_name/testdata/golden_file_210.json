@@ -1,0 +1,8 @@
+{
+  "input": "JUY-754 uncen.mp4",
+  "want": {
+    "title": "JUY-754 uncen",
+    "container": "mp4",
+    "adult": true
+  }
+}

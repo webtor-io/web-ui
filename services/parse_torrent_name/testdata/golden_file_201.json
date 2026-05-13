@@ -1,0 +1,11 @@
+{
+  "input": "[AnimeRG] Pokémon - 0153 - The Bonus Round [480p] [x265].mkv",
+  "want": {
+    "title": "Pokémon",
+    "episode": 153,
+    "resolution": "480p",
+    "codec": "x265",
+    "container": "mkv",
+    "website": "AnimeRG"
+  }
+}

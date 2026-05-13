@@ -1,0 +1,9 @@
+{
+  "input": "SLR Originals - Lily Blossom - Euro Trip Good Student 36278.mp4",
+  "want": {
+    "title": "Lily Blossom - Euro Trip Good Student 36278",
+    "studio": "SLR Originals",
+    "container": "mp4",
+    "adult": true
+  }
+}

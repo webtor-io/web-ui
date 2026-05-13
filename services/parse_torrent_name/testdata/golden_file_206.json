@@ -1,0 +1,9 @@
+{
+  "input": "PureTaboo - Lana Rhoades - Head of the House rq.mp4",
+  "want": {
+    "title": "Lana Rhoades - Head of the House rq",
+    "studio": "PureTaboo",
+    "container": "mp4",
+    "adult": true
+  }
+}

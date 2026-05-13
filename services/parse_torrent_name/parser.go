@@ -34,7 +34,7 @@ func (s *FieldParser) Parse(input string, matches Matches) (Matches, error) {
 // TransientFieldParser wraps a FieldParser so the produced Match is
 // flagged Transient — detected and reported (the field gets set) but
 // its (Start, End) span is NOT subtracted from the input available to
-// downstream parsers. Used for flag-only fields like Porn where the
+// downstream parsers. Used for flag-only fields like Adult where the
 // matched keyword sitting mid-title would otherwise truncate Title.
 type TransientFieldParser struct {
 	inner Parser

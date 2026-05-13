@@ -33,11 +33,15 @@ const (
 	qualityAlternation    = qualityRipForms + `|` + qualityBroadcastForms
 
 	// adultStudioAlternation — curated adult-studio / cam-site names
-	// from ai_enrich.query telemetry. Shared by pornMatcher (transient
+	// from ai_enrich.query telemetry. Shared by adultMatcher (transient
 	// flag) and the FieldTypeStudio parser (extracts the name into
 	// Studio so the title parser doesn't keep the prefix). Add new
 	// names here in lowercase; the `(?i)` modifier handles mixed-case.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys`
+	//
+	// Multi-word brands embed `\.?` between tokens so both the dotted
+	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
+	// match — the parser doesn't strip dots before field matching.
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -64,10 +68,10 @@ var fieldParsers = FieldParsers{
 	// otherwise a single torrent produces two movies (the real film and the
 	// preview), each calling AI/TMDB independently.
 	{FieldTypeSample, NewRegexpMatcher(`(?i)\b((sample))\b`), nil},
-	// FieldTypePorn lives outside the fieldParsers slice — see
-	// pornMatcher / pornParser below. Detected via TransientFieldParser
-	// so the matched keyword is reported (Porn=true) but its span is
-	// NOT consumed, otherwise "Bang My Tranny Ass" yields Title="Bang My"
+	// FieldTypeAdult lives outside the fieldParsers slice — see
+	// adultMatcher below. Detected via TransientFieldParser so the
+	// matched keyword is reported (Adult=true) but its span is NOT
+	// consumed, otherwise "Bang My Tranny Ass" yields Title="Bang My"
 	// because `tranny` sits mid-string.
 	{FieldTypeSize, NewRegexpMatcher(`(?i)\b((\d+(?:\.\d+)?(?:GB|MB)))\b`), nil},
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
@@ -178,8 +182,8 @@ var fieldParsers = FieldParsers{
 		// "NN-dash-Letter" arm so a release like "ep 07 - Escape from
 		// Side 1" consumes the full "ep 07 " span (leaving title clean)
 		// instead of bottom-up "07 - E" leaving "ep" attached to title.
-		`(?i)((?:episode|ep)[\s.]?([0-9]{2,3})(?:[^0-9]|$))`,
-		`(\b([0-9]{2,3})[\s.]+-[\s.]+\p{L})`,
+		`(?i)((?:episode|ep|chapter|глава|серия)[\s.\-_]?([0-9]{1,4})(?:[^0-9]|$))`,
+		`(\b([0-9]{2,4})[\s.]+-[\s.]+\p{L})`,
 		// Russian "NN серия <show>" naming. Aleksan55 rips and similar
 		// Cyrillic SATRip/DVDRip releases put the episode number before
 		// the word "серия" (= "episode"). Pattern matches the digit run
@@ -241,7 +245,7 @@ var fieldParsers = FieldParsers{
 	//      TMDB search.
 	//   2. Studio-with-year inside brackets ("[Studio YYYY]") for
 	//      anime-fansub release annotations.
-	//   3. Adult studios (shared alternation with the Porn detector —
+	//   3. Adult studios (shared alternation with the Adult detector —
 	//      see `adultStudioAlternation` above). Extracting these into
 	//      Studio cleans the title and makes the studio name available
 	//      as structured metadata downstream.
@@ -260,7 +264,7 @@ var fieldParsers = FieldParsers{
 	{FieldTypeRipBy, NewRegexpMatcher(`(?i)(\brip\s+by\s+(\S+))`), nil},
 }
 
-// pornMatcher carries the FieldTypePorn detection regexes. Each pattern
+// adultMatcher carries the FieldTypePorn detection regexes. Each pattern
 // is a separate regex so the matcher's "first hit wins" semantic still
 // works; only the bool flag matters — the captured content itself is
 // discarded.
@@ -273,13 +277,13 @@ var fieldParsers = FieldParsers{
 // Used downstream to skip Claude-backed enrichment for the ~30-40%
 // of negative-cache traffic that is porn/JAV/cam content (see
 // ai_enrich.query telemetry 2026-05-11).
-var pornMatcher = NewRegexpMatcher(
+var adultMatcher = NewRegexpMatcher(
 	// Explicit XXX scene tag. Kept first for backwards compatibility
 	// — existing golden_file_083 expects this exact match.
 	`(?i)\b((X{3}))\b`,
 	// English single-occurrence keywords. All of these are
 	// effectively never found in non-adult release names.
-	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies))\b`,
+	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|cum(?:ming)?|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies|twink|pmv|anal|pussy))\b`,
 	// Adult studios / sites (case-insensitive). Curated from
 	// ai_enrich.query — every name here was observed dominating
 	// the negative cache (milfy alone: 106 rows). The list itself
@@ -308,11 +312,24 @@ var pornMatcher = NewRegexpMatcher(
 	// trailing `\d{2,5}` is what disambiguates ambiguous prefixes
 	// like APNS (Apple Push Notification Service) — only
 	// "APNS-410" form fires, "APNS notifications" stays clean.
-	`(?i)\b((aarm|abp|abw|adn|apns|atid|cawd|dasd|dvaj|ebod|hbad|hmn|hnd|imoe|ipvr|ipx|ipz|jufe|meyd|mide|midv|mird|pred|prtd|rbd|rct|sdde|sdmu|shkd|snos|sone|ssis|ssni|start|venu|venx|wanz)[\-_]?\d{2,5})\b`,
+	//
+	// Separator between prefix and serial is `[\s\-_.]*` (zero or
+	// more) — JAV codes appear as "ABP-123", "ABP_123", "ABP.123",
+	// or after parser normalisation "ABP 123" with a single space.
+	// Dropped from this list intentionally: `md`, `roe`, `shc` —
+	// 2-3 char prefixes that collide too easily with legitimate
+	// non-adult content ("MD-80" airliner, "Roe v Wade", "SHC" generic
+	// initialism). Acceptable FN cost: each accounted for ≤1 hit/day
+	// in the 2026-05-13 audit.
+	`(?i)\b((aarm|abp|abw|adn|apns|atid|beaf|cawd|dasd|dldss|dvaj|ebod|getchu|gmem|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|jera|jufd|jufe|jur|juy|maxvr|mdhr|meyd|mgnl|miaa|mide|midv|mird|mism|mmus|mudr|pred|prtd|rbd|rct|real|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|venu|venx|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
 	// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 	// match the lowercase alternation. Non-Cyrillic prefix guard
 	// prevents false matches like "страх" (fear) → "трах".
-	`(?i)((?:^|[^а-яА-Я])(трах[аеёиоунюя]|еб[аеёилоутю]|инцест|шлюх|минет|дрочи|кримпай|пизд|сперм|порно))`,
+	// `сводн<case>\s+(сестр|брат)` — Russian "stepsibling" phrase,
+	// near-exclusively used in incest-themed adult releases. Plain
+	// `сводн` would FP on "сводный закон" / "сводная таблица" (sum
+	// chart) so we require the explicit family-member follow-up.
+	`(?i)((?:^|[^а-яА-Я])(трах[аеёиоунюя]|еб[аеёилоутю]|инцест|шлюх|минет|дрочи|кримпай|пизд|сперм|порно|сводн(?:ая|ый|ого|ой|ому)[\s_]+(?:сестр|брат)))`,
 	// Chinese adult markers — uncensored / leaked / explicit body
 	// terms / adult-BBS shorthand. No CJK prefix guard: these tokens
 	// don't appear inside other common Chinese words, and Chinese
@@ -322,10 +339,10 @@ var pornMatcher = NewRegexpMatcher(
 )
 
 var parser = NewCompoundParser([]Parser{
-	// Run FIRST so Porn detection sees the unmolested input. Transient
+	// Run FIRST so Adult detection sees the unmolested input. Transient
 	// so its matched spans don't truncate Title downstream — see
 	// "Bang My Tranny Ass" trace in parser.go/Match.Transient.
-	NewTransientFieldParser(FieldTypePorn, pornMatcher, nil),
+	NewTransientFieldParser(FieldTypeAdult, adultMatcher, nil),
 	NewCompoundParser(fieldParsers.ToParserSlice()),
 	// Swallow stray separator characters into the adjacent consumed
 	// spans so the gaps between non-transient matches stop being

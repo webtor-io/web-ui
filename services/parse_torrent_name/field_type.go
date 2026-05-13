@@ -30,7 +30,7 @@ const (
 	FieldTypeUnrated     FieldType = "unrated"
 	FieldType3D          FieldType = "threed"
 	FieldTypeAVC         FieldType = "avc"
-	FieldTypePorn        FieldType = "porn"
+	FieldTypeAdult       FieldType = "adult"
 	FieldTypeSplitScenes FieldType = "split_scenes"
 	FieldTypeScene       FieldType = "scene"
 	FieldTypeDubbing     FieldType = "dubbing"

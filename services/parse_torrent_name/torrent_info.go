@@ -34,7 +34,7 @@ type TorrentInfo struct {
 	Unrated     bool   `json:"unrated,omitempty"`
 	Size        string `json:"size,omitempty"`
 	Threed      bool   `json:"3d,omitempty"`
-	Porn        bool   `json:"porn,omitempty"`
+	Adult       bool   `json:"adult,omitempty"`
 	Avc         bool   `json:"avc,omitempty"`
 	SplitScenes bool   `json:"split_scenes,omitempty"`
 	Scene       int    `json:"scene,omitempty"`

@@ -1,0 +1,8 @@
+{
+  "input": "Chapter5《再见》_new_newb.mp4",
+  "want": {
+    "title": "再见》 new newb",
+    "episode": 5,
+    "container": "mp4"
+  }
+}

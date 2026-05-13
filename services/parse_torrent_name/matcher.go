@@ -16,10 +16,10 @@ type Match struct {
 	// Transient matches are detected and reported (so the matched
 	// FieldType still gets set on the output struct) but their
 	// (Start, End) span is NOT subtracted from the input available
-	// to subsequent matchers. Used for "flag-only" fields like Porn
+	// to subsequent matchers. Used for "flag-only" fields like Adult
 	// where we want the side-effect (boolean=true) without ripping
 	// the matched keyword out of the title — "Bang My Tranny Ass"
-	// should still produce Title="Bang My Tranny Ass" + Porn=true,
+	// should still produce Title="Bang My Tranny Ass" + Adult=true,
 	// not Title="Bang My" because `tranny` was consumed mid-string.
 	Transient bool
 }

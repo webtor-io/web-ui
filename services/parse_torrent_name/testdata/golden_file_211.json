@@ -1,0 +1,8 @@
+{
+  "input": "MUDR 338ch.mp4",
+  "want": {
+    "title": "MUDR 338ch",
+    "container": "mp4",
+    "adult": true
+  }
+}

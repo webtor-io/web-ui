@@ -1,0 +1,8 @@
+{
+  "input": "DLDSS-439.mp4",
+  "want": {
+    "title": "DLDSS-439",
+    "container": "mp4",
+    "adult": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "input": "Chapter 12 - The Final Confrontation.mkv",
+  "want": {
+    "title": "The Final Confrontation",
+    "episode": 12,
+    "container": "mkv"
+  }
+}

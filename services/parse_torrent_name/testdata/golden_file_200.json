@@ -1,0 +1,11 @@
+{
+  "input": "[AnimeRG] Pokémon - 0001 - Pokémon, I Choose You [480p] [x265].mkv",
+  "want": {
+    "title": "Pokémon",
+    "episode": 1,
+    "resolution": "480p",
+    "codec": "x265",
+    "container": "mkv",
+    "website": "AnimeRG"
+  }
+}
