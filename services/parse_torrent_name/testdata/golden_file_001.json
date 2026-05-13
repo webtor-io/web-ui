@@ -6,6 +6,6 @@
     "resolution": "1080p",
     "quality": "BrRip",
     "codec": "H264",
-    "extra": "YIFY"
+    "group": "YIFY"
   }
 }

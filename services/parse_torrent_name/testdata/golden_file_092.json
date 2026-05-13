@@ -7,8 +7,9 @@
     "quality": "BluRay",
     "codec": "x264",
     "audio": "AAC",
+    "group": "ESub",
     "website": "www.1TamilMV.kiwi",
     "size": "5.5GB",
-    "extra": "Tam + Hin + Eng ESub"
+    "extra": "Tam + Hin + Eng"
   }
 }

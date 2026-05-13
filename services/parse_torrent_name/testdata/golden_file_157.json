@@ -6,10 +6,10 @@
     "resolution": "1080p",
     "quality": "BluRay",
     "codec": "x264",
-    "audio": "DTS",
+    "audio": "DTS-HD MA",
     "group": "MgB",
     "container": "mkv",
     "sample": true,
-    "extra": "HD MA TrueHD 7 1 Atmos"
+    "extra": "TrueHD 7 1 Atmos"
   }
 }

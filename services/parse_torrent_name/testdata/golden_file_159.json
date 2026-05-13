@@ -5,9 +5,11 @@
     "year": 2015,
     "resolution": "1080p",
     "quality": "BluRay",
+    "color_depth": "10bit",
     "codec": "x265",
+    "audio": "8CH",
     "group": "PSA",
     "container": "mkv",
-    "extra": "HQ 10bit 8CH HEVC"
+    "extra": "HQ HEVC"
   }
 }

@@ -6,7 +6,8 @@
     "resolution": "720p",
     "quality": "BluRay",
     "codec": "x265",
+    "group": "ShAaN",
     "size": "999MB",
-    "extra": "HEVC ShAaN"
+    "extra": "HEVC"
   }
 }

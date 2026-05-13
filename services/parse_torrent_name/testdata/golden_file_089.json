@@ -6,10 +6,11 @@
     "resolution": "1080p",
     "bitrate": "768Kbps",
     "codec": "x264",
+    "audio": "DDP 5.1",
     "container": "mkv",
     "website": "www.1TamilBlasters.moi",
     "size": "8.2GB",
     "avc": true,
-    "extra": "HD Tam + Tel + Hin + Eng - DDP 5 1 ATMOS ESub"
+    "extra": "HD Tam + Tel + Hin + Eng ATMOS ESub"
   }
 }

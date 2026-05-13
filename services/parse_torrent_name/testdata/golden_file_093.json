@@ -5,7 +5,8 @@
     "year": 2014,
     "resolution": "1080p",
     "quality": "BrRip",
-    "audio": "Dual Audio",
-    "extra": "IMAX 6ch 1046"
+    "audio": "6ch",
+    "group": "1046",
+    "extra": "IMAX Dual Audio"
   }
 }

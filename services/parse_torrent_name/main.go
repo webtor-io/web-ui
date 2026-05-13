@@ -77,9 +77,17 @@ var fieldParsers = FieldParsers{
 	{FieldTypeQuality, NewRegexpMatcher(`(?i)\b((` + qualityAlternation + `))\b`), nil},
 	{FieldTypeResolution, NewRegexpMatcher(`\b(([0-9]{3,4}p|[248][Kk]))\b`), NewLowercaseTransformer()},
 	{FieldTypeBitrate, NewRegexpMatcher(`(?i)\b(([0-9]+[KMGT]bps))\b`), nil},
-	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?))`), nil},
-	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|[hx]\.?26[45]))\b`), nil},
-	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((MP3|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?))\b`), nil},
+	// ColorDepth covers SDR/HDR variants plus the "N-bit" / "Nbit"
+	// suffix common on anime encodes ("10bit", "10-bit", "8-bit").
+	{FieldTypeColorDepth, NewRegexpMatcher(`(?i)(([HS]DR(?:[0-9]{0,2})?\+?|(?:8|10|12)[\s-]?bit))`), nil},
+	// Codec — added HEVC (H.265 alias) and AV1.
+	{FieldTypeCodec, NewRegexpMatcher(`(?i)\b((xvid|divx|[hx]\.?26[45]|hevc|av1))\b`), nil},
+	// Audio — extended with Atmos/TrueHD/EAC3/FLAC/DDP and channel
+	// counts (7.1/5.1/2CH/6ch) so newer encodes don't leak these
+	// markers into Title or Extra. Order: longer / more specific
+	// alternations first so a "DTS-HD MA" match doesn't get cut
+	// short by the bare "DTS" alternative.
+	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((DTS[\s.-]?HD(?:[\s.-]?MA)?|TrueHD|Atmos|E[\s.-]?AC3|FLAC|MP3|DDP[\s.]?[57]\.[01]|DDP|DD\+?5\.?1|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?|[5-9]\.1|[5-9]ch|2CH))\b`), nil},
 	{FieldTypeWebsite, NewRegexpMatcher(`^((www\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}))`, `^(\[ ?([^\]]+?) ?\])`), nil},
 	// Scene-release date. Runs BEFORE Year + Episode so the year-shaped
 	// trailing group in "DD.MM.YYYY" doesn't get split between Year and
@@ -426,6 +434,14 @@ var parser = NewCompoundParser([]Parser{
 		// they appear.
 		`(?i)(\.((?:Files)-[a-zA-Z0-9]+))(?:\.[a-z0-9]{2,4})?$`,
 		`\b(- ?([^-]+(?:-={[^-]+-?$)?))$`,
+		// Space-dash-space form: "H264 - YIFY", "2014 - YIFY". The
+		// existing `\b-` anchor fails when the dash has whitespace on
+		// BOTH sides (no word/non-word transition AT the dash). Captured
+		// group is restricted to a single token (no internal space) so
+		// episode-title forms like "Onigashima 20 - Straw Hat Luffy" do
+		// NOT spill into Group — multi-word trailing chunks belong in
+		// Title/Extra, not the release-group field.
+		` (- +([^-\s\[\]\{\}\(\)]+))$`,
 	), nil),
 	// LAST in the chain — collects any bytes no prior parser claimed
 	// into FieldTypeExtra. Transient match so it doesn't affect any

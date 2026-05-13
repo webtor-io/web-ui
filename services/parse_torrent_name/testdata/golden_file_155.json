@@ -1,7 +1,8 @@
 {
   "input": "10bit.sicario.sample.mkv",
   "want": {
-    "title": "10bit sicario",
+    "title": "sicario",
+    "color_depth": "10bit",
     "container": "mkv",
     "sample": true
   }

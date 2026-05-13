@@ -5,8 +5,8 @@
     "year": 2017,
     "resolution": "720p",
     "quality": "WEBRip",
+    "audio": "2CH",
     "container": "mkv",
-    "sample": true,
-    "extra": "2CH"
+    "sample": true
   }
 }
