@@ -1,0 +1,10 @@
+{
+  "input": "Royal Challengers Bengaluru v Kolkata Knight Riders 13.05.2026.mkv",
+  "want": {
+    "title": "Royal Challengers Bengaluru v Kolkata Knight Riders",
+    "year": 2026,
+    "container": "mkv",
+    "date": "2026-05-13",
+    "sport": true
+  }
+}

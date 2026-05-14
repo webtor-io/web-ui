@@ -1,0 +1,10 @@
+{
+  "input": "Royal Tenenbaums (2001) 1080p BluRay.mkv",
+  "want": {
+    "title": "Royal Tenenbaums",
+    "year": 2001,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "container": "mkv"
+  }
+}

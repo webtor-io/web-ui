@@ -1,0 +1,8 @@
+{
+  "input": "Cerebellum BTR TND Microbiology Anatomy.mp4",
+  "want": {
+    "title": "Cerebellum BTR TND Microbiology Anatomy",
+    "container": "mp4",
+    "course": true
+  }
+}

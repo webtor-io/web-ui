@@ -1,0 +1,8 @@
+{
+  "input": "aosogo.cc@IPZZ823.mp4",
+  "want": {
+    "title": "aosogo cc@IPZZ823",
+    "container": "mp4",
+    "adult": true
+  }
+}

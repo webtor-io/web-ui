@@ -1,0 +1,12 @@
+{
+  "input": "[MomComesFirst] Brianna Beach The Rest Stop (26.05.12) 720p.mp4",
+  "want": {
+    "title": "Brianna Beach The Rest Stop",
+    "year": 2026,
+    "resolution": "720p",
+    "studio": "MomComesFirst",
+    "container": "mp4",
+    "adult": true,
+    "date": "2026-05-12"
+  }
+}

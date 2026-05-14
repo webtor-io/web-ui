@@ -1,0 +1,8 @@
+{
+  "input": "slerm.io Kubernetes Advanced 02 Components.mp4",
+  "want": {
+    "title": "slerm io Kubernetes Advanced 02 Components",
+    "container": "mp4",
+    "course": true
+  }
+}

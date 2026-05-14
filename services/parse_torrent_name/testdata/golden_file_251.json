@@ -1,0 +1,10 @@
+{
+  "input": "YoungPerps Volume 1 720p.mp4",
+  "want": {
+    "title": "Volume 1",
+    "resolution": "720p",
+    "studio": "YoungPerps",
+    "container": "mp4",
+    "adult": true
+  }
+}

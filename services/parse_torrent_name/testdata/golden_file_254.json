@@ -1,0 +1,10 @@
+{
+  "input": "Migoto VR_Whitney Malone_The Switcheroo_4096p.mp4",
+  "want": {
+    "title": "Whitney Malone The Switcheroo",
+    "resolution": "4096p",
+    "studio": "Migoto VR",
+    "container": "mp4",
+    "adult": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "VirtualTaboo-ASMR-Side-Effect-Files-7K.mp4",
+  "want": {
+    "title": "ASMR-Side-Effect-Files-7K",
+    "studio": "VirtualTaboo",
+    "container": "mp4",
+    "adult": true
+  }
+}

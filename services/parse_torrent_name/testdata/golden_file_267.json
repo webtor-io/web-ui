@@ -1,0 +1,12 @@
+{
+  "input": "Zootopia (2016) 1080p BluRay x264-RARBG.mkv",
+  "want": {
+    "title": "Zootopia",
+    "year": 2016,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264",
+    "group": "RARBG",
+    "container": "mkv"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "TYHPJ_1080_2023.mp4",
+  "want": {
+    "title": "TYHPJ 1080",
+    "year": 2023,
+    "container": "mp4",
+    "adult": true
+  }
+}

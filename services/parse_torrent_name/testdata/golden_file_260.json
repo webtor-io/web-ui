@@ -1,0 +1,9 @@
+{
+  "input": "SDAB-273 [4K].mkv",
+  "want": {
+    "title": "SDAB-273",
+    "resolution": "4k",
+    "container": "mkv",
+    "adult": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "input": "Euro2016 Semi-final Germany-France HDTV.ts",
+  "want": {
+    "title": "Euro2016 Semi-final Germany-France",
+    "quality": "HDTV",
+    "group": "ts",
+    "sport": true
+  }
+}
