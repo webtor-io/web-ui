@@ -1,0 +1,9 @@
+{
+  "input": "4k2.com@juvr00260_1_8k.mp4",
+  "want": {
+    "title": "4k2 com@juvr00260 1",
+    "resolution": "8k",
+    "container": "mp4",
+    "adult": true
+  }
+}

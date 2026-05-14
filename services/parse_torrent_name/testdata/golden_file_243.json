@@ -1,0 +1,9 @@
+{
+  "input": "[FreeCoursesOnline.Me] MasterClass - Natalie Portman.mp4",
+  "want": {
+    "title": "MasterClass - Natalie Portman",
+    "container": "mp4",
+    "website": "FreeCoursesOnline.Me",
+    "course": true
+  }
+}

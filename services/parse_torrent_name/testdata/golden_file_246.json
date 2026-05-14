@@ -1,0 +1,8 @@
+{
+  "input": "karpov.courses - Python.mp4",
+  "want": {
+    "title": "karpov courses - Python",
+    "container": "mp4",
+    "course": true
+  }
+}

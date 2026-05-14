@@ -1,0 +1,12 @@
+{
+  "input": "VRLatina_Eighteen_and_Keen_4096p_UHD_180_LR.mp4",
+  "want": {
+    "title": "Eighteen and Keen",
+    "episode": 180,
+    "resolution": "4096p",
+    "studio": "VRLatina",
+    "container": "mp4",
+    "adult": true,
+    "extra": "UHD LR"
+  }
+}

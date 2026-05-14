@@ -1,0 +1,9 @@
+{
+  "input": "Tour de Force (2017) 1080p.mkv",
+  "want": {
+    "title": "Tour de Force",
+    "year": 2017,
+    "resolution": "1080p",
+    "container": "mkv"
+  }
+}

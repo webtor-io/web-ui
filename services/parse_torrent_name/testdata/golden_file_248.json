@@ -1,0 +1,10 @@
+{
+  "input": "109th Giro d'Italia 2026 Stage 05.mkv",
+  "want": {
+    "title": "109th Giro d'Italia",
+    "year": 2026,
+    "container": "mkv",
+    "extra": "Stage 05",
+    "sport": true
+  }
+}

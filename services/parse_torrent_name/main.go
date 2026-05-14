@@ -113,7 +113,7 @@ const (
 	// Multi-word brands embed `\.?` between tokens so both the dotted
 	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
 	// match — the parser doesn't strip dots before field matching.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt`
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -462,7 +462,7 @@ var adultMatcher = NewRegexpMatcher(
 	// non-adult content ("MD-80" airliner, "Roe v Wade", "SHC" generic
 	// initialism). Acceptable FN cost: each accounted for ≤1 hit/day
 	// in the 2026-05-13 audit.
-	`(?i)\b((aarm|abp|abw|adn|apns|atid|beaf|cawd|dasd|dldss|dvaj|ebod|getchu|gmem|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|jera|jufd|jufe|jur|juy|maxvr|mdhr|meyd|mgnl|miaa|mide|midv|mird|mism|mmus|mudr|pred|prtd|rbd|rct|real|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|venu|venx|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
+	`(?i)\b((aarm|abp|abw|adn|apns|atid|beaf|cawd|dasd|dldss|dpvr|dvaj|ebod|fsdss|getchu|gmem|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|ipzz|jera|jufd|jufe|jur|juvr|juy|kbd|lafbd|maxvr|mdhr|meyd|mgnl|miaa|mide|midv|mird|mism|mmus|mudr|nhdtb|niks|onez|pred|prtd|rbd|rct|real|savr|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|svace|venu|venx|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
 	// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 	// match the lowercase alternation. Non-Cyrillic prefix guard
 	// prevents false matches like "страх" (fear) → "трах".
@@ -477,6 +477,12 @@ var adultMatcher = NewRegexpMatcher(
 	// titles concatenate ideographs (so "[^CJK]" would block real
 	// hits like "极品...内射" mid-string).
 	`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃))`,
+	// Chinese / paywall-rip filename prefix: `<digits>.<tld>@` —
+	// signature shape of paywall-scraped adult content from CN
+	// forums (4k2.com@, 2048.vip-, big2048.com@, 489155.com@, ...).
+	// The numeric site-id + `@` glyph is a content-pirate convention
+	// and effectively never appears in legitimate releases.
+	`(?i)((\d{3,}\.(?:com|vip|net|cc|me)@))`,
 )
 
 // sportMatcher detects FieldTypeSport — used downstream to skip AI
@@ -502,7 +508,13 @@ var sportMatcher = NewRegexpMatcher(
 	`(?i)\b((NBA|NHL|NFL|MLB|MLS|WNBA|WWE|AEW|UFC|ATP|WTA|PGA|MotoGP|NASCAR|F1|IndyCar))\b`,
 	`(?i)\b((Monday\s+Night\s+Raw|SmackDown|NXT|Dynamite|Collision|Rampage|WrestleMania|SummerSlam|Royal\s+Rumble|Survivor\s+Series))\b`,
 	`(?i)\b((Premier\s+League|Champions\s+League|Europa\s+League|La\s+Liga|Bundesliga|Serie\s+A|Ligue\s+1|World\s+Cup|FIFA|UEFA|Stanley\s+Cup|Super\s+Bowl|Eurocup|Euroleague))\b`,
-	`(?i)((?:^|[^а-яА-Я])(НХЛ|КХЛ|РФПЛ|РПЛ|хоккей|футбол|баскетбол|теннис|биатлон|формула[\s\-]*1))`,
+	// Cycling grand tours — "109th Giro d'Italia 2026 Stage 05" /
+	// "Tour de France 2024" / "Vuelta a España". The apostrophe in
+	// "d'Italia" is `['\x{2019}]?` so both ASCII and Unicode curly
+	// quotes match. Pattern is `(?:...)` outer non-capture wrapping
+	// the alternation so the `?` is allowed.
+	`(?i)\b((Giro\s+d['\x{2019}]?Italia|Tour\s+de\s+France|Vuelta\s+a\s+Espa(?:ñ|n)a))\b`,
+	`(?i)((?:^|[^а-яА-Я])(НХЛ|КХЛ|РФПЛ|РПЛ|хоккей|футбол|баскетбол|теннис|биатлон|формула[\s\-]*1|велогонк[а-я]+|велотур))`,
 )
 
 // courseMatcher detects FieldTypeCourse — pirated-course / tutorial /
@@ -510,19 +522,35 @@ var sportMatcher = NewRegexpMatcher(
 // TMDB/OMDB/KPU. Downstream enrichment skips both AI fallback and
 // path-title fallback when this flag fires.
 //
-// Two pattern groups, both high-confidence:
+// Five pattern groups, all high-confidence:
 //
 //   1. Mainstream e-learning platforms ("Udemy", "Coursera",
-//      "Pluralsight", ...). These names are essentially never used
-//      as movie / TV titles.
+//      "Pluralsight", "MasterClass", ...). These names are
+//      essentially never used as movie / TV titles.
 //   2. Pirate-aggregator bracket prefixes that pirate-course
 //      torrents universally carry — "[FreeCourseSite.com]",
 //      "[TutsNode]", "[DevCourseWeb]", etc. The bracket-with-domain
 //      shape itself is the marker, paired with one of the known
 //      aggregator domains.
+//   3. Bracketless aggregator suffix — "-Paracourse.webm" filename
+//      convention used by some course-rip aggregators (the bracket
+//      shape is absent, the marker is the brand name attached as a
+//      file-name suffix).
+//   4. ".courses" TLD — Russian / niche course platforms
+//      ("karpov.courses", "geekbrains.courses"). Treating the TLD
+//      itself as the marker covers future-proof additions without
+//      maintaining a brand list.
+//   5. Game DLC tutorials and storefront-rip indicators — game
+//      vendor-rip releases ("Ubisoft.Connect.Rip", "GOG.Rip",
+//      "Steam.Rip") or DLC-tutorial file conventions
+//      ("DLC_AbilityTutorial_..."). Per-user request, these are
+//      treated as courses since they are interactive-software
+//      tutorials with no movie/TV metadata.
 var courseMatcher = NewRegexpMatcher(
-	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books))\b`,
-	`(?i)(\[\s*(freecoursesite|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
+	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse))\b`,
+	`(?i)(\[\s*(freecoursesite|freecoursesonline|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
+	`(?i)\b([a-z0-9-]+\.(courses))\b`,
+	`(?i)\b((dlc[\s_]+\w*tutorial|ubisoft[\s.]?connect[\s.]?rip|steam[\s.-]?rip|gog[\s.-]?rip|epic[\s.-]?games[\s.-]?rip))\b`,
 )
 
 var parser = NewCompoundParser([]Parser{

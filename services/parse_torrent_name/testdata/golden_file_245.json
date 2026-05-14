@@ -1,0 +1,9 @@
+{
+  "input": "Medcurso 2024.mp4",
+  "want": {
+    "title": "Medcurso",
+    "year": 2024,
+    "container": "mp4",
+    "course": true
+  }
+}

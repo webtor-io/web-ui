@@ -1,0 +1,9 @@
+{
+  "input": "Tour de France 2024.mkv",
+  "want": {
+    "title": "Tour de France",
+    "year": 2024,
+    "container": "mkv",
+    "sport": true
+  }
+}

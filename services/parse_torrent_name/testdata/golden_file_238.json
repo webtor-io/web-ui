@@ -1,0 +1,13 @@
+{
+  "input": "KBD172---HookupHotshot-Scarlett-Mae---E170-1080p-HEVC-x265.mkv",
+  "want": {
+    "title": "KBD172",
+    "episode": 170,
+    "resolution": "1080p",
+    "codec": "x265",
+    "studio": "HookupHotshot",
+    "container": "mkv",
+    "adult": true,
+    "extra": "Scarlett-Mae"
+  }
+}

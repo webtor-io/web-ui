@@ -1,0 +1,9 @@
+{
+  "input": "SAVR-1027 8K.mp4",
+  "want": {
+    "title": "SAVR-1027",
+    "resolution": "8k",
+    "container": "mp4",
+    "adult": true
+  }
+}

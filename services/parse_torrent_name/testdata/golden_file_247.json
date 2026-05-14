@@ -1,0 +1,8 @@
+{
+  "input": "DLC_AbilityTutorial_Yasuke_WhirlwindStance.webm",
+  "want": {
+    "title": "DLC AbilityTutorial Yasuke WhirlwindStance",
+    "container": "webm",
+    "course": true
+  }
+}

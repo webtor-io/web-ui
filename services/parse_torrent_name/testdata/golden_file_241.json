@@ -1,0 +1,9 @@
+{
+  "input": "LAFBD-41 1080p.mp4",
+  "want": {
+    "title": "LAFBD-41",
+    "resolution": "1080p",
+    "container": "mp4",
+    "adult": true
+  }
+}
