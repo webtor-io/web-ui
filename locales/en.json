@@ -71,7 +71,7 @@
     "about.features.zip.title": "ZIP Archive Download",
     "about.features.zip.text": "Download the entire torrent as a ZIP archive on-the-fly, preserving the original folder structure.",
     "about.features.library.title": "Cloud Library",
-    "about.features.library.text": "Save torrents to your account — movies and TV series are detected and organized automatically. Upgrade to Vault for long-term storage that keeps files available even when seeders disappear.",
+    "about.features.library.text": "Save torrents to your account — movies and TV series are detected, enriched and organized automatically with AI. Upgrade to Vault for long-term storage that keeps files available even when seeders disappear.",
     "about.features.ai.title": "AI-Powered Discover",
     "about.features.ai.text": "Describe what you want to watch in plain words and get a personalized list of films — each with a one-line reason tying it to your taste. Built on top of the Discover catalog.",
     "about.features.discover.title": "Discover Catalog",
