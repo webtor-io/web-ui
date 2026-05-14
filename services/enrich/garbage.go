@@ -10,12 +10,20 @@ import (
 // resolve via Claude — a pure ID, hash, release-group salt, or 4-char
 // abbreviation that no metadata DB indexes.
 //
+// CALLER NOTE — this function only looks at one string. The AI
+// fallback passes Claude both pathHint AND the title, so a real
+// movie name in a parent directory can still produce a useful
+// candidate even when the file-level title is a hash. Use this
+// helper to check `vc.Title` AND every entry in `PathTitles`; only
+// skip AI when ALL of them look like garbage. See enrich.go's
+// tryAIFallback for the composite gate.
+//
 // Calibrated over 4578-row ai_enrich.query corpus (2026-05-14 audit):
-// composite OR of six signals catches 186 / 4578 = 4.06% of queries
-// with zero recoverable false positives. All "FP-looking" cases (real
-// movie path with garbage filename, e.g. /Fargo (1996)/Frgo.mkv) had
-// already been tried via path-title fallback and would have produced
-// the same Claude null-result.
+// composite OR of five signals (post-H2/H5 drop) catches 154 / 4578
+// = 3.36% of queries with zero recoverable false positives. All
+// "FP-looking" cases (real movie path with garbage filename, e.g.
+// /Fargo (1996)/Frgo.mkv) had already been tried via path-title
+// fallback and would have produced the same Claude null-result.
 //
 // Non-ASCII scripts (CJK, Arabic, Hebrew, Cyrillic) are exempt from
 // every signal here — Latin-letter heuristics don't translate, and

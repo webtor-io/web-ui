@@ -947,12 +947,26 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 	}
 	// Shape-based garbage filter — pure IDs, hashes, release-group salt
 	// ("etrg", "frgo"), random alphanumerics. See garbage.go for the
-	// six signals; calibrated over 4578-row corpus to catch ~4% of
-	// queries with zero recoverable false positives (all suspect FPs
-	// had path-title fallback already tried and missed).
+	// signals. Calibrated over 4578-row corpus.
+	//
+	// Skip ONLY when both the parsed title AND every path-segment
+	// title look like noise — Claude receives both pathHint and the
+	// title, and can still extract a real name from a clean parent
+	// directory even when the file's own title is a hash. Conversely,
+	// if every candidate string is garbage there's nothing for Claude
+	// to disambiguate.
 	if isGarbageTitle(vc.Title) {
-		log.WithField("title", vc.Title).Info("ai_enrich: skipping likely-garbage title")
-		return nil
+		allGarbage := true
+		for _, pt := range extractPathTitles(vc) {
+			if !isGarbageTitle(pt) {
+				allGarbage = false
+				break
+			}
+		}
+		if allGarbage {
+			log.WithField("title", vc.Title).Info("ai_enrich: skipping likely-garbage title + path-titles")
+			return nil
+		}
 	}
 	// Locked candidates — two consecutive Claude calls returned the
 	// SAME set, so the parser is almost certainly seeing N "different"
