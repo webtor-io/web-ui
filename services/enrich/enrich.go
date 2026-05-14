@@ -945,6 +945,15 @@ func (s *Enricher) tryAIFallback(ctx context.Context, vc *models.VideoContent, t
 		log.WithField("path", pathHint).Info("ai_enrich: skipping course path")
 		return nil
 	}
+	// Shape-based garbage filter — pure IDs, hashes, release-group salt
+	// ("etrg", "frgo"), random alphanumerics. See garbage.go for the
+	// six signals; calibrated over 4578-row corpus to catch ~4% of
+	// queries with zero recoverable false positives (all suspect FPs
+	// had path-title fallback already tried and missed).
+	if isGarbageTitle(vc.Title) {
+		log.WithField("title", vc.Title).Info("ai_enrich: skipping likely-garbage title")
+		return nil
+	}
 	// Locked candidates — two consecutive Claude calls returned the
 	// SAME set, so the parser is almost certainly seeing N "different"
 	// titles for one logical work (Dragon Ball Clássico 001…153 → all
