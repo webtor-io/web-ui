@@ -393,7 +393,7 @@ var fieldParsers = FieldParsers{
 	{FieldTypeStudio, NewRegexpMatcher(
 		`(?i)\b((AMZN|NF))\b`,
 		`(\[ ?([^\]]+?)[\s.]?[0-9]{4}\])`,
-		`(?i)\b((` + adultStudioAlternation + `))\b`,
+		`(?i)\b((` + adultStudioAlternation + `)(?:x[a-z]+)?)\b`,
 	), titleTransformer},
 	// "rip by <Name>" Russian release attribution. Aleksan55 SATRip and
 	// similar fan-encoded packs trail every filename with "rip by X",
@@ -431,7 +431,7 @@ var adultMatcher = NewRegexpMatcher(
 	// lives in `adultStudioAlternation` so FieldTypeStudio can
 	// extract the matched name into Studio without duplicating
 	// the alternation.
-	`(?i)\b((` + adultStudioAlternation + `))\b`,
+	`(?i)\b((` + adultStudioAlternation + `)(?:x[a-z]+)?)\b`,
 	// Bestiality phrases — explicit "dog/zoo/horse + sex/fuck/porn"
 	// and the "art of zoo" series of bestiality torrents.
 	`(?i)\b((art\s+of\s+zoo|(?:dog|zoo|horse|animal)\s+(?:sex|fuck|porn|cum)))\b`,
