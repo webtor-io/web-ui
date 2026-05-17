@@ -450,7 +450,13 @@ export function AISection({
                             <span class="hidden sm:inline">{t('discover.ai.refresh')}</span>
                         </button>
                     </div>
-                    <AIChipsRow chips={aiState.chips} onSelect={handleChipClick} disabled={busy} />
+                    {/* Chips become tappable as soon as phase flips to
+                        chipsReady (first chip arrives from the stream) — we
+                        deliberately do not gate on `refreshing` so the user
+                        can pick a chip that already landed while the rest
+                        are still streaming in. Refresh button stays
+                        disabled via `busy` so they can't double-fire it. */}
+                    <AIChipsRow chips={aiState.chips} onSelect={handleChipClick} disabled={aiState.phase !== 'chipsReady'} />
                 </>
             )}
 
