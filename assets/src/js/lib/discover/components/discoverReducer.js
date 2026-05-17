@@ -278,12 +278,26 @@ export function discoverReducer(state, action) {
         case 'AI_DISABLED':
             return { ...state, ai: { ...state.ai, phase: 'disabled' } };
         case 'AI_LOAD_CHIPS_START':
-            return { ...state, ai: { ...state.ai, phase: 'loadingChips', error: null } };
+            // Clear chips so the streaming append starts from a fresh list —
+            // important for refresh, where stale chips from a previous load
+            // would otherwise blend with the new stream until the first chip
+            // event flips phase.
+            return { ...state, ai: { ...state.ai, phase: 'loadingChips', chips: [], error: null } };
+        case 'AI_LOAD_CHIPS_CHIP':
+            // Per-chip event from the streaming endpoint. Flip phase to
+            // 'chipsReady' on the first chip so the user sees pills appear
+            // one by one instead of staring at the skeleton until done.
+            return { ...state, ai: {
+                ...state.ai,
+                phase: 'chipsReady',
+                chips: [...state.ai.chips, action.chip],
+                error: null,
+            } };
         case 'AI_LOAD_CHIPS_SUCCESS':
             return { ...state, ai: {
                 ...state.ai,
                 phase: 'chipsReady',
-                chips: action.chips || [],
+                chips: action.chips || state.ai.chips,
                 chipsGeneratedAt: action.generatedAt || 0,
                 tier: action.tier || state.ai.tier,
                 remainingQuota: action.remainingQuota ?? state.ai.remainingQuota,

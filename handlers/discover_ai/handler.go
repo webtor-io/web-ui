@@ -64,6 +64,7 @@ func RegisterHandler(r *gin.Engine, svc rec.Service) {
 	gr := r.Group("/discover/ai")
 	gr.Use(auth.HasAuth)
 	gr.GET("/chips", h.getChips)
+	gr.GET("/chips/stream", h.getChipsStream)
 	gr.POST("/chips/refresh", h.refreshChips)
 	gr.GET("/recommend/stream", h.recommendStream)
 	gr.GET("/refine/stream", h.refineStream)
@@ -219,6 +220,51 @@ func (h *Handler) refreshChips(c *gin.Context) {
 //     custom headers.
 //   - gin's c.Stream + c.SSEvent handle the loop, flushing, named events
 //     and client-disconnect detection.
+// getChipsStream emits text/event-stream frames as chips are produced by
+// Claude, so the UI can render the first pill ~500ms after the first delta
+// instead of waiting for the whole batch. Cold-start defaults and cache
+// hits also flow through the stream (as individual "chip" events) so the
+// frontend has one code path regardless of source.
+//
+// Quota policy mirrors GET /chips: no unit consumed on a normal load.
+// Force-refresh stays on POST /chips/refresh as before.
+func (h *Handler) getChipsStream(c *gin.Context) {
+	if token := c.Query("_csrf"); token == "" || token != csrf.GetToken(c) {
+		c.String(http.StatusForbidden, "CSRF token mismatch")
+		return
+	}
+	user := auth.GetUserFromContext(c)
+	tier := tierFromClaims(claims.GetFromContext(c))
+	clock, locale := readClockLocaleFromQuery(c)
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache,no-store,no-transform")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	events := make(chan rec.StreamEvent, 8)
+	go h.svc.GenerateChipsStream(c.Request.Context(), rec.ChipsRequest{
+		UserID: user.ID,
+		Tier:   tier,
+		Locale: locale,
+		Clock:  clock,
+	}, events)
+
+	c.Stream(func(_ io.Writer) bool {
+		select {
+		case <-c.Request.Context().Done():
+			return false
+		case ev, ok := <-events:
+			if !ok {
+				return false
+			}
+			c.SSEvent(ev.Type, ev.Data)
+			return ev.Type != "done" && ev.Type != "error"
+		}
+	})
+}
+
 func (h *Handler) recommendStream(c *gin.Context) {
 	h.handleRecommendStream(c, false)
 }

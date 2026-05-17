@@ -226,6 +226,136 @@ func (s *ClaudeService) generateChipsUncached(ctx context.Context, tier Tier, uc
 	}, nil
 }
 
+// GenerateChipsStream is the streaming twin of GenerateChips. It pushes one
+// StreamEvent of Type "chip" onto `events` as each chip is produced, then a
+// terminal "done" or "error". Cold-start defaults and cache hits stream too,
+// so the UI's progressive-render path is the same regardless of source.
+//
+// Quota policy: a normal chips load never consumes a unit (chips are the
+// first thing a user sees). ForceRefresh is the only path that costs — and
+// in that case the handler is expected to consume the unit before calling us,
+// same as the non-streaming GenerateChips contract.
+func (s *ClaudeService) GenerateChipsStream(ctx context.Context, req ChipsRequest, events chan<- StreamEvent) {
+	defer close(events)
+
+	send := func(t string, data any) bool {
+		select {
+		case events <- StreamEvent{Type: t, Data: data}:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	emitChips := func(chips []Chip) bool {
+		for _, c := range chips {
+			if !send("chip", c) {
+				return false
+			}
+		}
+		return true
+	}
+	emitDone := func(total int) {
+		remaining, rerr := s.quota.Remaining(ctx, req.UserID, req.Tier)
+		if rerr != nil {
+			log.WithError(rerr).WithField("feature", "ai_rec").Warn("remaining quota lookup failed (chips stream)")
+			remaining = -1
+		}
+		send("done", DoneStreamPayload{
+			Total:          total,
+			RemainingQuota: remaining,
+			DailyQuota:     s.DailyQuota(req.Tier),
+			Tier:           req.Tier.String(),
+		})
+	}
+	emitError := func(code string) {
+		send("error", ErrorStreamPayload{Code: code, Tier: req.Tier.String()})
+	}
+
+	uc, err := s.context.Build(ctx, req.UserID, req.Locale, req.Clock)
+	if err != nil {
+		log.WithError(err).WithField("feature", "ai_rec").Warn("user context partial failure (chips stream)")
+	}
+
+	// Cold-start mirrors GenerateChips: no Claude call, no cache I/O — just
+	// stream the curated defaults so the UI shows something instantly.
+	if uc.HistorySize == 0 && uc.WatchlistSize == 0 {
+		log.WithField("feature", "ai_rec").
+			WithField("locale", uc.Locale).
+			WithField("tier", req.Tier.String()).
+			Info("cold-start chips streamed (no AI call)")
+		chips := defaultChips(uc.Locale)
+		if !emitChips(chips) {
+			return
+		}
+		emitDone(len(chips))
+		return
+	}
+
+	key := chipsCacheKey(req.UserID, uc)
+	ttl := time.Duration(s.cfg.ChipsTTLSeconds) * time.Second
+
+	if req.ForceRefresh {
+		if err := s.chips.Del(ctx, key); err != nil {
+			log.WithError(err).WithField("feature", "ai_rec").Warn("chips cache del failed (stream)")
+		}
+	} else {
+		if cached, err := s.chips.Get(ctx, key); err != nil {
+			log.WithError(err).WithField("feature", "ai_rec").Warn("chips cache get failed (stream)")
+		} else if cached != nil {
+			if !emitChips(cached.Chips) {
+				return
+			}
+			emitDone(len(cached.Chips))
+			return
+		}
+	}
+
+	// Real LLM path: stream chips off Claude as they arrive, accumulate the
+	// full list, then write it back to cache so the next load is instant.
+	chipCh := make(chan Chip, desiredChips)
+	streamErr := make(chan error, 1)
+	go func() {
+		streamErr <- s.streamClaudeChipsText(ctx, userPromptForChipsNDJSON(uc, desiredChips), req.Tier, chipCh)
+	}()
+
+	collected := make([]Chip, 0, desiredChips)
+	for chip := range chipCh {
+		collected = append(collected, chip)
+		if !send("chip", chip) {
+			// Drain so the producer goroutine doesn't block on a full
+			// channel after the client went away.
+			for range chipCh {
+			}
+			return
+		}
+	}
+	if err := <-streamErr; err != nil {
+		log.WithError(err).WithField("feature", "ai_rec").Warn("chips stream failed")
+		if len(collected) == 0 {
+			emitError("upstream_error")
+			return
+		}
+		// Partial result is still useful — fall through to "done" so the UI
+		// keeps what it got. Skip cache write so we retry fully next time.
+		emitDone(len(collected))
+		return
+	}
+	if len(collected) == 0 {
+		emitError("no_chips")
+		return
+	}
+
+	resp := &ChipsResponse{
+		Chips:       collected,
+		GeneratedAt: time.Now().Unix(),
+		Tier:        req.Tier.String(),
+	}
+	if err := s.chips.Set(ctx, key, resp, ttl); err != nil {
+		log.WithError(err).WithField("feature", "ai_rec").Warn("chips cache set failed (stream)")
+	}
+	emitDone(len(collected))
+}
+
 // --- Quota pass-through ---
 
 // Remaining reports how many quota units the user has left today.
@@ -789,6 +919,130 @@ func extractToolUseInput(blocks []anthropic.ContentBlockUnion, toolName string) 
 		}
 	}
 	return nil, errors.Errorf("claude did not call tool %s (blocks=%d)", toolName, len(blocks))
+}
+
+// streamClaudeChipsText is the streaming Claude flow for chip generation.
+// Mirrors streamClaudeItemsText (NDJSON plain-text, no tools) but with the
+// shorter chips system prompt, chips model, and the smaller token budget.
+//
+// Why NDJSON instead of the tool_use path used by callClaudeForChips:
+// Anthropic buffers tool_use generation server-side, which defeats per-chip
+// streaming entirely. Plain text genuinely flows token-by-token, so the
+// first chip lands ~500ms after the first delta instead of waiting for the
+// whole batch to materialise.
+func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt string, tier Tier, out chan<- Chip) error {
+	defer close(out)
+
+	ctx, cancel := context.WithTimeout(ctx, claudeTimeout)
+	defer cancel()
+
+	streamStart := time.Now()
+
+	// Single system block, no prompt caching: the chips system prompt is well
+	// below Anthropic's caching minimums and ChipsCache absorbs most repeat
+	// calls anyway. See callClaudeForChips for the same reasoning.
+	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
+		Model:     s.chipsModel,
+		MaxTokens: claudeMaxTokensChips,
+		System: []anthropic.TextBlockParam{
+			{Text: systemPromptChips},
+		},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+		Temperature: anthropic.Float(0.9),
+	})
+	defer stream.Close()
+
+	extractor := newNDJSONItemsExtractor(func(raw json.RawMessage) {
+		var c struct {
+			Label string `json:"label"`
+			Icon  string `json:"icon"`
+			Query string `json:"query"`
+		}
+		if err := json.Unmarshal(raw, &c); err != nil {
+			log.WithError(err).
+				WithField("feature", "ai_rec").
+				WithField("raw", string(raw)).
+				Warn("chips ndjson item parse failed")
+			return
+		}
+		label := strings.TrimSpace(c.Label)
+		query := strings.TrimSpace(c.Query)
+		if label == "" || query == "" {
+			return
+		}
+		chip := Chip{
+			ID:    shortHash(label),
+			Label: label,
+			Icon:  strings.TrimSpace(c.Icon),
+			Query: query,
+		}
+		select {
+		case out <- chip:
+		case <-ctx.Done():
+		}
+	})
+
+	var (
+		inputTokens  int64
+		outputTokens int64
+		modelName    string
+		ttftLogged   bool
+		deltaCount   int
+	)
+
+	for stream.Next() {
+		event := stream.Current()
+		switch event.Type {
+		case "message_start":
+			if event.Message.Usage.InputTokens > 0 {
+				inputTokens = event.Message.Usage.InputTokens
+			}
+			modelName = string(event.Message.Model)
+		case "content_block_delta":
+			if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
+				deltaCount++
+				if !ttftLogged {
+					ttftLogged = true
+					log.WithFields(log.Fields{
+						"feature": "ai_rec",
+						"kind":    "chips",
+						"mode":    "text",
+						"ttft_ms": time.Since(streamStart).Milliseconds(),
+					}).Info("claude first chip delta")
+				}
+				extractor.write(event.Delta.Text)
+			}
+		case "message_delta":
+			if event.Usage.OutputTokens > 0 {
+				outputTokens = event.Usage.OutputTokens
+			}
+			if event.Usage.InputTokens > 0 {
+				inputTokens = event.Usage.InputTokens
+			}
+		}
+	}
+	if err := stream.Err(); err != nil {
+		if errors.Is(err, context.Canceled) {
+			log.WithField("feature", "ai_rec").Debug("chips stream cancelled")
+			return nil
+		}
+		return errors.Wrap(err, "chips stream failed")
+	}
+
+	log.WithFields(log.Fields{
+		"feature":       "ai_rec",
+		"kind":          "chips",
+		"mode":          "text",
+		"model":         modelName,
+		"input_tokens":  inputTokens,
+		"output_tokens": outputTokens,
+		"deltas":        deltaCount,
+		"total_ms":      time.Since(streamStart).Milliseconds(),
+	}).Info("claude chips stream complete")
+
+	return nil
 }
 
 // logUsage writes token usage at info level so we can aggregate costs in

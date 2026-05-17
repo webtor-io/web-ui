@@ -177,6 +177,17 @@ type Service interface {
 	// a unit via ConsumeQuota below.
 	GenerateChips(ctx context.Context, req ChipsRequest) (*ChipsResponse, error)
 
+	// GenerateChipsStream is the streaming counterpart of GenerateChips:
+	// it pushes one StreamEvent per chip onto `events` as soon as Claude
+	// emits its closing brace, instead of buffering the full batch. Event
+	// Type is "chip" (Data: Chip), "done" (Data: DoneStreamPayload) or
+	// "error" (Data: ErrorStreamPayload). Cache hits and cold-start fall-
+	// back chips are streamed too so the UI's progressive-render path is
+	// the same regardless of source. Closes `events` before returning so
+	// the SSE handler can simply range over it. Same quota policy as
+	// GenerateChips: no unit consumed on a normal load.
+	GenerateChipsStream(ctx context.Context, req ChipsRequest, events chan<- StreamEvent)
+
 	// RecommendStream turns a natural-language request into a stream of
 	// resolved movie cards. Claude is given the user's watch history as
 	// context, and each fully-formed recommendation is pushed onto

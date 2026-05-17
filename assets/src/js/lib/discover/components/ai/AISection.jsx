@@ -153,25 +153,32 @@ export function AISection({
     // above via abortRef.
     useEffect(() => {
         dispatch({ type: 'AI_LOAD_CHIPS_START' });
-        const ac = new AbortController();
-        abortRef.current = ac;
-        (async () => {
-            try {
-                const data = await aiClient.fetchChips({ signal: ac.signal });
+        let cancelled = false;
+        let count = 0;
+        let tierAtDone = null;
+        const handle = aiClient.chipsStream({
+            onChip(chip) {
+                if (cancelled) return;
+                count++;
+                dispatch({ type: 'AI_LOAD_CHIPS_CHIP', chip });
+            },
+            onDone(data) {
+                if (cancelled) return;
+                tierAtDone = data.tier || null;
                 dispatch({
                     type: 'AI_LOAD_CHIPS_SUCCESS',
-                    chips: data.chips,
-                    generatedAt: data.generated_at,
+                    generatedAt: Math.floor(Date.now() / 1000),
                     tier: data.tier,
                     remainingQuota: data.remaining_quota,
                     dailyQuota: data.daily_quota,
                 });
                 window.umami?.track?.('ai-chips-loaded', {
-                    count: data.chips?.length || 0,
-                    tier: data.tier,
+                    count,
+                    tier: tierAtDone,
                 });
-            } catch (err) {
-                if (err.name === 'AbortError') return;
+            },
+            onError(err) {
+                if (cancelled) return;
                 if (err.status === 404) {
                     dispatch({ type: 'AI_DISABLED' });
                     window.umami?.track?.('ai-disabled');
@@ -179,8 +186,15 @@ export function AISection({
                 }
                 dispatch({ type: 'AI_LOAD_CHIPS_ERROR', error: { code: err.code, message: err.message } });
                 window.umami?.track?.('ai-chips-error', { code: err.code });
-            }
-        })();
+            },
+        });
+        // Reuse the abort pattern of the rest of the file: closing the
+        // EventSource is the cancellation mechanism here.
+        abortRef.current = { abort: () => handle.close() };
+        return () => {
+            cancelled = true;
+            handle.close();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

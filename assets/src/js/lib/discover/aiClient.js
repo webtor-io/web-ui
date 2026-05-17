@@ -250,6 +250,61 @@ export function recommendStream(query, callbacks) {
     return openAIStream(url, callbacks);
 }
 
+// chipsStream — open an SSE connection to /discover/ai/chips/stream. The
+// server emits `chip` events as each chip is produced (Claude stream) or
+// replayed (cache hit / cold-start), then a terminal `done` or `error`.
+//
+// callbacks shape:
+//   onChip(chip)                                — one chip
+//   onDone({total, remaining_quota, daily_quota, tier}) — terminal success
+//   onError(AIError)                            — terminal failure
+// Returns a {close()} handle so callers can abort on unmount.
+export function chipsStream(callbacks) {
+    const { day, hour } = currentClock();
+    const locale = currentLocale();
+    const params = new URLSearchParams({
+        locale,
+        day,
+        hour: String(hour),
+        _csrf: window._CSRF || '',
+    });
+    const url = `/discover/ai/chips/stream?${params.toString()}`;
+    const source = new EventSource(url, { withCredentials: true });
+    let closed = false;
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        source.close();
+    };
+    const safeParse = (raw) => {
+        try { return JSON.parse(raw); } catch { return null; }
+    };
+
+    source.addEventListener('chip', (e) => {
+        const data = safeParse(e.data);
+        if (data && callbacks.onChip) callbacks.onChip(data);
+    });
+    source.addEventListener('done', (e) => {
+        const data = safeParse(e.data) || {};
+        if (callbacks.onDone) callbacks.onDone(data);
+        close();
+    });
+    source.addEventListener('error', (e) => {
+        if (e && e.data) {
+            const data = safeParse(e.data) || {};
+            if (callbacks.onError) callbacks.onError(new AIError(
+                0, data.code, data.code, data.tier,
+                data.daily_quota, data.reset_at, data.upgrade_quota,
+            ));
+        } else if (source.readyState === EventSource.CLOSED && !closed) {
+            if (callbacks.onError) callbacks.onError(new AIError(0, 'connection_lost', 'lost connection to server'));
+        }
+        close();
+    });
+
+    return { close };
+}
+
 export function refineStream(query, history, callbacks) {
     const url = buildStreamURL('/discover/ai/refine/stream', { query, history });
     return openAIStream(url, callbacks);
