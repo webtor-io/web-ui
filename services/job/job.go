@@ -297,8 +297,28 @@ func (s *Job) formatError(err error) string {
 	return makeErrorMessage(err)
 }
 
+// isStoplistBlock reports whether err is a torrent-store stoplist rejection
+// (gRPC PermissionDenied with "found in stoplist" message). These are working-
+// as-intended CSAM blocks, not real errors — they bypass the "got job error"
+// log path to keep error counters meaningful.
+func isStoplistBlock(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "found in stoplist")
+}
+
 func (s *Job) Error(err error) error {
-	log.WithError(err).Error("got job error")
+	fields := log.Fields{
+		"ID":    s.ID,
+		"Queue": s.Queue,
+		"Tag":   s.cur,
+	}
+	if isStoplistBlock(err) {
+		log.WithError(err).WithFields(fields).Warn("job rejected by stoplist")
+	} else {
+		log.WithError(err).WithFields(fields).Error("got job error")
+	}
 	_ = s.log(LogItem{
 		Level:   Error,
 		Message: s.formatError(err),
@@ -468,7 +488,15 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 				dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer dCancel()
 				_ = s.storage.Drop(dCtx, s.queue, id)
-				log.WithError(err).Error("got job error")
+				fields := log.Fields{
+					"ID":    id,
+					"Queue": s.queue,
+				}
+				if isStoplistBlock(err) {
+					log.WithError(err).WithFields(fields).Warn("job rejected by stoplist")
+				} else {
+					log.WithError(err).WithFields(fields).Error("got job error")
+				}
 			}
 			delete(s.jobs, id)
 		}
