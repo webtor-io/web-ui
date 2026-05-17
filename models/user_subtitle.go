@@ -36,6 +36,21 @@ func CreateUserSubtitle(ctx context.Context, db *pg.DB, us *UserSubtitle) error 
 	return nil
 }
 
+// ListAllUserSubtitles returns every subtitle binding owned by a user, oldest first.
+// Used by the GDPR data-export.
+func ListAllUserSubtitles(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*UserSubtitle, error) {
+	var list []*UserSubtitle
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all user subtitles")
+	}
+	return list, nil
+}
+
 // ListUserSubtitlesForFile returns subtitles uploaded by a specific user for a
 // single file inside a torrent, ordered oldest first.
 func ListUserSubtitlesForFile(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID, path string) ([]*UserSubtitle, error) {

@@ -12,7 +12,6 @@ import (
 type SpeedtestResult struct {
 	tableName         struct{}  `pg:"speedtest_result"`
 	SpeedtestResultID uuid.UUID `pg:"speedtest_result_id,pk,type:uuid,default:uuid_generate_v4()"`
-	SourceIP          string    `pg:"source_ip,notnull"`
 	DestIP            string    `pg:"dest_ip,notnull"`
 	SpeedMbps         float32   `pg:"speed_mbps,notnull"`
 	RequestURL        string    `pg:"request_url,notnull"`

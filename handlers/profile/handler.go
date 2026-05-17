@@ -2,8 +2,10 @@ package profile
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
@@ -15,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/data_export"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -73,6 +76,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 	gr := r.Group("/profile")
 	gr.Use(auth.HasAuth)
 	gr.POST("/delete", h.delete)
+	gr.GET("/export", h.export)
 }
 
 // getAvailableBackendTypes returns the list of available streaming backend types
@@ -124,6 +128,44 @@ func (s *Handler) delete(c *gin.Context) {
 		return
 	}
 	c.Redirect(http.StatusFound, "/logout")
+}
+
+// buildExport is the pure-data level: load the full user record and assemble
+// the export payload. Returns nil when the authenticated user_id no longer
+// exists in the DB (e.g. mid-deletion race).
+func buildExport(ctx context.Context, db *pg.DB, userID uuid.UUID) (*data_export.Export, error) {
+	u, err := models.GetUserByID(ctx, db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, nil
+	}
+	return data_export.Build(ctx, db, u)
+}
+
+func (s *Handler) export(c *gin.Context) {
+	u := auth.GetUserFromContext(c)
+	db := s.pg.Get()
+	exp, err := buildExport(c.Request.Context(), db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to build data export"))
+		return
+	}
+	if exp == nil {
+		c.Redirect(http.StatusFound, "/logout")
+		return
+	}
+	filename := fmt.Sprintf("webtor-data-export-%s.json", time.Now().UTC().Format("2006-01-02"))
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Header("Cache-Control", "no-store")
+	enc := json.NewEncoder(c.Writer)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(exp); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to write data export"))
+		return
+	}
 }
 
 func (s *Handler) get(c *gin.Context) {

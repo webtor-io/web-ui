@@ -151,13 +151,6 @@ func (s *Handler) postResult(c *gin.Context) {
 	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(data))
 }
 
-func getRemoteAddress(c *gin.Context) string {
-	if addr := c.Request.Header.Get(gin.PlatformCloudflare); addr != "" {
-		return addr
-	}
-	return c.ClientIP()
-}
-
 func stripQueryParams(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -194,8 +187,6 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 		return ""
 	}
 
-	sourceIP := getRemoteAddress(c)
-
 	var measurements []measurement
 
 	if standardURL := c.PostForm("standard-url"); standardURL != "" && speedMbps > 0 {
@@ -230,7 +221,6 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 	defer cancel()
 	for _, m := range measurements {
 		err := models.CreateSpeedtestResult(ctx, db, &models.SpeedtestResult{
-			SourceIP:   sourceIP,
 			DestIP:     m.destIP,
 			SpeedMbps:  m.speedMbps,
 			RequestURL: m.requestURL,

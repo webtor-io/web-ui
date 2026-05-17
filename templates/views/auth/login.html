@@ -72,6 +72,10 @@
       </form>
     </div>
 
+    <p class="text-xs text-w-muted text-center mt-5 leading-relaxed px-2">
+      {{ tpHTML $.Lang "auth.login.legalNotice" "TosURL" (langPath $.Lang "/legal/tos") "PrivacyURL" (langPath $.Lang "/legal/privacy") }}
+    </p>
+
   </div>
 </section>
 {{ "auth/login.js" | asset }}

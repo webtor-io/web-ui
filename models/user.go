@@ -92,6 +92,24 @@ func GetOrCreateUser(ctx context.Context, db *pg.DB, email string, patreonUserID
 	return user, true, nil
 }
 
+// GetUserByID loads a user record by primary key. Returns (nil, nil) when no
+// row is found so callers can distinguish "missing" from a DB error.
+func GetUserByID(ctx context.Context, db *pg.DB, userID uuid.UUID) (*User, error) {
+	u := &User{}
+	err := db.Model(u).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		Limit(1).
+		Select()
+	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to load user by id")
+	}
+	return u, nil
+}
+
 func DeleteUser(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
 	_, err := db.Model((*User)(nil)).
 		Context(ctx).

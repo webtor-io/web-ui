@@ -41,6 +41,21 @@ func GetAccessTokenByName(ctx context.Context, db *pg.DB, userID uuid.UUID, name
 	return token, nil
 }
 
+// ListUserAccessTokens returns every access token issued to a user, oldest first.
+// Used by the GDPR data-export.
+func ListUserAccessTokens(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*AccessToken, error) {
+	var list []*AccessToken
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func MakeAccessToken(ctx context.Context, db *pg.DB, userID uuid.UUID, name string, scope []string) (*AccessToken, error) {
 	token := &AccessToken{
 		Token:     uuid.NewV4(),

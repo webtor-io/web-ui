@@ -91,6 +91,21 @@ func CountWatchedEpisodes(ctx context.Context, db *pg.DB, userID uuid.UUID, vide
 	return n, nil
 }
 
+// ListAllEpisodeStatuses returns every episode_status row for a user, oldest first.
+// Used by the GDPR data-export.
+func ListAllEpisodeStatuses(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*EpisodeStatus, error) {
+	var list []*EpisodeStatus
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all episode statuses")
+	}
+	return list, nil
+}
+
 // GetEpisodeStatusMapForSeries returns a map keyed on (season, episode)
 // for a single series. Used on the resource page to render per-episode state.
 func GetEpisodeStatusMapForSeries(ctx context.Context, db *pg.DB, userID uuid.UUID, videoID string) (map[EpisodeKey]*EpisodeStatus, error) {

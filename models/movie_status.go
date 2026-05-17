@@ -203,6 +203,21 @@ func ListUserRatedMovies(ctx context.Context, db *pg.DB, userID uuid.UUID, limit
 	return out, nil
 }
 
+// ListAllMovieStatuses returns every movie_status row for a user, oldest first.
+// Used by the GDPR data-export.
+func ListAllMovieStatuses(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*MovieStatus, error) {
+	var list []*MovieStatus
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all movie statuses")
+	}
+	return list, nil
+}
+
 // GetMovieStatusMap returns a map of video_id -> *MovieStatus for the
 // given user, filtered to the requested video IDs. Used for bulk prefetch in
 // library listings to avoid N+1 queries.

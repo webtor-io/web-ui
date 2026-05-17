@@ -58,6 +58,7 @@ func NewContext(c *gin.Context) *Context {
 	aCl := api.GetClaimsFromContext(c)
 	tu := claims.GetTierUpdateFromContext(c)
 	lang := i18n.GetLang(c)
+	path := c.Request.URL.Path
 
 	return &Context{
 		CSRF:        sess.CSRF,
@@ -68,7 +69,8 @@ func NewContext(c *gin.Context) *Context {
 		Geo:         geoData,
 		TierUpdated: tu,
 		Lang:        lang,
-		Path:        c.Request.URL.Path,
+		Path:        path,
 		ginCtx:      c,
 	}
 }
+

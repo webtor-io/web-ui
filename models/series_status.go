@@ -141,6 +141,21 @@ func FilterWatchedSeriesIDs(ctx context.Context, db *pg.DB, userID uuid.UUID, vi
 	return out, nil
 }
 
+// ListAllSeriesStatuses returns every series_status row for a user, oldest first.
+// Used by the GDPR data-export.
+func ListAllSeriesStatuses(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*SeriesStatus, error) {
+	var list []*SeriesStatus
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all series statuses")
+	}
+	return list, nil
+}
+
 // GetSeriesStatusMap returns a map of video_id -> *SeriesStatus for
 // bulk prefetch in library listings.
 func GetSeriesStatusMap(ctx context.Context, db *pg.DB, userID uuid.UUID, videoIDs []string) (map[string]*SeriesStatus, error) {

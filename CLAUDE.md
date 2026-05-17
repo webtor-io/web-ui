@@ -66,6 +66,7 @@ Produces minimal 3-stage Alpine image. Exposes ports 8080, 8081. Entrypoint `./s
 - Model files named after the entity (e.g., `models/embed_domain.go`).
 - Model methods accept `*pg.DB` as first parameter.
 - Provide Get/List, Create, Update, Delete, Count/Exists methods per entity.
+- **New user-keyed table → must be added to the GDPR data export.** Whenever you introduce a table with a `user_id` (or any column that ties rows to a single account), you MUST also wire it into `services/data_export/export.go` so it appears in the `/profile/export` JSON. Steps and rationale are in `docs/data_export.md`. Skipping this leaves a real Art. 20 compliance gap — treat it as part of the schema change, not a follow-up.
 
 ### Handler Architecture (Two-Level Pattern)
 

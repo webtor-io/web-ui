@@ -401,6 +401,21 @@ func filterOutFullyWatched(ctx context.Context, db *pg.DB, list []*WatchHistory,
 	return filtered
 }
 
+// ListAllWatchHistory returns every watch_history row for a user, oldest first.
+// Used by the GDPR data-export to dump the user's full playback history.
+func ListAllWatchHistory(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*WatchHistory, error) {
+	var list []*WatchHistory
+	err := db.Model(&list).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		OrderExpr("created_at ASC").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all watch history")
+	}
+	return list, nil
+}
+
 // GetWatchedPaths returns a map of path -> watched for all entries of a resource.
 func GetWatchedPaths(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID string) (map[string]bool, error) {
 	var list []WatchHistory
