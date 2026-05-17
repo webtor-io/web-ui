@@ -1,7 +1,6 @@
 package session
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/http"
@@ -116,32 +115,10 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 	r.Use(func(c *gin.Context) {
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), Session{}, &Session{
 			CSRF: csrf.GetToken(c),
-			ID:   getSessionId(c, "session"),
+			ID:   sessions.Default(c).ID(),
 		}))
 	})
 	return
-}
-func getSessionId(c *gin.Context, name string) (id string) {
-	id, _ = c.Cookie(name)
-	if id != "" {
-		return
-	}
-	id = getSessionIdFromResponseHeader(c, "Set-Cookie", name)
-	return
-}
-
-func getSessionIdFromResponseHeader(c *gin.Context, headerName string, cookieName string) string {
-	cookies := c.Writer.Header().Get(headerName)
-	rawRequest := fmt.Sprintf("GET / HTTP/1.0\r\nCookie: %s\r\n\r\n", cookies)
-	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(rawRequest)))
-	var id string
-	for _, q := range req.Cookies() {
-		if q.Name == cookieName {
-			id = q.Value
-			break
-		}
-	}
-	return id
 }
 
 func GetFromContext(c *gin.Context) *Session {
