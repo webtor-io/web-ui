@@ -1,14 +1,20 @@
 import av from '../lib/av';
 import { eventDefaults } from '../lib/trackContext';
 
+function identifySession() {
+    if (!window.umami || !window._sessionID) return;
+    // Always use the server-side session cookie ID as the Umami distinct_id —
+    // for anons too. The cookie is HttpOnly, MaxAge=30d, and is created on the
+    // very first request, so every session of the same browser carries the same
+    // distinct_id from anonymous first-touch through auth → Patreon → return.
+    // window._userId rides along as a property for cross-reference with
+    // SuperTokens; tier/is_authed stay live via eventDefaults().
+    window.umami.identify(window._sessionID, eventDefaults());
+}
+
 av(async function() {
     if (window.umami) {
-        const sessionData = eventDefaults();
-        if (window._userId) {
-            window.umami.identify(window._userId, sessionData);
-        } else {
-            window.umami.identify(sessionData);
-        }
+        identifySession();
         if (window._isNewUser) {
             window.umami.track('signup');
         }
@@ -20,14 +26,10 @@ av(async function() {
     }
     const self = this;
     window.addEventListener('auth', function() {
-        // Re-identify the Umami session after OAuth/magic-link success so the
-        // session-data row carries the authed user's distinct_id (and the
-        // up-to-date tier/is_authed props). Without this, paid-tier sessions
-        // stay attributed to the pre-login anonymous snapshot and cross-session
-        // first-touch analysis cannot resolve them by user.
-        if (window._userId && window.umami) {
-            window.umami.identify(window._userId, eventDefaults());
-        }
+        // Re-identify so the now-authed tier/is_authed/user_id props land in
+        // session_data under the same server session id. distinct_id stays
+        // stable across the anon→authed transition.
+        identifySession();
         self.reload();
     }, { once: true });
 });
