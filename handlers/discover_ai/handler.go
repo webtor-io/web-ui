@@ -226,8 +226,15 @@ func (h *Handler) refreshChips(c *gin.Context) {
 // hits also flow through the stream (as individual "chip" events) so the
 // frontend has one code path regardless of source.
 //
-// Quota policy mirrors GET /chips: no unit consumed on a normal load.
-// Force-refresh stays on POST /chips/refresh as before.
+// Quota policy:
+//   - normal load (?force=0 or absent) — no quota consumed; cache or LLM
+//     call happens transparently.
+//   - explicit refresh (?force=1) — ConsumeQuota first, then bust cache
+//     and stream fresh chips. The streaming refresh path lets the UI show
+//     the same per-pill animation it shows on initial load (which matters
+//     for TTFT measurement) and merges with the existing /chips/refresh
+//     POST endpoint conceptually — the POST is kept as a non-streaming
+//     fallback for callers that don't speak SSE.
 func (h *Handler) getChipsStream(c *gin.Context) {
 	if token := c.Query("_csrf"); token == "" || token != csrf.GetToken(c) {
 		c.String(http.StatusForbidden, "CSRF token mismatch")
@@ -236,6 +243,7 @@ func (h *Handler) getChipsStream(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 	tier := tierFromClaims(claims.GetFromContext(c))
 	clock, locale := readClockLocaleFromQuery(c)
+	force := c.Query("force") == "1"
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache,no-store,no-transform")
@@ -243,12 +251,37 @@ func (h *Handler) getChipsStream(c *gin.Context) {
 	c.Header("X-Accel-Buffering", "no")
 	c.Header("Access-Control-Allow-Origin", "*")
 
+	// Force-refresh consumes one daily-quota unit BEFORE the LLM call. We do
+	// this after the SSE headers so a quota_exceeded failure can flow back
+	// as a regular SSE `error` event — EventSource on the client cannot
+	// inspect the JSON body of a non-2xx response (it just sees a generic
+	// transport error), so wrapping the error in an SSE frame is the only
+	// way the UI can render the upgrade hint with quota/reset metadata.
+	if force {
+		if _, err := h.svc.ConsumeQuota(c.Request.Context(), user.ID, tier); err != nil {
+			payload := rec.ErrorStreamPayload{Code: "internal", Tier: tier.String()}
+			if errors.Is(err, rec.ErrQuotaExceeded) {
+				payload.Code = "quota_exceeded"
+				payload.DailyQuota = h.svc.DailyQuota(tier)
+				payload.ResetAt = h.svc.QuotaResetAt()
+				if tier == rec.TierFree {
+					payload.UpgradeQuota = h.svc.DailyQuota(rec.TierPaid)
+				}
+			} else {
+				log.WithError(err).WithField("feature", "ai_rec").Warn("chips refresh quota consume failed")
+			}
+			c.SSEvent("error", payload)
+			return
+		}
+	}
+
 	events := make(chan rec.StreamEvent, 8)
 	go h.svc.GenerateChipsStream(c.Request.Context(), rec.ChipsRequest{
-		UserID: user.ID,
-		Tier:   tier,
-		Locale: locale,
-		Clock:  clock,
+		UserID:       user.ID,
+		Tier:         tier,
+		Locale:       locale,
+		Clock:        clock,
+		ForceRefresh: force,
 	}, events)
 
 	c.Stream(func(_ io.Writer) bool {

@@ -313,40 +313,55 @@ export function AISection({
         dispatch({ type: 'AI_RESET' });
     }, [dispatch]);
 
-    const handleRefreshChips = useCallback(async () => {
+    const handleRefreshChips = useCallback(() => {
         if (refreshing) return;
         setRefreshing(true);
         window.umami?.track?.('ai-chips-refresh-requested');
-        const ac = new AbortController();
-        abortRef.current = ac;
-        try {
-            const data = await aiClient.refreshChips({ signal: ac.signal });
-            dispatch({
-                type: 'AI_LOAD_CHIPS_SUCCESS',
-                chips: data.chips,
-                generatedAt: data.generated_at,
-                tier: data.tier,
-                remainingQuota: data.remaining_quota,
-            });
-            window.umami?.track?.('ai-chips-refreshed', { count: data.chips?.length || 0 });
-        } catch (err) {
-            if (err.name === 'AbortError') return;
-            if (err.status === 402) {
+        // Streaming refresh: same SSE path as the initial load, just with
+        // force=1 so the server consumes a quota unit and busts cache. Keeps
+        // TTFT measurement consistent and lets pills appear one by one.
+        dispatch({ type: 'AI_LOAD_CHIPS_START' });
+        let cancelled = false;
+        let count = 0;
+        let tierAtDone = null;
+        const handle = aiClient.chipsStream({
+            onChip(chip) {
+                if (cancelled) return;
+                count++;
+                dispatch({ type: 'AI_LOAD_CHIPS_CHIP', chip });
+            },
+            onDone(data) {
+                if (cancelled) return;
+                tierAtDone = data.tier || null;
                 dispatch({
-                    type: 'AI_QUOTA_EXCEEDED',
-                    tier: err.tier,
-                    dailyQuota: err.dailyQuota,
-                    upgradeQuota: err.upgradeQuota,
-                    quotaResetAt: err.resetAt,
+                    type: 'AI_LOAD_CHIPS_SUCCESS',
+                    generatedAt: Math.floor(Date.now() / 1000),
+                    tier: data.tier,
+                    remainingQuota: data.remaining_quota,
+                    dailyQuota: data.daily_quota,
                 });
-                window.umami?.track?.('ai-quota-hit', { tier: err.tier, phase: 'chips-refresh' });
-                return;
-            }
-            dispatch({ type: 'AI_LOAD_CHIPS_ERROR', error: { code: err.code, message: err.message } });
-            window.umami?.track?.('ai-chips-error', { code: err.code });
-        } finally {
-            setRefreshing(false);
-        }
+                window.umami?.track?.('ai-chips-refreshed', { count, tier: tierAtDone });
+                setRefreshing(false);
+            },
+            onError(err) {
+                if (cancelled) return;
+                if (err.code === 'quota_exceeded') {
+                    dispatch({
+                        type: 'AI_QUOTA_EXCEEDED',
+                        tier: err.tier,
+                        dailyQuota: err.dailyQuota,
+                        upgradeQuota: err.upgradeQuota,
+                        quotaResetAt: err.resetAt,
+                    });
+                    window.umami?.track?.('ai-quota-hit', { tier: err.tier, phase: 'chips-refresh' });
+                } else {
+                    dispatch({ type: 'AI_LOAD_CHIPS_ERROR', error: { code: err.code, message: err.message } });
+                    window.umami?.track?.('ai-chips-error', { code: err.code });
+                }
+                setRefreshing(false);
+            },
+        }, { force: true });
+        abortRef.current = { abort: () => { cancelled = true; handle.close(); setRefreshing(false); } };
     }, [refreshing, dispatch]);
 
     if (aiState.phase === 'disabled') return null;
@@ -372,29 +387,6 @@ export function AISection({
                     {showQuotaCounter && (
                         <span class="tabular-nums">{(aiState.dailyQuota != null && aiState.dailyQuota > 0) ? tf('discover.ai.remainingQuota', aiState.remainingQuota, aiState.dailyQuota) : tf('discover.ai.remainingQuotaSimple', aiState.remainingQuota)}</span>
                     )}
-                    {/*
-                        Manual chip refresh is intentionally hidden from the
-                        UI to keep AI quota spending under control — it was
-                        the cheapest way for users to burn a unit by accident.
-                        Chips still rotate naturally on cache TTL expiry
-                        (4h). The handler and endpoint remain wired up so
-                        re-enabling the button is a one-line revert.
-
-                    {aiState.phase === 'chipsReady' && (
-                        <button
-                            type="button"
-                            onClick={handleRefreshChips}
-                            disabled={busy}
-                            class="inline-flex items-center gap-1 text-w-cyan hover:text-w-cyan/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={t('discover.ai.refresh')}
-                        >
-                            <svg class={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                            </svg>
-                            <span class="hidden sm:inline">{t('discover.ai.refresh')}</span>
-                        </button>
-                    )}
-                    */}
                 </div>
             </header>
 
@@ -443,7 +435,21 @@ export function AISection({
 
             {aiState.phase === 'chipsReady' && aiState.chips.length > 0 && (
                 <>
-                    <p class="mt-3 text-xs text-w-muted">{t('discover.ai.tryThese')}</p>
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <p class="text-xs text-w-muted">{t('discover.ai.tryThese')}</p>
+                        <button
+                            type="button"
+                            onClick={handleRefreshChips}
+                            disabled={busy}
+                            class="inline-flex items-center gap-1 text-xs text-w-cyan hover:text-w-cyan/80 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={t('discover.ai.refresh')}
+                        >
+                            <svg class={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                            </svg>
+                            <span class="hidden sm:inline">{t('discover.ai.refresh')}</span>
+                        </button>
+                    </div>
                     <AIChipsRow chips={aiState.chips} onSelect={handleChipClick} disabled={busy} />
                 </>
             )}

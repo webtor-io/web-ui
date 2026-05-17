@@ -278,7 +278,10 @@ func (s *ClaudeService) GenerateChipsStream(ctx context.Context, req ChipsReques
 
 	// Cold-start mirrors GenerateChips: no Claude call, no cache I/O — just
 	// stream the curated defaults so the UI shows something instantly.
-	if uc.HistorySize == 0 && uc.WatchlistSize == 0 {
+	// Skipped on ForceRefresh: the user explicitly asked for a fresh set and
+	// has already paid one quota unit, so they get a real LLM-generated
+	// batch even with empty history.
+	if !req.ForceRefresh && uc.HistorySize == 0 && uc.WatchlistSize == 0 {
 		log.WithField("feature", "ai_rec").
 			WithField("locale", uc.Locale).
 			WithField("tier", req.Tier.String()).
@@ -938,14 +941,21 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 
 	streamStart := time.Now()
 
-	// Single system block, no prompt caching: the chips system prompt is well
-	// below Anthropic's caching minimums and ChipsCache absorbs most repeat
-	// calls anyway. See callClaudeForChips for the same reasoning.
+	// System block carries all static rules so its prefix is identical across
+	// requests — Anthropic's prompt cache then matches on it and the
+	// re-tokenisation work that drove TTFT to ~2.6s drops to ~10% of input
+	// tokens, pulling TTFT to ~300-500ms on Haiku within the 5-minute cache
+	// window. systemPromptChips is sized just above Haiku's 2048-token cache
+	// minimum on purpose; the user message stays short so it doesn't blow the
+	// cache key.
 	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
 		Model:     s.chipsModel,
 		MaxTokens: claudeMaxTokensChips,
 		System: []anthropic.TextBlockParam{
-			{Text: systemPromptChips},
+			{
+				Text:         systemPromptChips,
+				CacheControl: anthropic.NewCacheControlEphemeralParam(),
+			},
 		},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
@@ -985,11 +995,13 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 	})
 
 	var (
-		inputTokens  int64
-		outputTokens int64
-		modelName    string
-		ttftLogged   bool
-		deltaCount   int
+		inputTokens       int64
+		outputTokens      int64
+		cacheCreateTokens int64
+		cacheReadTokens   int64
+		modelName         string
+		ttftLogged        bool
+		deltaCount        int
 	)
 
 	for stream.Next() {
@@ -999,6 +1011,12 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 			if event.Message.Usage.InputTokens > 0 {
 				inputTokens = event.Message.Usage.InputTokens
 			}
+			if event.Message.Usage.CacheCreationInputTokens > 0 {
+				cacheCreateTokens = event.Message.Usage.CacheCreationInputTokens
+			}
+			if event.Message.Usage.CacheReadInputTokens > 0 {
+				cacheReadTokens = event.Message.Usage.CacheReadInputTokens
+			}
 			modelName = string(event.Message.Model)
 		case "content_block_delta":
 			if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
@@ -1006,10 +1024,12 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 				if !ttftLogged {
 					ttftLogged = true
 					log.WithFields(log.Fields{
-						"feature": "ai_rec",
-						"kind":    "chips",
-						"mode":    "text",
-						"ttft_ms": time.Since(streamStart).Milliseconds(),
+						"feature":     "ai_rec",
+						"kind":        "chips",
+						"mode":        "text",
+						"ttft_ms":     time.Since(streamStart).Milliseconds(),
+						"cache_read":  cacheReadTokens,
+						"cache_write": cacheCreateTokens,
 					}).Info("claude first chip delta")
 				}
 				extractor.write(event.Delta.Text)
@@ -1020,6 +1040,12 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 			}
 			if event.Usage.InputTokens > 0 {
 				inputTokens = event.Usage.InputTokens
+			}
+			if event.Usage.CacheCreationInputTokens > 0 {
+				cacheCreateTokens = event.Usage.CacheCreationInputTokens
+			}
+			if event.Usage.CacheReadInputTokens > 0 {
+				cacheReadTokens = event.Usage.CacheReadInputTokens
 			}
 		}
 	}
@@ -1038,6 +1064,8 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 		"model":         modelName,
 		"input_tokens":  inputTokens,
 		"output_tokens": outputTokens,
+		"cache_read":    cacheReadTokens,
+		"cache_write":   cacheCreateTokens,
 		"deltas":        deltaCount,
 		"total_ms":      time.Since(streamStart).Milliseconds(),
 	}).Info("claude chips stream complete")

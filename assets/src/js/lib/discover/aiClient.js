@@ -254,12 +254,17 @@ export function recommendStream(query, callbacks) {
 // server emits `chip` events as each chip is produced (Claude stream) or
 // replayed (cache hit / cold-start), then a terminal `done` or `error`.
 //
+// options.force=true triggers a quota-consuming refresh: the server busts
+// the chips cache for this user, charges one daily-quota unit, and streams
+// freshly-generated chips. Used by the manual refresh button so its TTFT
+// flows through exactly the same path as the initial load.
+//
 // callbacks shape:
 //   onChip(chip)                                — one chip
 //   onDone({total, remaining_quota, daily_quota, tier}) — terminal success
 //   onError(AIError)                            — terminal failure
 // Returns a {close()} handle so callers can abort on unmount.
-export function chipsStream(callbacks) {
+export function chipsStream(callbacks, options = {}) {
     const { day, hour } = currentClock();
     const locale = currentLocale();
     const params = new URLSearchParams({
@@ -268,6 +273,7 @@ export function chipsStream(callbacks) {
         hour: String(hour),
         _csrf: window._CSRF || '',
     });
+    if (options.force) params.set('force', '1');
     const url = `/discover/ai/chips/stream?${params.toString()}`;
     const source = new EventSource(url, { withCredentials: true });
     let closed = false;
