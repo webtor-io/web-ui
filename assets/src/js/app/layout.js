@@ -55,6 +55,15 @@ if (window._umami) {
         defaultData: eventDefaults,
     });
     window.umami = umami;
+    // Identify the session here, once, before any view-specific script (nav,
+    // discover, action/*, …) fires its own track events. Server-side gin
+    // session cookie ID is rendered to window._sessionID — same value across
+    // anon → auth → Patreon → return, so the resulting distinct_id ties the
+    // whole funnel together. umami.identify hashes it to a UUID under the
+    // hood (Umami v2 validation requirement) — see lib/umami.js.
+    if (window._sessionID) {
+        umami.identify(window._sessionID);
+    }
 }
 
 window.progress = {

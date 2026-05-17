@@ -263,18 +263,45 @@ export function init(window, config) {
         return send(getPayload());
     };
 
-    const identify = (idOrData, maybeData) => {
-        let id;
+    // UUID v5 (SHA-1, URL namespace) of `name`. We hash whatever raw id the
+    // caller passes (server session cookie value, supertokens userId, anything)
+    // into a 36-char UUID before handing it to Umami: the server-side validator
+    // silently rejects anything that doesn't match the UUID format and falls
+    // back to its own anonymous cookie id, which is what masked our anon→paid
+    // attribution for months. Stable: same raw id → same UUID forever.
+    const NAMESPACE_URL = new Uint8Array([
+        0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1,
+        0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8,
+    ]);
+    const uuidV5 = async name => {
+        if (!name || !window.crypto || !window.crypto.subtle) return null;
+        const nameBytes = new TextEncoder().encode(name);
+        const buf = new Uint8Array(NAMESPACE_URL.length + nameBytes.length);
+        buf.set(NAMESPACE_URL, 0);
+        buf.set(nameBytes, NAMESPACE_URL.length);
+        const d = new Uint8Array(await window.crypto.subtle.digest('SHA-1', buf));
+        d[6] = (d[6] & 0x0f) | 0x50; // version 5
+        d[8] = (d[8] & 0x3f) | 0x80; // RFC 4122 variant
+        const hex = Array.from(d.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20, 32);
+    };
+
+    const identify = async (idOrData, maybeData) => {
+        let rawId;
         let data;
         if (typeof idOrData === 'string') {
-            id = idOrData;
+            rawId = idOrData;
             data = (maybeData && typeof maybeData === 'object') ? maybeData : undefined;
         } else if (idOrData && typeof idOrData === 'object') {
             data = idOrData;
         }
         const payload = { ...getPayload() };
-        if (id) payload.id = id;
-        if (data) payload.data = data;
+        if (rawId) {
+            const id = await uuidV5(rawId);
+            if (id) payload.id = id;
+        }
+        const merged = mergeData(data);
+        if (merged) payload.data = merged;
         return send(payload, 'identify');
     };
 
