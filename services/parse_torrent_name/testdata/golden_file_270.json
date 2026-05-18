@@ -1,0 +1,7 @@
+{
+  "input": "489155 com@pfes-126-c",
+  "want": {
+    "title": "489155 com@pfes-126-c",
+    "adult": true
+  }
+}

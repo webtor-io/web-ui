@@ -113,7 +113,7 @@ const (
 	// Multi-word brands embed `\.?` between tokens so both the dotted
 	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
 	// match — the parser doesn't strip dots before field matching.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media`
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|milfty|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|momswap|familyswap|sislovesme|daughterswap|dadcrush|dontfuckmydaughter|mydadshotgirlfriend|mommys?[\s.-]?girl|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media|intimatepov|rickysroom|loveherfeet|showstars|badoinkvr|baikal[\s.-]?films|elitepain|graias|raging[\s.-]?stallion|sexmex|trickymasseur|woodmancastingx?|pornpros|castingcouch[\s.-]?hd|swallowed|swallowsalon|mommyandme|vrconk|czechvr|realjamvr|darkroomvr|tmwvrnet|vrcosplayx|vrhush|dancingbear|hijab[\s.-]?hookups|please-cuck[\s.-]?me|please-fuck[\s.-]?my[\s.-]?wife|familytherapyxxx|naturist[\s.-]?freedom|gangland[\s.-]?cream[\s.-]?pie|faphouse|fap[\s.-]?house`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -424,7 +424,18 @@ var adultMatcher = NewRegexpMatcher(
 	`(?i)\b((X{3}))\b`,
 	// English single-occurrence keywords. All of these are
 	// effectively never found in non-adult release names.
-	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|cum(?:ming)?|blowjob|handjob|footjob|threesome|creampie|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|fetish|fuckermate|blackzilla|tranny|trannys|trannies|twink|pmv|anal|pussy))\b`,
+	// `creampie[ds]?` covers the `creampied` / `creampies` suffixed
+	// forms — the prior `creampie\b` form failed on those because
+	// `d`/`s` is a word char so `\b` didn't fire (audit 2026-05-18).
+	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|cum(?:ming)?|blowjob|handjob|footjob|threesome|creampie[ds]?|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|titjob|titfuck|fetish|fuckermate|blackzilla|tranny|trannys|trannies|twink|pmv|anal\d*|pussy|busty|bigtit|bigass))\b`,
+	// Adjective+sexual-noun composites — none of these phrases occur
+	// in legitimate media titles. Covers the "rough face fuck",
+	// "fucked hard", "deep throat", "brutal anal" shape that's
+	// pervasive in adult listings but missed by single-word keywords.
+	// Audit 2026-05-18: "faphouse - amira mae - tight 19 yr old
+	// latina rough face fuck fucked hard & creampied" had zero
+	// single-word matches before this rule.
+	`(?i)\b((face[\s.-]?fuck(?:ed|ing|s)?|fuck(?:ed|ing|s)[\s.-]+(?:hard|raw|rough|deep|by)|(?:rough|brutal|raw|deep|wild)[\s.-]+(?:sex|fuck|anal|throat|pussy)|barely[\s.-]?legal|teen[\s.-]?(?:slut|whore)|amateur[\s.-]?(?:wife|couple)|big[\s.-]?(?:tits?|ass|cock|dick)))\b`,
 	// Adult studios / sites (case-insensitive). Curated from
 	// ai_enrich.query — every name here was observed dominating
 	// the negative cache (milfy alone: 106 rows). The list itself
@@ -462,7 +473,7 @@ var adultMatcher = NewRegexpMatcher(
 	// non-adult content ("MD-80" airliner, "Roe v Wade", "SHC" generic
 	// initialism). Acceptable FN cost: each accounted for ≤1 hit/day
 	// in the 2026-05-13 audit.
-	`(?i)\b((aarm|abp|abw|adn|apns|atid|beaf|cawd|dasd|dldss|dpvr|dvaj|ebod|fsdss|getchu|gmem|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|ipzz|jera|jufd|jufe|jur|juvr|juy|kbd|kbpd|lafbd|maxvr|mdhr|meyd|mgnl|mida|miaa|mide|midv|mird|mism|mmus|mudr|nhdtb|niks|onez|pred|prtd|rbd|rct|real|sdab|savr|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|svace|tyhpj|venu|venx|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
+	`(?i)\b((aarm|abf|abp|abw|adn|apns|atid|beaf|cawd|daa|dasd|dass|dldss|dnjr|dpvr|dvaj|ebod|fns|fsdss|getchu|gmem|gvh|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|ipzz|jera|jufd|jufe|juq|jur|juvr|juy|kbd|kbpd|ktra|lafbd|maxvr|mdhr|meyd|mgnl|miab|miaa|mibb|mide|midv|mikr|mimk|mird|mism|mkmp|mmus|mngs|mudr|nhdtb|niks|onez|pfes|pred|prtd|rbd|rct|real|rki|sdab|savr|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|svace|tyhpj|venu|venx|waaa|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
 	// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 	// match the lowercase alternation. Non-Cyrillic prefix guard
 	// prevents false matches like "страх" (fear) → "трах".
@@ -487,7 +498,12 @@ var adultMatcher = NewRegexpMatcher(
 	// (hyphen instead of `@`) so the alternation now covers both —
 	// but with `[a-z0-9]{3,}` minimum to keep accidents like a stray
 	// `it.com-X` shape from matching.
-	`(?i)(([a-z0-9]{3,}\.(?:com|vip|net|cc|me)[@-]))`,
+	// `[\s.]` between site-id and TLD instead of literal `.` — observed
+	// in-the-wild form is often space-separated after the parser's
+	// internal normalisation (e.g. `489155 com@pfes-126-c`,
+	// `4k2 me@juvr00260 1`). Audit 2026-05-18 found 38 hits of
+	// `489155 com@` slipping past the dot-only form.
+	`(?i)(([a-z0-9]{3,}[\s.](?:com|vip|net|cc|me|la|io|tv|xyz)[@-]))`,
 )
 
 // sportMatcher detects FieldTypeSport — used downstream to skip AI
