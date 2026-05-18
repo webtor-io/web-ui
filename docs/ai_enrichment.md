@@ -120,6 +120,10 @@ TMDB.Map("Вот это драма", 2026)               → tt33071426  ✓
 movie_metadata: "The Drama" / 2026 / poster / plot / rating 7.0
 ```
 
+## Abuse cleanup
+
+`ai_enrich.query` rows that were first triggered by a now-banned resource are purged from the `resource.banned` NATS handler (`handlers/event/banned.go`). The `resource_id` column is a non-unique diagnostic field — PK is `(parsed_title, parsed_year, content_type)` — so deletion is best-effort: if the same title arrives later from a legitimate hash, the memo gets re-populated on next lookup. Without this cleanup the diagnostic trace of a CSAM title persists in the table indefinitely (no `force` path otherwise removes it).
+
 ## Files of interest
 
 - `services/anthropic_client/anthropic_client.go` — shared SDK client constructor + API-key flag.

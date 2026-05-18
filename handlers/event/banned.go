@@ -76,12 +76,19 @@ func (h *Handler) resourceBanned(data []byte) error {
 		}
 
 		// Per-user / cache rows that have no FK on the resource.
+		//
+		// ai_enrich.query: diagnostic resource_id column (non-unique, PK is
+		// (parsed_title, parsed_year, content_type)) records the first
+		// torrent that triggered the memoized Claude lookup. Deletion is
+		// best-effort cleanup of the diagnostic trace — if the same title
+		// arrives later from a legit hash, the memo gets re-populated.
 		for _, q := range []string{
 			`DELETE FROM library WHERE resource_id = ?`,
 			`DELETE FROM watch_history WHERE resource_id = ?`,
 			`DELETE FROM cache_index WHERE resource_id = ?`,
 			`DELETE FROM torrent_resource WHERE resource_id = ?`,
 			`DELETE FROM user_subtitle WHERE resource_id = ?`,
+			`DELETE FROM ai_enrich.query WHERE resource_id = ?`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, m.Infohash); err != nil {
 				return errors.Wrapf(err, "failed to execute cleanup query: %s", q)
