@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v doplňků neodpovídalo — seznam může být neúplný.",
     "profile.addons.refresh": "Obnovit",
     "profile.addons.refreshed": "Doplněk byl obnoven",
-    "profile.addons.refreshFailed": "Doplněk se nepodařilo obnovit"
+    "profile.addons.refreshFailed": "Doplněk se nepodařilo obnovit",
+    "release_sub.soon_badge": "Brzy",
+    "release_sub.banner_title": "Odebírat nové epizody tohoto releasu",
+    "release_sub.banner_desc": "Když stejná skupina vydá další epizodu ve stejné kvalitě — ukážeme ji ve tvém feedu.",
+    "release_sub.btn_yes": "Užitečné",
+    "release_sub.btn_no": "Nemám zájem",
+    "release_sub.anon_register_cta": "Zaregistruj se pro aktivaci",
+    "release_sub.thanks": "Děkujeme za zpětnou vazbu."
 }

@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v dodatków nie odpowiedziało — lista może być niekompletna.",
     "profile.addons.refresh": "Odśwież",
     "profile.addons.refreshed": "Dodatek odświeżony",
-    "profile.addons.refreshFailed": "Nie udało się odświeżyć dodatku"
+    "profile.addons.refreshFailed": "Nie udało się odświeżyć dodatku",
+    "release_sub.soon_badge": "Wkrótce",
+    "release_sub.banner_title": "Subskrybuj nowe odcinki tego release'u",
+    "release_sub.banner_desc": "Gdy ta sama grupa wypuści kolejny odcinek w tej samej jakości — pokażemy go w Twoim feedzie.",
+    "release_sub.btn_yes": "Przydatne",
+    "release_sub.btn_no": "Nie interesuje mnie",
+    "release_sub.anon_register_cta": "Zarejestruj się, aby włączyć",
+    "release_sub.thanks": "Dziękujemy za opinię."
 }

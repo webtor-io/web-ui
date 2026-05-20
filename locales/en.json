@@ -1116,5 +1116,12 @@
     "discover.streamsPartialFailureMany": "%v addons didn't respond — the list may be incomplete.",
     "profile.addons.refresh": "Refresh",
     "profile.addons.refreshed": "Addon refreshed",
-    "profile.addons.refreshFailed": "Failed to refresh addon"
+    "profile.addons.refreshFailed": "Failed to refresh addon",
+    "release_sub.soon_badge": "Soon",
+    "release_sub.banner_title": "Subscribe to new episodes of this release",
+    "release_sub.banner_desc": "When the same uploader publishes the next episode in the same quality — we'll show it in your feed.",
+    "release_sub.btn_yes": "Useful",
+    "release_sub.btn_no": "Not interested",
+    "release_sub.anon_register_cta": "Sign up to enable",
+    "release_sub.thanks": "Thanks for the feedback."
 }

@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v addons reageerden niet — de lijst kan onvolledig zijn.",
     "profile.addons.refresh": "Vernieuwen",
     "profile.addons.refreshed": "Addon vernieuwd",
-    "profile.addons.refreshFailed": "Addon kon niet worden vernieuwd"
+    "profile.addons.refreshFailed": "Addon kon niet worden vernieuwd",
+    "release_sub.soon_badge": "Binnenkort",
+    "release_sub.banner_title": "Abonneer op nieuwe afleveringen van deze release",
+    "release_sub.banner_desc": "Wanneer dezelfde release-groep de volgende aflevering in dezelfde kwaliteit uitbrengt — tonen we die in je feed.",
+    "release_sub.btn_yes": "Nuttig",
+    "release_sub.btn_no": "Geen interesse",
+    "release_sub.anon_register_cta": "Registreer om in te schakelen",
+    "release_sub.thanks": "Bedankt voor de feedback."
 }

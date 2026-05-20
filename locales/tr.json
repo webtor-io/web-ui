@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v eklenti yanıt vermedi — liste eksik olabilir.",
     "profile.addons.refresh": "Yenile",
     "profile.addons.refreshed": "Eklenti yenilendi",
-    "profile.addons.refreshFailed": "Eklenti yenilenemedi"
+    "profile.addons.refreshFailed": "Eklenti yenilenemedi",
+    "release_sub.soon_badge": "Yakında",
+    "release_sub.banner_title": "Bu sürümün yeni bölümlerine abone ol",
+    "release_sub.banner_desc": "Aynı release grubu sonraki bölümü aynı kalitede paylaştığında — akışında göstereceğiz.",
+    "release_sub.btn_yes": "Yararlı",
+    "release_sub.btn_no": "İlgilenmiyorum",
+    "release_sub.anon_register_cta": "Etkinleştirmek için kayıt ol",
+    "release_sub.thanks": "Geri bildirimin için teşekkürler."
 }

@@ -93,6 +93,30 @@ func UpsertInfo(ctx context.Context, db *pg.DB, tmdbID int, tmdbType TmdbType, m
 	return m, err
 }
 
+// GetInfoByIMDBID looks up a cached TMDB record by its IMDB id. Used by the
+// release-subscribe fake-door eligibility check to read `status` /
+// `in_production` / `next_episode_to_air` off `metadata` without a TMDB API
+// round-trip. Returns nil (no error) when the row isn't cached locally yet —
+// in that case eligibility falls through to "not airing".
+func GetInfoByIMDBID(ctx context.Context, db *pg.DB, imdbID string) (*Info, error) {
+	if imdbID == "" {
+		return nil, nil
+	}
+	var info Info
+	err := db.Model(&info).
+		Context(ctx).
+		Where("imdb_id = ?", imdbID).
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
 // ListRecentPopular returns films released on or after minYear, sorted by
 // TMDB vote_average descending. Used by the AI recommendations service to
 // build the "recent releases" prompt block that compensates for Claude's

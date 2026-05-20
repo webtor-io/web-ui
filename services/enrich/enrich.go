@@ -58,6 +58,14 @@ type LocalizableMapper interface {
 	Localize(ctx context.Context, videoID string, lang string) (title string, plot string, err error)
 }
 
+// AiringChecker is an optional capability of a MetadataMapper. Mappers that
+// know "is this series currently producing new episodes" implement it.
+// Today only TMDB does — it reads `status` and `in_production` off its
+// cached metadata. Adding KPU/anidb support later is one method.
+type AiringChecker interface {
+	IsAiring(ctx context.Context, videoID string) (bool, error)
+}
+
 func (s *Enricher) HasMappers() bool {
 	return len(s.mappers) > 0
 }
@@ -116,6 +124,35 @@ func (s *Enricher) Localize(ctx context.Context, md *models.VideoMetadata, lang 
 		}
 		return
 	}
+}
+
+// IsAiringSeries asks any mapper that supports AiringChecker whether the
+// series identified by videoID is currently airing. Returns true on the
+// first positive hit; mapper errors are logged and swallowed (a wrong
+// "false" just hides the release-subscribe banner, which is the safe
+// default for the experiment).
+func (s *Enricher) IsAiringSeries(ctx context.Context, videoID string) bool {
+	if videoID == "" {
+		return false
+	}
+	for _, m := range s.mappers {
+		ac, ok := m.(AiringChecker)
+		if !ok {
+			continue
+		}
+		airing, err := ac.IsAiring(ctx, videoID)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", videoID).
+				Debug("airing check: mapper failed, trying next")
+			continue
+		}
+		if airing {
+			return true
+		}
+	}
+	return false
 }
 
 func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper, aiResolver *AIResolver) *Enricher {

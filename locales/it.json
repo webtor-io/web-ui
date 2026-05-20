@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v addon non hanno risposto — la lista potrebbe essere incompleta.",
     "profile.addons.refresh": "Aggiorna",
     "profile.addons.refreshed": "Addon aggiornato",
-    "profile.addons.refreshFailed": "Impossibile aggiornare l'addon"
+    "profile.addons.refreshFailed": "Impossibile aggiornare l'addon",
+    "release_sub.soon_badge": "Presto",
+    "release_sub.banner_title": "Iscriviti ai nuovi episodi di questo release",
+    "release_sub.banner_desc": "Quando lo stesso gruppo pubblica il prossimo episodio nella stessa qualità, lo vediamo nel tuo feed.",
+    "release_sub.btn_yes": "Utile",
+    "release_sub.btn_no": "Non mi interessa",
+    "release_sub.anon_register_cta": "Iscriviti per attivare",
+    "release_sub.thanks": "Grazie del feedback."
 }

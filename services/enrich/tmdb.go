@@ -480,7 +480,34 @@ func (s *TMDB) localizeFromDBOrAPI(ctx context.Context, tmdbID int, tmdbType tmd
 	return &localizedText{Title: title, Plot: plot}, nil
 }
 
+// IsAiring reads `status` / `in_production` off the locally cached TMDB
+// metadata. No external API call — if the row isn't cached yet, we return
+// false and the release-subscribe banner just doesn't render (safe
+// default). Powered by the AiringChecker capability interface; called
+// from Enricher.IsAiringSeries on resource page render.
+func (s *TMDB) IsAiring(ctx context.Context, videoID string) (bool, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return false, nil
+	}
+	info, err := tm.GetInfoByIMDBID(ctx, db, videoID)
+	if err != nil {
+		return false, err
+	}
+	if info == nil || info.Metadata == nil {
+		return false, nil
+	}
+	if v, ok := info.Metadata["status"].(string); ok && v == "Returning Series" {
+		return true, nil
+	}
+	if v, ok := info.Metadata["in_production"].(bool); ok && v {
+		return true, nil
+	}
+	return false, nil
+}
+
 var _ MetadataMapper = (*TMDB)(nil)
 var _ DirectMapper = (*TMDB)(nil)
 var _ PopularProvider = (*TMDB)(nil)
 var _ LocalizableMapper = (*TMDB)(nil)
+var _ AiringChecker = (*TMDB)(nil)

@@ -1074,5 +1074,12 @@
     "discover.streamsPartialFailureMany": "%v аддонов не ответили — список может быть неполным.",
     "profile.addons.refresh": "Обновить",
     "profile.addons.refreshed": "Аддон обновлён",
-    "profile.addons.refreshFailed": "Не удалось обновить аддон"
+    "profile.addons.refreshFailed": "Не удалось обновить аддон",
+    "release_sub.soon_badge": "Скоро",
+    "release_sub.banner_title": "Подписка на новые серии этой раздачи",
+    "release_sub.banner_desc": "Когда тот же релизер выложит следующую серию в том же качестве — покажем в твоей подборке.",
+    "release_sub.btn_yes": "Полезно",
+    "release_sub.btn_no": "Не нужно",
+    "release_sub.anon_register_cta": "Войдите, чтобы получать уведомления",
+    "release_sub.thanks": "Спасибо за фидбек."
 }

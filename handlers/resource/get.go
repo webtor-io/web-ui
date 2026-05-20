@@ -104,6 +104,7 @@ type GetData struct {
 	SeriesStatus          *models.SeriesStatus
 	PathActions           map[string]*PathAction
 	RateForm              *RateForm
+	ReleaseSubBanner      *ReleaseSubscribeBanner
 }
 
 type RateForm struct {
@@ -186,6 +187,7 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		if d.Movie == nil {
 			d.Series, _ = models.GetSeriesWithMetadataByResourceID(ctx, db, args.ID)
 		}
+		d.ReleaseSubBanner = prepareReleaseSubscribeBanner(ctx, s.enricher, res, d.Series)
 		// Load watch history for file list
 		if args.User.HasAuth() {
 			d.WatchedPaths, _ = models.GetWatchedPaths(ctx, db, args.User.ID, args.ID)
