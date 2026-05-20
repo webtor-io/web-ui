@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -134,7 +135,7 @@ func New(ctx context.Context, id string, queue string, runnable Runnable, storag
 func (s *Job) Run(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("job panic: %v", r)
+			log.WithField("stack", string(debug.Stack())).Errorf("job panic: %v", r)
 		}
 	}()
 	defer s.close()
