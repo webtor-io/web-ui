@@ -204,6 +204,38 @@
 
 <!-- FAQ -->
 <section id="faq" class="py-24 px-3 sm:px-6">
+    {{ if eq $instruction "torrent_to_ddl" }}
+    {{ faqSchema $.Lang
+        "about.faq.free.q|about.faq.free.a"
+        "about.faq.vpn.q|about.faq.vpn.a"
+        "about.faq.mobile.q|about.faq.mobile.a"
+        "about.faq.formats.q|about.faq.formats.a"
+        "about.faq.opensource.q|about.faq.opensource.a"
+        "about.faq.smarttv.q|about.faq.smarttv.a"
+        "about.faq.expire.q|about.faq.expire.a"
+        "about.faq.ads.q|about.faq.ads.a"
+        "about.faq.zip.q|about.faq.zip.a"
+        "about.faq.speed.q|about.faq.speed.a1"
+        "tool.torrentToDdl.about.faq.q1.question|tool.torrentToDdl.about.faq.q1.answer"
+        "tool.torrentToDdl.about.faq.q2.question|tool.torrentToDdl.about.faq.q2.answer"
+        "tool.torrentToDdl.about.faq.q3.question|tool.torrentToDdl.about.faq.q3.answer"
+        "tool.torrentToDdl.about.faq.q4.question|tool.torrentToDdl.about.faq.q4.answer"
+        "tool.torrentToDdl.about.faq.q5.question|tool.torrentToDdl.about.faq.q5.answer"
+    }}
+    {{ else }}
+    {{ faqSchema $.Lang
+        "about.faq.free.q|about.faq.free.a"
+        "about.faq.vpn.q|about.faq.vpn.a"
+        "about.faq.mobile.q|about.faq.mobile.a"
+        "about.faq.formats.q|about.faq.formats.a"
+        "about.faq.opensource.q|about.faq.opensource.a"
+        "about.faq.smarttv.q|about.faq.smarttv.a"
+        "about.faq.expire.q|about.faq.expire.a"
+        "about.faq.ads.q|about.faq.ads.a"
+        "about.faq.zip.q|about.faq.zip.a"
+        "about.faq.speed.q|about.faq.speed.a1"
+    }}
+    {{ end }}
     <div class="max-w-[1100px] mx-auto">
         <div class="text-center mb-14">
             <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
