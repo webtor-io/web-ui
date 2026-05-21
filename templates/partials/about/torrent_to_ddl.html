@@ -151,4 +151,54 @@
         <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">{{ t $.Lang "tool.torrentToDdl.about.video.footer" }}</p>
     </div>
 </section>
+
+<!-- FAQ -->
+<section class="py-16 px-3 sm:px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            {{ t $.Lang "tool.about.badges.faq" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.torrentToDdl.about.faq.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">{{ t $.Lang "tool.torrentToDdl.about.faq.subtitle" }}</p>
+
+        <div class="max-w-[800px] space-y-3">
+            <details class="card bg-base-300 border border-w-line group">
+                <summary class="card-body cursor-pointer list-none flex items-center justify-between gap-4">
+                    <h3 class="card-title text-[1.1rem]">{{ t $.Lang "tool.torrentToDdl.about.faq.q1.question" }}</h3>
+                    <svg class="w-5 h-5 shrink-0 text-w-cyan transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="px-8 pb-6 text-[0.95rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q1.answer" }}</div>
+            </details>
+            <details class="card bg-base-300 border border-w-line group">
+                <summary class="card-body cursor-pointer list-none flex items-center justify-between gap-4">
+                    <h3 class="card-title text-[1.1rem]">{{ t $.Lang "tool.torrentToDdl.about.faq.q2.question" }}</h3>
+                    <svg class="w-5 h-5 shrink-0 text-w-cyan transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="px-8 pb-6 text-[0.95rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q2.answer" }}</div>
+            </details>
+            <details class="card bg-base-300 border border-w-line group">
+                <summary class="card-body cursor-pointer list-none flex items-center justify-between gap-4">
+                    <h3 class="card-title text-[1.1rem]">{{ t $.Lang "tool.torrentToDdl.about.faq.q3.question" }}</h3>
+                    <svg class="w-5 h-5 shrink-0 text-w-cyan transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="px-8 pb-6 text-[0.95rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q3.answer" }}</div>
+            </details>
+            <details class="card bg-base-300 border border-w-line group">
+                <summary class="card-body cursor-pointer list-none flex items-center justify-between gap-4">
+                    <h3 class="card-title text-[1.1rem]">{{ t $.Lang "tool.torrentToDdl.about.faq.q4.question" }}</h3>
+                    <svg class="w-5 h-5 shrink-0 text-w-cyan transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="px-8 pb-6 text-[0.95rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q4.answer" }}</div>
+            </details>
+            <details class="card bg-base-300 border border-w-line group">
+                <summary class="card-body cursor-pointer list-none flex items-center justify-between gap-4">
+                    <h3 class="card-title text-[1.1rem]">{{ t $.Lang "tool.torrentToDdl.about.faq.q5.question" }}</h3>
+                    <svg class="w-5 h-5 shrink-0 text-w-cyan transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="px-8 pb-6 text-[0.95rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q5.answer" }}</div>
+            </details>
+        </div>
+    </div>
+</section>
 {{ end }}
