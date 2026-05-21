@@ -120,6 +120,59 @@ const (
 	// extracts the digit trailing the tag ("<show> - ONA 01"). Same
 	// reuse pattern as qualityAlternation.
 	kindAlternation = `ONA|OVA|OAD|NCOP|NCED`
+
+	// javPrefixAlternation — JAV studio-code prefixes for the
+	// "<prefix><sep><3-5 digit serial>" release convention. Curated
+	// from ai_enrich.query telemetry and grouped by studio so it's
+	// obvious where a new prefix belongs (and which group's other
+	// codes might also be missing). Group order has no effect on
+	// regex behavior — RE2 alternation has no observable left-to-right
+	// preference here, every branch has the same shape and is followed
+	// by the same anchor (`[\s\-_.]*\d{2,5}…`). Used by adultMatcher
+	// below.
+	//
+	// Pruned from this list intentionally: `md`, `roe`, `shc`, `sw`,
+	// `jul`, `mum`, `stars` — 2-4 char prefixes that collide too
+	// easily with legitimate content ("MD-80" airliner, "Roe v Wade",
+	// "stars 2024"). Acceptable FN cost; see 2026-05-13 audit notes.
+	javPrefixAlternation = "" +
+		// S1 NO.1 STYLE (Japan's largest JAV label, incl. ONEZ debut series)
+		`ssis|ssni|snis|snos|sone|start|onez` +
+		// MOODYZ
+		`|miaa|miab|mibb|mide|midv|mikr|mimk|mird|mism|mdhr` +
+		// IdeaPocket (IP, incl. IPVR)
+		`|ipx|ipz|ipzz|ipvr` +
+		// Madonna / JU-* family
+		`|juq|jufd|jufe|juvr|juy|jur` +
+		// Attackers
+		`|atid|rbd|shkd|adn` +
+		// Premium
+		`|pred|prtd` +
+		// PRESTIGE
+		`|aarm|abf|abp|abw|gvh` +
+		// Faleno
+		`|fsdss|fns` +
+		// kawaii* (CAWD), K-M Produce (MKMP, KTRA)
+		`|cawd|ktra|mkmp` +
+		// SOD Create (incl. SOD VR — SAVR / SVACE)
+		`|sdab|sdde|sdmu|savr|svace` +
+		// Honnaka / Hunters
+		`|hnd|hbad|hmn|huntc` +
+		// Das! / DASS / DLDSS family
+		`|daa|dasd|dass|dldss|dnjr` +
+		// Wanz Factory (WAAA replaces WANZ post-2021)
+		`|wanz|waaa` +
+		// VENUS
+		`|venu|venx` +
+		// K-M Group cells (KBD / KBPD)
+		`|kbd|kbpd` +
+		// MGS digital labels
+		`|mgnl|mngs` +
+		// Single-label entries (one prefix per studio)
+		`|ebod|dvaj|maxvr|dpvr|nhdtb|real|rki|apns|niks|mmus|meyd` +
+		// Other JAV codes — studio attribution unknown / less common.
+		// Move into a named group above once attribution is confirmed.
+		`|beaf|gmem|imoe|jera|lafbd|pfes|tyhpj|mudr|getchu|rct`
 )
 
 var fieldParsers = FieldParsers{
@@ -458,22 +511,17 @@ var adultMatcher = NewRegexpMatcher(
 	// Excludes "BBC News", "BBC Earth", etc. — those have neither
 	// these verbs nor matching nouns.
 	`(?i)\b((bbc))\s+(?:cock|fuck|treat|surprise|crave|hungry|addict|obsess|loves?|monster|stretch|hung|breed|breeding|destroy|destroys|stretching|inches|fan|goddess|hotwife|wife|stud|stallion)`,
-	// JAV studio code prefix + numeric serial. Prefix list pruned
-	// to combinations unlikely to collide with English words / years
-	// (so no bare "sw", "jul", "mum", "stars"). The required
-	// trailing `\d{2,5}` is what disambiguates ambiguous prefixes
-	// like APNS (Apple Push Notification Service) — only
-	// "APNS-410" form fires, "APNS notifications" stays clean.
-	//
-	// Separator between prefix and serial is `[\s\-_.]*` (zero or
-	// more) — JAV codes appear as "ABP-123", "ABP_123", "ABP.123",
-	// or after parser normalisation "ABP 123" with a single space.
-	// Dropped from this list intentionally: `md`, `roe`, `shc` —
-	// 2-3 char prefixes that collide too easily with legitimate
-	// non-adult content ("MD-80" airliner, "Roe v Wade", "SHC" generic
-	// initialism). Acceptable FN cost: each accounted for ≤1 hit/day
-	// in the 2026-05-13 audit.
-	`(?i)\b((aarm|abf|abp|abw|adn|apns|atid|beaf|cawd|daa|dasd|dass|dldss|dnjr|dpvr|dvaj|ebod|fns|fsdss|getchu|gmem|gvh|hbad|hmn|hnd|huntc|imoe|ipvr|ipx|ipz|ipzz|jera|jufd|jufe|juq|jur|juvr|juy|kbd|kbpd|ktra|lafbd|maxvr|mdhr|meyd|mgnl|miab|miaa|mibb|mide|midv|mikr|mimk|mird|mism|mkmp|mmus|mngs|mudr|nhdtb|niks|onez|pfes|pred|prtd|rbd|rct|real|rki|sdab|savr|sdde|sdmu|shkd|snis|snos|sone|ssis|ssni|start|svace|tyhpj|venu|venx|waaa|wanz)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
+	// JAV studio code prefix + numeric serial. The required trailing
+	// `\d{2,5}` disambiguates ambiguous prefixes like APNS (Apple
+	// Push Notification Service) — only "APNS-410" form fires, "APNS
+	// notifications" stays clean. Separator between prefix and serial
+	// is `[\s\-_.]*` (zero or more) — JAV codes appear as "ABP-123",
+	// "ABP_123", "ABP.123", or after parser normalisation "ABP 123"
+	// with a single space. The prefix alternation lives in
+	// `javPrefixAlternation` (grouped by studio for readability;
+	// also documents which prefixes were pruned to avoid English-word
+	// collisions).
+	`(?i)\b((` + javPrefixAlternation + `)[\s\-_.]*\d{2,5}(?:-?[a-z]{1,3})?)\b`,
 	// Russian explicit markers. (?i) lets uppercase forms ("Трахаю")
 	// match the lowercase alternation. Non-Cyrillic prefix guard
 	// prevents false matches like "страх" (fear) → "трах".
