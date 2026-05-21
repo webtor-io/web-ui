@@ -167,6 +167,10 @@ export const initialState = {
     // 'all' | 'movie' | 'series' — mirrors searchType so we can reuse the
     // SearchTabs component (counts + chip styling) for the watchlist view.
     watchlistType: 'all',
+    // 'grid' | 'calendar'. The calendar view is a series-only mode that
+    // re-renders the current displayItems as a timeline of upcoming/recent
+    // episodes (see CalendarView). Hydrated from prefs in INIT_SUCCESS.
+    viewMode: 'grid',
     // AI recommendations slice
     ai: initialAIState,
 };
@@ -174,9 +178,17 @@ export const initialState = {
 export function discoverReducer(state, action) {
     switch (action.type) {
         case 'INIT_SUCCESS': {
-            const { manifests, catalogs, selectedType, selectedCatalog, addons } = action;
-            return { ...state, phase: 'ready', manifests, catalogs, addons: addons || state.addons, selectedType, selectedCatalog };
+            const { manifests, catalogs, selectedType, selectedCatalog, addons, viewMode } = action;
+            return {
+                ...state,
+                phase: 'ready', manifests, catalogs,
+                addons: addons || state.addons,
+                selectedType, selectedCatalog,
+                viewMode: viewMode || state.viewMode,
+            };
         }
+        case 'SET_VIEW_MODE':
+            return { ...state, viewMode: action.viewMode };
         case 'ADDONS_UPDATED':
             return { ...state, addons: action.addons };
         case 'INIT_ERROR':

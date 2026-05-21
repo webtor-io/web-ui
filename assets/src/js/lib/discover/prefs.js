@@ -10,3 +10,8 @@ export function savePrefs(patch) {
         localStorage.setItem(LS_KEY, JSON.stringify({ ...loadPrefs(), ...patch }));
     } catch {}
 }
+
+export function getViewMode() {
+    const v = loadPrefs().viewMode;
+    return v === 'calendar' ? 'calendar' : 'grid';
+}

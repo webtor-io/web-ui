@@ -203,15 +203,26 @@ export class StremioClient {
     }
 
     async fetchMeta(type, id, { signal } = {}) {
-        // Always try Cinemeta first
+        // Cache only confirmed hits (meta with videos[]). A meta-without-
+        // videos response can be transient — caching it would freeze a
+        // series out of the calendar until the page reloads, even after
+        // Cinemeta recovers.
+        const cacheKey = `meta:${type}:${id}`;
+        const cached = this.cache.get(cacheKey);
+        if (cached !== undefined) return cached;
+
+        let result = null;
+
         try {
             const url = `${CINEMETA_BASE}/meta/${type}/${id}.json`;
             const res = await fetchWithTimeout(url, signal);
             if (res.ok) {
                 const data = await res.json();
                 if (data.meta?.videos?.length > 0) {
+                    this.cache.set(cacheKey, data.meta);
                     return data.meta;
                 }
+                if (data.meta) result = data.meta;
             }
         } catch (e) { /* fall through to user addons */ }
 
@@ -238,13 +249,14 @@ export class StremioClient {
 
         for (const r of results) {
             if (r.status === 'fulfilled' && r.value?.videos?.length > 0) {
+                this.cache.set(cacheKey, r.value);
                 return r.value;
             }
         }
         for (const r of results) {
             if (r.status === 'fulfilled' && r.value) return r.value;
         }
-        return null;
+        return result;
     }
 
     getSearchCatalogs() {

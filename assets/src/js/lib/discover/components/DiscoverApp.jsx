@@ -7,13 +7,14 @@ import {
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
-import { loadPrefs, savePrefs } from '../prefs';
+import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
-import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass } from './discoverUtils';
+import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass, viewModeChipClass } from './discoverUtils';
 import { fetchWatchlistIds, fetchWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlistClient';
 import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
+import { CalendarView } from './CalendarView';
 import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, CatalogUnavailable } from './EmptyStates';
 import { AddonHealthChip } from './AddonHealthChip';
@@ -137,7 +138,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     if (match) selectedCatalog = match;
                 }
 
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: getViewMode() });
 
                 // Store page/modal restore targets
                 if (urlPage > 0) restoredPageRef.current = urlPage;
@@ -783,7 +784,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 }
                 const selectedType = types[0];
                 const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: getViewMode() });
             } catch (e) {
                 dispatch({ type: 'INIT_ERROR', message: t('discover.manifestLoadError') });
             }
@@ -853,7 +854,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // Force a fresh catalog load when the previous selection
             // becomes available again or changes.
             prevCatalogRef.current = null;
-            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
+            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: stateRef.current?.viewMode });
         } catch (e) {
             // Keep the page rendered as-is; chip retains failure state.
         }
@@ -917,7 +918,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 }
                 const selectedType = types[0];
                 const selectedCatalog = getCatalogsForType(catalogs, selectedType)[0] || null;
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: getViewMode() });
             } catch (e) {
                 dispatch({ type: 'INIT_ERROR', message: t('discover.manifestLoadError') });
             }
@@ -1186,6 +1187,109 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         dispatch({ type: 'SELECT_WATCHLIST_TYPE', watchlistType: wt });
     }, []);
 
+    // Calendar view: a per-user series-only mode. Persisted globally (one
+    // preference for every series catalog) so the user picks once and the
+    // setting follows them. The Calendar button stays visible on non-
+    // series catalogs as a discoverability cue; the handler no-ops the
+    // click while still letting the native title tooltip fire on hover.
+    const selectViewMode = useCallback((mode) => {
+        if (mode !== 'grid' && mode !== 'calendar') return;
+        if (mode === state.viewMode) return;
+        savePrefs({ viewMode: mode });
+        window.umami?.track?.(mode === 'calendar' ? 'discover-view-mode-calendar' : 'discover-view-mode-grid');
+        dispatch({ type: 'SET_VIEW_MODE', viewMode: mode });
+    }, [state.viewMode]);
+
+    // Bridges a CalendarView episode click into the same stream-loading
+    // flow the episodes-modal uses (onEpisodeSelect). We get to skip the
+    // intermediate "Select an episode" view since the user already picked
+    // a specific S/E from the timeline. Meta is forwarded from the
+    // CalendarView fetch so backToEpisodes works without a refetch.
+    const openEpisodeFromCalendar = useCallback(async (item, video, meta) => {
+        const type = item.type || 'series';
+        const id = item.id;
+        const season = video.season;
+        const episode = video.episode;
+        const epId = video.id || `${id}:${season}:${episode}`;
+        const seriesName = meta?.name || item.name || id;
+        const epLabel = Number(season) === 0
+            ? t('discover.specials')
+            : `S${season} E${episode}`;
+        const epName = `${seriesName} - ${epLabel}`;
+
+        // Mirror the cardClick → onEpisodeSelect flow's history shape:
+        // entry 1 = just `id` (would render the episodes modal), entry 2
+        // = + season/episode (renders streams). Single combined push
+        // would collapse both steps so "< Серии" back-navigation would
+        // exit the modal entirely instead of falling back to the episode
+        // list at the right season.
+        url.push({ id, season: null, episode: null });
+        url.push({ season, episode });
+
+        const cardMeta = {
+            year: item.year,
+            releaseInfo: item.releaseInfo,
+            imdbRating: item.imdbRating,
+            description: item.description,
+        };
+        const backToEpisodes = meta?.videos?.length > 0 ? {
+            title: seriesName,
+            poster: meta?.poster || item.poster,
+            meta,
+            itemId: id,
+            itemType: type,
+            season,
+            ...cardMeta,
+        } : undefined;
+
+        await loadStreams(
+            type, epId,
+            { name: epName, poster: meta?.poster || item.poster, ...cardMeta },
+            backToEpisodes ? { backToEpisodes } : {},
+        );
+    }, [loadStreams]);
+
+    // Click on a collapsed "Season N · X episodes" card from the calendar.
+    // Bypasses the per-episode picker — opens the episodes modal at the
+    // right season so the user can pick which one to play. Meta is
+    // forwarded so no refetch happens.
+    const openSeasonFromCalendar = useCallback((item, season, meta) => {
+        const id = item.id;
+        const type = item.type || 'series';
+        url.push({ id, season, episode: null });
+        dispatch({
+            type: 'SHOW_MODAL',
+            modal: {
+                view: 'episodes',
+                title: meta?.name || item.name,
+                poster: meta?.poster || item.poster,
+                meta,
+                itemId: id,
+                itemType: type,
+                defaultSeason: Number(season),
+                year: item.year,
+                releaseInfo: item.releaseInfo,
+                imdbRating: item.imdbRating,
+                description: item.description,
+            },
+        });
+    }, []);
+
+    // Calendar toggle is always shown in catalog/watchlist mode (we still
+    // hide it in search mode where the result set is mixed and not the
+    // user's chosen catalog). Calendar is meaningful only for series, so
+    // we disable the button rather than hide it — that keeps the UI
+    // affordance discoverable for users coming from a movie catalog who
+    // might not realise switching to series unlocks the timeline.
+    const showCalendarToggle = !state.isSearchMode;
+    const calendarAvailable = useMemo(() => {
+        if (state.isSearchMode) return false;
+        if (state.watchlistFilterEnabled) return state.watchlistType === 'series';
+        return state.selectedType === 'series';
+    }, [state.isSearchMode, state.watchlistFilterEnabled, state.watchlistType, state.selectedType]);
+
+    const isCalendarMode = calendarAvailable && state.viewMode === 'calendar';
+
     // --- Render ---
     if (state.phase === 'loading') {
         return <LoadingSpinner />;
@@ -1243,7 +1347,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                             tight screens flex-wrap drops the switcher to a
                             new line where it stays right-aligned via
                             ml-auto on its row. */}
-                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <div class="min-w-0">
                                 {state.watchlistFilterEnabled ? (
                                     <SearchTabs
@@ -1256,7 +1360,8 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                                     <TypeTabs types={types} selectedType={state.selectedType} onSelect={selectType} />
                                 )}
                             </div>
-                            <div class="join ml-auto">
+                            <div class="ml-auto flex items-center gap-2">
+                            <div class="join">
                                 <button
                                     type="button"
                                     onClick={() => setMode('catalog')}
@@ -1285,9 +1390,44 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                                     )}
                                 </button>
                             </div>
+                            {showCalendarToggle && (
+                                <div class="join" role="group" aria-label={t('discover.view.grid')}>
+                                    <button
+                                        type="button"
+                                        onClick={() => selectViewMode('grid')}
+                                        class={viewModeChipClass(!isCalendarMode)}
+                                        title={t('discover.view.grid')}
+                                        aria-label={t('discover.view.grid')}
+                                        aria-pressed={!isCalendarMode}
+                                    >
+                                        {/* 3 vertical columns icon — visually distinct from the
+                                            Catalog-mode chip's 2×2 squares, which matters on
+                                            mobile where both chips drop their labels. */}
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M3 4.5h4.5v15H3v-15ZM9.75 4.5h4.5v15h-4.5v-15ZM16.5 4.5H21v15h-4.5v-15Z" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => calendarAvailable && selectViewMode('calendar')}
+                                        class={`${viewModeChipClass(isCalendarMode)} ${!calendarAvailable ? 'opacity-50 hover:bg-transparent hover:text-w-sub' : ''}`}
+                                        title={calendarAvailable ? t('discover.view.calendar') : t('discover.view.calendarSeriesOnly')}
+                                        aria-label={calendarAvailable ? t('discover.view.calendar') : t('discover.view.calendarSeriesOnly')}
+                                        aria-pressed={isCalendarMode}
+                                        aria-disabled={!calendarAvailable}
+                                    >
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+                            </div>
                         </div>
-                        {!state.watchlistFilterEnabled && (
-                            <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                        {!state.watchlistFilterEnabled && catalogsForType.length > 1 && (
+                            <div class="mt-2">
+                                <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                            </div>
                         )}
                     </>
                 )}
@@ -1319,16 +1459,27 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 </div>
             )}
 
-            <ItemGrid
-                items={displayItems}
-                showBadges={showBadges}
-                userStatuses={state.userStatuses}
-                watchlistIds={state.watchlistIds}
-                onClick={cardClick}
-                onToggleWatched={handleToggleWatched}
-                onRate={handleOpenRating}
-                onToggleWatchlist={handleToggleWatchlist}
-            />
+            {isCalendarMode ? (
+                <CalendarView
+                    items={displayItems}
+                    client={client}
+                    watchlistIds={state.watchlistIds}
+                    onEpisodeClick={openEpisodeFromCalendar}
+                    onSeasonDropClick={openSeasonFromCalendar}
+                    onToggleWatchlist={handleToggleWatchlist}
+                />
+            ) : (
+                <ItemGrid
+                    items={displayItems}
+                    showBadges={showBadges}
+                    userStatuses={state.userStatuses}
+                    watchlistIds={state.watchlistIds}
+                    onClick={cardClick}
+                    onToggleWatched={handleToggleWatched}
+                    onRate={handleOpenRating}
+                    onToggleWatchlist={handleToggleWatchlist}
+                />
+            )}
 
             {!state.isSearchMode && !state.watchlistFilterEnabled && !state.catalogLoading && state.hasMore && state.items.length > 0 && (
                 <LoadMore onLoadMore={loadMore} />

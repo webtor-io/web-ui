@@ -82,7 +82,7 @@ export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
     const useGroups = groups.length > 1;
 
     return (
-        <div class="mt-2">
+        <div>
             <select
                 class="select select-sm bg-w-surface border-w-line text-w-text w-full sm:w-auto"
                 onChange={handleChange}

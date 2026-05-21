@@ -36,6 +36,15 @@ export function catalogChipClass(active, size = 'sm') {
         : `btn ${sizeClass} join-item btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan`;
 }
 
+// Neutral-themed icon-only chip used by the Grid/Calendar view switcher.
+// Square + label-less by design so it reads as secondary to the cyan/pink
+// mode toggle next to it. Active = filled surface, inactive = ghost.
+export function viewModeChipClass(active) {
+    return active
+        ? 'btn btn-sm btn-square join-item bg-w-surface border border-w-line text-w-text hover:bg-w-surface'
+        : 'btn btn-sm btn-square join-item btn-ghost border border-w-line text-w-sub hover:text-w-text';
+}
+
 // Dedup: modal restore logic used in two effects
 export function restoreModalFromUrl(id, url, openModalById, modalEpisodeRef) {
     if (modalEpisodeRef.current) {
