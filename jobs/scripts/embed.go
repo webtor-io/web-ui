@@ -182,7 +182,10 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 		i = s.findBestItem(l)
 	}
 	if i == nil {
-		return nil, errors.Wrap(err, "failed to find stream content")
+		// errors.Wrap(nil, ...) returns nil — every err != nil branch above
+		// already returned, so err is guaranteed nil here. Caller saw
+		// (nil, nil), dereferenced i.MediaFormat, panicked. See embed.go:124.
+		return nil, errors.New("failed to find stream content")
 	}
 	j.Done()
 	return
