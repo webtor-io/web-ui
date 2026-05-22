@@ -15,7 +15,15 @@ type smtpMailer struct {
 	port   int
 	user   string
 	pass   string
+	from   string
 	secure bool
+}
+
+func (m *smtpMailer) fromAddr() string {
+	if m.from != "" {
+		return m.from
+	}
+	return m.user
 }
 
 func (m *smtpMailer) Send(to, subject, body string) error {
@@ -25,7 +33,7 @@ func (m *smtpMailer) Send(to, subject, body string) error {
 	}
 
 	msg := gomail.NewMessage()
-	msg.SetHeader("From", m.user)
+	msg.SetHeader("From", m.fromAddr())
 	msg.SetHeader("To", to)
 	msg.SetHeader("Subject", subject)
 	msg.SetBody("text/html", body)

@@ -89,6 +89,7 @@ type Auth struct {
 	url                 string
 	smtpUser            string
 	smtpPass            string
+	smtpFrom            string
 	smtpSecure          bool
 	smtpHost            string
 	smtpPort            int
@@ -109,6 +110,7 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 		hasSupetokens:       c.String(SupertokensHostFlag) != "" && c.String(SupertokensPortFlag) != "",
 		smtpUser:            c.String(sv.SMTPUserFlag),
 		smtpPass:            c.String(sv.SMTPPassFlag),
+		smtpFrom:            c.String(sv.SMTPFromFlag),
 		smtpHost:            c.String(sv.SMTPHostFlag),
 		smtpSecure:          c.BoolT(sv.SMTPSecureFlag),
 		smtpPort:            c.Int(sv.SMTPPortFlag),
@@ -127,11 +129,15 @@ func (s *Auth) Init() error {
 	if !s.hasSupetokens {
 		return nil
 	}
+	fromEmail := s.smtpFrom
+	if fromEmail == "" {
+		fromEmail = s.smtpUser
+	}
 	smtpSettings := emaildelivery.SMTPSettings{
 		Host: s.smtpHost,
 		From: emaildelivery.SMTPFrom{
 			Name:  "Webtor",
-			Email: s.smtpUser,
+			Email: fromEmail,
 		},
 		Username: &s.smtpUser,
 		Port:     s.smtpPort,

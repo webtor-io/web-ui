@@ -19,6 +19,7 @@ var (
 	SMTPPassFlag      = "smtp-pass"
 	SMTPPortFlag      = "smtp-port"
 	SMTPSecureFlag    = "smtp-secure"
+	SMTPFromFlag      = "smtp-from"
 	UseDirectLinks    = "use-direct-links"
 	SessionSecretFlag = "secret"
 	DisableWebDAVFlag = "disable-webdav"
@@ -70,6 +71,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   SMTPSecureFlag,
 			Usage:  "smtp secure",
 			EnvVar: "SMTP_SECURE",
+		},
+		cli.StringFlag{
+			Name:   SMTPFromFlag,
+			Usage:  "smtp from address (falls back to smtp user if empty)",
+			EnvVar: "SMTP_FROM",
 		},
 		cli.BoolTFlag{
 			Name:   UseDirectLinks,

@@ -36,6 +36,7 @@ func New(c *cli.Context, db *pg.DB) *Service {
 			port:   c.Int(common.SMTPPortFlag),
 			user:   c.String(common.SMTPUserFlag),
 			pass:   c.String(common.SMTPPassFlag),
+			from:   c.String(common.SMTPFromFlag),
 			secure: c.Bool(common.SMTPSecureFlag),
 		},
 		domain:                c.String(common.DomainFlag),
