@@ -32,6 +32,12 @@ RUN go build -ldflags '-w -s -X google.golang.org/protobuf/reflect/protoregistry
 
 FROM alpine:3.21
 
+# ffmpeg powers the thumbnail-generation fallback (services/thumbnail).
+# Alpine's ffmpeg package brings in libavformat + libavcodec + libswscale
+# — adds ~80 MB to the image. Only the decode/encode-still-frame path is
+# used; we never transcode video here.
+RUN apk add --no-cache ffmpeg
+
 # set work dir
 WORKDIR /app
 

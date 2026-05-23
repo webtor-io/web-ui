@@ -13,7 +13,7 @@ import (
 
 func (s *Jobs) Action(c *web.Context, resourceID string, itemID string, action string, settings *m.StreamSettings, purge bool, vsud *m.VideoStreamUserData, forceSlow bool, debug string) (j *job.Job, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	as, id := scripts.Action(s.tb, s.api, s.i18n, s.userSubtitles, c, resourceID, itemID, action, settings, nil, vsud, s.warmup, s.grace, forceSlow, debug)
+	as, id := scripts.Action(s.tb, s.api, s.i18n, s.userSubtitles, s.thumbnail, c, resourceID, itemID, action, settings, nil, vsud, s.warmup, s.grace, forceSlow, debug)
 	j = s.q.GetOrCreate(action).Enqueue(ctx, cancel, id, as, purge, s.errorFormatter(c))
 	return
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
+	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -130,6 +131,21 @@ func (r *speedReader) Read(p []byte) (n int, err error) {
 		}
 	}
 	return
+}
+
+// mediaProbeDurationSec returns the probed duration rounded to whole
+// seconds, or 0 when the probe is missing or unparsable. Used as the
+// duration hint for thumbnail-frame selection — a 0 makes the
+// thumbnail service fall back to its blind 5-minute default.
+func mediaProbeDurationSec(mp *api.MediaProbe) int {
+	if mp == nil || mp.Format.Duration == "" {
+		return 0
+	}
+	d, err := strconv.ParseFloat(mp.Format.Duration, 64)
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return int(d)
 }
 
 func getVideoBitrate(mp *api.MediaProbe) int64 {
@@ -366,6 +382,33 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		log.Infof("got media probe %+v", mp)
 	}
 	j.Done()
+
+	// Step 2.5: Resource thumbnail — generate a poster preview for share
+	// links when the resource has no IMDb-matched poster. Sync so the
+	// thumbnail is guaranteed ready by the time the player loads; the
+	// service short-circuits on its existing-row check, so cached
+	// resources skip straight through. Runs after probe so the ffmpeg
+	// fallback can seek to ~25 % of duration instead of a blind 5 min.
+	if s.thumbnail.Enabled() {
+		j.InProgress(s.t("job.generatingThumbnail"))
+		durationSec := mediaProbeDurationSec(sc.MediaProbe)
+		tCtx, tCancel := context.WithTimeout(ctx, 2*time.Minute)
+		_, tErr := s.thumbnail.Generate(tCtx, c.ApiClaims, resourceID, durationSec)
+		tCancel()
+		if tErr != nil {
+			if errors.Is(tErr, thumb.ErrNoSource) {
+				j.Skip(s.t("job.generatingThumbnail"))
+			} else {
+				// Don't fail the stream over a preview — log + carry on.
+				// Share previews then fall back to the favicon.
+				log.WithError(tErr).WithField("resource_id", resourceID).
+					Warn("thumbnail generation failed")
+				j.Warn(tErr)
+			}
+		} else {
+			j.Done()
+		}
+	}
 
 	// Step 3: Bandwidth check.
 	//
@@ -719,6 +762,7 @@ type ActionScript struct {
 	c             *web.Context
 	i18n          *i18n.Service
 	userSubtitles *us.Service
+	thumbnail     *thumb.Service
 	resourceId    string
 	itemId        string
 	action        string
@@ -823,7 +867,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -875,6 +919,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			api:           api,
 			i18n:          i18nSvc,
 			userSubtitles: userSubtitles,
+			thumbnail:     thumbnailSvc,
 			c:             c,
 			resourceId:    resourceID,
 			itemId:        itemID,

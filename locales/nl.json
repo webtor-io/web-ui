@@ -418,6 +418,7 @@
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",
+    "job.generatingThumbnail": "voorbeeld genereren",
     "job.checkingBandwidth": "bandbreedte controleren",
     "job.loadingSubtitles": "OpenSubtitles laden",
     "job.waitingPlayer": "wachten op speler-initialisatie",

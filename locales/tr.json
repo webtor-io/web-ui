@@ -418,6 +418,7 @@
     "job.retrievingData": "kaynak verisi alınıyor",
     "job.retrievingStreamUrl": "stream URL'si alınıyor",
     "job.probingMedia": "içerik medya bilgisi inceleniyor",
+    "job.generatingThumbnail": "önizleme oluşturuluyor",
     "job.checkingBandwidth": "bant genişliği kontrol ediliyor",
     "job.loadingSubtitles": "OpenSubtitles yükleniyor",
     "job.waitingPlayer": "oynatıcı başlatılması bekleniyor",

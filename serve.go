@@ -56,6 +56,7 @@ import (
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	usv "github.com/webtor-io/web-ui/services/user_subtitle"
 	uvss "github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/vault"
@@ -119,6 +120,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
 	c.Flags = usv.RegisterFlags(c.Flags)
+	c.Flags = thumb.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -281,10 +283,16 @@ func serve(c *cli.Context) error {
 	// the feature as disabled.
 	userSubtitleSvc := usv.New(c, s3Cl, pg)
 
+	// Setting ThumbnailService — generates a resource preview at stream
+	// prep time when the resource has no IMDb-matched poster. Same nil-safe
+	// pattern as userSubtitleSvc: New returns nil when the bucket isn't
+	// configured, callers branch via Enabled().
+	thumbnailSvc := thumb.New(c, s3Cl, pg, sapi, cl)
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)
@@ -391,7 +399,7 @@ func serve(c *cli.Context) error {
 	discover_watchlist.RegisterHandler(r, pg, en)
 
 	// Setting Library
-	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en)
+	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en, thumbnailSvc)
 
 	// Setting UserSubtitle handler. When AWS_USER_SUBTITLE_BUCKET is not
 	// set the service is nil; RegisterHandler skips its routes and the UI

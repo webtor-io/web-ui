@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -37,10 +38,11 @@ type Handler struct {
 	cl                  *http.Client
 	s3Cl                *cs.S3Client
 	enricher            *enrich.Enricher
+	thumbnail           *thumbnail.Service
 	posterCacheS3Bucket string
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, pg *cs.PG, jobs *j.Jobs, cl *http.Client, s3Cl *cs.S3Client, en *enrich.Enricher) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, pg *cs.PG, jobs *j.Jobs, cl *http.Client, s3Cl *cs.S3Client, en *enrich.Enricher, thumb *thumbnail.Service) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("library/*").
 			WithHelper(helpers.NewStarsHelper()).
@@ -54,6 +56,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		cl:                  cl,
 		s3Cl:                s3Cl,
 		enricher:            en,
+		thumbnail:           thumb,
 		posterCacheS3Bucket: c.String(awsPosterCacheBucket),
 	}
 	lg := r.Group("/lib")
@@ -65,7 +68,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		AllowMethods: []string{"GET"},
 	}))
 	plg.GET("/:type/poster/:imdb_id/:file", h.poster)
-	plg.GET("/:type/og-image/:file", h.ogImage)
+	plg.GET("/og-image/:resource_id/:file", h.ogImage)
 	plg.GET("/episode/still/:video_id/:season/:episode/:file", h.still)
 	lg.POST("/add", h.add)
 	lg.POST("/remove", h.remove)

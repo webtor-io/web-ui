@@ -418,6 +418,7 @@
     "job.retrievingData": "pobieranie danych zasobu",
     "job.retrievingStreamUrl": "pobieranie URL strumienia",
     "job.probingMedia": "analizowanie informacji o mediach",
+    "job.generatingThumbnail": "generowanie podglądu",
     "job.checkingBandwidth": "sprawdzanie przepustowości",
     "job.loadingSubtitles": "ładowanie OpenSubtitles",
     "job.waitingPlayer": "oczekiwanie na inicjalizację odtwarzacza",

@@ -8,6 +8,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -68,6 +69,7 @@ type Jobs struct {
 	enricher      *enrich.Enricher
 	i18n          *i18n.Service
 	userSubtitles *us.Service
+	thumbnail     *thumbnail.Service
 	warmup        scripts.WarmupSettings
 	grace         scripts.GraceSettings
 }
@@ -87,7 +89,7 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 	}
 }
 
-func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service) *Jobs {
+func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service, thumb *thumbnail.Service) *Jobs {
 	return &Jobs{
 		q:             q,
 		tb:            tm,
@@ -95,6 +97,7 @@ func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api 
 		enricher:      enricher,
 		i18n:          i18nSvc,
 		userSubtitles: userSubtitles,
+		thumbnail:     thumb,
 		warmup: scripts.WarmupSettings{
 			TimeoutMin:          c.Int(warmupTimeoutMinFlag),
 			NoPeersTimeoutSec:   c.Int(warmupNoPeersTimeoutSecFlag),

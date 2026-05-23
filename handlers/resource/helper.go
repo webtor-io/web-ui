@@ -249,20 +249,17 @@ func (s *Helper) GetEnrichedPosterURL(gd *GetData) string {
 	return fmt.Sprintf("/lib/%s/poster/%s/480.jpg", ct, md.VideoID)
 }
 
-// GetEnrichedOGImageURL returns the absolute path for the 1200x630 OG-image
-// variant (poster centered on dark background). Used by og:image meta in
-// share previews — vertical 2:3 posters served raw get squished or
-// whitespace-padded by Telegram / iMessage / Twitter.
-func (s *Helper) GetEnrichedOGImageURL(gd *GetData) string {
-	md := s.getMetadata(gd)
-	if md == nil || md.VideoID == "" {
+// GetOGImageURL returns the path of the unified OG-image endpoint for
+// a resource. The handler itself picks the best available source
+// (IMDb poster first, then thumbnail, then a brand-default banner)
+// — the template never branches on which kind of preview exists, and
+// the URL is guaranteed to resolve (the brand banner is the safety
+// net so Telegram never caches a 404).
+func (s *Helper) GetOGImageURL(gd *GetData) string {
+	if gd == nil || gd.Resource == nil {
 		return ""
 	}
-	ct := "movie"
-	if gd.Series != nil {
-		ct = "series"
-	}
-	return fmt.Sprintf("/lib/%s/og-image/%s.jpg", ct, md.VideoID)
+	return fmt.Sprintf("/lib/og-image/%s/og.jpg", gd.Resource.ID)
 }
 
 func (s *Helper) IsEnrichedMovie(gd *GetData) bool {
