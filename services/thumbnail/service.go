@@ -65,14 +65,17 @@ const (
 	// opening sequence but well clear of act-two pivots.
 	ffmpegMaxOffsetSec = 600
 
-	// FFmpegTimeout bounds the worst-case ffmpeg invocation. A warm
-	// torrent + libavformat HTTP demuxer typically returns in <5s; 60s
-	// covers cold-cache + seek-heavy mkv files.
-	FFmpegTimeout = 60 * time.Second
+	// FFmpegTimeout bounds the worst-case ffmpeg invocation. Warm
+	// torrent + libavformat HTTP demuxer typically returns in 1-3 s;
+	// 15 s fits inside the 20 s overall budget set by streamContent
+	// while leaving room for image-file attempts that fail before this.
+	FFmpegTimeout = 15 * time.Second
 
-	// downloadHTTPTimeout bounds the image-file pull. Image files are
-	// small and the THP export URL is on-cluster, so this is generous.
-	downloadHTTPTimeout = 30 * time.Second
+	// downloadHTTPTimeout bounds the image-file pull. THP export URL is
+	// on-cluster and posters are small; 5 s is enough for a real fetch
+	// and short enough to leave the bulk of the budget for ffmpeg when
+	// image-file isn't viable.
+	downloadHTTPTimeout = 5 * time.Second
 )
 
 // preferredImageNames is a stem→priority map; lower numbers win. The

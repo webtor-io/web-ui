@@ -456,7 +456,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if s.thumbnail.Enabled() && (enrichedMD == nil || enrichedMD.PosterURL == "") {
 		j.InProgress(s.t("job.generatingThumbnail"))
 		durationSec := mediaProbeDurationSec(sc.MediaProbe)
-		tCtx, tCancel := context.WithTimeout(ctx, 2*time.Minute)
+		// Hard 20 s budget for the whole pipeline (image-file pull +
+		// optional ffmpeg fallback). The stream is already prepared
+		// downstream — if the preview is slow, we'd rather degrade to
+		// the brand banner than block the viewer behind a ~minute wait.
+		tCtx, tCancel := context.WithTimeout(ctx, 20*time.Second)
 		_, tErr := s.thumbnail.Generate(tCtx, c.ApiClaims, resourceID, durationSec)
 		tCancel()
 		if tErr != nil {
