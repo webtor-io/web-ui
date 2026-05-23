@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -30,6 +31,7 @@ var (
 type EmbedScript struct {
 	api      *api.Api
 	i18n     *i18n.Service
+	enricher *enrich.Enricher
 	settings *models.EmbedSettings
 	file     string
 	tb       template.Builder[*web.Context]
@@ -43,11 +45,12 @@ type EmbedAdsData struct {
 	DomainSettings *embed.DomainSettingsData
 }
 
-func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) *EmbedScript {
+func NewEmbedScript(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, enricher *enrich.Enricher, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) *EmbedScript {
 	return &EmbedScript{
 		c:        c,
 		api:      api,
 		i18n:     i18nSvc,
+		enricher: enricher,
 		settings: settings,
 		file:     file,
 		tb:       tb,
@@ -131,11 +134,13 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return err
 	}
 	vsud := models.NewVideoStreamUserData(id, i.ID, &s.settings.StreamSettings)
-	// Pass nil for user-subtitles and thumbnails: the embed flow
-	// intentionally omits the My Subtitles tab (no account context on
-	// third-party sites) and embed pages don't expose share previews,
-	// so neither service is needed.
-	as, _ := Action(s.tb, s.api, s.i18n, nil, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmup, GraceSettings{}, false, "")
+	// Pass nil for user-subtitles and thumbnails: the embed flow omits
+	// the My Subtitles tab (no account context on third-party sites)
+	// and the inline share button isn't surfaced in embed players, so
+	// neither service is needed. Enricher is plumbed through so the
+	// player overlay's title respects IMDb-matched metadata even on
+	// embed pages — falls back to the file basename when nil.
+	as, _ := Action(s.tb, s.api, s.i18n, nil, nil, s.enricher, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmup, GraceSettings{}, false, "")
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err
@@ -227,13 +232,13 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 	return
 }
 
-func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) (r job.Runnable, hash string, err error) {
+func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, enricher *enrich.Enricher, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings) (r job.Runnable, hash string, err error) {
 	geoHash := ""
 	if c.Geo != nil {
 		geoHash = c.Geo.Country
 	}
 	hourKey := time.Now().UTC().Format("2006010215")
 	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang)))
-	r = NewEmbedScript(tb, cl, c, api, i18nSvc, settings, file, dsd, warmup)
+	r = NewEmbedScript(tb, cl, c, api, i18nSvc, enricher, settings, file, dsd, warmup)
 	return
 }

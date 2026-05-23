@@ -189,6 +189,21 @@ func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID s
 		return nil, errors.Wrap(gErr, "ffmpeg-frame thumbnail failed")
 	}
 
+	// Audio-only torrent: try to pull the embedded album art (id3
+	// APIC frame for mp3, METADATA_BLOCK_PICTURE for flac, cover atom
+	// for m4a/aac). Most tagged music carries one, and it's the right
+	// thing to show in a share preview.
+	if aud := pickFirstAudio(items); aud != nil {
+		t, gErr := s.generateFromAudioEmbeddedArt(ctx, db, claims, resourceID, aud)
+		if gErr == nil {
+			return t, nil
+		}
+		// Missing-art failures aren't surprising — many encodes ship
+		// audio with no APIC. Log + degrade rather than bubbling.
+		log.WithError(gErr).WithField("resource_id", resourceID).
+			WithField("path", aud.PathStr).Info("audio embedded-art extraction failed")
+	}
+
 	return nil, ErrNoSource
 }
 
@@ -341,6 +356,23 @@ func pickFirstVideo(items []ra.ListItem) *ra.ListItem {
 	return best
 }
 
+// pickFirstAudio returns the largest audio item. Used only when the
+// torrent has no video at all — embedded album art on the longest
+// track is the best guess for the release-level cover image.
+func pickFirstAudio(items []ra.ListItem) *ra.ListItem {
+	var best *ra.ListItem
+	for i := range items {
+		it := &items[i]
+		if it.MediaFormat != ra.Audio {
+			continue
+		}
+		if best == nil || it.Size > best.Size {
+			best = it
+		}
+	}
+	return best
+}
+
 func (s *Service) generateFromImageFile(ctx context.Context, db *pg.DB, claims *api.Claims, resourceID string, item *ra.ListItem) (*models.Thumbnail, error) {
 	dlURL, err := s.downloadURLFor(ctx, claims, resourceID, item.ID)
 	if err != nil {
@@ -396,6 +428,46 @@ func (s *Service) generateFromFFmpegFrame(ctx context.Context, db *pg.DB, claims
 	w, h := decodeDimensions(data)
 	return s.store(ctx, db, resourceID, item.PathStr, offsetSec,
 		models.ThumbnailSourceFFmpegFrame, data, "jpg", w, h)
+}
+
+// generateFromAudioEmbeddedArt extracts the cover image embedded in
+// the audio file's tags via `ffmpeg -map 0:v?`. Works for id3v2 APIC
+// (mp3), METADATA_BLOCK_PICTURE (flac), and the cover atom in m4a/aac.
+// No -ss seek — embedded pictures are not in the audio timeline.
+func (s *Service) generateFromAudioEmbeddedArt(ctx context.Context, db *pg.DB, claims *api.Claims, resourceID string, item *ra.ListItem) (*models.Thumbnail, error) {
+	dlURL, err := s.downloadURLFor(ctx, claims, resourceID, item.ID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve audio download URL")
+	}
+
+	cctx, cancel := context.WithTimeout(ctx, FFmpegTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(cctx,
+		"ffmpeg",
+		"-loglevel", "error",
+		"-i", dlURL,
+		"-map", "0:v?", // optional video stream = embedded picture
+		"-frames:v", "1",
+		"-c:v", "mjpeg",
+		"-q:v", "3",
+		"-f", "image2pipe",
+		"-",
+	)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, errors.Wrapf(err, "ffmpeg failed: %s", strings.TrimSpace(stderr.String()))
+	}
+	if out.Len() == 0 {
+		return nil, errors.New("no embedded album art")
+	}
+	data := out.Bytes()
+	w, h := decodeDimensions(data)
+	return s.store(ctx, db, resourceID, item.PathStr, 0,
+		models.ThumbnailSourceAudioArt, data, "jpg", w, h)
 }
 
 // downloadURLFor pulls the `download` ExportItem for a torrent item.

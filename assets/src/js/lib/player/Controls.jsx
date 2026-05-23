@@ -1,4 +1,4 @@
-import { PlayIcon, PauseIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, EmbedIcon, ShareIcon } from './icons';
+import { PlayIcon, PauseIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, EmbedIcon } from './icons';
 import { ProgressBar } from './ProgressBar';
 import { TimeDisplay } from './TimeDisplay';
 import { VolumeControl } from './VolumeControl';
@@ -11,7 +11,7 @@ import { t } from './i18n';
 export function Controls({
     playing, currentTime, duration, volume, muted, fullscreen, buffered, seeking,
     onTogglePlay, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen,
-    onCaptionsClick, onEmbedClick, onShareClick, streamStarted,
+    onCaptionsClick, onEmbedClick,
     isVideo, features,
 }) {
     return (
@@ -62,12 +62,6 @@ export function Controls({
                     {features.embed && (
                         <button type="button" class="wt-player-btn" onClick={onEmbedClick} aria-label={t('player.embed')}>
                             <EmbedIcon />
-                        </button>
-                    )}
-
-                    {features.share && streamStarted && onShareClick && (
-                        <button type="button" class="wt-player-btn" onClick={onShareClick} aria-label={t('player.share')}>
-                            <ShareIcon />
                         </button>
                     )}
 

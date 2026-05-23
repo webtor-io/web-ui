@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/enrich"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
@@ -33,6 +35,11 @@ type StreamContent struct {
 	ExportTag           *ra.ExportTag
 	Resource            *ra.ResourceResponse
 	Item                *ra.ListItem
+	// Title is the leaf label the player overlay shows in its top bar.
+	// Prefer the played file's basename (without extension) when one
+	// is present, otherwise the torrent name. Computed server-side so
+	// the player JS doesn't have to scrape document.title.
+	Title               string
 	MediaProbe          *api.MediaProbe
 	OpenSubtitles       []api.OpenSubtitleTrack
 	UserSubtitles       []models.UserSubtitleTrack
@@ -131,6 +138,41 @@ func (r *speedReader) Read(p []byte) (n int, err error) {
 		}
 	}
 	return
+}
+
+// resourceLeafTitle picks the human label the player overlay shows.
+// Order:
+//   1. Enriched metadata title (e.g. "Sintel (2010)") — best UX for
+//      anything that matched IMDb/TMDB; survives sloppy filenames.
+//   2. File basename minus extension — fallback for un-enriched
+//      torrents; reflects what's actually playing in a multi-file pack.
+//   3. Torrent name — single-file no-Item case.
+//
+// Length-bounded extension trim (≤5 chars) avoids eating "Movie 2020.
+// Director's Cut" where the dot is meaningful.
+func resourceLeafTitle(md *models.VideoMetadata, r *ra.ResourceResponse, item *ra.ListItem) string {
+	if md != nil && md.Title != "" {
+		if md.Year != nil && *md.Year > 0 {
+			return fmt.Sprintf("%s (%d)", md.Title, *md.Year)
+		}
+		return md.Title
+	}
+	if item != nil {
+		name := item.Name
+		if name == "" {
+			name = filepath.Base(item.PathStr)
+		}
+		if name != "" && name != "." && name != "/" {
+			if ext := filepath.Ext(name); ext != "" && len(ext) <= 5 {
+				name = strings.TrimSuffix(name, ext)
+			}
+			return name
+		}
+	}
+	if r != nil {
+		return r.Name
+	}
+	return ""
 }
 
 // mediaProbeDurationSec returns the probed duration rounded to whole
@@ -334,6 +376,23 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	j.Done()
 	sc.ExportTag = exportResponse.ExportItems["stream"].Tag
 	sc.Item = &exportResponse.Source
+
+	// Pull persisted enrichment once — drives both the player overlay
+	// title (prefer "Movie Title (2020)" over "S01E03.mkv") and the
+	// thumbnail-skip decision below (no point regenerating a worse
+	// preview when an IMDb poster already exists). Apply localized
+	// title/plot in-place so non-EN viewers see the matching language.
+	var enrichedMD *models.VideoMetadata
+	if s.enricher != nil {
+		emdCtx, emdCancel := context.WithTimeout(ctx, 5*time.Second)
+		enrichedMD, _ = s.enricher.GetEnrichedResource(emdCtx, resourceID)
+		if enrichedMD != nil {
+			s.enricher.Localize(emdCtx, enrichedMD, c.Lang)
+		}
+		emdCancel()
+	}
+	sc.Title = resourceLeafTitle(enrichedMD, sc.Resource, sc.Item)
+
 	se := exportResponse.ExportItems["stream"]
 
 	var downloadSpeed float64
@@ -383,13 +442,18 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 
-	// Step 2.5: Resource thumbnail — generate a poster preview for share
-	// links when the resource has no IMDb-matched poster. Sync so the
+	// Step 2.5: Resource thumbnail — generate a share-preview poster
+	// when the resource has no IMDb-matched artwork. Sync so the
 	// thumbnail is guaranteed ready by the time the player loads; the
 	// service short-circuits on its existing-row check, so cached
 	// resources skip straight through. Runs after probe so the ffmpeg
 	// fallback can seek to ~25 % of duration instead of a blind 5 min.
-	if s.thumbnail.Enabled() {
+	//
+	// Skipped entirely (no UI row, no DB read) when enrichment already
+	// supplied a poster — IMDb-quality artwork wins over any image we
+	// could pull from the torrent or decode out of a video frame, and a
+	// flashing "skipped" badge for a step that does nothing is noise.
+	if s.thumbnail.Enabled() && (enrichedMD == nil || enrichedMD.PosterURL == "") {
 		j.InProgress(s.t("job.generatingThumbnail"))
 		durationSec := mediaProbeDurationSec(sc.MediaProbe)
 		tCtx, tCancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -400,7 +464,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				j.Skip(s.t("job.generatingThumbnail"))
 			} else {
 				// Don't fail the stream over a preview — log + carry on.
-				// Share previews then fall back to the favicon.
+				// Share previews then fall back to the brand banner.
 				log.WithError(tErr).WithField("resource_id", resourceID).
 					Warn("thumbnail generation failed")
 				j.Warn(tErr)
@@ -763,6 +827,7 @@ type ActionScript struct {
 	i18n          *i18n.Service
 	userSubtitles *us.Service
 	thumbnail     *thumb.Service
+	enricher      *enrich.Enricher
 	resourceId    string
 	itemId        string
 	action        string
@@ -867,7 +932,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -920,6 +985,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			i18n:          i18nSvc,
 			userSubtitles: userSubtitles,
 			thumbnail:     thumbnailSvc,
+			enricher:      enricher,
 			c:             c,
 			resourceId:    resourceID,
 			itemId:        itemID,

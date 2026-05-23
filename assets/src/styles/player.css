@@ -205,6 +205,95 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     padding: 0.625rem 0 0;
 }
 
+/* Top overlay — title (left) + share button (right). Visible
+   immediately, fades in/out with the bottom controls via the
+   .wt-player--controls-visible class on the container. Gradient
+   mirrors the bottom controls so the two overlays read as one
+   coherent treatment. */
+.wt-player-top-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    color: white;
+    /* Click-through gradient — the player container's onClick handles
+       play-toggle, the share button itself flips pointer-events back
+       to auto so its own click handler fires. */
+    pointer-events: none;
+}
+
+.wt-player--controls-visible .wt-player-top-overlay,
+.wt-player-top-overlay:hover {
+    opacity: 1;
+}
+
+/* Title fills the remaining space, share button sits at the end.
+   pointer-events re-enabled on interactive children so the gradient
+   itself stays click-through (clicks on the gradient toggle play, same
+   as elsewhere in the player). */
+.wt-player-top-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Padding-right keeps the ellipsis from butting against the share
+       button. Single positioning mechanism for layout — share uses
+       margin-left:auto, here we add a small visual gutter. */
+    padding-right: 0.5rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+}
+@media (max-width: 640px) {
+    .wt-player-top-title {
+        font-size: 0.875rem;
+    }
+}
+
+/* Compound selector bumps specificity past the .wt-player-btn block
+   that's declared later in the file (CSS source order would otherwise
+   reset our width/height/padding back to the small bottom-bar size). */
+.wt-player-top-overlay .wt-player-top-share {
+    flex: 0 0 auto;
+    pointer-events: auto;
+    margin-left: auto;
+    width: 3.5rem;
+    height: 3.5rem;
+    /* Padding matches the bottom-bar buttons (.wt-player-btn 0.375rem)
+       so the visible icon's right edge lines up with the right-group
+       icons in the controls row — the two overlays share the same
+       0.75rem container padding, so identical button padding gives
+       identical visual gutters. */
+    padding: 0.375rem;
+    color: white;
+}
+.wt-player-top-overlay .wt-player-top-share svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Mobile — desktop overlay size is intentionally chunky for desktop
+   click targets, but on phone screens it dominates the top bar. Drop
+   the button ~30 % at narrow viewports while keeping padding
+   proportional so the icon stays visually centred. */
+@media (max-width: 640px) {
+    .wt-player-top-overlay .wt-player-top-share {
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0.375rem;
+    }
+}
+
 /* Controls row */
 .wt-player-controls-row {
     display: flex;

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"image"
-	"image/color"
 	"image/jpeg"
 	"io"
 	"net/http"
@@ -31,15 +30,14 @@ import (
 const (
 	ogImageWidth       = 1200
 	ogImageHeight      = 630
-	ogImageInnerH      = 560 // ~35 px padding around vertical sources
-	ogImageInnerWPad   = 80  // padding around landscape sources
 	ogImageJPEGQuality = 85
-)
 
-// ogImageBgColor — single dark fill matching the resource-page header
-// card. `image/draw` ships no gradient brush and a real gradient is
-// disproportionate effort for static decorative background.
-var ogImageBgColor = color.NRGBA{R: 0x14, G: 0x12, B: 0x1E, A: 0xFF}
+	// Stained-glass background tuning. Sigma 30 dissolves any recognisable
+	// detail while keeping colour. Darkening -25 holds the foreground
+	// readable on bright posters without crushing dark scenes.
+	ogImageBgBlurSigma = 30.0
+	ogImageBgDarken    = -25.0
+)
 
 // ogImage serves the OG-preview canvas for a resource. The handler
 // picks the best available source in a fixed order — IMDb-matched
@@ -89,10 +87,24 @@ func (s *Handler) ogImage(c *gin.Context) {
 		src = s.defaultOGSource()
 	}
 
-	b, err := s.getOGFromCache(ctx, src.cacheKey)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to read og cache"))
-		return
+	// ?force=1 skips the cache read and rewrites the cached object —
+	// dev/QA escape hatch for picking up a composition tweak without
+	// waiting for the natural cache miss or purging S3 by hand. Gated
+	// to non-release modes so prod can't be DoS'd by burning Lanczos +
+	// Gaussian-blur + S3-PUT cycles on demand.
+	force := false
+	if gin.Mode() != gin.ReleaseMode {
+		q := c.Query("force")
+		force = q != "" && q != "0" && q != "false"
+	}
+
+	var b *bytes.Buffer
+	if !force {
+		b, err = s.getOGFromCache(ctx, src.cacheKey)
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to read og cache"))
+			return
+		}
 	}
 	if b == nil {
 		b, err = src.render(ctx, s)
@@ -130,23 +142,24 @@ type ogSource struct {
 
 // resolveOGSource picks the best available source for a resource.
 // Order: IMDb poster (movie → series) > per-resource thumbnail. nil
-// when nothing usable exists — caller returns 404. Pure lookup; no
-// fetches or composing here.
+// when nothing usable exists — caller falls through to the brand
+// banner. Pure lookup; no fetches or composing here.
+//
+// The plain GetMoviesByResourceID/GetSeriesByResourceID variants do
+// NOT preload metadata — m.GetMetadata() returns nil for them. We use
+// the *WithMetadata loaders so the poster URL is actually present on
+// the returned row. See handlers/resource/get.go for the same pattern.
 func (s *Handler) resolveOGSource(ctx context.Context, db *pg.DB, resourceID string) (*ogSource, error) {
-	if movies, err := models.GetMoviesByResourceID(ctx, db, resourceID); err == nil {
-		for _, m := range movies {
-			md := m.GetMetadata()
-			if md != nil && md.PosterURL != "" && md.VideoID != "" {
-				return s.posterSource(md.VideoID, "movie", md.PosterURL), nil
-			}
+	if movie, err := models.GetMovieWithMetadataByResourceID(ctx, db, resourceID); err == nil && movie != nil {
+		md := movie.GetMetadata()
+		if md != nil && md.PosterURL != "" && md.VideoID != "" {
+			return s.posterSource(md.VideoID, "movie", md.PosterURL), nil
 		}
 	}
-	if series, err := models.GetSeriesByResourceID(ctx, db, resourceID); err == nil {
-		for _, ss := range series {
-			md := ss.GetMetadata()
-			if md != nil && md.PosterURL != "" && md.VideoID != "" {
-				return s.posterSource(md.VideoID, "series", md.PosterURL), nil
-			}
+	if series, err := models.GetSeriesWithMetadataByResourceID(ctx, db, resourceID); err == nil && series != nil {
+		md := series.GetMetadata()
+		if md != nil && md.PosterURL != "" && md.VideoID != "" {
+			return s.posterSource(md.VideoID, "series", md.PosterURL), nil
 		}
 	}
 	if s.thumbnail != nil && s.thumbnail.Enabled() {
@@ -238,26 +251,48 @@ func (s *Handler) thumbnailSource(t *models.Thumbnail) *ogSource {
 	}
 }
 
-// composeOGCanvas wraps a source image in the 1200x630 dark canvas.
-// Vertical (poster-shaped) sources get fit-by-height; landscape
-// sources get fit-by-width with horizontal padding so a wide
-// ffmpeg-frame doesn't push past the canvas edges.
+// composeOGCanvas wraps a source image in the 1200x630 OG canvas.
+// Two layers:
+//
+//  1. Background — the same source scaled to FILL the canvas (cropping
+//     the long axis), then heavily blurred and darkened. Vertical
+//     posters end up with a soft "stained-glass" ambient backdrop in
+//     the same hue as the artwork — far better than a flat dark fill,
+//     and the technique platforms like Spotify and Netflix use.
+//  2. Foreground — the source fit to either the inner height (vertical
+//     sources) or width (landscape sources), centered. Landscape sources
+//     fill the canvas almost edge-to-edge, so the blurred background is
+//     barely visible — keeps the look consistent without special cases.
+//
+// Single dark-fill fallback (ogImageBgColor) is no longer used: even
+// the brand-default banner gets the blurred treatment so all three
+// source kinds (poster / thumbnail / default) produce the same look.
 func composeOGCanvas(srcImg image.Image) (*bytes.Buffer, error) {
+	// Foreground — fit edge-to-edge against the longest axis (no padding).
+	// Vertical posters cover the full 630 px height; landscape sources
+	// cover the full 1200 px width. The blurred background fills whatever
+	// the foreground doesn't.
 	srcW := srcImg.Bounds().Dx()
 	srcH := srcImg.Bounds().Dy()
-	var fit image.Image
+	var fg image.Image
 	if srcH >= srcW {
-		fit = imaging.Resize(srcImg, 0, ogImageInnerH, imaging.Lanczos)
+		fg = imaging.Resize(srcImg, 0, ogImageHeight, imaging.Lanczos)
 	} else {
-		fit = imaging.Resize(srcImg, ogImageWidth-ogImageInnerWPad*2, 0, imaging.Lanczos)
+		fg = imaging.Resize(srcImg, ogImageWidth, 0, imaging.Lanczos)
 	}
-	pw := fit.Bounds().Dx()
-	ph := fit.Bounds().Dy()
 
-	canvas := imaging.New(ogImageWidth, ogImageHeight, ogImageBgColor)
+	// Background — fill + blur + darken. Fill (not Fit) intentionally
+	// crops the source so the canvas has zero transparent pixels; the
+	// foreground sits on top to show the full art.
+	bg := imaging.Fill(srcImg, ogImageWidth, ogImageHeight, imaging.Center, imaging.Linear)
+	bg = imaging.Blur(bg, ogImageBgBlurSigma)
+	bg = imaging.AdjustBrightness(bg, ogImageBgDarken)
+
+	pw := fg.Bounds().Dx()
+	ph := fg.Bounds().Dy()
 	x := (ogImageWidth - pw) / 2
 	y := (ogImageHeight - ph) / 2
-	canvas = imaging.Overlay(canvas, fit, image.Pt(x, y), 1.0)
+	canvas := imaging.Overlay(bg, fg, image.Pt(x, y), 1.0)
 
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, canvas, &jpeg.Options{Quality: ogImageJPEGQuality}); err != nil {

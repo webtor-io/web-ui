@@ -5,7 +5,7 @@ import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { Controls } from './Controls';
-import { LoadingSpinner } from './icons';
+import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
 import { shareResource } from '../share/share';
 import '../../../styles/player.css';
@@ -34,7 +34,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const isSession = !!sessionId;
     const graceDurationSec = videoEl.dataset.graceDurationSec ? parseInt(videoEl.dataset.graceDurationSec, 10) : 0;
     const graceShownRef = useRef(false);
-    const [streamStarted, setStreamStarted] = useState(false);
+    // streamStarted is tracked via a ref, not state — the value is only
+    // read to gate the one-shot Umami event below, never to drive UI, so
+    // a re-render on transition would be pure overhead.
     const streamStartFiredRef = useRef(false);
     const poster = videoEl.getAttribute('poster');
     const resourceID = videoEl.dataset.resourceId;
@@ -135,14 +137,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // Stream-start Umami event — fires once per player session when playback
     // actually advances past 5s (real engagement, not just press-play-and-bounce).
-    // Gates the in-player share button (Controls reads `streamStarted` prop) and
-    // is the canonical denominator for share-rate analysis (share-resource events
-    // divided by stream-start sessions).
+    // Canonical denominator for share-rate analysis (share-resource events
+    // divided by stream-start sessions). No UI gating; the in-player share
+    // button is always visible.
     useEffect(() => {
         if (streamStartFiredRef.current) return;
         if (state.currentTime < 5) return;
         streamStartFiredRef.current = true;
-        setStreamStarted(true);
         if (window.umami) window.umami.track('stream-start', {
             isVideo,
             isSession,
@@ -347,8 +348,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // In-player share click — same handler as the header button (see
     // assets/src/js/lib/share/share.js), tagged `location:'player'` so we
     // can A/B which placement converts better.
+    //
+    // Use the explicit `data-share-url` baked into the <video> by the
+    // server (always points at the resource page on webtor.io). On the
+    // resource page this equals window.location.href; on embed players
+    // it sends the recipient to the real resource page, not the iframe
+    // URL on the embedding site.
     const handleShareClick = useCallback(() => {
-        shareResource({ location: 'player' });
+        shareResource({
+            location: 'player',
+            url: videoEl?.dataset?.shareUrl,
+        });
     }, []);
 
     // Click on video to toggle play (video only).
@@ -458,14 +468,44 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onToggleFullscreen={state.toggleFullscreen}
                     onCaptionsClick={handleCaptionsClick}
                     onEmbedClick={handleEmbedClick}
-                    onShareClick={handleShareClick}
-                    streamStarted={streamStarted}
                     isVideo={isVideo}
                     features={features}
                 />
             )}
+
+            {/* Top-right share affordance — visible immediately, fades with
+                the controls. Title on the left, share icon on the right.
+                The title comes from data-resource-title when provided by
+                the template, else from document.title stripped of the
+                " | Webtor.io" site-suffix that layouts/main.html appends. */}
+            {showControls && isVideo && features.share && (() => {
+                const title = getResourceTitle(videoEl);
+                // Overlay container has pointer-events:none in CSS so the
+                // gradient stays click-through (clicks land on the video
+                // for play-toggle). Only the share button needs explicit
+                // stopPropagation — its own pointer-events:auto means it
+                // captures the click before it can reach video.
+                return (
+                    <div class="wt-player-top-overlay">
+                        {title && <div class="wt-player-top-title" title={title}>{title}</div>}
+                        <button type="button" class="wt-player-btn wt-player-top-share" onClick={(e) => { e.stopPropagation(); handleShareClick(); }} aria-label={t('player.share')}>
+                            <ShareIcon />
+                        </button>
+                    </div>
+                );
+            })()}
         </>
     );
+}
+
+// getResourceTitle pulls the leaf label for the top overlay.
+// Server computes the right title (file basename minus extension,
+// falling back to the torrent name) in jobs/scripts/action.go
+// resourceLeafTitle() and passes it via data-resource-title on the
+// <video>. Empty string when the attribute is missing — the overlay
+// renders without a label rather than mis-parsing document.title.
+function getResourceTitle(videoEl) {
+    return videoEl?.dataset?.resourceTitle || '';
 }
 
 function formatTime(seconds) {
@@ -478,6 +518,7 @@ function formatTime(seconds) {
 }
 
 function parseFeatures(settings, isVideo, duration, isSession) {
+    const adsOn = !!(window._domainSettings && window._domainSettings.ads === true);
     const defaults = {
         playpause: true,
         progress: true,
@@ -487,16 +528,22 @@ function parseFeatures(settings, isVideo, duration, isSession) {
         fullscreen: isVideo,
         chromecast: isVideo,
         embed: isVideo,
-        // In-player share button — same handler as the header button, fires
-        // share-resource Umami with location:'player'. Visible only after
-        // stream-start (gated in Controls). Embed contexts can opt out via
-        // settings.features.share=false.
+        // In-player share button — same handler as the header button,
+        // fires share-resource Umami with location:'player'. Treated as
+        // a growth feature: locked on for ads-enabled (free) embed
+        // domains, so the override loop below ignores settings.features.share
+        // unless the domain has earned NoAds (paid tier). On the resource
+        // page itself there's no _domainSettings, so adsOn is false and
+        // the override is always honoured.
         share: true,
         availableprogress: duration > 0 && !isSession,
-        logo: !!(window._domainSettings && window._domainSettings.ads === true),
+        logo: adsOn,
     };
     if (settings && settings.features) {
         for (const name in settings.features) {
+            // Growth-feature lock: settings can only disable share when
+            // the host domain isn't already paying us back via ads.
+            if (name === 'share' && adsOn) continue;
             defaults[name] = settings.features[name];
         }
     }

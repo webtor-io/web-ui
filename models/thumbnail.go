@@ -18,6 +18,7 @@ type ThumbnailSourceKind int16
 const (
 	ThumbnailSourceImageFile   ThumbnailSourceKind = 1
 	ThumbnailSourceFFmpegFrame ThumbnailSourceKind = 2
+	ThumbnailSourceAudioArt    ThumbnailSourceKind = 3
 )
 
 type Thumbnail struct {

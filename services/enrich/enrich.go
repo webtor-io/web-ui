@@ -642,6 +642,37 @@ func (s *Enricher) LookupByVideoID(ctx context.Context, videoID string, ct model
 	return nil, nil
 }
 
+// GetEnrichedResource returns the persisted enrichment metadata
+// (movie first, then series) for a torrent's resource_id, or nil when
+// no enrichment row exists yet. Lightweight read — does not trigger
+// mapper calls or the AI fallback. Used by the stream-prep flow to:
+//
+//   - pick the player-overlay title (prefer enriched movie/series
+//     name over the raw file basename)
+//   - skip thumbnail generation when an IMDb poster is already in
+//     place (no point regenerating a worse-quality preview)
+//
+// Callers that need richer fields (episodes, year, plot) should keep
+// reaching for the model loaders directly; this helper intentionally
+// returns only the shared VideoMetadata for cheap, hot-path lookups.
+func (s *Enricher) GetEnrichedResource(ctx context.Context, resourceID string) (*models.VideoMetadata, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+	if movie, err := models.GetMovieWithMetadataByResourceID(ctx, db, resourceID); err == nil && movie != nil {
+		if md := movie.GetMetadata(); md != nil {
+			return md, nil
+		}
+	}
+	if series, err := models.GetSeriesWithMetadataByResourceID(ctx, db, resourceID); err == nil && series != nil {
+		if md := series.GetMetadata(); md != nil {
+			return md, nil
+		}
+	}
+	return nil, nil
+}
+
 // LookupByTitleYear iterates through configured metadata mappers (TMDB, OMDB,
 // Kinopoisk, ...) and returns the first matching video metadata for the given
 // title and optional year.
