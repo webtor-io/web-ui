@@ -304,6 +304,7 @@
     "resource.series": "Series",
     "resource.torrent": "Torrent",
     "resource.share": "Share",
+    "resource.ogShareTagline": "Watch in your browser — no download, no install.",
     "resource.copy": "Copy",
     "resource.close": "Close",
     "resource.linkCopied": "Link copied!",

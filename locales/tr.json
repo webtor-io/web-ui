@@ -288,6 +288,7 @@
     "resource.series": "Dizi",
     "resource.torrent": "Torrent",
     "resource.share": "Paylaş",
+    "resource.ogShareTagline": "Tarayıcınızda izleyin — indirme ve kurulum yok.",
     "resource.copy": "Kopyala",
     "resource.close": "Kapat",
     "resource.linkCopied": "Link kopyalandı!",

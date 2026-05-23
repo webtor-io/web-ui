@@ -288,6 +288,7 @@
     "resource.series": "Сериал",
     "resource.torrent": "Торрент",
     "resource.share": "Поделиться",
+    "resource.ogShareTagline": "Смотрите в браузере — без скачивания и установки.",
     "resource.copy": "Копировать",
     "resource.close": "Закрыть",
     "resource.linkCopied": "Ссылка скопирована!",

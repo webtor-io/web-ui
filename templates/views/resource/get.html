@@ -21,11 +21,14 @@
     {{ if . | hasEnrichment }}
     <meta property="og:type" content="{{ if . | isEnrichedMovie }}video.movie{{ else }}video.tv_show{{ end }}">
     <meta property="og:title" content="{{ . | getEnrichedTitle }}{{ if . | hasEnrichedYear }} ({{ . | getEnrichedYear }}){{ end }} | Webtor.io">
-    {{ $plot := . | getEnrichedPlot }}{{ if $plot }}<meta property="og:description" content="{{ $plot }}">{{ end }}
-    {{ if . | hasEnrichedPoster }}<meta property="og:image" content="{{ domain }}{{ . | getEnrichedPosterURL }}">{{ end }}
+    {{ $plot := . | getEnrichedPlot }}{{ if $plot }}<meta property="og:description" content="{{ $plot }}">{{ else }}<meta property="og:description" content="{{ t $.Lang "resource.ogShareTagline" }}">{{ end }}
+    {{ if . | hasEnrichedPoster }}<meta property="og:image" content="{{ domain }}{{ . | getEnrichedOGImageURL }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">{{ end }}
     {{ else }}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ .Resource.Name }} | Webtor.io">
+    <meta property="og:description" content="{{ t $.Lang "resource.ogShareTagline" }}">
     <meta property="og:image" content="{{ domain }}/assets/night/favicon.svg">
     {{ end }}
     {{ end }}

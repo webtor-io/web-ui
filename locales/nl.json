@@ -288,6 +288,7 @@
     "resource.series": "Serie",
     "resource.torrent": "Torrent",
     "resource.share": "Delen",
+    "resource.ogShareTagline": "Bekijk in je browser — geen download, geen installatie.",
     "resource.copy": "Kopiëren",
     "resource.close": "Sluiten",
     "resource.linkCopied": "Link gekopieerd!",

@@ -249,6 +249,22 @@ func (s *Helper) GetEnrichedPosterURL(gd *GetData) string {
 	return fmt.Sprintf("/lib/%s/poster/%s/480.jpg", ct, md.VideoID)
 }
 
+// GetEnrichedOGImageURL returns the absolute path for the 1200x630 OG-image
+// variant (poster centered on dark background). Used by og:image meta in
+// share previews — vertical 2:3 posters served raw get squished or
+// whitespace-padded by Telegram / iMessage / Twitter.
+func (s *Helper) GetEnrichedOGImageURL(gd *GetData) string {
+	md := s.getMetadata(gd)
+	if md == nil || md.VideoID == "" {
+		return ""
+	}
+	ct := "movie"
+	if gd.Series != nil {
+		ct = "series"
+	}
+	return fmt.Sprintf("/lib/%s/og-image/%s.jpg", ct, md.VideoID)
+}
+
 func (s *Helper) IsEnrichedMovie(gd *GetData) bool {
 	return gd.Movie != nil && gd.Movie.GetMetadata() != nil
 }
