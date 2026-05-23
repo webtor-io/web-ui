@@ -449,6 +449,7 @@
     "player.exitFullscreen": "Exit Fullscreen",
     "player.subtitlesAndAudio": "Subtitles & Audio",
     "player.embed": "Embed",
+    "player.share": "Share",
     "player.copied": "Copied!",
     "player.continueFrom": "Continue from %v",
     "player.startOver": "Start from beginning",

@@ -7,6 +7,7 @@ import { createSessionSeeker } from './session-seek';
 import { Controls } from './Controls';
 import { LoadingSpinner } from './icons';
 import { init as initI18n, t, tf } from './i18n';
+import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 
 let _currentPlayer = null;
@@ -33,6 +34,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const isSession = !!sessionId;
     const graceDurationSec = videoEl.dataset.graceDurationSec ? parseInt(videoEl.dataset.graceDurationSec, 10) : 0;
     const graceShownRef = useRef(false);
+    const [streamStarted, setStreamStarted] = useState(false);
+    const streamStartFiredRef = useRef(false);
     const poster = videoEl.getAttribute('poster');
     const resourceID = videoEl.dataset.resourceId;
     const path = videoEl.dataset.path;
@@ -129,6 +132,23 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => {
         if (!state.playing) setControlsVisible(true);
     }, [state.playing]);
+
+    // Stream-start Umami event — fires once per player session when playback
+    // actually advances past 5s (real engagement, not just press-play-and-bounce).
+    // Gates the in-player share button (Controls reads `streamStarted` prop) and
+    // is the canonical denominator for share-rate analysis (share-resource events
+    // divided by stream-start sessions).
+    useEffect(() => {
+        if (streamStartFiredRef.current) return;
+        if (state.currentTime < 5) return;
+        streamStartFiredRef.current = true;
+        setStreamStarted(true);
+        if (window.umami) window.umami.track('stream-start', {
+            isVideo,
+            isSession,
+            resourceID: resourceID || '',
+        });
+    }, [state.currentTime, isVideo, isSession, resourceID]);
 
     // Grace soft CTA — fires once when movie-time crosses the grace window.
     // The popup is server-rendered by the action template (stream_video.html)
@@ -324,6 +344,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (checkbox) checkbox.checked = !checkbox.checked;
     }, []);
 
+    // In-player share click — same handler as the header button (see
+    // assets/src/js/lib/share/share.js), tagged `location:'player'` so we
+    // can A/B which placement converts better.
+    const handleShareClick = useCallback(() => {
+        shareResource({ location: 'player' });
+    }, []);
+
     // Click on video to toggle play (video only).
     // Use ref for showResumePrompt to avoid re-registering native DOM listeners.
     const showResumePromptRef = useRef(false);
@@ -431,6 +458,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onToggleFullscreen={state.toggleFullscreen}
                     onCaptionsClick={handleCaptionsClick}
                     onEmbedClick={handleEmbedClick}
+                    onShareClick={handleShareClick}
+                    streamStarted={streamStarted}
                     isVideo={isVideo}
                     features={features}
                 />
@@ -458,6 +487,11 @@ function parseFeatures(settings, isVideo, duration, isSession) {
         fullscreen: isVideo,
         chromecast: isVideo,
         embed: isVideo,
+        // In-player share button — same handler as the header button, fires
+        // share-resource Umami with location:'player'. Visible only after
+        // stream-start (gated in Controls). Embed contexts can opt out via
+        // settings.features.share=false.
+        share: true,
         availableprogress: duration > 0 && !isSession,
         logo: !!(window._domainSettings && window._domainSettings.ads === true),
     };

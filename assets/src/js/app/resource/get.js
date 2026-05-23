@@ -1,4 +1,5 @@
 import av from '../../lib/av';
+import '../../lib/share/share';
 av( async function() {
     if (window._ads !== undefined && window._sessionExpired !== true) {
         const renderAd = (await import('../../lib/ads')).default;
