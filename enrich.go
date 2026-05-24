@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"net/http"
+	"sync/atomic"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/webtor-io/web-ui/models"
 	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	"github.com/webtor-io/web-ui/services/api"
@@ -174,15 +178,58 @@ func enrich(c *cli.Context) error {
 		}
 		log.WithField("count", len(hashes)).WithField("force", force).
 			Info("metadata-only backfill: classifying resources")
-		for _, h := range hashes {
-			if mdErr := en.EnsureResourceMetadata(ctx, h, &api.Claims{}); mdErr != nil {
-				// Per-resource failures are non-fatal so one bad hash
-				// (e.g. torrent-store dropped the item) doesn't abort
-				// the whole sweep.
-				log.WithError(mdErr).WithField("hash", h).
-					Warn("metadata-only backfill: classify failed")
+
+		// 10 concurrent workers — most of the per-resource cost is a
+		// gRPC round-trip to rest-api → torrent-store for the item
+		// listing, so the loop is I/O-bound, not CPU-bound. Sequential
+		// is 4 resources/minute (≈ 55 days for a 320k catalog); 10
+		// parallel takes that to ~5 days conservatively, ~hours when
+		// stoplist purges sweep ahead of legitimate-fetch latency.
+		// Tuning ceiling: rest-api / abuse-store gRPC pools can handle
+		// 50+, but 10 leaves headroom under production traffic.
+		const workers = 10
+		g, gctx := errgroup.WithContext(ctx)
+		g.SetLimit(workers)
+
+		var done, failed atomic.Int64
+		progressTicker := time.NewTicker(60 * time.Second)
+		progressDone := make(chan struct{})
+		go func() {
+			defer close(progressDone)
+			for {
+				select {
+				case <-progressTicker.C:
+					log.WithFields(log.Fields{
+						"done":   done.Load(),
+						"total":  len(hashes),
+						"failed": failed.Load(),
+					}).Info("metadata-only backfill: progress")
+				case <-gctx.Done():
+					return
+				}
 			}
+		}()
+
+		for _, h := range hashes {
+			h := h // capture
+			g.Go(func() error {
+				if mdErr := en.EnsureResourceMetadata(gctx, h, &api.Claims{}); mdErr != nil {
+					failed.Add(1)
+					log.WithError(mdErr).WithField("hash", h).
+						Warn("metadata-only backfill: classify failed")
+				}
+				done.Add(1)
+				return nil
+			})
 		}
+		_ = g.Wait()
+		progressTicker.Stop()
+		<-progressDone
+		log.WithFields(log.Fields{
+			"done":   done.Load(),
+			"total":  len(hashes),
+			"failed": failed.Load(),
+		}).Info("metadata-only backfill: done")
 		return nil
 	}
 
