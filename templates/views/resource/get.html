@@ -166,7 +166,7 @@
     </div>
     {{ else }}
     <!-- Fallback: plain torrent header card -->
-    <div class="relative overflow-hidden rounded-2xl p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
+    <div class="relative overflow-hidden rounded-2xl p-4 sm:p-6 mb-4 bg-gradient-to-br from-w-pink/10 via-base-300/50 to-base-300/50 border border-w-pink/20">
         <div class="absolute top-0 right-0 w-40 h-40 bg-w-pink/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         <dialog id="share-dialog" class="modal" data-link-copied-text="{{ t $.Lang "resource.linkCopied" }}">
             <div class="modal-box max-w-sm bg-w-card border border-w-line">
@@ -181,39 +181,54 @@
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
-        <div class="relative">
-            <div class="flex items-center gap-2">
-                <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-2 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
-                <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
-                    </svg>
-                </button>
+        <div class="relative flex gap-3 sm:gap-5">
+            <!-- Poster slot: shows the per-resource thumbnail when one
+                 exists (generated during stream/download), otherwise the
+                 onerror handler hides the <img> and the gradient
+                 placeholder underneath shows through. Same picture as
+                 the OG share preview, so a visitor arriving via a
+                 shared link sees consistent artwork. -->
+            <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+                    <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ .Resource.Name }}</div>
+                </div>
+                <img src="{{ getResourcePosterURL . 480 }}" alt="{{ .Resource.Name }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                     onerror="this.remove()">
             </div>
-            {{ if .TorrentStatus }}
-            <div class="mb-4">
-                <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
-                    <span id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</span>
-                    {{ "resource/status.js" | asset }}
-                </div>
-            </div>
-            {{ end }}
-            <div class="flex flex-wrap items-center gap-2">
-                <div id="pledge-button" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
-                    {{ if .Vault }}
-                        {{ template "vault/button" (withContext $ .VaultButton) }}
-                    {{ end }}
-                </div>
-                <div id="library-button" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
-                    {{ template "library/button" (withContext $ .Resource) }}
-                </div>
-                <div class="ml-auto">
-                    <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-2 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+                    <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
                         </svg>
-                        .torrent
-                    </a>
+                    </button>
+                </div>
+                {{ if .TorrentStatus }}
+                <div class="mb-4">
+                    <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
+                        <span id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</span>
+                        {{ "resource/status.js" | asset }}
+                    </div>
+                </div>
+                {{ end }}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
+                        {{ if .Vault }}
+                            {{ template "vault/button" (withContext $ .VaultButton) }}
+                        {{ end }}
+                    </div>
+                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
+                        {{ template "library/button" (withContext $ .Resource) }}
+                    </div>
+                    <div class="sm:ml-auto shrink-0">
+                        <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            .torrent
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

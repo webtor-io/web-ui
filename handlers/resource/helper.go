@@ -249,17 +249,29 @@ func (s *Helper) GetEnrichedPosterURL(gd *GetData) string {
 	return fmt.Sprintf("/lib/%s/poster/%s/480.jpg", ct, md.VideoID)
 }
 
-// GetOGImageURL returns the path of the unified OG-image endpoint for
-// a resource. The handler itself picks the best available source
-// (IMDb poster first, then thumbnail, then a brand-default banner)
-// — the template never branches on which kind of preview exists, and
-// the URL is guaranteed to resolve (the brand banner is the safety
-// net so Telegram never caches a 404).
+// GetOGImageURL returns the path of the unified poster endpoint in OG
+// canvas mode. The handler picks the best available source (IMDb
+// poster first, then thumbnail, then a brand-default banner) — the
+// template never branches on which kind of preview exists, and the
+// URL is guaranteed to resolve (brand banner is the safety net so
+// Telegram never caches a 404).
 func (s *Helper) GetOGImageURL(gd *GetData) string {
 	if gd == nil || gd.Resource == nil {
 		return ""
 	}
-	return fmt.Sprintf("/lib/og-image/%s/og.jpg", gd.Resource.ID)
+	return fmt.Sprintf("/lib/poster/%s/og.jpg", gd.Resource.ID)
+}
+
+// GetResourcePosterURL returns the path of the unified poster endpoint
+// in resize mode at the given width. Used by the resource page header
+// to show the same image visitors see in a shared preview — IMDb
+// poster, generated thumbnail, or nothing (handler returns 404 and
+// the template's CSS placeholder takes over).
+func (s *Helper) GetResourcePosterURL(gd *GetData, width int) string {
+	if gd == nil || gd.Resource == nil {
+		return ""
+	}
+	return fmt.Sprintf("/lib/poster/%s/%d.jpg", gd.Resource.ID, width)
 }
 
 func (s *Helper) IsEnrichedMovie(gd *GetData) bool {

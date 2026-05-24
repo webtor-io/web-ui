@@ -15,14 +15,16 @@
             {{ range .Data }}
             <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}?file={{ .Path }}#action=stream" data-async-target="main" data-umami-event="continue-watching-click" class="shrink-0 w-[140px] group cursor-pointer">
                 <div class="relative aspect-[2/3] rounded-xl overflow-hidden border border-w-line group-hover:border-w-pink/30 group-hover:shadow-[0_0_20px_rgba(232,67,147,0.1)] transition-all duration-300">
-                    {{ if .PosterURL }}
-                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                         src="{{ .PosterURL }}" alt="{{ .DisplayName }}" loading="lazy" />
-                    {{ else }}
-                    <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 flex items-center justify-center">
+                    <!-- Placeholder layer (always rendered). When the
+                         poster endpoint returns a real image, the <img>
+                         on top covers it; on 404 the onerror handler
+                         drops the <img> and this shows through. -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 flex items-center justify-center">
                         <div class="text-center font-bold text-sm p-2 text-w-purpleL/60 line-clamp-3">{{ .DisplayName }}</div>
                     </div>
-                    {{ end }}
+                    <img class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                         src="{{ .PosterURL }}" alt="{{ .DisplayName }}" loading="lazy"
+                         onerror="this.remove()" />
                     <!-- Progress bar -->
                     <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
                         <div class="h-full bg-w-pink transition-all" style="width: {{ .Progress }}%"></div>
