@@ -785,6 +785,20 @@ func (s *Enricher) EnsureResourceMetadata(ctx context.Context, hash string, clai
 	}
 	items, err := s.retrieveTorrentItems(ctx, hash, claims)
 	if err != nil {
+		// Stoplist rejection = abuse-store has flagged this hash as
+		// banned (CSAM, infringement rules, etc). The torrent will
+		// never be retrievable again, and leaving the row behind makes
+		// every subsequent backfill / lookup re-pay the gRPC round-trip
+		// to the same dead-end. Run the same purge the resource.banned
+		// NATS handler runs so media_info + cascades + per-user tables
+		// all clear in one go.
+		if strings.Contains(err.Error(), "found in stoplist") {
+			if purgeErr := models.PurgeResourceByID(ctx, db, hash); purgeErr != nil {
+				return errors.Wrapf(purgeErr, "failed to purge stoplist-blocked hash %s", hash)
+			}
+			log.WithField("hash", hash).Info("purged stoplist-blocked resource during classification")
+			return nil
+		}
 		return errors.Wrapf(err, "failed to retrieve items for hash %s", hash)
 	}
 	var torrentInfos, samples []*TorrentInfo
