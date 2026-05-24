@@ -24,6 +24,8 @@
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",
     "ageGate.footnote": "Yukarıdaki butonları kullanarak en az 16 yaşında olduğunu onaylar ve <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Hizmet Şartları</a> ile <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gizlilik Politikamızı</a> kabul edersin.",
+    "ageGate.adultFootnote": "Yetişkinlere yönelik içerik. Yukarıdaki butonları kullanarak en az 18 yaşında olduğunu onaylarsın.",
+    "ageGate.adultFootnoteAnon": "Yetişkinlere yönelik içerik. Yukarıdaki butonları kullanarak en az 18 yaşında olduğunu onaylar ve <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Hizmet Şartları</a> ile <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gizlilik Politikamızı</a> kabul edersin.",
     "footer.filmData": "Film verileri",
     "home.title": "Online torrent platformu — Tarayıcıda izle ve indir",
     "home.description": "Kendi torrentlerini doğrudan tarayıcıda izlemek ve indirmek için web tabanlı torrent platformu. Yazılım gerekmez. Güvenli bulut işleme ve depolama.",

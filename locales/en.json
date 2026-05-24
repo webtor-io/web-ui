@@ -27,6 +27,8 @@
     "footer.ageMark": "16+",
     "footer.filmData": "Film data from",
     "ageGate.footnote": "By using the buttons above you confirm you are at least 16 years old and accept our <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Terms of Service</a> and <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacy Policy</a>.",
+    "ageGate.adultFootnote": "This content is for adults only. By using the buttons above you confirm you are at least 18 years old.",
+    "ageGate.adultFootnoteAnon": "This content is for adults only. By using the buttons above you confirm you are at least 18 years old and accept our <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Terms of Service</a> and <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacy Policy</a>.",
     "home.title": "Online Torrent Platform — Stream & Download in Browser",
     "home.description": "Web-based torrent platform to stream and download your own torrents directly in the browser. No software required. Secure cloud processing and storage",
     "home.ogTitle": "Webtor.io — Stream & Download Torrents in Browser",

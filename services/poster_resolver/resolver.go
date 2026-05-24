@@ -35,6 +35,7 @@ const (
 	SourceIMDbMovie  SourceKind = "imdb_movie"
 	SourceIMDbSeries SourceKind = "imdb_series"
 	SourceThumbnail  SourceKind = "thumbnail"
+	sourceDefault    SourceKind = "default"
 )
 
 // Source is the resolved instruction for one resource. CacheID is the

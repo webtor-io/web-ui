@@ -24,9 +24,17 @@ type Movie struct {
 	UserWatched bool   `pg:"-"`
 	UserRating  *int16 `pg:"-"`
 
-	MediaInfo     *MediaInfo     `pg:"rel:has-one,fk:resource_id"`
-	MovieMetadata *MovieMetadata `pg:"rel:has-one,fk:movie_metadata_id"`
-	LibraryItems  []*Library     `pg:"rel:has-many,fk:library_id,join_fk:resource_id"`
+	MediaInfo        *MediaInfo        `pg:"rel:has-one,fk:resource_id"`
+	MovieMetadata    *MovieMetadata    `pg:"rel:has-one,fk:movie_metadata_id"`
+	ResourceMetadata *ResourceMetadata `pg:"rel:has-one,fk:resource_id"`
+	LibraryItems     []*Library        `pg:"rel:has-many,fk:library_id,join_fk:resource_id"`
+}
+
+// IsAdult returns the classification flag from the joined
+// resource_metadata. Nil-safe — un-classified rows return false so
+// they render normally.
+func (s *Movie) IsAdult() bool {
+	return s.ResourceMetadata != nil && s.ResourceMetadata.IsAdult
 }
 
 func (s *Movie) GetMetadata() *VideoMetadata {

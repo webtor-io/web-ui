@@ -24,6 +24,8 @@
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",
     "ageGate.footnote": "Použitím tlačítek výše potvrzuješ, že je ti alespoň 16 let, a souhlasíš s našimi <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Podmínkami služby</a> a <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Zásadami ochrany osobních údajů</a>.",
+    "ageGate.adultFootnote": "Obsah pouze pro dospělé. Použitím tlačítek výše potvrzuješ, že je ti alespoň 18 let.",
+    "ageGate.adultFootnoteAnon": "Obsah pouze pro dospělé. Použitím tlačítek výše potvrzuješ, že je ti alespoň 18 let, a souhlasíš s našimi <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Podmínkami služby</a> a <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Zásadami ochrany osobních údajů</a>.",
     "footer.filmData": "Data o filmech od",
     "home.title": "Online torrentová platforma — Streamování a stahování v prohlížeči",
     "home.description": "Webová torrentová platforma pro streamování a stahování vlastních torrentů přímo v prohlížeči. Žádný software. Bezpečné cloudové zpracování a úložiště.",

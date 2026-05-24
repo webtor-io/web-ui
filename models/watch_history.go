@@ -24,13 +24,20 @@ type WatchHistory struct {
 	CreatedAt  time.Time `pg:"created_at"`
 	UpdatedAt  time.Time `pg:"updated_at"`
 
-	Torrent *TorrentResource `pg:"rel:has-one,fk:resource_id"`
+	Torrent          *TorrentResource  `pg:"rel:has-one,fk:resource_id"`
+	ResourceMetadata *ResourceMetadata `pg:"rel:has-one,fk:resource_id"`
 
 	// Enriched fields (not stored in DB)
 	Title       string      `pg:"-"`
 	PosterURL   string      `pg:"-"`
 	VideoID     string      `pg:"-"`
 	ContentType ContentType `pg:"-"`
+}
+
+// IsAdult returns the classification flag from the joined
+// resource_metadata. Nil-safe — un-classified rows return false.
+func (wh *WatchHistory) IsAdult() bool {
+	return wh.ResourceMetadata != nil && wh.ResourceMetadata.IsAdult
 }
 
 // Progress returns watch progress as percentage (0-100).
@@ -128,6 +135,7 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 			Where("watch_history.watched = false").
 			Where("watch_history.duration > 0").
 			Relation("Torrent").
+			Relation("ResourceMetadata").
 			OrderExpr("watch_history.resource_id, watch_history.updated_at DESC").
 			Select()
 	})

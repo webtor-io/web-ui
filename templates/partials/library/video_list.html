@@ -18,6 +18,9 @@
                 <img class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                      src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}"
                      loading="lazy" onerror="this.remove()" />
+                {{ if .IsAdult }}
+                <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 badge badge-lg bg-base-300/80 text-w-sub border-0 font-bold text-base tracking-wider backdrop-blur-sm">18+</span>
+                {{ end }}
                 {{ if . | hasVideoID }}
                 {{/* Watched toggle (top-right) */}}
                 {{ if .UserWatched }}

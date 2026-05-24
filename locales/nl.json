@@ -24,6 +24,8 @@
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",
     "ageGate.footnote": "Door de bovenstaande knoppen te gebruiken bevestig je dat je minimaal 16 jaar oud bent en ga je akkoord met onze <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gebruiksvoorwaarden</a> en ons <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacybeleid</a>.",
+    "ageGate.adultFootnote": "Inhoud alleen voor volwassenen. Door de bovenstaande knoppen te gebruiken bevestig je dat je minimaal 18 jaar oud bent.",
+    "ageGate.adultFootnoteAnon": "Inhoud alleen voor volwassenen. Door de bovenstaande knoppen te gebruiken bevestig je dat je minimaal 18 jaar oud bent en ga je akkoord met onze <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gebruiksvoorwaarden</a> en ons <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacybeleid</a>.",
     "footer.filmData": "Filmgegevens van",
     "home.title": "Online torrent platform — Stream & download in je browser",
     "home.description": "Webgebaseerd torrent platform om je eigen torrents direct in je browser te streamen en downloaden. Geen software nodig. Veilige cloud-verwerking en opslag.",

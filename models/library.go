@@ -327,7 +327,8 @@ func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort Sor
 		Join("left join movie_status as ums").
 		JoinOn("ums.user_id = l.user_id AND ums.video_id = mmd.video_id AND ums.watched = true").
 		Where("l.user_id = ?", uID).
-		Relation("MovieMetadata")
+		Relation("MovieMetadata").
+		Relation("ResourceMetadata")
 
 	switch watchedFilter {
 	case "unwatched":
@@ -370,7 +371,8 @@ func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort So
 		Join("left join series_status as uss").
 		JoinOn("uss.user_id = l.user_id AND uss.video_id = smd.video_id AND uss.watched = true").
 		Where("l.user_id = ?", uID).
-		Relation("SeriesMetadata")
+		Relation("SeriesMetadata").
+		Relation("ResourceMetadata")
 
 	switch watchedFilter {
 	case "unwatched":

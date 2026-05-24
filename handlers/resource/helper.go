@@ -262,6 +262,22 @@ func (s *Helper) GetResourcePosterURL(gd *GetData, width int) string {
 	return fmt.Sprintf("/lib/poster/%s/%d.jpg", gd.Resource.ID, width)
 }
 
+// IsAdult reports whether the torrent's name/paths tripped the adult
+// classifier during enrichment. Drives both the server-side poster
+// blur and the 18+ overlay/footnote. Nil-safe — un-classified
+// resources (rows added before this feature, or while backfill is in
+// flight) return false so they render normally.
+func (s *Helper) IsAdult(gd *GetData) bool {
+	return gd != nil && gd.ResourceMetadata != nil && gd.ResourceMetadata.IsAdult
+}
+
+// IsSport reports whether the torrent looks like a sports broadcast.
+// Stored for future filters (skip-from-recommendations etc.); does
+// NOT trigger blur or the 18+ overlay.
+func (s *Helper) IsSport(gd *GetData) bool {
+	return gd != nil && gd.ResourceMetadata != nil && gd.ResourceMetadata.IsSport
+}
+
 func (s *Helper) IsEnrichedMovie(gd *GetData) bool {
 	return gd.Movie != nil && gd.Movie.GetMetadata() != nil
 }

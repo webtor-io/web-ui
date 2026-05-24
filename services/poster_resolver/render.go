@@ -17,6 +17,12 @@ import (
 // posters and HLS-decoded video frames alike.
 const jpegQuality = 85
 
+// jpegQualityBlur is reduced for adult-blur output — heavy Gaussian
+// kills high-frequency content anyway, so the encoder has nothing to
+// preserve. Drops payload to ~5-10 KB for a 240px card and ~20-30 KB
+// for the 1200x630 OG canvas (vs ~30 KB / ~150 KB unblurred).
+const jpegQualityBlur = 60
+
 // OG canvas dimensions. 1200x630 is the cross-platform safe target —
 // Telegram, Twitter (card=summary_large_image), Facebook and iMessage
 // all render this aspect ratio cleanly. The blur/darken pair turns the
@@ -29,20 +35,40 @@ const (
 	ogCanvasDarken    = -25.0
 )
 
+// adultBlurSigma is the Gaussian-blur radius used for adult rendering.
+// 14 keeps general shapes recognisable (a viewer can tell roughly
+// what's in the frame) while blocking explicit detail — the "censor
+// pixelation" feel, not a featureless smear.
+const adultBlurSigma = 14.0
+
+// adultDarken slightly darkens the blurred output so a thin "18+"
+// badge rendered on top by the client stays legible across bright
+// sources (snow / explosions / bright skin tones).
+const adultDarken = -10.0
+
 // Mode is what the request asked the service to produce. Parsed from
-// the `file` route parameter via ParseFileMode.
+// the `file` route parameter via ParseFileMode; the resolver may
+// force Blur=true at miss time when resource_metadata.is_adult=true.
 type Mode struct {
 	OG    bool // true → render in 1200x630 OG canvas
 	Width int  // resize-mode target width (only used when OG=false)
+	Blur  bool // true → heavy Gaussian + darken (adult/sport)
 }
 
 // CacheTag is a short stable string for the cache key. Two requests
 // with the same Mode share the same cached object for the same source.
+// Blur is encoded as a `blur-` prefix so unblurred and blurred renders
+// of the same source live as distinct objects — flipping is_adult on
+// a resource doesn't invalidate the non-adult cache.
 func (m Mode) CacheTag() string {
-	if m.OG {
-		return "og"
+	tag := "og"
+	if !m.OG {
+		tag = strconv.Itoa(m.Width)
 	}
-	return strconv.Itoa(m.Width)
+	if m.Blur {
+		tag = "blur-" + tag
+	}
+	return tag
 }
 
 // ParseFileMode unpacks the `file` route parameter into a Mode. Accepts
@@ -70,6 +96,12 @@ func ParseFileMode(file string) (Mode, error) {
 // render produces the JPEG bytes for one (source-image, mode) pair.
 // Pure function — no I/O, deterministic, safe to share results
 // across callers.
+//
+// Blur is applied AFTER OG-canvas composition / resize so the cached
+// payload is already at the final display dimensions. The 18+ badge
+// itself is drawn client-side via CSS overlay (template emits the
+// data-adult attribute), not baked into the image — keeps the
+// rendering pipeline free of font/glyph dependencies.
 func render(src image.Image, mode Mode) (*bytes.Buffer, error) {
 	var out image.Image
 	if mode.OG {
@@ -77,8 +109,14 @@ func render(src image.Image, mode Mode) (*bytes.Buffer, error) {
 	} else {
 		out = imaging.Resize(src, mode.Width, 0, imaging.Lanczos)
 	}
+	quality := jpegQuality
+	if mode.Blur {
+		out = imaging.Blur(out, adultBlurSigma)
+		out = imaging.AdjustBrightness(out, adultDarken)
+		quality = jpegQualityBlur
+	}
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, out, &jpeg.Options{Quality: jpegQuality}); err != nil {
+	if err := jpeg.Encode(&buf, out, &jpeg.Options{Quality: quality}); err != nil {
 		return nil, errors.Wrap(err, "failed to encode jpeg")
 	}
 	return &buf, nil

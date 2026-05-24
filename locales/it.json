@@ -24,6 +24,8 @@
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",
     "ageGate.footnote": "Utilizzando i pulsanti sopra confermi di avere almeno 16 anni e accetti i nostri <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Termini di servizio</a> e la nostra <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Informativa sulla privacy</a>.",
+    "ageGate.adultFootnote": "Contenuto solo per adulti. Utilizzando i pulsanti sopra confermi di avere almeno 18 anni.",
+    "ageGate.adultFootnoteAnon": "Contenuto solo per adulti. Utilizzando i pulsanti sopra confermi di avere almeno 18 anni e accetti i nostri <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Termini di servizio</a> e la nostra <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Informativa sulla privacy</a>.",
     "footer.filmData": "Dati sui film da",
     "home.title": "Piattaforma torrent online — streaming e download nel browser",
     "home.description": "Piattaforma torrent web per guardare e scaricare i tuoi torrent direttamente nel browser. Nessun software richiesto. Elaborazione e archiviazione cloud sicure.",

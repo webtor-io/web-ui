@@ -38,6 +38,10 @@ func configureEnrich(c *cli.Command) {
 			Name:  "force-error",
 			Usage: "force error enrichment",
 		},
+		cli.BoolFlag{
+			Name:  "metadata-only",
+			Usage: "only populate resource_metadata (classification + parsed-name) for resources missing it; skip mapper/AI work",
+		},
 		cli.StringFlag{
 			Name:  "id",
 			Usage: "id for enrichment",
@@ -117,6 +121,7 @@ func enrichPopular(c *cli.Context) error {
 func enrich(c *cli.Context) error {
 	force := c.Bool("force")
 	forceError := c.Bool("force-error")
+	metadataOnly := c.Bool("metadata-only")
 	if forceError {
 		force = true
 	}
@@ -145,8 +150,43 @@ func enrich(c *cli.Context) error {
 	// Setting Enricher (with optional AI fallback wired from --ai-enrich-* flags)
 	en := makeEnricher(c, cl, pg, sapi, ac.New(c))
 
-	var resources []*models.TorrentResource
 	ctx := context.Background()
+
+	// Metadata-only backfill — populates resource_metadata without
+	// rerunning the full mapper/AI pipeline. Selection logic:
+	//   --id          → just that one hash (re-classifies regardless)
+	//   --force       → every media_info row (re-classifies all, used
+	//                   after a parse_torrent_name change)
+	//   default       → only rows missing a resource_metadata entry
+	//                   (cheap incremental backfill)
+	if metadataOnly {
+		var hashes []string
+		switch {
+		case id != "":
+			hashes = []string{id}
+		case force:
+			hashes, err = models.GetAllResourceIDsFromMediaInfo(ctx, db)
+		default:
+			hashes, err = models.GetResourceIDsWithoutResourceMetadata(ctx, db)
+		}
+		if err != nil {
+			return err
+		}
+		log.WithField("count", len(hashes)).WithField("force", force).
+			Info("metadata-only backfill: classifying resources")
+		for _, h := range hashes {
+			if mdErr := en.EnsureResourceMetadata(ctx, h, &api.Claims{}); mdErr != nil {
+				// Per-resource failures are non-fatal so one bad hash
+				// (e.g. torrent-store dropped the item) doesn't abort
+				// the whole sweep.
+				log.WithError(mdErr).WithField("hash", h).
+					Warn("metadata-only backfill: classify failed")
+			}
+		}
+		return nil
+	}
+
+	var resources []*models.TorrentResource
 	if id != "" {
 		r, err := models.GetResourceByID(ctx, db, id)
 		if err != nil {

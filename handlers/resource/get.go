@@ -105,6 +105,11 @@ type GetData struct {
 	PathActions           map[string]*PathAction
 	RateForm              *RateForm
 	ReleaseSubBanner      *ReleaseSubscribeBanner
+	// ResourceMetadata carries per-torrent classification (is_adult /
+	// is_sport) and the parsed-name snapshot. Nil when classification
+	// hasn't run for this resource yet — templates treat nil as "no
+	// flags raised, behave normally".
+	ResourceMetadata *models.ResourceMetadata
 }
 
 type RateForm struct {
@@ -187,6 +192,11 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		if d.Movie == nil {
 			d.Series, _ = models.GetSeriesWithMetadataByResourceID(ctx, db, args.ID)
 		}
+		// Per-torrent classification (is_adult / is_sport). Nil when
+		// the resource hasn't been classified yet — template helpers
+		// treat that as "no flags" so old resources render normally
+		// until the metadata-only backfill catches up.
+		d.ResourceMetadata, _ = models.GetResourceMetadataByResourceID(ctx, db, args.ID)
 		d.ReleaseSubBanner = prepareReleaseSubscribeBanner(ctx, s.enricher, res, d.Series)
 		// Load watch history for file list
 		if args.User.HasAuth() {

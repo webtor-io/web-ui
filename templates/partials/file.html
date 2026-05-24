@@ -31,7 +31,22 @@
             {{ end }}
         {{ end }}
     </div>
-    {{ if not ($.User | hasAuth) }}
+    {{/* Adult-content footnote.
+         - Anonymous + adult: 18+ message REPLACES the generic 16+ ageGate
+           (includes TOS/Privacy links so the legal hook isn't lost).
+         - Logged-in + adult: 18+ message is ADDED on top of nothing
+           (logged-in users have already accepted TOS at signup).
+         - Anonymous + non-adult: existing 16+ ageGate.
+         - Logged-in + non-adult: nothing (existing behaviour). */}}
+    {{ if . | isAdult }}
+    <p class="text-xs text-w-muted leading-relaxed mt-3">
+        {{ if not ($.User | hasAuth) }}
+        {{ tpHTML $.Lang "ageGate.adultFootnoteAnon" "TosURL" (langPath $.Lang "/legal/tos") "PrivacyURL" (langPath $.Lang "/legal/privacy") }}
+        {{ else }}
+        {{ t $.Lang "ageGate.adultFootnote" }}
+        {{ end }}
+    </p>
+    {{ else if not ($.User | hasAuth) }}
     <p class="text-xs text-w-muted leading-relaxed mt-3">
         {{ tpHTML $.Lang "ageGate.footnote" "TosURL" (langPath $.Lang "/legal/tos") "PrivacyURL" (langPath $.Lang "/legal/privacy") }}
     </p>

@@ -19,6 +19,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 )
 
@@ -99,6 +100,11 @@ func (s *Service) Get(ctx context.Context, resourceID, file string, force bool) 
 // miss runs the full pipeline: resolve → S3 cache check → render →
 // S3 put. Called from lazymap on cache miss; also called directly on
 // force=true.
+//
+// Adult/sport is checked here (not in Resolve) because it doesn't
+// affect WHICH source is picked — only HOW the rendered output is
+// post-processed. A separate look-up keeps the resolver function pure
+// and lets us flip is_adult via SQL without re-running classification.
 func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Result, error) {
 	db := s.pg.Get()
 	if db == nil {
@@ -117,6 +123,19 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 		// OG canvas mode → fall back to brand banner so platforms cache
 		// something durable.
 		src = s.defaultOGSource()
+	}
+
+	// Force blur for adult-classified resources. Sport is tracked but
+	// NOT blurred — broadcasts are legitimate content people would
+	// reasonably share. Brand default never blurs — that banner is
+	// generic and serving a heavily-blurred Webtor logo to Telegram
+	// would just look like a server error.
+	if src.Kind != sourceDefault {
+		if rm, err := models.GetResourceMetadataByResourceID(ctx, db, resourceID); err == nil && rm != nil && rm.IsAdult {
+			mode.Blur = true
+		}
+		// rm lookup error is non-fatal — default to no blur, log
+		// silently. Classification will retry on the next miss.
 	}
 
 	ck := cacheKey(src, mode)
@@ -158,7 +177,7 @@ func newResult(body []byte) *Result {
 // reused for every OG fallback site-wide.
 func (s *Service) defaultOGSource() *Source {
 	return &Source{
-		Kind:    "default",
+		Kind:    sourceDefault,
 		CacheID: "default",
 		Fetch: func(ctx context.Context) (image.Image, error) {
 			f, err := os.Open(defaultOGBannerPath)

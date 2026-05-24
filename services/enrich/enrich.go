@@ -442,6 +442,67 @@ func matchesPathFlag(pathStr string, pick func(*ptn.TorrentInfo) bool) bool {
 	return false
 }
 
+// saveResourceMetadata aggregates the per-item ptn outputs into a
+// single classification + snapshot row for the resource. is_adult /
+// is_sport win on any-true across all items (including samples) —
+// the studio folder triggers even when the leaf file looks innocent.
+// The representative `metadata` JSONB is the largest video item's
+// parsed info, a proxy for "the main feature" in mixed packs.
+func (s *Enricher) saveResourceMetadata(ctx context.Context, db *pg.DB, hash string, infos, samples []*TorrentInfo) error {
+	all := append(append([]*TorrentInfo{}, infos...), samples...)
+	var (
+		isAdult bool
+		isSport bool
+		rep     *ptn.TorrentInfo
+		repSize int64
+	)
+	for _, ti := range all {
+		if ti == nil || ti.TorrentInfo == nil {
+			continue
+		}
+		if ti.Adult {
+			isAdult = true
+		}
+		if ti.Sport {
+			isSport = true
+		}
+		if ti.ListItem != nil && ti.ListItem.Size > repSize {
+			rep = ti.TorrentInfo
+			repSize = ti.ListItem.Size
+		}
+	}
+	if rep == nil && len(all) > 0 && all[0] != nil {
+		rep = all[0].TorrentInfo
+	}
+	rm := &models.ResourceMetadata{
+		ResourceID: hash,
+		IsAdult:    isAdult,
+		IsSport:    isSport,
+		Metadata:   ptnAsJSON(rep),
+	}
+	return models.UpsertResourceMetadata(ctx, db, rm)
+}
+
+// ptnAsJSON round-trips a TorrentInfo through encoding/json so the
+// stored jsonb mirrors the package's own field names + omitempty
+// layout. Cheap (microseconds for a small struct) and keeps the DB
+// column shape locked to the public ptn schema rather than re-mapping
+// fields by hand.
+func ptnAsJSON(ti *ptn.TorrentInfo) map[string]interface{} {
+	if ti == nil {
+		return nil
+	}
+	buf, err := json.Marshal(ti)
+	if err != nil {
+		return nil
+	}
+	out := map[string]interface{}{}
+	if err := json.Unmarshal(buf, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
 func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool, hintVideoID string) (*models.MediaInfoMediaType, error) {
 
 	items, err := s.retrieveTorrentItems(ctx, hash, claims)
@@ -487,6 +548,19 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	}
 
 	log.Infof("got %v media items", len(torrentInfos))
+
+	// Persist classification + parsed-name snapshot for the whole
+	// resource. is_adult / is_sport are OR-aggregated across every
+	// video item (including samples) so a clean main file under an
+	// adult studio folder still trips the flag at the resource level.
+	// Representative metadata is the largest video item — proxies for
+	// "the main feature" in mixed packs.
+	if err := s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples); err != nil {
+		// Non-fatal — classification is best-effort. Adult/sport blur
+		// degrades to the default (no blur) until the next enrichment.
+		log.WithError(err).WithField("hash", hash).
+			Warn("failed to persist resource_metadata")
+	}
 
 	mt := s.getMediaType(torrentInfos)
 
@@ -693,6 +767,54 @@ func (s *Enricher) LookupByTitleYear(ctx context.Context, title string, year *in
 	// nil budget — LookupByTitleYear has no pathHint, so AI fallback
 	// is never triggered anyway. Pass nil to keep the call site clean.
 	return s.mapMetadata(ctx, vc, ct, false, "", "", nil)
+}
+
+// EnsureResourceMetadata runs only the classification + parsed-name
+// step of the enrich pipeline — retrieve items, parse names, save
+// resource_metadata. Skips the heavy mapper / AI / movie-series
+// machinery entirely. Used by `enrich run --metadata-only` to
+// backfill the classification table for resources enriched before
+// this feature shipped, without re-spending the metadata-lookup
+// budget those resources already exhausted.
+//
+// Safe to call repeatedly: the upsert is idempotent on resource_id.
+func (s *Enricher) EnsureResourceMetadata(ctx context.Context, hash string, claims *api.Claims) error {
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("db is nil")
+	}
+	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+	if err != nil {
+		return errors.Wrapf(err, "failed to retrieve items for hash %s", hash)
+	}
+	var torrentInfos, samples []*TorrentInfo
+	for _, item := range items {
+		if item.MediaFormat != ra.Video {
+			continue
+		}
+		ti, err := MakeTorrentInfo(&item)
+		if err != nil {
+			// Per-item parse failures are non-fatal — log + skip,
+			// classification stays best-effort.
+			log.WithError(err).WithField("hash", hash).
+				WithField("path", item.PathStr).
+				Warn("failed to parse torrent item for classification")
+			continue
+		}
+		if ti.Sample {
+			samples = append(samples, ti)
+			continue
+		}
+		torrentInfos = append(torrentInfos, ti)
+	}
+	if len(torrentInfos) == 0 && len(samples) == 0 {
+		// No video at all — write an empty row anyway so the backfill
+		// query doesn't return this hash on every subsequent run.
+		return models.UpsertResourceMetadata(ctx, db, &models.ResourceMetadata{
+			ResourceID: hash,
+		})
+	}
+	return s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples)
 }
 
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {

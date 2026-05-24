@@ -25,6 +25,8 @@
     "footer.ageMark": "16+",
     "footer.filmData": "Данные о фильмах от",
     "ageGate.footnote": "Используя кнопки выше, вы подтверждаете, что вам не меньше 16 лет, и соглашаетесь с нашими <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Условиями использования</a> и <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Политикой конфиденциальности</a>.",
+    "ageGate.adultFootnote": "Контент для взрослых. Используя кнопки выше, вы подтверждаете, что вам не меньше 18 лет.",
+    "ageGate.adultFootnoteAnon": "Контент для взрослых. Используя кнопки выше, вы подтверждаете, что вам не меньше 18 лет, и соглашаетесь с нашими <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Условиями использования</a> и <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Политикой конфиденциальности</a>.",
     "home.title": "Онлайн торрент-платформа — просмотр и скачивание в браузере",
     "home.description": "Веб-платформа для просмотра и скачивания торрентов прямо в браузере. Без установки ПО. Безопасная облачная обработка и хранение",
     "home.ogTitle": "Webtor.io — Просмотр и скачивание торрентов в браузере",

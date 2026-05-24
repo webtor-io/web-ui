@@ -23,10 +23,17 @@ type Series struct {
 	UserWatched bool   `pg:"-"`
 	UserRating  *int16 `pg:"-"`
 
-	Episodes       []*Episode      `pg:"rel:has-many,fk:series_id"`
-	MediaInfo      *MediaInfo      `pg:"rel:has-one,fk:resource_id"`
-	SeriesMetadata *SeriesMetadata `pg:"rel:has-one,fk:series_metadata_id"`
-	LibraryItems   []*Library      `pg:"rel:has-many,fk:library_id,join_fk:resource_id"`
+	Episodes         []*Episode        `pg:"rel:has-many,fk:series_id"`
+	MediaInfo        *MediaInfo        `pg:"rel:has-one,fk:resource_id"`
+	SeriesMetadata   *SeriesMetadata   `pg:"rel:has-one,fk:series_metadata_id"`
+	ResourceMetadata *ResourceMetadata `pg:"rel:has-one,fk:resource_id"`
+	LibraryItems     []*Library        `pg:"rel:has-many,fk:library_id,join_fk:resource_id"`
+}
+
+// IsAdult returns the classification flag from the joined
+// resource_metadata. Nil-safe — un-classified rows return false.
+func (s *Series) IsAdult() bool {
+	return s.ResourceMetadata != nil && s.ResourceMetadata.IsAdult
 }
 
 func (s *Series) GetMetadata() *VideoMetadata {
