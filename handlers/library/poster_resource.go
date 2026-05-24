@@ -47,6 +47,14 @@ func (s *Handler) posterResource(c *gin.Context) {
 		return
 	}
 
+	// Strip Set-Cookie before flushing so Cloudflare actually caches
+	// the response. Session + CSRF middleware register a session
+	// cookie on each request; CF defaults to bypassing the cache when
+	// Set-Cookie is present in the origin response. Posters are pure
+	// functions of (resource_id, file), no per-user variation — safe
+	// to drop the cookie so the 24h max-age becomes effective edge-side.
+	c.Writer.Header().Del("Set-Cookie")
+
 	if match := c.Request.Header.Get("If-None-Match"); match != "" && match == res.ETag {
 		c.Status(http.StatusNotModified)
 		return

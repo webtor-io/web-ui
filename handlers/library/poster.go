@@ -103,6 +103,12 @@ func (s *Handler) poster(c *gin.Context) {
 
 	etag := s.generateETag(b.Bytes())
 
+	// Strip Set-Cookie before flushing — see poster_resource.go for
+	// rationale. Posters are public/idempotent; the session cookie
+	// emitted by upstream middleware would otherwise force CF to
+	// bypass the cache.
+	c.Writer.Header().Del("Set-Cookie")
+
 	if match := c.Request.Header.Get("If-None-Match"); match != "" && match == etag {
 		c.Status(http.StatusNotModified)
 		return

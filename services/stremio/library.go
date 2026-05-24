@@ -256,8 +256,15 @@ func (s *Library) getMetaDataByID(ctx context.Context, ct, id string) ([]models.
 	}
 }
 
+// makePoster returns the resource-keyed unified poster URL. Same
+// endpoint as the library/continue-watching cards on the web — IMDb
+// poster resolves first, per-resource thumbnail falls back, 404 if
+// neither. Stremio renders its own placeholder on 404.
 func (s *Library) makePoster(vc models.VideoContentWithMetadata) string {
-	return fmt.Sprintf("%v/lib/%v/poster/%v/240.jpg", s.domain, vc.GetContentType(), vc.GetMetadata().VideoID)
+	if vc.GetContent() == nil || vc.GetContent().ResourceID == "" {
+		return ""
+	}
+	return fmt.Sprintf("%v/lib/poster/%v/240.jpg", s.domain, vc.GetContent().ResourceID)
 }
 
 func (s *Library) makeMeta(vc models.VideoContentWithMetadata) MetaItem {
@@ -279,9 +286,11 @@ func (s *Library) makeMetaWithMetadata(vc models.VideoContentWithMetadata) MetaI
 		y := *vc.GetMetadata().Year
 		meta.ReleaseInfo = strconv.Itoa(int(y))
 	}
-	if vc.GetMetadata().PosterURL != "" {
-		meta.Poster = s.makePoster(vc)
-	}
+	// Always emit the resource-keyed poster URL — endpoint resolves
+	// IMDb → thumbnail → 404 internally. Even if PosterURL on the
+	// metadata is empty, the per-resource thumbnail (generated at
+	// stream/download) can still cover it.
+	meta.Poster = s.makePoster(vc)
 	return meta
 }
 
@@ -291,6 +300,10 @@ func (s *Library) makeMetaWithoutMetadata(vc models.VideoContentWithMetadata) Me
 		Type:        string(vc.GetContentType()),
 		Name:        vc.GetContent().Title,
 		PosterShape: "poster",
+		// Un-enriched torrents still have a resource_id; the unified
+		// endpoint serves the generated thumbnail when available,
+		// 404s otherwise. Stremio renders its own placeholder on 404.
+		Poster: s.makePoster(vc),
 	}
 	if vc.GetContent().Year != nil {
 		y := *vc.GetContent().Year

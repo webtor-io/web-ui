@@ -46,7 +46,7 @@
         "ratingValue": "{{ printf "%.1f" (. | getEnrichedRating) }}",
         "bestRating": "10"
     }{{ end }}
-    {{ if . | hasEnrichedPoster }},"image": "{{ domain }}{{ . | getEnrichedPosterURL }}"{{ end }}
+    {{ if . | hasEnrichedPoster }},"image": "{{ domain }}{{ getResourcePosterURL . 480 }}"{{ end }}
     ,"url": "{{ domain }}/{{ .Resource.ID }}"
 }
 </script>
@@ -95,10 +95,12 @@
                 <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                     <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ . | getEnrichedTitle }}</div>
                 </div>
-                {{ if . | hasEnrichedPoster }}
-                <img src="{{ . | getEnrichedPosterURL }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                {{/* Same unified endpoint as the fallback header and
+                     library cards — resolves IMDb → thumbnail → 404.
+                     onerror drops the <img> on 404 so the gradient
+                     placeholder behind shows through. */}}
+                <img src="{{ getResourcePosterURL . 480 }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
                      onerror="this.remove()">
-                {{ end }}
             </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">

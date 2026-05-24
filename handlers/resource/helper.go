@@ -237,18 +237,6 @@ func (s *Helper) HasEnrichedPoster(gd *GetData) bool {
 	return md != nil && md.PosterURL != ""
 }
 
-func (s *Helper) GetEnrichedPosterURL(gd *GetData) string {
-	md := s.getMetadata(gd)
-	if md == nil || md.VideoID == "" {
-		return ""
-	}
-	ct := "movie"
-	if gd.Series != nil {
-		ct = "series"
-	}
-	return fmt.Sprintf("/lib/%s/poster/%s/480.jpg", ct, md.VideoID)
-}
-
 // GetOGImageURL returns the path of the unified poster endpoint in OG
 // canvas mode. The handler picks the best available source (IMDb
 // poster first, then thumbnail, then a brand-default banner) — the
