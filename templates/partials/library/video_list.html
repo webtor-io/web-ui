@@ -7,14 +7,17 @@
     <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main" class="group flex">
         <div class="w-card-frame {{ if .UserWatched }}is-watched{{ end }}">
             <figure class="aspect-[2/3] overflow-hidden relative">
-                {{ if . | hasPoster }}
-                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                         src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}" />
-                {{ else }}
-                    <div class="w-full h-full bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
-                        <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">{{ . | getTitle }}</div>
-                    </div>
-                {{ end }}
+                {{/* Placeholder layer (always rendered). The <img> on
+                     top covers it when the poster endpoint returns a
+                     real image (IMDb poster OR per-resource thumbnail);
+                     on 404 the onerror handler drops the <img> and
+                     this shows through. */}}
+                <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
+                    <div class="text-center font-bold text-lg p-3 line-clamp-3 drop-shadow-sm">{{ . | getTitle }}</div>
+                </div>
+                <img class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                     src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}"
+                     loading="lazy" onerror="this.remove()" />
                 {{ if . | hasVideoID }}
                 {{/* Watched toggle (top-right) */}}
                 {{ if .UserWatched }}

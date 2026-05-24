@@ -73,8 +73,17 @@ func (s *VideoContentHelper) GetVideoType(m models.VideoContentWithMetadata) str
 	return string(m.GetContentType())
 }
 
+// GetCachedPoster240 returns the resource-keyed poster URL. Unified
+// endpoint resolves IMDb → thumbnail → 404 internally — un-enriched
+// torrents (no IMDb poster) get their generated thumbnail instead of
+// falling through to the gradient placeholder. The template wraps the
+// <img> with onerror=this.remove() so 404s degrade to the placeholder
+// rendered underneath.
 func (s *VideoContentHelper) GetCachedPoster240(m models.VideoContentWithMetadata) string {
-	return fmt.Sprintf("/lib/%v/poster/%v/240.jpg", m.GetContentType(), m.GetMetadata().VideoID)
+	if m.GetContent() == nil || m.GetContent().ResourceID == "" {
+		return ""
+	}
+	return fmt.Sprintf("/lib/poster/%v/240.jpg", m.GetContent().ResourceID)
 }
 
 func (s *VideoContentHelper) HasEpisodeStill(ep *models.Episode) bool {
