@@ -35,11 +35,17 @@ const (
 	ogCanvasDarken    = -25.0
 )
 
-// adultBlurSigma is the Gaussian-blur radius used for adult rendering.
-// 14 keeps general shapes recognisable (a viewer can tell roughly
-// what's in the frame) while blocking explicit detail — the "censor
-// pixelation" feel, not a featureless smear.
-const adultBlurSigma = 14.0
+// adultBlurRatio scales the Gaussian-blur sigma with image dimension
+// so a 240px card and a 1200px OG canvas look equally censored.
+// imaging.Blur takes sigma in PIXELS — a fixed value would over-blur
+// thumbnails and under-blur large posters. 5% of the smallest side
+// hits the "shapes visible, detail killed" sweet spot across all
+// sizes we render.
+const adultBlurRatio = 0.05
+
+// adultBlurMin is the floor sigma so tiny images (24x24 favicon-style
+// edge cases) still get a meaningful blur.
+const adultBlurMin = 5.0
 
 // adultDarken slightly darkens the blurred output so a thin "18+"
 // badge rendered on top by the client stays legible across bright
@@ -111,7 +117,7 @@ func render(src image.Image, mode Mode) (*bytes.Buffer, error) {
 	}
 	quality := jpegQuality
 	if mode.Blur {
-		out = imaging.Blur(out, adultBlurSigma)
+		out = imaging.Blur(out, adultBlurSigmaFor(out))
 		out = imaging.AdjustBrightness(out, adultDarken)
 		quality = jpegQualityBlur
 	}
@@ -120,6 +126,24 @@ func render(src image.Image, mode Mode) (*bytes.Buffer, error) {
 		return nil, errors.Wrap(err, "failed to encode jpeg")
 	}
 	return &buf, nil
+}
+
+// adultBlurSigmaFor scales sigma to the image's smaller dimension so
+// the censor effect is visually constant across thumbnail and OG
+// canvas. Floored at adultBlurMin to keep meaningful blur on tiny
+// edge-case images.
+func adultBlurSigmaFor(img image.Image) float64 {
+	w := img.Bounds().Dx()
+	h := img.Bounds().Dy()
+	minSide := w
+	if h < minSide {
+		minSide = h
+	}
+	sigma := float64(minSide) * adultBlurRatio
+	if sigma < adultBlurMin {
+		sigma = adultBlurMin
+	}
+	return sigma
 }
 
 // composeOGCanvas wraps a source image in the 1200x630 OG canvas with

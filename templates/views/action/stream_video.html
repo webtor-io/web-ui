@@ -7,7 +7,7 @@
            data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
            data-path="{{ .Item.PathStr }}"
            {{ if .Title }}data-resource-title="{{ .Title }}"{{ end }}
-           data-share-url="{{ domain }}/{{ .VideoStreamUserData.ResourceID }}{{ if .Item }}?file={{ .Item.PathStr | urlquery }}{{ end }}"
+           data-share-url="{{ domain }}{{ langPath $.Lang (printf "/%s" .VideoStreamUserData.ResourceID) }}{{ if .Item }}?file={{ .Item.PathStr | urlquery }}{{ end }}"
            {{ if .ExternalData.Poster }}poster="{{ .ExternalData.Poster }}"
            {{ else if .ExportTag.Poster }}poster="{{ .ExportTag.Poster }}" {{ end }}
            {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"

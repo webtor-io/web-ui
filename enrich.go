@@ -179,15 +179,14 @@ func enrich(c *cli.Context) error {
 		log.WithField("count", len(hashes)).WithField("force", force).
 			Info("metadata-only backfill: classifying resources")
 
-		// 10 concurrent workers — most of the per-resource cost is a
-		// gRPC round-trip to rest-api → torrent-store for the item
-		// listing, so the loop is I/O-bound, not CPU-bound. Sequential
-		// is 4 resources/minute (≈ 55 days for a 320k catalog); 10
-		// parallel takes that to ~5 days conservatively, ~hours when
-		// stoplist purges sweep ahead of legitimate-fetch latency.
-		// Tuning ceiling: rest-api / abuse-store gRPC pools can handle
-		// 50+, but 10 leaves headroom under production traffic.
-		const workers = 10
+		// 4 concurrent workers — observed sweet spot under the 2Gi
+		// pod memory limit when this command runs alongside the
+		// regular HTTP server (`./server` is a single binary in two
+		// modes). 10 workers OOMKilled the pod within ~30 minutes
+		// because each in-flight item list + ptn parse holds heap
+		// faster than Go's GC reclaims it. 4 keeps memory bounded
+		// while still ~50× faster than sequential.
+		const workers = 4
 		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(workers)
 

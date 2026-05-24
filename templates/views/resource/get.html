@@ -104,7 +104,9 @@
                 <img src="{{ getResourcePosterURL . 480 }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
                      onerror="this.remove()">
                 {{ if . | isAdult }}
-                <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 badge bg-base-300/80 text-w-sub border-0 font-semibold tracking-wide backdrop-blur-sm">18+</span>
+                <div class="absolute inset-0 grid place-items-center pointer-events-none">
+                    <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center">18+</span>
+                </div>
                 {{ end }}
             </div>
             <div class="flex-1 min-w-0">
@@ -202,7 +204,9 @@
                 <img src="{{ getResourcePosterURL . 480 }}" alt="{{ .Resource.Name }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
                      onerror="this.remove()">
                 {{ if . | isAdult }}
-                <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 badge bg-base-300/80 text-w-sub border-0 font-semibold tracking-wide backdrop-blur-sm">18+</span>
+                <div class="absolute inset-0 grid place-items-center pointer-events-none">
+                    <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center">18+</span>
+                </div>
                 {{ end }}
             </div>
             <div class="flex-1 min-w-0">
