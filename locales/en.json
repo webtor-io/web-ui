@@ -457,7 +457,6 @@
     "job.retrievingData": "retrieving resource data",
     "job.retrievingStreamUrl": "retrieving stream url",
     "job.probingMedia": "probing content media info",
-    "job.generatingThumbnail": "generating preview",
     "job.checkingBandwidth": "checking bandwidth",
     "job.loadingSubtitles": "loading OpenSubtitles",
     "job.waitingPlayer": "waiting player initialization",

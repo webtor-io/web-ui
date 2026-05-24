@@ -418,7 +418,6 @@
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",
-    "job.generatingThumbnail": "генерируем превью",
     "job.checkingBandwidth": "проверка скорости",
     "job.loadingSubtitles": "загрузка субтитров",
     "job.waitingPlayer": "ожидание инициализации плеера",

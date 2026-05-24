@@ -418,7 +418,6 @@
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",
-    "job.generatingThumbnail": "generujeme náhled",
     "job.checkingBandwidth": "kontroluji šířku pásma",
     "job.loadingSubtitles": "načítám OpenSubtitles",
     "job.waitingPlayer": "čekám na inicializaci přehrávače",

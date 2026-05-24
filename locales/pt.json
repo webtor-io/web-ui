@@ -418,7 +418,6 @@
     "job.retrievingData": "buscando dados do recurso",
     "job.retrievingStreamUrl": "buscando URL do stream",
     "job.probingMedia": "analisando informações de mídia",
-    "job.generatingThumbnail": "gerando prévia",
     "job.checkingBandwidth": "verificando banda",
     "job.loadingSubtitles": "carregando OpenSubtitles",
     "job.waitingPlayer": "aguardando inicialização do player",

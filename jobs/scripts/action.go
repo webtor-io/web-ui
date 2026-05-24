@@ -175,21 +175,6 @@ func resourceLeafTitle(md *models.VideoMetadata, r *ra.ResourceResponse, item *r
 	return ""
 }
 
-// mediaProbeDurationSec returns the probed duration rounded to whole
-// seconds, or 0 when the probe is missing or unparsable. Used as the
-// duration hint for thumbnail-frame selection — a 0 makes the
-// thumbnail service fall back to its blind 5-minute default.
-func mediaProbeDurationSec(mp *api.MediaProbe) int {
-	if mp == nil || mp.Format.Duration == "" {
-		return 0
-	}
-	d, err := strconv.ParseFloat(mp.Format.Duration, 64)
-	if err != nil || d <= 0 {
-		return 0
-	}
-	return int(d)
-}
-
 func getVideoBitrate(mp *api.MediaProbe) int64 {
 	if mp.Format.BitRate != "" {
 		br, err := strconv.ParseInt(mp.Format.BitRate, 10, 64)
@@ -442,41 +427,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	j.Done()
 
-	// Step 2.5: Resource thumbnail — generate a share-preview poster
-	// when the resource has no IMDb-matched artwork. Sync so the
-	// thumbnail is guaranteed ready by the time the player loads; the
-	// service short-circuits on its existing-row check, so cached
-	// resources skip straight through. Runs after probe so the ffmpeg
-	// fallback can seek to ~25 % of duration instead of a blind 5 min.
-	//
-	// Skipped entirely (no UI row, no DB read) when enrichment already
-	// supplied a poster — IMDb-quality artwork wins over any image we
-	// could pull from the torrent or decode out of a video frame, and a
-	// flashing "skipped" badge for a step that does nothing is noise.
-	if s.thumbnail.Enabled() && (enrichedMD == nil || enrichedMD.PosterURL == "") {
-		j.InProgress(s.t("job.generatingThumbnail"))
-		durationSec := mediaProbeDurationSec(sc.MediaProbe)
-		// Hard 20 s budget for the whole pipeline (image-file pull +
-		// optional ffmpeg fallback). The stream is already prepared
-		// downstream — if the preview is slow, we'd rather degrade to
-		// the brand banner than block the viewer behind a ~minute wait.
-		tCtx, tCancel := context.WithTimeout(ctx, 20*time.Second)
-		_, tErr := s.thumbnail.Generate(tCtx, c.ApiClaims, resourceID, durationSec)
-		tCancel()
-		if tErr != nil {
-			if errors.Is(tErr, thumb.ErrNoSource) {
-				j.Skip(s.t("job.generatingThumbnail"))
-			} else {
-				// Don't fail the stream over a preview — log + carry on.
-				// Share previews then fall back to the brand banner.
-				log.WithError(tErr).WithField("resource_id", resourceID).
-					Warn("thumbnail generation failed")
-				j.Warn(tErr)
-			}
-		} else {
-			j.Done()
-		}
-	}
+	// Step 2.5: Resource thumbnail — fire-and-forget so the player isn't
+	// blocked. The service probes the picked video itself for the
+	// ffmpeg seek offset; consumed later by the OG-image endpoint when
+	// the user shares.
+	s.generateThumbnailAsync(c.ApiClaims, resourceID)
 
 	// Step 3: Bandwidth check.
 	//
@@ -588,6 +543,41 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	return
 }
 
+// generateThumbnailAsync fires a background goroutine that generates a
+// share-preview poster for the resource. Non-blocking and silent — the
+// stream/download flow continues immediately and never surfaces the
+// step in the job UI. Consumed later by the OG-image endpoint when the
+// user shares.
+//
+// Self-contained: the goroutine re-checks for an IMDb poster (skipping
+// the thumbnail entirely when one exists) and the thumbnail service
+// itself probes the picked video for duration before seeking. Callers
+// don't need to feed in probe results or pre-loaded enrichment.
+//
+// Detached from the request context with a 2-minute budget so a cold
+// torrent + ffmpeg seek can finish even after the player template has
+// already rendered and the job has closed.
+func (s *ActionScript) generateThumbnailAsync(claims *api.Claims, resourceID string) {
+	if !s.thumbnail.Enabled() {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if s.enricher != nil {
+			if md, _ := s.enricher.GetEnrichedResource(ctx, resourceID); md != nil && md.PosterURL != "" {
+				return
+			}
+		}
+		if _, err := s.thumbnail.Generate(ctx, claims, resourceID); err != nil {
+			if !errors.Is(err, thumb.ErrNoSource) {
+				log.WithError(err).WithField("resource_id", resourceID).
+					Warn("background thumbnail generation failed")
+			}
+		}
+	}()
+}
+
 func (s *ActionScript) previewImage(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string, settings *models.StreamSettings, vsud *models.VideoStreamUserData, dsd *embed.DomainSettingsData) error {
 	return s.streamContent(ctx, j, c, resourceID, itemID, "preview_image", settings, vsud, dsd)
 }
@@ -638,6 +628,10 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		}
 	}
 	j.DoneWithMessage(s.t("job.downloadReady"))
+	// Fire-and-forget poster generation so a shared download link has
+	// artwork on Telegram/iMessage. The service handles duration probing
+	// internally.
+	s.generateThumbnailAsync(c.ApiClaims, resourceID)
 	tpl := s.tb.Build("action/download_file").WithLayoutBody(`{{ template "main" . }}`)
 	hasAds := false
 	tierName := "free"

@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,15 +68,16 @@ const (
 
 	// FFmpegTimeout bounds the worst-case ffmpeg invocation. Warm
 	// torrent + libavformat HTTP demuxer typically returns in 1-3 s;
-	// 15 s fits inside the 20 s overall budget set by streamContent
-	// while leaving room for image-file attempts that fail before this.
-	FFmpegTimeout = 15 * time.Second
+	// the cap matters for cold seeks against a half-warmed torrent —
+	// 60 s fits comfortably inside the 2-minute async budget set by
+	// the streamContent / download flows.
+	FFmpegTimeout = 60 * time.Second
 
-	// downloadHTTPTimeout bounds the image-file pull. THP export URL is
-	// on-cluster and posters are small; 5 s is enough for a real fetch
-	// and short enough to leave the bulk of the budget for ffmpeg when
-	// image-file isn't viable.
-	downloadHTTPTimeout = 5 * time.Second
+	// downloadHTTPTimeout bounds the image-file pull. THP export URL
+	// is on-cluster and posters are small, but a cold torrent can take
+	// a while to start serving — 15 s avoids a premature failover to
+	// ffmpeg when image-file is just slow to first byte.
+	downloadHTTPTimeout = 15 * time.Second
 )
 
 // preferredImageNames is a stem→priority map; lower numbers win. The
@@ -146,16 +148,16 @@ func (s *Service) Enabled() bool { return s != nil }
 // expensive item-listing + S3 round-trip. Callers don't need to dedup
 // upstream.
 //
-// durationSec is the probed video duration (0 if unknown). When non-zero
-// the ffmpeg fallback aims for ~25 % in, capped at 10 min — past every
-// realistic opening sequence but well clear of act-two pivots. Image-file
-// extraction ignores it.
+// Self-contained: when an image file isn't available and we fall back
+// to ffmpeg, the picked video is probed in-line for duration so the
+// seek offset lands at ~25 % rather than the blind 5-min default. The
+// caller doesn't need to feed a probe in.
 //
 // Returns ErrNoSource when the torrent has neither a usable image file
 // nor a video item — caller logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
 // daily error budget.
-func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID string, durationSec int) (*models.Thumbnail, error) {
+func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
 	if s == nil {
 		return nil, nil
 	}
@@ -184,8 +186,12 @@ func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID s
 	}
 
 	if vid := pickFirstVideo(items); vid != nil {
-		offset := pickFFmpegOffset(durationSec)
-		t, gErr := s.generateFromFFmpegFrame(ctx, db, claims, resourceID, vid, offset)
+		dlURL, dlErr := s.downloadURLFor(ctx, claims, resourceID, vid.ID)
+		if dlErr != nil {
+			return nil, errors.Wrap(dlErr, "failed to resolve video download URL")
+		}
+		offset := pickFFmpegOffset(s.probeDurationSec(ctx, dlURL))
+		t, gErr := s.generateFromFFmpegFrame(ctx, db, resourceID, vid, dlURL, offset)
 		if gErr == nil {
 			return t, nil
 		}
@@ -397,12 +403,7 @@ func (s *Service) generateFromImageFile(ctx context.Context, db *pg.DB, claims *
 		models.ThumbnailSourceImageFile, data, format, w, h)
 }
 
-func (s *Service) generateFromFFmpegFrame(ctx context.Context, db *pg.DB, claims *api.Claims, resourceID string, item *ra.ListItem, offsetSec int) (*models.Thumbnail, error) {
-	dlURL, err := s.downloadURLFor(ctx, claims, resourceID, item.ID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve video download URL")
-	}
-
+func (s *Service) generateFromFFmpegFrame(ctx context.Context, db *pg.DB, resourceID string, item *ra.ListItem, dlURL string, offsetSec int) (*models.Thumbnail, error) {
 	cctx, cancel := context.WithTimeout(ctx, FFmpegTimeout)
 	defer cancel()
 
@@ -486,6 +487,37 @@ func (s *Service) downloadURLFor(ctx context.Context, claims *api.Claims, resour
 		return "", errors.New("no download export item")
 	}
 	return dl.URL, nil
+}
+
+// probeDurationSec asks content-prober for the picked file's duration
+// so the ffmpeg seek lands at ~25 % in instead of the blind 5-min
+// default. Best-effort: any failure (timeout, prober down, missing
+// duration field) returns 0 and the caller falls back to the default
+// offset rather than aborting the whole thumbnail.
+//
+// The ~cp suffix routes through THP's content-prober chain; rest-api
+// caches the result so a streamContent probe on the same file is reused.
+func (s *Service) probeDurationSec(ctx context.Context, dlURL string) int {
+	pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	mp, err := s.api.GetMediaProbe(pctx, contentProbeURL(dlURL))
+	if err != nil || mp == nil || mp.Format.Duration == "" {
+		return 0
+	}
+	d, err := strconv.ParseFloat(mp.Format.Duration, 64)
+	if err != nil || d <= 0 {
+		return 0
+	}
+	return int(d)
+}
+
+// contentProbeURL injects the ~cp suffix between path and query so the
+// request hits THP's content-prober chain rather than the raw download.
+func contentProbeURL(dlURL string) string {
+	if i := strings.IndexByte(dlURL, '?'); i >= 0 {
+		return dlURL[:i] + "~cp" + dlURL[i:]
+	}
+	return dlURL + "~cp"
 }
 
 func (s *Service) fetchCapped(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
