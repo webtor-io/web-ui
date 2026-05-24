@@ -46,6 +46,11 @@ func configureEnrich(c *cli.Command) {
 			Name:  "metadata-only",
 			Usage: "only populate resource_metadata (classification + parsed-name) for resources missing it; skip mapper/AI work",
 		},
+		cli.IntFlag{
+			Name:  "workers",
+			Usage: "concurrent workers for --metadata-only backfill (default 4 — safe under in-cluster 2Gi pod limit; bump to 20+ locally where memory is unconstrained)",
+			Value: 4,
+		},
 		cli.StringFlag{
 			Name:  "id",
 			Usage: "id for enrichment",
@@ -179,14 +184,17 @@ func enrich(c *cli.Context) error {
 		log.WithField("count", len(hashes)).WithField("force", force).
 			Info("metadata-only backfill: classifying resources")
 
-		// 4 concurrent workers — observed sweet spot under the 2Gi
-		// pod memory limit when this command runs alongside the
-		// regular HTTP server (`./server` is a single binary in two
-		// modes). 10 workers OOMKilled the pod within ~30 minutes
-		// because each in-flight item list + ptn parse holds heap
-		// faster than Go's GC reclaims it. 4 keeps memory bounded
-		// while still ~50× faster than sequential.
-		const workers = 4
+		// Default 4 workers — observed sweet spot under the 2Gi pod
+		// memory limit when this runs alongside the regular HTTP
+		// server (`./server` is a single binary in two modes). 10
+		// workers OOMKilled the pod within ~30 minutes because each
+		// in-flight item list + ptn parse holds heap faster than Go's
+		// GC reclaims it. Override via --workers when running locally
+		// (memory unconstrained) to push throughput higher.
+		workers := c.Int("workers")
+		if workers < 1 {
+			workers = 1
+		}
 		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(workers)
 
