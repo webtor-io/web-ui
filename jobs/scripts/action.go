@@ -85,6 +85,13 @@ type WarmupSettings struct {
 	// rate is below the early-min threshold" — surfaces the no_peers CTA
 	// before probe hangs on its own deadline.
 	SlowPeersTimeoutSec int
+	// SeederProbeTimeoutSec bounds the fast-path probe that asks the seeder
+	// pod (via one Stats SSE event) whether the head + tail pieces of the
+	// target file are already Complete locally. When they are, we treat the
+	// content as cached and skip the full warmup — common in share flows
+	// where the sharer's seeder pod just served them and the new viewer
+	// arrives moments later. 0 disables the probe (kill-switch).
+	SeederProbeTimeoutSec int
 }
 
 type SlowDownloadData struct {
@@ -391,7 +398,23 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// Step 1: Torrent warmup (skip for cached/vault content; also skipped on
 	// forceSlow — the user already accepted slow playback, so we save the warmup
 	// budget and let the transcoder pull cold instead).
-	if !se.Meta.Cache {
+	//
+	// "Cached" has two sources: rest-api long-term cache (S3) via se.Meta.Cache
+	// AND a seeder pod that already holds our head+tail pieces locally (common
+	// in share flows). The fast-path probe (one SSE event, ~hundreds of ms when
+	// the pod is warm) detects the latter; on a hit we treat the rest of the
+	// flow as cached so bandwidth-check routes through the plan-cap branch
+	// instead of trying to use a never-measured downloadSpeed.
+	const tailWarmupBytes = 500 * 1024
+	statsURL := exportResponse.ExportItems["torrent_client_stat"].URL
+	effectiveCache := se.Meta.Cache
+	if !effectiveCache && !s.forceSlow && s.seederHasContent(ctx, statsURL, fileSize, warmupSize, tailWarmupBytes) {
+		// Silent skip — the probe hit, the pod already has the bytes, and we
+		// don't want to surface a "Skip" line for what looks to the user like
+		// the cached-content flow. The job log jumps straight to probe/render.
+		effectiveCache = true
+	}
+	if !effectiveCache {
 		if s.forceSlow {
 			j.Skip(s.t("job.warmingUp"))
 		} else {
@@ -399,7 +422,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			if warmupSize <= skipBytes {
 				skipBytes = 0
 			}
-			if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, exportResponse.ExportItems["torrent_client_stat"].URL, fileSize, warmupSize, 500*1024, skipBytes, "file", true); err != nil {
+			if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, "file", true); err != nil {
 				return
 			}
 		}
@@ -451,13 +474,13 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		if bitrate > 0 {
 			if s.forceSlow {
 				j.Skip(s.t("job.checkingBandwidth"))
-			} else if se.Meta.Cache && !graceMode {
+			} else if effectiveCache && !graceMode {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
 					return &SlowDownloadError{Data: sdd}
 				}
 				j.Done()
-			} else if !se.Meta.Cache && downloadSpeed > 0 {
+			} else if !effectiveCache && downloadSpeed > 0 {
 				j.InProgress(s.t("job.checkingBandwidth"))
 				if downloadSpeed*8 < float64(bitrate) {
 					return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
@@ -623,8 +646,15 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	de := resp.ExportItems["download"]
 	//url := de.URL
 	if !de.ExportMetaItem.Meta.Cache {
-		if _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, resp.ExportItems["torrent_client_stat"].URL, int(resp.Source.Size), 1024*1024, 0, 0, "", true); err != nil {
-			return err
+		const downloadHeadWarmup = 1024 * 1024
+		statsURL := resp.ExportItems["torrent_client_stat"].URL
+		fileSize := int(resp.Source.Size)
+		// Silent fast-path: when the seeder pod already holds the head pieces,
+		// the warmup step is omitted from the job log entirely (no "Skip" line).
+		if !s.seederHasContent(ctx, statsURL, fileSize, downloadHeadWarmup, 0) {
+			if _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, statsURL, fileSize, downloadHeadWarmup, 0, 0, "", true); err != nil {
+				return err
+			}
 		}
 	}
 	j.DoneWithMessage(s.t("job.downloadReady"))
@@ -653,6 +683,116 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	}
 	j.Custom("action/download_file", strings.TrimSpace(str))
 	return
+}
+
+// seederHasContent is the fast-path probe used before warmUp. It opens the
+// stats SSE, reads the first statupdate, and checks whether every piece
+// covering the head (headBytes) and tail (tailBytes) byte ranges of the
+// target file is already Complete on the seeder pod. When true the caller
+// is expected to skip warmUp and route through the cap-modal bandwidth
+// branch — the BT-slow gate is meaningless once the bottleneck has moved
+// from peers to plan-cap / user-uplink.
+//
+// Returns false on any of: probe disabled, no statsURL, deadline elapsed
+// before the first event, empty Pieces, missing tail/head pieces, or any
+// transport error. False is always safe — the caller falls through to the
+// existing warmUp path.
+//
+// Piece size is approximated as ceil(fileSize / len(Pieces)) because the
+// seeder proto carries position/complete/priority only. That over-counts
+// covered pieces by at most one at each edge — fine for our purposes
+// since we already require *every* covering piece to be Complete.
+func (s *ActionScript) seederHasContent(ctx context.Context, statsURL string, fileSize, headBytes, tailBytes int) bool {
+	if statsURL == "" || s.warmup.SeederProbeTimeoutSec <= 0 || fileSize <= 0 {
+		return false
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmup.SeederProbeTimeoutSec)*time.Second)
+	defer cancel()
+
+	ch, err := s.api.Stats(probeCtx, statsURL)
+	if err != nil {
+		// rest-api signals fully-cached content with 404 on torrent_client_stat
+		// (see handlers/resource/status.go:329). api.Stats translates that
+		// into errors.New("cached"). Should normally not fire here because
+		// se.Meta.Cache=true short-circuits this whole branch upstream, but
+		// covered for completeness.
+		if err.Error() == "cached" {
+			return true
+		}
+		log.WithError(err).Debug("seeder probe: stats subscribe failed")
+		return false
+	}
+
+	select {
+	case ev, ok := <-ch:
+		if !ok {
+			return false
+		}
+		hit := piecesCoverRange(ev, fileSize, headBytes, tailBytes)
+		if hit {
+			log.WithField("file_size", fileSize).
+				WithField("head_bytes", headBytes).
+				WithField("tail_bytes", tailBytes).
+				WithField("pieces", len(ev.Pieces)).
+				Info("seeder probe hit: skipping warmup")
+		}
+		return hit
+	case <-probeCtx.Done():
+		return false
+	}
+}
+
+// piecesCoverRange returns true when every piece touching [0..head) ∪
+// [size-tail..size) carries Complete=true in the SSE event. Head/tail piece
+// counts are rounded up; overlap (small files where head+tail ≥ size) is
+// handled by clamping the tail start at headPieces.
+func piecesCoverRange(ev api.EventData, fileSize, head, tail int) bool {
+	n := len(ev.Pieces)
+	if n == 0 || fileSize <= 0 {
+		return false
+	}
+	pieceSize := fileSize / n
+	if fileSize%n != 0 {
+		pieceSize++
+	}
+	if pieceSize <= 0 {
+		return false
+	}
+	if head > fileSize {
+		head = fileSize
+	}
+	if tail > fileSize {
+		tail = fileSize
+	}
+
+	headPieces := 0
+	if head > 0 {
+		headPieces = (head + pieceSize - 1) / pieceSize
+		if headPieces > n {
+			headPieces = n
+		}
+	}
+	for i := 0; i < headPieces; i++ {
+		if !ev.Pieces[i].Complete {
+			return false
+		}
+	}
+	if tail > 0 {
+		tailPieces := (tail + pieceSize - 1) / pieceSize
+		if tailPieces > n {
+			tailPieces = n
+		}
+		start := n - tailPieces
+		if start < headPieces {
+			start = headPieces
+		}
+		for i := start; i < n; i++ {
+			if !ev.Pieces[i].Complete {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, skipBytes int, tagSuff string, useStatus bool) (downloadSpeed float64, err error) {

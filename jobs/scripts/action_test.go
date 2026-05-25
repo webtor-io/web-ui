@@ -146,3 +146,94 @@ func TestCheckCachedRateLimit_CapEqualsRequirement(t *testing.T) {
 		t.Error("cap == bitrate should not raise warning")
 	}
 }
+
+func makePieces(n int, complete []int) []struct {
+	Position int  `json:"position"`
+	Complete bool `json:"complete"`
+	Priority int  `json:"priority"`
+} {
+	set := map[int]bool{}
+	for _, i := range complete {
+		set[i] = true
+	}
+	out := make([]struct {
+		Position int  `json:"position"`
+		Complete bool `json:"complete"`
+		Priority int  `json:"priority"`
+	}, n)
+	for i := 0; i < n; i++ {
+		out[i].Position = i
+		out[i].Complete = set[i]
+	}
+	return out
+}
+
+func TestPiecesCoverRange(t *testing.T) {
+	// 10 pieces, file = 100MB → 10MB/piece.
+	const fileSize = 100 * 1024 * 1024
+	allComplete := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+	t.Run("all complete, head only", func(t *testing.T) {
+		ev := api.EventData{Pieces: makePieces(10, allComplete)}
+		if !piecesCoverRange(ev, fileSize, 30*1024*1024, 0) {
+			t.Error("all-complete should cover 30MB head")
+		}
+	})
+
+	t.Run("head missing one", func(t *testing.T) {
+		// First 3 pieces cover 30MB but piece 1 missing.
+		ev := api.EventData{Pieces: makePieces(10, []int{0, 2, 3, 4, 5, 6, 7, 8, 9})}
+		if piecesCoverRange(ev, fileSize, 30*1024*1024, 0) {
+			t.Error("missing head piece must fail coverage")
+		}
+	})
+
+	t.Run("tail missing", func(t *testing.T) {
+		// All except the last piece.
+		ev := api.EventData{Pieces: makePieces(10, []int{0, 1, 2, 3, 4, 5, 6, 7, 8})}
+		if piecesCoverRange(ev, fileSize, 30*1024*1024, 500*1024) {
+			t.Error("missing tail piece must fail coverage")
+		}
+	})
+
+	t.Run("head+tail covered but middle missing", func(t *testing.T) {
+		ev := api.EventData{Pieces: makePieces(10, []int{0, 1, 2, 8, 9})}
+		if !piecesCoverRange(ev, fileSize, 30*1024*1024, 20*1024*1024) {
+			t.Error("middle gap is irrelevant when only head+tail are checked")
+		}
+	})
+
+	t.Run("empty pieces", func(t *testing.T) {
+		if piecesCoverRange(api.EventData{}, fileSize, 1024, 0) {
+			t.Error("empty pieces should never report cached")
+		}
+	})
+
+	t.Run("head exceeds file", func(t *testing.T) {
+		ev := api.EventData{Pieces: makePieces(10, allComplete)}
+		if !piecesCoverRange(ev, fileSize, fileSize*10, 0) {
+			t.Error("head > size should clamp to full file (all complete here)")
+		}
+	})
+
+	t.Run("ceil rounding pulls in extra piece", func(t *testing.T) {
+		// 30MB+1 byte needs piece 3 too — and piece 3 is missing.
+		ev := api.EventData{Pieces: makePieces(10, []int{0, 1, 2, 4, 5, 6, 7, 8, 9})}
+		if piecesCoverRange(ev, fileSize, 30*1024*1024+1, 0) {
+			t.Error("ceil should pull in piece 3, which is missing")
+		}
+	})
+
+	t.Run("overlap small file", func(t *testing.T) {
+		// 4 pieces, head wants 2 pieces, tail wants 3 pieces → overlap. Only
+		// "all complete" should pass; one gap anywhere fails.
+		ev := api.EventData{Pieces: makePieces(4, []int{0, 1, 2, 3})}
+		if !piecesCoverRange(ev, 40*1024*1024, 20*1024*1024, 30*1024*1024) {
+			t.Error("overlapping head+tail with full coverage should pass")
+		}
+		ev2 := api.EventData{Pieces: makePieces(4, []int{0, 1, 3})}
+		if piecesCoverRange(ev2, 40*1024*1024, 20*1024*1024, 30*1024*1024) {
+			t.Error("overlap covering piece 2 should fail — it's missing")
+		}
+	})
+}

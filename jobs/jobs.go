@@ -14,12 +14,13 @@ import (
 )
 
 const (
-	warmupTimeoutMinFlag          = "warmup-timeout-min"
-	warmupNoPeersTimeoutSecFlag   = "warmup-no-peers-timeout-sec"
-	warmupSlowPeersTimeoutSecFlag = "warmup-slow-peers-timeout-sec"
-	graceRulesEnabledFlag         = "grace-rules-enabled"
-	graceDurationSecFlag          = "grace-duration-sec"
-	graceRateFlag                 = "grace-rate"
+	warmupTimeoutMinFlag            = "warmup-timeout-min"
+	warmupNoPeersTimeoutSecFlag     = "warmup-no-peers-timeout-sec"
+	warmupSlowPeersTimeoutSecFlag   = "warmup-slow-peers-timeout-sec"
+	warmupSeederProbeTimeoutSecFlag = "warmup-seeder-probe-timeout-sec"
+	graceRulesEnabledFlag           = "grace-rules-enabled"
+	graceDurationSecFlag            = "grace-duration-sec"
+	graceRateFlag                   = "grace-rate"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -41,6 +42,12 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "warmup watchdog cutoff (sec): if downloaded bytes are still below the early-min threshold within this window, surface the no_peers CTA early",
 			EnvVar: "WARMUP_SLOW_PEERS_TIMEOUT_SEC",
 			Value:  120,
+		},
+		cli.IntFlag{
+			Name:   warmupSeederProbeTimeoutSecFlag,
+			Usage:  "warmup seeder fast-path probe budget (sec): time to wait for the first stats SSE event; if all head/tail pieces are already Complete on the pod, the full torrent warmup is skipped. 0 disables the probe.",
+			EnvVar: "WARMUP_SEEDER_PROBE_TIMEOUT_SEC",
+			Value:  3,
 		},
 		cli.BoolFlag{
 			Name:   graceRulesEnabledFlag,
@@ -99,9 +106,10 @@ func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api 
 		userSubtitles: userSubtitles,
 		thumbnail:     thumb,
 		warmup: scripts.WarmupSettings{
-			TimeoutMin:          c.Int(warmupTimeoutMinFlag),
-			NoPeersTimeoutSec:   c.Int(warmupNoPeersTimeoutSecFlag),
-			SlowPeersTimeoutSec: c.Int(warmupSlowPeersTimeoutSecFlag),
+			TimeoutMin:            c.Int(warmupTimeoutMinFlag),
+			NoPeersTimeoutSec:     c.Int(warmupNoPeersTimeoutSecFlag),
+			SlowPeersTimeoutSec:   c.Int(warmupSlowPeersTimeoutSecFlag),
+			SeederProbeTimeoutSec: c.Int(warmupSeederProbeTimeoutSecFlag),
 		},
 		grace: scripts.GraceSettings{
 			Enabled:     c.Bool(graceRulesEnabledFlag),

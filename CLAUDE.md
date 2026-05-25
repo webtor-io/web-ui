@@ -19,6 +19,7 @@
 | `resource_metadata` table — не JSONB | `is_adult`/`is_sport` — индексируемые булы для hot-path запросов (poster blur, фильтры). Full ptn snapshot в `metadata` JSONB. Switch to JSONB only когда появится много long-tail soft-флагов |
 | `user_settings` — typed columns | Same rationale — `show_adult` индексируем для "сколько юзеров opted in". JSONB defer'нут до накопления флагов |
 | URL/UI хелперы — НЕ методы на `web.Context` | `web.Context` остаётся raw request-state (CSRF/User/Lang). Feature-specific URL builders принимают `*Context` параметром в helpers (`web.PosterURL(rid, w, isAdult, ctx)`), не методами на shared type |
+| Seeder fast-path warmup — silent skip | Когда seeder pod уже держит head+tail pieces, `warmUp` тихо пропускается без `j.Skip` UI-следа и роутится через cap-modal ветку (как `Cache=true`). Главный win — share-flow: viewer попадает на hot pod сразу после sharer'а. См. `docs/warmup.md` |
 
 ## Internationalization (i18n)
 
