@@ -23,9 +23,9 @@
                         <div class="text-center font-bold text-sm p-2 text-w-purpleL/60 line-clamp-3">{{ .DisplayName }}</div>
                     </div>
                     <img class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                         src="{{ .PosterURL }}" alt="{{ .DisplayName }}" loading="lazy"
+                         src="{{ posterURL .ResourceID 240 .IsAdult $.Ctx }}" alt="{{ .DisplayName }}" loading="lazy"
                          onerror="this.remove()" />
-                    {{ if .IsAdult }}
+                    {{ if showAdultBadge .IsAdult $.Ctx }}
                     <div class="w-adult-badge absolute inset-0 grid place-items-center pointer-events-none" data-resource-id="{{ .ResourceID }}">
                         <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center cursor-pointer pointer-events-auto select-none">18+</span>
                     </div>

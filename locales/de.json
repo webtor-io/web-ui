@@ -224,9 +224,6 @@
     "profile.backends.save": "Speichern",
     "profile.backends.deleteConfirm": "Möchtest du diesen %v-Backend wirklich löschen?",
     "profile.backends.deleted": "Backend gelöscht",
-    "profile.preferences.title": "Einstellungen",
-        "profile.preferences.showAdult": "Erwachseneninhalte ohne Weichzeichner anzeigen",
-        "profile.preferences.showAdultDesc": "Deaktiviert den Datenschutz-Weichzeichner für als Erwachsenenmaterial klassifizierte Poster im gesamten Webtor. Das 18+ Overlay wird ebenfalls ausgeblendet. Standardmäßig aus — Schutz vor versehentlichem Anschauen ist die sicherere Voreinstellung.",
     "profile.settings.title": "Einstellungen",
     "profile.settings.resolutions": "Bevorzugte Auflösungen",
     "profile.settings.dragHint": "Ziehen zum Neuordnen nach Präferenz",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Nützlich",
     "release_sub.btn_no": "Nicht interessiert",
     "release_sub.anon_register_cta": "Registrieren, um zu aktivieren",
-    "release_sub.thanks": "Danke für dein Feedback."
+    "release_sub.thanks": "Danke für dein Feedback.",
+    "profile.preferences": "Einstellungen",
+    "profile.adultContent.title": "Inhalte für Erwachsene",
+    "profile.adultContent.unblur": "Vorschauen nicht verwischen",
+    "profile.adultContent.unblurDesc": "Blendet den Datenschutz-Weichzeichner und das 18+ Overlay auf als Erwachsenenmaterial klassifizierten Postern aus."
 }

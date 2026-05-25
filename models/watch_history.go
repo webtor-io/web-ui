@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -334,12 +333,6 @@ func enrichWatchHistoryParallel(ctx context.Context, db *pg.DB, list []*WatchHis
 			wh.VideoID = m.VideoID
 			wh.ContentType = m.ContentType
 		}
-		// Always emit the resource-keyed poster URL — the endpoint
-		// resolves IMDb → thumbnail → 404 internally. For un-enriched
-		// torrents this now serves the generated thumbnail (when the
-		// user has streamed/downloaded it before) instead of falling
-		// straight through to the gradient placeholder.
-		wh.PosterURL = fmt.Sprintf("/lib/poster/%s/240.jpg", wh.ResourceID)
 	}
 }
 

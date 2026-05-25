@@ -224,9 +224,6 @@
     "profile.backends.save": "Salva",
     "profile.backends.deleteConfirm": "Sei sicuro di voler eliminare questo backend %v?",
     "profile.backends.deleted": "Backend eliminato",
-    "profile.preferences.title": "Preferenze",
-        "profile.preferences.showAdult": "Mostra contenuti per adulti senza sfocatura",
-        "profile.preferences.showAdultDesc": "Disattiva la sfocatura della privacy sui poster classificati come per adulti in tutto il sito. Anche il badge 18+ viene nascosto. Disattivato per impostazione predefinita — la protezione dalla visione accidentale è l\opzione più sicura.",
     "profile.settings.title": "Impostazioni",
     "profile.settings.resolutions": "Risoluzioni preferite",
     "profile.settings.dragHint": "Trascina per riordinare in base alle preferenze",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Utile",
     "release_sub.btn_no": "Non mi interessa",
     "release_sub.anon_register_cta": "Iscriviti per attivare",
-    "release_sub.thanks": "Grazie del feedback."
+    "release_sub.thanks": "Grazie del feedback.",
+    "profile.preferences": "Preferenze",
+    "profile.adultContent.title": "Contenuti per adulti",
+    "profile.adultContent.unblur": "Non sfocare le anteprime",
+    "profile.adultContent.unblurDesc": "Nasconde la sfocatura della privacy e il badge 18+ sui poster classificati come per adulti in tutto il sito."
 }

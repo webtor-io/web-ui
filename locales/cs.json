@@ -224,9 +224,6 @@
     "profile.backends.save": "Uložit",
     "profile.backends.deleteConfirm": "Jsi si jistý, že chceš smazat tento backend %v?",
     "profile.backends.deleted": "Backend smazán",
-    "profile.preferences.title": "Předvolby",
-        "profile.preferences.showAdult": "Zobrazovat obsah pro dospělé bez rozmazání",
-        "profile.preferences.showAdultDesc": "Vypne rozmazání soukromí na plakátech klasifikovaných jako pro dospělé v celém webu. Odznak 18+ je rovněž skryt. Ve výchozím nastavení vypnuto — ochrana před náhodným zobrazením je bezpečnější volba.",
     "profile.settings.title": "Nastavení",
     "profile.settings.resolutions": "Preferovaná rozlišení",
     "profile.settings.dragHint": "Přetáhni pro změnu pořadí podle preferencí",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Užitečné",
     "release_sub.btn_no": "Nemám zájem",
     "release_sub.anon_register_cta": "Zaregistruj se pro aktivaci",
-    "release_sub.thanks": "Děkujeme za zpětnou vazbu."
+    "release_sub.thanks": "Děkujeme za zpětnou vazbu.",
+    "profile.preferences": "Předvolby",
+    "profile.adultContent.title": "Obsah pro dospělé",
+    "profile.adultContent.unblur": "Nerozmazávat náhledy",
+    "profile.adultContent.unblurDesc": "Skryje rozmazání soukromí a odznak 18+ na plakátech klasifikovaných jako pro dospělé v celém webu."
 }

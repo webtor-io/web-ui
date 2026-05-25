@@ -255,11 +255,14 @@ func (s *Helper) GetOGImageURL(gd *GetData) string {
 // to show the same image visitors see in a shared preview — IMDb
 // poster, generated thumbnail, or nothing (handler returns 404 and
 // the template's CSS placeholder takes over).
-func (s *Helper) GetResourcePosterURL(gd *GetData, width int) string {
+//
+// Delegates the /raw/ switch to web.PosterURL so the adult-opt-in
+// behaviour stays consistent with library cards and continue-watching.
+func (s *Helper) GetResourcePosterURL(gd *GetData, width int, ctx *w.Context) string {
 	if gd == nil || gd.Resource == nil {
 		return ""
 	}
-	return fmt.Sprintf("/lib/poster/%s/%d.jpg", gd.Resource.ID, width)
+	return w.PosterURL(gd.Resource.ID, width, s.IsAdult(gd), ctx)
 }
 
 // IsAdult reports whether the torrent's name/paths tripped the adult

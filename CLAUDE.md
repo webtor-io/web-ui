@@ -15,6 +15,10 @@
 | go-i18n + path prefix routing | SEO (каждый язык — отдельный URL), обратная совместимость (EN без префикса), HTTP middleware до Gin routing |
 | `withContext` для sub-templates | Lang не протекает в domain structs. Контекст передаётся отдельно через wrapper |
 | Translation keys в Go коде | Tool titles, sort labels, button names, job messages — ключи вместо строк, перевод в шаблоне/runtime |
+| Adult-content blur — server-side, не client | Server рендерит блюр в poster_resolver на ответе. Защищает share-flow (Telegram/Stremio fetch'ат без auth → получают блюр гарантированно). См. `docs/adult_classification.md` |
+| `resource_metadata` table — не JSONB | `is_adult`/`is_sport` — индексируемые булы для hot-path запросов (poster blur, фильтры). Full ptn snapshot в `metadata` JSONB. Switch to JSONB only когда появится много long-tail soft-флагов |
+| `user_settings` — typed columns | Same rationale — `show_adult` индексируем для "сколько юзеров opted in". JSONB defer'нут до накопления флагов |
+| URL/UI хелперы — НЕ методы на `web.Context` | `web.Context` остаётся raw request-state (CSRF/User/Lang). Feature-specific URL builders принимают `*Context` параметром в helpers (`web.PosterURL(rid, w, isAdult, ctx)`), не методами на shared type |
 
 ## Internationalization (i18n)
 

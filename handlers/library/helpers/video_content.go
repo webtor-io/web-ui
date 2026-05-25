@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 type VideoContentHelper struct{}
@@ -73,17 +74,21 @@ func (s *VideoContentHelper) GetVideoType(m models.VideoContentWithMetadata) str
 	return string(m.GetContentType())
 }
 
-// GetCachedPoster240 returns the resource-keyed poster URL. Unified
-// endpoint resolves IMDb → thumbnail → 404 internally — un-enriched
-// torrents (no IMDb poster) get their generated thumbnail instead of
-// falling through to the gradient placeholder. The template wraps the
-// <img> with onerror=this.remove() so 404s degrade to the placeholder
-// rendered underneath.
-func (s *VideoContentHelper) GetCachedPoster240(m models.VideoContentWithMetadata) string {
+// GetCachedPoster240 returns the resource-keyed poster URL at 240px.
+// Delegates to web.Helper.PosterURL so the /raw/ switch stays in one
+// place across all consumers (library, continue-watching, resource
+// page). Per-helper indirection just lets the template call this
+// pipeline-style without having to fish ResourceID + IsAdult out
+// of the model in the template itself.
+func (s *VideoContentHelper) GetCachedPoster240(m models.VideoContentWithMetadata, ctx *web.Context) string {
 	if m.GetContent() == nil || m.GetContent().ResourceID == "" {
 		return ""
 	}
-	return fmt.Sprintf("/lib/poster/%v/240.jpg", m.GetContent().ResourceID)
+	isAdult := false
+	if a, ok := m.(interface{ IsAdult() bool }); ok {
+		isAdult = a.IsAdult()
+	}
+	return web.PosterURL(m.GetContent().ResourceID, 240, isAdult, ctx)
 }
 
 func (s *VideoContentHelper) HasEpisodeStill(ep *models.Episode) bool {

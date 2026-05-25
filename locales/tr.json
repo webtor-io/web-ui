@@ -224,9 +224,6 @@
     "profile.backends.save": "Kaydet",
     "profile.backends.deleteConfirm": "Bu %v backend'ini silmek istediğine emin misin?",
     "profile.backends.deleted": "Backend silindi",
-    "profile.preferences.title": "Tercihler",
-        "profile.preferences.showAdult": "Yetişkin içeriği bulanıklaştırmadan göster",
-        "profile.preferences.showAdultDesc": "Site genelinde yetişkin olarak sınıflandırılan posterlerdeki gizlilik bulanıklığını devre dışı bırakır. 18+ rozet de gizlenir. Varsayılan olarak kapalı — kazara görüntülemeye karşı koruma daha güvenli seçenektir.",
     "profile.settings.title": "Ayarlar",
     "profile.settings.resolutions": "Tercih edilen çözünürlükler",
     "profile.settings.dragHint": "Tercih sırasına göre yeniden düzenlemek için sürükle",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Yararlı",
     "release_sub.btn_no": "İlgilenmiyorum",
     "release_sub.anon_register_cta": "Etkinleştirmek için kayıt ol",
-    "release_sub.thanks": "Geri bildirimin için teşekkürler."
+    "release_sub.thanks": "Geri bildirimin için teşekkürler.",
+    "profile.preferences": "Tercihler",
+    "profile.adultContent.title": "Yetişkin içerik",
+    "profile.adultContent.unblur": "Önizlemeleri bulanıklaştırma",
+    "profile.adultContent.unblurDesc": "Site genelinde yetişkin olarak sınıflandırılan posterlerdeki gizlilik bulanıklığını ve 18+ rozetini gizler."
 }

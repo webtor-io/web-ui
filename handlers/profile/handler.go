@@ -266,8 +266,9 @@ func (s *Handler) get(c *gin.Context) {
 
 // updateSettings persists the toggles from the per-user settings
 // section of the profile page. Form is data-async so the response
-// re-renders the section in place; redirect with X-Return-Url
-// preserves the user's scroll position.
+// re-renders the section in place; web.RedirectWithSuccess routes
+// the async-loader back to X-Return-Url with the standard
+// status=success query param attached.
 func (s *Handler) updateSettings(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	us := &models.UserSettings{
@@ -278,9 +279,5 @@ func (s *Handler) updateSettings(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	ret := c.GetHeader("X-Return-Url")
-	if ret == "" {
-		ret = "/profile"
-	}
-	c.Redirect(http.StatusFound, ret)
+	web.RedirectWithSuccess(c)
 }

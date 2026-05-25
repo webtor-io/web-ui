@@ -1,30 +1,30 @@
-{{ define "profile/preferences" }}
-    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6" id="preferences-section">
+{{ define "profile/adult_content" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/>
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
             </svg>
-            {{ t .Ctx.Lang "profile.preferences.title" }}
+            {{ t .Ctx.Lang "profile.adultContent.title" }}
         </h2>
 
         <form method="post" enctype="multipart/form-data" data-async-push-state="false"
               action="{{ langPath .Ctx.Lang "/profile/settings" }}"
-              data-async-target="#preferences-section">
+              data-async-target="#adult-content-section">
 
-            <!-- show_adult toggle -->
             <div class="flex items-start gap-4">
                 <div class="flex-1">
-                    <h3 class="text-sm font-semibold mb-1">{{ t .Ctx.Lang "profile.preferences.showAdult" }}</h3>
+                    <h3 class="text-sm font-semibold mb-1">{{ t .Ctx.Lang "profile.adultContent.unblur" }}</h3>
                     <p class="text-xs text-w-muted leading-relaxed">
-                        {{ t .Ctx.Lang "profile.preferences.showAdultDesc" }}
+                        {{ t .Ctx.Lang "profile.adultContent.unblurDesc" }}
                     </p>
                 </div>
                 <label class="cursor-pointer shrink-0">
                     {{/* Submit-on-change pattern: the hidden text input rides
                          alongside a UI checkbox so the form posts the literal
                          "true"/"false" string regardless of checkbox quirks. */}}
-                    <input type="hidden" name="show_adult" value="{{ if .Data.UserSettings.ShowAdult }}true{{ else }}false{{ end }}">
-                    <input type="checkbox" class="toggle toggle-soft" {{ if .Data.UserSettings.ShowAdult }}checked{{ end }}
+                    <input type="hidden" name="show_adult" value="{{ if and .Data .Data.ShowAdult }}true{{ else }}false{{ end }}">
+                    <input type="checkbox" class="toggle toggle-soft" {{ if and .Data .Data.ShowAdult }}checked{{ end }}
                            onchange="this.previousElementSibling.value = this.checked ? 'true' : 'false'; this.form.requestSubmit();">
                 </label>
             </div>

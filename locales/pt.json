@@ -224,9 +224,6 @@
     "profile.backends.save": "Salvar",
     "profile.backends.deleteConfirm": "Tem certeza que quer excluir este backend %v?",
     "profile.backends.deleted": "Backend excluído",
-    "profile.preferences.title": "Preferências",
-        "profile.preferences.showAdult": "Mostrar conteúdo adulto sem desfoque",
-        "profile.preferences.showAdultDesc": "Desativa o desfoque de privacidade nos pôsteres classificados como adultos em todo o site. A insígnia 18+ também é ocultada. Desativado por padrão — a proteção contra visualização acidental é a opção mais segura.",
     "profile.settings.title": "Configurações",
     "profile.settings.resolutions": "Resoluções preferidas",
     "profile.settings.dragHint": "Arraste para reordenar por preferência",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Útil",
     "release_sub.btn_no": "Não tenho interesse",
     "release_sub.anon_register_cta": "Cadastre-se para ativar",
-    "release_sub.thanks": "Obrigado pelo feedback."
+    "release_sub.thanks": "Obrigado pelo feedback.",
+    "profile.preferences": "Preferências",
+    "profile.adultContent.title": "Conteúdo adulto",
+    "profile.adultContent.unblur": "Não desfocar pré-visualizações",
+    "profile.adultContent.unblurDesc": "Oculta o desfoque de privacidade e a insígnia 18+ nos pôsteres classificados como adultos em todo o site."
 }

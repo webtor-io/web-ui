@@ -46,7 +46,7 @@
         "ratingValue": "{{ printf "%.1f" (. | getEnrichedRating) }}",
         "bestRating": "10"
     }{{ end }}
-    {{ if . | hasEnrichedPoster }},"image": "{{ domain }}{{ getResourcePosterURL . 480 }}"{{ end }}
+    {{ if . | hasEnrichedPoster }},"image": "{{ domain }}{{ getResourcePosterURL . 480 $ }}"{{ end }}
     ,"url": "{{ domain }}/{{ .Resource.ID }}"
 }
 </script>
@@ -101,9 +101,9 @@
                      placeholder behind shows through. The endpoint
                      itself applies adult/sport blur server-side; this
                      badge labels the intent so it doesn't look broken. */}}
-                <img src="{{ getResourcePosterURL . 480 }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                <img src="{{ getResourcePosterURL . 480 $ }}" alt="{{ . | getEnrichedTitle }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
                      onerror="this.remove()">
-                {{ if . | isAdult }}
+                {{ if showAdultBadge (isAdult .) $ }}
                 <div class="w-adult-badge absolute inset-0 grid place-items-center pointer-events-none" data-resource-id="{{ .Resource.ID }}">
                     <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center cursor-pointer pointer-events-auto select-none">18+</span>
                 </div>
@@ -201,9 +201,9 @@
                 <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                     <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ .Resource.Name }}</div>
                 </div>
-                <img src="{{ getResourcePosterURL . 480 }}" alt="{{ .Resource.Name }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
+                <img src="{{ getResourcePosterURL . 480 $ }}" alt="{{ .Resource.Name }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy"
                      onerror="this.remove()">
-                {{ if . | isAdult }}
+                {{ if showAdultBadge (isAdult .) $ }}
                 <div class="w-adult-badge absolute inset-0 grid place-items-center pointer-events-none" data-resource-id="{{ .Resource.ID }}">
                     <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center cursor-pointer pointer-events-auto select-none">18+</span>
                 </div>

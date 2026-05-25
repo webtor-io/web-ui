@@ -224,9 +224,6 @@
     "profile.backends.save": "Сохранить",
     "profile.backends.deleteConfirm": "Вы уверены, что хотите удалить бэкенд %v?",
     "profile.backends.deleted": "Бэкенд удалён",
-    "profile.preferences.title": "Предпочтения",
-    "profile.preferences.showAdult": "Показывать контент 18+ без размытия",
-    "profile.preferences.showAdultDesc": "Отключает блюр на постерах adult-контента по всему сайту. Бейдж 18+ также скрывается. По умолчанию выключено — защита от случайного просмотра безопаснее.",
     "profile.settings.title": "Настройки",
     "profile.settings.resolutions": "Предпочитаемые разрешения",
     "profile.settings.dragHint": "Перетащите для изменения порядка",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Полезно",
     "release_sub.btn_no": "Не нужно",
     "release_sub.anon_register_cta": "Войдите, чтобы получать уведомления",
-    "release_sub.thanks": "Спасибо за фидбек."
+    "release_sub.thanks": "Спасибо за фидбек.",
+    "profile.preferences": "Предпочтения",
+    "profile.adultContent.title": "Контент для взрослых",
+    "profile.adultContent.unblur": "Не размывать превью",
+    "profile.adultContent.unblurDesc": "Снять блюр и 18+ оверлей с постеров adult-контента по всему сайту."
 }

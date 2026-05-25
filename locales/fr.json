@@ -224,9 +224,6 @@
     "profile.backends.save": "Enregistrer",
     "profile.backends.deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce backend %v ?",
     "profile.backends.deleted": "Backend supprimé",
-    "profile.preferences.title": "Préférences",
-        "profile.preferences.showAdult": "Afficher le contenu pour adultes sans flou",
-        "profile.preferences.showAdultDesc": "Désactive le flou de confidentialité sur les affiches classées adultes sur tout le site. Le badge 18+ est également masqué. Désactivé par défaut — la protection contre la visualisation accidentelle est l\option la plus sûre.",
     "profile.settings.title": "Paramètres",
     "profile.settings.resolutions": "Résolutions préférées",
     "profile.settings.dragHint": "Glissez pour réorganiser selon vos préférences",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Utile",
     "release_sub.btn_no": "Pas intéressé",
     "release_sub.anon_register_cta": "S'inscrire pour activer",
-    "release_sub.thanks": "Merci pour votre retour."
+    "release_sub.thanks": "Merci pour votre retour.",
+    "profile.preferences": "Préférences",
+    "profile.adultContent.title": "Contenu pour adultes",
+    "profile.adultContent.unblur": "Ne pas flouter les aperçus",
+    "profile.adultContent.unblurDesc": "Masque le flou de confidentialité et le badge 18+ sur les affiches classées adultes sur tout le site."
 }

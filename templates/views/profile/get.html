@@ -23,7 +23,15 @@
     </div>
     {{ end }}
 
-    {{ template "profile/preferences" $ }}
+    <!-- Preferences -->
+    <div class="flex items-center gap-3 mt-10 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.preferences" }}</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+    </div>
+
+    <div id="adult-content-section" data-async-layout="{{`{{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}`}}">
+        {{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}
+    </div>
 
     <!-- Stremio -->
     <div class="flex items-center gap-3 mt-10 mb-4">

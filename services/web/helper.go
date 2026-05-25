@@ -577,6 +577,56 @@ func (s *Helper) LangPath(lang string, path string) string {
 	return s.LangURL(lang, path)
 }
 
+// PosterURL builds the unified resource-keyed poster URL, slotting in
+// the auth-gated `/raw/` segment only when both conditions hold:
+//   - the resource is classified as adult (isAdult=true), AND
+//   - the request user has opted into seeing adult content unblurred
+//     (ctx.UserSettings.ShowAdult=true)
+//
+// Non-adult resources never go through /raw/ — the endpoint would
+// return the byte-identical image (no blur to suppress) at the cost
+// of an extra auth check. Anonymous users get the default URL too;
+// the /raw/ route requires sign-in.
+//
+// Exposed as both a package function (for handler-side callers and
+// other helpers) and a Helper method (registered as the `posterURL`
+// template func via reflection) so each call site picks the form
+// that reads best at the call site.
+//
+// Template usage: {{ posterURL .ResourceID 240 .IsAdult $.Ctx }}
+func PosterURL(resourceID string, width int, isAdult bool, ctx *Context) string {
+	if isAdult && ctx != nil && ctx.UserSettings != nil && ctx.UserSettings.ShowAdult {
+		return fmt.Sprintf("/lib/poster/raw/%s/%d.jpg", resourceID, width)
+	}
+	return fmt.Sprintf("/lib/poster/%s/%d.jpg", resourceID, width)
+}
+
+func (s *Helper) PosterURL(resourceID string, width int, isAdult bool, ctx *Context) string {
+	return PosterURL(resourceID, width, isAdult, ctx)
+}
+
+// ShowAdultBadge tells templates whether to render the 18+ overlay on
+// an adult card. False for users who've opted in to see adult content
+// unblurred — the badge would just clutter every card once the blur
+// is gone. Returns false for non-adult resources unconditionally so
+// templates can use this as a single guard without an outer
+// `if .IsAdult` check.
+//
+// Template usage: {{ if showAdultBadge .IsAdult $.Ctx }}
+func ShowAdultBadge(isAdult bool, ctx *Context) bool {
+	if !isAdult {
+		return false
+	}
+	if ctx != nil && ctx.UserSettings != nil && ctx.UserSettings.ShowAdult {
+		return false
+	}
+	return true
+}
+
+func (s *Helper) ShowAdultBadge(isAdult bool, ctx *Context) bool {
+	return ShowAdultBadge(isAdult, ctx)
+}
+
 // CanonicalURL returns the full canonical URL for the current page and language.
 // Template usage: {{ canonicalURL $.Lang $.Path }}
 func (s *Helper) CanonicalURL(lang string, path string) string {

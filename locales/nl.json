@@ -224,9 +224,6 @@
     "profile.backends.save": "Opslaan",
     "profile.backends.deleteConfirm": "Weet je zeker dat je deze %v backend wilt verwijderen?",
     "profile.backends.deleted": "Backend verwijderd",
-    "profile.preferences.title": "Voorkeuren",
-        "profile.preferences.showAdult": "Toon volwassen inhoud zonder vervaging",
-        "profile.preferences.showAdultDesc": "Schakelt de privacy-vervaging uit op als volwassen geclassificeerde posters op de hele site. De 18+ badge wordt ook verborgen. Standaard uit — bescherming tegen onbedoeld bekijken is de veiligere keuze.",
     "profile.settings.title": "Instellingen",
     "profile.settings.resolutions": "Voorkeursresoluties",
     "profile.settings.dragHint": "Sleep om te ordenen op voorkeur",
@@ -1109,5 +1106,9 @@
     "release_sub.btn_yes": "Nuttig",
     "release_sub.btn_no": "Geen interesse",
     "release_sub.anon_register_cta": "Registreer om in te schakelen",
-    "release_sub.thanks": "Bedankt voor de feedback."
+    "release_sub.thanks": "Bedankt voor de feedback.",
+    "profile.preferences": "Voorkeuren",
+    "profile.adultContent.title": "Inhoud voor volwassenen",
+    "profile.adultContent.unblur": "Voorvertoningen niet vervagen",
+    "profile.adultContent.unblurDesc": "Verbergt de privacy-vervaging en de 18+ badge op als volwassen geclassificeerde posters op de hele site."
 }
