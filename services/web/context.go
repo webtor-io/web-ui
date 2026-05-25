@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/handlers/geo"
 	"github.com/webtor-io/web-ui/handlers/session"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -11,19 +12,26 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 )
 
+// userSettingsContextKey is the gin-context key the user-settings
+// middleware (services/user_settings/middleware.go) writes into. We
+// keep the constant here (the consumer side) so the middleware can
+// stay decoupled from web.Context's internal layout.
+const userSettingsContextKey = "web.user_settings"
+
 type Context struct {
-	Data        any
-	CSRF        string
-	SessionID   string
-	ErrKey      string
-	User        *auth.User
-	Claims      *claims.Data
-	TierUpdated bool
-	Geo         *geoip.Data
-	ApiClaims   *api.Claims
-	Lang        string
-	Path        string
-	ginCtx      *gin.Context
+	Data         any
+	CSRF         string
+	SessionID    string
+	ErrKey       string
+	User         *auth.User
+	Claims       *claims.Data
+	TierUpdated  bool
+	Geo          *geoip.Data
+	ApiClaims    *api.Claims
+	UserSettings *models.UserSettings
+	Lang         string
+	Path         string
+	ginCtx       *gin.Context
 }
 
 func (c *Context) WithData(obj any) *Context {
@@ -59,18 +67,30 @@ func NewContext(c *gin.Context) *Context {
 	tu := claims.GetTierUpdateFromContext(c)
 	lang := i18n.GetLang(c)
 	path := c.Request.URL.Path
+	us, _ := c.Get(userSettingsContextKey)
+	settings, _ := us.(*models.UserSettings)
 
 	return &Context{
-		CSRF:        sess.CSRF,
-		User:        user,
-		Claims:      cl,
-		ApiClaims:   aCl,
-		SessionID:   sess.ID,
-		Geo:         geoData,
-		TierUpdated: tu,
-		Lang:        lang,
-		Path:        path,
-		ginCtx:      c,
+		CSRF:         sess.CSRF,
+		User:         user,
+		Claims:       cl,
+		ApiClaims:    aCl,
+		SessionID:    sess.ID,
+		Geo:          geoData,
+		TierUpdated:  tu,
+		UserSettings: settings,
+		Lang:         lang,
+		Path:         path,
+		ginCtx:       c,
 	}
+}
+
+// SetUserSettings stashes the loaded UserSettings into the gin
+// context. Called by the user-settings middleware right after the
+// auth middleware runs so any downstream handler that wraps the
+// request in a web.Context gets the value populated. Exposed (rather
+// than direct c.Set) so the context-key constant stays internal.
+func SetUserSettings(c *gin.Context, us *models.UserSettings) {
+	c.Set(userSettingsContextKey, us)
 }
 

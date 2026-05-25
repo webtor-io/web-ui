@@ -27,6 +27,7 @@
             window._CSRF = "{{ .CSRF }}";
             window._sessionID = "{{ .SessionID }}";
             window._domain = "{{ domain }}";
+            window._showAdult = {{ if and .UserSettings .UserSettings.ShowAdult }}true{{ else }}false{{ end }};
             {{- if useUmami }}
             window._umami = {{ umamiConfig | json }};
             {{- end }}

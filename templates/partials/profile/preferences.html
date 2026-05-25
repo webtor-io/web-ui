@@ -1,0 +1,33 @@
+{{ define "profile/preferences" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6" id="preferences-section">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            {{ t .Ctx.Lang "profile.preferences.title" }}
+        </h2>
+
+        <form method="post" enctype="multipart/form-data" data-async-push-state="false"
+              action="{{ langPath .Ctx.Lang "/profile/settings" }}"
+              data-async-target="#preferences-section">
+
+            <!-- show_adult toggle -->
+            <div class="flex items-start gap-4">
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold mb-1">{{ t .Ctx.Lang "profile.preferences.showAdult" }}</h3>
+                    <p class="text-xs text-w-muted leading-relaxed">
+                        {{ t .Ctx.Lang "profile.preferences.showAdultDesc" }}
+                    </p>
+                </div>
+                <label class="cursor-pointer shrink-0">
+                    {{/* Submit-on-change pattern: the hidden text input rides
+                         alongside a UI checkbox so the form posts the literal
+                         "true"/"false" string regardless of checkbox quirks. */}}
+                    <input type="hidden" name="show_adult" value="{{ if .Data.UserSettings.ShowAdult }}true{{ else }}false{{ end }}">
+                    <input type="checkbox" class="toggle toggle-soft" {{ if .Data.UserSettings.ShowAdult }}checked{{ end }}
+                           onchange="this.previousElementSibling.value = this.checked ? 'true' : 'false'; this.form.requestSubmit();">
+                </label>
+            </div>
+        </form>
+    </div>
+{{ end }}

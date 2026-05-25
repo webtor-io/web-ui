@@ -23,6 +23,8 @@
     </div>
     {{ end }}
 
+    {{ template "profile/preferences" $ }}
+
     <!-- Stremio -->
     <div class="flex items-center gap-3 mt-10 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.stremio" }}</h2>

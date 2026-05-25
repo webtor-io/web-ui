@@ -26,8 +26,8 @@
                          src="{{ .PosterURL }}" alt="{{ .DisplayName }}" loading="lazy"
                          onerror="this.remove()" />
                     {{ if .IsAdult }}
-                    <div class="absolute inset-0 grid place-items-center pointer-events-none">
-                        <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center">18+</span>
+                    <div class="w-adult-badge absolute inset-0 grid place-items-center pointer-events-none" data-resource-id="{{ .ResourceID }}">
+                        <span class="badge bg-transparent text-white/90 border-2 border-white/70 font-semibold tracking-wide backdrop-blur-sm leading-none flex items-center justify-center cursor-pointer pointer-events-auto select-none">18+</span>
                     </div>
                     {{ end }}
                     <!-- Progress bar -->

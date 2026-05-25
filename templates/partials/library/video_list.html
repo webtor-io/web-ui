@@ -19,8 +19,8 @@
                      src="{{ . | getCachedPoster240 }}" alt="{{ . | getTitle }}{{ if . | hasYear }} ({{ . | getYear }}){{ end }}"
                      loading="lazy" onerror="this.remove()" />
                 {{ if .IsAdult }}
-                <div class="absolute inset-0 z-10 grid place-items-center pointer-events-none">
-                    <span class="badge badge-lg bg-transparent text-white/90 border-2 border-white/70 font-bold text-base tracking-wider backdrop-blur-sm leading-none flex items-center justify-center">18+</span>
+                <div class="w-adult-badge absolute inset-0 z-10 grid place-items-center pointer-events-none" data-resource-id="{{ .ResourceID }}">
+                    <span class="badge badge-lg bg-transparent text-white/90 border-2 border-white/70 font-bold text-base tracking-wider backdrop-blur-sm leading-none flex items-center justify-center cursor-pointer pointer-events-auto select-none">18+</span>
                 </div>
                 {{ end }}
                 {{ if . | hasVideoID }}

@@ -21,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -45,6 +46,7 @@ type Data struct {
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
 	VaultStats            *vault.UserStats
+	UserSettings          *models.UserSettings
 	ErrKey                string
 	DisableWebDAV         bool
 	DisableEmbed          bool
@@ -57,11 +59,12 @@ type Handler struct {
 	pg            *cs.PG
 	claims        *claims.Claims
 	vault         *vault.Vault
+	userSettings  *usettings.Service
 	disableWebDAV bool
 	disableEmbed  bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service) {
 	h := &Handler{
 		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:            at,
@@ -69,6 +72,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		pg:            pg,
 		claims:        cl,
 		vault:         v,
+		userSettings:  us,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
@@ -77,6 +81,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 	gr.Use(auth.HasAuth)
 	gr.POST("/delete", h.delete)
 	gr.GET("/export", h.export)
+	gr.POST("/settings", h.updateSettings)
 }
 
 // getAvailableBackendTypes returns the list of available streaming backend types
@@ -235,6 +240,14 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
+	// Per-user preferences (adult-content visibility, etc). Missing row
+	// falls through to Default() — the toggle renders unchecked.
+	userSettings, err := s.userSettings.Get(c.Request.Context(), u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get user settings"))
+		return
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
@@ -244,8 +257,30 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		VaultStats:            vaultStats,
+		UserSettings:          userSettings,
 		ErrKey:                c.Query("err"),
 		DisableWebDAV:         s.disableWebDAV,
 		DisableEmbed:          s.disableEmbed,
 	}))
+}
+
+// updateSettings persists the toggles from the per-user settings
+// section of the profile page. Form is data-async so the response
+// re-renders the section in place; redirect with X-Return-Url
+// preserves the user's scroll position.
+func (s *Handler) updateSettings(c *gin.Context) {
+	u := auth.GetUserFromContext(c)
+	us := &models.UserSettings{
+		UserID:    u.ID,
+		ShowAdult: c.PostForm("show_adult") == "true",
+	}
+	if err := s.userSettings.Set(c.Request.Context(), us); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	ret := c.GetHeader("X-Return-Url")
+	if ret == "" {
+		ret = "/profile"
+	}
+	c.Redirect(http.StatusFound, ret)
 }

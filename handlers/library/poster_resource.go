@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/poster_resolver"
 )
 
@@ -21,6 +22,37 @@ import (
 // Source-resolution (IMDb → thumbnail → default) and caching live in
 // services/poster_resolver. This handler is just HTTP packaging.
 func (s *Handler) posterResource(c *gin.Context) {
+	s.servePoster(c, false)
+}
+
+// posterResourceRaw is the auth-gated variant that suppresses the
+// adult blur. Sign-in is required (anonymous users can't ever see
+// unblurred adult content), but the per-user ShowAdult preference is
+// NOT required — that toggle is consumed by the layout-level JS
+// rewrite for users who want everything raw by default, while this
+// endpoint also backs per-card click-to-reveal where the user opts
+// in resource-by-resource without flipping the global switch.
+//
+//	GET /lib/poster/raw/<resource_id>/<width>.jpg
+//	GET /lib/poster/raw/<resource_id>/og.jpg
+//
+// For non-adult resources the rendered output is byte-identical to
+// the default route (no blur to suppress), so the auth check is the
+// only behavioural difference. The cache key carries a `raw-` prefix
+// so the two variants don't share an S3 object.
+func (s *Handler) posterResourceRaw(c *gin.Context) {
+	u := auth.GetUserFromContext(c)
+	if u == nil || !u.HasAuth() {
+		_ = c.AbortWithError(http.StatusUnauthorized, errors.New("raw poster requires authentication"))
+		return
+	}
+	s.servePoster(c, true)
+}
+
+// servePoster is the shared HTTP packaging — bind params, ask the
+// resolver, set cache headers, copy bytes. allowRaw drives the
+// per-resource blur override (see poster_resolver.Service.Get).
+func (s *Handler) servePoster(c *gin.Context, allowRaw bool) {
 	resourceID := c.Param("resource_id")
 	if resourceID == "" {
 		_ = c.AbortWithError(http.StatusBadRequest, errors.New("empty resource_id"))
@@ -37,7 +69,7 @@ func (s *Handler) posterResource(c *gin.Context) {
 		force = q != "" && q != "0" && q != "false"
 	}
 
-	res, err := s.posterResolver.Get(c.Request.Context(), resourceID, c.Param("file"), force)
+	res, err := s.posterResolver.Get(c.Request.Context(), resourceID, c.Param("file"), force, allowRaw)
 	if err != nil {
 		if errors.Is(err, poster_resolver.ErrNotFound) {
 			_ = c.AbortWithError(http.StatusNotFound, err)

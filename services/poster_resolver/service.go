@@ -82,16 +82,23 @@ func New(s3Cl *cs.S3Client, pg *cs.PG, cl *http.Client, thumb *thumbnail.Service
 
 // Get is the entry point. file is the route's :file param ("500.jpg",
 // "og.jpg"). force=true bypasses both cache layers — dev escape hatch
-// wired off ?force=1 in non-release builds.
-func (s *Service) Get(ctx context.Context, resourceID, file string, force bool) (*Result, error) {
+// wired off ?force=1 in non-release builds. allowRaw=true tells the
+// miss path to skip the adult blur entirely; reserved for the
+// auth-gated /raw/ route, which is the opt-out for users who've
+// flipped UserSettings.ShowAdult.
+func (s *Service) Get(ctx context.Context, resourceID, file string, force, allowRaw bool) (*Result, error) {
 	mode, err := ParseFileMode(file)
 	if err != nil {
 		return nil, err
 	}
+	mode.Raw = allowRaw
 	if force {
 		return s.miss(ctx, resourceID, mode)
 	}
-	key := resourceID + "/" + file
+	// Cache key already encodes Mode.Raw via CacheTag's `raw-` prefix
+	// so blurred and unblurred renders of the same source live as
+	// independent lazymap / S3 entries.
+	key := resourceID + "/" + mode.CacheTag()
 	return s.lm.Get(key, func() (*Result, error) {
 		return s.miss(ctx, resourceID, mode)
 	})
@@ -130,7 +137,13 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 	// reasonably share. Brand default never blurs — that banner is
 	// generic and serving a heavily-blurred Webtor logo to Telegram
 	// would just look like a server error.
-	if src.Kind != sourceDefault {
+	//
+	// mode.Raw skips the blur entirely. The auth-gated /raw/ route
+	// sets it for users who've opted into showing adult content
+	// unblurred (UserSettings.ShowAdult=true); reaching this code path
+	// without the opt-in is the route handler's responsibility, not
+	// the resolver's.
+	if !mode.Raw && src.Kind != sourceDefault {
 		if rm, err := models.GetResourceMetadataByResourceID(ctx, db, resourceID); err == nil && rm != nil && rm.IsAdult {
 			mode.Blur = true
 		}

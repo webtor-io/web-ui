@@ -55,24 +55,29 @@ const adultDarken = -10.0
 // Mode is what the request asked the service to produce. Parsed from
 // the `file` route parameter via ParseFileMode; the resolver may
 // force Blur=true at miss time when resource_metadata.is_adult=true.
+// Raw is set by the auth-gated /raw/ route to skip that blur override.
 type Mode struct {
 	OG    bool // true → render in 1200x630 OG canvas
 	Width int  // resize-mode target width (only used when OG=false)
 	Blur  bool // true → heavy Gaussian + darken (adult/sport)
+	Raw   bool // true → suppress is_adult blur override (auth-gated route)
 }
 
 // CacheTag is a short stable string for the cache key. Two requests
 // with the same Mode share the same cached object for the same source.
-// Blur is encoded as a `blur-` prefix so unblurred and blurred renders
-// of the same source live as distinct objects — flipping is_adult on
-// a resource doesn't invalidate the non-adult cache.
+// `blur-` and `raw-` prefixes keep blurred / unblurred / raw renders
+// distinct so flipping is_adult on a resource doesn't invalidate the
+// other variants.
 func (m Mode) CacheTag() string {
 	tag := "og"
 	if !m.OG {
 		tag = strconv.Itoa(m.Width)
 	}
-	if m.Blur {
+	switch {
+	case m.Blur:
 		tag = "blur-" + tag
+	case m.Raw:
+		tag = "raw-" + tag
 	}
 	return tag
 }

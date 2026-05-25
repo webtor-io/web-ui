@@ -57,6 +57,7 @@ import (
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
+	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	usv "github.com/webtor-io/web-ui/services/user_subtitle"
 	uvss "github.com/webtor-io/web-ui/services/user_video_status"
 	"github.com/webtor-io/web-ui/services/vault"
@@ -289,6 +290,14 @@ func serve(c *cli.Context) error {
 	// configured, callers branch via Enabled().
 	thumbnailSvc := thumb.New(c, s3Cl, pg, sapi, cl)
 
+	// Setting UserSettings. Thin lazymap-backed cache over the
+	// user_settings row; read on the hot path (poster_resolver,
+	// templates), written on profile-toggle submit. Middleware
+	// stashes the loaded row into the gin context so web.NewContext
+	// picks it up without an extra DB lookup per handler.
+	userSettingsSvc := usettings.New(pg)
+	r.Use(usettings.Middleware(userSettingsSvc))
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
@@ -360,7 +369,7 @@ func serve(c *cli.Context) error {
 	wa.RegisterHandler(r, tm, jobs, sapi)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
