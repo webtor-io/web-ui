@@ -39,7 +39,11 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 			strings.HasPrefix(path, "/token/") ||
 			strings.HasPrefix(path, "/embed/") ||
 			strings.HasPrefix(path, "/stremio/") ||
-			strings.HasPrefix(path, "/user-subtitle/file/") {
+			strings.HasPrefix(path, "/user-subtitle/file/") ||
+			strings.HasPrefix(path, "/lib/poster/") ||
+			strings.HasPrefix(path, "/lib/movie/poster/") ||
+			strings.HasPrefix(path, "/lib/series/poster/") ||
+			strings.HasPrefix(path, "/lib/episode/still/") {
 			next.ServeHTTP(w, r)
 			return
 		}
