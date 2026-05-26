@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"io"
 	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -124,27 +124,6 @@ type NoPeersError struct{}
 
 func (e *NoPeersError) Error() string {
 	return "no peers / nothing downloaded during warmup"
-}
-
-type speedReader struct {
-	r            io.Reader
-	bytesRead    atomic.Int64
-	skipBytes    int64
-	measureStart atomic.Int64 // unix nano, set once when started
-	started      atomic.Bool
-}
-
-func (r *speedReader) Read(p []byte) (n int, err error) {
-	n, err = r.r.Read(p)
-	if n > 0 {
-		newBytes := r.bytesRead.Add(int64(n))
-		if !r.started.Load() && newBytes >= r.skipBytes {
-			if r.started.CompareAndSwap(false, true) {
-				r.measureStart.Store(time.Now().UnixNano())
-			}
-		}
-	}
-	return
 }
 
 // resourceLeafTitle picks the human label the player overlay shows.
@@ -418,7 +397,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				skipBytes = 0
 			}
 			var hit bool
-			if downloadSpeed, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, "file", true); err != nil {
+			if downloadSpeed, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, true); err != nil {
 				return
 			}
 			if hit {
@@ -650,7 +629,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		fileSize := int(resp.Source.Size)
 		// Silent fast-path: warmUp opens Stats and short-circuits on its own
 		// when the pod already holds the head pieces — no separate probe call.
-		if _, _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, statsURL, fileSize, downloadHeadWarmup, 0, 0, "", true); err != nil {
+		if _, _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, downloadHeadWarmup, 0, 0, true); err != nil {
 			return err
 		}
 	}
@@ -735,11 +714,7 @@ func piecesCoverRange(ev api.EventData, fileSize, head, tail int) bool {
 	return true
 }
 
-func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, skipBytes int, tagSuff string, useStatus bool) (downloadSpeed float64, cached bool, err error) {
-	tag := "download"
-	if tagSuff != "" {
-		tag += "-" + tagSuff
-	}
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su string, size int, limitStart int, limitEnd int, skipBytes int, useStatus bool) (downloadSpeed float64, cached bool, err error) {
 	if limitStart > size {
 		limitStart = size
 	}
@@ -786,7 +761,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	// Fast-path probe: read the first event (if any) within
 	// SeederProbeTimeoutSec. If all pieces covering [0..limitStart) ∪
 	// [size-limitEnd..size) are Complete on the pod, return cached=true and
-	// skip the actual warmup download. forceSlow callsites never reach here.
+	// skip the actual warmup. forceSlow callsites never reach here.
 	if statsCh != nil && s.warmup.SeederProbeTimeoutSec > 0 && size > 0 {
 		probeCtx, probeCancel := context.WithTimeout(warmupCtx, time.Duration(s.warmup.SeederProbeTimeoutSec)*time.Second)
 		select {
@@ -850,7 +825,39 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		}
 	}
 
-	sr := &speedReader{skipBytes: int64(skipBytes)}
+	// Warmup-SSE bookkeeping: the seeder's ?warmup endpoint bumps
+	// PiecePriorityHigh on every piece overlapping the requested range
+	// and streams a cumulative downloaded counter (bytes-within-range
+	// verified locally) once per second. Stream close = warmup done.
+	// We open head and tail in parallel so both priority bumps land up
+	// front and anacrolix can parallelise peer requests across both
+	// ranges; the speed estimate is computed off the combined counter.
+	var (
+		headDownloaded     atomic.Int64
+		tailDownloaded     atomic.Int64
+		headEventsReceived atomic.Bool
+		measureStartNs     atomic.Int64
+		measureStartBytes  atomic.Int64
+	)
+	totalDownloaded := func() int64 {
+		return headDownloaded.Load() + tailDownloaded.Load()
+	}
+	// updateMeasure latches the speed-measurement window once total
+	// downloaded crosses skipBytes — same slow-start skip the old
+	// io.Copy-based path used, just driven off the SSE counter.
+	updateMeasure := func() {
+		if measureStartNs.Load() != 0 {
+			return
+		}
+		total := totalDownloaded()
+		if total < int64(skipBytes) {
+			return
+		}
+		if measureStartNs.CompareAndSwap(0, time.Now().UnixNano()) {
+			measureStartBytes.Store(total)
+		}
+	}
+
 	warmupStart := time.Now()
 
 	// Watchdog: surface no_peers CTA early instead of waiting the full warmup
@@ -875,7 +882,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 			case <-warmupCtx.Done():
 				return
 			case <-ticker.C:
-				bytes := sr.bytesRead.Load()
+				bytes := totalDownloaded()
 				elapsed := time.Since(warmupStart)
 				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 && statsEverSeen.Load() {
 					noPeersFlag.Store(true)
@@ -891,68 +898,99 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 		}
 	}()
 
-	b, err := s.api.DownloadWithRange(warmupCtx, u, 0, limitStart)
-	if err != nil {
-		if noPeersFlag.Load() {
-			return 0, false, &NoPeersError{}
-		}
-		return 0, false, errors.Wrap(err, "failed to start download")
+	var (
+		wg      sync.WaitGroup
+		headErr error
+	)
+	if limitStart > 0 && su != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, werr := s.api.Warmup(warmupCtx, su, 0, int64(limitStart)-1)
+			if werr != nil {
+				headErr = werr
+				return
+			}
+			for n := range ch {
+				headEventsReceived.Store(true)
+				headDownloaded.Store(n)
+				updateMeasure()
+			}
+		}()
 	}
-	defer func(b io.ReadCloser) {
-		_ = b.Close()
-	}(b)
+	if limitEnd > 0 && su != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, werr := s.api.Warmup(warmupCtx, su, int64(size-limitEnd), -1)
+			if werr != nil {
+				// Tail prefetch is best-effort (used for seek warmup); don't fail.
+				log.WithError(werr).Warn("warmup tail failed")
+				return
+			}
+			for n := range ch {
+				tailDownloaded.Store(n)
+				updateMeasure()
+			}
+		}()
+	}
+	wg.Wait()
 
-	sr.r = b
-	_, err = io.Copy(io.Discard, sr)
 	if noPeersFlag.Load() {
 		return 0, false, &NoPeersError{}
 	}
-	if sr.started.Load() {
-		measured := sr.bytesRead.Load() - sr.skipBytes
-		elapsed := time.Since(time.Unix(0, sr.measureStart.Load()))
+	if headErr != nil {
+		return 0, false, errors.Wrap(headErr, "failed to warmup")
+	}
+
+	// Vault/cache fast-path: the seeder short-circuits ?warmup with a
+	// 200 + empty SSE body when the file is fully available via vault or
+	// local file-cache (see web_seeder.serveWarmup). We detect that as
+	// "head SSE closed without emitting any data event" and treat the
+	// content as cached — the bandwidth check then routes through the
+	// cap-modal branch (plan-cap vs bitrate) instead of the BT-slow
+	// branch that needs a measured downloadSpeed we never got.
+	if limitStart > 0 && su != "" && !headEventsReceived.Load() && headErr == nil && warmupCtx.Err() == nil {
+		cached = true
+		log.WithField("file_size", size).
+			WithField("head_bytes", limitStart).
+			WithField("tail_bytes", limitEnd).
+			Info("seeder vault/cache hit: empty warmup SSE")
+		return
+	}
+
+	final := totalDownloaded()
+	if start := measureStartNs.Load(); start != 0 {
+		measured := final - measureStartBytes.Load()
+		elapsed := time.Since(time.Unix(0, start))
 		if elapsed > 0 && measured > 0 {
 			downloadSpeed = float64(measured) / elapsed.Seconds()
 		}
-	} else if bytes := sr.bytesRead.Load(); bytes > 0 {
+	} else if final > 0 {
 		// Hard deadline hit before measurement window opened — rough estimate
 		// over the whole warmup span so the bandwidth-check has *some* number
 		// to classify against.
 		elapsed := time.Since(warmupStart)
 		if elapsed > 0 {
-			downloadSpeed = float64(bytes) / elapsed.Seconds()
+			downloadSpeed = float64(final) / elapsed.Seconds()
 		}
 	}
 
-	if errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+	if errors.Is(warmupCtx.Err(), context.DeadlineExceeded) {
 		// Hard warmup timeout. If we didn't even reach the measurement window
 		// (skipBytes), the torrent is effectively dead — probe will hang on
 		// its own deadline too. Surface no_peers immediately. Otherwise pass
 		// the measured speed to probe + bandwidth-check.
-		bytes := sr.bytesRead.Load()
-		if bytes < int64(skipBytes) {
+		if final < int64(skipBytes) {
 			log.WithField("elapsed", time.Since(warmupStart)).
-				WithField("bytes", bytes).
+				WithField("bytes", final).
 				Warn("warmup hard timeout, insufficient data — surfacing no_peers")
 			return 0, false, &NoPeersError{}
 		}
 		log.WithField("elapsed", time.Since(warmupStart)).
-			WithField("bytes", bytes).
+			WithField("bytes", final).
 			WithField("speed_bps", downloadSpeed).
 			Warn("warmup hard timeout, continuing with partial measurement")
-		err = nil
-	} else if err != nil {
-		return 0, false, errors.Wrap(err, "failed to download")
-	}
-
-	if limitEnd > 0 {
-		b2, err2 := s.api.DownloadWithRange(warmupCtx, u, size-limitEnd, -1)
-		if err2 != nil {
-			// Tail prefetch is best-effort (used for seek warmup); don't fail.
-			log.WithError(err2).Warn("warmup tail download failed")
-		} else {
-			defer func(b2 io.ReadCloser) { _ = b2.Close() }(b2)
-			_, _ = io.Copy(io.Discard, b2)
-		}
 	}
 
 	j.Done()

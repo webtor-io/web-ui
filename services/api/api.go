@@ -713,6 +713,85 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 	return ch, nil
 }
 
+// Warmup opens the seeder's ?warmup SSE stream for the byte range
+// [rangeStart, rangeEnd] (rangeEnd == -1 means "to EOF"). The seeder
+// bumps PiecePriorityHigh on every piece covering the range and emits a
+// cumulative-downloaded counter (bytes within the range that have been
+// verified) once per second. Stream close = warmup complete; the
+// returned channel is closed in the same moment.
+//
+// The URL is derived from statsURL — the seeder routes ?stats and
+// ?warmup off the same path, so we reuse the rest-api-signed stats URL
+// (which already pins to the direct, non-premium domain to keep SSE
+// chunks unbuffered through nginx). statsURL must be non-empty; the
+// caller is expected to have short-circuited the Cache=true branch
+// upstream (rest-api emits an empty stats URL in that case).
+func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, rangeEnd int64) (chan int64, error) {
+	if statsURL == "" {
+		return nil, errors.New("empty stats url")
+	}
+	warmupURL := strings.Replace(statsURL, "stats=true", "warmup=true", 1)
+	req, err := s.makeTorrentHTTPProxyRequest(ctx, warmupURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to make warmup request")
+	}
+	if rangeStart != 0 || rangeEnd != -1 {
+		endStr := ""
+		if rangeEnd != -1 {
+			endStr = strconv.FormatInt(rangeEnd, 10)
+		}
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%s", rangeStart, endStr))
+	}
+	res, err := s.cl.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to do warmup request")
+	}
+	if res.StatusCode == http.StatusNotFound {
+		_ = res.Body.Close()
+		return nil, errors.New("cached")
+	}
+	if res.StatusCode != http.StatusOK {
+		_ = res.Body.Close()
+		return nil, errors.Errorf("warmup returned status %d", res.StatusCode)
+	}
+	ch := make(chan int64)
+	go func() {
+		b := res.Body
+		defer func() {
+			close(ch)
+			_ = b.Close()
+		}()
+		// Buffer is tiny — "data: <int>\n\n" is at most ~24 bytes; the
+		// scanner default (64KB) is overkill but harmless.
+		scanner := bufio.NewScanner(b)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			if ctx.Err() != nil {
+				return
+			}
+			if scanner.Err() != nil {
+				log.WithError(scanner.Err()).Error("warmup scanner error")
+				return
+			}
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			n, perr := strconv.ParseInt(strings.TrimPrefix(line, "data: "), 10, 64)
+			if perr != nil {
+				log.WithError(perr).Errorf("failed to parse warmup data line=%v", line)
+				continue
+			}
+			select {
+			case ch <- n:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
 func (s *Api) makeSubtitleURL(u string, esub ExtSubtitle) string {
 	src, _ := url.Parse(u)
 	path := ""

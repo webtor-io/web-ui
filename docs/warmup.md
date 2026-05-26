@@ -3,8 +3,8 @@
 Warmup is the pre-flight step that runs between the user clicking *Stream* /
 *Download* and the actual playback / file delivery. Two motivations:
 
-1. **Pull head + tail bytes** so the transcoder / HTTP server can answer the
-   first segment / range request without stalling.
+1. **Prioritise head + tail pieces** on the seeder pod so the transcoder /
+   HTTP server can answer the first segment / range request without stalling.
 2. **Measure download throughput** so we can compare against the required
    video bitrate (BT-slow modal) before the player starts.
 
@@ -17,8 +17,8 @@ same file.
 | Path | Trigger | Behaviour |
 |---|---|---|
 | **Long-term cache** | `se.Meta.Cache=true` (rest-api S3 promotion) | Skip `warmUp` entirely. Bandwidth check runs cap-modal branch (plan-cap vs bitrate). |
-| **Seeder fast-path** | `se.Meta.Cache=false` AND `seederHasContent(...)` returns true within `WARMUP_SEEDER_PROBE_TIMEOUT_SEC` (default 3s) | Silent skip — no `j.Skip` line, the job log goes straight to probe/render. Bandwidth check joins the cap-modal branch (same rationale: bottleneck has moved to plan-cap, not peers). |
-| **Full warmup** | Everything else | Download `bandwidthTestSize` head + 500KB tail (stream) or 1MB head (download). Measure throughput. Bandwidth check runs BT-slow branch against the measured speed. |
+| **Seeder fast-path** | `se.Meta.Cache=false` AND (stats first event shows head+tail pieces complete OR seeder vault/cache short-circuits `?warmup` with an empty SSE) | Silent skip — no `j.Skip` line, the job log goes straight to probe/render. Bandwidth check joins the cap-modal branch (same rationale: bottleneck has moved to plan-cap, not peers). |
+| **Full warmup** | Everything else | Open `?warmup` SSE for the head range (`bandwidthTestSize` for stream, 1MB for download) and tail range (500KB on stream only) in parallel. Seeder bumps `PiecePriorityHigh` on covered pieces and streams a cumulative downloaded counter; web-ui derives throughput from that. Bandwidth check runs BT-slow branch against the measured speed. |
 
 ## Fast-path probe — inlined in `warmUp`
 
@@ -60,6 +60,56 @@ seeder proto only carries `position/complete/priority` (no per-piece byte
 count). Rounding up means we sometimes require one extra piece at the edge —
 fine, because we only short-circuit when *every* covering piece is complete,
 so the worst case is a false negative that just falls through to full warmup.
+
+## `?warmup` SSE — bandwidth-free byte priming
+
+Before sha-3fa59da (torrent-web-seeder) the "full warmup" path issued two
+`Range` GETs (head + tail) over the proxy chain and discarded the body —
+purely to make anacrolix pull those bytes from peers. That wasted bandwidth
+end-to-end (peers → seeder → THP → web-ui, all to feed `io.Discard`) and
+told anacrolix about the head range only after it was already most of the
+way downloaded.
+
+The seeder now exposes a `?warmup` SSE endpoint on the same URL path as
+`?stats`. It parses the `Range` header, calls `Piece.SetPriority(High)` on
+every piece overlapping the range, and emits `data: <downloaded>\n\n` once
+per second where `downloaded` is the count of bytes-within-range that
+anacrolix has already verified. Stream close = warmup complete. The bytes
+themselves are never transferred. `web-ui`:
+
+- Derives the warmup URL by swapping `stats=true` → `warmup=true` on the
+  rest-api-signed stats URL (same path, same auth tokens, same pinned
+  non-premium domain — see `api.Warmup` in `services/api/api.go`).
+- Opens head and tail SSE streams in parallel so both priority bumps land
+  up front and anacrolix can dispatch peer requests for both ranges
+  concurrently. The tail stream is best-effort; a failure there just logs
+  and continues. Head failure surfaces as `failed to warmup`.
+- Computes `downloadSpeed` from the combined head+tail counter: latches a
+  `(timestamp, bytes)` measurement window once total downloaded crosses
+  `skipBytes` (slow-start skip, same threshold the old `speedReader` used),
+  then divides `(final - measureStartBytes) / elapsed` at SSE close.
+
+**Throughput semantics shifted slightly.** The old path measured the
+end-to-end byte rate (peers → seeder → THP → web-ui). The new SSE counter
+measures peer → seeder throughput only. For the BT-slow gate this is
+strictly more correct — that gate exists to catch "the swarm can't feed
+this bitrate", and seeder-side throughput is the closest signal. In
+practice the two are equivalent today because the warmup `?download=true`
+URL was unmoderated (no THP rate-limit on the warmup path).
+
+**Vault/cache short-circuit.** The seeder responds with `200 OK` and an
+empty SSE body when `availableWithoutTorrent(...)` is true (file fully
+served from local file-cache or vault), then closes. `web-ui` detects this
+as "head SSE closed with zero `data:` events" and treats the result as
+`cached=true`, routing the bandwidth check through the cap-modal branch —
+same outcome as a stats-probe hit, just for the broader vault/cache case
+the piece-array probe can't see.
+
+**Why not drop the stats-probe now that `?warmup` reports completion?**
+The probe completes in one round-trip on a single, already-open SSE; the
+`?warmup` path needs two new TCP sessions plus their HTTP/2 stream
+windups before it can report the same "all pieces present" verdict. Keep
+both: probe first (cheapest hit), `?warmup` for the broader case.
 
 ## Why the fast-path goes through the cap-modal branch
 
@@ -113,3 +163,7 @@ if !effectiveCache {
   playback, no need to optimise.
 - **Very small files** — head+tail can overlap; `piecesCoverRange` clamps the
   tail start at `headPieces` so overlapping ranges still validate correctly.
+- **`?warmup` empty SSE response** — seeder vault/local-cache hit; web-ui
+  treats this identically to a probe hit (`cached=true`, cap-modal branch).
+- **`?warmup` tail failure** — best-effort; logged and ignored. The head
+  range still drives the throughput measurement and the watchdog.
