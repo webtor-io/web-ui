@@ -401,19 +401,14 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	//
 	// "Cached" has two sources: rest-api long-term cache (S3) via se.Meta.Cache
 	// AND a seeder pod that already holds our head+tail pieces locally (common
-	// in share flows). The fast-path probe (one SSE event, ~hundreds of ms when
-	// the pod is warm) detects the latter; on a hit we treat the rest of the
-	// flow as cached so bandwidth-check routes through the plan-cap branch
-	// instead of trying to use a never-measured downloadSpeed.
+	// in share flows). The fast-path probe — first event of the Stats SSE that
+	// warmUp opens for the UI peer-counter — detects the latter inline: on a
+	// hit warmUp returns immediately with cached=true and bandwidth-check
+	// routes through the plan-cap branch instead of using a never-measured
+	// downloadSpeed.
 	const tailWarmupBytes = 500 * 1024
 	statsURL := exportResponse.ExportItems["torrent_client_stat"].URL
 	effectiveCache := se.Meta.Cache
-	if !effectiveCache && !s.forceSlow && s.seederHasContent(ctx, statsURL, fileSize, warmupSize, tailWarmupBytes) {
-		// Silent skip — the probe hit, the pod already has the bytes, and we
-		// don't want to surface a "Skip" line for what looks to the user like
-		// the cached-content flow. The job log jumps straight to probe/render.
-		effectiveCache = true
-	}
 	if !effectiveCache {
 		if s.forceSlow {
 			j.Skip(s.t("job.warmingUp"))
@@ -422,8 +417,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			if warmupSize <= skipBytes {
 				skipBytes = 0
 			}
-			if downloadSpeed, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, "file", true); err != nil {
+			var hit bool
+			if downloadSpeed, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), downloadURL, statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, "file", true); err != nil {
 				return
+			}
+			if hit {
+				effectiveCache = true
 			}
 		}
 	}
@@ -649,12 +648,10 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		const downloadHeadWarmup = 1024 * 1024
 		statsURL := resp.ExportItems["torrent_client_stat"].URL
 		fileSize := int(resp.Source.Size)
-		// Silent fast-path: when the seeder pod already holds the head pieces,
-		// the warmup step is omitted from the job log entirely (no "Skip" line).
-		if !s.seederHasContent(ctx, statsURL, fileSize, downloadHeadWarmup, 0) {
-			if _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, statsURL, fileSize, downloadHeadWarmup, 0, 0, "", true); err != nil {
-				return err
-			}
+		// Silent fast-path: warmUp opens Stats and short-circuits on its own
+		// when the pod already holds the head pieces — no separate probe call.
+		if _, _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), resp.ExportItems["download"].URL, statsURL, fileSize, downloadHeadWarmup, 0, 0, "", true); err != nil {
+			return err
 		}
 	}
 	j.DoneWithMessage(s.t("job.downloadReady"))
@@ -683,63 +680,6 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	}
 	j.Custom("action/download_file", strings.TrimSpace(str))
 	return
-}
-
-// seederHasContent is the fast-path probe used before warmUp. It opens the
-// stats SSE, reads the first statupdate, and checks whether every piece
-// covering the head (headBytes) and tail (tailBytes) byte ranges of the
-// target file is already Complete on the seeder pod. When true the caller
-// is expected to skip warmUp and route through the cap-modal bandwidth
-// branch — the BT-slow gate is meaningless once the bottleneck has moved
-// from peers to plan-cap / user-uplink.
-//
-// Returns false on any of: probe disabled, no statsURL, deadline elapsed
-// before the first event, empty Pieces, missing tail/head pieces, or any
-// transport error. False is always safe — the caller falls through to the
-// existing warmUp path.
-//
-// Piece size is approximated as ceil(fileSize / len(Pieces)) because the
-// seeder proto carries position/complete/priority only. That over-counts
-// covered pieces by at most one at each edge — fine for our purposes
-// since we already require *every* covering piece to be Complete.
-func (s *ActionScript) seederHasContent(ctx context.Context, statsURL string, fileSize, headBytes, tailBytes int) bool {
-	if statsURL == "" || s.warmup.SeederProbeTimeoutSec <= 0 || fileSize <= 0 {
-		return false
-	}
-	probeCtx, cancel := context.WithTimeout(ctx, time.Duration(s.warmup.SeederProbeTimeoutSec)*time.Second)
-	defer cancel()
-
-	ch, err := s.api.Stats(probeCtx, statsURL)
-	if err != nil {
-		// rest-api signals fully-cached content with 404 on torrent_client_stat
-		// (see handlers/resource/status.go:329). api.Stats translates that
-		// into errors.New("cached"). Should normally not fire here because
-		// se.Meta.Cache=true short-circuits this whole branch upstream, but
-		// covered for completeness.
-		if err.Error() == "cached" {
-			return true
-		}
-		log.WithError(err).Debug("seeder probe: stats subscribe failed")
-		return false
-	}
-
-	select {
-	case ev, ok := <-ch:
-		if !ok {
-			return false
-		}
-		hit := piecesCoverRange(ev, fileSize, headBytes, tailBytes)
-		if hit {
-			log.WithField("file_size", fileSize).
-				WithField("head_bytes", headBytes).
-				WithField("tail_bytes", tailBytes).
-				WithField("pieces", len(ev.Pieces)).
-				Info("seeder probe hit: skipping warmup")
-		}
-		return hit
-	case <-probeCtx.Done():
-		return false
-	}
 }
 
 // piecesCoverRange returns true when every piece touching [0..head) ∪
@@ -795,7 +735,7 @@ func piecesCoverRange(ev api.EventData, fileSize, head, tail int) bool {
 	return true
 }
 
-func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, skipBytes int, tagSuff string, useStatus bool) (downloadSpeed float64, err error) {
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u string, su string, size int, limitStart int, limitEnd int, skipBytes int, tagSuff string, useStatus bool) (downloadSpeed float64, cached bool, err error) {
 	tag := "download"
 	if tagSuff != "" {
 		tag += "-" + tagSuff
@@ -805,14 +745,6 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	}
 	if limitEnd > size-limitStart {
 		limitEnd = size - limitStart
-	}
-	if size > 0 {
-		downloading := s.tp("job.downloading", map[string]any{
-			"Bytes": helpers.Bytes(uint64(limitStart + limitEnd)),
-		})
-		j.InProgress(fmt.Sprintf("%v, %v", m, downloading))
-	} else {
-		j.InProgress(m)
 	}
 	warmupCtx, warmupCancel := context.WithTimeout(ctx, time.Duration(s.warmup.TimeoutMin)*time.Minute)
 	defer warmupCancel()
@@ -826,28 +758,96 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	// of peers.
 	var statsEverSeen atomic.Bool
 
-	if useStatus {
-		j.StatusUpdate(s.t("job.waitingForPeers"))
-		go func() {
-			ch, err := s.api.Stats(warmupCtx, su)
-			if err != nil {
-				log.WithError(err).Error("failed to get stats")
+	// Stats SSE: one subscription per warmUp invocation. The first statupdate
+	// doubles as the seeder fast-path probe (its pieces array reflects what
+	// the pod has locally); subsequent events feed the UI peer counter.
+	// Opening Stats twice (probe + UI) previously doubled the 1 MB scanner
+	// buffer churn and pushed prod pods into OOM under load — see docs/warmup.md.
+	var statsCh chan api.EventData
+	var probeEvent api.EventData
+	var probeHadEvent bool
+	if useStatus && su != "" {
+		ch, statsErr := s.api.Stats(warmupCtx, su)
+		if statsErr != nil {
+			// rest-api signals fully-cached content with 404 on torrent_client_stat
+			// (see handlers/resource/status.go:329). api.Stats wraps that as
+			// errors.New("cached"). Should normally not fire here because the
+			// caller already gated on se.Meta.Cache, but treat as a hit either way.
+			if statsErr.Error() == "cached" {
+				cached = true
 				return
 			}
-			for {
-				select {
-				case ev, ok := <-ch:
-					if !ok {
-						return
-					}
-					statsEverSeen.Store(true)
-					peerCount.Store(int32(ev.Peers))
-					j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
-				case <-warmupCtx.Done():
+			log.WithError(statsErr).Error("failed to get stats")
+		} else {
+			statsCh = ch
+		}
+	}
+
+	// Fast-path probe: read the first event (if any) within
+	// SeederProbeTimeoutSec. If all pieces covering [0..limitStart) ∪
+	// [size-limitEnd..size) are Complete on the pod, return cached=true and
+	// skip the actual warmup download. forceSlow callsites never reach here.
+	if statsCh != nil && s.warmup.SeederProbeTimeoutSec > 0 && size > 0 {
+		probeCtx, probeCancel := context.WithTimeout(warmupCtx, time.Duration(s.warmup.SeederProbeTimeoutSec)*time.Second)
+		select {
+		case ev, ok := <-statsCh:
+			if ok {
+				probeEvent = ev
+				probeHadEvent = true
+				if piecesCoverRange(ev, size, limitStart, limitEnd) {
+					probeCancel()
+					cached = true
+					log.WithField("file_size", size).
+						WithField("head_bytes", limitStart).
+						WithField("tail_bytes", limitEnd).
+						WithField("pieces", len(ev.Pieces)).
+						Info("seeder probe hit: skipping warmup")
 					return
 				}
 			}
-		}()
+		case <-probeCtx.Done():
+			// No event before deadline — fall through to full warmup with the
+			// same Stats subscription still live for the UI goroutine below.
+		}
+		probeCancel()
+	}
+
+	// Probe missed: announce the step and start the UI peer-count goroutine.
+	if size > 0 {
+		downloading := s.tp("job.downloading", map[string]any{
+			"Bytes": helpers.Bytes(uint64(limitStart + limitEnd)),
+		})
+		j.InProgress(fmt.Sprintf("%v, %v", m, downloading))
+	} else {
+		j.InProgress(m)
+	}
+
+	if useStatus {
+		j.StatusUpdate(s.t("job.waitingForPeers"))
+		// If the probe already consumed event #1 (just with pieces incomplete),
+		// surface its peer count now so the UI isn't blank until event #2.
+		if probeHadEvent {
+			statsEverSeen.Store(true)
+			peerCount.Store(int32(probeEvent.Peers))
+			j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": probeEvent.Peers}))
+		}
+		if statsCh != nil {
+			go func() {
+				for {
+					select {
+					case ev, ok := <-statsCh:
+						if !ok {
+							return
+						}
+						statsEverSeen.Store(true)
+						peerCount.Store(int32(ev.Peers))
+						j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
+					case <-warmupCtx.Done():
+						return
+					}
+				}
+			}()
+		}
 	}
 
 	sr := &speedReader{skipBytes: int64(skipBytes)}
@@ -894,9 +894,9 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	b, err := s.api.DownloadWithRange(warmupCtx, u, 0, limitStart)
 	if err != nil {
 		if noPeersFlag.Load() {
-			return 0, &NoPeersError{}
+			return 0, false, &NoPeersError{}
 		}
-		return 0, errors.Wrap(err, "failed to start download")
+		return 0, false, errors.Wrap(err, "failed to start download")
 	}
 	defer func(b io.ReadCloser) {
 		_ = b.Close()
@@ -905,7 +905,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 	sr.r = b
 	_, err = io.Copy(io.Discard, sr)
 	if noPeersFlag.Load() {
-		return 0, &NoPeersError{}
+		return 0, false, &NoPeersError{}
 	}
 	if sr.started.Load() {
 		measured := sr.bytesRead.Load() - sr.skipBytes
@@ -933,7 +933,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 			log.WithField("elapsed", time.Since(warmupStart)).
 				WithField("bytes", bytes).
 				Warn("warmup hard timeout, insufficient data — surfacing no_peers")
-			return 0, &NoPeersError{}
+			return 0, false, &NoPeersError{}
 		}
 		log.WithField("elapsed", time.Since(warmupStart)).
 			WithField("bytes", bytes).
@@ -941,7 +941,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, u strin
 			Warn("warmup hard timeout, continuing with partial measurement")
 		err = nil
 	} else if err != nil {
-		return 0, errors.Wrap(err, "failed to download")
+		return 0, false, errors.Wrap(err, "failed to download")
 	}
 
 	if limitEnd > 0 {
