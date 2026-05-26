@@ -899,8 +899,8 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	}()
 
 	var (
-		wg      sync.WaitGroup
-		headErr error
+		wg          sync.WaitGroup
+		headOpenErr atomic.Bool
 	)
 	if limitStart > 0 && su != "" {
 		wg.Add(1)
@@ -908,7 +908,13 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			defer wg.Done()
 			ch, werr := s.api.Warmup(warmupCtx, su, 0, int64(limitStart)-1)
 			if werr != nil {
-				headErr = werr
+				// Head SSE open failed (proxy hop, seeder 500, file-not-found
+				// 404, etc). Not fatal — the transcoder/HTTP path will pull
+				// the head cold; the watchdog still surfaces no_peers if the
+				// torrent is actually dead. Just record that we couldn't open
+				// so we don't mis-classify "no events" as a vault/cache hit.
+				log.WithError(werr).Warn("warmup head failed")
+				headOpenErr.Store(true)
 				return
 			}
 			for n := range ch {
@@ -939,18 +945,17 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	if noPeersFlag.Load() {
 		return 0, false, &NoPeersError{}
 	}
-	if headErr != nil {
-		return 0, false, errors.Wrap(headErr, "failed to warmup")
-	}
 
 	// Vault/cache fast-path: the seeder short-circuits ?warmup with a
 	// 200 + empty SSE body when the file is fully available via vault or
 	// local file-cache (see web_seeder.serveWarmup). We detect that as
-	// "head SSE closed without emitting any data event" and treat the
-	// content as cached — the bandwidth check then routes through the
-	// cap-modal branch (plan-cap vs bitrate) instead of the BT-slow
-	// branch that needs a measured downloadSpeed we never got.
-	if limitStart > 0 && su != "" && !headEventsReceived.Load() && headErr == nil && warmupCtx.Err() == nil {
+	// "head SSE opened cleanly and closed without emitting any data event"
+	// and treat the content as cached — the bandwidth check then routes
+	// through the cap-modal branch (plan-cap vs bitrate) instead of the
+	// BT-slow branch that needs a measured downloadSpeed we never got.
+	// headOpenErr is the discriminator: zero events from an SSE that never
+	// opened is just an upstream failure, not a vault hit.
+	if limitStart > 0 && su != "" && !headEventsReceived.Load() && !headOpenErr.Load() && warmupCtx.Err() == nil {
 		cached = true
 		log.WithField("file_size", size).
 			WithField("head_bytes", limitStart).

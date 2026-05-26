@@ -746,10 +746,11 @@ func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, ran
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do warmup request")
 	}
-	if res.StatusCode == http.StatusNotFound {
-		_ = res.Body.Close()
-		return nil, errors.New("cached")
-	}
+	// Unlike Stats, the seeder's ?warmup handler never returns 404 as a
+	// cache signal — 404 here means findFile didn't match (file path not
+	// resolvable on this pod). Bucket all non-200 as a single error;
+	// callers downgrade these to log-and-continue, since a missed warmup
+	// just means the transcoder/HTTP path will pull the bytes cold.
 	if res.StatusCode != http.StatusOK {
 		_ = res.Body.Close()
 		return nil, errors.Errorf("warmup returned status %d", res.StatusCode)

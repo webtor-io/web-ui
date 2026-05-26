@@ -167,3 +167,10 @@ if !effectiveCache {
   treats this identically to a probe hit (`cached=true`, cap-modal branch).
 - **`?warmup` tail failure** — best-effort; logged and ignored. The head
   range still drives the throughput measurement and the watchdog.
+- **`?warmup` head failure (404 / 500 / network)** — logged and downgraded
+  to "no warmup performed". The transcoder/HTTP path pulls the head cold;
+  the watchdog still surfaces `no_peers` if the swarm is actually dead.
+  Unlike `Stats`, the seeder's `?warmup` handler never uses 404 as a
+  cache signal — 404 means `findFile` couldn't resolve the path on this
+  pod, not "content is cached". `api.Warmup` therefore treats all non-200
+  responses as a single transient error.
