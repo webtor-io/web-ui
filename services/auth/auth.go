@@ -106,7 +106,7 @@ type Auth struct {
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 	return &Auth{
-		url:                 c.String(SupertokensHostFlag) + ":" + c.String(SupertokensPortFlag),
+		url:                 "http://" + c.String(SupertokensHostFlag) + ":" + c.String(SupertokensPortFlag),
 		hasSupetokens:       c.String(SupertokensHostFlag) != "" && c.String(SupertokensPortFlag) != "",
 		smtpUser:            c.String(sv.SMTPUserFlag),
 		smtpPass:            c.String(sv.SMTPPassFlag),
