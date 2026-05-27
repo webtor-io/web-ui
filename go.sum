@@ -545,8 +545,8 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/supertokens/supertokens-golang v0.22.1 h1:aRNny4oa/t0rYlbxO/MA3kD3o44GaIABNtjir9NGjO8=
-github.com/supertokens/supertokens-golang v0.22.1/go.mod h1:/n6zQ9461RscnnWB4Y4bWwzhPivnj8w79j/doqkLOs8=
+github.com/supertokens/supertokens-golang v0.25.2 h1:twXhBQHWi9R26797Js6h7gN/6iPbGnZbKt2jrWIlh2I=
+github.com/supertokens/supertokens-golang v0.25.2/go.mod h1:EUNFkAgZH9VF+dxEMPKwfSFVzqnPkUQtfKa96+xQ1Bw=
 github.com/swaggo/files v1.0.1 h1:J1bVJ4XHZNq0I46UU90611i9/YzdrF7x92oX1ig5IdE=
 github.com/swaggo/files v1.0.1/go.mod h1:0qXmMNH6sXNf+73t65aKeB+ApmgxdnkQzVTAj2uaMUg=
 github.com/swaggo/gin-swagger v1.6.1 h1:Ri06G4gc9N4t4k8hekMigJ9zKTFSlqj/9paAQCQs7cY=

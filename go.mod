@@ -18,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/supertokens/supertokens-golang v0.22.1
+	github.com/supertokens/supertokens-golang v0.25.2
 	github.com/urfave/cli v1.22.17
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
 	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
