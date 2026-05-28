@@ -675,7 +675,10 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 			_ = b.Close()
 		}()
 		scanner := bufio.NewScanner(b)
-		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024) // 1MB buffer for large torrent stats
+		// 4KB initial, grow on demand up to 1MB for large torrent stats.
+		// Pre-allocating the full 1MB per stream was ~300MB of off-heap arenas
+		// across all live status SSE streams; the scanner auto-grows when needed.
+		scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 		scanner.Split(bufio.ScanLines)
 
 		t := ""
