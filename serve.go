@@ -172,6 +172,7 @@ func serve(c *cli.Context) error {
 	// Setting Gin
 	r := gin.Default()
 	r.Use(w.ErrorLogger())
+	r.Use(w.NoindexDefault())
 	r.RedirectTrailingSlash = false
 	r.HTMLRender = re
 

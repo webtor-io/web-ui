@@ -30,9 +30,10 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 		tb: tm.MustRegisterViews("*").WithLayout("main"),
 		pg: pg,
 	}
-	r.GET("/", h.index)
+	indexable := r.Group("", web.IndexFollow())
+	indexable.GET("/", h.index)
 	for _, tool := range common.Tools {
-		r.GET("/"+tool.Url, h.index)
+		indexable.GET("/"+tool.Url, h.index)
 	}
 }
 

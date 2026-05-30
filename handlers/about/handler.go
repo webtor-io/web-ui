@@ -17,7 +17,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 		tb: tm.MustRegisterViews("about/*").WithLayout("main"),
 	}
 
-	r.GET("/about", h.get)
+	r.GET("/about", web.IndexFollow(), h.get)
 }
 
 type Data struct {

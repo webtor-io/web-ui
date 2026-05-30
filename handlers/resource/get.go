@@ -343,7 +343,6 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
-	c.Header("X-Robots-Tag", "noindex, follow")
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
 }
 
