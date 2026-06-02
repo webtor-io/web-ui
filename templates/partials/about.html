@@ -212,6 +212,8 @@
         "about.faq.formats.q|about.faq.formats.a"
         "about.faq.opensource.q|about.faq.opensource.a"
         "about.faq.smarttv.q|about.faq.smarttv.a"
+        "about.faq.openTorrent.q|about.faq.openTorrent.a"
+        "about.faq.magnetDownload.q|about.faq.magnetDownload.a"
         "about.faq.expire.q|about.faq.expire.a"
         "about.faq.ads.q|about.faq.ads.a"
         "about.faq.zip.q|about.faq.zip.a"
@@ -230,6 +232,8 @@
         "about.faq.formats.q|about.faq.formats.a"
         "about.faq.opensource.q|about.faq.opensource.a"
         "about.faq.smarttv.q|about.faq.smarttv.a"
+        "about.faq.openTorrent.q|about.faq.openTorrent.a"
+        "about.faq.magnetDownload.q|about.faq.magnetDownload.a"
         "about.faq.expire.q|about.faq.expire.a"
         "about.faq.ads.q|about.faq.ads.a"
         "about.faq.zip.q|about.faq.zip.a"
@@ -282,6 +286,18 @@
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.smarttv.q" }}</div>
                 <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.smarttv.a" }}</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.openTorrent.q" }}</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrent.a" }}</p></div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.magnetDownload.q" }}</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.magnetDownload.a" }}</p></div>
             </div>
 
             {{ if aiEnabled }}
