@@ -1,6 +1,8 @@
 package web
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -8,16 +10,35 @@ import (
 // Routes listed in sitemap.xml opt in to indexing via IndexFollow,
 // which overrides the header (last c.Header() call wins before flush).
 // sitemap.xml and robots.txt are exempted — search engines consume them
-// as directives, not as pages to index.
+// as directives, not as pages to index. Favicons, PWA manifest, and the
+// og:image are also exempted: Google's favicon crawler honors
+// X-Robots-Tag on image responses and will drop the site icon from
+// search results otherwise.
 func NoindexDefault() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		switch c.Request.URL.Path {
-		case "/sitemap.xml", "/robots.txt":
-		default:
-			c.Header("X-Robots-Tag", "noindex, follow")
+		if isIndexableAsset(c.Request.URL.Path) {
+			c.Next()
+			return
 		}
+		c.Header("X-Robots-Tag", "noindex, follow")
 		c.Next()
 	}
+}
+
+func isIndexableAsset(path string) bool {
+	switch path {
+	case "/sitemap.xml", "/robots.txt",
+		"/favicon.ico", "/favicon.svg",
+		"/manifest.webmanifest",
+		"/webtor.jpg":
+		return true
+	}
+	if strings.HasPrefix(path, "/favicon-") ||
+		strings.HasPrefix(path, "/android-chrome-") ||
+		strings.HasPrefix(path, "/apple-touch-icon") {
+		return true
+	}
+	return false
 }
 
 // IndexFollow overrides the default noindex with index, follow. Apply

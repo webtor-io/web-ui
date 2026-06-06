@@ -15,6 +15,13 @@ func TestNoindexDefault(t *testing.T) {
 	r.GET("/profile", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
 	r.GET("/sitemap.xml", func(c *gin.Context) { c.String(http.StatusOK, "<xml/>") })
 	r.GET("/robots.txt", func(c *gin.Context) { c.String(http.StatusOK, "User-agent: *") })
+	r.GET("/favicon.ico", func(c *gin.Context) { c.String(http.StatusOK, "ico") })
+	r.GET("/favicon.svg", func(c *gin.Context) { c.String(http.StatusOK, "svg") })
+	r.GET("/favicon-32x32.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
+	r.GET("/android-chrome-192x192.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
+	r.GET("/apple-touch-icon.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
+	r.GET("/manifest.webmanifest", func(c *gin.Context) { c.String(http.StatusOK, "{}") })
+	r.GET("/webtor.jpg", func(c *gin.Context) { c.String(http.StatusOK, "jpg") })
 
 	cases := []struct {
 		path string
@@ -23,6 +30,13 @@ func TestNoindexDefault(t *testing.T) {
 		{"/profile", "noindex, follow"},
 		{"/sitemap.xml", ""},
 		{"/robots.txt", ""},
+		{"/favicon.ico", ""},
+		{"/favicon.svg", ""},
+		{"/favicon-32x32.png", ""},
+		{"/android-chrome-192x192.png", ""},
+		{"/apple-touch-icon.png", ""},
+		{"/manifest.webmanifest", ""},
+		{"/webtor.jpg", ""},
 	}
 	for _, tc := range cases {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
