@@ -77,6 +77,23 @@ export function getSearchResultsForType(searchResults, type) {
     return searchResults.filter(item => item.type === type);
 }
 
+// Overlay localized title/plot (state.localized) onto grid items at render
+// time. Items are NOT mutated in state — catalog/search/watchlist arrays
+// get replaced wholesale on reload, so a render-time overlay survives that
+// while keeping the English original as fallback.
+export function overlayLocalized(items, localized) {
+    if (!localized || Object.keys(localized).length === 0) return items;
+    return items.map(item => {
+        const loc = localized[item.id];
+        if (!loc) return item;
+        return {
+            ...item,
+            name: loc.title || item.name,
+            description: loc.plot || item.description,
+        };
+    });
+}
+
 // AI recommendations slice. Kept flat inside the main discover state so the
 // existing reducer switch can handle it without restructuring the whole app.
 // See components/ai/AISection.jsx for the UI that reads this slice.
@@ -152,6 +169,11 @@ export const initialState = {
     // User statuses — accumulated map of IMDB id → { watched, rating }.
     // Additive-only during a session.
     userStatuses: {},
+    // Localized metadata — accumulated map of video id → { title, plot }
+    // from /discover/localize (server enrichment pipeline). Additive-only,
+    // overlaid onto grid items / modal at render time. Always empty for
+    // English sessions.
+    localized: {},
     // Watchlist slice — ids in Set form for O(1) bookmark-badge lookups in
     // every card, items in adapted Cinemeta shape for the filtered grid.
     // The toggle UI flips watchlistFilterEnabled; AI/catalog/search results
@@ -237,6 +259,10 @@ export function discoverReducer(state, action) {
         case 'USER_STATUSES_MERGED': {
             if (!action.statuses || Object.keys(action.statuses).length === 0) return state;
             return { ...state, userStatuses: { ...state.userStatuses, ...action.statuses } };
+        }
+        case 'LOCALIZED_MERGED': {
+            if (!action.localized || Object.keys(action.localized).length === 0) return state;
+            return { ...state, localized: { ...state.localized, ...action.localized } };
         }
 
         // --- Watchlist slice ---

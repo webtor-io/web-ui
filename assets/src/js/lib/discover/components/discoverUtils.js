@@ -1,5 +1,6 @@
 import { buildCatalogs, buildAddons, getCatalogsForType, getTypes } from './discoverReducer';
 import { langPath, t } from '../i18n';
+import { csrfHeaders } from '../http';
 
 // Shared button chip class for Tabs (btn-sm) and FilterChips (btn-xs)
 // Size classes must be written as full literals for Tailwind static analysis
@@ -138,11 +139,7 @@ export async function fetchUserStatuses(ids) {
     try {
         const res = await fetch(langPath('/library/status'), {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': window._CSRF,
-            },
+            headers: csrfHeaders(),
             body: JSON.stringify({ ids: titleIds }),
         });
         if (!res.ok) return {};

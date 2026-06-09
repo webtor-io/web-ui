@@ -42,13 +42,17 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/watchlistClient.js` — fetch wrapper for `/discover/watchlist/*` endpoints (add/remove/list)
 - `handlers/discover_watchlist/handler.go` — Go handler for the watchlist (GET/POST/DELETE)
 - `models/movie_watchlist.go`, `models/series_watchlist.go` — DB models, joined with `*_metadata` for the list view
+- `assets/src/js/lib/discover/localizeClient.js` — fetch wrapper for `POST /discover/localize` (batch localized titles/plots, per-id session cache) + `localizedTitle`/`withLocalized` overlay helpers
+- `assets/src/js/lib/discover/http.js` — shared `csrfHeaders()` for the discover JSON POST endpoints
+- `handlers/discover/localize.go` — Go handler bridging catalog ids to the enrichment localization pipeline
+- `migrations/59_tmdb_info_imdb_id_index.up.sql` — partial index on `tmdb.info(imdb_id)` for batch imdb→tmdb lookups
 
 ### Key Components
 
 - **DiscoverApp** — root component using `useReducer(discoverReducer, initialState)`. Manages init, catalog loading, search, modal state, and addon wizard flow.
 - **StreamModal** — dialog modal driven by `modal` state from reducer. Views: `loading`, `streams` (with reactive filter chips), `episodes` (season tabs + episode list), `progress` (torrent processing).
 - **AddonWizard** — two-step guided wizard for discovering and installing Stremio addons. Step 1: source selection (Official Stremio, Community). Step 2: addon browsing with search, filters, and batch install.
-- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `ADDONS_UPDATED`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`, `WATCHLIST_IDS_LOADED`, `WATCHLIST_ITEMS_LOADED`, `WATCHLIST_FILTER_TOGGLE`, `WATCHLIST_ADD`, `WATCHLIST_REMOVE`, `SELECT_WATCHLIST_TYPE`.
+- **discoverReducer** — single reducer handling all state transitions. Actions: `INIT_SUCCESS`, `INIT_ERROR`, `SET_PHASE`, `ADDONS_UPDATED`, `SELECT_TYPE`, `SELECT_CATALOG`, `CATALOG_LOADING`, `CATALOG_LOADED`, `CATALOG_ERROR`, `SEARCH_START`, `SEARCH_RESULTS`, `SELECT_SEARCH_TYPE`, `EXIT_SEARCH`, `SHOW_MODAL`, `CLOSE_MODAL`, `WATCHLIST_IDS_LOADED`, `WATCHLIST_ITEMS_LOADED`, `WATCHLIST_FILTER_TOGGLE`, `WATCHLIST_ADD`, `WATCHLIST_REMOVE`, `SELECT_WATCHLIST_TYPE`, `LOCALIZED_MERGED`.
 - **StremioClient** (`lib/discover/client.js`) — fetches manifests, catalogs, search results, meta, and streams from Stremio addon URLs. Uses LRU cache (max 100 entries) and AbortController with 10s timeout on all fetch calls. `fetchAllManifests()` returns full per-addon health (status / source / error) — see [Addon Health](#addon-health).
 - **AddonHealthChip** — page-level surface for addon outages: hidden when everything is `ok`, otherwise renders a warning chip with retry + a per-addon drawer. See [Addon Health](#addon-health).
 - **useDiscoverUrl** — custom hook managing browser history (`pushState`/`replaceState`) and `popstate` events for back/forward navigation.
@@ -81,6 +85,28 @@ Controlled by `{{ if not .Tool }}` — hidden when the page is loaded as a tool/
 3. Catalogs are extracted from manifests and grouped by type (movie, series, etc.)
 4. User selects a type tab, then a catalog from the dropdown
 5. Items are fetched with pagination (`skip` param), Load More button for next page
+
+## Localized Metadata
+
+Stremio addons (Cinemeta included) return English titles/descriptions regardless of `Accept-Language`. For non-English locales the grid and stream modal overlay translations served by the **server enrichment pipeline** — the same `LocalizableMapper` chain (today: TMDB) and `tmdb.localized` cache used by the resource page, library and AI recommendations.
+
+### Flow
+
+1. After any grid surface loads (catalog page, search results, watchlist items), `DiscoverApp` fire-and-forgets `fetchLocalized([{id, type}])` — same pattern as `fetchUserStatuses`
+2. `localizeClient.js` filters to bare IMDB `tt*` ids (episode ids, bare `tmdb*` and custom addon ids are skipped), dedupes against a module-level session cache, and POSTs `/discover/localize` in chunks of ≤100
+3. `handlers/discover/localize.go` (auth-gated) reads the language from the i18n middleware (URL prefix), fans out `Enricher.LocalizeByID` with bounded concurrency (8). Response contract — three outcomes per id: `{title, plot}` (localized), explicit `{}` (checked, no translation → client caches the negative verdict), id omitted (pipeline error → client leaves it uncached and retries on a later batch)
+4. `Enricher.LocalizeByID` walks the mapper chain via capability interfaces: `LocalizableMapper.Localize` first (3-tier cache: lazymap → `tmdb.localized` → TMDB API); only when that finds nothing, one `DirectMapper.MapByID` call pulls a previously unseen id into `tmdb.info` (find + details + external ids) and Localize retries — known ids never pay the extra resolution queries
+5. The response merges into `state.localized` (`LOCALIZED_MERGED`, additive-only); `overlayLocalized()` applies it at render time in the `displayItems` memo — items in state stay untouched, English remains the fallback
+6. Modal dispatch sites build titles through `localizedTitle(id, ...fallbacks)` / `withLocalized(item)` from `localizeClient.js` (cardClick, episodes view, post-meta patch, both calendar flows) so the localized-over-`meta.name` precedence lives in one place; deep-links with a cold cache fetch the single id and patch the open modal in place
+
+### Properties
+
+- **English sessions cost zero** — `getLang() === 'en'` short-circuits in the client before any network call, and the handler guards server-side too
+- **First sight of an id is the only expensive case** (up to 4 TMDB calls); the result persists in `tmdb.info` + `tmdb.localized`, so popular catalog pages are effectively free for everyone after the first non-English viewer
+- **No new localization logic** — the endpoint is a thin bridge; adding e.g. Kinopoisk Russian titles means implementing `LocalizableMapper` on the KPU mapper, zero changes in this path
+- **Client type hints are not trusted for identity** — only `tt*` ids are accepted (an IMDB id maps to exactly one TMDB entity; `GetTmdbID` resolves the real movie/tv type from `tmdb.info` or the populated find-result array, the hint is just a preference). Bare `tmdb*` ids are rejected because their movie/tv namespaces overlap numerically and a wrong hint could upsert a wrong-namespace title into `tmdb.info`
+- **Transient failures don't stick** — a TMDB timeout during a batch leaves those ids uncached on the client (omitted-from-response contract above), so the next grid load retries them; only an explicit "no translation" verdict is pinned for the session
+- Episode names in the episodes view stay English (Cinemeta data) — TMDB episode localization is a possible follow-up via `tmdb_episodes.go`
 
 ## Search
 

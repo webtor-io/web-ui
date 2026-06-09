@@ -391,7 +391,7 @@ func serve(c *cli.Context) error {
 	donate.RegisterHandler(r)
 
 	// Setting Discover
-	discover.RegisterHandler(r, tm, pg)
+	discover.RegisterHandler(r, tm, pg, en)
 
 	// Setting AI Recommendations (Discover)
 	//

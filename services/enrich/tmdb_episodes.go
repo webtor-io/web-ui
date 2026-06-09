@@ -34,7 +34,7 @@ func (s *TMDBEpisodes) MapEpisodes(ctx context.Context, videoID string, season i
 	}
 
 	// Resolve TMDB ID from video ID (IMDB ID or tmdbXXX)
-	tmdbID, err := s.tmdb.GetTmdbID(ctx, videoID, models.ContentTypeSeries)
+	tmdbID, _, err := s.tmdb.GetTmdbID(ctx, videoID, models.ContentTypeSeries)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve tmdb id")
 	}

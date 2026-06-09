@@ -176,21 +176,27 @@ func (s *TMDB) Map(ctx context.Context, m *models.VideoContent, mt models.Conten
 	return s.makeVideoMetadata(info), nil
 }
 
-// GetTmdbID returns the TMDB ID for a given video ID by looking up the cache or calling the API.
-// videoID can be an IMDB ID (tt*) or internal TMDB ID (tmdb*).
-func (s *TMDB) GetTmdbID(ctx context.Context, videoID string, ct models.ContentType) (int, error) {
-	// Handle our own tmdbXXX format
+// GetTmdbID returns the TMDB ID for a given video ID by looking up the
+// cache or calling the API, together with the RESOLVED content type.
+// videoID can be an IMDB ID (tt*) or internal TMDB ID (tmdb*). The ct
+// argument is only a hint: an IMDB id maps to exactly one TMDB entity, so
+// the cached row's type / the populated find-result array is authoritative
+// — a wrong hint (e.g. a client-supplied catalog type) must not turn into
+// a silent miss or a cross-namespace fetch.
+func (s *TMDB) GetTmdbID(ctx context.Context, videoID string, ct models.ContentType) (int, models.ContentType, error) {
+	// Handle our own tmdbXXX format. The numeric id alone can't disambiguate
+	// the movie/tv namespaces, so the hint stands.
 	if strings.HasPrefix(videoID, "tmdb") {
 		id, err := strconv.Atoi(strings.TrimPrefix(videoID, "tmdb"))
 		if err != nil {
-			return 0, nil
+			return 0, ct, nil
 		}
-		return id, nil
+		return id, ct, nil
 	}
 
 	db := s.pg.Get()
 	if db == nil {
-		return 0, errors.New("db is nil")
+		return 0, ct, errors.New("db is nil")
 	}
 
 	// Try to find in tmdb.info by imdb_id
@@ -201,23 +207,30 @@ func (s *TMDB) GetTmdbID(ctx context.Context, videoID string, ct models.ContentT
 		Limit(1).
 		Select()
 	if err == nil {
-		return info.TmdbID, nil
+		actual := models.ContentTypeMovie
+		if info.Type == tm.TmdbTypeSeries {
+			actual = models.ContentTypeSeries
+		}
+		return info.TmdbID, actual, nil
 	}
 
-	// Not found in cache, call TMDB find API
+	// Not found in cache, call TMDB find API. Prefer the hinted namespace,
+	// but fall back to the other one — find by IMDB id returns the entity
+	// in whichever array matches its real type.
 	resp, err := s.api.FindByExternalID(ctx, videoID, "imdb_id")
 	if err != nil {
-		return 0, errors.Wrap(err, "find by external id")
+		return 0, ct, errors.Wrap(err, "find by external id")
 	}
 
-	if ct == models.ContentTypeSeries && len(resp.TVResults) > 0 {
-		return resp.TVResults[0].ID, nil
+	preferTV := ct == models.ContentTypeSeries
+	if preferTV && len(resp.TVResults) > 0 || !preferTV && len(resp.MovieResults) == 0 && len(resp.TVResults) > 0 {
+		return resp.TVResults[0].ID, models.ContentTypeSeries, nil
 	}
-	if ct == models.ContentTypeMovie && len(resp.MovieResults) > 0 {
-		return resp.MovieResults[0].ID, nil
+	if len(resp.MovieResults) > 0 {
+		return resp.MovieResults[0].ID, models.ContentTypeMovie, nil
 	}
 
-	return 0, nil
+	return 0, ct, nil
 }
 
 func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentType, force bool) (*models.VideoMetadata, error) {
@@ -226,18 +239,13 @@ func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentTyp
 		return nil, errors.New("db is nil")
 	}
 
-	ttype := tm.TmdbTypeMovie
-	searchType := tmdb.TmdbTypeMovie
-	if ct == models.ContentTypeSeries {
-		ttype = tm.TmdbTypeSeries
-		searchType = tmdb.TmdbTypeTV
-	}
-
 	var tmdbID int
 
 	if strings.HasPrefix(videoID, "tt") {
 		var err error
-		tmdbID, err = s.GetTmdbID(ctx, videoID, ct)
+		// ct is replaced by the resolved type so ensureByTmdbID below never
+		// fetches the wrong movie/tv namespace off a bad hint.
+		tmdbID, ct, err = s.GetTmdbID(ctx, videoID, ct)
 		if err != nil {
 			return nil, err
 		}
@@ -262,6 +270,13 @@ func (s *TMDB) MapByID(ctx context.Context, videoID string, ct models.ContentTyp
 		if mi != nil {
 			return s.makeVideoMetadata(mi), nil
 		}
+	}
+
+	ttype := tm.TmdbTypeMovie
+	searchType := tmdb.TmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		ttype = tm.TmdbTypeSeries
+		searchType = tmdb.TmdbTypeTV
 	}
 
 	info, err := s.ensureByTmdbID(ctx, db, tmdbID, ttype, searchType)

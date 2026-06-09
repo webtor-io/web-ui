@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"time"
@@ -10,6 +11,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
@@ -38,17 +40,28 @@ type indexData struct {
 	Addons []addonView
 }
 
+// enricher is the slice of enrich.Enricher the localize endpoint needs.
+// Kept as an interface so the Level 2 batch worker is testable without a
+// real mapper chain.
+type enricher interface {
+	HasMappers() bool
+	LocalizeByID(ctx context.Context, videoID string, ct models.ContentType, lang string) (string, string, error)
+}
+
 type Handler struct {
 	tb template.Builder[*web.Context]
 	pg *cs.PG
+	en *enrich.Enricher
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("discover/*").WithLayout("main"),
 		pg: pg,
+		en: en,
 	}
 	r.GET("/discover", h.index)
+	r.POST("/discover/localize", auth.HasAuth, h.localize)
 }
 
 func (h *Handler) index(c *gin.Context) {

@@ -10,15 +10,7 @@
 // no source-of-truth branching.
 
 import { langPath } from './i18n';
-
-function csrfHeaders() {
-    return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': window._CSRF,
-    };
-}
+import { csrfHeaders } from './http';
 
 function adaptItem(row) {
     return {

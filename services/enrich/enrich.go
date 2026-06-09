@@ -126,6 +126,70 @@ func (s *Enricher) Localize(ctx context.Context, md *models.VideoMetadata, lang 
 	}
 }
 
+// LocalizeByID returns the localized title and plot for a bare video ID
+// (IMDB tt* / tmdb*) without a pre-built VideoMetadata — the Discover
+// catalog grid only has Stremio ids on hand. Walks the same mapper chain
+// as Localize. Localize is tried first (cheap: cache-backed); only when it
+// finds nothing does a DirectMapper get one MapByID call to pull a
+// previously unseen id into its local cache, followed by a retry — so
+// already-known ids never pay the extra resolution queries.
+//
+// The returned error distinguishes "checked, no translation exists"
+// (empty strings, nil error) from "could not check" (empty strings,
+// non-nil error) — callers that cache negative results must not pin a
+// transient failure as a permanent miss.
+func (s *Enricher) LocalizeByID(ctx context.Context, videoID string, ct models.ContentType, lang string) (string, string, error) {
+	if videoID == "" || lang == "en" {
+		return "", "", nil
+	}
+	var lastErr error
+	for _, m := range s.mappers {
+		lm, ok := m.(LocalizableMapper)
+		if !ok {
+			continue
+		}
+		title, plot, err := lm.Localize(ctx, videoID, lang)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", videoID).
+				WithField("lang", lang).
+				Debug("localize by id: mapper failed, trying next")
+			lastErr = err
+			continue
+		}
+		if title != "" || plot != "" {
+			return title, plot, nil
+		}
+
+		dm, ok := m.(DirectMapper)
+		if !ok {
+			continue
+		}
+		md, err := dm.MapByID(ctx, videoID, ct, false)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", videoID).
+				Debug("localize by id: map by id failed, trying next")
+			lastErr = err
+			continue
+		}
+		if md == nil {
+			continue
+		}
+		title, plot, err = lm.Localize(ctx, videoID, lang)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if title != "" || plot != "" {
+			return title, plot, nil
+		}
+	}
+	return "", "", lastErr
+}
+
 // IsAiringSeries asks any mapper that supports AiringChecker whether the
 // series identified by videoID is currently airing. Returns true on the
 // first positive hit; mapper errors are logged and swallowed (a wrong

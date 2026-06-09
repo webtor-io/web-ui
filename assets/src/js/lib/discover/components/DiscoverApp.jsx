@@ -4,6 +4,7 @@ import {
     discoverReducer, initialState,
     getCatalogsForType, getTypes,
     getSearchTypes, getSearchResultsForType,
+    overlayLocalized,
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
@@ -11,6 +12,7 @@ import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
 import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass, viewModeChipClass } from './discoverUtils';
 import { fetchWatchlistIds, fetchWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlistClient';
+import { fetchLocalized, getCachedLocalized, withLocalized, localizedTitle } from '../localizeClient';
 import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
@@ -187,6 +189,21 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         prevCatalogRef.current = key;
         loadCatalog(state.selectedCatalog, 0, []);
     }, [state.phase, state.selectedCatalog, state.selectedType, state.isSearchMode, loadCatalog]);
+
+    // Batch-localize whatever grid surface is on screen through the server
+    // enrichment pipeline (POST /discover/localize). localizeClient holds a
+    // per-id session cache, so pagination, tab switches and re-renders only
+    // request unseen ids; English sessions short-circuit inside
+    // fetchLocalized without touching the network.
+    useEffect(() => {
+        const src = state.isSearchMode
+            ? state.searchResults
+            : state.watchlistFilterEnabled ? state.watchlistItems : state.items;
+        if (!src.length) return;
+        fetchLocalized(src.map(i => ({ id: i.id, type: i.type || state.selectedType }))).then(found => {
+            if (Object.keys(found).length) dispatch({ type: 'LOCALIZED_MERGED', localized: found });
+        });
+    }, [state.items, state.searchResults, state.watchlistItems, state.isSearchMode, state.watchlistFilterEnabled, state.selectedType]);
 
     // --- Type/Catalog selection ---
     const selectType = useCallback((type) => {
@@ -371,6 +388,25 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const restoreSeason = modalSeasonRef.current;
         modalSeasonRef.current = null;
 
+        // Grid items arrive already overlaid via displayItems, but deep-links
+        // (openModalById fallback) don't — apply the cached translation here
+        // so every downstream modal dispatch sees the localized
+        // name/description. On a cold cache (direct link before any grid
+        // batch ran), fetch this one id and patch the open modal in place.
+        if (getCachedLocalized(id)) {
+            item = withLocalized(item);
+        } else {
+            fetchLocalized([{ id, type }]).then(found => {
+                if (!Object.keys(found).length) return;
+                dispatch({ type: 'LOCALIZED_MERGED', localized: found });
+                const l = found[id];
+                const cur = stateRef.current?.modal;
+                if (l && cur && (cur.metaId === id || cur.itemId === id) && !cur.backToEpisodes) {
+                    dispatch({ type: 'SHOW_MODAL', modal: { ...cur, title: l.title || cur.title, description: l.plot || cur.description } });
+                }
+            });
+        }
+
         // Watchlist conversion telemetry: a click that originates from the
         // watchlist view is the only signal we have today that "saved → opened
         // to stream" — without this we cannot answer whether Watchlist drives
@@ -404,8 +440,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 const meta = await client.fetchMeta(type, id);
                 enrichFromMeta(meta);
                 if (meta?.videos?.length > 0) {
+                    // Cinemeta's meta.name is the freshest English title, but a
+                    // localized title beats it; re-read the cache at dispatch
+                    // time so the parallel cold-cache fetch above is covered.
                     dispatch({ type: 'SHOW_MODAL', modal: {
-                        view: 'episodes', title: meta.name || item.name, poster: meta.poster || item.poster, meta, itemId: id, itemType: type, ...cardMeta,
+                        view: 'episodes', title: localizedTitle(id, meta.name, item.name), poster: meta.poster || item.poster, meta, itemId: id, itemType: type, ...cardMeta,
                         defaultSeason: restoreSeason != null ? Number(restoreSeason) : undefined,
                     } });
                 } else {
@@ -424,7 +463,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 enrichFromMeta(meta);
                 const cur = stateRef.current?.modal;
                 if (cur && cur.metaId === id.split(':')[0]) {
-                    dispatch({ type: 'SHOW_MODAL', modal: { ...cur, ...cardMeta, title: meta.name || cur.title, poster: meta.poster || cur.poster } });
+                    dispatch({ type: 'SHOW_MODAL', modal: { ...cur, ...cardMeta, title: localizedTitle(id, meta.name, cur.title), poster: meta.poster || cur.poster } });
                 }
             }
         }
@@ -1165,17 +1204,22 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     const watchlistTypes = useMemo(() => getSearchTypes(state.watchlistItems), [state.watchlistItems]);
 
     const displayItems = useMemo(() => {
+        let items;
         if (state.isSearchMode) {
-            if (state.searchType === 'all') return state.searchResults;
-            return getSearchResultsForType(state.searchResults, state.searchType);
+            items = state.searchType === 'all'
+                ? state.searchResults
+                : getSearchResultsForType(state.searchResults, state.searchType);
+        } else if (state.watchlistFilterEnabled) {
+            items = state.watchlistType === 'all'
+                ? state.watchlistItems
+                : getSearchResultsForType(state.watchlistItems, state.watchlistType);
+        } else {
+            items = state.items;
         }
-        if (state.watchlistFilterEnabled) {
-            if (state.watchlistType === 'all') return state.watchlistItems;
-            return getSearchResultsForType(state.watchlistItems, state.watchlistType);
-        }
-        return state.items;
+        return overlayLocalized(items, state.localized);
     }, [state.isSearchMode, state.items, state.searchResults, state.searchType,
-        state.watchlistFilterEnabled, state.watchlistItems, state.watchlistType]);
+        state.watchlistFilterEnabled, state.watchlistItems, state.watchlistType,
+        state.localized]);
 
     const showBadges = useMemo(() => {
         if (state.isSearchMode) return state.searchType === 'all';
@@ -1211,7 +1255,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const season = video.season;
         const episode = video.episode;
         const epId = video.id || `${id}:${season}:${episode}`;
-        const seriesName = meta?.name || item.name || id;
+        const seriesName = localizedTitle(id, meta?.name, item.name) || id;
         const epLabel = Number(season) === 0
             ? t('discover.specials')
             : `S${season} E${episode}`;
@@ -1261,7 +1305,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             type: 'SHOW_MODAL',
             modal: {
                 view: 'episodes',
-                title: meta?.name || item.name,
+                title: localizedTitle(id, meta?.name, item.name),
                 poster: meta?.poster || item.poster,
                 meta,
                 itemId: id,
