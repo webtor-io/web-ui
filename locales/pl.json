@@ -620,14 +620,11 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Inne",
-    "discover.streamsFound": "Znaleziono strumieni: %v",
-    "discover.streamsFiltered": "%v z %v strumieni",
     "discover.noStreams": "Brak dostępnych strumieni dla tego tytułu.",
     "discover.installAddonsHint": "Zainstaluj dodatki do streamingu, aby uzyskać strumienie torrent.",
     "discover.setupAddonsBtn": "Skonfiguruj dodatki",
     "discover.noFilterMatch": "Żadne strumienie nie pasują do wybranych filtrów.",
     "discover.include4k": "Uwzględnij 4K",
-    "discover.mayNotWork": "(streaming może nie działać)",
     "discover.warning4kTitle": "Ostrzeżenie o streamingu 4K",
     "discover.warning4kBody": "Treści 4K są bardzo duże i streaming wideo najprawdopodobniej nie będzie działać. Może również wymagać transkodowania, które jest wyłączone dla 4K. Zalecane jest tylko pobieranie.",
     "discover.show4k": "Pokaż 4K",
@@ -1114,5 +1111,9 @@
     "profile.preferences": "Preferencje",
     "profile.adultContent.title": "Treści dla dorosłych",
     "profile.adultContent.unblur": "Nie rozmywaj podglądów",
-    "profile.adultContent.unblurDesc": "Ukrywa rozmycie prywatności i odznakę 18+ na plakatach treści dla dorosłych w całym serwisie."
+    "profile.adultContent.unblurDesc": "Ukrywa rozmycie prywatności i odznakę 18+ na plakatach treści dla dorosłych w całym serwisie.",
+    "discover.reviews.title": "Recenzje",
+    "discover.tabStreams": "Strumienie (%v)",
+    "discover.tabReviews": "Recenzje (%v)",
+    "discover.tabEpisodes": "Odcinki (%v)"
 }

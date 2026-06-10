@@ -620,14 +620,11 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Otro",
-    "discover.streamsFound": "%v stream(s) encontrados",
-    "discover.streamsFiltered": "%v de %v stream(s)",
     "discover.noStreams": "No hay streams disponibles para este título.",
     "discover.installAddonsHint": "Instala addons de streaming para obtener streams de torrents.",
     "discover.setupAddonsBtn": "Configurar addons",
     "discover.noFilterMatch": "Ningún stream coincide con los filtros seleccionados.",
     "discover.include4k": "Incluir 4K",
-    "discover.mayNotWork": "(el streaming puede no funcionar)",
     "discover.warning4kTitle": "Advertencia de streaming 4K",
     "discover.warning4kBody": "El contenido 4K es muy grande y lo más probable es que el streaming de video no funcione. También puede requerir transcodificación, que está deshabilitada para 4K. Solo se recomienda la descarga.",
     "discover.show4k": "Mostrar 4K",
@@ -1114,5 +1111,9 @@
     "profile.preferences": "Preferencias",
     "profile.adultContent.title": "Contenido para adultos",
     "profile.adultContent.unblur": "No difuminar previsualizaciones",
-    "profile.adultContent.unblurDesc": "Oculta el difuminado de privacidad y la insignia 18+ en los carteles clasificados como adultos en todo el sitio."
+    "profile.adultContent.unblurDesc": "Oculta el difuminado de privacidad y la insignia 18+ en los carteles clasificados como adultos en todo el sitio.",
+    "discover.reviews.title": "Reseñas",
+    "discover.tabStreams": "Streams (%v)",
+    "discover.tabReviews": "Reseñas (%v)",
+    "discover.tabEpisodes": "Episodios (%v)"
 }

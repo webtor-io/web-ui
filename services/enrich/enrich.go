@@ -58,6 +58,29 @@ type LocalizableMapper interface {
 	Localize(ctx context.Context, videoID string, lang string) (title string, plot string, err error)
 }
 
+// Review is a single external user review surfaced through the
+// ReviewsProvider capability. Rating is the author's 0-10 score when
+// present; CreatedAt is an RFC3339 timestamp string straight from the
+// upstream API.
+type Review struct {
+	Author    string
+	Rating    *float64
+	Content   string
+	URL       string
+	CreatedAt string
+}
+
+// ReviewsProvider is an optional capability of a MetadataMapper. Mappers
+// that can fetch user reviews for a video id implement it. Today only
+// TMDB does. Contract mirrors LocalizeByID's three-valued shape: a
+// non-nil (possibly empty) slice means "checked, this is what exists";
+// nil with nil error means the mapper could not resolve the id locally
+// (the Enricher may MapByID and retry); non-nil error means the check
+// itself failed and the caller must not cache the miss.
+type ReviewsProvider interface {
+	Reviews(ctx context.Context, videoID string) ([]Review, error)
+}
+
 // AiringChecker is an optional capability of a MetadataMapper. Mappers that
 // know "is this series currently producing new episodes" implement it.
 // Today only TMDB does — it reads `status` and `in_production` off its
@@ -126,40 +149,37 @@ func (s *Enricher) Localize(ctx context.Context, md *models.VideoMetadata, lang 
 	}
 }
 
-// LocalizeByID returns the localized title and plot for a bare video ID
-// (IMDB tt* / tmdb*) without a pre-built VideoMetadata — the Discover
-// catalog grid only has Stremio ids on hand. Walks the same mapper chain
-// as Localize. Localize is tried first (cheap: cache-backed); only when it
-// finds nothing does a DirectMapper get one MapByID call to pull a
-// previously unseen id into its local cache, followed by a retry — so
-// already-known ids never pay the extra resolution queries.
+// walkByID implements the shared by-id capability walk used by
+// LocalizeByID and ReviewsByID: for each mapper, `try` reports whether
+// the mapper supports the capability and whether it produced a result
+// (writing the result into variables the caller captures). On a
+// resolve-miss (supported, no result, no error) the mapper gets exactly
+// one DirectMapper.MapByID call to pull a previously unseen id into its
+// local cache, followed by one retry — so already-known ids never pay
+// the extra resolution queries.
 //
-// The returned error distinguishes "checked, no translation exists"
-// (empty strings, nil error) from "could not check" (empty strings,
-// non-nil error) — callers that cache negative results must not pin a
-// transient failure as a permanent miss.
-func (s *Enricher) LocalizeByID(ctx context.Context, videoID string, ct models.ContentType, lang string) (string, string, error) {
-	if videoID == "" || lang == "en" {
-		return "", "", nil
-	}
+// Returns nil as soon as any try reports found; otherwise returns the
+// last error seen (nil when every mapper cleanly missed) — the same
+// "checked, nothing exists" vs "could not check" distinction both
+// callers expose to their negative-result-caching clients.
+func (s *Enricher) walkByID(ctx context.Context, videoID string, ct models.ContentType, op string,
+	try func(m MetadataMapper) (supported bool, found bool, err error)) error {
 	var lastErr error
 	for _, m := range s.mappers {
-		lm, ok := m.(LocalizableMapper)
-		if !ok {
+		supported, found, err := try(m)
+		if !supported {
 			continue
 		}
-		title, plot, err := lm.Localize(ctx, videoID, lang)
 		if err != nil {
 			log.WithError(err).
 				WithField("mapper", m.GetName()).
 				WithField("video_id", videoID).
-				WithField("lang", lang).
-				Debug("localize by id: mapper failed, trying next")
+				Debugf("%s: mapper failed, trying next", op)
 			lastErr = err
 			continue
 		}
-		if title != "" || plot != "" {
-			return title, plot, nil
+		if found {
+			return nil
 		}
 
 		dm, ok := m.(DirectMapper)
@@ -171,23 +191,95 @@ func (s *Enricher) LocalizeByID(ctx context.Context, videoID string, ct models.C
 			log.WithError(err).
 				WithField("mapper", m.GetName()).
 				WithField("video_id", videoID).
-				Debug("localize by id: map by id failed, trying next")
+				Debugf("%s: map by id failed, trying next", op)
 			lastErr = err
 			continue
 		}
 		if md == nil {
 			continue
 		}
-		title, plot, err = lm.Localize(ctx, videoID, lang)
+		_, found, err = try(m)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		if title != "" || plot != "" {
-			return title, plot, nil
+		if found {
+			return nil
 		}
 	}
-	return "", "", lastErr
+	return lastErr
+}
+
+// LocalizeByID returns the localized title and plot for a bare video ID
+// (IMDB tt* / tmdb*) without a pre-built VideoMetadata — the Discover
+// catalog grid only has Stremio ids on hand. Walks the same mapper chain
+// as Localize via walkByID: Localize is tried first (cheap:
+// cache-backed); only on a resolve-miss does MapByID run once, followed
+// by a retry.
+//
+// The returned error distinguishes "checked, no translation exists"
+// (empty strings, nil error) from "could not check" (empty strings,
+// non-nil error) — callers that cache negative results must not pin a
+// transient failure as a permanent miss.
+func (s *Enricher) LocalizeByID(ctx context.Context, videoID string, ct models.ContentType, lang string) (string, string, error) {
+	if videoID == "" || lang == "en" {
+		return "", "", nil
+	}
+	var title, plot string
+	err := s.walkByID(ctx, videoID, ct, "localize by id", func(m MetadataMapper) (bool, bool, error) {
+		lm, ok := m.(LocalizableMapper)
+		if !ok {
+			return false, false, nil
+		}
+		t, p, err := lm.Localize(ctx, videoID, lang)
+		if err != nil {
+			return true, false, err
+		}
+		if t != "" || p != "" {
+			title, plot = t, p
+			return true, true, nil
+		}
+		return true, false, nil
+	})
+	if title != "" || plot != "" {
+		return title, plot, nil
+	}
+	return "", "", err
+}
+
+// ReviewsByID returns user reviews for a bare video ID (IMDB tt* /
+// tmdb*). Same walkByID semantics as LocalizeByID: the cheap cached
+// Reviews call goes first; only when the mapper can't resolve the id at
+// all (nil, nil) does MapByID run once, followed by a retry. A resolved
+// id with zero reviews comes back as an empty non-nil slice and is a
+// definitive answer — no extra resolution work is spent on it.
+//
+// Same error contract as LocalizeByID: (nil, non-nil) means "could not
+// check" and callers must not cache it as a permanent miss.
+func (s *Enricher) ReviewsByID(ctx context.Context, videoID string, ct models.ContentType) ([]Review, error) {
+	if videoID == "" {
+		return nil, nil
+	}
+	var out []Review
+	err := s.walkByID(ctx, videoID, ct, "reviews by id", func(m MetadataMapper) (bool, bool, error) {
+		rp, ok := m.(ReviewsProvider)
+		if !ok {
+			return false, false, nil
+		}
+		revs, err := rp.Reviews(ctx, videoID)
+		if err != nil {
+			return true, false, err
+		}
+		if revs != nil {
+			out = revs
+			return true, true, nil
+		}
+		return true, false, nil
+	})
+	if out != nil {
+		return out, nil
+	}
+	return nil, err
 }
 
 // IsAiringSeries asks any mapper that supports AiringChecker whether the

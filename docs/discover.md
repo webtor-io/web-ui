@@ -45,6 +45,13 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/localizeClient.js` — fetch wrapper for `POST /discover/localize` (batch localized titles/plots, per-id session cache) + `localizedTitle`/`withLocalized` overlay helpers
 - `assets/src/js/lib/discover/http.js` — shared `csrfHeaders()` for the discover JSON POST endpoints
 - `handlers/discover/localize.go` — Go handler bridging catalog ids to the enrichment localization pipeline
+- `assets/src/js/lib/discover/reviewsClient.js` — fetch wrapper for `POST /discover/reviews` (single-id, per-id session cache)
+- `assets/src/js/lib/discover/components/Reviews.jsx` — `useReviews` hook + `ReviewsList` (content of the Reviews tab in the stream modal)
+- `assets/src/js/lib/discover/components/ExpandableText.jsx` — inline "…"-expandable clamped text (modal description, AI rec plots, review bodies)
+- `assets/src/js/lib/textClamp.js` — shared cut-search math (`findTextCut`/`trimTextCut`/`CLAMP_LINE_HEIGHT`) used by ExpandableText and the vanilla plot clamp in `app/resource/get.js`
+- `assets/src/js/lib/discover/components/StarIcon.jsx` — shared filled rating star (grid cards, modal header, rate buttons, AI badges, review ratings)
+- `assets/src/js/lib/discover/ids.js` — `bareImdbTitleID` guard shared by localizeClient and reviewsClient (client mirror of the server-side id checks)
+- `handlers/discover/reviews.go` — Go handler bridging the modal's title id to the `ReviewsProvider` enrichment capability
 - `migrations/59_tmdb_info_imdb_id_index.up.sql` — partial index on `tmdb.info(imdb_id)` for batch imdb→tmdb lookups
 
 ### Key Components
@@ -107,6 +114,25 @@ Stremio addons (Cinemeta included) return English titles/descriptions regardless
 - **Client type hints are not trusted for identity** — only `tt*` ids are accepted (an IMDB id maps to exactly one TMDB entity; `GetTmdbID` resolves the real movie/tv type from `tmdb.info` or the populated find-result array, the hint is just a preference). Bare `tmdb*` ids are rejected because their movie/tv namespaces overlap numerically and a wrong hint could upsert a wrong-namespace title into `tmdb.info`
 - **Transient failures don't stick** — a TMDB timeout during a batch leaves those ids uncached on the client (omitted-from-response contract above), so the next grid load retries them; only an explicit "no translation" verdict is pinned for the session
 - Episode names in the episodes view stay English (Cinemeta data) — TMDB episode localization is a possible follow-up via `tmdb_episodes.go`
+
+## Reviews (TMDB)
+
+The stream modal shows TMDB community reviews for the open title, when they exist. "When they exist" is the design: Discover surfaces mostly popular/trending content where TMDB review coverage is decent; long-tail titles get a disabled `(0)` tab / no section (no empty state). Reviews are served as-is — predominantly English, no locale filter — because an English review beats an empty section for non-EN users, and translating user text through the pipeline isn't justified before the Umami numbers prove anyone reads them.
+
+### Flow
+
+1. Both settled modal views carry the same `ModalTabs` chip row: `Episodes (N)` / `Reviews (M)` in the episodes view, `Streams (N)` / `Reviews (M)` plus the right-aligned 4K toggle in the streams view. Reviews load via the shared `useReviews(id, type)` hook (bare IMDB `tt*` ids only); the reviews chip is disabled while the count is 0. Drilling into an episode clears the tab (`tab: null` on the episode push) — the episode's streams open on the primary tab
+2. The active tab lives in the `?tab=reviews` URL param: `handleModalTabChange` in `DiscoverApp` pushes history entries, and a guard at the top of the popstate handler syncs tab-only steps into `modal.tab` without re-opening the modal — browser back/forward walks streams ⇄ reviews
+3. `reviewsClient.js` POSTs `/discover/reviews` (single id — no batching, only the modal needs reviews) and caches the verdict per id for the page lifetime; non-OK / network failures are not cached, so the next modal open retries
+4. `handlers/discover/reviews.go` (auth-gated) calls `Enricher.ReviewsByID`. Contract: 200 with a (possibly empty) `reviews` array is a definitive, cacheable verdict; 502 means the pipeline couldn't check
+5. `Enricher.ReviewsByID` walks the mapper chain via the `ReviewsProvider` capability (today: TMDB only) through the shared `walkByID` helper: the cached `Reviews` call first; a `DirectMapper.MapByID` + retry only when the id isn't in `tmdb.info` yet. TMDB keeps reviews in an in-memory lazymap (1h expire, capacity 1000, no DB table — reviews are display-only), capped at 5 per title, each body truncated to 2000 runes. Reviews containing links (`https?://` or `www.`-prefixed — `reviewHasLink` in `services/enrich/tmdb.go`) are dropped as self-promotion/spam; bare domains are deliberately kept (false-positive prone)
+6. Switching to the reviews tab fires the `discover-reviews-expand` Umami event. Review bodies — like the modal description, AI rec plots and the resource-page plot — clamp to N lines with a clickable inline `…` at the cut point that expands the full text; an inline `↑` at the end of the expanded text collapses it back. The cut index is binary-searched against the height budget: `ExpandableText.jsx` (measures on an invisible clone) in Preact surfaces, an equivalent vanilla snippet in `app/resource/get.js` on the resource page
+
+### Properties
+
+- **Value is still a hypothesis** — `discover-reviews-expand` exists to answer "does anyone read these" before investing in translation or additional sources (RT/Metacritic via OMDB would be a separate `RatingsProvider`-style capability)
+- **TMDB attribution** — the section header carries a TMDB badge; reviews are community content from TMDB and the badge is part of their attribution terms
+- **No new pipeline logic** — adding reviews from another source means implementing `ReviewsProvider` on that mapper, zero changes in the endpoint
 
 ## Search
 
@@ -197,6 +223,7 @@ The active mode is reflected in the URL so back/forward navigation works:
 - `?watchlist=1` — Watchlist view active
 - `?watchlist=1&watchlist-type=movie` — Watchlist view filtered to movies/series
 - No `watchlist` param — Catalog view (default)
+- `?tab=reviews` — reviews tab active inside an open stream modal (absent = streams tab); cleared on modal close
 
 The Preact app pushes a history entry on each switcher click and listens to `popstate` so the user can navigate between catalog → watchlist → modal → catalog with the browser controls. Direct links to `/discover?watchlist=1` open the Watchlist view immediately and lazy-load items on first paint.
 
@@ -248,6 +275,7 @@ Events tracked:
 - `watchlist-removed` — heart icon clicked on a card already in the list (`id`, `source`)
 - `ai-watchlist-toggled` — heart icon clicked on an AI recommendation card (`id`, `on`)
 - `stream-from-watchlist` — a card was clicked while the Watchlist view was active (no params; bare counter so the conversion ratio is `count(stream-from-watchlist) / count(watchlist-added)`)
+- `discover-reviews-expand` — TMDB reviews section expanded in the stream modal (`id`); the gate metric for investing further in reviews (translation, more sources)
 
 ## Addon Health
 

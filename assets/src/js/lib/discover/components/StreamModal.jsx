@@ -2,12 +2,15 @@ import { useRef, useEffect, useState, useMemo, useCallback } from 'preact/hooks'
 import { rebindAsync } from '../../async';
 import { initProgressLog } from '../../progressLog';
 import { parseStreamName, extractInfoHash, extractFileIdx } from '../stream';
-import { extractLanguages } from '../lang';
+import { extractLanguages, supportsFlagEmoji } from '../lang';
 import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
+import { ExpandableText } from './ExpandableText';
+import { ReviewsList, useReviews } from './Reviews';
+import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -55,7 +58,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     </button>
                 </div>
                 <div class="overflow-y-auto px-3 sm:px-6 pb-4 sm:pb-6">
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} onTabChange={onTabChange} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -65,7 +68,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange }) {
     const videoId = modal.metaId || modal.itemId;
     const videoType = modal.itemType;
     const isImdb = videoId && videoId.startsWith('tt') && !videoId.includes(':');
@@ -102,12 +105,18 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
         return <ProgressView logUrl={modal.logUrl} title={modal.title} poster={modal.poster} fileIdx={modal.fileIdx} />;
     }
 
+    // Both settled views carry the same tab row — Episodes (N) / Reviews (M)
+    // in the episodes view, Streams (N) / Reviews (M) + the 4K toggle in the
+    // streams view. Transient views (loading / fetching / progress) stay
+    // reviews-free.
+    const reviewsVideoId = isImdb && videoType ? videoId : null;
+
     if (modal.view === 'episodes') {
-        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} />;
+        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} />;
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} />;
     }
 
     return null;
@@ -160,7 +169,7 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, inWatchlist, 
                     class="btn btn-ghost btn-sm sm:btn-xs join-item border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/10 whitespace-nowrap"
                     title={t('discover.changeRating')}
                     aria-label={t('discover.changeRating')}>
-                    <svg class="w-5 h-5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
+                    <StarIcon class="w-5 h-5 sm:w-4 sm:h-4" />
                     {rating}
                 </button>
             ) : (
@@ -226,14 +235,14 @@ function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, i
                         {year && <span>{year}</span>}
                         {imdbRating && (
                             <span class="flex items-center gap-1 text-yellow-400">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" /></svg>
+                                <StarIcon class="w-3.5 h-3.5" />
                                 {parseFloat(imdbRating).toFixed(1)}
                             </span>
                         )}
                     </div>
                 )}
                 {extra}
-                {description && <p class="text-sm text-w-sub leading-relaxed mt-1 line-clamp-3">{description}</p>}
+                {description && <ExpandableText text={description} lines={3} textClass="text-sm text-w-sub leading-relaxed" class="mt-1" />}
                 {afterDescription}
                 {subtitle && <p class="text-sm text-w-muted mt-1">{subtitle}</p>}
             </div>
@@ -312,15 +321,55 @@ function FetchingView({ modal, statusButtons, headerMeta }) {
     );
 }
 
+// --- Modal tabs (shared by episodes & streams views) ---
+
+// ModalTabs — the Primary (N) / Reviews (M) chip row. `extra` lands
+// right-aligned (the 4K toggle in the streams view). The reviews chip is
+// disabled until reviews arrive and stays disabled at zero.
+function ModalTabs({ tab, onSwitch, primaryLabel, reviews, showReviews, extra }) {
+    return (
+        <div class="flex items-center gap-1.5 mb-3 flex-wrap">
+            <button type="button" class={chipClass(tab === 'primary')} onClick={() => onSwitch('primary')}>
+                {primaryLabel}
+            </button>
+            {showReviews && (
+                <button
+                    type="button"
+                    class={chipClass(tab === 'reviews')}
+                    disabled={!reviews || reviews.length === 0}
+                    onClick={() => onSwitch('reviews')}
+                >
+                    {tf('discover.tabReviews', reviews === null ? '…' : reviews.length)}
+                </button>
+            )}
+            {extra && <div class="ml-auto">{extra}</div>}
+        </div>
+    );
+}
+
+function ReviewsTabContent({ reviews }) {
+    if (reviews === null) {
+        return <div class="text-center py-6"><span class="loading loading-spinner loading-md text-w-cyan"></span></div>;
+    }
+    return <ReviewsList reviews={reviews} />;
+}
+
 // --- Stream Content ---
 
 function is4kStream(parsedInfo) {
     return parsedInfo.labels.some(l => l === '4K');
 }
 
-function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta }) {
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta, videoId, videoType, onTabChange }) {
     const { title, poster, streams, error, failedAddons } = modal;
     const failed = failedAddons || [];
+    // Tab state lives in the modal (synced to the ?tab= URL param by
+    // DiscoverApp) so browser back/forward walks streams ⇄ reviews.
+    const tab = modal.tab === 'reviews' ? 'reviews' : 'primary';
+    const reviews = useReviews(videoId, videoType);
+    const switchTab = useCallback((next) => {
+        if (next !== tab && onTabChange) onTabChange(next);
+    }, [tab, onTabChange]);
     const [retrying, setRetrying] = useState(false);
     const handleRetry = useCallback(async (e) => {
         e?.stopPropagation?.();
@@ -460,14 +509,6 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         window.umami?.track('discover-4k-cancelled');
     }, []);
 
-    const subtitleText = useMemo(() => {
-        const total = baseStreams.length;
-        if (hasActiveFilters) {
-            return tf('discover.streamsFiltered', visibleCount, total);
-        }
-        return tf('discover.streamsFound', total);
-    }, [hasActiveFilters, visibleCount, baseStreams.length]);
-
     const toggleSource = useCallback((src) => {
         setActiveSources(prev => {
             const next = { ...prev };
@@ -496,81 +537,69 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         });
     }, []);
 
-    if (streams.length === 0) {
+    // Streams-tab content. Empty states render inside the tab so the
+    // Streams/Reviews row stays visible — a title with zero streams can
+    // still have readable reviews.
+    let streamsContent;
+    if (streams.length === 0 && failed.length > 0) {
         // When the empty result is caused (or partly caused) by addon
         // failures, surface that explicitly instead of the generic
         // "no streams" copy. Without this the user can't tell whether
         // the title genuinely has no streams or their Torrentio is down.
-        if (failed.length > 0) {
-            const onlyFailure = failed[0];
-            const headline = failed.length === 1
-                ? tf('discover.streamsFailedOne', onlyFailure.name || onlyFailure.host)
-                : tf('discover.streamsFailedMany', failed.length);
-            return (
-                <div>
-                    <ModalHeader title={title} poster={poster} subtitle={t('discover.streamsFailedTitle')} extra={statusButtons} {...headerMeta} />
-                    <div class="text-center py-4">
-                        <svg class="w-12 h-12 text-yellow-400/50 mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
-                        </svg>
-                        <p class="text-sm text-w-text mb-1">{headline}</p>
-                        <p class="text-xs text-w-muted mb-4">{t('discover.streamsFailedBody')}</p>
-                        {failed.length > 1 && (
-                            <ul class="text-xs text-w-sub mb-4 inline-block text-left">
-                                {failed.map(f => (
-                                    <li key={f.host}>· {f.name || f.host}</li>
-                                ))}
-                            </ul>
-                        )}
-                        <div class="flex justify-center gap-2">
-                            <button
-                                class="btn btn-soft-cyan btn-sm"
-                                onClick={handleRetry}
-                                disabled={retrying}
-                            >
-                                {retrying && <span class="loading loading-spinner loading-xs"></span>}
-                                {t('discover.retry')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        return (
-            <div>
-                <ModalHeader title={title} poster={poster} subtitle={subtitleText} extra={statusButtons} {...headerMeta} />
-                <div class="text-center py-6">
-                    <p class="text-w-muted text-sm">
-                        {error || t('discover.noStreams')}
-                    </p>
-                    {!hasCustomAddons && (
-                        <>
-                            <p class="text-w-sub text-xs mt-2 mb-4">
-                                {t('discover.installAddonsHint')}
-                            </p>
-                            <button
-                                class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan"
-                                onClick={onSetupAddons}
-                            >
-                                {t('discover.setupAddonsBtn')}
-                            </button>
-                        </>
-                    )}
+        const onlyFailure = failed[0];
+        const headline = failed.length === 1
+            ? tf('discover.streamsFailedOne', onlyFailure.name || onlyFailure.host)
+            : tf('discover.streamsFailedMany', failed.length);
+        streamsContent = (
+            <div class="text-center py-4">
+                <svg class="w-12 h-12 text-yellow-400/50 mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+                </svg>
+                <p class="text-sm text-w-text mb-1">{headline}</p>
+                <p class="text-xs text-w-muted mb-4">{t('discover.streamsFailedBody')}</p>
+                {failed.length > 1 && (
+                    <ul class="text-xs text-w-sub mb-4 inline-block text-left">
+                        {failed.map(f => (
+                            <li key={f.host}>· {f.name || f.host}</li>
+                        ))}
+                    </ul>
+                )}
+                <div class="flex justify-center gap-2">
+                    <button
+                        class="btn btn-soft-cyan btn-sm"
+                        onClick={handleRetry}
+                        disabled={retrying}
+                    >
+                        {retrying && <span class="loading loading-spinner loading-xs"></span>}
+                        {t('discover.retry')}
+                    </button>
                 </div>
             </div>
         );
-    }
-
-    return (
-        <div>
-            <ModalHeader title={title} poster={poster} subtitle={subtitleText} {...headerMeta}
-                extra={statusButtons}
-                afterDescription={total4kCount > 0 ? (
-                    <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
-                        showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
-                ) : undefined}
-            />
-
+    } else if (streams.length === 0) {
+        streamsContent = (
+            <div class="text-center py-6">
+                <p class="text-w-muted text-sm">
+                    {error || t('discover.noStreams')}
+                </p>
+                {!hasCustomAddons && (
+                    <>
+                        <p class="text-w-sub text-xs mt-2 mb-4">
+                            {t('discover.installAddonsHint')}
+                        </p>
+                        <button
+                            class="btn btn-ghost btn-sm border border-w-line hover:border-w-cyan/30 hover:text-w-cyan"
+                            onClick={onSetupAddons}
+                        >
+                            {t('discover.setupAddonsBtn')}
+                        </button>
+                    </>
+                )}
+            </div>
+        );
+    } else {
+        streamsContent = (
+            <>
             {failed.length > 0 && (
                 <div class="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
                     <svg class="w-4 h-4 text-yellow-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -623,13 +652,40 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                     )}
                 </>
             )}
+            </>
+        );
+    }
+
+    // No stream-count subtitle — the count already lives in the
+    // "Streams (N)" tab chip. Only the addon-failure headline remains.
+    const headerSubtitle = streams.length === 0 && failed.length > 0
+        ? t('discover.streamsFailedTitle')
+        : undefined;
+
+    return (
+        <div>
+            <ModalHeader title={title} poster={poster} subtitle={headerSubtitle} extra={statusButtons} {...headerMeta} />
+
+            <ModalTabs
+                tab={tab}
+                onSwitch={switchTab}
+                primaryLabel={tf('discover.tabStreams', baseStreams.length)}
+                reviews={reviews}
+                showReviews={!!videoId}
+                extra={tab === 'primary' && total4kCount > 0 ? (
+                    <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
+                        showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
+                ) : null}
+            />
+
+            {tab === 'reviews' ? <ReviewsTabContent reviews={reviews} /> : streamsContent}
         </div>
     );
 }
 
 function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel }) {
     return (
-        <div class="mt-3 relative">
+        <div class="relative">
             <label class="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
                     type="checkbox"
@@ -641,13 +697,10 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
                     {t('discover.include4k')}
                     <span class="text-w-muted ml-0.5">({count})</span>
                 </span>
-                {!show4k && (
-                    <span class="text-[10px] text-w-muted">{t('discover.mayNotWork')}</span>
-                )}
             </label>
 
             {showWarning && (
-                <div class="absolute left-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
+                <div class="absolute right-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
                     <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">{t('discover.warning4kTitle')}</p>
                     <p class="text-[11px] text-w-muted mt-0.5 leading-snug">
                         {t('discover.warning4kBody')}
@@ -673,6 +726,9 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
 }
 
 function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLabels, activeLang, onToggleSource, onToggleLabel, onToggleLang }) {
+    // Windows renders flag emoji as bare letter pairs ("RU") — drop the
+    // flag there and let the language name carry the chip.
+    const showFlags = supportsFlagEmoji();
     return (
         <div class="flex flex-wrap gap-1.5 mb-3">
             {allSources.map(src => (
@@ -699,7 +755,7 @@ function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLab
                     class={chipClass(activeLang === lang.name, 'xs')}
                     onClick={() => onToggleLang(lang.name)}
                 >
-                    {lang.flag} {lang.name}
+                    {showFlags ? `${lang.flag} ${lang.name}` : lang.name}
                 </button>
             ))}
         </div>
@@ -759,9 +815,16 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta, videoId, videoType, onTabChange }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
+    // Same tab mechanics as StreamContent — Episodes (N) / Reviews (M),
+    // synced to ?tab= through DiscoverApp for history navigation.
+    const tab = modal.tab === 'reviews' ? 'reviews' : 'primary';
+    const reviews = useReviews(videoId, videoType);
+    const switchTab = useCallback((next) => {
+        if (next !== tab && onTabChange) onTabChange(next);
+    }, [tab, onTabChange]);
 
     const { seasons, seasonNums } = useMemo(() => {
         const s = {};
@@ -799,6 +862,11 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
         [seasons, activeSeason]
     );
 
+    // Tab chip counts every episode across all seasons, specials
+    // excluded — the seasons map buckets specials (and unknown-season
+    // videos) under 0.
+    const totalEpisodes = videos.length - (seasons[0]?.length || 0);
+
     if (!videos.length) {
         return (
             <div>
@@ -810,8 +878,18 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
 
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle={t('discover.selectEpisode')} extra={statusButtons} {...headerMeta} />
+            <ModalHeader title={title} poster={poster} subtitle={tab === 'primary' ? t('discover.selectEpisode') : undefined} extra={statusButtons} {...headerMeta} />
 
+            <ModalTabs
+                tab={tab}
+                onSwitch={switchTab}
+                primaryLabel={tf('discover.tabEpisodes', totalEpisodes)}
+                reviews={reviews}
+                showReviews={!!videoId}
+            />
+
+            {tab === 'reviews' ? <ReviewsTabContent reviews={reviews} /> : (
+            <>
             {seasonNums.length > 1 && (
                 <div class="flex gap-1.5 mb-3 flex-wrap">
                     {seasonNums.map(sn => (
@@ -858,6 +936,8 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                     ))}
                 </div>
             </div>
+            </>
+            )}
         </div>
     );
 }

@@ -62,6 +62,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 	}
 	r.GET("/discover", h.index)
 	r.POST("/discover/localize", auth.HasAuth, h.localize)
+	r.POST("/discover/reviews", auth.HasAuth, h.reviews)
 }
 
 func (h *Handler) index(c *gin.Context) {

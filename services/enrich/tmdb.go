@@ -3,6 +3,7 @@ package enrich
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,10 +23,33 @@ type localizedText struct {
 	Plot  string
 }
 
+// maxReviews caps the number of reviews kept per title; maxReviewRunes
+// truncates a single review body. TMDB reviews are occasionally
+// multi-thousand-word essays — past ~2000 chars they stop being modal
+// content, and the in-memory cache shouldn't hold them either.
+const (
+	maxReviews     = 5
+	maxReviewRunes = 2000
+)
+
+// reviewLinkRe flags review bodies that carry links — on TMDB those are
+// almost always self-promotion ("full review on my blog…") or outright
+// spam, not content worth a modal slot. Matches explicit schemes and
+// www.-prefixed hosts; bare domains are left alone (too many false
+// positives on titles and abbreviations).
+var reviewLinkRe = regexp.MustCompile(`(?i)\b(?:https?://|www\.)\S+`)
+
+// reviewHasLink reports whether a review body should be dropped by the
+// link filter.
+func reviewHasLink(content string) bool {
+	return reviewLinkRe.MatchString(content)
+}
+
 type TMDB struct {
 	api      *tmdb.Api
 	pg       *cs.PG
 	locCache *lazymap.LazyMap[*localizedText]
+	revCache *lazymap.LazyMap[[]Review]
 }
 
 func (s *TMDB) GetName() string {
@@ -42,6 +66,15 @@ func NewTMDB(pg *cs.PG, api *tmdb.Api) *TMDB {
 		locCache: lazymap.New[*localizedText](&lazymap.Config{
 			Expire:      10 * time.Minute,
 			ErrorExpire: 30 * time.Second,
+		}),
+		revCache: lazymap.New[[]Review](&lazymap.Config{
+			Expire:      time.Hour,
+			ErrorExpire: 30 * time.Second,
+			// Reviews are the largest payloads cached in this file (up to
+			// ~5×2000 runes per title) and keys arrive at modal-open rate
+			// across all users — cap the map so an hour of busy browsing
+			// can't grow it unbounded.
+			Capacity: 1000,
 		}),
 	}
 }
@@ -495,6 +528,59 @@ func (s *TMDB) localizeFromDBOrAPI(ctx context.Context, tmdbID int, tmdbType tmd
 	return &localizedText{Title: title, Plot: plot}, nil
 }
 
+// Reviews implements ReviewsProvider. Resolves the id against tmdb.info
+// only (no API-side find call — same as Localize) and returns nil when
+// the id isn't locally known, letting Enricher.ReviewsByID decide
+// whether to pay a MapByID. A resolved id always yields a non-nil slice,
+// empty when TMDB has no reviews, so the verdict is cacheable upstream.
+// Reviews are served default-language (mostly English) — see
+// docs/discover.md for why no locale filter is applied.
+func (s *TMDB) Reviews(ctx context.Context, videoID string) ([]Review, error) {
+	tmdbID, tmdbType, err := s.resolveLocalizeIDs(ctx, videoID)
+	if err != nil {
+		return nil, err
+	}
+	if tmdbID == 0 {
+		return nil, nil
+	}
+
+	cacheKey := fmt.Sprintf("%d:%s", tmdbID, tmdbType)
+	return s.revCache.Get(cacheKey, func() ([]Review, error) {
+		raw, err := s.api.GetReviews(ctx, tmdbID, tmdbType)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]Review, 0, maxReviews)
+		for _, r := range raw {
+			if reviewHasLink(r.Content) {
+				continue
+			}
+			out = append(out, Review{
+				Author:    r.Author,
+				Rating:    r.Rating,
+				Content:   truncateRunes(r.Content, maxReviewRunes),
+				URL:       r.URL,
+				CreatedAt: r.CreatedAt,
+			})
+			if len(out) == maxReviews {
+				break
+			}
+		}
+		return out, nil
+	})
+}
+
+// truncateRunes cuts s to at most n runes, appending an ellipsis when
+// something was dropped. Rune-based so multi-byte text doesn't get split
+// mid-character.
+func truncateRunes(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n]) + "…"
+}
+
 // IsAiring reads `status` / `in_production` off the locally cached TMDB
 // metadata. No external API call — if the row isn't cached yet, we return
 // false and the release-subscribe banner just doesn't render (safe
@@ -526,3 +612,4 @@ var _ DirectMapper = (*TMDB)(nil)
 var _ PopularProvider = (*TMDB)(nil)
 var _ LocalizableMapper = (*TMDB)(nil)
 var _ AiringChecker = (*TMDB)(nil)
+var _ ReviewsProvider = (*TMDB)(nil)

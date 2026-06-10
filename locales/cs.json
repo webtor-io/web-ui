@@ -620,14 +620,11 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Ostatní",
-    "discover.streamsFound": "Nalezeno streamů: %v",
-    "discover.streamsFiltered": "%v z %v streamů",
     "discover.noStreams": "Pro tento titul nejsou k dispozici žádné streamy.",
     "discover.installAddonsHint": "Nainstalujte doplňky pro streamování a získejte torrent streamy.",
     "discover.setupAddonsBtn": "Nastavit doplňky",
     "discover.noFilterMatch": "Žádné streamy neodpovídají vybraným filtrům.",
     "discover.include4k": "Zahrnout 4K",
-    "discover.mayNotWork": "(streamování nemusí fungovat)",
     "discover.warning4kTitle": "Upozornění na 4K streaming",
     "discover.warning4kBody": "4K obsah je velmi velký a streamování videa s největší pravděpodobností nebude fungovat. Může také vyžadovat překódování, které je pro 4K zakázáno. Doporučuje se pouze stažení.",
     "discover.show4k": "Zobrazit 4K",
@@ -1114,5 +1111,9 @@
     "profile.preferences": "Předvolby",
     "profile.adultContent.title": "Obsah pro dospělé",
     "profile.adultContent.unblur": "Nerozmazávat náhledy",
-    "profile.adultContent.unblurDesc": "Skryje rozmazání soukromí a odznak 18+ na plakátech klasifikovaných jako pro dospělé v celém webu."
+    "profile.adultContent.unblurDesc": "Skryje rozmazání soukromí a odznak 18+ na plakátech klasifikovaných jako pro dospělé v celém webu.",
+    "discover.reviews.title": "Recenze",
+    "discover.tabStreams": "Streamy (%v)",
+    "discover.tabReviews": "Recenze (%v)",
+    "discover.tabEpisodes": "Epizody (%v)"
 }

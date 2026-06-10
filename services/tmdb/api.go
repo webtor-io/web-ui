@@ -104,6 +104,17 @@ type DiscoverResult struct {
 	VoteCount   int     `json:"vote_count"`
 }
 
+// Review is a single user review returned by the /reviews endpoint.
+// Rating is the author's 0-10 score and may be absent (TMDB allows
+// text-only reviews).
+type Review struct {
+	Author    string
+	Rating    *float64
+	Content   string
+	URL       string
+	CreatedAt string
+}
+
 type Api struct {
 	url            string
 	cl             *http.Client
@@ -353,6 +364,50 @@ func (api *Api) DiscoverMovies(ctx context.Context, releaseDateGte string, minVo
 	}
 
 	return out, totalPages, nil
+}
+
+// GetReviews fetches the first page of user reviews for a movie or TV
+// show. TMDB reviews are community-written and predominantly English;
+// no language filter is applied — callers show whatever exists.
+func (api *Api) GetReviews(ctx context.Context, tmdbID int, tmdbType TmdbType) ([]Review, error) {
+	u := fmt.Sprintf("%s/3/%s/%d/reviews", api.url, tmdbType, tmdbID)
+
+	raw, err := api.doRequest(ctx, u)
+	if err != nil {
+		return nil, errors.Wrap(err, "tmdb get reviews")
+	}
+	if raw == nil {
+		return nil, nil
+	}
+
+	results, ok := raw["results"].([]any)
+	if !ok {
+		return nil, nil
+	}
+
+	out := make([]Review, 0, len(results))
+	for _, r := range results {
+		m, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		rev := Review{}
+		rev.Author, _ = m["author"].(string)
+		rev.Content, _ = m["content"].(string)
+		rev.URL, _ = m["url"].(string)
+		rev.CreatedAt, _ = m["created_at"].(string)
+		if ad, ok := m["author_details"].(map[string]any); ok {
+			if rating, ok := ad["rating"].(float64); ok && rating > 0 {
+				rev.Rating = &rating
+			}
+		}
+		if rev.Content == "" {
+			continue
+		}
+		out = append(out, rev)
+	}
+
+	return out, nil
 }
 
 func (api *Api) PosterURL(posterPath string, size string) string {

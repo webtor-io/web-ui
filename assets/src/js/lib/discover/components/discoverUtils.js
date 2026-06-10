@@ -2,6 +2,15 @@ import { buildCatalogs, buildAddons, getCatalogsForType, getTypes } from './disc
 import { langPath, t } from '../i18n';
 import { csrfHeaders } from '../http';
 
+// reviewsTab reads the stream-modal tab from the ?tab= URL param —
+// 'reviews' or undefined (= primary tab). Single point of truth for the
+// param's shape; used by modal seeding (loadStreams / cardClick) and the
+// popstate handler in DiscoverApp.
+export function reviewsTab(params) {
+    const p = params || new URLSearchParams(window.location.search);
+    return p.get('tab') === 'reviews' ? 'reviews' : undefined;
+}
+
 // Shared button chip class for Tabs (btn-sm) and FilterChips (btn-xs)
 // Size classes must be written as full literals for Tailwind static analysis
 export function chipClass(active, size = 'sm') {

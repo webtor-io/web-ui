@@ -10,7 +10,7 @@ import { StreamModal } from './StreamModal';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
-import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass, viewModeChipClass } from './discoverUtils';
+import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass, viewModeChipClass, reviewsTab } from './discoverUtils';
 import { fetchWatchlistIds, fetchWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlistClient';
 import { fetchLocalized, getCachedLocalized, withLocalized, localizedTitle } from '../localizeClient';
 import { RatingDialog } from './RatingDialog';
@@ -22,6 +22,43 @@ import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, 
 import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
 import { t, langPath } from '../i18n';
+
+// episodesModalFromBack rebuilds the episodes-view modal from the
+// backToEpisodes snapshot carried by an episode-streams modal. Shared by
+// the "‹ Episodes" button and the popstate restore path so the two can't
+// drift apart.
+function episodesModalFromBack(back, { tab, defaultSeason } = {}) {
+    return {
+        view: 'episodes',
+        title: back.title,
+        poster: back.poster,
+        meta: back.meta,
+        itemId: back.itemId,
+        itemType: back.itemType,
+        year: back.year,
+        releaseInfo: back.releaseInfo,
+        imdbRating: back.imdbRating,
+        description: back.description,
+        tab,
+        defaultSeason: defaultSeason != null ? defaultSeason : (back.season != null ? Number(back.season) : undefined),
+    };
+}
+
+// modalIdentity extracts the fields every SHOW_MODAL recreation must
+// carry forward — the watched/rate buttons and the reviews tab are gated
+// on them (see ModalBody in StreamModal.jsx). Dropping any of these on a
+// rebuilt modal silently hides those surfaces.
+function modalIdentity(m) {
+    return {
+        metaId: m?.metaId,
+        itemId: m?.itemId,
+        itemType: m?.itemType,
+        year: m?.year,
+        releaseInfo: m?.releaseInfo,
+        imdbRating: m?.imdbRating,
+        description: m?.description,
+    };
+}
 
 export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     const [state, dispatch] = useReducer(discoverReducer, initialState);
@@ -323,7 +360,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const imdbRating = item.imdbRating;
         const description = item.description;
         const addons = client.getStreamAddons();
-        const itemMeta = { year, releaseInfo, imdbRating, description };
+        // Seed the tab from the URL so deep links / reloads with
+        // ?tab=reviews land on the reviews tab — a freshly built modal
+        // object otherwise defaults to the primary tab.
+        const itemMeta = { year, releaseInfo, imdbRating, description, tab: reviewsTab() };
 
         // Addons we couldn't even probe for streams because their manifest
         // is unreachable or returned a 4xx. Without surfacing these, an
@@ -443,8 +483,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     // Cinemeta's meta.name is the freshest English title, but a
                     // localized title beats it; re-read the cache at dispatch
                     // time so the parallel cold-cache fetch above is covered.
+                    // Tab seeded from the URL so a ?tab=reviews deep link lands
+                    // on the reviews tab of the episodes view.
                     dispatch({ type: 'SHOW_MODAL', modal: {
-                        view: 'episodes', title: localizedTitle(id, meta.name, item.name), poster: meta.poster || item.poster, meta, itemId: id, itemType: type, ...cardMeta,
+                        view: 'episodes', title: localizedTitle(id, meta.name, item.name), poster: meta.poster || item.poster, meta, itemId: id, itemType: type, ...cardMeta, tab: reviewsTab(),
                         defaultSeason: restoreSeason != null ? Number(restoreSeason) : undefined,
                     } });
                 } else {
@@ -529,7 +571,9 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const type = item.itemType || 'series';
         const epId = episode.id || `${item.itemId}:${episode.season}:${episode.episode}`;
         const epName = `${item.title} - ${Number(episode.season) === 0 ? 'Specials' : `S${episode.season || '?'}`} E${episode.episode || '?'}`;
-        url.push({ season: episode.season, episode: episode.episode });
+        // tab: null — drilling into an episode leaves the reviews tab of the
+        // episodes view behind; the episode's streams open on the primary tab.
+        url.push({ season: episode.season, episode: episode.episode, tab: null });
 
         const backToEpisodes = {
             title: item.title,
@@ -547,8 +591,18 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         await loadStreams(type, epId, { name: epName, poster: item.poster, year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description }, { backToEpisodes });
     }, [loadStreams]);
 
+    // Direct jump to the episodes view — NOT history.back(): the history
+    // may contain tab-switch entries (?tab=reviews), and the button
+    // promises "Episodes", not "previous step". Pushes a proper episodes
+    // URL so browser-back from there returns to these streams.
     const onBackToEpisodes = useCallback(() => {
-        window.history.back();
+        const back = modalRef.current?.backToEpisodes;
+        if (!back) {
+            window.history.back();
+            return;
+        }
+        url.push({ episode: null, tab: null });
+        dispatch({ type: 'SHOW_MODAL', modal: episodesModalFromBack(back) });
     }, []);
 
     const onSeasonChange = useCallback((season) => {
@@ -559,9 +613,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const currentTitle = state.modal?.title;
         const currentPoster = state.modal?.poster;
         const currentBackToEpisodes = state.modal?.backToEpisodes;
+        const currentIdentity = modalIdentity(state.modal);
 
         dispatch({ type: 'SHOW_MODAL', modal: {
-            view: 'progress', title: currentTitle, poster: currentPoster, logUrl: null, fileIdx: fileIdx != null ? fileIdx : null,
+            view: 'progress', title: currentTitle, poster: currentPoster, ...currentIdentity, logUrl: null, fileIdx: fileIdx != null ? fileIdx : null,
         }});
 
         try {
@@ -585,11 +640,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             if (!logUrl) throw new Error('No job log URL');
 
             dispatch({ type: 'SHOW_MODAL', modal: {
-                view: 'progress', title: currentTitle, poster: currentPoster, logUrl, fileIdx: fileIdx != null ? fileIdx : null,
+                view: 'progress', title: currentTitle, poster: currentPoster, ...currentIdentity, logUrl, fileIdx: fileIdx != null ? fileIdx : null,
             }});
         } catch (e) {
             dispatch({ type: 'SHOW_MODAL', modal: {
-                view: 'streams', title: currentTitle, poster: currentPoster, streams: [],
+                view: 'streams', title: currentTitle, poster: currentPoster, ...currentIdentity, streams: [],
                 error: t('discover.resourcePrepError'),
                 backToEpisodes: currentBackToEpisodes,
             }});
@@ -598,7 +653,20 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
     const closeModal = useCallback(() => {
         dispatch({ type: 'CLOSE_MODAL' });
-        url.replace({ id: null, season: null, episode: null });
+        url.replace({ id: null, season: null, episode: null, tab: null });
+    }, []);
+
+    // Primary ⇄ reviews tab inside the stream modal. The tab lives in the
+    // ?tab= URL param (pushed, so browser back/forward walks the tabs) and
+    // mirrors into modal.tab for rendering — stored as 'reviews' or
+    // undefined, never a primary marker.
+    const handleModalTabChange = useCallback((tab) => {
+        const m = modalRef.current;
+        if (!m) return;
+        const reviews = tab === 'reviews';
+        dispatch({ type: 'SHOW_MODAL', modal: { ...m, tab: reviews ? 'reviews' : undefined } });
+        url.push({ tab: reviews ? 'reviews' : null });
+        if (reviews) window.umami?.track('discover-reviews-expand', { id: m.metaId || m.itemId });
     }, []);
 
     const selectSearchType = useCallback((searchType) => {
@@ -626,6 +694,24 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const watchlistType = urlParams.get('watchlist-type');
 
         const cur = stateRef.current;
+
+        // Tab-only history steps (primary ⇄ reviews within the same open
+        // modal view) must not re-open the modal — just sync the tab. The
+        // view-shape check (episode param ↔ modal view) keeps this from
+        // swallowing steps that also cross the episodes ⇄ streams boundary.
+        const urlTab = reviewsTab(urlParams);
+        const curModal = modalRef.current;
+        const sameModalView = curModal && (
+            curModal.view === 'streams'
+                ? (!!episode || !curModal.backToEpisodes)
+                : (curModal.view === 'episodes' && !episode)
+        );
+        if (id && sameModalView &&
+            (curModal.metaId === id || curModal.itemId === id) &&
+            (curModal.tab === 'reviews' ? 'reviews' : undefined) !== urlTab) {
+            dispatch({ type: 'SHOW_MODAL', modal: { ...curModal, tab: urlTab } });
+            return;
+        }
 
         // Handle watchlist mode toggle. We do this before search so back
         // navigation from a search-while-watchlist-open lands correctly.
@@ -719,22 +805,12 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     },
                 });
             } else if (currentModal?.backToEpisodes) {
-                const back = currentModal.backToEpisodes;
                 dispatch({
                     type: 'SHOW_MODAL',
-                    modal: {
-                        view: 'episodes',
-                        title: back.title,
-                        poster: back.poster,
-                        meta: back.meta,
-                        itemId: back.itemId,
-                        itemType: back.itemType,
-                        year: back.year,
-                        releaseInfo: back.releaseInfo,
-                        imdbRating: back.imdbRating,
-                        description: back.description,
-                        defaultSeason: season != null ? Number(season) : (back.season != null ? Number(back.season) : undefined),
-                    },
+                    modal: episodesModalFromBack(currentModal.backToEpisodes, {
+                        tab: urlTab,
+                        defaultSeason: season != null ? Number(season) : undefined,
+                    }),
                 });
             } else {
                 url.withPopstate(() => openModalByIdRef.current(id));
@@ -804,7 +880,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
         // Preserve modal params if present
         const cur = new URLSearchParams(window.location.search);
-        ['id', 'season', 'episode'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
+        ['id', 'season', 'episode', 'tab'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
 
         url.replaceAll(params);
     }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
@@ -926,7 +1002,14 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 client.manifests = manifests;
             } catch (e) { /* streams may still work */ }
 
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: pending.title, poster: pending.poster, subtitle: 'Loading streams...' } });
+            // Same identity-carry as handleStreamClick: pending.modal holds
+            // the full pre-wizard modal, so the recreated modal keeps the
+            // watched/rate buttons and reviews tab alive.
+            const pendingIdentity = {
+                ...modalIdentity(pending.modal),
+                itemType: pending.modal?.itemType || pending.type,
+            };
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'loading', title: pending.title, poster: pending.poster, ...pendingIdentity, subtitle: 'Loading streams...' } });
             let streams = [];
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
@@ -938,7 +1021,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
             }
             dispatch({ type: 'SHOW_MODAL', modal: {
-                view: 'streams', title: pending.title, poster: pending.poster, streams,
+                view: 'streams', title: pending.title, poster: pending.poster, ...pendingIdentity, streams,
                 backToEpisodes: pending.backToEpisodes,
             } });
             // Restore URL params so browser back returns to this modal
@@ -1545,6 +1628,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     onToggleWatched={handleToggleWatched}
                     onRate={handleOpenRating}
                     onToggleWatchlist={handleToggleWatchlist}
+                    onTabChange={handleModalTabChange}
                 />
             )}
 

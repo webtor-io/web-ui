@@ -620,14 +620,11 @@
     "discover.type.tv": "ТВ",
     "discover.type.anime": "Аниме",
     "discover.type.other": "Другое",
-    "discover.streamsFound": "Найдено стримов: %v",
-    "discover.streamsFiltered": "%v из %v стримов",
     "discover.noStreams": "Нет доступных стримов для этого контента.",
     "discover.installAddonsHint": "Установите аддоны для стриминга, чтобы получить торрент-стримы.",
     "discover.setupAddonsBtn": "Настроить аддоны",
     "discover.noFilterMatch": "Нет стримов, соответствующих выбранным фильтрам.",
     "discover.include4k": "Включить 4K",
-    "discover.mayNotWork": "(стриминг может не работать)",
     "discover.warning4kTitle": "Предупреждение о 4K",
     "discover.warning4kBody": "4K-контент очень большой, и видеостриминг, скорее всего, не будет работать. Также может потребоваться транскодирование, которое отключено для 4K. Рекомендуется только скачивание.",
     "discover.show4k": "Показать 4K",
@@ -1114,5 +1111,9 @@
     "profile.preferences": "Предпочтения",
     "profile.adultContent.title": "Контент для взрослых",
     "profile.adultContent.unblur": "Не размывать превью",
-    "profile.adultContent.unblurDesc": "Снять блюр и 18+ оверлей с постеров adult-контента по всему сайту."
+    "profile.adultContent.unblurDesc": "Снять блюр и 18+ оверлей с постеров adult-контента по всему сайту.",
+    "discover.reviews.title": "Отзывы",
+    "discover.tabStreams": "Стримы (%v)",
+    "discover.tabReviews": "Отзывы (%v)",
+    "discover.tabEpisodes": "Серии (%v)"
 }

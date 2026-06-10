@@ -620,14 +620,11 @@
     "discover.type.tv": "TV",
     "discover.type.anime": "Anime",
     "discover.type.other": "Anders",
-    "discover.streamsFound": "%v stream(s) gevonden",
-    "discover.streamsFiltered": "%v van %v stream(s)",
     "discover.noStreams": "Geen streams beschikbaar voor deze titel.",
     "discover.installAddonsHint": "Installeer streaming-addons om torrent-streams te krijgen.",
     "discover.setupAddonsBtn": "Addons instellen",
     "discover.noFilterMatch": "Geen streams komen overeen met de geselecteerde filters.",
     "discover.include4k": "4K opnemen",
-    "discover.mayNotWork": "(streaming werkt mogelijk niet)",
     "discover.warning4kTitle": "4K-streamingwaarschuwing",
     "discover.warning4kBody": "4K-content is erg groot en videostreaming zal hoogstwaarschijnlijk niet werken. Het kan ook transcodering vereisen, die is uitgeschakeld voor 4K. Alleen downloaden wordt aanbevolen.",
     "discover.show4k": "4K tonen",
@@ -1114,5 +1111,9 @@
     "profile.preferences": "Voorkeuren",
     "profile.adultContent.title": "Inhoud voor volwassenen",
     "profile.adultContent.unblur": "Voorvertoningen niet vervagen",
-    "profile.adultContent.unblurDesc": "Verbergt de privacy-vervaging en de 18+ badge op als volwassen geclassificeerde posters op de hele site."
+    "profile.adultContent.unblurDesc": "Verbergt de privacy-vervaging en de 18+ badge op als volwassen geclassificeerde posters op de hele site.",
+    "discover.reviews.title": "Recensies",
+    "discover.tabStreams": "Streams (%v)",
+    "discover.tabReviews": "Recensies (%v)",
+    "discover.tabEpisodes": "Afleveringen (%v)"
 }

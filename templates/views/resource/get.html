@@ -141,7 +141,8 @@
                 </div>
                 {{ end }}
                 {{ $plot := . | getEnrichedPlot }}{{ if $plot }}
-                <p class="text-sm text-w-sub leading-relaxed mb-4 line-clamp-3">{{ $plot }}</p>
+                {{/* Clamped to 3 lines via max-h in em (3 × leading-relaxed 1.625). resource/get.js cuts the text at the fitting prefix and appends a clickable inline "…" when it overflows; the expanded text ends with an inline "↑" that collapses it back. Without JS the plot stays clamped with no toggle. */}}
+                <p data-plot-clamp class="text-sm text-w-sub leading-relaxed overflow-hidden max-h-[4.875em] mb-4">{{ $plot }}</p>
                 {{ end }}
                 <div class="flex items-center gap-2 mb-3">
                     {{ if .TorrentStatus }}

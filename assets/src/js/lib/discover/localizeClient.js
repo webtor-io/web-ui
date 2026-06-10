@@ -14,6 +14,7 @@
 import { getLang } from '../i18n';
 import { langPath } from './i18n';
 import { csrfHeaders } from './http';
+import { bareImdbTitleID } from './ids';
 
 // Server caps a batch at 100 ids; chunk larger merges (multi-source search
 // can exceed a single catalog page) instead of silently dropping the tail.
@@ -22,12 +23,8 @@ const BATCH_LIMIT = 100;
 const cache = new Map();
 const pending = new Set();
 
-// Bare IMDB title ids only — mirrors the server-side guard in
-// handlers/discover/localize.go (bare tmdb* ids are namespace-ambiguous
-// and rejected there; episode ids carry ':').
-function localizableID(id) {
-    return typeof id === 'string' && id.startsWith('tt') && !id.includes(':');
-}
+// Bare IMDB title ids only — shared guard, see ids.js.
+const localizableID = bareImdbTitleID;
 
 // Synchronous cache read for call sites that need the translation at
 // dispatch time (modal title assembly in DiscoverApp).

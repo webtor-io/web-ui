@@ -50,6 +50,37 @@ const LANG_SKIP = new Set([
     'no', // Norwegian conflicts with "no" (e.g. "No torrent")
 ]);
 
+// supportsFlagEmoji reports whether the platform actually renders
+// regional-indicator flag emoji. Windows (every browser except Firefox,
+// which ships its own emoji font) falls back to letter pairs like "RU",
+// so flag-decorated chips look broken there. Detection: draw a flag on
+// a canvas and look for a colored (non-grayscale) pixel — the letter
+// fallback is monochrome. Result is computed once per page.
+let flagEmojiSupport = null;
+export function supportsFlagEmoji() {
+    if (flagEmojiSupport != null) return flagEmojiSupport;
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 20;
+        canvas.height = 20;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.textBaseline = 'top';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('🇷🇺', 0, 0);
+        const data = ctx.getImageData(0, 0, 20, 20).data;
+        flagEmojiSupport = false;
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 0 && !(data[i] === data[i + 1] && data[i + 1] === data[i + 2])) {
+                flagEmojiSupport = true;
+                break;
+            }
+        }
+    } catch {
+        flagEmojiSupport = true; // can't tell — assume the common case
+    }
+    return flagEmojiSupport;
+}
+
 export function extractLanguages(title) {
     if (!title) return [];
     const found = {};

@@ -1,5 +1,39 @@
 import av from '../../lib/av';
+import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import '../../lib/share/share';
+// Plot clamp: when the 3-line clamped paragraph overflows, cut the text
+// at the longest fitting prefix (shared findTextCut from lib/textClamp)
+// and append a clickable inline "\u2026" that expands the full plot; an
+// inline "\u2191" at the end of the expanded text collapses it back.
+// Mirrors the Preact ExpandableText used in Discover.
+av(function () {
+    const plot = document.querySelector('[data-plot-clamp]');
+    if (!plot) return;
+    const full = plot.textContent;
+    const cut = findTextCut(plot, full);
+    if (cut == null) return;
+    const cutText = trimTextCut(full, cut) + ' ';
+
+    function toggleBtn(label, onClick) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.className = 'text-w-cyan hover:underline cursor-pointer font-bold';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+    function renderCollapsed() {
+        plot.style.maxHeight = '';
+        plot.textContent = cutText;
+        plot.appendChild(toggleBtn('\u2026', renderExpanded));
+    }
+    function renderExpanded() {
+        plot.style.maxHeight = 'none';
+        plot.textContent = full + ' ';
+        plot.appendChild(toggleBtn('\u2191', renderCollapsed));
+    }
+    renderCollapsed();
+});
 av( async function() {
     if (window._ads !== undefined && window._sessionExpired !== true) {
         const renderAd = (await import('../../lib/ads')).default;
