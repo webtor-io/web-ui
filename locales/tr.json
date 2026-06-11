@@ -549,7 +549,6 @@
     "discover.episodes": "Bölümler",
     "discover.loading": "Yükleniyor...",
     "discover.preparingResource": "Kaynak hazırlanıyor...",
-    "discover.fetchingStreams": "Streamler getiriliyor... (%v/%v)",
     "discover.fetchingAddon": "%v getiriliyor...",
     "discover.addonStreams": "%v — %v stream",
     "discover.errorFetchingAddon": "%v getirilirken hata",

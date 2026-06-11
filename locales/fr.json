@@ -549,7 +549,6 @@
     "discover.episodes": "Épisodes",
     "discover.loading": "Chargement...",
     "discover.preparingResource": "Préparation de la ressource...",
-    "discover.fetchingStreams": "Récupération des flux... (%v/%v)",
     "discover.fetchingAddon": "Récupération de %v...",
     "discover.addonStreams": "%v — %v flux",
     "discover.errorFetchingAddon": "Erreur lors de la récupération de %v",

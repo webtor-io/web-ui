@@ -549,7 +549,6 @@
     "discover.episodes": "Afleveringen",
     "discover.loading": "Laden...",
     "discover.preparingResource": "Bron voorbereiden...",
-    "discover.fetchingStreams": "Streams ophalen... (%v/%v)",
     "discover.fetchingAddon": "%v ophalen...",
     "discover.addonStreams": "%v — %v stream(s)",
     "discover.errorFetchingAddon": "Fout bij ophalen %v",

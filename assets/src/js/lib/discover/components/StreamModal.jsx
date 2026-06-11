@@ -287,12 +287,12 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 
 function FetchingView({ modal, statusButtons, headerMeta }) {
     const { title, poster, addons } = modal;
-    const doneCount = addons.filter(a => a.status !== 'fetching').length;
-    const subtitle = tf('discover.fetchingStreams', doneCount, addons.length);
 
+    // No "fetching streams (N/M)" subtitle — the per-addon rows below carry
+    // the same progress with more detail.
     return (
         <div>
-            <ModalHeader title={title} poster={poster} subtitle={subtitle} extra={statusButtons} {...headerMeta} />
+            <ModalHeader title={title} poster={poster} extra={statusButtons} {...headerMeta} />
             <div class="flex flex-col gap-2 py-2">
                 {addons.map((addon, i) => (
                     <div key={i} class="flex items-center gap-3 px-3 py-2 rounded-lg border border-w-line/50">

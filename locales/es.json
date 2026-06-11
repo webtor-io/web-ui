@@ -549,7 +549,6 @@
     "discover.episodes": "Episodios",
     "discover.loading": "Cargando...",
     "discover.preparingResource": "Preparando recurso...",
-    "discover.fetchingStreams": "Obteniendo streams... (%v/%v)",
     "discover.fetchingAddon": "Obteniendo %v...",
     "discover.addonStreams": "%v — %v stream(s)",
     "discover.errorFetchingAddon": "Error obteniendo %v",

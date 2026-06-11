@@ -549,7 +549,6 @@
     "discover.episodes": "Серии",
     "discover.loading": "Загрузка...",
     "discover.preparingResource": "Подготовка ресурса...",
-    "discover.fetchingStreams": "Загрузка потоков... (%v/%v)",
     "discover.fetchingAddon": "Загрузка %v...",
     "discover.addonStreams": "%v — %v поток(ов)",
     "discover.errorFetchingAddon": "Ошибка загрузки %v",

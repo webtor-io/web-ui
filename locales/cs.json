@@ -549,7 +549,6 @@
     "discover.episodes": "Epizody",
     "discover.loading": "Načítám...",
     "discover.preparingResource": "Připravuji zdroj...",
-    "discover.fetchingStreams": "Získávám streamy... (%v/%v)",
     "discover.fetchingAddon": "Získávám %v...",
     "discover.addonStreams": "%v — %v streamů",
     "discover.errorFetchingAddon": "Chyba při získávání %v",
