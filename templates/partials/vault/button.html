@@ -6,9 +6,14 @@
 	the submit goes to /{lang}/... no matter what the browser thinks of
 	the current document URL.
 */}}
-<div data-vault-state="{{ if .Ctx.User | hasAuth }}{{ if .Data.Funded }}funded{{ else }}authed{{ end }}{{ else }}anon{{ end }}">
+{{/* .Data (the VaultButton) can be nil when its state couldn't be resolved
+     (transient vault failure / canceled request); treat that as not-funded
+     so a missing button never nil-derefs the template. */}}
+{{ $funded := false }}
+{{ if .Data }}{{ $funded = .Data.Funded }}{{ end }}
+<div data-vault-state="{{ if .Ctx.User | hasAuth }}{{ if $funded }}funded{{ else }}authed{{ end }}{{ else }}anon{{ end }}">
 	{{ if .Ctx.User | hasAuth }}
-		{{ if .Data.Funded }}
+		{{ if $funded }}
 			<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
 				<input type="hidden" name="pledge-form" value="true" />
 				<button type="submit" class="btn btn-soft btn-sm whitespace-nowrap" data-umami-event="vault-supporting-clicked">

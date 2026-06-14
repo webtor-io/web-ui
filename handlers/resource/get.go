@@ -312,33 +312,35 @@ func (s *Handler) get(c *gin.Context) {
 	// Prepare initial torrent status (vault DB only, no SSE)
 	d.TorrentStatus = s.prepareInitialStatus(ctx, args.ID)
 
-	// Prepare vault button state
+	// Prepare vault button state. The vault button is a non-critical UI
+	// element (and is also re-fetched async), so if its state can't be
+	// resolved — e.g. a transient vault failure or a canceled request — log
+	// and render the page without it rather than 500'ing the whole page.
 	if s.vault != nil && args.User.HasAuth() {
 		vaultButton, err := s.prepareVaultButton(ctx, args)
 		if err != nil {
 			_ = c.Error(errors.Wrap(err, "failed to prepare vault button"))
-			getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
-			return
-		}
-		d.VaultButton = vaultButton
-		if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
-			vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
-			if err != nil {
-				_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
-				getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
-				return
-			}
+		} else {
+			d.VaultButton = vaultButton
+			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
+				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
+				if err != nil {
+					_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
+					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
+					return
+				}
 
-			d.VaultPledgeAddForm = vaultPledgeAddForm
-		}
-		if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/remove" {
-			vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
-			if err != nil {
-				_ = c.Error(errors.Wrap(err, "failed to prepare vault pledge remove form"))
-				getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
-				return
+				d.VaultPledgeAddForm = vaultPledgeAddForm
 			}
-			d.VaultPledgeRemoveForm = vaultPledgeRemoveForm
+			if c.Query("pledge-remove-form") == "true" || c.Query("from") == "/vault/remove" {
+				vaultPledgeRemoveForm, err := s.prepareVaultPledgeRemoveForm(c, args)
+				if err != nil {
+					_ = c.Error(errors.Wrap(err, "failed to prepare vault pledge remove form"))
+					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
+					return
+				}
+				d.VaultPledgeRemoveForm = vaultPledgeRemoveForm
+			}
 		}
 	}
 
