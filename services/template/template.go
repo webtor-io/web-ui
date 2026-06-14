@@ -256,17 +256,22 @@ func (s *Manager[K]) firstToLower(in string) string {
 }
 
 func (s *Manager[K]) WithHelper(h any) *Manager[K] {
-	fooType := reflect.TypeOf(h)
-	for i := 0; i < fooType.NumMethod(); i++ {
-		method := fooType.Method(i)
-		s.funcs[s.firstToLower(method.Name)] = func(args ...any) any {
-			args = append([]any{h}, args...)
-			inputs := make([]reflect.Value, len(args))
-			for i := range args {
-				inputs[i] = reflect.ValueOf(args[i])
-			}
-			return method.Func.Call(inputs)[0].Interface()
-		}
+	hv := reflect.ValueOf(h)
+	ht := hv.Type()
+	for i := 0; i < ht.NumMethod(); i++ {
+		// Register the bound method value directly as a typed FuncMap entry.
+		// html/template already invokes FuncMap funcs via reflection, so the
+		// previous `func(args ...any) any` wrapper added a SECOND reflection
+		// layer that allocated a fresh []any (append) + []reflect.Value +
+		// per-arg reflect.ValueOf on EVERY helper call in EVERY render. Under
+		// a burst of concurrent renders that churn was the top alloc_space
+		// consumer (reflect.Value.call) and could overshoot GOMEMLIMIT toward
+		// the container limit. A bound method value carries its concrete typed
+		// signature, so the engine calls it directly in a single reflection
+		// pass with no per-call wrapper allocation. Safe: every helper method
+		// returns a single value (no (T, error) methods), so this preserves
+		// the old `.Call(...)[0]`-only return behaviour.
+		s.funcs[s.firstToLower(ht.Method(i).Name)] = hv.Method(i).Interface()
 	}
 	return s
 }
