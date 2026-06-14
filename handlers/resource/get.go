@@ -142,41 +142,47 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	if res == nil {
 		return nil, nil
 	}
-	list, err = s.getList(ctx, args)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to list resource")
-	}
-	if len(list.Items) == 1 && list.Items[0].Type == ra.ListTypeDirectory {
-		args.PWD = list.Items[0].PathStr
+	if res.MultiFile {
 		list, err = s.getList(ctx, args)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to list resource")
 		}
-	}
-	if len(list.Items) > 1 {
-		d.List = list
-	}
-	if args.FileIdx != nil && args.File == "" {
-		path, err := s.resolveFileIdx(ctx, args, *args.FileIdx)
-		if err == nil && path != "" {
-			args.File = path
-			// Set PWD to the parent directory of the resolved file
-			if dir := filepath.Dir(path); dir != "/" && dir != "." {
-				args.PWD = dir
-				list, err = s.getList(ctx, args)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to list resource after fileIdx resolution")
-				}
-				d.List = list
+		if len(list.Items) == 1 && list.Items[0].Type == ra.ListTypeDirectory {
+			args.PWD = list.Items[0].PathStr
+			list, err = s.getList(ctx, args)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to list resource")
 			}
 		}
-	}
-	d.Item, err = s.getBestItem(ctx, list, args)
-	if len(list.Items) == 1 && d.Item == nil {
-		d.List = list
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get item")
+		if len(list.Items) > 1 {
+			d.List = list
+		}
+		if args.FileIdx != nil && args.File == "" {
+			path, err := s.resolveFileIdx(ctx, args, *args.FileIdx)
+			if err == nil && path != "" {
+				args.File = path
+				// Set PWD to the parent directory of the resolved file
+				if dir := filepath.Dir(path); dir != "/" && dir != "." {
+					args.PWD = dir
+					list, err = s.getList(ctx, args)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to list resource after fileIdx resolution")
+					}
+					d.List = list
+				}
+			}
+		}
+		d.Item, err = s.getBestItem(ctx, list, args)
+		if len(list.Items) == 1 && d.Item == nil {
+			d.List = list
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get item")
+		}
+	} else {
+		// Single-file torrent: rest-api already returned the one file in the
+		// resource response, so render it directly without a /list round-trip.
+		d.Item = res.File
 	}
 
 	db := s.pg.Get()
