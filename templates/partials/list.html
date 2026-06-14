@@ -1,5 +1,9 @@
 {{ define "list" }}
     {{ with .Data }}
+        {{/* No listing to show — e.g. an async #list reload that resolves to
+             a single file or an out-of-range page leaves .List nil. Guard so
+             .List.* never nil-derefs the template. */}}
+        {{ if .List }}
         {{ $Args := .Args}}
         {{ $Resource := .Resource}}
         {{ $List := .List}}
@@ -182,5 +186,6 @@
                 <button>close</button>
             </form>
         </dialog>
+        {{ end }}
     {{ end }}
 {{ end }}
