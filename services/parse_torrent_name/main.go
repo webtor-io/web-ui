@@ -172,7 +172,12 @@ const (
 		`|ebod|dvaj|maxvr|dpvr|nhdtb|real|rki|apns|niks|mmus|meyd` +
 		// Other JAV codes — studio attribution unknown / less common.
 		// Move into a named group above once attribution is confirmed.
-		`|beaf|gmem|imoe|jera|lafbd|pfes|tyhpj|mudr|getchu|rct`
+		`|beaf|gmem|imoe|jera|lafbd|pfes|tyhpj|mudr|getchu|rct` +
+		// Added 2026-06-15 from weekly skiplist TP-mining: mida (×12
+		// unflagged adult, re-recommended 3 weeks), pppe/ngod/rctd
+		// (distinct 4-char JAV codes; rctd ≠ existing rct — the `\d`
+		// serial requirement means "rct" never matches the "rctd" form).
+		`|mida|pppe|ngod|rctd`
 )
 
 var fieldParsers = FieldParsers{
@@ -618,7 +623,7 @@ var sportMatcher = NewRegexpMatcher(
 //      treated as courses since they are interactive-software
 //      tutorials with no movie/TV metadata.
 var courseMatcher = NewRegexpMatcher(
-	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy))\b`,
+	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy))\b`,
 	`(?i)(\[\s*(freecoursesite|freecoursesonline|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
 	`(?i)\b([a-z0-9-]+\.(courses))\b`,
 	`(?i)\b((dlc[\s_]+\w*tutorial|ubisoft[\s.]?connect[\s.]?rip|steam[\s.-]?rip|gog[\s.-]?rip|epic[\s.-]?games[\s.-]?rip))\b`,
