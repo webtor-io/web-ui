@@ -23,4 +23,5 @@ var Tools = []Tool{
 	{Url: "online-torrent-downloader", Title: "tool.onlineTorrentDownloader.title", Benefit: "tool.onlineTorrentDownloader.benefit", Description: "tool.onlineTorrentDownloader.description"},
 	{Url: "stream-torrent-online", Title: "tool.streamTorrentOnline.title", Benefit: "tool.streamTorrentOnline.benefit", Description: "tool.streamTorrentOnline.description"},
 	{Url: "torrent-player", Title: "tool.torrentPlayer.title", Benefit: "tool.torrentPlayer.benefit", Description: "tool.torrentPlayer.description"},
+	{Url: "web-torrent-client", Title: "tool.webTorrentClient.title", Benefit: "tool.webTorrentClient.benefit", Description: "tool.webTorrentClient.description"},
 }
