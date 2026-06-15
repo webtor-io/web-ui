@@ -673,7 +673,7 @@
     "tool.webTorrentClient.about.steps.step3.title": "Tarayıcıda izle veya indir",
     "tool.webTorrentClient.about.steps.step3.text": "Videoyu ve sesi anında oynat ya da herhangi bir dosyayı indir — hepsi tarayıcı sekmenden.",
     "tool.webTorrentClient.about.explained.title": "Web torrent istemcisi nedir?",
-    "tool.webTorrentClient.about.explained.p1": "Web torrent istemcisi, masaüstü yazılımı yerine tamamen tarayıcıda çalışan bir torrent istemcisidir. Kurulacak, ayarlanacak veya güncellenecek bir şey yoktur — bir siteyi açar, torrent eklersin ve hemen izlemeye ya da indirmeye başlarsın.",
+    "tool.webTorrentClient.about.explained.p1": "Web torrent istemcisi, masaüstü yazılımı yerine tamamen tarayıcıda çalışan bir torrent istemcisidir. Kurulacak, ayarlanacak veya güncellenecek bir şey yoktur — bir torrent sitesini açar, torrent eklersin ve hemen izlemeye ya da indirmeye başlarsın.",
     "tool.webTorrentClient.about.explained.p2": "Webtor ücretsiz, açık kaynaklı bir web torrent istemcisidir. BitTorrent bağlantısını bulutta yönetir ve dosyalarını sıradan HTTPS üzerinden sunar; böylece normal bir torrent uygulaması çalıştıramayan cihazlar bile — telefonlar, tabletler, akıllı TV'ler, iş dizüstüleri — torrentleri online izleyip indirebilir.",
     "tool.webTorrentClient.about.benefits.title": "Neden web torrent istemcisi kullanmalı",
     "tool.webTorrentClient.about.benefits.subtitle": "Masaüstü torrent uygulamasının yaptığı her şey, hiçbir şey kurmadan.",

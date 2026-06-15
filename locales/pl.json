@@ -673,7 +673,7 @@
     "tool.webTorrentClient.about.steps.step3.title": "Strumieniuj lub pobieraj w przeglądarce",
     "tool.webTorrentClient.about.steps.step3.text": "Odtwarzaj wideo i audio od razu albo pobierz dowolny plik — wszystko z karty przeglądarki.",
     "tool.webTorrentClient.about.explained.title": "Czym jest webowy klient torrent?",
-    "tool.webTorrentClient.about.explained.p1": "Webowy klient torrent to klient torrent działający w całości w przeglądarce, a nie jako program na komputer. Niczego nie trzeba instalować, konfigurować ani aktualizować — otwierasz stronę, dodajesz torrent i od razu zaczynasz oglądać lub pobierać.",
+    "tool.webTorrentClient.about.explained.p1": "Webowy klient torrent to klient torrent działający w całości w przeglądarce, a nie jako program na komputer. Niczego nie trzeba instalować, konfigurować ani aktualizować — otwierasz stronę torrentową, dodajesz torrent i od razu zaczynasz oglądać lub pobierać.",
     "tool.webTorrentClient.about.explained.p2": "Webtor to darmowy webowy klient torrent o otwartym kodzie. Obsługuje połączenie BitTorrent w chmurze i udostępnia twoje pliki przez zwykły HTTPS, więc nawet urządzenia, które nie uruchomią zwykłej aplikacji torrent — telefony, tablety, smart TV, służbowe laptopy — mogą strumieniować i pobierać torrenty online.",
     "tool.webTorrentClient.about.benefits.title": "Dlaczego warto używać webowego klienta torrent",
     "tool.webTorrentClient.about.benefits.subtitle": "Wszystko, co potrafi desktopowa aplikacja torrent, bez instalowania czegokolwiek.",

@@ -673,7 +673,7 @@
     "tool.webTorrentClient.about.steps.step3.title": "Streamuj nebo stahuj v prohlížeči",
     "tool.webTorrentClient.about.steps.step3.text": "Přehraj video a zvuk okamžitě, nebo stáhni jakýkoli soubor — vše z karty prohlížeče.",
     "tool.webTorrentClient.about.explained.title": "Co je webový torrent klient?",
-    "tool.webTorrentClient.about.explained.p1": "Webový torrent klient je torrent klient, který běží celý v prohlížeči, ne jako program na počítači. Není co instalovat, nastavovat ani aktualizovat — otevřeš web, přidáš torrent a hned začneš sledovat nebo stahovat.",
+    "tool.webTorrentClient.about.explained.p1": "Webový torrent klient je torrent klient, který běží celý v prohlížeči, ne jako program na počítači. Není co instalovat, nastavovat ani aktualizovat — otevřeš torrentový web, přidáš torrent a hned začneš sledovat nebo stahovat.",
     "tool.webTorrentClient.about.explained.p2": "Webtor je bezplatný webový torrent klient s otevřeným kódem. Spojení BitTorrent řeší v cloudu a soubory ti doručuje přes běžné HTTPS, takže i zařízení, která neumí spustit běžnou torrent aplikaci — telefony, tablety, chytré TV, pracovní notebooky — mohou streamovat a stahovat torrenty online.",
     "tool.webTorrentClient.about.benefits.title": "Proč používat webový torrent klient",
     "tool.webTorrentClient.about.benefits.subtitle": "Vše, co umí desktopová torrent aplikace, bez instalace.",

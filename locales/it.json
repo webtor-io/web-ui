@@ -673,7 +673,7 @@
     "tool.webTorrentClient.about.steps.step3.title": "Guarda o scarica nel browser",
     "tool.webTorrentClient.about.steps.step3.text": "Riproduci video e audio all'istante, o scarica qualsiasi file — tutto dalla scheda del browser.",
     "tool.webTorrentClient.about.explained.title": "Cos'è un client torrent web?",
-    "tool.webTorrentClient.about.explained.p1": "Un client torrent web è un client torrent che funziona interamente nel browser anziché come software desktop. Non c'è nulla da installare, configurare o aggiornare: apri un sito, aggiungi un torrent e inizi subito a guardare o scaricare.",
+    "tool.webTorrentClient.about.explained.p1": "Un client torrent web è un client torrent che funziona interamente nel browser anziché come software desktop. Non c'è nulla da installare, configurare o aggiornare: apri un sito di torrent, aggiungi un torrent e inizi subito a guardare o scaricare.",
     "tool.webTorrentClient.about.explained.p2": "Webtor è un client torrent web gratuito e open source. Gestisce la connessione BitTorrent nel cloud e serve i tuoi file tramite semplice HTTPS, così anche i dispositivi che non possono eseguire una normale app torrent — telefoni, tablet, smart TV, portatili di lavoro — possono guardare e scaricare torrent online.",
     "tool.webTorrentClient.about.benefits.title": "Perché usare un client torrent web",
     "tool.webTorrentClient.about.benefits.subtitle": "Tutto ciò che fa un'app torrent desktop, senza installare nulla.",

@@ -673,7 +673,7 @@
     "tool.webTorrentClient.about.steps.step3.title": "Stream of download in de browser",
     "tool.webTorrentClient.about.steps.step3.text": "Speel video en audio meteen af, of download elk bestand — allemaal vanuit je browsertab.",
     "tool.webTorrentClient.about.explained.title": "Wat is een webtorrent-client?",
-    "tool.webTorrentClient.about.explained.p1": "Een webtorrent-client is een torrent-client die volledig in je browser draait in plaats van als desktopsoftware. Er valt niets te installeren, in te stellen of bij te werken: je opent een website, voegt een torrent toe en begint meteen met kijken of downloaden.",
+    "tool.webTorrentClient.about.explained.p1": "Een webtorrent-client is een torrent-client die volledig in je browser draait in plaats van als desktopsoftware. Er valt niets te installeren, in te stellen of bij te werken: je opent een torrent-website, voegt een torrent toe en begint meteen met kijken of downloaden.",
     "tool.webTorrentClient.about.explained.p2": "Webtor is een gratis, open-source webtorrent-client. Het regelt de BitTorrent-verbinding in de cloud en levert je bestanden via gewone HTTPS, zodat zelfs apparaten die geen gewone torrent-app kunnen draaien — telefoons, tablets, smart-tv's, werklaptops — torrents online kunnen streamen en downloaden.",
     "tool.webTorrentClient.about.benefits.title": "Waarom een webtorrent-client gebruiken",
     "tool.webTorrentClient.about.benefits.subtitle": "Alles wat een desktop-torrent-app doet, zonder iets te installeren.",
