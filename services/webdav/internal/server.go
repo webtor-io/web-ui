@@ -1,11 +1,11 @@
 package internal
 
 import (
+	"bufio"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,16 +28,16 @@ func ServeError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), code)
 }
 
-func isContentXML(h http.Header) bool {
-	t, _, _ := mime.ParseMediaType(h.Get("Content-Type"))
-	return t == "application/xml" || t == "text/xml"
-}
-
+// DecodeXMLRequest decodes the request body as an XML document.
+//
+// Per RFC 4918 the body of a WebDAV method like PROPFIND/PROPPATCH is an XML
+// document, but the spec does not require the client to send a particular
+// Content-Type. Some widely-used clients (notably rclone) send a valid XML
+// body with no Content-Type header at all, so we must not gate decoding on it
+// — doing so previously broke `rclone about` (Statfs) and listing with a
+// "webdav: unsupported request body" 400. This mirrors the tolerant behaviour
+// of golang.org/x/net/webdav.
 func DecodeXMLRequest(r *http.Request, v interface{}) error {
-	if !isContentXML(r.Header) {
-		return HTTPErrorf(http.StatusBadRequest, "webdav: expected application/xml request")
-	}
-
 	if err := xml.NewDecoder(r.Body).Decode(v); err != nil {
 		return &HTTPError{http.StatusBadRequest, err}
 	}
@@ -126,16 +126,15 @@ func (h *Handler) handleOptions(w http.ResponseWriter, r *http.Request) error {
 
 func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) error {
 	var propfind PropFind
-	if isContentXML(r.Header) {
-		if err := DecodeXMLRequest(r, &propfind); err != nil {
-			return err
-		}
-	} else {
-		var b [1]byte
-		if _, err := r.Body.Read(b[:]); err != io.EOF {
-			return HTTPErrorf(http.StatusBadRequest, "webdav: unsupported request body")
-		}
+
+	// An empty body means allprop (RFC 4918 §9.1). Otherwise the body is an
+	// XML document, which we parse regardless of Content-Type — see
+	// DecodeXMLRequest for why we can't rely on the header.
+	body := bufio.NewReader(r.Body)
+	if _, err := body.Peek(1); err == io.EOF {
 		propfind.AllProp = &struct{}{}
+	} else if err := xml.NewDecoder(body).Decode(&propfind); err != nil {
+		return &HTTPError{http.StatusBadRequest, err}
 	}
 
 	depth := DepthInfinity
