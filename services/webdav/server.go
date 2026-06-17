@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
+	"strings"
 
 	"github.com/webtor-io/web-ui/services/webdav/internal"
 )
@@ -167,16 +169,28 @@ func (b *backend) propFindFile(propfind *internal.PropFind, fi *FileInfo) (*inte
 		return internal.NewResourceType(types...), nil
 	}
 
+	// displayname applies to both files and directories. Clients otherwise
+	// derive the name from the href basename, but answering it explicitly is
+	// cheaper for them and avoids one entry in the 404 propstat.
+	if name := path.Base(strings.TrimSuffix(fi.Path, "/")); name != "" && name != "." && name != "/" {
+		props[internal.DisplayNameName] = internal.PropFindValue(&internal.DisplayName{
+			Name: name,
+		})
+	}
+
+	// getlastmodified is valid for collections too (RFC 4918 §15.7) and we
+	// have a real ModTime for directories (virtual roots = now, library dirs =
+	// torrent CreatedAt). Without it clients show the epoch for every folder.
+	if !fi.ModTime.IsZero() {
+		props[internal.GetLastModifiedName] = internal.PropFindValue(&internal.GetLastModified{
+			LastModified: internal.Time(fi.ModTime),
+		})
+	}
+
 	if !fi.IsDir {
 		props[internal.GetContentLengthName] = internal.PropFindValue(&internal.GetContentLength{
 			Length: fi.Size,
 		})
-
-		if !fi.ModTime.IsZero() {
-			props[internal.GetLastModifiedName] = internal.PropFindValue(&internal.GetLastModified{
-				LastModified: internal.Time(fi.ModTime),
-			})
-		}
 
 		if fi.MIMEType != "" {
 			props[internal.GetContentTypeName] = internal.PropFindValue(&internal.GetContentType{

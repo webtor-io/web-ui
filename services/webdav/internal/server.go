@@ -195,30 +195,51 @@ func NewPropFindResponse(path string, propfind *PropFind, props map[xml.Name]Pro
 			}
 		}
 	} else if prop := propfind.Prop; prop != nil {
+		// Emit the properties we can satisfy first, and defer the 404
+		// propstat for requested-but-unknown properties to the end.
+		//
+		// RFC 4918 lets a response carry several <propstat> blocks with
+		// different statuses and doesn't mandate an order, but some widely
+		// used clients only look at the status of the *first* <propstat> and
+		// discard the whole entry if it isn't 2xx — notably rclone in
+		// owncloud/nextcloud mode (Prop.StatusOK reads Status[0]). rclone
+		// always asks for <displayname> (which we don't expose) before
+		// <resourcetype>, so emitting the 404 block first made every entry
+		// look failed and listings came back empty. Returning the found
+		// props first mirrors golang.org/x/net/webdav and keeps both lenient
+		// and strict clients happy.
+		var notFound []xml.Name
 		for _, raw := range prop.Raw {
 			xmlName, ok := raw.XMLName()
 			if !ok {
 				continue
 			}
 
+			f, ok := props[xmlName]
+			if !ok {
+				notFound = append(notFound, xmlName)
+				continue
+			}
+
 			emptyVal := NewRawXMLElement(xmlName, nil, nil)
 
-			var code int
+			code := http.StatusOK
 			var val interface{} = emptyVal
-			f, ok := props[xmlName]
-			if ok {
-				if v, err := f(&raw); err != nil {
-					// TODO: don't throw away error message here
-					code = HTTPErrorFromError(err).Code
-				} else {
-					code = http.StatusOK
-					val = v
-				}
+			if v, err := f(&raw); err != nil {
+				// TODO: don't throw away error message here
+				code = HTTPErrorFromError(err).Code
 			} else {
-				code = http.StatusNotFound
+				val = v
 			}
 
 			if err := resp.EncodeProp(code, val); err != nil {
+				return nil, err
+			}
+		}
+
+		for _, xmlName := range notFound {
+			emptyVal := NewRawXMLElement(xmlName, nil, nil)
+			if err := resp.EncodeProp(http.StatusNotFound, emptyVal); err != nil {
 				return nil, err
 			}
 		}

@@ -18,6 +18,7 @@ var (
 	GetContentTypeName   = xml.Name{Namespace, "getcontenttype"}
 	GetLastModifiedName  = xml.Name{Namespace, "getlastmodified"}
 	GetETagName          = xml.Name{Namespace, "getetag"}
+	DisplayNameName      = xml.Name{Namespace, "displayname"}
 )
 
 type Status struct {

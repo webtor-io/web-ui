@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -142,6 +143,41 @@ func TestPropfind_MalformedBody_is400(t *testing.T) {
 	}
 	if be.propFindCalled {
 		t.Fatal("backend.PropFind must not be called for a malformed body")
+	}
+}
+
+// rclone in owncloud/nextcloud mode only inspects the status of the *first*
+// <propstat> of each <response> (Prop.StatusOK reads Status[0]) and drops the
+// whole entry if it isn't 2xx. It asks for <displayname> (which we don't
+// expose) before <resourcetype>, so the found props must be emitted before the
+// 404 block or every listed item is silently discarded and `ls` shows nothing.
+func TestNewPropFindResponse_FoundPropsBeforeNotFound(t *testing.T) {
+	// Order mirrors rclone's owncloud request: an unsupported prop first,
+	// the one we satisfy (resourcetype) afterwards.
+	propfind := &PropFind{
+		Prop: &Prop{Raw: xmlNamesToRaw([]xml.Name{
+			{Space: Namespace, Local: "displayname"},
+			ResourceTypeName,
+		})},
+	}
+
+	props := map[xml.Name]PropFindFunc{
+		ResourceTypeName: PropFindValue(NewResourceType(CollectionName)),
+	}
+
+	resp, err := NewPropFindResponse("/all/", propfind, props)
+	if err != nil {
+		t.Fatalf("NewPropFindResponse: %v", err)
+	}
+
+	if len(resp.PropStats) != 2 {
+		t.Fatalf("expected 2 propstats (200 + 404), got %d", len(resp.PropStats))
+	}
+	if got := resp.PropStats[0].Status.Code; got != http.StatusOK {
+		t.Fatalf("first propstat must be 200 so rclone owncloud-mode keeps the item, got %d", got)
+	}
+	if got := resp.PropStats[1].Status.Code; got != http.StatusNotFound {
+		t.Fatalf("second propstat must be 404, got %d", got)
 	}
 }
 
