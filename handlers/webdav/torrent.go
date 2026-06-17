@@ -13,9 +13,17 @@ import (
 	"github.com/webtor-io/web-ui/services/webdav"
 )
 
+// torrentAPI is the slice of *api.Api that TorrentDirectory needs. Declaring
+// it as an interface keeps the directory unit-testable with a fake that records
+// the list/export calls (otherwise it would reach for a live rest-api).
+type torrentAPI interface {
+	ListResourceContentCached(ctx context.Context, c *api.Claims, infohash string, args *api.ListResourceContentArgs) (*ra.ListResponse, error)
+	ExportResourceContent(ctx context.Context, c *api.Claims, infohash string, itemID string, imdbID string) (*ra.ExportResponse, error)
+}
+
 type TorrentDirectory struct {
 	*BaseDirectory
-	api *api.Api
+	api torrentAPI
 }
 
 func (s *TorrentDirectory) Stat(ctx context.Context, tr *models.TorrentResource, path string) (*webdav.FileInfo, error) {
@@ -125,7 +133,10 @@ func (s *TorrentDirectory) retrieveTorrentItems(ctx context.Context, hash string
 	if err != nil {
 		return nil, err
 	}
-	limit := uint(100)
+	// rest-api caps the page at 1000 and now serves listings from the
+	// lightweight torrent-store manifest, so a single page covers all but the
+	// largest directories and we make ~10x fewer round-trips than the old 100.
+	limit := uint(1000)
 	offset := uint(0)
 	var items []ra.ListItem
 	for {
@@ -149,31 +160,32 @@ func (s *TorrentDirectory) retrieveTorrentItems(ctx context.Context, hash string
 
 func (s *TorrentDirectory) retrieveTorrentItem(ctx context.Context, hash string, path string) (*ra.ListItem, error) {
 	path = strings.TrimSuffix(path, "/")
-	wcc, err := getWebContext(ctx)
+	// Resolve a single entry by listing only its parent directory (tree
+	// output) and matching the child, instead of pulling the whole torrent's
+	// flat file list and scanning it linearly. The parent listing shares its
+	// cache key with the ReadDir the client almost always issues first, so a
+	// Stat/Open right after browsing a directory is a cache hit.
+	items, err := s.retrieveTorrentItems(ctx, hash, parentPath(path))
 	if err != nil {
 		return nil, err
 	}
-	limit := uint(100)
-	offset := uint(0)
-	for {
-		resp, err := s.api.ListResourceContentCached(ctx, wcc.ApiClaims, hash, &api.ListResourceContentArgs{
-			Limit:  limit,
-			Offset: offset,
-		})
-		if err != nil {
-			return nil, err
+	for i := range items {
+		if strings.TrimSuffix(items[i].PathStr, "/") == path {
+			return &items[i], nil
 		}
-		for _, item := range resp.Items {
-			if item.PathStr == path {
-				return &item, nil
-			}
-		}
-		if (resp.Count - int(offset)) == len(resp.Items) {
-			break
-		}
-		offset += limit
 	}
 	return nil, nil
+}
+
+// parentPath returns the directory containing path, using "/" for top-level
+// entries. path is expected to be absolute ("/a/b" -> "/a", "/a" -> "/").
+func parentPath(path string) string {
+	path = strings.TrimSuffix(path, "/")
+	i := strings.LastIndex(path, "/")
+	if i <= 0 {
+		return "/"
+	}
+	return path[:i]
 }
 
 func (s *TorrentDirectory) getPrefix(ctx context.Context, hash string) (string, error) {
