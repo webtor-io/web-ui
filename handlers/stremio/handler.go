@@ -42,7 +42,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	gr := r.Group("/stremio")
 	gr.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST"},
+		AllowMethods: []string{"GET", "HEAD", "POST"},
 	}))
 	gr.GET("/manifest.json", h.manifest)
 	// Public configure endpoint to satisfy stremio-addons directory requirements
@@ -55,7 +55,12 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	grapi.GET("/catalog/:type/*id", h.catalog)
 	grapi.GET("/stream/:type/*id", h.stream)
 	grapi.GET("/meta/:type/*id", h.meta)
-	grapi.GET("/resolve/*data", h.resolve)
+	// Stremio validates a binge stream's playback URL with a HEAD request
+	// before auto-playing the next episode (see stremio-core player binge
+	// logic). Gin does not auto-register HEAD for a GET route, so without
+	// this the probe 404s, Stremio treats the next episode's stream as dead
+	// and falls back to the source-selection screen instead of binge-playing.
+	grapi.Match([]string{http.MethodGet, http.MethodHead}, "/resolve/*data", h.resolve)
 }
 
 func (s *Handler) generateUrl(c *gin.Context) {
