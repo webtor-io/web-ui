@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
+	gopg "github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -15,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	"github.com/webtor-io/web-ui/services/api"
+	enr "github.com/webtor-io/web-ui/services/enrich"
 )
 
 func makeEnrichCMD() cli.Command {
@@ -88,7 +92,128 @@ func configureEnrich(c *cli.Command) {
 		},
 	)
 
-	c.Subcommands = []cli.Command{runCmd, popularCmd}
+	cleanupCmd := cli.Command{
+		Name:   "cleanup-matches",
+		Usage:  "Detach pre-guard fuzzy-false-positive metadata matches (e.g. \"01\" → \"0187 UFO\"). Dry-run by default; pass --apply to write.",
+		Action: enrichCleanupMatches,
+	}
+	cleanupCmd.Flags = cs.RegisterPGFlags(cleanupCmd.Flags)
+	cleanupCmd.Flags = append(cleanupCmd.Flags,
+		cli.BoolFlag{
+			Name:  "apply",
+			Usage: "actually detach the false-positive matches; without this flag the command only reports (dry-run)",
+		},
+		cli.IntFlag{
+			Name:  "sample",
+			Usage: "how many example rejections to print",
+			Value: 25,
+		},
+	)
+
+	c.Subcommands = []cli.Command{runCmd, popularCmd, cleanupCmd}
+}
+
+// enrichCleanupMatches scans every movie/series row that carries a
+// metadata link, re-evaluates it against the current enrichment guards
+// (enr.IsRejectableMatch — the same weak-title + fuzzy-match rules the
+// live pipeline uses), and detaches the false positives. The shared
+// metadata rows are left intact; only the per-resource FK is nulled, so
+// a later re-enrich can resolve the resource correctly.
+//
+// Dry-run by default — it reports the count and a sample and writes
+// nothing unless --apply is passed.
+func enrichCleanupMatches(c *cli.Context) error {
+	apply := c.Bool("apply")
+	sampleN := c.Int("sample")
+
+	pg := cs.NewPG(c)
+	defer pg.Close()
+	db := pg.Get()
+	if db == nil {
+		return errors.New("db is nil")
+	}
+	ctx := context.Background()
+
+	kinds := []struct {
+		name   string
+		list   func(context.Context, *gopg.DB) ([]models.MetadataMatchRow, error)
+		detach func(context.Context, *gopg.DB, []uuid.UUID) (int, error)
+	}{
+		{"movie", models.ListMovieMetadataMatches, models.DetachMovieMetadata},
+		{"series", models.ListSeriesMetadataMatches, models.DetachSeriesMetadata},
+	}
+
+	var grandTotal, grandReject int
+	for _, k := range kinds {
+		rows, err := k.list(ctx, db)
+		if err != nil {
+			return errors.Wrapf(err, "listing %s matches", k.name)
+		}
+		var rejectIDs []uuid.UUID
+		var shown int
+		for _, r := range rows {
+			if !enr.IsRejectableMatch(r.QueryTitle, r.ResultTitle) {
+				continue
+			}
+			rejectIDs = append(rejectIDs, r.ID)
+			if shown < sampleN {
+				log.WithFields(log.Fields{
+					"kind":     k.name,
+					"resource": r.ResourceID,
+					"query":    r.QueryTitle,
+					"year":     yearStr(r.QueryYear),
+					"matched":  r.ResultTitle,
+					"video_id": r.VideoID,
+				}).Info("fuzzy false positive")
+				shown++
+			}
+		}
+		grandTotal += len(rows)
+		grandReject += len(rejectIDs)
+		log.WithFields(log.Fields{
+			"kind":     k.name,
+			"scanned":  len(rows),
+			"rejected": len(rejectIDs),
+		}).Info("cleanup-matches: scan complete")
+
+		if apply && len(rejectIDs) > 0 {
+			// Detach in batches to keep the IN (...) list and the
+			// transaction footprint bounded.
+			const batch = 1000
+			var detached int
+			for i := 0; i < len(rejectIDs); i += batch {
+				end := i + batch
+				if end > len(rejectIDs) {
+					end = len(rejectIDs)
+				}
+				n, err := k.detach(ctx, db, rejectIDs[i:end])
+				if err != nil {
+					return errors.Wrapf(err, "detaching %s matches", k.name)
+				}
+				detached += n
+			}
+			log.WithFields(log.Fields{"kind": k.name, "detached": detached}).
+				Info("cleanup-matches: detached")
+		}
+	}
+
+	mode := "DRY-RUN (no changes written — pass --apply to detach)"
+	if apply {
+		mode = "APPLIED"
+	}
+	log.WithFields(log.Fields{
+		"scanned":  grandTotal,
+		"rejected": grandReject,
+		"mode":     mode,
+	}).Info("cleanup-matches: done")
+	return nil
+}
+
+func yearStr(y *int16) string {
+	if y == nil {
+		return ""
+	}
+	return strconv.Itoa(int(*y))
 }
 
 func enrichPopular(c *cli.Context) error {

@@ -29,6 +29,40 @@ mapMetadata(title, year, ct, pathHint)
 
 For series, `pathHint` is the torrent's **root folder** (first non-empty segment of the representative episode path) rather than the per-episode filename. A pack named `Stand.Up.S13.Complete/01 - first joke.mkv` would otherwise hand Claude `01 - first joke` as both `parsed_title` (via the parser overwriting Title with the last path segment) and `pathHint`. Stripping back to `Stand.Up.S13.Complete` keeps the series-title signal alive even when individual episode filenames are bare numbered indexes.
 
+## Weak-title and fuzzy-match guards
+
+`TMDB /search` returns substring / prefix fuzzy matches and the mapper takes `results[0]` with no validation. A weak parsed title therefore resolves to an arbitrary obscure entry: the adult torrent `/BWA34___720_2026/01.mp4` parsed to title `01` and matched the 2026 film **"0187 UFO"** (`vote_count=0`). The same `01` matches a *different* junk film for every year, polluting `tmdb.query` (audit 2026-06-20: 1814 pure-numeric titles resolved to `vote_count=0` TMDB entries; 10225 / 57494 = 17.8 % of all `movie_metadata` pointed at `vote_count=0` rows). Two layers in `services/enrich/title_match.go` guard this — **note neither consults popularity / `vote_count`**, so a genuinely rare or brand-new film still resolves as long as its title matches:
+
+- **`isWeakSearchTitle` (pre-filter, in `searchAllMappers`)** — skips the mapper chain entirely for pure-numeric titles with a leading zero (`01`, `0006`, `007`). Those are part / episode / disc numbers harvested from filenames, never real titles. Real numeric titles (`1917`, `300`, `9`, `21`) carry no leading zero and pass.
+- **`acceptableTMDBMatch` (post-filter, in `TMDB.Map` — both the fresh-search and the cache-hit paths)** — rejects a result whose title doesn't resemble the query. **The alignment check fires ONLY for low-signal queries** (`isLowSignalQuery`): a single token that is pure-numeric (`01`, `9`), very short (`R`, `v34`, `Up`), or `isGarbageTitle`-shaped. A **confident** query — two or more tokens, or a single real word — is trusted *regardless* of how differently the match is titled, because that is how legitimate localized / alternate-title matches resolve: `A Freira → The Nun`, `La guerre des boutons → War of the Buttons`, `Shou Trumana → The Truman Show`. Gating those on title similarity would detach ~50 % of all foreign / aka matches (104 949 of 294 301 movie matches share zero tokens with their result title — most are correct translations). For the narrow low-signal set the rule is: ≥ half of the query's *significant* tokens (articles + bare year dropped) appear verbatim in the result, OR the squashed forms match (`Spiderman` ↔ `Spider-Man`); diacritics folded (`Amelie` ↔ `Amélie`). Non-Latin queries/results skip the gate untouched.
+
+The cache-hit path re-validates too, so `tmdb.query` rows cached before the guard existed stop resolving on a plain re-enrich (not only under `--force`).
+
+Regression coverage: `services/enrich/title_match_test.go`.
+
+### Repairing already-stored false positives
+
+The code change stops *new* and *cache-hit* FPs but does not detach matches already written to `movie` / `series`. Use the dedicated command (dry-run by default, reuses the exact runtime guards via `enr.IsRejectableMatch`):
+
+```bash
+# report only — counts + a sample, writes nothing
+./server enrich cleanup-matches
+
+# actually detach (nulls movie_metadata_id / series_metadata_id; the
+# shared *_metadata rows are kept — they're video_id-keyed and may back
+# a legit match elsewhere)
+./server enrich cleanup-matches --apply
+```
+
+In-cluster, mirror the metadata-only backfill pattern:
+
+```bash
+kubectl exec -n webtor deployment/web-ui -- sh -c \
+  "nohup ./server enrich cleanup-matches --apply > /tmp/cleanup.log 2>&1 & echo PID=\$!"
+```
+
+Estimated scope (2026-06-20): ~9 964 movie matches + ~377 series matches (≈3.4 % of all linked matches; of those 4 316 are leading-zero numerics). Detached resources show as un-enriched and re-resolve correctly on the next `enrich run` since the cache-hit guard now rejects the poisoned `tmdb.query` rows.
+
 ## Adult-content prefilter
 
 Adult releases (porn studio sites, JAV codes, explicit keywords, Chinese uncensored markers, Russian explicit verbs) are never enrichable through TMDB/OMDB/KPU and were filling the `ai_enrich.query` negative cache with ~30% pure waste (2026-05-11 telemetry: 693 of 2333 cache rows match by `parsed_title` alone, with the full-path Go-side check catching more).

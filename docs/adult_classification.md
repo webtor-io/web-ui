@@ -57,6 +57,8 @@ metadata = the largest-by-size video item's TorrentInfo (representative)
 
 Both `torrentInfos` AND `samples` are scanned — adult releases often ship with a clean main file under a studio-named root folder, and the parser trips on the folder name regardless of which file is "the main feature".
 
+**Non-video sidecar scan.** `is_adult` / `is_sport` also OR in `scanSidecarFlags(items)` — the parser run over every NON-video item's path. Scene releases frequently carry the only marker in a sidecar file (`00 -XXX- 00.nfo`, `art-of-zoo.txt`) while the video file (`01.mp4`) and its parent folder (`__HD____540_2026`) are completely clean. The video-only aggregation above never sees those filenames, so without the sidecar scan such a release classifies as non-adult and (pre-guard) even fuzzy-matched a real film. Both `enrichMediaInfo` and the `--metadata-only` backfill (`EnsureResourceMetadata`) run the scan, so a re-classification pass picks up already-stored resources.
+
 `models.UpsertResourceMetadata` is `INSERT ... ON CONFLICT (resource_id) DO UPDATE`, so re-running enrichment (after a parser change, `--force`, etc.) overwrites the row in place.
 
 ## Backfill
@@ -257,7 +259,7 @@ Loaded into `web.Context.UserSettings` via the user-settings middleware so every
 
 ## What we don't do (yet)
 
-- **AI content scan** for adult content with innocent filenames. Current detection is purely parse_torrent_name-driven (studio names, scene-release prefixes, JAV codes). Files like `vacation_2024.mp4` with adult content slip through. Would require Claude-backed scan at enrichment time.
+- **AI content scan** for adult content with innocent filenames AND no marker anywhere in the torrent. Detection is parse_torrent_name-driven over every file path — video items, samples, and non-video sidecars (studio names, scene-release prefixes, JAV codes, `XXX` tags). A release that carries the marker in any filename (incl. a `.nfo`/`.txt` sidecar) is caught; one where `vacation_2024.mp4` is the *only* clue with zero textual marker still slips through. Closing that last gap would require a Claude-backed visual/content scan at enrichment time.
 - **Session-only reveals**. localStorage persists across sessions; the user has to clear it manually or wait for LRU eviction. Twitter-style "click every view" is doable via `sessionStorage` if the persist semantics ever annoy users.
 - **Per-resource cross-device reveals**. Stored locally per browser. Would need a `user_adult_reveals(user_id, resource_id)` table.
 - **Cron-driven re-classification**. Backfill is currently a manual `kubectl exec`. After every parse_torrent_name change someone has to remember to run `enrich run --metadata-only --force`. Could move to a helmfile CronJob.

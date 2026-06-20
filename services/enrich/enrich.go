@@ -604,11 +604,11 @@ func matchesPathFlag(pathStr string, pick func(*ptn.TorrentInfo) bool) bool {
 // the studio folder triggers even when the leaf file looks innocent.
 // The representative `metadata` JSONB is the largest video item's
 // parsed info, a proxy for "the main feature" in mixed packs.
-func (s *Enricher) saveResourceMetadata(ctx context.Context, db *pg.DB, hash string, infos, samples []*TorrentInfo) error {
+func (s *Enricher) saveResourceMetadata(ctx context.Context, db *pg.DB, hash string, infos, samples []*TorrentInfo, sidecarAdult, sidecarSport bool) error {
 	all := append(append([]*TorrentInfo{}, infos...), samples...)
 	var (
-		isAdult bool
-		isSport bool
+		isAdult = sidecarAdult
+		isSport = sidecarSport
 		rep     *ptn.TorrentInfo
 		repSize int64
 	)
@@ -672,6 +672,14 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	var torrentInfos []*TorrentInfo
 	var samples []*TorrentInfo
 
+	// Adult/sport markers often live in a non-video sidecar file (a
+	// scene-release "00 -XXX- 00.nfo", an "art-of-zoo.txt") while the
+	// actual video file and its parent folder are marker-free — the
+	// video-only classification below never sees them. Fold every
+	// non-video filename into the resource-level flags so a clean
+	// "01.mp4" under a tagged sidecar still trips is_adult.
+	sidecarAdult, sidecarSport := scanSidecarFlags(items)
+
 	for _, item := range items {
 		if item.MediaFormat != ra.Video {
 			continue
@@ -711,7 +719,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 	// adult studio folder still trips the flag at the resource level.
 	// Representative metadata is the largest video item — proxies for
 	// "the main feature" in mixed packs.
-	if err := s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples); err != nil {
+	if err := s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples, sidecarAdult, sidecarSport); err != nil {
 		// Non-fatal — classification is best-effort. Adult/sport blur
 		// degrades to the default (no blur) until the next enrichment.
 		log.WithError(err).WithField("hash", hash).
@@ -984,14 +992,39 @@ func (s *Enricher) EnsureResourceMetadata(ctx context.Context, hash string, clai
 		}
 		torrentInfos = append(torrentInfos, ti)
 	}
+	sidecarAdult, sidecarSport := scanSidecarFlags(items)
 	if len(torrentInfos) == 0 && len(samples) == 0 {
-		// No video at all — write an empty row anyway so the backfill
-		// query doesn't return this hash on every subsequent run.
+		// No video at all — write a row anyway so the backfill query
+		// doesn't return this hash on every subsequent run. Sidecar
+		// flags still apply: a torrent of only a tagged ".nfo" plus
+		// non-video payload is classified, not left blank.
 		return models.UpsertResourceMetadata(ctx, db, &models.ResourceMetadata{
 			ResourceID: hash,
+			IsAdult:    sidecarAdult,
+			IsSport:    sidecarSport,
 		})
 	}
-	return s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples)
+	return s.saveResourceMetadata(ctx, db, hash, torrentInfos, samples, sidecarAdult, sidecarSport)
+}
+
+// scanSidecarFlags reports whether any NON-video item carries an adult /
+// sport marker in its path. Scene releases frequently put the only
+// marker in a sidecar file ("00 -XXX- 00.nfo", "art-of-zoo.txt") while
+// the video file and its folder stay clean, so the video-only
+// classification would otherwise miss them.
+func scanSidecarFlags(items []ra.ListItem) (adult, sport bool) {
+	for _, item := range items {
+		if item.MediaFormat == ra.Video {
+			continue
+		}
+		if isAdultPath(item.PathStr) {
+			adult = true
+		}
+		if isSportPath(item.PathStr) {
+			sport = true
+		}
+	}
+	return
 }
 
 func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
@@ -1244,6 +1277,14 @@ func (s *Enricher) lookupByHint(ctx context.Context, hintVideoID string, t model
 // only when every path ultimately fails so retry semantics
 // (`enrich --force-error`) stay intact.
 func (s *Enricher) searchAllMappers(ctx context.Context, vc *models.VideoContent, t models.ContentType, f bool) (*models.VideoMetadata, error) {
+	// Part / episode / disc numbers harvested from filenames ("01.mp4"
+	// -> "01") are not real titles. They fuzzy-resolve to an arbitrary
+	// obscure film per year on TMDB and only pollute the query cache.
+	// Skip them before any mapper call. See isWeakSearchTitle.
+	if isWeakSearchTitle(vc.Title) {
+		log.WithField("title", vc.Title).Info("skipping mapper search for weak/part-number title")
+		return nil, nil
+	}
 	var firstErr error
 	for i, m := range s.mappers {
 		md, err := m.Map(ctx, vc, t, f)

@@ -142,6 +142,17 @@ func (s *TMDB) Map(ctx context.Context, m *models.VideoContent, mt models.Conten
 		if mi == nil {
 			return nil, nil
 		}
+		// Re-validate cached matches against the current title guard.
+		// Rows cached before the guard existed ("01" → "0187 UFO") must
+		// stop resolving on a plain re-enrich, not only under --force.
+		if !acceptableTMDBMatch(m.Title, &tmdb.SearchResult{Title: mi.Title}) {
+			log.WithFields(log.Fields{
+				"query":   m.Title,
+				"result":  mi.Title,
+				"tmdb_id": *q.TmdbID,
+			}).Info("rejecting cached low-confidence tmdb title match")
+			return nil, nil
+		}
 		return s.makeVideoMetadata(mi), nil
 	}
 
@@ -166,6 +177,25 @@ func (s *TMDB) Map(ctx context.Context, m *models.VideoContent, mt models.Conten
 	}
 	if sr == nil {
 		log.Infof("no tmdb found for title %v and year %v", m.Title, m.Year)
+		_, err = tm.InsertQueryIgnoreConflict(ctx, db, m.Title, m.Year, ttype, nil)
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	// TMDB /search returns substring / prefix fuzzy matches and we take
+	// results[0]. Reject a result whose title doesn't actually resemble
+	// the query — a weak query ("01") otherwise resolves to an arbitrary
+	// obscure entry ("0187 UFO"). Cache the rejection as a miss (nil id)
+	// so future torrents with the same title short-circuit here.
+	// See services/enrich/title_match.go for the title-similarity rule.
+	if !acceptableTMDBMatch(m.Title, sr) {
+		log.WithFields(log.Fields{
+			"query":   m.Title,
+			"result":  sr.Title,
+			"tmdb_id": sr.ID,
+		}).Info("rejecting low-confidence tmdb title match")
 		_, err = tm.InsertQueryIgnoreConflict(ctx, db, m.Title, m.Year, ttype, nil)
 		if err != nil {
 			return nil, err
