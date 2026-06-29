@@ -29,7 +29,7 @@
     "ageGate.footnote": "By using the buttons above you confirm you are at least 16 years old and accept our <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Terms of Service</a> and <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacy Policy</a>.",
     "ageGate.adultFootnote": "This content is for adults only. By using the buttons above you confirm you are at least 18 years old.",
     "ageGate.adultFootnoteAnon": "This content is for adults only. By using the buttons above you confirm you are at least 18 years old and accept our <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Terms of Service</a> and <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacy Policy</a>.",
-    "home.title": "Online Torrent Platform — Stream & Download in Browser",
+    "home.title": "Torrent Online — Stream & Download in Browser",
     "home.description": "Free online torrent website to stream and download torrents right in your browser — no app, no client, no install. Open-source and private.",
     "home.ogTitle": "Webtor.io — Stream & Download Torrents in Browser",
     "home.ogDescription": "Stream and download any torrent right in your browser — free, open-source, no app to install. Your private web torrent player, on any device.",

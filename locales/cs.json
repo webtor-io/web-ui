@@ -27,7 +27,7 @@
     "ageGate.adultFootnote": "Obsah pouze pro dospělé. Použitím tlačítek výše potvrzuješ, že je ti alespoň 18 let.",
     "ageGate.adultFootnoteAnon": "Obsah pouze pro dospělé. Použitím tlačítek výše potvrzuješ, že je ti alespoň 18 let, a souhlasíš s našimi <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Podmínkami služby</a> a <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Zásadami ochrany osobních údajů</a>.",
     "footer.filmData": "Data o filmech od",
-    "home.title": "Online torrentová platforma — Streamování a stahování v prohlížeči",
+    "home.title": "Torrenty online — Streamování a stahování v prohlížeči",
     "home.description": "Bezplatný online torrentový web pro streamování a stahování torrentů přímo v prohlížeči — žádná aplikace, klient ani instalace. Otevřený kód a soukromí.",
     "home.ogTitle": "Webtor.io — Streamuj a stahuj torrenty v prohlížeči",
     "home.ogDescription": "Streamuj a stahuj jakýkoli torrent přímo v prohlížeči — zdarma, otevřený kód, bez instalace. Tvůj soukromý webový torrent přehrávač na každém zařízení.",

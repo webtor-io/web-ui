@@ -27,7 +27,7 @@
     "ageGate.adultFootnote": "Yetişkinlere yönelik içerik. Yukarıdaki butonları kullanarak en az 18 yaşında olduğunu onaylarsın.",
     "ageGate.adultFootnoteAnon": "Yetişkinlere yönelik içerik. Yukarıdaki butonları kullanarak en az 18 yaşında olduğunu onaylar ve <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Hizmet Şartları</a> ile <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gizlilik Politikamızı</a> kabul edersin.",
     "footer.filmData": "Film verileri",
-    "home.title": "Online torrent platformu — Tarayıcıda izle ve indir",
+    "home.title": "Online torrent — Tarayıcıda izle ve indir",
     "home.description": "Torrentleri doğrudan tarayıcıda izlemek ve indirmek için ücretsiz online torrent sitesi — uygulama, istemci ve kurulum yok. Açık kaynak ve gizli.",
     "home.ogTitle": "Webtor.io — Tarayıcıda torrent izle ve indir",
     "home.ogDescription": "Herhangi bir torrenti doğrudan tarayıcıda izle ve indir — ücretsiz, açık kaynak, kurulum yok. Her cihazda çalışan gizli web torrent oynatıcın.",

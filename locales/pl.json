@@ -27,7 +27,7 @@
     "ageGate.adultFootnote": "Treści tylko dla dorosłych. Korzystając z przycisków powyżej potwierdzasz, że masz co najmniej 18 lat.",
     "ageGate.adultFootnoteAnon": "Treści tylko dla dorosłych. Korzystając z przycisków powyżej potwierdzasz, że masz co najmniej 18 lat, i akceptujesz nasze <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Warunki świadczenia usług</a> i <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Politykę prywatności</a>.",
     "footer.filmData": "Dane o filmach z",
-    "home.title": "Platforma torrentów online — strumieniowanie i pobieranie w przeglądarce",
+    "home.title": "Torrenty online — strumieniowanie i pobieranie w przeglądarce",
     "home.description": "Darmowa internetowa strona torrentowa do strumieniowania i pobierania torrentów bezpośrednio w przeglądarce — bez aplikacji, klienta i instalacji. Open source i prywatnie.",
     "home.ogTitle": "Webtor.io — strumieniowanie i pobieranie torrentów w przeglądarce",
     "home.ogDescription": "Strumieniuj i pobieraj dowolny torrent bezpośrednio w przeglądarce — za darmo, open source, bez instalacji. Twój prywatny webowy odtwarzacz torrentów na każdym urządzeniu.",

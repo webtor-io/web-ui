@@ -27,7 +27,7 @@
     "ageGate.adultFootnote": "Contenu réservé aux adultes. En utilisant les boutons ci-dessus vous confirmez avoir au moins 18 ans.",
     "ageGate.adultFootnoteAnon": "Contenu réservé aux adultes. En utilisant les boutons ci-dessus vous confirmez avoir au moins 18 ans et acceptez nos <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Conditions d'utilisation</a> et notre <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Politique de confidentialité</a>.",
     "footer.filmData": "Données de films par",
-    "home.title": "Plateforme torrent en ligne — streaming et téléchargement dans le navigateur",
+    "home.title": "Torrent en ligne — streaming et téléchargement dans le navigateur",
     "home.description": "Site web de torrent en ligne et gratuit pour diffuser et télécharger des torrents directement dans le navigateur — sans appli, sans client, sans installation. Open source et privé.",
     "home.ogTitle": "Webtor.io — diffuser et télécharger des torrents dans le navigateur",
     "home.ogDescription": "Diffusez et téléchargez n'importe quel torrent directement dans le navigateur — gratuit, open source, sans installation. Votre lecteur torrent web sur tous vos appareils.",

@@ -27,7 +27,7 @@
     "ageGate.adultFootnote": "Inhoud alleen voor volwassenen. Door de bovenstaande knoppen te gebruiken bevestig je dat je minimaal 18 jaar oud bent.",
     "ageGate.adultFootnoteAnon": "Inhoud alleen voor volwassenen. Door de bovenstaande knoppen te gebruiken bevestig je dat je minimaal 18 jaar oud bent en ga je akkoord met onze <a href='{{.TosURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Gebruiksvoorwaarden</a> en ons <a href='{{.PrivacyURL}}' target='_blank' rel='noopener' class='underline hover:text-w-text'>Privacybeleid</a>.",
     "footer.filmData": "Filmgegevens van",
-    "home.title": "Online torrent platform — Stream & download in je browser",
+    "home.title": "Torrent online — Stream & download in je browser",
     "home.description": "Gratis online torrent-website om torrents direct in je browser te streamen en downloaden — geen app, geen client, geen installatie. Open source en privé.",
     "home.ogTitle": "Webtor.io — Stream & download torrents in je browser",
     "home.ogDescription": "Stream en download elke torrent direct in je browser — gratis, open source, niets te installeren. Jouw privé webtorrent-speler op elk apparaat.",
