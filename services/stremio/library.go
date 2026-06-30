@@ -130,19 +130,6 @@ func (s *Library) getCatalogData(ctx context.Context, t string) ([]models.VideoC
 	return items, nil
 }
 
-func (s *Library) makeStreamTitle(title string, md map[string]any) string {
-	if quality, ok := md["quality"]; ok && strings.TrimSpace(quality.(string)) != "" {
-		title = title + "." + quality.(string)
-	}
-	if resolution, ok := md["resolution"]; ok && strings.TrimSpace(resolution.(string)) != "" {
-		title = title + "." + resolution.(string)
-	}
-	if container, ok := md["container"]; ok && strings.TrimSpace(container.(string)) != "" {
-		title = title + "." + container.(string)
-	}
-	return title
-}
-
 type Args struct {
 	ID      string
 	Season  int
@@ -178,13 +165,12 @@ func (s *Library) bindArgs(ct, id string) (args *Args, err error) {
 }
 
 func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithMetadata, ct string, args *Args) (*StreamItem, error) {
-	var title, p string
+	var p string
 	var md map[string]any
 	var fileIdx *int
 	var fileSize *int64
 	if ct == "movie" {
 		p = *vc.GetPath()
-		title = vc.GetContent().Title
 		md = vc.GetContent().Metadata
 		fileIdx = vc.GetFileIdx()
 		fileSize = vc.GetFileSize()
@@ -195,7 +181,6 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 			return nil, nil
 		}
 		p = *ep.Path
-		title = fmt.Sprintf("%v.S%vE%v", vc.GetContent().Title, args.Season, args.Episode)
 		md = ep.Metadata
 		fileIdx = ep.FileIdx
 		fileSize = ep.FileSize
@@ -210,12 +195,13 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 	if filename == "" {
 		return nil, nil
 	}
+	// The detail block goes in Title, not Description: Stremio (and addons
+	// like Torrentio) render the multi-line Title and ignore Description.
 	return &StreamItem{
-		Name:        s.makeStreamName("Webtor.io", md),
-		Title:       s.makeStreamTitle(title, md),
-		Description: makeStreamDescription(vc.GetContent().Title, ct, args, md, fileSize, filename, vc.GetContent().Year),
-		InfoHash:    vc.GetContent().ResourceID,
-		FileIdx:     idx,
+		Name:     s.makeStreamName("Webtor.io", md),
+		Title:    makeStreamTitle(vc.GetContent().Title, ct, args, md, fileSize, filename, vc.GetContent().Year),
+		InfoHash: vc.GetContent().ResourceID,
+		FileIdx:  idx,
 		BehaviorHints: &StreamBehaviorHints{
 			Filename:   filename,
 			BingeGroup: fmt.Sprintf("webtorio|%v", vc.GetContent().ResourceID),
@@ -224,16 +210,18 @@ func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithM
 
 }
 
-// makeStreamDescription builds the Torrentio-style multi-line stream
-// description shown by Stremio: a clean release line, a size/source line, and
-// an optional language-flag line. Mirrors how addon streams present their
-// detail block so library entries don't look bare next to them. Every part is
-// optional — missing metadata simply drops its segment.
+// makeStreamTitle builds the Torrentio-style multi-line stream title shown by
+// Stremio: a clean release line, a size/source line, and an optional
+// language-flag line. It populates the StreamItem.Title field (NOT
+// Description) because Stremio and addons render the multi-line Title and
+// ignore Description. Mirrors how addon streams present their detail block so
+// library entries don't look bare next to them. Every part is optional —
+// missing metadata simply drops its segment.
 //
 //	The Big Bang Theory · S05E14 [2012 BluRay 1080p]
 //	💾 1.41 GB  ⚙️ Library
 //	🇬🇧 / 🇷🇺
-func makeStreamDescription(displayTitle, ct string, args *Args, md map[string]any, size *int64, filename string, year *int16) string {
+func makeStreamTitle(displayTitle, ct string, args *Args, md map[string]any, size *int64, filename string, year *int16) string {
 	line1 := displayTitle
 	if ct == "series" {
 		line1 = fmt.Sprintf("%s · S%02dE%02d", displayTitle, args.Season, args.Episode)

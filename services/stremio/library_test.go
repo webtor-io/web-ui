@@ -47,7 +47,7 @@ func TestLanguageFlags(t *testing.T) {
 func i16(v int16) *int16 { return &v }
 func i64(v int64) *int64 { return &v }
 
-func TestMakeStreamDescription(t *testing.T) {
+func TestMakeStreamTitle(t *testing.T) {
 	cases := []struct {
 		name       string
 		displayTtl string
@@ -114,9 +114,9 @@ func TestMakeStreamDescription(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := makeStreamDescription(c.displayTtl, c.ct, c.args, c.md, c.size, c.filename, c.year)
+			got := makeStreamTitle(c.displayTtl, c.ct, c.args, c.md, c.size, c.filename, c.year)
 			if got != c.want {
-				t.Errorf("makeStreamDescription:\n got = %q\nwant = %q", got, c.want)
+				t.Errorf("makeStreamTitle:\n got = %q\nwant = %q", got, c.want)
 			}
 		})
 	}
