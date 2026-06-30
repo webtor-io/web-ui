@@ -65,23 +65,39 @@ missing in Stremio, addon streams left on top. See migration 60 for the
 rationale.
 
 `resolveFileItem` falls back to the legacy `retrieveTorrentItem` list-walk when
-`file_idx` is `NULL` (rows enriched before the column existed; cleared on the
-next re-enrich). The fallback is also nil-safe now: a path no longer present in
-the listing yields no stream instead of a nil-deref.
+`file_idx` is `NULL` (rows enriched before the column existed). The fallback is
+nil-safe (a path no longer in the listing yields no stream, not a nil-deref)
+and returns the matched item's **`ListItem.Index`** — the torrent's natural
+file index — not a positional count over the sorted list. The old positional
+count resolved the *wrong* file whenever the torrent's natural `r.Files` order
+didn't match the folders-first/name sort (e.g. a season pack with scrambled
+file order).
+
+**Self-heal.** Adding a resource to a library calls `jobs.Enrich`, but enrich
+short-circuits for already-enriched resources (`TryInsertOrLockMediaInfo`
+returns nil), so a pre-migration-60 resource would keep `file_idx = NULL` and
+fall back to the slow/legacy path forever. `Enricher.backfillFileIndex` closes
+that gap: on the skip branch it fills `file_idx`/`file_size` directly from
+rest-api `ListItem.Index/Size` (`models.FillFileIndex`), gated by
+`HasNullFileIdx` so it issues no rest-api call once populated. A one-time
+backfill seeds existing rows; self-heal covers everything added afterward.
 
 > Cross-service note: `ListItem.Index` requires rest-api ≥ the release that
 > added it. Bump the `github.com/webtor-io/rest-api` pin in `go.mod` after that
 > release; until then enrich stores `file_idx` from a stale index field and the
 > Library fast path may resolve the wrong file. Deploy rest-api first.
 
-### Stream presentation (marker + description)
+### Stream presentation (marker + title)
 
 Library streams carry a `⭐` prefix on their `name` badge (added in
 `EnrichStream.enrichStream` for any `isLibraryStream`), so the user's own
 entries are unmistakable next to addon results.
 
-`Library.makeStreamDescription` builds a Torrentio-style multi-line
-`description` from data already on the row — no extra fetch:
+`Library.makeStreamTitle` builds a Torrentio-style multi-line **`Title`** from
+data already on the row — no extra fetch. It MUST go in `Title`, not
+`Description`: Stremio (and addons like Torrentio) render `Title` and ignore
+`Description` — a library stream that only set `Description` shows up in the
+JSON but is invisible in the Stremio app.
 
 ```
 The Big Bang Theory · S05E14 [2012 BluRay 1080p]
@@ -96,9 +112,11 @@ The Big Bang Theory · S05E14 [2012 BluRay 1080p]
   migration 60, captured from `ListItem.Size` at enrich time) + the `⚙️ Library`
   source. No 👤 seeders line — vault content is cached, not P2P;
 - line 3 — language flags via `ExtractLanguages(filename)` (`lang.go`),
-  de-duplicated, omitted when nothing is recognised. Note `lang.go`'s alias
-  table is 639-2/B (`ger`, not `deu`) and has no Hebrew, so some addon-visible
-  tags won't map to a flag.
+  de-duplicated, omitted when nothing is recognised. **Known gap:** ptn rarely
+  populates `md.language` (~0.05% of rows) and the filename often carries no
+  language token, so most flags are missing. The planned fix is to extract
+  languages into `md` at enrich time and read from there — see
+  `project_stremio_library_languages_in_md` memo.
 
 ## Binge-watching (auto-play next episode) — the non-obvious contract
 

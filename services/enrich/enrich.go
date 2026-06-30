@@ -1053,6 +1053,14 @@ func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, 
 	}
 	if mi == nil {
 		log.Infof("no media info acquired for hash %s", hash)
+		// Self-heal: an already-enriched resource (e.g. one just added to a
+		// library) may predate the file_idx column, so the full enrich above
+		// is skipped and file_idx/file_size stay NULL. Fill them directly from
+		// rest-api's ListItem.Index/Size — no expensive re-enrich, gated so it
+		// no-ops once the resource is populated.
+		if ferr := s.backfillFileIndex(ctx, db, hash, claims); ferr != nil {
+			log.WithError(ferr).WithField("hash", hash).Warn("failed to backfill file_idx")
+		}
 		return nil
 	}
 	log.Infof("start processing media info %+v", mi)
@@ -1465,6 +1473,32 @@ func (s *Enricher) tryUpgrade(ctx context.Context, md *models.VideoMetadata, t m
 		}
 	}
 	return nil
+}
+
+// backfillFileIndex fills file_idx/file_size on the resource's already-present
+// movie/episode rows from rest-api's authoritative ListItem.Index/Size,
+// without re-running the full enrich. Gated by HasNullFileIdx so it issues no
+// rest-api call once the resource is populated.
+func (s *Enricher) backfillFileIndex(ctx context.Context, db *pg.DB, hash string, claims *api.Claims) error {
+	need, err := models.HasNullFileIdx(ctx, db, hash)
+	if err != nil || !need {
+		return err
+	}
+	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+	if err != nil {
+		return err
+	}
+	entries := make([]models.FileIndexEntry, 0, len(items))
+	for _, it := range items {
+		if it.Type == ra.ListTypeFile {
+			entries = append(entries, models.FileIndexEntry{
+				Path:     it.PathStr,
+				FileIdx:  it.Index,
+				FileSize: it.Size,
+			})
+		}
+	}
+	return models.FillFileIndex(ctx, db, hash, entries)
 }
 
 func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string, claims *api.Claims) ([]ra.ListItem, error) {

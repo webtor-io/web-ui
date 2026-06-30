@@ -447,10 +447,17 @@ func (s *Library) makeMetaWithoutMetadata(vc models.VideoContentWithMetadata) Me
 	return meta
 }
 
+// retrieveTorrentItem is the fallback used only when file_idx was not
+// persisted (pre-migration-60 rows). It returns the matched file's
+// ListItem.Index — the torrent's natural file index, authoritative from
+// rest-api — NOT a positional count over the sorted/paginated list. The old
+// positional count was wrong whenever the torrent's natural file order didn't
+// match the folders-first/name sort (e.g. a season pack whose r.Files order is
+// scrambled), resolving the wrong file. This matches the value enrich now
+// persists.
 func (s *Library) retrieveTorrentItem(ctx context.Context, hash string, claims *api.Claims, path string) (*ra.ListItem, int, error) {
 	limit := uint(100)
 	offset := uint(0)
-	var idx int
 	for {
 		resp, err := s.sapi.ListResourceContentCached(ctx, claims, hash, &api.ListResourceContentArgs{
 			Limit:  limit,
@@ -461,10 +468,7 @@ func (s *Library) retrieveTorrentItem(ctx context.Context, hash string, claims *
 		}
 		for _, item := range resp.Items {
 			if item.PathStr == path {
-				return &item, idx, nil
-			}
-			if item.Type == ra.ListTypeFile {
-				idx++
+				return &item, item.Index, nil
 			}
 		}
 		if (resp.Count - int(offset)) == len(resp.Items) {
