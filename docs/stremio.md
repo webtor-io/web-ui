@@ -42,6 +42,64 @@ those exact torrents by adding them to their Vault. Without the PreferredStream
 exemption a 4k library title — or a series episode whose filename carries no
 resolution token (→ `"other"`) — silently vanishes from results.
 
+### File index is persisted, not re-derived at /stream time
+
+Each library `StreamItem` needs the torrent **file index** (`FileIdx`) — it
+goes into the `/resolve` JWT and the ⚡ availability check, and is the
+`content_id` rest-api's `/resource/<hash>/export/<idx>` expects.
+
+`FileIdx` is stored on the `movie` / `episode` rows (`file_idx` column,
+migration 60) at enrich time. The value comes straight from rest-api's
+`ListItem.Index` — the file's position in the torrent's natural file order
+(`r.Files`), authoritative and independent of the sorted/paginated `/list`
+order. `Library.getStreamItem` reads it via `resolveFileItem` and derives the
+filename from the path basename — **no rest-api call on the `/stream` hot
+path**.
+
+This replaced the old behavior where `retrieveTorrentItem` paginated
+`/resource/<hash>/list` on every request, counting files until the path
+matched. For files deep in large season packs that meant 2–3 sequential
+rest-api round trips, and under the `CompositeStream` 5s per-service timeout it
+intermittently dropped the **entire** Library result — vault streams silently
+missing in Stremio, addon streams left on top. See migration 60 for the
+rationale.
+
+`resolveFileItem` falls back to the legacy `retrieveTorrentItem` list-walk when
+`file_idx` is `NULL` (rows enriched before the column existed; cleared on the
+next re-enrich). The fallback is also nil-safe now: a path no longer present in
+the listing yields no stream instead of a nil-deref.
+
+> Cross-service note: `ListItem.Index` requires rest-api ≥ the release that
+> added it. Bump the `github.com/webtor-io/rest-api` pin in `go.mod` after that
+> release; until then enrich stores `file_idx` from a stale index field and the
+> Library fast path may resolve the wrong file. Deploy rest-api first.
+
+### Stream presentation (marker + description)
+
+Library streams carry a `⭐` prefix on their `name` badge (added in
+`EnrichStream.enrichStream` for any `isLibraryStream`), so the user's own
+entries are unmistakable next to addon results.
+
+`Library.makeStreamDescription` builds a Torrentio-style multi-line
+`description` from data already on the row — no extra fetch:
+
+```
+The Big Bang Theory · S05E14 [2012 BluRay 1080p]
+💾 1.41 GB  ⚙️ Library
+🇷🇺 / 🇬🇧
+```
+
+- line 1 — clean title (+ `S<season>E<episode>` for series) and a
+  `[year quality resolution]` tag built from the ptn snapshot (`md`), each part
+  optional;
+- line 2 — `💾 <size>` from the persisted `file_size` column (`bigint`,
+  migration 60, captured from `ListItem.Size` at enrich time) + the `⚙️ Library`
+  source. No 👤 seeders line — vault content is cached, not P2P;
+- line 3 — language flags via `ExtractLanguages(filename)` (`lang.go`),
+  de-duplicated, omitted when nothing is recognised. Note `lang.go`'s alias
+  table is 639-2/B (`ger`, not `deu`) and has no Hebrew, so some addon-visible
+  tags won't map to a flag.
+
 ## Binge-watching (auto-play next episode) — the non-obvious contract
 
 This is easy to break and hard to diagnose, so read this before touching the

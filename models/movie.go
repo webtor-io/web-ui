@@ -17,6 +17,8 @@ type Movie struct {
 	MovieID         uuid.UUID  `pg:"movie_id,pk,type:uuid,default:uuid_generate_v4()"`
 	MovieMetadataID *uuid.UUID `pg:"movie_metadata_id"`
 	Path            *string    `pg:"path"`
+	FileIdx         *int       `pg:"file_idx"`
+	FileSize        *int64     `pg:"file_size"`
 	CreatedAt       time.Time  `pg:"created_at,default:now()"`
 	UpdatedAt       time.Time  `pg:"updated_at,default:now()"`
 
@@ -58,6 +60,14 @@ func (s *Movie) GetID() uuid.UUID {
 
 func (s *Movie) GetPath() *string {
 	return s.Path
+}
+
+func (s *Movie) GetFileIdx() *int {
+	return s.FileIdx
+}
+
+func (s *Movie) GetFileSize() *int64 {
+	return s.FileSize
 }
 
 func (s *Movie) GetIntYear() int {

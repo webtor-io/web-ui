@@ -59,6 +59,19 @@ func (s *Series) GetPath() *string {
 	return nil
 }
 
+// GetFileIdx returns nil at the series level — a series spans many files,
+// so the torrent file index is carried per-episode (Episode.FileIdx), not
+// on the series row.
+func (s *Series) GetFileIdx() *int {
+	return nil
+}
+
+// GetFileSize returns nil at the series level — file size is per-episode
+// (Episode.FileSize), like the file index.
+func (s *Series) GetFileSize() *int64 {
+	return nil
+}
+
 func (s *Series) GetEpisode(season int, episode int) *Episode {
 	for _, e := range s.Episodes {
 		var se int16

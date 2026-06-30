@@ -337,6 +337,12 @@ func StructToMap(s interface{}) (map[string]interface{}, error) {
 type TorrentInfo struct {
 	*ptn.TorrentInfo
 	*ra.ListItem
+	// FileIdx is the torrent file index (rest-api ListItem.Index — the
+	// file's position in the torrent's natural file order). Stremio's
+	// Library stream service persists it (Episode.FileIdx / Movie.FileIdx)
+	// so it never re-derives the index from the list at /stream time. It is
+	// the value consumed by /export/<idx>.
+	FileIdx int
 }
 
 func MakeTorrentInfo(item *ra.ListItem) (*TorrentInfo, error) {
@@ -688,6 +694,11 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to make torrent info for hash %v", hash)
 		}
+		// item.Index is the file's position in the torrent's natural file
+		// order, authoritative from rest-api — the value /export/<idx>
+		// expects. Persisted as Episode.FileIdx / Movie.FileIdx so the
+		// Stremio Library service never re-derives it at /stream time.
+		ti.FileIdx = item.Index
 		if ti.Sample {
 			samples = append(samples, ti)
 			continue
@@ -1552,6 +1563,10 @@ func (s *Enricher) makeMovie(infos []*TorrentInfo, hash string) (*models.Movie, 
 		movie.Year = &year
 	}
 	movie.Path = &ti.PathStr
+	fileIdx := ti.FileIdx
+	movie.FileIdx = &fileIdx
+	fileSize := ti.ListItem.Size
+	movie.FileSize = &fileSize
 	metadata, err := StructToMap(ti.TorrentInfo)
 	if err != nil {
 		return nil, err
@@ -1624,10 +1639,14 @@ func (s *Enricher) makeSeriesWithEpisodes(infos []*TorrentInfo, hash string, mt 
 			epInt16 := int16(episode)
 			ep = &epInt16
 		}
+		fileIdx := ti.FileIdx
+		fileSize := ti.ListItem.Size
 		e := &models.Episode{
 			ResourceID: hash,
 			SeriesID:   ser.SeriesID,
 			Path:       &ti.PathStr,
+			FileIdx:    &fileIdx,
+			FileSize:   &fileSize,
 			Season:     sea,
 			Episode:    ep,
 		}

@@ -19,6 +19,8 @@ type Episode struct {
 	ResourceID        string         `pg:"resource_id"`
 	Title             *string        `pg:"title"`
 	Path              *string        `pg:"path"`
+	FileIdx           *int           `pg:"file_idx"`
+	FileSize          *int64         `pg:"file_size"`
 	Metadata          map[string]any `pg:"metadata,type:jsonb"`
 	EpisodeMetadataID *uuid.UUID     `pg:"episode_metadata_id"`
 	CreatedAt         time.Time      `pg:"created_at,default:now()"`

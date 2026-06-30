@@ -22,5 +22,7 @@ type VideoContentWithMetadata interface {
 	GetContent() *VideoContent
 	GetMetadata() *VideoMetadata
 	GetPath() *string
+	GetFileIdx() *int
+	GetFileSize() *int64
 	GetEpisode(season int, episode int) *Episode
 }

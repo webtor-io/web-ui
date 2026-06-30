@@ -110,8 +110,17 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 	return &StreamsResponse{Streams: finalStreams}, nil
 }
 
-// sortVaultFirstByResolution stable-sorts cached items to the front of
-// each resolution group while preserving every other relative order.
+// sortVaultFirstByResolution stable-sorts each resolution group so library
+// streams come first, then cached (⚡) items, preserving every other relative
+// order.
+//
+// The library-first tier matters because PreferredStream already pinned
+// library streams to the front, but it groups by resolution: when the last
+// library stream shares a resolution with the following addon group they land
+// in one contiguous bucket here. Sorting that bucket on Cached alone let a
+// cached addon overtake a *non-cached* library stream — re-inverting the
+// priority PreferredStream established. Library origin is the primary key so
+// the user's own torrents stay on top regardless of cache state.
 func sortVaultFirstByResolution(streams []StreamItem) {
 	if len(streams) < 2 {
 		return
@@ -145,6 +154,10 @@ func sortVaultFirstByResolution(streams []StreamItem) {
 			if i-start > 1 {
 				bucket := streams[start:i]
 				sort.SliceStable(bucket, func(a, b int) bool {
+					al, bl := isLibraryStream(&bucket[a]), isLibraryStream(&bucket[b])
+					if al != bl {
+						return al // library streams always above addon streams
+					}
 					return bucket[a].Cached && !bucket[b].Cached
 				})
 			}
@@ -168,6 +181,13 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 		return nil, errors.Wrap(err, "failed to check availability")
 	}
 	stream.Name = s.updateStreamName(stream.Name, availability)
+	// Mark the user's own library entries with a ⭐ so they're unmistakable
+	// next to addon results. Library streams are the ones carrying the
+	// webtorio| bingeGroup; addon P2P streams reach this path too (they also
+	// arrive without a Url), so the marker is keyed on origin, not Url.
+	if isLibraryStream(stream) {
+		stream.Name = "⭐ " + stream.Name
+	}
 	if availability != nil && availability.Cached {
 		stream.Cached = true
 	}
