@@ -607,6 +607,8 @@ github.com/webtor-io/rest-api v1.0.1-0.20260614144943-896c022bb5d5 h1:n9eIOwiKzj
 github.com/webtor-io/rest-api v1.0.1-0.20260614144943-896c022bb5d5/go.mod h1:o7VurVd5hOFInzJ7CCm59UmKz4hHRYujIsSis8wlFCI=
 github.com/webtor-io/rest-api v1.0.1-0.20260630160434-8dc97695e0cb h1:a0t/jb1G17lgPgm/rfdK5tV9SUnLCtlW/y7bZt5tfVU=
 github.com/webtor-io/rest-api v1.0.1-0.20260630160434-8dc97695e0cb/go.mod h1:o7VurVd5hOFInzJ7CCm59UmKz4hHRYujIsSis8wlFCI=
+github.com/webtor-io/rest-api v1.0.1-0.20260702182913-e2204030bcdf h1:JFBcJEZX0vPoLdGeUTWDkl6MMI0rqukfinKnygw8xfE=
+github.com/webtor-io/rest-api v1.0.1-0.20260702182913-e2204030bcdf/go.mod h1:o7VurVd5hOFInzJ7CCm59UmKz4hHRYujIsSis8wlFCI=
 github.com/webtor-io/torrent-store v1.0.1-0.20260614135143-50f5d91eee6b h1:jmEAhWEzU9RDKsOh2r7qdRvwOm8ZkTDe/9WnbaxIHb8=
 github.com/webtor-io/torrent-store v1.0.1-0.20260614135143-50f5d91eee6b/go.mod h1:HEre6qOE71TekOuef3PQD1C0fvh6pOdRVOeOadtOnek=
 github.com/willf/bitset v1.1.3/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=

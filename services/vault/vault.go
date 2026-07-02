@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	VaultPledgeFreezePeriodFlag              = "vault-pledge-freeze-period"
-	VaultResourceExpirePeriodFlag            = "vault-resource-expire-period"
-	VaultResourceAbandonedExpirePeriodFlag   = "vault-resource-abandoned-expire-period"
-	VaultResourceTransferTimeoutPeriodFlag   = "vault-resource-transfer-timeout-period"
+	VaultPledgeFreezePeriodFlag            = "vault-pledge-freeze-period"
+	VaultResourceExpirePeriodFlag          = "vault-resource-expire-period"
+	VaultResourceAbandonedExpirePeriodFlag = "vault-resource-abandoned-expire-period"
+	VaultResourceTransferTimeoutPeriodFlag = "vault-resource-transfer-timeout-period"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -560,16 +560,16 @@ func (s *Vault) getTorrentName(ctx context.Context, claims *api.Claims, resource
 
 // GetRequiredVP calculates the required vault points for a resource based on its total size
 func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceID string) (float64, error) {
-	// Get list to calculate total size
-	list, err := s.api.ListResourceContentCached(ctx, claims, resourceID, &api.ListResourceContentArgs{
-		Output: api.OutputList,
-	})
+	// Read the total size straight from the resource response (size) instead
+	// of paginating the whole /list just for the total — a heavy scan on
+	// torrents with tens of thousands of files.
+	r, err := s.api.GetResourceCached(ctx, claims, resourceID)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to list resource content")
+		return 0, errors.Wrap(err, "failed to get resource")
 	}
 
 	// Convert bytes to VP (1 VP = 1 GB)
-	requiredVP := float64(list.Size) / (1024 * 1024 * 1024)
+	requiredVP := float64(r.Size) / (1024 * 1024 * 1024)
 
 	return requiredVP, nil
 }

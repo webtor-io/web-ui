@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/api"
 )
 
 type VaultPledgeAddForm struct {
@@ -46,16 +45,15 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 		return nil, errors.Wrap(err, "failed to get required VP")
 	}
 
-	// Get torrent size separately via REST API
-	list, err := s.api.ListResourceContentCached(ctx, args.Claims, args.ID, &api.ListResourceContentArgs{
-		Output: api.OutputList,
-	})
+	// Read the torrent size straight from the resource response instead of
+	// paginating the whole /list just for the total (heavy on huge torrents).
+	res, err := s.api.GetResourceCached(ctx, args.Claims, args.ID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list resource content for size calculation")
+		return nil, errors.Wrap(err, "failed to get resource for size calculation")
 	}
 
 	// Convert bytes to GB
-	torrentSizeGB := float64(list.Size) / (1024 * 1024 * 1024)
+	torrentSizeGB := float64(res.Size) / (1024 * 1024 * 1024)
 
 	vaultForm := &VaultPledgeAddForm{
 		Available:     stats.Available,
