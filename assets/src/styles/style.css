@@ -7,6 +7,22 @@
 
 @config '../../../tailwind.config.js';
 
+/* ===== Mobile accidental-zoom prevention =====
+   touch-action: manipulation disables double-tap-to-zoom (pinch-zoom stays
+   available for accessibility). The 16px floor on form fields on touch
+   devices stops iOS Safari from auto-zooming the page when an input with
+   font-size < 16px receives focus. */
+html {
+  touch-action: manipulation;
+}
+@media (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* ===== Video card grid (library + discover) =====
    Shared visual primitives for video cards. Used by both
    templates/partials/library/video_list.html (Go templates) and

@@ -1487,6 +1487,15 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       </ul>
     </div>
 
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Accidental-Zoom Prevention</h3>
+    <p class="desc">Global rules in <code>style.css</code> stop mobile browsers from zooming the page unexpectedly, while deliberate pinch-zoom stays available for accessibility.</p>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li><code>html { touch-action: manipulation; }</code> — disables double-tap-to-zoom everywhere</li>
+        <li>On touch devices (<code>@media (hover: none) and (pointer: coarse)</code>) all <code>input</code>/<code>select</code>/<code>textarea</code> get <code>font-size: max(16px, 1em) !important</code> — iOS Safari auto-zooms on focus when a field's font-size is below 16px, so never rely on <code>text-sm</code> input text rendering at 14px on phones</li>
+      </ul>
+    </div>
+
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Touch Targets</h3>
     <p class="desc">Interactive elements on touch devices need larger hit areas.</p>
     <div class="uikit-rule">

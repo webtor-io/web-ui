@@ -36,7 +36,18 @@
         {{- template "head_extra" . }}
     </head>
     <body class="flex flex-col min-h-screen font-sans antialiased">
-        <script>document.body.style.display = 'none';</script>
+        <script>
+            // Anti-FOUC hide; layout.js unhides once it runs. The load/timeout
+            // fallbacks guarantee the page never stays blank if layout.js
+            // fails to load (stale cached bundle after a deploy, network flap
+            // on tab restore) — display '' falls back to the body's flex class.
+            (function () {
+                document.body.style.display = 'none';
+                var show = function () { document.body.style.display = ''; };
+                window.addEventListener('load', show);
+                setTimeout(show, 5000);
+            })();
+        </script>
         <progress id="progress" class="progress fixed progress-accent h-1 z-toast"></progress>
         <header>
             <nav data-async-layout="{{`{{ template "nav" . }}`}}">{{ template "nav" . }}</nav>

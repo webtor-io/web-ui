@@ -51,21 +51,35 @@ function updateDescription(val) {
     }
 }
 
+// Unhide the body before anything that can fail at runtime — especially the
+// umami chunk import below: it fetches a contenthash-named chunk that 404s
+// when a stale cached layout.js survives a redeploy (Chrome tab discard →
+// reload after long idle). If this module dies past this point the page is
+// degraded but visible, not blank.
+document.body.style.display = 'flex';
+hideProgress();
+
 if (window._umami) {
-    const { eventDefaults } = await import('../lib/trackContext');
-    const umami = (await import('../lib/umami')).init(window, {
-        ...window._umami,
-        defaultData: eventDefaults,
-    });
-    window.umami = umami;
-    // Identify the session here, once, before any view-specific script (nav,
-    // discover, action/*, …) fires its own track events. Server-side gin
-    // session cookie ID is rendered to window._sessionID — same value across
-    // anon → auth → Patreon → return, so the resulting distinct_id ties the
-    // whole funnel together. umami.identify hashes it to a UUID under the
-    // hood (Umami v2 validation requirement) — see lib/umami.js.
-    if (window._sessionID) {
-        umami.identify(window._sessionID);
+    try {
+        const { eventDefaults } = await import('../lib/trackContext');
+        const umami = (await import('../lib/umami')).init(window, {
+            ...window._umami,
+            defaultData: eventDefaults,
+        });
+        window.umami = umami;
+        // Identify the session here, once, before any view-specific script (nav,
+        // discover, action/*, …) fires its own track events. Server-side gin
+        // session cookie ID is rendered to window._sessionID — same value across
+        // anon → auth → Patreon → return, so the resulting distinct_id ties the
+        // whole funnel together. umami.identify hashes it to a UUID under the
+        // hood (Umami v2 validation requirement) — see lib/umami.js.
+        if (window._sessionID) {
+            umami.identify(window._sessionID);
+        }
+    } catch (e) {
+        // Analytics chunk failed to load (stale bundle after deploy, flaky
+        // network on wake). Never let analytics take the page down.
+        console.error('umami init failed', e);
     }
 }
 
@@ -78,9 +92,6 @@ import {bindAsync} from '../lib/async';
 import initAsyncView from '../lib/asyncView';
 import loadAsyncView from '../lib/loadAsyncView';
 import toast from '../lib/toast';
-
-document.body.style.display = 'flex';
-hideProgress();
 
 // Lang switcher: flip <html lang> synchronously on click — before the
 // async-target fetch starts — so any client-side code reading

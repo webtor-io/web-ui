@@ -33,7 +33,7 @@ func (m *smtpMailer) Send(to, subject, body string) error {
 	}
 
 	msg := gomail.NewMessage()
-	msg.SetHeader("From", m.fromAddr())
+	msg.SetAddressHeader("From", m.fromAddr(), "Webtor")
 	msg.SetHeader("To", to)
 	msg.SetHeader("Subject", subject)
 	msg.SetBody("text/html", body)
