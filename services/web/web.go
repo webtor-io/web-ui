@@ -13,8 +13,10 @@ import (
 )
 
 const (
-	webHostFlag = "host"
-	webPortFlag = "port"
+	webHostFlag        = "host"
+	webPortFlag        = "port"
+	StagingFlag        = "staging"
+	RedirectDomainFlag = "redirect-domain"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -30,6 +32,16 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "http listening port",
 			Value:  8080,
 			EnvVar: "WEB_PORT",
+		},
+		cli.BoolFlag{
+			Name:   StagingFlag,
+			Usage:  "mark deployment as staging: forces X-Robots-Tag noindex on every response",
+			EnvVar: "STAGING",
+		},
+		cli.StringFlag{
+			Name:   RedirectDomainFlag,
+			Usage:  "redirect requests for hosts other than the canonical domain to this URL (e.g. https://webtor.io)",
+			EnvVar: "REDIRECT_DOMAIN",
 		},
 	)
 }

@@ -172,7 +172,10 @@ func serve(c *cli.Context) error {
 	// Setting Gin
 	r := gin.Default()
 	r.Use(w.ErrorLogger())
-	r.Use(w.NoindexDefault())
+	if redirect := w.RedirectNonCanonical(c.String(common.DomainFlag), c.String(w.RedirectDomainFlag)); redirect != nil {
+		r.Use(redirect)
+	}
+	r.Use(w.NoindexDefault(c.Bool(w.StagingFlag)))
 	r.RedirectTrailingSlash = false
 	r.HTMLRender = re
 
