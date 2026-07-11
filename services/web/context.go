@@ -62,6 +62,13 @@ func NewContext(c *gin.Context) *Context {
 	user := auth.GetUserFromContext(c)
 	cl := claims.GetFromContext(c)
 	sess := session.GetFromContext(c)
+	if sess == nil {
+		// Defensive: the session middleware normally populates this for
+		// every request, but the centralized error handler can render a
+		// Context for a request that failed before it ran. Fall back to an
+		// empty session (anonymous, no CSRF) instead of panicking.
+		sess = &session.Session{}
+	}
 	geoData := geo.GetFromContext(c)
 	aCl := api.GetClaimsFromContext(c)
 	tu := claims.GetTierUpdateFromContext(c)

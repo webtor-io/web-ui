@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/http"
 	"strings"
 )
 
@@ -43,7 +44,14 @@ func ClassifyError(err error) string {
 	case strings.Contains(msg, "resource not found"):
 		return "error.not_found"
 
-	case strings.Contains(msg, "failed to connect to database"):
+	case strings.Contains(msg, "failed to connect to database"),
+		strings.Contains(msg, "failed to get claims"),
+		strings.Contains(msg, "failed to create user"),
+		strings.Contains(msg, "SuperTokens"),
+		strings.Contains(msg, "connection refused"),
+		strings.Contains(msg, "Unavailable"):
+		// Backend/auth-DB blip: claims-provider, SuperTokens core or the
+		// app DB is transiently unreachable. Transient, retry-able.
 		return "error.service_unavailable"
 
 	case strings.Contains(msg, "wrong resource provided"),
@@ -73,5 +81,24 @@ func ClassifyError(err error) string {
 
 	default:
 		return "error.generic"
+	}
+}
+
+// StatusForErrKey maps a user-facing error key to the HTTP status the
+// centralized ErrorHandler should return. Defaults to 500; the transient
+// backend/auth failures map to 503 so clients and Cloudflare treat them as
+// retry-able rather than a hard error.
+func StatusForErrKey(key string) int {
+	switch key {
+	case "error.forbidden", "error.access_denied":
+		return http.StatusForbidden
+	case "error.not_found":
+		return http.StatusNotFound
+	case "error.unauthorized":
+		return http.StatusUnauthorized
+	case "error.service_unavailable":
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
 	}
 }

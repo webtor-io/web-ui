@@ -124,7 +124,10 @@ func (s *Claims) RegisterHandler(r *gin.Engine) {
 	r.Use(func(c *gin.Context) {
 		ucl, err := s.MakeUserClaimsFromContext(c)
 		if err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, err)
+			// Feed the error to the centralized ErrorHandler (services/web)
+			// without writing a status, so it can render the friendly page.
+			_ = c.Error(err)
+			c.Abort()
 			return
 		}
 

@@ -350,61 +350,53 @@ type ErrorContext struct{}
 type UserContext struct{}
 type IsNewContext struct{}
 
-func (s *Auth) myVerifySession(options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		sess, err := session.GetSession(r, w, options)
-		//err = errors.TryRefreshTokenError{}
+func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) {
+	w, r := c.Writer, c.Request
+	sess, err := session.GetSession(r, w, options)
+	if err != nil {
+		ctx := context.WithValue(r.Context(), ErrorContext{}, err)
+		r := r.WithContext(ctx)
+		if defaultErrors.As(err, &errors.TryRefreshTokenError{}) {
+			if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+				otherHandler(w, r)
+				return
+			}
+			// session exists but the access token expired
+		} else if defaultErrors.As(err, &errors.UnauthorizedError{}) {
+			otherHandler(w, r)
+			return
+			// session does not exist anymore — proceed as anonymous
+		} else if defaultErrors.As(err, &errors.InvalidClaimError{}) {
+			otherHandler(w, r)
+			return
+			// user is missing some required claim
+		}
+
+		// Any remaining error means SuperTokens couldn't handle it — its
+		// core is unreachable (auth-DB blip). Hand it to the centralized
+		// ErrorHandler (services/web) to render the friendly page, instead
+		// of a bare 500. The error is still logged there.
+		err = supertokens.ErrorHandler(err, r, w)
 		if err != nil {
-			ctx := context.WithValue(r.Context(), ErrorContext{}, err)
-			r := r.WithContext(ctx)
-			if defaultErrors.As(err, &errors.TryRefreshTokenError{}) {
-				if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
-					otherHandler(w, r)
-					return
-				}
-				// This means that the session exists, but the access token
-				// has expired.
-
-				// You can handle this in a custom way by sending a 401.
-				// Or you can call the errorHandler middleware as shown below
-			} else if defaultErrors.As(err, &errors.UnauthorizedError{}) {
-				otherHandler(w, r)
-				return
-				// This means that the session does not exist anymore.
-
-				// You can handle this in a custom way by sending a 401.
-				// Or you can call the errorHandler middleware as shown below
-			} else if defaultErrors.As(err, &errors.InvalidClaimError{}) {
-				otherHandler(w, r)
-				return
-				// The user is missing some required claim.
-				// You can pass the missing claims to the frontend and handle it there
-			}
-
-			// OR you can use this errorHandler which will
-			// handle all of the above errors in the default way
-			err = supertokens.ErrorHandler(err, r, w)
-			if err != nil {
-				log.WithError(err).Error("failed to handle error")
-				w.WriteHeader(500)
-			}
+			_ = c.Error(err)
+			c.Abort()
+		}
+		return
+	}
+	if sess != nil {
+		ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
+		u, isNew, err := s.createUser(r.Context(), sess)
+		if err != nil {
+			// App DB unreachable while materializing the user — same class.
+			_ = c.Error(err)
+			c.Abort()
 			return
 		}
-		if sess != nil {
-			ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
-			u, isNew, err := s.createUser(r.Context(), sess)
-			if err != nil {
-				log.WithError(err).Error("failed to create user")
-				w.WriteHeader(500)
-			} else {
-				ctx = context.WithValue(ctx, UserContext{}, u)
-				ctx = context.WithValue(ctx, IsNewContext{}, isNew)
-			}
-
-			otherHandler(w, r.WithContext(ctx))
-		} else {
-			otherHandler(w, r)
-		}
+		ctx = context.WithValue(ctx, UserContext{}, u)
+		ctx = context.WithValue(ctx, IsNewContext{}, isNew)
+		otherHandler(w, r.WithContext(ctx))
+	} else {
+		otherHandler(w, r)
 	}
 }
 
@@ -439,10 +431,10 @@ func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer)
 
 func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		s.myVerifySession(options, func(rw http.ResponseWriter, r *http.Request) {
+		s.myVerifySession(c, options, func(rw http.ResponseWriter, r *http.Request) {
 			c.Request = c.Request.WithContext(r.Context())
 			c.Next()
-		})(c.Writer, c.Request)
+		})
 		// we call Abort so that the next handler in the chain is not called, unless we call Next explicitly
 		c.Abort()
 	}
