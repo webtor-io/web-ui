@@ -887,7 +887,12 @@ func (s *Api) MakeClaimsFromContext(c *gin.Context, domain string, uc *claims.Da
 }
 
 func GetClaimsFromContext(c *gin.Context) *Claims {
-	return c.Request.Context().Value(ClaimsContext{}).(*Claims)
+	// Comma-ok: ClaimsContext is unset when the api middleware didn't run
+	// (e.g. an upstream middleware aborted on a claims/auth failure and the
+	// centralized ErrorHandler is now rendering). Returning nil instead of a
+	// panicking type assertion keeps NewContext / the error page safe.
+	cl, _ := c.Request.Context().Value(ClaimsContext{}).(*Claims)
+	return cl
 }
 
 func GenerateSessionID(c *gin.Context) string {

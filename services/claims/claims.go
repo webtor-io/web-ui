@@ -91,13 +91,15 @@ func (s *Claims) MakeUserClaimsFromContext(c *gin.Context) (*Data, error) {
 		Email:         u.Email,
 		PatreonUserID: u.PatreonUserID,
 	})
+	if err != nil {
+		// Check the error BEFORE touching r — on failure r is nil, so the
+		// test-ads deref below would panic.
+		return nil, err
+	}
 	if _, err := c.Cookie("test-ads"); err == nil {
 		r.Claims.Site.NoAds = false
 	} else if c.Query("test-ads") != "" {
 		r.Claims.Site.NoAds = false
-	}
-	if err != nil {
-		return nil, err
 	}
 	return r, nil
 }
