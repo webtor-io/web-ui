@@ -1,5 +1,5 @@
 {{ define "discover" }}
-{{ if not .Data }}
+{{ if and (not .Data) (.Ctx.User | hasAuth) }}
 <div class="mt-12 relative z-10 w-full" id="discover-ribbon">
     <div class="max-w-[1100px] mx-auto overflow-hidden">
         <!-- Header -->
