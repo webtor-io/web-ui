@@ -1,0 +1,135 @@
+{{ define "about_instruction_stremio_addons_online_how_to" }}
+<!-- Steps -->
+<section id="how" class="py-16 px-3 sm:px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            {{ t $.Lang "tool.about.badges.howItWorks" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">{{ tHTML $.Lang "tool.stremioAddonsOnline.about.steps.subtitle" }}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">1</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step1.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step1.text" }}</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">2</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step2.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step2.text" }}</p>
+                </div>
+            </div>
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">3</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step3.title" }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.steps.step3.text" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-10">
+            <a href="{{ langPath $.Lang "/discover" }}" class="btn btn-lg btn-pink gap-2 px-9">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                {{ t $.Lang "tool.stremioAddonsOnline.about.steps.cta" }}
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Explainer: What are Stremio addons -->
+<section class="py-16 px-3 sm:px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            {{ t $.Lang "tool.about.badges.explained" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.explained.title" }}</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.explained.p1" }}</p>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.stremioAddonsOnline.about.explained.p2" }}</p>
+        </div>
+    </div>
+</section>
+
+<!-- Benefits: Why in the browser -->
+<section class="py-16 px-3 sm:px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            {{ t $.Lang "tool.about.badges.benefits" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.subtitle" }}</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.item1" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.item2" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.item3" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.benefits.item4" }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Safety -->
+<section class="py-16 px-3 sm:px-6 bg-base-200">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            {{ t $.Lang "tool.about.badges.safety" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.safety.title" }}</h2>
+        <div class="max-w-[700px]">
+            <p class="text-[1.05rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.stremioAddonsOnline.about.safety.text" }}</p>
+        </div>
+    </div>
+</section>
+
+<!-- Devices -->
+<section class="py-16 px-3 sm:px-6">
+    <div class="max-w-[1100px] mx-auto">
+        <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            {{ t $.Lang "tool.about.badges.devices" }}
+        </div>
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.title" }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.subtitle" }}</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.item1" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.item2" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.item3" }}</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Lang "tool.stremioAddonsOnline.about.devices.item4" }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+{{ end }}
