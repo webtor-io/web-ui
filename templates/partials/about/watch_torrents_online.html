@@ -34,10 +34,7 @@
         </div>
 
         <div class="mt-10">
-            <a href="{{ langPath $.Lang "/discover" }}" class="btn btn-lg btn-pink gap-2 px-9">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                {{ t $.Lang "tool.watchTorrentsOnline.about.steps.cta" }}
-            </a>
+            {{ template "discover_cta" (withContext $ $.Data.Tool) }}
         </div>
     </div>
 </section>

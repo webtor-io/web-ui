@@ -69,6 +69,10 @@
                 </div>
             </div>
         </div>
+
+        <div class="mt-10">
+            {{ template "discover_cta" (withContext $ $.Data.Tool) }}
+        </div>
     </div>
 </section>
 {{ end }}
