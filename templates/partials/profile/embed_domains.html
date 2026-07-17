@@ -29,7 +29,7 @@
             {{ end }}
             {{ if .Data.ErrKey }}
                 <div class="text-sm text-error mt-3">
-                    {{ t $.Lang .Data.ErrKey }}
+                    {{ t .Ctx.Lang .Data.ErrKey }}
                 </div>
             {{ end }}
         </div>
