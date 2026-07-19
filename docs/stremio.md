@@ -13,7 +13,7 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 | `GET /manifest.json` | Addon manifest (`resources: stream, catalog, meta`; `types: movie, series`) |
 | `GET /catalog/:type/*id` | The user's library as a Stremio catalog |
 | `GET /meta/:type/*id` | Series/movie meta. For series, `videos[]` is built from the library torrent's episodes (`Library.makeVideos`) |
-| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}`; resolves to a backend URL via `LinkResolver` and `302`s to it |
+| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it |
 | `GET /stream/:type/*id` | Streams for a movie/episode (the pipeline below) |
 
 The personalised addon URL is a short alias (`/s/<code>`, `services/url_alias`)

@@ -201,10 +201,17 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 // torrent's infohash and the file index inside it. /resolve resolves the
 // idx to a full path against rest-api lazily.
 func (s *EnrichStream) generateRedirectURL(stream *StreamItem) string {
+	// Stremio persists the selected stream (URL included) across app
+	// sessions and probes it on resume and before binge-playing the next
+	// episode. With an episode-per-evening viewing pattern those probes
+	// arrive >24h after the URL was minted, so a 12h expiry made every
+	// next-day resume 401 and drop the user to the source-selection
+	// screen. 72h covers a weekend gap; the token still only grants
+	// access to a single file and rides behind the user's addon token.
 	clms := jwt.MapClaims{
 		"hash": stream.InfoHash,
 		"idx":  stream.FileIdx,
-		"exp":  time.Now().Add(12 * time.Hour).Unix(),
+		"exp":  time.Now().Add(72 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, clms)
 	tokenString, _ := token.SignedString([]byte(s.secret))
