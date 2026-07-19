@@ -20,6 +20,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Zásady ochrany soukromí",
     "footer.termsOfService": "Podmínky služby",
+    "footer.refundPolicy": "Zásady vrácení peněz",
     "footer.description": "Open-source torrentová platforma v prohlížeči. Streamuj, stahuj a spravuj torrenty bez instalace čehokoliv.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",

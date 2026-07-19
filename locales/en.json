@@ -22,6 +22,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Privacy Policy",
     "footer.termsOfService": "Terms of Service",
+    "footer.refundPolicy": "Refund Policy",
     "footer.description": "An open-source, browser-based torrent platform. Stream, download, and manage torrents without installing anything.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",

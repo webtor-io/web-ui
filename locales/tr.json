@@ -20,6 +20,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Gizlilik politikası",
     "footer.termsOfService": "Kullanım şartları",
+    "footer.refundPolicy": "İade politikası",
     "footer.description": "Tarayıcı tabanlı, açık kaynak torrent platformu. Hiçbir şey yüklemeden torrent izle, indir ve yönet.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",

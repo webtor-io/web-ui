@@ -20,6 +20,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Политика конфиденциальности",
     "footer.termsOfService": "Условия использования",
+    "footer.refundPolicy": "Политика возврата",
     "footer.description": "Открытая торрент-платформа прямо в браузере. Смотрите, скачивайте и управляйте торрентами без установки.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",

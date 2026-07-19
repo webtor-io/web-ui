@@ -20,6 +20,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Privacybeleid",
     "footer.termsOfService": "Servicevoorwaarden",
+    "footer.refundPolicy": "Restitutiebeleid",
     "footer.description": "Een open-source torrent platform in de browser. Stream, download en beheer torrents zonder iets te installeren.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",

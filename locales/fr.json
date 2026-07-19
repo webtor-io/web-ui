@@ -20,6 +20,7 @@
     "footer.dmca": "DMCA",
     "footer.privacyPolicy": "Politique de confidentialité",
     "footer.termsOfService": "Conditions d'utilisation",
+    "footer.refundPolicy": "Politique de remboursement",
     "footer.description": "Une plateforme torrent open-source, accessible depuis le navigateur. Diffusez, téléchargez et gérez vos torrents sans rien installer.",
     "footer.copyright": "Copyright © {{.Year}} Webtor.io",
     "footer.ageMark": "16+",
