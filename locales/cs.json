@@ -108,6 +108,8 @@
     "about.faq.openTorrent.a": "Přetáhni svůj .torrent soubor do oblasti pro nahrávání v horní části této stránky nebo vlož magnet link do vyhledávacího pole. Webtor ho okamžitě otevře — vyber video nebo audio soubor, který chceš, a sleduj/poslouchej, nebo si vezmi přímý odkaz na stažení. Žádný torrent klient k instalaci a nic k nastavení.",
     "about.faq.magnetDownload.q": "Jak stáhnu soubory z magnet linku bez torrent klienta?",
     "about.faq.magnetDownload.a": "Vlož magnet link do vyhledávacího pole v horní části této stránky. Webtor funguje jako online stahovač magnet linků: stáhne torrent a dá ti přímý HTTP odkaz na stažení každého souboru, plus zabudovaný přehrávač pro video a audio. Tvůj prohlížeč se nikdy nepřipojuje k síti BitTorrent — to dělají servery Webtor.",
+    "about.faq.magnetUse.q": "Jak použít magnet odkaz?",
+    "about.faq.magnetUse.a": "Vložte magnet odkaz do vyhledávacího pole nahoře — Webtor jej otevře během několika sekund, bez instalace klienta. Můžete také přetáhnout soubor .torrent. Webtor stahuje data na svých serverech, takže váš prohlížeč se nikdy nepřipojí k BitTorrent roji; jen přehráváte nebo stahujete soubory.",
     "about.faq.openTorrentApp.q": "Čím otevřu soubor torrent?",
     "about.faq.openTorrentApp.a": "Nemusíte nic instalovat — Webtor otevírá torrentové soubory přímo v prohlížeči, na Windows, Macu, Linuxu, Androidu i iOS. Nahrajte soubor .torrent nebo vložte magnet odkaz, pak sledujte video nebo si soubory stáhněte běžným HTTPS stahováním. Desktopoví klienti jako qBittorrent nebo uTorrent fungují také, ale vyžadují instalaci a připojují vaše zařízení k torrentovému roji.",
     "about.faq.unzipTorrent.q": "Jak rozbalím soubor torrent?",

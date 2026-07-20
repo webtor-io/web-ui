@@ -108,6 +108,8 @@
     "about.faq.openTorrent.a": "Przeciągnij plik .torrent do obszaru przesyłania na górze tej strony lub wklej link magnet w pole wyszukiwania. Webtor otworzy go natychmiast — wybierz plik wideo lub audio, który chcesz, i obejrzyj go lub uzyskaj bezpośredni link do pobrania. Nie ma klienta torrent do zainstalowania ani niczego do skonfigurowania.",
     "about.faq.magnetDownload.q": "Jak pobrać pliki z linku magnet bez klienta torrent?",
     "about.faq.magnetDownload.a": "Wklej link magnet w pole wyszukiwania na górze tej strony. Webtor działa jako online'owy pobieracz linków magnet: pobiera torrent i daje bezpośredni link HTTP do pobrania każdego pliku, plus wbudowany odtwarzacz wideo i audio. Twoja przeglądarka nigdy nie łączy się z siecią BitTorrent — robią to serwery Webtor.",
+    "about.faq.magnetUse.q": "Jak używać linku magnet?",
+    "about.faq.magnetUse.a": "Wklej link magnet w pole wyszukiwania u góry strony — Webtor otworzy go w kilka sekund, bez instalowania klienta. Możesz też przeciągnąć plik .torrent. Webtor pobiera dane na swoich serwerach, więc Twoja przeglądarka nigdy nie łączy się z rojem BitTorrent; po prostu oglądasz lub pobierasz pliki.",
     "about.faq.openTorrentApp.q": "Czym otworzyć plik torrent?",
     "about.faq.openTorrentApp.a": "Nie musisz nic instalować — Webtor otwiera pliki torrent bezpośrednio w przeglądarce, na Windows, Mac, Linux, Androidzie i iOS. Prześlij plik .torrent lub wklej link magnet, a następnie oglądaj wideo lub zapisuj pliki przez zwykłe pobieranie HTTPS. Klienty desktopowe, takie jak qBittorrent czy uTorrent, też działają, ale wymagają instalacji i łączą Twoje urządzenie z rojem torrenta.",
     "about.faq.unzipTorrent.q": "Jak rozpakować plik torrent?",
