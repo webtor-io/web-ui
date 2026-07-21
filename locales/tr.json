@@ -1254,11 +1254,12 @@
     "profile.payments.days": "{{.Days}} gün",
     "profile.payments.st.paid": "ödendi",
     "profile.payments.st.pending": "bekliyor",
-    "profile.payments.st.partial": "kısmen ödendi",
-    "profile.payments.st.failed": "tamamlanmadı",
-    "profile.payments.st.refunded": "iade edildi",
-    "profile.payments.track": "takip et",
+    "profile.payments.st.partial": "kısmi",
+    "profile.payments.st.failed": "başarısız",
+    "profile.payments.st.refunded": "iade",
+    "profile.payments.track": "ödeme durumunu aç",
     "profile.payments.empty": "Henüz ödeme yok.",
     "profile.payments.buyMore": "Paket satın al",
-    "profile.payments.method": "Yöntem"
+    "profile.payments.method": "Yöntem",
+    "profile.payments.backToProfile": "Profile dön"
 }

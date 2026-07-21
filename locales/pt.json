@@ -1254,11 +1254,12 @@
     "profile.payments.days": "{{.Days}} dias",
     "profile.payments.st.paid": "pago",
     "profile.payments.st.pending": "pendente",
-    "profile.payments.st.partial": "pago parcialmente",
-    "profile.payments.st.failed": "não concluído",
+    "profile.payments.st.partial": "parcial",
+    "profile.payments.st.failed": "falhou",
     "profile.payments.st.refunded": "reembolsado",
-    "profile.payments.track": "acompanhar",
+    "profile.payments.track": "ver status do pagamento",
     "profile.payments.empty": "Nenhum pagamento ainda.",
     "profile.payments.buyMore": "Comprar plano",
-    "profile.payments.method": "Método"
+    "profile.payments.method": "Método",
+    "profile.payments.backToProfile": "Voltar ao perfil"
 }

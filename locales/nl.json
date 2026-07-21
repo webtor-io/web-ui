@@ -1254,11 +1254,12 @@
     "profile.payments.days": "{{.Days}} dagen",
     "profile.payments.st.paid": "betaald",
     "profile.payments.st.pending": "in afwachting",
-    "profile.payments.st.partial": "gedeeltelijk betaald",
-    "profile.payments.st.failed": "niet voltooid",
+    "profile.payments.st.partial": "deels",
+    "profile.payments.st.failed": "mislukt",
     "profile.payments.st.refunded": "terugbetaald",
-    "profile.payments.track": "volgen",
+    "profile.payments.track": "betaalstatus bekijken",
     "profile.payments.empty": "Nog geen betalingen.",
     "profile.payments.buyMore": "Abonnement kopen",
-    "profile.payments.method": "Methode"
+    "profile.payments.method": "Methode",
+    "profile.payments.backToProfile": "Terug naar profiel"
 }

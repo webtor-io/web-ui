@@ -2,8 +2,13 @@
 {{ define "main" }}
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14l2 2 4-4"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2z"/></svg>
+      {{ t $.Lang "profile.payments.title" }}
+    </div>
+
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "profile.payments.title" }}</h1>
-    <p class="text-sm text-w-sub leading-relaxed mb-8">{{ t $.Lang "profile.payments.subtitle" }}</p>
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "profile.payments.subtitle" }}</p>
 
     {{ if .ErrKey }}
         <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">
@@ -12,54 +17,63 @@
     {{ end }}
     {{ with .Data }}
         {{ if .Rows }}
-        <div class="overflow-x-auto bg-w-card border border-w-line rounded-2xl">
-            <table class="table">
-                <thead>
-                    <tr class="text-w-sub">
-                        <th>{{ t $.Lang "profile.payments.date" }}</th>
-                        <th>{{ t $.Lang "profile.payments.tier" }}</th>
-                        <th>{{ t $.Lang "profile.payments.method" }}</th>
-                        <th>{{ t $.Lang "profile.payments.period" }}</th>
-                        <th>{{ t $.Lang "profile.payments.amount" }}</th>
-                        <th>{{ t $.Lang "profile.payments.status" }}</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{ range .Rows }}
-                    <tr>
-                        <td class="whitespace-nowrap">{{ .Date }}</td>
-                        <td class="capitalize font-semibold">{{ .TierName }}</td>
-                        <td class="whitespace-nowrap">{{ .Method }}</td>
-                        <td class="whitespace-nowrap">{{ tp $.Lang "profile.payments.days" "Days" .PeriodDays }}</td>
-                        <td class="whitespace-nowrap">${{ .AmountUSD }}</td>
-                        <td>
-                            {{ if eq .StatusKey "paid" }}
-                            <span class="badge badge-sm bg-success/10 border-success/30 text-success">{{ t $.Lang "profile.payments.st.paid" }}</span>
-                            {{ else if eq .StatusKey "pending" }}
-                            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan">{{ t $.Lang "profile.payments.st.pending" }}</span>
-                            {{ else if eq .StatusKey "partial" }}
-                            <span class="badge badge-sm bg-warning/10 border-warning/30 text-warning">{{ t $.Lang "profile.payments.st.partial" }}</span>
-                            {{ else if eq .StatusKey "refunded" }}
-                            <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">{{ t $.Lang "profile.payments.st.refunded" }}</span>
-                            {{ else }}
-                            <span class="badge badge-sm bg-error/10 border-error/30 text-error">{{ t $.Lang "profile.payments.st.failed" }}</span>
-                            {{ end }}
-                        </td>
-                        <td class="text-right whitespace-nowrap">
-                            {{ if .Pending }}
-                            <a href="{{ langPath $.Lang "/donate/crypto/success" }}?payment_id={{ .PaymentID }}" data-async-target="main" data-umami-event="payments-open-pending" class="link text-w-cyan text-sm">{{ t $.Lang "profile.payments.track" }}</a>
-                            {{ end }}
-                        </td>
-                    </tr>
-                    {{ end }}
-                </tbody>
-            </table>
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-8">
+            <div class="bg-base-200/50 rounded-xl p-4 overflow-x-auto">
+                <table class="table w-full text-sm">
+                    <thead>
+                        <tr class="text-w-sub">
+                            <th>{{ t $.Lang "profile.payments.date" }}</th>
+                            <th>{{ t $.Lang "profile.payments.tier" }}</th>
+                            <th>{{ t $.Lang "profile.payments.method" }}</th>
+                            <th>{{ t $.Lang "profile.payments.period" }}</th>
+                            <th class="text-right">{{ t $.Lang "profile.payments.amount" }}</th>
+                            <th>{{ t $.Lang "profile.payments.status" }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Rows }}
+                        <tr class="hover:bg-base-300/40 transition-colors">
+                            <td class="whitespace-nowrap">{{ .Date }}</td>
+                            <td class="capitalize font-semibold">{{ .TierName }}</td>
+                            <td class="whitespace-nowrap">{{ .Method }}</td>
+                            <td class="whitespace-nowrap">{{ tp $.Lang "profile.payments.days" "Days" .PeriodDays }}</td>
+                            <td class="whitespace-nowrap text-right font-semibold">${{ .AmountUSD }}</td>
+                            <td>
+                                {{ if eq .StatusKey "paid" }}
+                                <span class="badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "profile.payments.st.paid" }}</span>
+                                {{ else if eq .StatusKey "pending" }}
+                                <a href="{{ langPath $.Lang "/donate/crypto/success" }}?payment_id={{ .PaymentID }}" data-async-target="main" data-umami-event="payments-open-pending" title="{{ t $.Lang "profile.payments.track" }}" class="badge badge-sm whitespace-nowrap gap-1 bg-w-cyan/10 border-w-cyan/30 text-w-cyan hover:border-w-cyan transition-colors">
+                                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    {{ t $.Lang "profile.payments.st.pending" }}
+                                </a>
+                                {{ else if eq .StatusKey "partial" }}
+                                <span class="badge badge-sm whitespace-nowrap bg-warning/10 border-warning/30 text-warning">{{ t $.Lang "profile.payments.st.partial" }}</span>
+                                {{ else if eq .StatusKey "refunded" }}
+                                <span class="badge badge-sm whitespace-nowrap bg-w-purple/10 border-w-purple/30 text-w-purpleL">{{ t $.Lang "profile.payments.st.refunded" }}</span>
+                                {{ else }}
+                                <span class="badge badge-sm whitespace-nowrap bg-error/10 border-error/30 text-error">{{ t $.Lang "profile.payments.st.failed" }}</span>
+                                {{ end }}
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
         </div>
         {{ else }}
-        <p class="text-w-sub">{{ t $.Lang "profile.payments.empty" }}</p>
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-8">
+            <p class="text-w-sub">{{ t $.Lang "profile.payments.empty" }}</p>
+        </div>
         {{ end }}
-        <a href="{{ langPath $.Lang "/donate" }}" data-async-target="main" data-umami-event="payments-to-donate" class="btn btn-soft mt-8">{{ t $.Lang "profile.payments.buyMore" }}</a>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <a href="{{ langPath $.Lang "/donate" }}" data-async-target="main" data-umami-event="payments-to-donate" class="btn btn-soft">{{ t $.Lang "profile.payments.buyMore" }}</a>
+            <a href="{{ langPath $.Lang "/profile" }}" class="btn btn-ghost border border-w-line" data-async-target="main">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                {{ t $.Lang "profile.payments.backToProfile" }}
+            </a>
+        </div>
     {{ end }}
   </div>
 </section>

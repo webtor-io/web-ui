@@ -113,7 +113,7 @@ module.exports = async (env, options) => {
                     secure: false,
                 },
             ],
-            watchFiles: ['templates/*.html', 'assets/src/*'],
+            watchFiles: ['templates/**/*.html', 'assets/src/**/*'],
         },
         optimization: {
             // splitChunks disabled: entry points are loaded independently via Go

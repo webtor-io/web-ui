@@ -1253,12 +1253,13 @@
     "profile.payments.status": "Статус",
     "profile.payments.days": "{{.Days}} дн.",
     "profile.payments.st.paid": "оплачен",
-    "profile.payments.st.pending": "ожидает оплаты",
-    "profile.payments.st.partial": "частичная оплата",
+    "profile.payments.st.pending": "ожидает",
+    "profile.payments.st.partial": "частично",
     "profile.payments.st.failed": "не завершён",
     "profile.payments.st.refunded": "возвращён",
-    "profile.payments.track": "отслеживать",
+    "profile.payments.track": "открыть статус платежа",
     "profile.payments.empty": "Оплат пока нет.",
     "profile.payments.buyMore": "Купить тариф",
-    "profile.payments.method": "Способ"
+    "profile.payments.method": "Способ",
+    "profile.payments.backToProfile": "Назад в профиль"
 }

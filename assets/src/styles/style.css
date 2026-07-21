@@ -699,3 +699,5 @@ input:-webkit-autofill:focus {
 .modal-box .progress-alert {
   margin-bottom: 0 !important;
 }
+
+/* trigger tailwind rescan */

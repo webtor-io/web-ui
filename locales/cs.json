@@ -1253,12 +1253,13 @@
     "profile.payments.status": "Stav",
     "profile.payments.days": "{{.Days}} dní",
     "profile.payments.st.paid": "zaplaceno",
-    "profile.payments.st.pending": "čeká na platbu",
-    "profile.payments.st.partial": "částečně zaplaceno",
-    "profile.payments.st.failed": "nedokončeno",
+    "profile.payments.st.pending": "čeká",
+    "profile.payments.st.partial": "částečně",
+    "profile.payments.st.failed": "selhalo",
     "profile.payments.st.refunded": "vráceno",
-    "profile.payments.track": "sledovat",
+    "profile.payments.track": "zobrazit stav platby",
     "profile.payments.empty": "Zatím žádné platby.",
     "profile.payments.buyMore": "Koupit tarif",
-    "profile.payments.method": "Metoda"
+    "profile.payments.method": "Metoda",
+    "profile.payments.backToProfile": "Zpět na profil"
 }
