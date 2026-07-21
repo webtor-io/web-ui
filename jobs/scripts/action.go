@@ -17,8 +17,8 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/embed"
-	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/i18n"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
@@ -32,17 +32,17 @@ import (
 )
 
 type StreamContent struct {
-	ExportTag           *ra.ExportTag
-	Resource            *ra.ResourceResponse
-	Item                *ra.ListItem
+	ExportTag *ra.ExportTag
+	Resource  *ra.ResourceResponse
+	Item      *ra.ListItem
 	// Title is the leaf label the player overlay shows in its top bar.
 	// Prefer the played file's basename (without extension) when one
 	// is present, otherwise the torrent name. Computed server-side so
 	// the player JS doesn't have to scrape document.title.
-	Title               string
-	MediaProbe          *api.MediaProbe
-	OpenSubtitles       []api.OpenSubtitleTrack
-	UserSubtitles       []models.UserSubtitleTrack
+	Title                string
+	MediaProbe           *api.MediaProbe
+	OpenSubtitles        []api.OpenSubtitleTrack
+	UserSubtitles        []models.UserSubtitleTrack
 	UserSubtitlesEnabled bool
 	// EIURL is the ExportItem "stream" URL — the torrent-http-proxy
 	// origin carrying whatever auth the cluster embeds (subdomain,
@@ -128,11 +128,11 @@ func (e *NoPeersError) Error() string {
 
 // resourceLeafTitle picks the human label the player overlay shows.
 // Order:
-//   1. Enriched metadata title (e.g. "Sintel (2010)") — best UX for
-//      anything that matched IMDb/TMDB; survives sloppy filenames.
-//   2. File basename minus extension — fallback for un-enriched
-//      torrents; reflects what's actually playing in a multi-file pack.
-//   3. Torrent name — single-file no-Item case.
+//  1. Enriched metadata title (e.g. "Sintel (2010)") — best UX for
+//     anything that matched IMDb/TMDB; survives sloppy filenames.
+//  2. File basename minus extension — fallback for un-enriched
+//     torrents; reflects what's actually playing in a multi-file pack.
+//  3. Torrent name — single-file no-Item case.
 //
 // Length-bounded extension trim (≤5 chars) avoids eating "Movie 2020.
 // Director's Cut" where the dot is meaningful.

@@ -11,7 +11,7 @@
     {{ else }}
     {{ with .Data }}
         {{ if .Done }}
-            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.doneTitle" }}</h1>
+            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4"><span class="mr-3">🎉</span>{{ t $.Lang "donate.crypto.success.doneTitle" }}</h1>
             <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "donate.crypto.success.done" }}</p>
             <a href="{{ langPath $.Lang "/profile" }}" data-async-target="main" data-umami-event="donate-success-profile" class="btn btn-soft-cyan">{{ t $.Lang "donate.crypto.success.toProfile" }}</a>
         {{ else if .Pending }}

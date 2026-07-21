@@ -301,6 +301,12 @@ func (h *Handler) cryptoSuccess(c *gin.Context) {
 			web.NewContext(c).WithData(&successData{}).WithErr(errors.Wrap(err, "failed to get payment")))
 		return
 	}
+	// The success page (and the watch job it starts) is owner-only: the
+	// payment must belong to the signed-in account.
+	if p.UserID != u.ID.String() {
+		c.Redirect(http.StatusFound, donatePath)
+		return
+	}
 	d := &successData{Payment: p}
 	switch p.Status {
 	case "finished":

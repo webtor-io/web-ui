@@ -41,37 +41,49 @@ type Request struct {
 }
 
 func cacheKey(r *Request) string {
-	// prefer cache key by patreonID if available, otherwise by email
-	return fmt.Sprintf("email:%v;patreonid:%v", r.Email, r.PatreonUserID)
+	// prefer cache key by patreonID if available, otherwise by email.
+	// The pointer must be dereferenced: formatting *string with %v prints
+	// the address, which made the key unique per request for patreon-linked
+	// users (their claims were effectively never cached).
+	patreonUserID := ""
+	if r.PatreonUserID != nil {
+		patreonUserID = *r.PatreonUserID
+	}
+	return fmt.Sprintf("email:%v;patreonid:%v", r.Email, patreonUserID)
 }
 
-// Refresh drops the cached claims for the request and fetches them anew —
-// for flows that must observe a tier change immediately (e.g. right after a
-// payment) instead of waiting out the cache TTL.
+// Fetch queries the claims provider directly, bypassing the cache. For flows
+// that poll for a tier change (e.g. right after a payment) — polling through
+// Refresh would Drop hot cache entries and race the per-request middleware.
+func (s *Claims) Fetch(r *Request) (*Data, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cl, err := s.cl.Get()
+	if err != nil {
+		return nil, err
+	}
+	var patreonUserID string
+	if r.PatreonUserID != nil {
+		patreonUserID = *r.PatreonUserID
+	}
+	resp, err := cl.Get(ctx, &proto.GetRequest{Email: r.Email, PatreonUserId: patreonUserID})
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to get claims")
+	}
+	return resp, nil
+}
+
+// Refresh drops the cached claims for the request and fetches them anew, so
+// subsequent Gets observe the current state immediately instead of waiting
+// out the cache TTL.
 func (s *Claims) Refresh(r *Request) (*Data, error) {
 	s.LazyMap.Drop(cacheKey(r))
 	return s.Get(r)
 }
 
 func (s *Claims) Get(r *Request) (*Data, error) {
-	key := cacheKey(r)
-	return s.LazyMap.Get(key, func() (resp *Data, err error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		var cl proto.ClaimsProviderClient
-		cl, err = s.cl.Get()
-		if err != nil {
-			return nil, err
-		}
-		var patreonUserID string
-		if r.PatreonUserID != nil {
-			patreonUserID = *r.PatreonUserID
-		}
-		resp, err = cl.Get(ctx, &proto.GetRequest{Email: r.Email, PatreonUserId: patreonUserID})
-		if err != nil {
-			return nil, errors.WithMessage(err, "failed to get claims")
-		}
-		return
+	return s.LazyMap.Get(cacheKey(r), func() (*Data, error) {
+		return s.Fetch(r)
 	})
 }
 

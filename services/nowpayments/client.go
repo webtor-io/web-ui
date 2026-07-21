@@ -62,6 +62,7 @@ type Price struct {
 
 type Payment struct {
 	PaymentID  string  `json:"id"`
+	UserID     string  `json:"user_id"`
 	Status     string  `json:"status"`
 	TierID     int     `json:"tier_id"`
 	PeriodDays int     `json:"period_days"`

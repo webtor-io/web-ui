@@ -3,7 +3,7 @@
 {{ define "embed_extra" }}{{ end }}
 {{ define "promo" }}{{ end }}
 {{ define "promo_example" }}
-    <a class="border-rainbow border-4 p-4 mb-8 w-full block text-center text-white rounded-box" href="/donate" target="_blank" data-umami-event="promo"><span class="hidden md:inline">✨✨✨</span><span class="mx-2">Get 25% off on ad removal and extra bandwidth <span class="whitespace-nowrap">until January 1, 2025.</span></span><span class="hidden md:inline">✨✨✨</span></a>
+    <a class="border-rainbow border-4 p-4 mb-8 w-full block text-center text-white rounded-box" href="{{ langPath $.Lang "/donate" }}" data-async-target="main" data-umami-event="promo"><span class="hidden md:inline">✨✨✨</span><span class="mx-2">Get 25% off on ad removal and extra bandwidth <span class="whitespace-nowrap">until January 1, 2025.</span></span><span class="hidden md:inline">✨✨✨</span></a>
 {{ end }}
 {{ define "get_ads" }}{{ end }}
 {{ define "embed_ads" }}{{ end }}
