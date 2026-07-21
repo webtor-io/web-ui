@@ -35,7 +35,7 @@
 					{{ t .Ctx.Lang "vault.upgradeHint" }}
 				</p>
 				<p class="pb-2">
-					<a href="/donate" target="_blank" class="text-sm text-w-pinkL hover:underline" data-umami-event="vault-upgrade-clicked">{{ t .Ctx.Lang "vault.upgradeSubscription" }}</a>
+					<a href="{{ langPath .Ctx.Lang "/donate" }}" data-async-target="main" class="text-sm text-w-pinkL hover:underline" data-umami-event="vault-upgrade-clicked">{{ t .Ctx.Lang "vault.upgradeSubscription" }}</a>
 				</p>
 			{{ end }}
 		{{ else }}

@@ -1,0 +1,91 @@
+{{ define "title" }}{{ t $.Lang "donate.title" }}{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[110px] pb-20 px-3 sm:px-6">
+  <div class="max-w-[1100px] mx-auto">
+    <h1 class="text-center text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-8">{{ t $.Lang "donate.crypto.chooseTitle" }}</h1>
+
+    {{ if .ErrKey }}
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6 max-w-[700px] mx-auto">
+            <p class="text-sm text-error">{{ t $.Lang $.ErrKey }}</p>
+        </div>
+    {{ end }}
+    {{ with .Data }}
+        {{ if .Cards }}
+        <form action="{{ langPath $.Lang "/donate/crypto" }}" method="post" class="group">
+            <input type="hidden" name="_csrf" value="{{ $.CSRF }}" />
+            <div class="relative border border-w-cyan/30 rounded-3xl p-4 pt-8 sm:p-8 sm:pt-10 mt-3">
+                <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap leading-none bg-w-bg px-4 py-1 text-xs font-semibold uppercase tracking-widest text-w-cyan">{{ t $.Lang "donate.crypto.title" }}</span>
+                <label class="flex items-center justify-center gap-3 mb-10 cursor-pointer" data-umami-event="donate-annual-toggle">
+                    <input type="checkbox" name="annual" value="1" class="toggle toggle-soft" checked />
+                    <span class="text-w-sub">{{ t $.Lang "donate.crypto.payAnnually" }}</span>
+                    {{ if .AnnualSavePct }}
+                    <span class="badge bg-w-cyan/10 border-w-cyan/30 text-w-cyan">{{ tp $.Lang "donate.crypto.save" "Pct" .AnnualSavePct }}{{ if .FreeMonths }} · {{ tp $.Lang "donate.crypto.freeMonths" "Months" .FreeMonths }}{{ end }}</span>
+                    {{ end }}
+                </label>
+                <div class="grid md:grid-cols-3 gap-5 items-stretch">
+                    {{ range .Cards }}
+                    <div class="relative rounded-2xl flex flex-col bg-w-card {{ if .Recommended }}border-2 border-w-pink{{ else }}border border-w-line{{ end }}">
+                        {{ if .Recommended }}
+                        <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap bg-w-pink text-w-bg rounded-full px-4 py-1 text-xs font-bold tracking-widest uppercase">{{ t $.Lang "donate.crypto.recommended" }}</span>
+                        {{ end }}
+                        <div class="p-6 flex flex-col grow">
+                            <h2 class="text-xl font-bold mb-2">{{ if .TitleKey }}{{ t $.Lang .TitleKey }}{{ else }}<span class="capitalize">{{ .Name }}</span>{{ end }}</h2>
+                            <div class="h-[4.5rem]">
+                                {{ if .HasMonthly }}
+                                <div {{ if .HasAnnual }}class="group-has-[:checked]:hidden"{{ end }}>
+                                    <span class="text-3xl font-extrabold">${{ .MonthlyUSD }}</span>
+                                    <span class="text-sm text-w-sub">{{ t $.Lang "donate.crypto.perMonth" }}</span>
+                                </div>
+                                {{ end }}
+                                {{ if .HasAnnual }}
+                                <div class="hidden group-has-[:checked]:block">
+                                    <span class="text-3xl font-extrabold">${{ .AnnualPerMonthUSD }}</span>
+                                    <span class="text-sm text-w-sub">{{ t $.Lang "donate.crypto.perMonth" }}</span>
+                                    <span class="block text-xs text-w-muted mt-1">{{ tp $.Lang "donate.crypto.billedYearly" "Amount" .AnnualTotalUSD }}</span>
+                                </div>
+                                {{ end }}
+                            </div>
+                            <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
+                            {{ if .TaglineKey }}<p class="text-sm italic text-w-sub mb-3">{{ t $.Lang .TaglineKey }}</p>{{ end }}
+                            {{ if .BenefitKeys }}
+                            <p class="text-sm font-semibold mb-2">{{ t $.Lang "donate.crypto.youGet" }}</p>
+                            <ul class="flex flex-col gap-2 text-sm text-w-sub leading-snug">
+                                {{ range .BenefitKeys }}
+                                <li>{{ t $.Lang . }}</li>
+                                {{ end }}
+                            </ul>
+                            {{ end }}
+                            {{ if .HasTrial }}
+                            <div class="mt-auto pt-5">
+                                <a href="#patreon" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ t $.Lang "donate.patreon.trialBanner" }} ↓</a>
+                            </div>
+                            {{ end }}
+                        </div>
+                    </div>
+                    {{ end }}
+                </div>
+                <p class="text-center text-xs text-w-muted leading-relaxed mt-6 max-w-[700px] mx-auto">{{ t $.Lang "donate.crypto.note" }}</p>
+            </div>
+        </form>
+        {{ else }}
+        <p class="text-center text-w-sub">{{ t $.Lang "donate.crypto.noPlans" }}</p>
+        {{ end }}
+
+        <div class="divider max-w-[480px] mx-auto my-10 text-w-muted uppercase text-xs tracking-widest">{{ t $.Lang "donate.or" }}</div>
+
+        <div id="patreon" class="max-w-[480px] mx-auto bg-w-card border border-w-line rounded-2xl p-6">
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 569 546" fill="#FF424D" aria-hidden="true">
+                    <circle cx="362.6" cy="204.6" r="204.6"/>
+                    <rect x="0" y="0" width="100" height="545.8"/>
+                </svg>
+                <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.patreon.title" }}</h2>
+                <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ t $.Lang "donate.patreon.trial" }}</span>
+            </div>
+            <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
+            <a href="{{ .PatreonURL }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
+        </div>
+    {{ end }}
+  </div>
+</section>
+{{ end }}

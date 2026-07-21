@@ -67,6 +67,16 @@ func loginCardFor(from string) *LoginCard {
 				"discover.signInCard.feature4",
 			},
 		}
+	case "donate":
+		return &LoginCard{
+			NoteKey:  "auth.login.donateNote",
+			IntroKey: "donate.signInCard.intro",
+			FeatureKeys: []string{
+				"donate.signInCard.feature1",
+				"donate.signInCard.feature2",
+				"donate.signInCard.feature3",
+			},
+		}
 	}
 	return nil
 }

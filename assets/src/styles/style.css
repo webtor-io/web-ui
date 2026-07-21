@@ -197,6 +197,38 @@ html {
   to { --promo-angle: 360deg; }
 }
 
+/* Animated rainbow border only — promo's frame without its banner sizing.
+   For small inline callouts (e.g. the Silver free-trial plaque on /donate). */
+@utility promo-outline {
+  @apply relative block text-center text-white;
+  border-radius: var(--rounded-box, 1rem);
+  overflow: hidden;
+  background: #0a0a14;
+  isolation: isolate;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: var(--rounded-box, 1rem);
+    background: conic-gradient(
+      from var(--promo-angle),
+      #e84393, #6c5ce7, #00cec9, #fdcb6e, #e84393
+    );
+    animation: promo-spin 3s linear infinite;
+    z-index: -2;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: calc(var(--rounded-box, 1rem) - 2px);
+    background: #0a0a14;
+    z-index: -1;
+  }
+}
+
 /* Promo close button */
 .promo-close {
   position: absolute;

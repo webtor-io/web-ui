@@ -40,9 +40,21 @@ type Request struct {
 	PatreonUserID *string
 }
 
-func (s *Claims) Get(r *Request) (*Data, error) {
+func cacheKey(r *Request) string {
 	// prefer cache key by patreonID if available, otherwise by email
-	key := fmt.Sprintf("email:%v;patreonid:%v", r.Email, r.PatreonUserID)
+	return fmt.Sprintf("email:%v;patreonid:%v", r.Email, r.PatreonUserID)
+}
+
+// Refresh drops the cached claims for the request and fetches them anew —
+// for flows that must observe a tier change immediately (e.g. right after a
+// payment) instead of waiting out the cache TTL.
+func (s *Claims) Refresh(r *Request) (*Data, error) {
+	s.LazyMap.Drop(cacheKey(r))
+	return s.Get(r)
+}
+
+func (s *Claims) Get(r *Request) (*Data, error) {
+	key := cacheKey(r)
 	return s.LazyMap.Get(key, func() (resp *Data, err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

@@ -6,8 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --mode=production",
-    "start": "concurrently --kill-others \"npm run server\" \"npm run webpack-dev-server\"",
-    "server": "air",
+    "start": "npm run webpack-dev-server",
     "webpack-dev-server": "webpack-dev-server --mode=development"
   },
   "keywords": [],
@@ -19,7 +18,6 @@
     "@open-iframe-resizer/core": "^2.1.0",
     "@tailwindcss/postcss": "^4.1.16",
     "babel-loader": "^10.0.0",
-    "concurrently": "^9.2.1",
     "copy-webpack-plugin": "^13.0.1",
     "css-loader": "^7.1.2",
     "daisyui": "^5.4.3",

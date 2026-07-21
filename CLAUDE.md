@@ -51,7 +51,7 @@
 
 - `make build` — runs `npm run build` then `go build .`
 - `make run` — runs `./web-ui s` (serve)
-- `npm start` — hot reload via `air` (Go) + webpack-dev-server (requires `air`: `go install github.com/cosmtrek/air@latest`)
+- `npm start` — webpack-dev-server only; the Go binary is run/debugged from GoLand (air was removed 2026-07)
 - `go test ./...` — run all Go tests
 - `go test ./services/parse_torrent_name -v` — parser tests (golden-file based)
 - `go test ./services/parse_torrent_name -run TestParser -update` — update golden files
@@ -161,7 +161,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Purple (`bg-w-purple/10 text-w-purpleL`) — comparison sections
 - Cyan (`bg-w-cyan/10 text-w-cyan`) — info, tools, FAQ
 
-**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `loading-elipsis`, `popin`, `w-card-frame`, `w-card-title`, `w-card-badge`, `w-card-badge-label`, `w-card-badge-ghost`, `w-card-stars-compact`, `w-card-stars-full`.
+**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `promo-outline`, `loading-elipsis`, `popin`, `w-card-frame`, `w-card-title`, `w-card-badge`, `w-card-badge-label`, `w-card-badge-ghost`, `w-card-stars-compact`, `w-card-stars-full`.
 
 **Mobile patterns** — see `docs/uikit.html` section 15. Key rules:
 - Hide decorative badges/subtitles on mobile (`hidden sm:inline-flex` / `hidden sm:block`)

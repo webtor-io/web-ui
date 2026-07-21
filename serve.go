@@ -7,7 +7,6 @@ import (
 	"github.com/webtor-io/web-ui/handlers/about"
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
-	hi18n "github.com/webtor-io/web-ui/handlers/i18n"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
 	"github.com/webtor-io/web-ui/handlers/discover_watchlist"
@@ -18,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/event"
 	"github.com/webtor-io/web-ui/handlers/ext"
 	"github.com/webtor-io/web-ui/handlers/geo"
+	hi18n "github.com/webtor-io/web-ui/handlers/i18n"
 	wi "github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/handlers/instructions"
 	wj "github.com/webtor-io/web-ui/handlers/job"
@@ -44,19 +44,20 @@ import (
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	at "github.com/webtor-io/web-ui/services/access_token"
+	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
-	ac "github.com/webtor-io/web-ui/services/anthropic_client"
+	npg "github.com/webtor-io/web-ui/services/nowpayments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
+	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
-	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	usv "github.com/webtor-io/web-ui/services/user_subtitle"
 	uvss "github.com/webtor-io/web-ui/services/user_video_status"
@@ -120,6 +121,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = turnstile.RegisterFlags(c.Flags)
 	c.Flags = vault.RegisterApiFlags(c.Flags)
 	c.Flags = vault.RegisterFlags(c.Flags)
+	c.Flags = npg.RegisterFlags(c.Flags)
 	c.Flags = usv.RegisterFlags(c.Flags)
 	c.Flags = thumb.RegisterFlags(c.Flags)
 }
@@ -305,7 +307,7 @@ func serve(c *cli.Context) error {
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)
@@ -390,8 +392,8 @@ func serve(c *cli.Context) error {
 	// Setting ExtHandler
 	ext.RegisterHandler(r, tm)
 
-	// Setting Donate
-	donate.RegisterHandler(r)
+	// Setting Donate (crypto checkout appears when the gateway is configured)
+	donate.RegisterHandler(r, tm, npg.New(c), jobs)
 
 	// Setting Discover
 	discover.RegisterHandler(r, tm, pg, en)

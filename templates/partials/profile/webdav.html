@@ -37,7 +37,7 @@
                 <p class="text-sm text-w-sub">
                     {{ t $.Lang "profile.webdav.premiumOnly" }}
                 </p>
-                <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" target="_blank" data-umami-event="donate-webdav">{{ t $.Lang "profile.webdav.upgrade" }}</a>
+                <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" data-async-target="main" data-umami-event="donate-webdav">{{ t $.Lang "profile.webdav.upgrade" }}</a>
             </div>
         {{ end }}
     </div>

@@ -168,14 +168,36 @@ export function init(window, config) {
                                 e.metaKey ||
                                 (e.button && e.button === 1) ||
                                 parentElement.hasAttribute('download');
+                            // Links whose navigation is handled elsewhere:
+                            // in-page anchors (browser scroll) and async-nav
+                            // links (bindAsync fetches on the same click).
+                            // Blocking them would swallow the navigation, so
+                            // track without preventDefault.
+                            const selfNavigating =
+                                (parentElement.getAttribute('href') || '').startsWith('#') ||
+                                parentElement.hasAttribute('data-async-target');
 
                             if (eventName && href) {
-                                if (!external) {
-                                    e.preventDefault();
+                                if (external || selfNavigating) {
+                                    return trackElement(parentElement);
                                 }
-                                return trackElement(parentElement).then(() => {
-                                    // if (!external) location.href = href;
-                                });
+                                // Plain internal link: hold navigation until
+                                // the event is sent, but never let a slow or
+                                // blocked analytics endpoint keep the click
+                                // dead — navigate after a short grace period
+                                // no matter what.
+                                e.preventDefault();
+                                let navigated = false;
+                                const navigate = () => {
+                                    if (navigated) return;
+                                    navigated = true;
+                                    location.href = href;
+                                };
+                                const fallback = setTimeout(navigate, 1000);
+                                return trackElement(parentElement).then(
+                                    () => { clearTimeout(fallback); navigate(); },
+                                    () => { clearTimeout(fallback); navigate(); },
+                                );
                             }
                         } else if (parentElement.tagName === 'BUTTON') {
                             return trackElement(parentElement);

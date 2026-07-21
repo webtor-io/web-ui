@@ -1,0 +1,47 @@
+{{ define "title" }}{{ t $.Lang "donate.crypto.success.title" }}{{ end }}
+{{ define "head_extra" }}{{ if .Data.Pending }}<noscript><meta http-equiv="refresh" content="15"></noscript>{{ end }}{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+  <div class="max-w-[700px] mx-auto">
+    {{ if .ErrKey }}
+        <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.title" }}</h1>
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">
+            <p class="text-sm text-error">{{ t $.Lang $.ErrKey }}</p>
+        </div>
+    {{ else }}
+    {{ with .Data }}
+        {{ if .Done }}
+            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.doneTitle" }}</h1>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "donate.crypto.success.done" }}</p>
+            <a href="{{ langPath $.Lang "/profile" }}" data-async-target="main" data-umami-event="donate-success-profile" class="btn btn-soft-cyan">{{ t $.Lang "donate.crypto.success.toProfile" }}</a>
+        {{ else if .Pending }}
+            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.pendingTitle" }}</h1>
+            {{ if .Job }}
+            <div class="progress-alert progress-alert-block mb-6" data-async-progress-log="{{ makeJobLogURL $.Lang .Job }}">
+                <div class="log-target"></div>
+            </div>
+            <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "donate.crypto.success.pending" }}</p>
+            {{ else }}
+            <div class="flex items-center gap-4 bg-w-card border border-w-line rounded-2xl p-5 mb-6">
+                <span class="loading loading-spinner text-w-cyan"></span>
+                <p class="text-w-sub leading-relaxed">{{ t $.Lang "donate.crypto.success.pending" }}</p>
+            </div>
+            {{ end }}
+            {{ if .Payment }}{{ if .Payment.InvoiceURL }}
+            <a href="{{ .Payment.InvoiceURL }}" data-umami-event="donate-pending-invoice" class="btn btn-ghost border border-w-line">{{ t $.Lang "donate.crypto.success.backToInvoice" }}</a>
+            {{ end }}{{ end }}
+        {{ else if .Partial }}
+            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.partialTitle" }}</h1>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "donate.crypto.success.partial" }}</p>
+            <a href="{{ langPath $.Lang "/support" }}" data-async-target="main" data-umami-event="donate-partial-support" class="btn btn-soft-cyan">{{ t $.Lang "donate.crypto.success.toSupport" }}</a>
+        {{ else }}
+            <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "donate.crypto.success.failedTitle" }}</h1>
+            <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">{{ t $.Lang "donate.crypto.success.failed" }}</p>
+            <a href="{{ langPath $.Lang "/donate" }}" data-async-target="main" data-umami-event="donate-failed-retry" class="btn btn-soft-cyan">{{ t $.Lang "donate.crypto.success.retry" }}</a>
+        {{ end }}
+    {{ end }}
+    {{ end }}
+  </div>
+</section>
+{{ "donate.js" | asset }}
+{{ end }}
