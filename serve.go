@@ -51,7 +51,7 @@ import (
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
-	npg "github.com/webtor-io/web-ui/services/nowpayments"
+	npg "github.com/webtor-io/web-ui/services/payments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/webtor-io/web-ui/services/claims"
-	np "github.com/webtor-io/web-ui/services/nowpayments"
+	np "github.com/webtor-io/web-ui/services/payments"
 
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/web"

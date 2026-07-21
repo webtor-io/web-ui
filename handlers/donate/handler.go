@@ -17,7 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
-	np "github.com/webtor-io/web-ui/services/nowpayments"
+	np "github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )

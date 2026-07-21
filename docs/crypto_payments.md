@@ -45,7 +45,7 @@ cached claims, so the tier shows up within ~1 minute (claims cache TTL).
 
 ## web-ui pieces
 
-- `services/nowpayments/client.go` — HTTP client for the webhook service's
+- `services/payments/client.go` — HTTP client for the webhook service's
   provider-agnostic invoice API (`PUT/GET /invoice/{id}`, `GET /prices`, no
   auth — cluster-internal); passes `provider: "nowpayments"` and a
   client-generated uuid (PUT is idempotent server-side). `New()` returns nil

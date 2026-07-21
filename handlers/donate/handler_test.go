@@ -3,7 +3,7 @@ package donate
 import (
 	"testing"
 
-	np "github.com/webtor-io/web-ui/services/nowpayments"
+	np "github.com/webtor-io/web-ui/services/payments"
 )
 
 func price(tier int, name string, days int, amount float64) np.Price {

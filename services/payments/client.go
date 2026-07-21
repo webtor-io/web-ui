@@ -1,4 +1,4 @@
-package nowpayments
+package payments
 
 import (
 	"bytes"
@@ -22,8 +22,8 @@ const (
 	webhookPortFlag   = "webhook-service-port"
 	webhookSecureFlag = "webhook-secure"
 
-	// Provider is the provider identifier this client passes to the
-	// webhook service's provider-agnostic invoice API.
+	// Provider is the default provider identifier for crypto checkouts,
+	// passed to the webhook service's provider-agnostic invoice API.
 	Provider = "nowpayments"
 )
 
