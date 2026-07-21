@@ -21,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
+	pay "github.com/webtor-io/web-ui/services/payments"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
@@ -50,6 +51,9 @@ type Data struct {
 	ErrKey                string
 	DisableWebDAV         bool
 	DisableEmbed          bool
+	// HasPayments toggles the "my payments" link: shown only when the user
+	// has at least one crypto payment (Patreon history lives on patreon.com).
+	HasPayments bool
 }
 
 type Handler struct {
@@ -60,11 +64,12 @@ type Handler struct {
 	claims        *claims.Claims
 	vault         *vault.Vault
 	userSettings  *usettings.Service
+	payments      *pay.Client
 	disableWebDAV bool
 	disableEmbed  bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client) {
 	h := &Handler{
 		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:            at,
@@ -73,6 +78,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		claims:        cl,
 		vault:         v,
 		userSettings:  us,
+		payments:      payments,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 	}
@@ -248,6 +254,15 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	hasPayments := false
+	if s.payments != nil {
+		pctx, pcancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		items, perr := s.payments.ListPayments(pctx, u.ID.String())
+		pcancel()
+		// A history hiccup must not take the profile down — just hide the link.
+		hasPayments = perr == nil && len(items) > 0
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
@@ -259,6 +274,7 @@ func (s *Handler) get(c *gin.Context) {
 		VaultStats:            vaultStats,
 		UserSettings:          userSettings,
 		ErrKey:                c.Query("err"),
+		HasPayments:           hasPayments,
 		DisableWebDAV:         s.disableWebDAV,
 		DisableEmbed:          s.disableEmbed,
 	}))

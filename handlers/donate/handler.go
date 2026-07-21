@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], npClient
 	})
 	r.POST("/donate/crypto", h.cryptoCheckout)
 	r.GET("/donate/crypto/success", h.cryptoSuccess)
+	r.GET("/profile/payments", h.payments)
 }
 
 func (h *Handler) redirectPatreon(c *gin.Context) {
@@ -262,6 +264,95 @@ func (h *Handler) cryptoCheckout(c *gin.Context) {
 	}
 	// Hosted checkout lives on the payment provider's domain.
 	c.Redirect(http.StatusFound, inv.InvoiceURL)
+}
+
+// paymentStatusKey collapses provider statuses into the handful of
+// user-facing labels the history page shows.
+func paymentStatusKey(status string) string {
+	switch status {
+	case "finished":
+		return "paid"
+	case "partially_paid":
+		return "partial"
+	case "failed", "expired":
+		return "failed"
+	case "refunded":
+		return "refunded"
+	default:
+		return "pending"
+	}
+}
+
+// providerLabels maps provider ids to display names.
+var providerLabels = map[string]string{
+	np.Provider: "NOWPayments",
+}
+
+type paymentRow struct {
+	Date       string
+	Method     string
+	TierName   string
+	PeriodDays int
+	AmountUSD  string
+	StatusKey  string
+	Pending    bool
+	InvoiceURL string
+	PaymentID  string
+}
+
+type paymentsData struct {
+	Rows []paymentRow
+}
+
+// payments renders the user's crypto payment history (Patreon history lives
+// on patreon.com).
+func (h *Handler) payments(c *gin.Context) {
+	donatePath := i18n.LangPath(i18n.GetLang(c), "/donate")
+	if h.np == nil {
+		c.Redirect(http.StatusFound, donatePath)
+		return
+	}
+	u := auth.GetUserFromContext(c)
+	if !u.HasAuth() {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	tpl := h.tb.Build("profile/payments")
+	items, err := h.np.ListPayments(ctx, u.ID.String())
+	if err != nil {
+		tpl.HTML(http.StatusInternalServerError,
+			web.NewContext(c).WithData(&paymentsData{}).WithErr(errors.Wrap(err, "failed to get payments")))
+		return
+	}
+	d := &paymentsData{}
+	for _, it := range items {
+		statusKey := paymentStatusKey(it.Status)
+		name := it.TierName
+		if name == "" {
+			name = strconv.Itoa(it.TierID)
+		}
+		method := providerLabels[it.Provider]
+		if method == "" {
+			method = it.Provider
+		}
+		if it.PayCurrency != "" {
+			method += " (" + strings.ToUpper(it.PayCurrency) + ")"
+		}
+		d.Rows = append(d.Rows, paymentRow{
+			Date:       it.CreatedAt.Format("02.01.2006 15:04"),
+			Method:     method,
+			TierName:   name,
+			PeriodDays: it.PeriodDays,
+			AmountUSD:  fmtUSD(it.AmountUSD),
+			StatusKey:  statusKey,
+			Pending:    statusKey == "pending",
+			InvoiceURL: it.InvoiceURL,
+			PaymentID:  it.PaymentID,
+		})
+	}
+	tpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
 }
 
 type successData struct {

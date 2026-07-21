@@ -55,6 +55,15 @@ cached claims, so the tier shows up within ~1 minute (claims cache TTL).
 - `templates/views/donate/{index,crypto_success}.html` — i18n keys `donate.*`
   in all 11 locales.
 
+## Payment history
+
+`/profile/payments` (auth) lists the user's crypto purchases — date, tier,
+method (provider + pay currency), period, amount, status; pending rows link
+back to the success/status page. The "My payments" link in the profile tier
+block appears only when the user has at least one crypto payment
+(`Data.HasPayments`, fetched via `ListPayments`). Patreon subscriptions are
+managed on patreon.com and are not listed.
+
 ## Config
 
 | Env | Meaning |

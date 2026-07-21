@@ -1,0 +1,66 @@
+{{ define "title" }}{{ t $.Lang "profile.payments.title" }}{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+  <div class="max-w-[900px] mx-auto">
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "profile.payments.title" }}</h1>
+    <p class="text-sm text-w-sub leading-relaxed mb-8">{{ t $.Lang "profile.payments.subtitle" }}</p>
+
+    {{ if .ErrKey }}
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-6">
+            <p class="text-sm text-error">{{ t $.Lang $.ErrKey }}</p>
+        </div>
+    {{ end }}
+    {{ with .Data }}
+        {{ if .Rows }}
+        <div class="overflow-x-auto bg-w-card border border-w-line rounded-2xl">
+            <table class="table">
+                <thead>
+                    <tr class="text-w-sub">
+                        <th>{{ t $.Lang "profile.payments.date" }}</th>
+                        <th>{{ t $.Lang "profile.payments.tier" }}</th>
+                        <th>{{ t $.Lang "profile.payments.method" }}</th>
+                        <th>{{ t $.Lang "profile.payments.period" }}</th>
+                        <th>{{ t $.Lang "profile.payments.amount" }}</th>
+                        <th>{{ t $.Lang "profile.payments.status" }}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Rows }}
+                    <tr>
+                        <td class="whitespace-nowrap">{{ .Date }}</td>
+                        <td class="capitalize font-semibold">{{ .TierName }}</td>
+                        <td class="whitespace-nowrap">{{ .Method }}</td>
+                        <td class="whitespace-nowrap">{{ tp $.Lang "profile.payments.days" "Days" .PeriodDays }}</td>
+                        <td class="whitespace-nowrap">${{ .AmountUSD }}</td>
+                        <td>
+                            {{ if eq .StatusKey "paid" }}
+                            <span class="badge badge-sm bg-success/10 border-success/30 text-success">{{ t $.Lang "profile.payments.st.paid" }}</span>
+                            {{ else if eq .StatusKey "pending" }}
+                            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan">{{ t $.Lang "profile.payments.st.pending" }}</span>
+                            {{ else if eq .StatusKey "partial" }}
+                            <span class="badge badge-sm bg-warning/10 border-warning/30 text-warning">{{ t $.Lang "profile.payments.st.partial" }}</span>
+                            {{ else if eq .StatusKey "refunded" }}
+                            <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL">{{ t $.Lang "profile.payments.st.refunded" }}</span>
+                            {{ else }}
+                            <span class="badge badge-sm bg-error/10 border-error/30 text-error">{{ t $.Lang "profile.payments.st.failed" }}</span>
+                            {{ end }}
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            {{ if .Pending }}
+                            <a href="{{ langPath $.Lang "/donate/crypto/success" }}?payment_id={{ .PaymentID }}" data-async-target="main" data-umami-event="payments-open-pending" class="link text-w-cyan text-sm">{{ t $.Lang "profile.payments.track" }}</a>
+                            {{ end }}
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        {{ else }}
+        <p class="text-w-sub">{{ t $.Lang "profile.payments.empty" }}</p>
+        {{ end }}
+        <a href="{{ langPath $.Lang "/donate" }}" data-async-target="main" data-umami-event="payments-to-donate" class="btn btn-soft mt-8">{{ t $.Lang "profile.payments.buyMore" }}</a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}

@@ -30,6 +30,9 @@
                     </span>
                 {{ end }}
             </div>
+            {{ if $.Data.HasPayments }}
+            <a href="{{ langPath $.Lang "/profile/payments" }}" data-async-target="main" data-umami-event="profile-payments" class="inline-block mt-4 text-sm font-semibold text-w-pinkL link link-hover">{{ t $.Lang "profile.payments.link" }}</a>
+            {{ end }}
         </div>
     </div>
 {{ end }}

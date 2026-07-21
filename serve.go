@@ -374,8 +374,11 @@ func serve(c *cli.Context) error {
 	// Setting ActionHandler
 	wa.RegisterHandler(r, tm, jobs, sapi)
 
+	// Setting Payments client (shared by profile and donate)
+	payClient := npg.New(c)
+
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
@@ -393,7 +396,7 @@ func serve(c *cli.Context) error {
 	ext.RegisterHandler(r, tm)
 
 	// Setting Donate (crypto checkout appears when the gateway is configured)
-	donate.RegisterHandler(r, tm, npg.New(c), jobs)
+	donate.RegisterHandler(r, tm, payClient, jobs)
 
 	// Setting Discover
 	discover.RegisterHandler(r, tm, pg, en)

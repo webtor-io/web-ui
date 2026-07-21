@@ -148,6 +148,30 @@ func (s *Client) CreateInvoice(ctx context.Context, req *CreateInvoiceRequest) (
 	return &out, nil
 }
 
+type PaymentListItem struct {
+	PaymentID   string    `json:"id"`
+	Provider    string    `json:"provider"`
+	Status      string    `json:"status"`
+	TierID      int       `json:"tier_id"`
+	TierName    string    `json:"tier_name"`
+	PeriodDays  int       `json:"period_days"`
+	AmountUSD   float64   `json:"amount_usd"`
+	PayCurrency string    `json:"pay_currency"`
+	InvoiceURL  string    `json:"url"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ListPayments returns the user's payment history, newest first.
+func (s *Client) ListPayments(ctx context.Context, userID string) ([]PaymentListItem, error) {
+	var out struct {
+		Invoices []PaymentListItem `json:"invoices"`
+	}
+	if err := s.do(ctx, http.MethodGet, "/invoices?user_id="+url.QueryEscape(userID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Invoices, nil
+}
+
 func (s *Client) GetPayment(ctx context.Context, id string) (*Payment, error) {
 	var out Payment
 	if err := s.do(ctx, http.MethodGet, "/invoice/"+url.PathEscape(id), nil, &out); err != nil {
