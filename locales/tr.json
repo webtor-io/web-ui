@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Henüz ödeme yok.",
     "profile.payments.buyMore": "Paket satın al",
     "profile.payments.method": "Yöntem",
-    "profile.payments.backToProfile": "Profile dön"
+    "profile.payments.backToProfile": "Profile dön",
+    "donate.crypto.minNote": "Ödeme sağlayıcısının asgari ödeme tutarı nedeniyle bazı aylık paketler kriptoyla kullanılamayabilir — yıllık paketler her zaman kullanılabilir."
 }

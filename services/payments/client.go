@@ -58,6 +58,14 @@ type Price struct {
 	TierName   string  `json:"tier_name"`
 	PeriodDays int     `json:"period_days"`
 	AmountUSD  float64 `json:"amount_usd"`
+	// Available is a pointer so a webhook build that predates the field
+	// (absent key) reads as available rather than as false.
+	Available *bool `json:"available"`
+}
+
+// IsAvailable reports whether the plan can currently be purchased.
+func (p Price) IsAvailable() bool {
+	return p.Available == nil || *p.Available
 }
 
 type Payment struct {

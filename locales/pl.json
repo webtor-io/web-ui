@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Brak płatności.",
     "profile.payments.buyMore": "Kup plan",
     "profile.payments.method": "Metoda",
-    "profile.payments.backToProfile": "Wróć do profilu"
+    "profile.payments.backToProfile": "Wróć do profilu",
+    "donate.crypto.minNote": "Niektóre plany miesięczne mogą być niedostępne w krypto z powodu minimalnej kwoty płatności u dostawcy — plany roczne są zawsze dostępne."
 }

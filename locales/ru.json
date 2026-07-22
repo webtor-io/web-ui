@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Оплат пока нет.",
     "profile.payments.buyMore": "Купить тариф",
     "profile.payments.method": "Способ",
-    "profile.payments.backToProfile": "Назад в профиль"
+    "profile.payments.backToProfile": "Назад в профиль",
+    "donate.crypto.minNote": "Некоторые месячные планы могут быть недоступны для криптооплаты из-за минимального порога платежа у платёжного провайдера — годовые планы доступны всегда."
 }

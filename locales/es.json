@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Aún no hay pagos.",
     "profile.payments.buyMore": "Comprar plan",
     "profile.payments.method": "Método",
-    "profile.payments.backToProfile": "Volver al perfil"
+    "profile.payments.backToProfile": "Volver al perfil",
+    "donate.crypto.minNote": "Algunos planes mensuales pueden no estar disponibles con cripto por el importe mínimo de pago del proveedor — los planes anuales siempre están disponibles."
 }

@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Aucun paiement pour l'instant.",
     "profile.payments.buyMore": "Acheter une formule",
     "profile.payments.method": "Moyen",
-    "profile.payments.backToProfile": "Retour au profil"
+    "profile.payments.backToProfile": "Retour au profil",
+    "donate.crypto.minNote": "Certains forfaits mensuels peuvent être indisponibles en crypto en raison du montant minimum de paiement du prestataire — les forfaits annuels restent toujours disponibles."
 }

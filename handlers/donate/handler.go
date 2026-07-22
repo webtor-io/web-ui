@@ -93,6 +93,9 @@ type tierCard struct {
 
 type donateData struct {
 	Cards []tierCard
+	// HasUnavailable turns on the footnote about plans hidden because the
+	// payment provider's minimum payment exceeds their price.
+	HasUnavailable bool
 	// AnnualSavePct labels the pay-annually toggle; 0 hides the saving hint.
 	AnnualSavePct int
 	// FreeMonths restates the annual discount as months of 12 not paid for
@@ -113,7 +116,14 @@ func buildCards(prices []np.Price) *donateData {
 	monthlyRaw := map[int]float64{}
 	order := []int{}
 	savePct := 0
+	hasUnavailable := false
 	for _, p := range prices {
+		if !p.IsAvailable() {
+			// Unpurchasable plans stay out of the cards entirely; the
+			// footnote explains why a period is missing.
+			hasUnavailable = true
+			continue
+		}
 		card, ok := byTier[p.TierID]
 		if !ok {
 			card = &tierCard{TierID: p.TierID, Name: p.TierName}
@@ -162,10 +172,11 @@ func buildCards(prices []np.Price) *donateData {
 		cards[len(cards)/2].Recommended = true
 	}
 	return &donateData{
-		Cards:         cards,
-		AnnualSavePct: savePct,
-		FreeMonths:    int(math.Round(12 * float64(savePct) / 100)),
-		PatreonURL:    patreonURL,
+		Cards:          cards,
+		HasUnavailable: hasUnavailable,
+		AnnualSavePct:  savePct,
+		FreeMonths:     int(math.Round(12 * float64(savePct) / 100)),
+		PatreonURL:     patreonURL,
 	}
 }
 
@@ -185,7 +196,7 @@ func (h *Handler) pickPeriod(ctx context.Context, tierID int, annual bool) (int,
 	}
 	has := map[int]bool{}
 	for _, p := range prices {
-		if p.TierID == tierID {
+		if p.TierID == tierID && p.IsAvailable() {
 			has[p.PeriodDays] = true
 		}
 	}

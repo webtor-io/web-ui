@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Zatím žádné platby.",
     "profile.payments.buyMore": "Koupit tarif",
     "profile.payments.method": "Metoda",
-    "profile.payments.backToProfile": "Zpět na profil"
+    "profile.payments.backToProfile": "Zpět na profil",
+    "donate.crypto.minNote": "Některé měsíční tarify nemusí být pro krypto dostupné kvůli minimální částce platby u poskytovatele — roční tarify jsou dostupné vždy."
 }

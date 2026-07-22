@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Nog geen betalingen.",
     "profile.payments.buyMore": "Abonnement kopen",
     "profile.payments.method": "Methode",
-    "profile.payments.backToProfile": "Terug naar profiel"
+    "profile.payments.backToProfile": "Terug naar profiel",
+    "donate.crypto.minNote": "Sommige maandplannen zijn mogelijk niet beschikbaar met crypto vanwege het minimale betaalbedrag van de betaalprovider — jaarplannen zijn altijd beschikbaar."
 }

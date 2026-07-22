@@ -1303,5 +1303,6 @@
     "profile.payments.empty": "No payments yet.",
     "profile.payments.buyMore": "Get a tier",
     "profile.payments.method": "Paid via",
-    "profile.payments.backToProfile": "Back to profile"
+    "profile.payments.backToProfile": "Back to profile",
+    "donate.crypto.minNote": "Some monthly plans may be unavailable for crypto because of the payment provider's minimum payment amount — annual plans are always available."
 }

@@ -1261,5 +1261,6 @@
     "profile.payments.empty": "Noch keine Zahlungen.",
     "profile.payments.buyMore": "Tarif kaufen",
     "profile.payments.method": "Zahlungsart",
-    "profile.payments.backToProfile": "Zurück zum Profil"
+    "profile.payments.backToProfile": "Zurück zum Profil",
+    "donate.crypto.minNote": "Einige Monatstarife können wegen des Mindestzahlbetrags des Zahlungsanbieters für Krypto nicht verfügbar sein — Jahrestarife sind immer verfügbar."
 }
