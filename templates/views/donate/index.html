@@ -32,7 +32,7 @@
                             <h2 class="text-xl font-bold mb-2">{{ if .TitleKey }}{{ t $.Lang .TitleKey }}{{ else }}<span class="capitalize">{{ .Name }}</span>{{ end }}</h2>
                             <div class="h-[4.5rem]">
                                 {{ if .HasMonthly }}
-                                <div {{ if .HasAnnual }}class="group-has-[:checked]:hidden"{{ end }}>
+                                <div class="{{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}{{ if .MonthlyUnavailable }} opacity-40{{ end }}">
                                     <span class="text-3xl font-extrabold">${{ .MonthlyUSD }}</span>
                                     <span class="text-sm text-w-sub">{{ t $.Lang "donate.crypto.perMonth" }}</span>
                                 </div>
@@ -45,7 +45,12 @@
                                 </div>
                                 {{ end }}
                             </div>
+                            {{ if .MonthlyUnavailable }}
+                            <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4 hidden group-has-[:checked]:inline-flex" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
+                            <button type="button" class="btn w-full mb-4 group-has-[:checked]:hidden bg-base-300 border border-w-line text-w-muted cursor-not-allowed hover:bg-base-300 hover:border-w-line" data-plan-unavailable data-umami-event="donate-plan-unavailable" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
+                            {{ else }}
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
+                            {{ end }}
                             {{ if .TaglineKey }}<p class="text-sm italic text-w-sub mb-3">{{ t $.Lang .TaglineKey }}</p>{{ end }}
                             {{ if .BenefitKeys }}
                             <p class="text-sm font-semibold mb-2">{{ t $.Lang "donate.crypto.youGet" }}</p>
@@ -90,5 +95,15 @@
         </div>
     {{ end }}
   </div>
+  <dialog id="plan-unavailable-modal" class="modal">
+    <div class="modal-box bg-w-card border border-w-line">
+      <p class="text-sm text-w-sub leading-relaxed">{{ t $.Lang "donate.crypto.minNote" }}</p>
+      <div class="modal-action">
+        <form method="dialog"><button class="btn btn-soft-cyan btn-sm">OK</button></form>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
 </section>
+{{ "donate.js" | asset }}
 {{ end }}

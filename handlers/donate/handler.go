@@ -85,6 +85,9 @@ type tierCard struct {
 
 	HasMonthly bool
 	MonthlyUSD string
+	// MonthlyUnavailable: the plan exists but sits below the payment
+	// provider's minimum payment — shown muted with a disabled button.
+	MonthlyUnavailable bool
 
 	HasAnnual         bool
 	AnnualPerMonthUSD string
@@ -118,12 +121,6 @@ func buildCards(prices []np.Price) *donateData {
 	savePct := 0
 	hasUnavailable := false
 	for _, p := range prices {
-		if !p.IsAvailable() {
-			// Unpurchasable plans stay out of the cards entirely; the
-			// footnote explains why a period is missing.
-			hasUnavailable = true
-			continue
-		}
 		card, ok := byTier[p.TierID]
 		if !ok {
 			card = &tierCard{TierID: p.TierID, Name: p.TierName}
@@ -143,8 +140,19 @@ func buildCards(prices []np.Price) *donateData {
 		case 30:
 			card.HasMonthly = true
 			card.MonthlyUSD = fmtUSD(p.AmountUSD)
-			monthlyRaw[p.TierID] = p.AmountUSD
+			if p.IsAvailable() {
+				monthlyRaw[p.TierID] = p.AmountUSD
+			} else {
+				card.MonthlyUnavailable = true
+				hasUnavailable = true
+			}
 		case 365:
+			if !p.IsAvailable() {
+				// No UI treatment for unavailable annual plans yet — they
+				// are simply not offered.
+				hasUnavailable = true
+				continue
+			}
 			card.HasAnnual = true
 			card.AnnualPerMonthUSD = fmtUSD(p.AmountUSD / 12)
 			card.AnnualTotalUSD = fmtUSD(p.AmountUSD)
