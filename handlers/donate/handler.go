@@ -23,7 +23,12 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-const patreonURL = "https://www.patreon.com/bePatron?u=24145874"
+const (
+	patreonURL = "https://www.patreon.com/bePatron?u=24145874"
+	// Direct checkout of the Silver tier (the one with the 7-day free
+	// trial); rid confirmed from live Patreon webhook payloads.
+	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747"
+)
 
 type Handler struct {
 	tb   template.Builder[*web.Context]
@@ -103,8 +108,9 @@ type donateData struct {
 	AnnualSavePct int
 	// FreeMonths restates the annual discount as months of 12 not paid for
 	// (25% → 3).
-	FreeMonths int
-	PatreonURL string
+	FreeMonths      int
+	PatreonURL      string
+	PatreonTrialURL string
 }
 
 func fmtUSD(v float64) string {
@@ -180,11 +186,12 @@ func buildCards(prices []np.Price) *donateData {
 		cards[len(cards)/2].Recommended = true
 	}
 	return &donateData{
-		Cards:          cards,
-		HasUnavailable: hasUnavailable,
-		AnnualSavePct:  savePct,
-		FreeMonths:     int(math.Round(12 * float64(savePct) / 100)),
-		PatreonURL:     patreonURL,
+		Cards:           cards,
+		HasUnavailable:  hasUnavailable,
+		AnnualSavePct:   savePct,
+		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
+		PatreonURL:      patreonURL,
+		PatreonTrialURL: patreonTrialURL,
 	}
 }
 
@@ -309,6 +316,7 @@ var providerLabels = map[string]string{
 
 type paymentRow struct {
 	Date       string
+	DateISO    string
 	Method     string
 	TierName   string
 	PeriodDays int
@@ -360,7 +368,10 @@ func (h *Handler) payments(c *gin.Context) {
 			method += " (" + strings.ToUpper(it.PayCurrency) + ")"
 		}
 		d.Rows = append(d.Rows, paymentRow{
-			Date:       it.CreatedAt.Format("02.01.2006 15:04"),
+			// UTC with an explicit marker as the no-JS fallback; the client
+			// re-renders it in the browser's timezone via the datetime attr.
+			Date:       it.CreatedAt.UTC().Format("02.01.2006 15:04") + " UTC",
+			DateISO:    it.CreatedAt.UTC().Format(time.RFC3339),
 			Method:     method,
 			TierName:   name,
 			PeriodDays: it.PeriodDays,

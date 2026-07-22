@@ -15,7 +15,7 @@
             <input type="hidden" name="_csrf" value="{{ $.CSRF }}" />
             <div class="relative border border-w-cyan/30 rounded-3xl p-4 pt-8 sm:p-8 sm:pt-10 mt-3">
                 <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap leading-none bg-w-bg px-4 py-1 text-xs font-semibold uppercase tracking-widest text-w-cyan">{{ t $.Lang "donate.crypto.title" }}</span>
-                <label class="flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-10 cursor-pointer" data-umami-event="donate-annual-toggle">
+                <label class="flex items-center justify-center gap-2 sm:gap-3 mb-9 sm:mb-10 cursor-pointer" data-umami-event="donate-annual-toggle">
                     <input type="checkbox" name="annual" value="1" class="toggle toggle-soft shrink-0" checked />
                     <span class="text-w-sub whitespace-nowrap">{{ t $.Lang "donate.crypto.payAnnually" }}</span>
                     {{ if .AnnualSavePct }}
@@ -65,7 +65,7 @@
                             {{ end }}
                             {{ if .HasTrial }}
                             <div class="mt-auto pt-5">
-                                <a href="#patreon" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ t $.Lang "donate.patreon.trialBanner" }} ↓</a>
+                                <a href="{{ $.Data.PatreonTrialURL }}" target="_blank" rel="noopener" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ t $.Lang "donate.patreon.trialBanner" }}</a>
                             </div>
                             {{ end }}
                         </div>

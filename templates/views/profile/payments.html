@@ -33,7 +33,7 @@
                     <tbody>
                         {{ range .Rows }}
                         <tr class="hover:bg-base-300/40 transition-colors">
-                            <td class="whitespace-nowrap">{{ .Date }}</td>
+                            <td class="whitespace-nowrap"><time datetime="{{ .DateISO }}" data-localize-datetime>{{ .Date }}</time></td>
                             <td class="capitalize font-semibold">{{ .TierName }}</td>
                             <td class="whitespace-nowrap">{{ .Method }}</td>
                             <td class="whitespace-nowrap">{{ tp $.Lang "profile.payments.days" "Days" .PeriodDays }}</td>
@@ -77,4 +77,5 @@
     {{ end }}
   </div>
 </section>
+{{ "donate.js" | asset }}
 {{ end }}
