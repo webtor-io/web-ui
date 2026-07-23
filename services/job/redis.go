@@ -84,13 +84,17 @@ func (s *Redis) Sub(ctx context.Context, queue string, id string) (res chan LogI
 			case <-cctx.Done():
 				close(res)
 				return
-			case i := <-ch:
+			case i, ok := <-ch:
+				if !ok {
+					cancel()
+					close(res)
+					return
+				}
 				var li LogItem
-				err = json.Unmarshal([]byte(i), &li)
-				if err != nil {
+				if uErr := json.Unmarshal([]byte(i), &li); uErr != nil {
 					res <- LogItem{
 						Level:   Error,
-						Message: err.Error(),
+						Message: uErr.Error(),
 					}
 					cancel()
 					close(res)
@@ -135,11 +139,16 @@ func (s *Redis) subRaw(ctx context.Context, queue string, id string) (res chan s
 	}
 	res = make(chan string)
 	go func() {
+		defer close(res)
 		for _, i := range items {
 			if i == "" {
 				continue
 			}
-			res <- i
+			select {
+			case <-ctx.Done():
+				return
+			case res <- i:
+			}
 		}
 		if ctx.Err() != nil {
 			return
@@ -149,16 +158,25 @@ func (s *Redis) subRaw(ctx context.Context, queue string, id string) (res chan s
 			_ = ps.Close()
 		}(ps)
 
-		if err = ps.Ping(ctx); err != nil {
+		if pingErr := ps.Ping(ctx); pingErr != nil {
 			return
 		}
+		ch := ps.Channel()
 		for {
 			select {
 			case <-ctx.Done():
-				close(res)
 				return
-			case msg := <-ps.Channel():
-				res <- msg.Payload
+			case msg, ok := <-ch:
+				// ch closes when the redis client shuts down (pool.ErrClosed
+				// cascades into every PubSub), yielding a nil *Message
+				if !ok {
+					return
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case res <- msg.Payload:
+				}
 			}
 		}
 	}()
