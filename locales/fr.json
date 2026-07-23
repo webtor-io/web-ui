@@ -1231,7 +1231,7 @@
     "donate.or": "ou",
     "donate.crypto.title": "Paiement en crypto",
     "donate.patreon.trial": "7 jours gratuits sur Silver",
-    "donate.patreon.trialBanner": "Essayez Silver gratuitement 7 jours avec Patreon",
+    "donate.patreon.trialBanner": "Commencer 7 jours gratuits",
     "donate.crypto.freeMonths": "{{.Months}} mois offerts",
     "auth.login.donateNote": "Connectez-vous pour lier votre paiement à votre compte.",
     "donate.signInCard.intro": "Payer en crypto nécessite un compte afin que :",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Acheter une formule",
     "profile.payments.method": "Moyen",
     "profile.payments.backToProfile": "Retour au profil",
-    "donate.crypto.minNote": "Certains forfaits mensuels peuvent être indisponibles en crypto en raison du montant minimum de paiement du prestataire — les forfaits annuels restent toujours disponibles."
+    "donate.crypto.minNote": "Certains forfaits mensuels peuvent être indisponibles en crypto en raison du montant minimum de paiement du prestataire — les forfaits annuels restent toujours disponibles.",
+    "donate.crypto.optionUnavailable": "Crypto — indisponible (paiement min.)",
+    "donate.gift.text": "Offrir un abonnement",
+    "donate.gift.cta": "Offrir",
+    "donate.crypto.orPayCrypto": "ou payer en crypto"
 }

@@ -1231,7 +1231,7 @@
     "donate.or": "of",
     "donate.crypto.title": "Betalen met crypto",
     "donate.patreon.trial": "7 dagen gratis op Silver",
-    "donate.patreon.trialBanner": "Probeer Silver 7 dagen gratis met Patreon",
+    "donate.patreon.trialBanner": "Start 7 dagen gratis",
     "donate.crypto.freeMonths": "{{.Months}} maanden gratis",
     "auth.login.donateNote": "Log in zodat de betaling aan je account wordt gekoppeld.",
     "donate.signInCard.intro": "Betalen met crypto vereist een account zodat:",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Abonnement kopen",
     "profile.payments.method": "Methode",
     "profile.payments.backToProfile": "Terug naar profiel",
-    "donate.crypto.minNote": "Sommige maandplannen zijn mogelijk niet beschikbaar met crypto vanwege het minimale betaalbedrag van de betaalprovider — jaarplannen zijn altijd beschikbaar."
+    "donate.crypto.minNote": "Sommige maandplannen zijn mogelijk niet beschikbaar met crypto vanwege het minimale betaalbedrag van de betaalprovider — jaarplannen zijn altijd beschikbaar.",
+    "donate.crypto.optionUnavailable": "Crypto — niet beschikbaar (min. betaling)",
+    "donate.gift.text": "Geef een abonnement cadeau",
+    "donate.gift.cta": "Cadeau doen",
+    "donate.crypto.orPayCrypto": "of betaal met crypto"
 }

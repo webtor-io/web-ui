@@ -21,18 +21,6 @@ av(async function() {
             hour: '2-digit', minute: '2-digit',
         }).format(d);
     }
-
-    // Membership page: unavailable monthly plans render a disabled-looking
-    // button that explains itself in a modal instead of submitting.
-    const modal = this.querySelector('#plan-unavailable-modal');
-    if (modal) {
-        for (const btn of this.querySelectorAll('[data-plan-unavailable]')) {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                modal.showModal();
-            });
-        }
-    }
 });
 
 export {}

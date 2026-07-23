@@ -1231,7 +1231,7 @@
     "donate.or": "ou",
     "donate.crypto.title": "Pagamento com cripto",
     "donate.patreon.trial": "7 dias grátis no Silver",
-    "donate.patreon.trialBanner": "Experimente o Silver grátis por 7 dias com Patreon",
+    "donate.patreon.trialBanner": "Começar 7 dias grátis",
     "donate.crypto.freeMonths": "{{.Months}} meses grátis",
     "auth.login.donateNote": "Entre para vincular o pagamento à sua conta.",
     "donate.signInCard.intro": "Pagar com cripto requer uma conta para que:",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Comprar plano",
     "profile.payments.method": "Método",
     "profile.payments.backToProfile": "Voltar ao perfil",
-    "donate.crypto.minNote": "Alguns planos mensais podem estar indisponíveis em cripto devido ao valor mínimo de pagamento do provedor — os planos anuais estão sempre disponíveis."
+    "donate.crypto.minNote": "Alguns planos mensais podem estar indisponíveis em cripto devido ao valor mínimo de pagamento do provedor — os planos anuais estão sempre disponíveis.",
+    "donate.crypto.optionUnavailable": "Cripto — indisponível (pgto. mín.)",
+    "donate.gift.text": "Presenteie uma assinatura",
+    "donate.gift.cta": "Presentear",
+    "donate.crypto.orPayCrypto": "ou pagar com cripto"
 }

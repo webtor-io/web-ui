@@ -1231,7 +1231,7 @@
     "donate.or": "veya",
     "donate.crypto.title": "Kripto ile ödeme",
     "donate.patreon.trial": "Silver'da 7 gün ücretsiz",
-    "donate.patreon.trialBanner": "Patreon ile Silver'ı 7 gün ücretsiz dene",
+    "donate.patreon.trialBanner": "7 gün ücretsiz başla",
     "donate.crypto.freeMonths": "{{.Months}} ay ücretsiz",
     "auth.login.donateNote": "Ödemenin hesabına bağlanması için giriş yap.",
     "donate.signInCard.intro": "Kripto ile ödeme için hesap gerekir, böylece:",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Paket satın al",
     "profile.payments.method": "Yöntem",
     "profile.payments.backToProfile": "Profile dön",
-    "donate.crypto.minNote": "Ödeme sağlayıcısının asgari ödeme tutarı nedeniyle bazı aylık paketler kriptoyla kullanılamayabilir — yıllık paketler her zaman kullanılabilir."
+    "donate.crypto.minNote": "Ödeme sağlayıcısının asgari ödeme tutarı nedeniyle bazı aylık paketler kriptoyla kullanılamayabilir — yıllık paketler her zaman kullanılabilir.",
+    "donate.crypto.optionUnavailable": "Kripto — kullanılamaz (asg. ödeme)",
+    "donate.gift.text": "Arkadaşına üyelik hediye et",
+    "donate.gift.cta": "Hediye et",
+    "donate.crypto.orPayCrypto": "veya kripto ile öde"
 }

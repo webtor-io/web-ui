@@ -1231,7 +1231,7 @@
     "donate.or": "nebo",
     "donate.crypto.title": "Platba kryptoměnou",
     "donate.patreon.trial": "7 dní zdarma na Silver",
-    "donate.patreon.trialBanner": "Vyzkoušejte Silver na 7 dní zdarma přes Patreon",
+    "donate.patreon.trialBanner": "Začít 7 dní zdarma",
     "donate.crypto.freeMonths": "{{.Months}} měsíce zdarma",
     "auth.login.donateNote": "Přihlaste se, aby se platba propojila s vaším účtem.",
     "donate.signInCard.intro": "Platba kryptoměnou vyžaduje účet, aby:",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Koupit tarif",
     "profile.payments.method": "Metoda",
     "profile.payments.backToProfile": "Zpět na profil",
-    "donate.crypto.minNote": "Některé měsíční tarify nemusí být pro krypto dostupné kvůli minimální částce platby u poskytovatele — roční tarify jsou dostupné vždy."
+    "donate.crypto.minNote": "Některé měsíční tarify nemusí být pro krypto dostupné kvůli minimální částce platby u poskytovatele — roční tarify jsou dostupné vždy.",
+    "donate.crypto.optionUnavailable": "Krypto — nedostupné (min. platba)",
+    "donate.gift.text": "Darujte předplatné",
+    "donate.gift.cta": "Darovat",
+    "donate.crypto.orPayCrypto": "nebo zaplatit kryptem"
 }

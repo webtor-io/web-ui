@@ -1273,7 +1273,7 @@
     "donate.or": "or",
     "donate.crypto.title": "Pay with crypto",
     "donate.patreon.trial": "7-day free trial on Silver",
-    "donate.patreon.trialBanner": "Try Silver free for 7 days with Patreon",
+    "donate.patreon.trialBanner": "Start 7-day free trial",
     "donate.crypto.freeMonths": "{{.Months}} months free",
     "auth.login.donateNote": "Sign in to link your payment to your account.",
     "donate.signInCard.intro": "Paying with crypto requires an account so that:",
@@ -1304,5 +1304,9 @@
     "profile.payments.buyMore": "Get a tier",
     "profile.payments.method": "Paid via",
     "profile.payments.backToProfile": "Back to profile",
-    "donate.crypto.minNote": "Some monthly plans may be unavailable for crypto because of the payment provider's minimum payment amount — annual plans are always available."
+    "donate.crypto.minNote": "Some monthly plans may be unavailable for crypto because of the payment provider's minimum payment amount — annual plans are always available.",
+    "donate.crypto.optionUnavailable": "Crypto — unavailable (min. payment)",
+    "donate.gift.text": "Gift a membership to a friend",
+    "donate.gift.cta": "Gift now",
+    "donate.crypto.orPayCrypto": "or pay with crypto"
 }

@@ -1231,7 +1231,7 @@
     "donate.or": "или",
     "donate.crypto.title": "Оплата криптовалютой",
     "donate.patreon.trial": "7 дней бесплатно на Silver",
-    "donate.patreon.trialBanner": "Попробуйте Silver бесплатно 7 дней через Patreon",
+    "donate.patreon.trialBanner": "Начать 7 дней бесплатно",
     "donate.crypto.freeMonths": "{{.Months}} мес. бесплатно",
     "auth.login.donateNote": "Войдите, чтобы оплата привязалась к вашему аккаунту.",
     "donate.signInCard.intro": "Для оплаты криптовалютой нужен аккаунт, чтобы:",
@@ -1262,5 +1262,9 @@
     "profile.payments.buyMore": "Купить тариф",
     "profile.payments.method": "Способ",
     "profile.payments.backToProfile": "Назад в профиль",
-    "donate.crypto.minNote": "Некоторые месячные планы могут быть недоступны для криптооплаты из-за минимального порога платежа у платёжного провайдера — годовые планы доступны всегда."
+    "donate.crypto.minNote": "Некоторые месячные планы могут быть недоступны для криптооплаты из-за минимального порога платежа у платёжного провайдера — годовые планы доступны всегда.",
+    "donate.crypto.optionUnavailable": "Криптой — недоступно (мин. платёж)",
+    "donate.gift.text": "Подарить подписку другу",
+    "donate.gift.cta": "Подарить",
+    "donate.crypto.orPayCrypto": "или оплатить криптой"
 }

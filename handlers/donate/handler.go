@@ -2,6 +2,7 @@ package donate
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"net/url"
@@ -24,10 +25,11 @@ import (
 )
 
 const (
-	patreonURL = "https://www.patreon.com/bePatron?u=24145874"
-	// Direct checkout of the Silver tier (the one with the 7-day free
-	// trial); rid confirmed from live Patreon webhook payloads.
-	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747"
+	patreonURL         = "https://www.patreon.com/join/pavel_tatarskiy"
+	patreonGiftURL     = "https://www.patreon.com/pavel_tatarskiy/gift"
+	patreonCheckoutFmt = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=%s"
+	// Direct checkout of the Silver tier's 7-day free trial.
+	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
 )
 
 type Handler struct {
@@ -68,15 +70,17 @@ type tierMeta struct {
 	titleKey   string
 	taglineKey string
 	benefits   int
-	// trial: the tier has a free trial on Patreon — the card links to the
-	// Patreon block.
+	// trial: the tier has a free trial on Patreon — the card shows the
+	// trial plaque.
 	trial bool
+	// patreonRid is the Patreon tier id for direct checkout links.
+	patreonRid string
 }
 
 var tierMetas = map[string]tierMeta{
-	"bronze": {"donate.crypto.tier.bronze.title", "donate.crypto.tier.bronze.tagline", 4, false},
-	"silver": {"donate.crypto.tier.silver.title", "donate.crypto.tier.silver.tagline", 5, true},
-	"gold":   {"donate.crypto.tier.gold.title", "donate.crypto.tier.gold.tagline", 5, false},
+	"bronze": {"donate.crypto.tier.bronze.title", "donate.crypto.tier.bronze.tagline", 4, false, "3981231"},
+	"silver": {"donate.crypto.tier.silver.title", "donate.crypto.tier.silver.tagline", 5, true, "3972747"},
+	"gold":   {"donate.crypto.tier.gold.title", "donate.crypto.tier.gold.tagline", 5, false, "3981014"},
 }
 
 type tierCard struct {
@@ -90,13 +94,19 @@ type tierCard struct {
 
 	HasMonthly bool
 	MonthlyUSD string
-	// MonthlyUnavailable: the plan exists but sits below the payment
-	// provider's minimum payment — shown muted with a disabled button.
+	// MonthlyUnavailable: the crypto plan exists but sits below the payment
+	// provider's minimum payment — the crypto option in the split-button
+	// menu is greyed out for the monthly period.
 	MonthlyUnavailable bool
 
 	HasAnnual         bool
 	AnnualPerMonthUSD string
 	AnnualTotalUSD    string
+
+	// Patreon direct-checkout links (default action of the Join button);
+	// empty for tiers unknown to tierMetas.
+	PatreonMonthURL string
+	PatreonYearURL  string
 }
 
 type donateData struct {
@@ -110,6 +120,7 @@ type donateData struct {
 	// (25% → 3).
 	FreeMonths      int
 	PatreonURL      string
+	PatreonGiftURL  string
 	PatreonTrialURL string
 }
 
@@ -137,6 +148,16 @@ func buildCards(prices []np.Price) *donateData {
 				for i := 1; i <= m.benefits; i++ {
 					card.BenefitKeys = append(card.BenefitKeys,
 						"donate.crypto.tier."+p.TierName+".b"+strconv.Itoa(i))
+				}
+				if m.patreonRid != "" {
+					base := fmt.Sprintf(patreonCheckoutFmt, m.patreonRid)
+					card.PatreonMonthURL = base
+					if m.trial {
+						// Patreon fronts this tier's monthly plan with the
+						// free trial itself.
+						card.PatreonMonthURL = base + "&is_free_trial=true"
+					}
+					card.PatreonYearURL = base + "&cadence=12"
 				}
 			}
 			byTier[p.TierID] = card
@@ -191,6 +212,7 @@ func buildCards(prices []np.Price) *donateData {
 		AnnualSavePct:   savePct,
 		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
 		PatreonURL:      patreonURL,
+		PatreonGiftURL:  patreonGiftURL,
 		PatreonTrialURL: patreonTrialURL,
 	}
 }

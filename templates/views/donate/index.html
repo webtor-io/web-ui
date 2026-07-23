@@ -14,7 +14,6 @@
         <form action="{{ langPath $.Lang "/donate/crypto" }}" method="post" class="group">
             <input type="hidden" name="_csrf" value="{{ $.CSRF }}" />
             <div class="relative border border-w-cyan/30 rounded-3xl p-4 pt-8 sm:p-8 sm:pt-10 mt-3">
-                <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap leading-none bg-w-bg px-4 py-1 text-xs font-semibold uppercase tracking-widest text-w-cyan">{{ t $.Lang "donate.crypto.title" }}</span>
                 <label class="flex items-center justify-center gap-2 sm:gap-3 mb-9 sm:mb-10 cursor-pointer" data-umami-event="donate-annual-toggle">
                     <input type="checkbox" name="annual" value="1" class="toggle toggle-soft shrink-0" checked />
                     <span class="text-w-sub whitespace-nowrap">{{ t $.Lang "donate.crypto.payAnnually" }}</span>
@@ -24,18 +23,15 @@
                 </label>
                 <div class="grid md:grid-cols-3 gap-5 items-stretch">
                     {{ range .Cards }}
-                    {{/* Mobile card order follows the toggle: monthly mode sinks
-                         plans that cannot be bought monthly, annual mode lifts the
-                         recommended tier. Desktop keeps the natural order. */}}
-                    <div class="relative rounded-2xl flex flex-col bg-w-card {{ if .MonthlyUnavailable }}max-md:order-last {{ if .Recommended }}max-md:group-has-[:checked]:order-first{{ else }}max-md:group-has-[:checked]:order-none{{ end }}{{ else if .Recommended }}max-md:group-has-[:checked]:order-first{{ end }} {{ if .Recommended }}border-2 {{ if .MonthlyUnavailable }}border-w-line group-has-[:checked]:border-w-pink{{ else }}border-w-pink{{ end }}{{ else }}border border-w-line{{ end }}">
+                    <div class="relative rounded-2xl flex flex-col bg-w-card {{ if .Recommended }}max-md:order-first border-2 border-w-pink{{ else }}border border-w-line{{ end }}">
                         {{ if .Recommended }}
-                        <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-4 py-1 text-xs font-bold tracking-widest uppercase {{ if .MonthlyUnavailable }}bg-base-300 text-w-muted border border-w-line group-has-[:checked]:bg-w-pink group-has-[:checked]:text-w-bg group-has-[:checked]:border-0{{ else }}bg-w-pink text-w-bg{{ end }}">{{ t $.Lang "donate.crypto.recommended" }}</span>
+                        <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap bg-w-pink text-w-bg rounded-full px-4 py-1 text-xs font-bold tracking-widest uppercase">{{ t $.Lang "donate.crypto.recommended" }}</span>
                         {{ end }}
                         <div class="p-6 flex flex-col grow">
                             <h2 class="text-xl font-bold mb-2">{{ if .TitleKey }}{{ t $.Lang .TitleKey }}{{ else }}<span class="capitalize">{{ .Name }}</span>{{ end }}</h2>
                             <div class="h-[4.5rem]">
                                 {{ if .HasMonthly }}
-                                <div class="{{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}{{ if .MonthlyUnavailable }} opacity-40{{ end }}">
+                                <div {{ if .HasAnnual }}class="group-has-[:checked]:hidden"{{ end }}>
                                     <span class="text-3xl font-extrabold">${{ .MonthlyUSD }}</span>
                                     <span class="text-sm text-w-sub">{{ t $.Lang "donate.crypto.perMonth" }}</span>
                                 </div>
@@ -48,9 +44,17 @@
                                 </div>
                                 {{ end }}
                             </div>
-                            {{ if .MonthlyUnavailable }}
-                            <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4 hidden group-has-[:checked]:inline-flex" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
-                            <button type="button" class="btn w-full mb-4 group-has-[:checked]:hidden bg-base-300 border border-w-line text-w-muted cursor-not-allowed hover:bg-base-300 hover:border-w-line" data-plan-unavailable data-umami-event="donate-plan-unavailable" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
+                            {{ if .PatreonMonthURL }}
+                            <a href="{{ .PatreonMonthURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="1">{{ t $.Lang "donate.crypto.join" }}</a>
+                            <a href="{{ .PatreonYearURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 hidden group-has-[:checked]:inline-flex" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="12">{{ t $.Lang "donate.crypto.join" }}</a>
+                            {{ if .HasMonthly }}{{ if not .MonthlyUnavailable }}
+                            <button type="submit" name="tier_id" value="{{ .TierID }}" class="block w-full mb-4 text-center text-xs text-w-sub link link-hover hover:text-w-cyan transition-colors {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.orPayCrypto" }}</button>
+                            {{ else }}
+                            <span class="block w-full mb-4 text-center text-xs text-w-muted {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" title="{{ t $.Lang "donate.crypto.minNote" }}">{{ t $.Lang "donate.crypto.optionUnavailable" }}</span>
+                            {{ end }}{{ end }}
+                            {{ if .HasAnnual }}
+                            <button type="submit" name="tier_id" value="{{ .TierID }}" class="w-full mb-4 text-center text-xs text-w-sub link link-hover hover:text-w-cyan transition-colors hidden group-has-[:checked]:block" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.orPayCrypto" }}</button>
+                            {{ end }}
                             {{ else }}
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
                             {{ end }}
@@ -71,6 +75,13 @@
                         </div>
                     </div>
                     {{ end }}
+                </div>
+                <div class="max-w-[480px] mx-auto mt-6 flex items-center justify-between gap-4 bg-w-card border border-w-line rounded-2xl px-5 py-4">
+                    <span class="flex items-center gap-2.5 text-sm text-w-sub">
+                        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+                        {{ t $.Lang "donate.gift.text" }}
+                    </span>
+                    <a href="{{ $.Data.PatreonGiftURL }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm border border-w-line whitespace-nowrap" data-umami-event="donate-gift">{{ t $.Lang "donate.gift.cta" }}</a>
                 </div>
                 <p class="text-center text-xs text-w-muted leading-relaxed mt-6 max-w-[700px] mx-auto">{{ t $.Lang "donate.crypto.note" }}</p>
                 {{ if .HasUnavailable }}
@@ -98,15 +109,6 @@
         </div>
     {{ end }}
   </div>
-  <dialog id="plan-unavailable-modal" class="modal">
-    <div class="modal-box bg-w-card border border-w-line">
-      <p class="text-sm text-w-sub leading-relaxed">{{ t $.Lang "donate.crypto.minNote" }}</p>
-      <div class="modal-action">
-        <form method="dialog"><button class="btn btn-soft-cyan btn-sm">OK</button></form>
-      </div>
-    </div>
-    <form method="dialog" class="modal-backdrop"><button>close</button></form>
-  </dialog>
 </section>
 {{ "donate.js" | asset }}
 {{ end }}
