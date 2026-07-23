@@ -1185,7 +1185,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Měsíční předplatné s automatickým obnovením. Platba kartou přes účet Patreon.",
     "donate.patreon.cta": "Pokračovat s Patreonem",
-    "donate.crypto.note": "Předplacený přístup: žádné automatické obnovení, prodlužte kdykoli. Nová platba se přičte ke zbývajícím dnům.",
     "donate.crypto.noPlans": "Platby kryptoměnami jsou dočasně nedostupné. Zkuste to prosím později.",
     "donate.crypto.success.title": "Stav platby",
     "donate.crypto.success.doneTitle": "Platba přijata!",

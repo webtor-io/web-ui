@@ -1185,7 +1185,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Ежемесячная подписка с автопродлением. Оплата картой через аккаунт Patreon.",
     "donate.patreon.cta": "Продолжить с Patreon",
-    "donate.crypto.note": "Предоплаченный доступ: без автопродления, продлевайте когда удобно. Новая оплата добавляется к оставшимся дням.",
     "donate.crypto.noPlans": "Оплата криптовалютой временно недоступна. Попробуйте позже.",
     "donate.crypto.success.title": "Статус платежа",
     "donate.crypto.success.doneTitle": "Платёж получен!",

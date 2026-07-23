@@ -1185,7 +1185,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Otomatik yenilenen aylık abonelik. Patreon hesabın üzerinden kartla ödeme.",
     "donate.patreon.cta": "Patreon ile devam et",
-    "donate.crypto.note": "Ön ödemeli erişim: otomatik yenileme yok, istediğin zaman uzat. Yeni ödeme kalan günlerinin üzerine eklenir.",
     "donate.crypto.noPlans": "Kripto ödemeleri geçici olarak kullanılamıyor. Lütfen daha sonra tekrar dene.",
     "donate.crypto.success.title": "Ödeme durumu",
     "donate.crypto.success.doneTitle": "Ödeme alındı!",

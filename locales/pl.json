@@ -1185,7 +1185,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Miesięczna subskrypcja z automatycznym odnawianiem. Płatność kartą przez konto Patreon.",
     "donate.patreon.cta": "Kontynuuj z Patreon",
-    "donate.crypto.note": "Dostęp przedpłacony: bez automatycznego odnawiania, przedłużaj kiedy chcesz. Nowa płatność dodaje się do pozostałych dni.",
     "donate.crypto.noPlans": "Płatności kryptowalutą są chwilowo niedostępne. Spróbuj później.",
     "donate.crypto.success.title": "Status płatności",
     "donate.crypto.success.doneTitle": "Płatność otrzymana!",

@@ -1185,7 +1185,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Suscripción mensual con renovación automática. Pago con tarjeta a través de tu cuenta de Patreon.",
     "donate.patreon.cta": "Continuar con Patreon",
-    "donate.crypto.note": "Acceso prepagado: sin renovación automática, amplíalo cuando quieras. Un nuevo pago se suma a tus días restantes.",
     "donate.crypto.noPlans": "Los pagos con cripto no están disponibles temporalmente. Inténtalo más tarde.",
     "donate.crypto.success.title": "Estado del pago",
     "donate.crypto.success.doneTitle": "¡Pago recibido!",

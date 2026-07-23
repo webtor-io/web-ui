@@ -1227,7 +1227,6 @@
     "donate.patreon.title": "Patreon",
     "donate.patreon.description": "Monthly subscription with automatic renewal. Card payments, managed through your Patreon account.",
     "donate.patreon.cta": "Continue with Patreon",
-    "donate.crypto.note": "Prepaid access: no auto-renewal, extend anytime. Paying again stacks on top of your remaining days.",
     "donate.crypto.noPlans": "Crypto payments are temporarily unavailable. Please try again later.",
     "donate.crypto.success.title": "Payment status",
     "donate.crypto.success.doneTitle": "Payment received!",

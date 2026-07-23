@@ -83,7 +83,6 @@
                     </span>
                     <a href="{{ $.Data.PatreonGiftURL }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm border border-w-line whitespace-nowrap" data-umami-event="donate-gift">{{ t $.Lang "donate.gift.cta" }}</a>
                 </div>
-                <p class="text-center text-xs text-w-muted leading-relaxed mt-6 max-w-[700px] mx-auto">{{ t $.Lang "donate.crypto.note" }}</p>
                 {{ if .HasUnavailable }}
                 <p class="text-center text-xs text-w-muted leading-relaxed mt-2 max-w-[700px] mx-auto">{{ t $.Lang "donate.crypto.minNote" }}</p>
                 {{ end }}
