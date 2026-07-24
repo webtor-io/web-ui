@@ -129,7 +129,6 @@ type donateData struct {
 	// FreeMonths restates the annual discount as months of 12 not paid for
 	// (25% → 3).
 	FreeMonths      int
-	PatreonURL      string
 	PatreonGiftURL  string
 	PatreonTrialURL string
 }
@@ -221,7 +220,6 @@ func buildCards(prices []np.Price) *donateData {
 		HasUnavailable:  hasUnavailable,
 		AnnualSavePct:   savePct,
 		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
-		PatreonURL:      patreonURL,
 		PatreonGiftURL:  patreonGiftURL,
 		PatreonTrialURL: patreonTrialURL,
 	}

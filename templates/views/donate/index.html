@@ -105,7 +105,7 @@
                     <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ t $.Lang "donate.patreon.trial" }}</span>
                 </div>
                 <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
-                <a href="{{ .PatreonURL }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full mt-auto" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
+                <a href="{{ langPath $.Lang "/donate/patreon" }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full mt-auto" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
             </div>
 
             <div id="lava" class="bg-w-card border border-w-line rounded-2xl p-6 flex flex-col">
