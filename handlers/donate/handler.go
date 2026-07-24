@@ -54,8 +54,8 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], npClient
 		tb:   tm.MustRegisterViews("donate/*").WithLayout("main"),
 	}
 	r.GET("/donate", h.index)
-	r.GET("/donate/patreon", h.redirectPatreon)
-	r.GET("/donate/lava", h.redirectLava)
+	r.GET("/donate/patreon", redirectTo(patreonURL))
+	r.GET("/donate/lava", redirectTo(lavaURL))
 	// Old checkout URL, now merged into /donate.
 	r.GET("/donate/crypto", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, i18n.LangPath(i18n.GetLang(c), "/donate"))
@@ -65,12 +65,12 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], npClient
 	r.GET("/profile/payments", h.payments)
 }
 
-func (h *Handler) redirectPatreon(c *gin.Context) {
-	c.Redirect(http.StatusTemporaryRedirect, patreonURL)
-}
-
-func (h *Handler) redirectLava(c *gin.Context) {
-	c.Redirect(http.StatusTemporaryRedirect, lavaURL)
+// redirectTo keeps external storefront links (Patreon, lava.top) behind
+// same-origin routes, for umami tracking and URL changes in one place.
+func redirectTo(url string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Redirect(http.StatusTemporaryRedirect, url)
+	}
 }
 
 // tierMeta carries the marketing copy of the known tiers as i18n keys

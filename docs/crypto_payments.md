@@ -95,10 +95,17 @@ scheme — web-ui only advertises it, no invoice/checkout API is involved:
 - The purchase (recurring RUB subscription, Russian cards / SBP) happens
   entirely on lava.top. The webhook service receives lava.top webhooks at
   `/lavatop`, looks the contract up (`GET /api/v2/invoices/{contractId}` →
-  `subscriptionDetails.expiredAt`) and upserts `billing.member` with
-  `expire_at = GREATEST(current, expiredAt + grace)` — idempotent under
-  webhook redeliveries. Renewal webhooks extend the same row; `public.claim`
-  already unions `billing.member`, so tiers apply with no web-ui involvement.
+  offer name + `subscriptionDetails.expiredAt`) and upserts `billing.member`
+  with `expire_at = GREATEST(current, expiredAt + grace)` — idempotent under
+  webhook redeliveries. The tier comes from the offer name's first word
+  (`Bronze Backer` → tier `bronze`, patreon.member convention — offers must
+  not be renamed in the lava.top dashboard; a startup check verifies they
+  resolve). Subscriptions with a missing expiry and unknown statuses on
+  success events fail with 5xx so lava.top's retry ladder redelivers instead
+  of a paid sale being dropped; terminated (refunded) contracts are never
+  granted. Renewal webhooks extend the same row (falling back to the parent
+  contract when the child charge lacks details); `public.claim` already
+  unions `billing.member`, so tiers apply with no web-ui involvement.
 - Access binds to the **buyer email** (same limitation as Patreon) — hence
   the "use the same email as your Webtor account" note on the card; the
   operator fixes mismatches via `manual.member`.
