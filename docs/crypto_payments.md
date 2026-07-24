@@ -88,10 +88,11 @@ Payment statuses shown on the success page: `finished` → done;
 Patreon-style storefront integration, deliberately the cheapest possible
 scheme — web-ui only advertises it, no invoice/checkout API is involved:
 
-- `/donate` renders a "Continue with Lava.top" card below the Patreon block
-  (`donate.lava.*` i18n keys); `GET /donate/lava` 307-redirects to the
-  storefront `https://app.lava.top/webtor` (redirect instead of a direct link
-  for umami tracking and URL changes without template edits).
+- `/donate` renders a "Continue with Lava.top" card side by side with the
+  Patreon card, same structure (`donate.lava.*` i18n keys); `GET /donate/lava`
+  307-redirects to the storefront `https://app.lava.top/webtor` (redirect
+  instead of a direct link for umami tracking and URL changes without
+  template edits).
 - The purchase (recurring RUB subscription, Russian cards / SBP) happens
   entirely on lava.top. The webhook service receives lava.top webhooks at
   `/lavatop`, looks the contract up (`GET /api/v2/invoices/{contractId}` →
@@ -106,9 +107,9 @@ scheme — web-ui only advertises it, no invoice/checkout API is involved:
   granted. Renewal webhooks extend the same row (falling back to the parent
   contract when the child charge lacks details); `public.claim` already
   unions `billing.member`, so tiers apply with no web-ui involvement.
-- Access binds to the **buyer email** (same limitation as Patreon) — hence
-  the "use the same email as your Webtor account" note on the card; the
-  operator fixes mismatches via `manual.member`.
+- Access binds to the **buyer email** (same limitation as Patreon, which has
+  no note on its card either); the operator fixes "paid but no tier"
+  mismatches via `manual.member`.
 - Not built on purpose (owner decision 2026-07-24): lava.top checkout via
   their invoice API, lava payments in `/profile/payments`, in-product
   cancellation (users cancel in their lava.top account), automatic revocation

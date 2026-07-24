@@ -94,28 +94,29 @@
 
         <div class="divider max-w-[480px] mx-auto my-10 text-w-muted uppercase text-xs tracking-widest">{{ t $.Lang "donate.or" }}</div>
 
-        <div id="patreon" class="max-w-[480px] mx-auto bg-w-card border border-w-line rounded-2xl p-6">
-            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
-                <svg class="w-4 h-4 shrink-0" viewBox="0 0 569 546" fill="#FF424D" aria-hidden="true">
-                    <circle cx="362.6" cy="204.6" r="204.6"/>
-                    <rect x="0" y="0" width="100" height="545.8"/>
-                </svg>
-                <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.patreon.title" }}</h2>
-                <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ t $.Lang "donate.patreon.trial" }}</span>
+        <div class="grid md:grid-cols-2 gap-5 items-stretch max-w-[800px] mx-auto">
+            <div id="patreon" class="bg-w-card border border-w-line rounded-2xl p-6 flex flex-col">
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 569 546" fill="#FF424D" aria-hidden="true">
+                        <circle cx="362.6" cy="204.6" r="204.6"/>
+                        <rect x="0" y="0" width="100" height="545.8"/>
+                    </svg>
+                    <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.patreon.title" }}</h2>
+                    <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ t $.Lang "donate.patreon.trial" }}</span>
+                </div>
+                <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
+                <a href="{{ .PatreonURL }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full mt-auto" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
             </div>
-            <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
-            <a href="{{ .PatreonURL }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
-        </div>
 
-        <div id="lava" class="max-w-[480px] mx-auto mt-5 bg-w-card border border-w-line rounded-2xl p-6">
-            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
-                <span class="w-4 h-4 shrink-0 text-base leading-none" aria-hidden="true">🌋</span>
-                <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.lava.title" }}</h2>
-                <span class="badge badge-sm grow justify-center bg-w-cyan/10 border-w-cyan/40 text-w-text">₽ {{ t $.Lang "donate.lava.rub" }}</span>
+            <div id="lava" class="bg-w-card border border-w-line rounded-2xl p-6 flex flex-col">
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
+                    <span class="w-4 h-4 shrink-0 text-base leading-none" aria-hidden="true">🌋</span>
+                    <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.lava.title" }}</h2>
+                    <span class="badge badge-sm grow justify-center bg-w-cyan/10 border-w-cyan/40 text-w-text">{{ t $.Lang "donate.lava.rub" }}</span>
+                </div>
+                <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.lava.description" }}</p>
+                <a href="{{ langPath $.Lang "/donate/lava" }}" target="_blank" rel="noopener" class="btn btn-soft-cyan w-full mt-auto" data-umami-event="donate-lava-join">{{ t $.Lang "donate.lava.cta" }}</a>
             </div>
-            <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-4">{{ t $.Lang "donate.lava.description" }}</p>
-            <a href="{{ langPath $.Lang "/donate/lava" }}" target="_blank" rel="noopener" class="btn btn-soft-cyan w-full mb-3" data-umami-event="donate-lava-join">{{ t $.Lang "donate.lava.cta" }}</a>
-            <p class="text-xs text-w-muted leading-relaxed text-center">{{ t $.Lang "donate.lava.emailNote" }}</p>
         </div>
     {{ end }}
   </div>
