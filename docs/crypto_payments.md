@@ -82,3 +82,27 @@ Payment statuses shown on the success page: `finished` → done;
 - Payment history lives in the webhook DB (`crypto.payment`), not in the
   web-ui DB — it is intentionally outside the web-ui GDPR export; export of
   payment records is handled at the webhook service level if ever required.
+
+## Card / SBP payments (lava.top)
+
+Patreon-style storefront integration, deliberately the cheapest possible
+scheme — web-ui only advertises it, no invoice/checkout API is involved:
+
+- `/donate` renders a "Continue with Lava.top" card below the Patreon block
+  (`donate.lava.*` i18n keys); `GET /donate/lava` 307-redirects to the
+  storefront `https://app.lava.top/webtor` (redirect instead of a direct link
+  for umami tracking and URL changes without template edits).
+- The purchase (recurring RUB subscription, Russian cards / SBP) happens
+  entirely on lava.top. The webhook service receives lava.top webhooks at
+  `/lavatop`, looks the contract up (`GET /api/v2/invoices/{contractId}` →
+  `subscriptionDetails.expiredAt`) and upserts `billing.member` with
+  `expire_at = GREATEST(current, expiredAt + grace)` — idempotent under
+  webhook redeliveries. Renewal webhooks extend the same row; `public.claim`
+  already unions `billing.member`, so tiers apply with no web-ui involvement.
+- Access binds to the **buyer email** (same limitation as Patreon) — hence
+  the "use the same email as your Webtor account" note on the card; the
+  operator fixes mismatches via `manual.member`.
+- Not built on purpose (owner decision 2026-07-24): lava.top checkout via
+  their invoice API, lava payments in `/profile/payments`, in-product
+  cancellation (users cancel in their lava.top account), automatic revocation
+  on `subscription.cancelled`/refund (access just runs out at `expire_at`).

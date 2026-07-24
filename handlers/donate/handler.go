@@ -30,6 +30,11 @@ const (
 	patreonCheckoutFmt = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=%s"
 	// Direct checkout of the Silver tier's 7-day free trial.
 	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
+	// lava.top storefront (RUB cards/SBP): the purchase happens entirely on
+	// the lava.top side, access is granted by the payment webhook — see the
+	// webhook service. Access binds to the buyer email, hence the email note
+	// on the donate page.
+	lavaURL = "https://app.lava.top/webtor"
 )
 
 type Handler struct {
@@ -50,6 +55,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], npClient
 	}
 	r.GET("/donate", h.index)
 	r.GET("/donate/patreon", h.redirectPatreon)
+	r.GET("/donate/lava", h.redirectLava)
 	// Old checkout URL, now merged into /donate.
 	r.GET("/donate/crypto", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, i18n.LangPath(i18n.GetLang(c), "/donate"))
@@ -61,6 +67,10 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], npClient
 
 func (h *Handler) redirectPatreon(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, patreonURL)
+}
+
+func (h *Handler) redirectLava(c *gin.Context) {
+	c.Redirect(http.StatusTemporaryRedirect, lavaURL)
 }
 
 // tierMeta carries the marketing copy of the known tiers as i18n keys
