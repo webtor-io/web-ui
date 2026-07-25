@@ -76,6 +76,7 @@
                     </div>
                     {{ end }}
                 </div>
+                {{ if .PatreonEnabled }}
                 <div class="max-w-[480px] mx-auto mt-6 flex items-center justify-between gap-4 bg-w-card border border-w-line rounded-2xl px-5 py-4">
                     <span class="flex items-center gap-2.5 text-sm text-w-sub">
                         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
@@ -83,6 +84,7 @@
                     </span>
                     <a href="{{ $.Data.PatreonGiftURL }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm border border-w-line whitespace-nowrap" data-umami-event="donate-gift">{{ t $.Lang "donate.gift.cta" }}</a>
                 </div>
+                {{ end }}
                 {{ if .HasUnavailable }}
                 <p class="text-center text-xs text-w-muted leading-relaxed mt-2 max-w-[700px] mx-auto">{{ t $.Lang "donate.crypto.minNote" }}</p>
                 {{ end }}
@@ -92,9 +94,11 @@
         <p class="text-center text-w-sub">{{ t $.Lang "donate.crypto.noPlans" }}</p>
         {{ end }}
 
+        {{ if or .PatreonEnabled .LavaEnabled }}
         <div class="divider max-w-[480px] mx-auto my-10 text-w-muted uppercase text-xs tracking-widest">{{ t $.Lang "donate.or" }}</div>
 
-        <div class="grid md:grid-cols-2 gap-5 items-stretch max-w-[800px] mx-auto">
+        <div class="grid gap-5 items-stretch mx-auto {{ if and .PatreonEnabled .LavaEnabled }}md:grid-cols-2 max-w-[800px]{{ else }}max-w-[480px]{{ end }}">
+            {{ if .PatreonEnabled }}
             <div id="patreon" class="bg-w-card border border-w-line rounded-2xl p-6 flex flex-col">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
                     <svg class="w-4 h-4 shrink-0" viewBox="0 0 569 546" fill="#FF424D" aria-hidden="true">
@@ -107,7 +111,9 @@
                 <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
                 <a href="{{ langPath $.Lang "/donate/patreon" }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full mt-auto" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>
             </div>
+            {{ end }}
 
+            {{ if .LavaEnabled }}
             <div id="lava" class="bg-w-card border border-w-line rounded-2xl p-6 flex flex-col">
                 <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 mb-2">
                     <span class="w-4 h-4 shrink-0 text-base leading-none" aria-hidden="true">🌋</span>
@@ -117,7 +123,9 @@
                 <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.lava.description" }}</p>
                 <a href="{{ langPath $.Lang "/donate/lava" }}" target="_blank" rel="noopener" class="btn btn-soft-cyan w-full mt-auto" data-umami-event="donate-lava-join">{{ t $.Lang "donate.lava.cta" }}</a>
             </div>
+            {{ end }}
         </div>
+        {{ end }}
     {{ end }}
   </div>
 </section>

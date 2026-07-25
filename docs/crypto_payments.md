@@ -68,7 +68,9 @@ managed on patreon.com and are not listed.
 
 | Env | Meaning |
 |---|---|
-| `USE_PAYMENTS` | Feature switch (values: `payments.enable`). Off → /donate renders Patreon-only |
+| `USE_PAYMENTS` | Crypto switch (values: `payments.enable`). Off → /donate renders without tier cards |
+| `USE_PATREON` | Patreon switch, default **on** (values: `donate.patreon`). Off → Patreon card, tier join buttons, trial plaque and gift block hidden; /donate/patreon bounces to /donate |
+| `USE_LAVATOP` | lava.top switch, default **off** (values: `donate.lavatop`). Off → lava card hidden; /donate/lava bounces to /donate |
 | `WEBHOOK_SERVICE_HOST` / `WEBHOOK_SERVICE_PORT` | Webhook service address, auto-injected by kubernetes (same namespace); set manually for local dev |
 
 Payment statuses shown on the success page: `finished` → done;
@@ -84,6 +86,13 @@ Payment statuses shown on the success page: `finished` → done;
   payment records is handled at the webhook service level if ever required.
 
 ## Card / SBP payments (lava.top)
+
+**Currently disabled (`USE_LAVATOP=off` everywhere):** lava.top delivers
+webhooks (and any API visibility) only for invoices created through their
+Public API — storefront purchases are invisible to the integration, so the
+scheme below cannot grant access (empirically confirmed 2026-07-25 with a
+real paid purchase). Waiting on lava.top support; the likely path forward is
+checkout via their invoice API instead of the storefront link.
 
 Patreon-style storefront integration, deliberately the cheapest possible
 scheme — web-ui only advertises it, no invoice/checkout API is involved:

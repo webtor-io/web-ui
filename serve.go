@@ -124,6 +124,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = npg.RegisterFlags(c.Flags)
 	c.Flags = usv.RegisterFlags(c.Flags)
 	c.Flags = thumb.RegisterFlags(c.Flags)
+	c.Flags = donate.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -396,7 +397,7 @@ func serve(c *cli.Context) error {
 	ext.RegisterHandler(r, tm)
 
 	// Setting Donate (crypto checkout appears when the gateway is configured)
-	donate.RegisterHandler(r, tm, payClient, jobs)
+	donate.RegisterHandler(c, r, tm, payClient, jobs)
 
 	// Setting Discover
 	discover.RegisterHandler(r, tm, pg, en)

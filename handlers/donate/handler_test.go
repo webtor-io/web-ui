@@ -18,7 +18,7 @@ func TestBuildCards(t *testing.T) {
 		price(1, "bronze", 365, 18),
 		price(2, "silver", 30, 5),
 		price(2, "silver", 365, 45),
-	})
+	}, true, false)
 	if len(d.Cards) != 3 {
 		t.Fatalf("expected 3 cards, got %d", len(d.Cards))
 	}
@@ -56,7 +56,7 @@ func TestBuildCards(t *testing.T) {
 func TestBuildCards_UnknownTierAndMonthlyOnly(t *testing.T) {
 	d := buildCards([]np.Price{
 		price(7, "platinum", 30, 30),
-	})
+	}, true, false)
 	if len(d.Cards) != 1 {
 		t.Fatalf("expected 1 card, got %d", len(d.Cards))
 	}
@@ -76,7 +76,7 @@ func TestBuildCards_UnknownTierAndMonthlyOnly(t *testing.T) {
 }
 
 func TestBuildCards_Empty(t *testing.T) {
-	d := buildCards(nil)
+	d := buildCards(nil, true, false)
 	if len(d.Cards) != 0 || d.AnnualSavePct != 0 {
 		t.Errorf("expected empty, got %+v", d)
 	}
