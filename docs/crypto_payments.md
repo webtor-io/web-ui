@@ -70,7 +70,6 @@ managed on patreon.com and are not listed.
 |---|---|
 | `USE_PAYMENTS` | Crypto switch (values: `payments.enable`). Off → /donate renders without tier cards |
 | `USE_PATREON` | Patreon switch, default **on** (values: `donate.patreon`). Off → Patreon card, tier join buttons, trial plaque and gift block hidden; /donate/patreon bounces to /donate |
-| `USE_LAVATOP` | lava.top switch, default **off** (values: `donate.lavatop`). Off → lava card hidden; /donate/lava bounces to /donate |
 | `WEBHOOK_SERVICE_HOST` / `WEBHOOK_SERVICE_PORT` | Webhook service address, auto-injected by kubernetes (same namespace); set manually for local dev |
 
 Payment statuses shown on the success page: `finished` → done;
@@ -85,41 +84,10 @@ Payment statuses shown on the success page: `finished` → done;
   web-ui DB — it is intentionally outside the web-ui GDPR export; export of
   payment records is handled at the webhook service level if ever required.
 
-## Card / SBP payments (lava.top)
+## lava.top (removed)
 
-**Currently disabled (`USE_LAVATOP=off` everywhere):** lava.top delivers
-webhooks (and any API visibility) only for invoices created through their
-Public API — storefront purchases are invisible to the integration, so the
-scheme below cannot grant access (empirically confirmed 2026-07-25 with a
-real paid purchase). Waiting on lava.top support; the likely path forward is
-checkout via their invoice API instead of the storefront link.
-
-Patreon-style storefront integration, deliberately the cheapest possible
-scheme — web-ui only advertises it, no invoice/checkout API is involved:
-
-- `/donate` renders a "Continue with Lava.top" card side by side with the
-  Patreon card, same structure (`donate.lava.*` i18n keys); `GET /donate/lava`
-  307-redirects to the storefront `https://app.lava.top/webtor` (redirect
-  instead of a direct link for umami tracking and URL changes without
-  template edits).
-- The purchase (recurring RUB subscription, Russian cards / SBP) happens
-  entirely on lava.top. The webhook service receives lava.top webhooks at
-  `/lavatop`, looks the contract up (`GET /api/v2/invoices/{contractId}` →
-  offer name + `subscriptionDetails.expiredAt`) and upserts `billing.member`
-  with `expire_at = GREATEST(current, expiredAt + grace)` — idempotent under
-  webhook redeliveries. The tier comes from the offer name's first word
-  (`Bronze Backer` → tier `bronze`, patreon.member convention — offers must
-  not be renamed in the lava.top dashboard; a startup check verifies they
-  resolve). Subscriptions with a missing expiry and unknown statuses on
-  success events fail with 5xx so lava.top's retry ladder redelivers instead
-  of a paid sale being dropped; terminated (refunded) contracts are never
-  granted. Renewal webhooks extend the same row (falling back to the parent
-  contract when the child charge lacks details); `public.claim` already
-  unions `billing.member`, so tiers apply with no web-ui involvement.
-- Access binds to the **buyer email** (same limitation as Patreon, which has
-  no note on its card either); the operator fixes "paid but no tier"
-  mismatches via `manual.member`.
-- Not built on purpose (owner decision 2026-07-24): lava.top checkout via
-  their invoice API, lava payments in `/profile/payments`, in-product
-  cancellation (users cancel in their lava.top account), automatic revocation
-  on `subscription.cancelled`/refund (access just runs out at `expire_at`).
+A lava.top (RUB cards/SBP) integration was built and removed in July 2026 —
+discontinued before launch. Key learning kept for the future: lava.top
+webhooks and Public API only cover invoices created through their API —
+storefront purchases are invisible to the integration, so a Patreon-style
+storefront-link scheme cannot grant access there.

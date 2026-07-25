@@ -31,14 +31,8 @@ const (
 	patreonCheckoutFmt = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=%s"
 	// Direct checkout of the Silver tier's 7-day free trial.
 	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
-	// lava.top storefront (RUB cards/SBP): the purchase happens entirely on
-	// the lava.top side, access is granted by the payment webhook — see the
-	// webhook service. Access binds to the buyer email, hence the email note
-	// on the donate page.
-	lavaURL = "https://app.lava.top/webtor"
 
 	patreonFlag = "donate-patreon"
-	lavaFlag    = "donate-lavatop"
 )
 
 // RegisterFlags adds the per-method payment toggles. Crypto has its own
@@ -50,11 +44,6 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "offer Patreon on the donate page (set to false to hide)",
 			EnvVar: "USE_PATREON",
 		},
-		cli.BoolFlag{
-			Name:   lavaFlag,
-			Usage:  "offer lava.top on the donate page",
-			EnvVar: "USE_LAVATOP",
-		},
 	)
 }
 
@@ -63,7 +52,6 @@ type Handler struct {
 	np        *np.Client
 	jobs      *j.Jobs
 	patreonOn bool
-	lavaOn    bool
 }
 
 // RegisterHandler always serves /donate as a page: with a nil gateway client
@@ -76,11 +64,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		jobs:      jobs,
 		tb:        tm.MustRegisterViews("donate/*").WithLayout("main"),
 		patreonOn: c.BoolT(patreonFlag),
-		lavaOn:    c.Bool(lavaFlag),
 	}
 	r.GET("/donate", h.index)
 	r.GET("/donate/patreon", methodRedirect(h.patreonOn, patreonURL))
-	r.GET("/donate/lava", methodRedirect(h.lavaOn, lavaURL))
 	// Old checkout URL, now merged into /donate.
 	r.GET("/donate/crypto", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, i18n.LangPath(i18n.GetLang(c), "/donate"))
@@ -90,9 +76,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 	r.GET("/profile/payments", h.payments)
 }
 
-// methodRedirect keeps external storefront links (Patreon, lava.top) behind
-// same-origin routes, for umami tracking and URL changes in one place; a
-// disabled method bounces back to /donate instead of 404ing stale links.
+// methodRedirect keeps external storefront links behind same-origin routes,
+// for umami tracking and URL changes in one place; a disabled method bounces
+// back to /donate instead of 404ing stale links.
 func methodRedirect(enabled bool, url string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !enabled {
@@ -151,10 +137,10 @@ type tierCard struct {
 
 type donateData struct {
 	Cards []tierCard
-	// PatreonEnabled / LavaEnabled gate the payment-method cards below the
-	// tier grid (USE_PATREON / USE_LAVATOP).
+	// PatreonEnabled gates the Patreon card below the tier grid, the
+	// tier-card Patreon buttons, the trial plaque and the gift block
+	// (USE_PATREON).
 	PatreonEnabled bool
-	LavaEnabled    bool
 	// HasUnavailable turns on the footnote about plans hidden because the
 	// payment provider's minimum payment exceeds their price.
 	HasUnavailable bool
@@ -174,7 +160,7 @@ func fmtUSD(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
 }
 
-func buildCards(prices []np.Price, patreonOn, lavaOn bool) *donateData {
+func buildCards(prices []np.Price, patreonOn bool) *donateData {
 	byTier := map[int]*tierCard{}
 	monthlyRaw := map[int]float64{}
 	order := []int{}
@@ -252,7 +238,6 @@ func buildCards(prices []np.Price, patreonOn, lavaOn bool) *donateData {
 	return &donateData{
 		Cards:           cards,
 		PatreonEnabled:  patreonOn,
-		LavaEnabled:     lavaOn,
 		HasUnavailable:  hasUnavailable,
 		AnnualSavePct:   savePct,
 		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
@@ -299,17 +284,17 @@ func (h *Handler) pickPeriod(ctx context.Context, tierID int, annual bool) (int,
 func (h *Handler) index(c *gin.Context) {
 	tpl := h.tb.Build("donate/index")
 	if h.np == nil {
-		tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(nil, h.patreonOn, h.lavaOn)))
+		tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(nil, h.patreonOn)))
 		return
 	}
 	prices, err := h.np.Prices(c.Request.Context())
 	if err != nil {
 		// Plans unavailable must not take the Patreon option down with it.
 		tpl.HTML(http.StatusOK,
-			web.NewContext(c).WithData(buildCards(nil, h.patreonOn, h.lavaOn)).WithErr(errors.Wrap(err, "failed to get plans")))
+			web.NewContext(c).WithData(buildCards(nil, h.patreonOn)).WithErr(errors.Wrap(err, "failed to get plans")))
 		return
 	}
-	tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(prices, h.patreonOn, h.lavaOn)))
+	tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(prices, h.patreonOn)))
 }
 
 func (h *Handler) cryptoCheckout(c *gin.Context) {
@@ -351,7 +336,7 @@ func (h *Handler) cryptoCheckout(c *gin.Context) {
 	if err != nil {
 		prices, _ := h.np.Prices(ctx)
 		h.tb.Build("donate/index").HTML(http.StatusInternalServerError,
-			web.NewContext(c).WithData(buildCards(prices, h.patreonOn, h.lavaOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
+			web.NewContext(c).WithData(buildCards(prices, h.patreonOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
 		return
 	}
 	// Hosted checkout lives on the payment provider's domain.
