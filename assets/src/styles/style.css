@@ -526,6 +526,61 @@ input:-webkit-autofill:focus {
   background: radial-gradient(circle, rgba(232,67,147,0.18) 0%, rgba(232,67,147,0.06) 40%, transparent 70%);
 }
 
+/* Ambient wave lines drifting behind the hero slogan. Each svg is 200%
+   wide and holds a path that is periodic across half its viewBox, so a
+   translateX(-50%) loop tiles seamlessly. Layers share one direction at
+   different speeds (negative delays de-phase them) to read as slow
+   current, not oscillation. */
+.hero-wave {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 230px;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+.hero-wave svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200%;
+  height: 100%;
+  will-change: transform;
+}
+.hero-wave .wave-a {
+  opacity: 0.20;
+  animation: hero-wave-drift 38s linear infinite;
+}
+.hero-wave .wave-b {
+  opacity: 0.13;
+  top: 19%;
+  height: 70%;
+  animation: hero-wave-drift 61s linear infinite;
+  animation-delay: -23s;
+}
+.hero-wave .wave-c {
+  opacity: 0.10;
+  top: 31%;
+  height: 46%;
+  animation: hero-wave-drift 89s linear infinite;
+  animation-delay: -52s;
+}
+@keyframes hero-wave-drift {
+  to { transform: translateX(-50%); }
+}
+@media (max-width: 640px) {
+  .hero-wave { height: 170px; }
+  /* wider svg = longer visible period, otherwise ripples get too tight
+     on narrow screens; -50% self-translate stays seamless at any width */
+  .hero-wave svg { width: 400%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-wave svg { animation: none; }
+}
+
 .upload-dashed {
   border: 2px dashed rgba(232, 67, 147, 0.3);
   transition: all 0.3s;

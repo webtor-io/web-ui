@@ -161,7 +161,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Purple (`bg-w-purple/10 text-w-purpleL`) — comparison sections
 - Cyan (`bg-w-cyan/10 text-w-cyan`) — info, tools, FAQ
 
-**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `promo-outline`, `loading-elipsis`, `popin`, `w-card-frame`, `w-card-title`, `w-card-badge`, `w-card-badge-label`, `w-card-badge-ghost`, `w-card-stars-compact`, `w-card-stars-full`.
+**Custom CSS classes** (`assets/src/styles/style.css`): `btn-pink`, `btn-soft`, `btn-soft-cyan`, `toggle-soft`, `gradient-text`, `gradient-stat`, `hero-glow`, `hero-wave` (+ `wave-a/b/c`), `cta-glow`, `upload-dashed`, `navbar-redesign`, `collapse-webtor`, `progress-alert`, `promo`, `promo-close`, `promo-compact`, `promo-outline`, `loading-elipsis`, `popin`, `w-card-frame`, `w-card-title`, `w-card-badge`, `w-card-badge-label`, `w-card-badge-ghost`, `w-card-stars-compact`, `w-card-stars-full`.
 
 **Mobile patterns** — see `docs/uikit.html` section 15. Key rules:
 - Hide decorative badges/subtitles on mobile (`hidden sm:inline-flex` / `hidden sm:block`)
