@@ -456,9 +456,23 @@ func (s *Api) GetSpeedtestURLs(ctx context.Context, c *Claims) ([]SpeedtestURL, 
 }
 
 func (s *Api) ExportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string) (e *ra.ExportResponse, err error) {
+	return s.ExportResourceContentWithArchiveFormat(ctx, c, infohash, itemID, imdbID, "")
+}
+
+// ExportResourceContentWithArchiveFormat additionally forwards the archive
+// format ("tar" or "zip") that rest-api uses to name directory downloads;
+// empty keeps the rest-api default (zip).
+func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string, archiveFormat string) (e *ra.ExportResponse, err error) {
 	u := s.url + "/resource/" + infohash + "/export/" + itemID
+	q := url.Values{}
 	if imdbID != "" {
-		u += "?imdb-id=" + imdbID
+		q.Add("imdb-id", imdbID)
+	}
+	if archiveFormat != "" {
+		q.Add("archive-format", archiveFormat)
+	}
+	if len(q) > 0 {
+		u += "?" + q.Encode()
 	}
 	e = &ra.ExportResponse{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)

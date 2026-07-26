@@ -284,6 +284,22 @@
       &bull; <code>btn-ghost border border-w-line</code> = outlined ghost &mdash; nav, downloads, secondary actions (hover: pink border + white text)<br>
       &bull; <code>btn-ghost</code> (no border) = tertiary actions (demo, delete, logout)
     </div>
+
+    <h3 class="text-base font-bold mt-8 mb-3">Split button (default action + format dropdown)</h3>
+    <p class="desc">Primary submit rounded on the left only, chevron trigger rounded on the right with <code>border-l-0</code>, alternatives in a focus-driven <code>dropdown</code> (works without JS). Used by the directory download button (TAR default, ZIP in the menu; see <code>partials/list.html</code>). Each menu alternative is its own <code>&lt;form&gt;</code> &mdash; async.js posts <code>FormData</code> without the submitter, so button values would be lost in a shared form.</p>
+    <div class="uikit-row">
+      <div class="flex items-stretch">
+        <button class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">TAR [1.4 GB]</button>
+        <div class="dropdown dropdown-end -ml-px">
+          <div tabindex="0" role="button" class="btn btn-sm btn-ghost border border-w-line rounded-l-none px-1.5 relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </div>
+          <ul tabindex="0" class="dropdown-content menu bg-base-200 border border-w-line rounded-box z-[1] w-40 p-2 shadow-lg mt-2">
+            <li><button class="w-full text-left whitespace-nowrap px-3 py-1.5 rounded-lg hover:bg-base-300 cursor-pointer">ZIP [1.4 GB]</button></li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <hr class="uikit-divider">

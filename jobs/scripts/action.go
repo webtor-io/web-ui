@@ -606,6 +606,10 @@ type FileDownload struct {
 	URL      string
 	HasAds   bool
 	TierName string
+	// ZipWarning surfaces the CRC note for on-the-fly ZIP archives: they
+	// carry no per-file checksums, so picky unpackers may warn. TAR (the
+	// default) has no such problem.
+	ZipWarning bool
 }
 
 type NoPeersData struct {
@@ -616,7 +620,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	j.InProgress(s.t("job.retrievingDownloadLink"))
 	exportCtx, exportCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer exportCancel()
-	resp, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, "")
+	resp, err := s.api.ExportResourceContentWithArchiveFormat(exportCtx, c.ApiClaims, resourceID, itemID, "", s.archiveFormat)
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve download link")
 	}
@@ -650,9 +654,10 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		}
 	}
 	str, err := tpl.ToString(c.WithData(&FileDownload{
-		URL:      de.URL,
-		HasAds:   hasAds,
-		TierName: tierName,
+		URL:        de.URL,
+		HasAds:     hasAds,
+		TierName:   tierName,
+		ZipWarning: s.archiveFormat == "zip",
 	}))
 	if err != nil {
 		return err
@@ -1020,6 +1025,7 @@ type ActionScript struct {
 	grace         GraceSettings
 	forceSlow     bool
 	debug         string
+	archiveFormat string
 }
 
 func (s *ActionScript) t(key string) string {
@@ -1113,7 +1119,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -1153,7 +1159,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	if debug != "" {
 		debugKey = "dbg-" + debug
 	}
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey)))
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey+"/"+archiveFormat)))
 	return &ErrorWrapperScript{
 		tb:         tb,
 		c:          c,
@@ -1178,6 +1184,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			grace:         grace,
 			forceSlow:     forceSlow,
 			debug:         debug,
+			archiveFormat: archiveFormat,
 		},
 	}, id
 }

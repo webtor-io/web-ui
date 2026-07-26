@@ -35,16 +35,47 @@
                     </span>
                 </div>
                 {{ with makeDirDownload $ . }}
-                <form class="{{ .Action }}" action="{{ langPath $.Lang .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
-                    <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
-                    <input type="hidden" name="item-id" value="{{ .ItemID }}" />
-                    <button type="submit" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="{{ .Action }}" onclick="document.getElementById('progress-modal-{{ .ID }}').showModal()">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        ZIP [{{ $DirSize }}]
-                    </button>
-                </form>
+                {{/* Split button: the primary action downloads .tar (no
+                     per-file checksums → an interrupted-and-resumed download
+                     never unpacks as "corrupt"), the dropdown keeps .zip.
+                     Two separate forms because async.js posts
+                     `new FormData(form)` without the submitter, so a shared
+                     form couldn't tell which button was clicked. */}}
+                <div class="flex items-stretch">
+                    <form class="{{ .Action }}" action="{{ langPath $.Lang .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
+                        <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
+                        <input type="hidden" name="item-id" value="{{ .ItemID }}" />
+                        <input type="hidden" name="archive-format" value="tar" />
+                        <button type="submit" class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="{{ .Action }}" data-umami-event-format="tar" onclick="document.getElementById('progress-modal-{{ .ID }}').showModal()">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            TAR [{{ $DirSize }}]
+                        </button>
+                    </form>
+                    {{/* -ml-px overlaps the shared border; the hovered half
+                         raises itself via z-index so its pink outline draws
+                         as a complete rectangle over the seam. */}}
+                    <div class="dropdown dropdown-end -ml-px">
+                        <div tabindex="0" role="button" class="btn btn-sm btn-ghost border border-w-line rounded-l-none px-1.5 relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content" aria-label="{{ t $.Lang "resource.archiveFormat" }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </div>
+                        <ul tabindex="0" class="dropdown-content menu bg-base-200 border border-w-line rounded-box z-[1] w-40 p-2 shadow-lg mt-2">
+                            <li>
+                                <form class="{{ .Action }}" action="{{ langPath $.Lang .Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .ID }}" data-async-push-state="false">
+                                    <input type="hidden" name="resource-id" value="{{ .ResourceID }}" />
+                                    <input type="hidden" name="item-id" value="{{ .ItemID }}" />
+                                    <input type="hidden" name="archive-format" value="zip" />
+                                    <button type="submit" class="w-full text-left whitespace-nowrap px-3 py-1.5 rounded-lg hover:bg-base-300 cursor-pointer" data-umami-event="{{ .Action }}" data-umami-event-format="zip" onclick="document.getElementById('progress-modal-{{ .ID }}').showModal();document.activeElement.blur()">
+                                        ZIP [{{ $DirSize }}]
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
                 {{ end }}
             </div>
 

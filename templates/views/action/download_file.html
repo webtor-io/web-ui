@@ -25,6 +25,14 @@
         </a>
     </div>
     {{- end }}
+    {{- if .Data.ZipWarning }}
+    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-warning">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <div class="text-xs text-w-muted leading-relaxed">{{ t $.Lang "action.download.zipCrcWarning" }}</div>
+    </div>
+    {{- end }}
     <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
         <div class="flex flex-wrap gap-1.5 mr-auto">
             <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">

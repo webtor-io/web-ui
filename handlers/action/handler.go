@@ -23,6 +23,7 @@ type PostArgs struct {
 	Purge               bool
 	ForceSlow           bool
 	Debug               string
+	ArchiveFormat       string
 	VideoStreamUserData *models.VideoStreamUserData
 }
 
@@ -120,6 +121,21 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		}
 	}
 
+	// Only the directory-download forms post this field ("tar" is the UI
+	// default: no per-file checksums → a resumed download never unpacks as
+	// "corrupt"; "zip" stays available from the format dropdown). Gate on
+	// field presence, not on the action name — both /download-file and
+	// /download-dir run action "download", so the action can't tell them
+	// apart. Forms without the field (streams, previews, single files)
+	// keep it empty and rest-api applies its own default.
+	archiveFormat := ""
+	if v, ok := c.GetPostForm("archive-format"); ok {
+		archiveFormat = "tar"
+		if v == "zip" {
+			archiveFormat = "zip"
+		}
+	}
+
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 
@@ -130,6 +146,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		Purge:               purge,
 		ForceSlow:           forceSlow,
 		Debug:               debug,
+		ArchiveFormat:       archiveFormat,
 	}, nil
 }
 
@@ -160,6 +177,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		args.VideoStreamUserData,
 		args.ForceSlow,
 		args.Debug,
+		args.ArchiveFormat,
 	)
 	if err != nil {
 		postTpl.HTML(
