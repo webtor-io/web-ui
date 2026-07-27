@@ -1297,7 +1297,7 @@ log
     <div class="uikit-grid mb-6">
       <div class="hero-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">hero-glow</p>
-        <div class="uikit-label">Radial gradient: pink center, purple mid</div>
+        <div class="uikit-label">Radial gradient: pink center, purple mid &middot; breathes via 16s opacity/scale loop (scale, not transform &mdash; keeps Tailwind translate utilities intact)</div>
       </div>
       <div class="cta-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">cta-glow</p>
@@ -1325,10 +1325,132 @@ log
           <svg class="wave-c" viewBox="0 0 2880 240" preserveAspectRatio="none" fill="none">
             <path d="M0 120 C60 74 120 74 180 120 S300 166 360 120 S480 74 540 120 S660 166 720 120 S840 74 900 120 S1020 166 1080 120 S1200 74 1260 120 S1380 166 1440 120 S1560 74 1620 120 S1740 166 1800 120 S1920 74 1980 120 S2100 166 2160 120 S2280 74 2340 120 S2460 166 2520 120 S2640 74 2700 120 S2820 166 2880 120" stroke="#00cec9" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
           </svg>
+          <div class="hero-particles">
+            <div class="hero-particles-track particles-far">
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:5%;--y:60%;--s:2px;--o:0.24;--c:162 155 254"></i>
+                <i style="--x:10%;--y:79%;--s:1px;--o:0.23;--c:0 206 201"></i>
+                <i style="--x:16%;--y:88%;--s:2px;--o:0.16;--c:0 206 201"></i>
+                <i style="--x:20%;--y:32%;--s:2px;--o:0.22;--c:0 206 201"></i>
+                <i style="--x:23%;--y:57%;--s:2px;--o:0.26;--c:0 206 201"></i>
+                <i style="--x:27%;--y:41%;--s:1px;--o:0.17;--c:232 67 147"></i>
+                <i style="--x:33%;--y:65%;--s:2px;--o:0.15;--c:0 206 201"></i>
+                <i style="--x:37%;--y:36%;--s:1px;--o:0.19;--c:162 155 254"></i>
+                <i style="--x:44%;--y:75%;--s:2px;--o:0.25;--c:162 155 254"></i>
+                <i style="--x:48%;--y:20%;--s:1px;--o:0.14;--c:0 206 201"></i>
+                <i style="--x:53%;--y:83%;--s:2px;--o:0.20;--c:162 155 254"></i>
+                <i style="--x:56%;--y:71%;--s:1px;--o:0.15;--c:162 155 254"></i>
+                <i style="--x:62%;--y:67%;--s:2px;--o:0.25;--c:162 155 254"></i>
+                <i style="--x:66%;--y:17%;--s:2px;--o:0.20;--c:0 206 201"></i>
+                <i style="--x:71%;--y:13%;--s:1px;--o:0.21;--c:162 155 254"></i>
+                <i style="--x:76%;--y:29%;--s:1px;--o:0.23;--c:162 155 254"></i>
+                <i style="--x:82%;--y:53%;--s:1px;--o:0.19;--c:0 206 201"></i>
+                <i style="--x:86%;--y:49%;--s:1px;--o:0.16;--c:0 206 201"></i>
+                <i style="--x:90%;--y:44%;--s:2px;--o:0.19;--c:0 206 201"></i>
+                <i style="--x:95%;--y:25%;--s:2px;--o:0.22;--c:162 155 254"></i>
+              </div>
+              
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:5%;--y:60%;--s:2px;--o:0.24;--c:162 155 254"></i>
+                <i style="--x:10%;--y:79%;--s:1px;--o:0.23;--c:0 206 201"></i>
+                <i style="--x:16%;--y:88%;--s:2px;--o:0.16;--c:0 206 201"></i>
+                <i style="--x:20%;--y:32%;--s:2px;--o:0.22;--c:0 206 201"></i>
+                <i style="--x:23%;--y:57%;--s:2px;--o:0.26;--c:0 206 201"></i>
+                <i style="--x:27%;--y:41%;--s:1px;--o:0.17;--c:232 67 147"></i>
+                <i style="--x:33%;--y:65%;--s:2px;--o:0.15;--c:0 206 201"></i>
+                <i style="--x:37%;--y:36%;--s:1px;--o:0.19;--c:162 155 254"></i>
+                <i style="--x:44%;--y:75%;--s:2px;--o:0.25;--c:162 155 254"></i>
+                <i style="--x:48%;--y:20%;--s:1px;--o:0.14;--c:0 206 201"></i>
+                <i style="--x:53%;--y:83%;--s:2px;--o:0.20;--c:162 155 254"></i>
+                <i style="--x:56%;--y:71%;--s:1px;--o:0.15;--c:162 155 254"></i>
+                <i style="--x:62%;--y:67%;--s:2px;--o:0.25;--c:162 155 254"></i>
+                <i style="--x:66%;--y:17%;--s:2px;--o:0.20;--c:0 206 201"></i>
+                <i style="--x:71%;--y:13%;--s:1px;--o:0.21;--c:162 155 254"></i>
+                <i style="--x:76%;--y:29%;--s:1px;--o:0.23;--c:162 155 254"></i>
+                <i style="--x:82%;--y:53%;--s:1px;--o:0.19;--c:0 206 201"></i>
+                <i style="--x:86%;--y:49%;--s:1px;--o:0.16;--c:0 206 201"></i>
+                <i style="--x:90%;--y:44%;--s:2px;--o:0.19;--c:0 206 201"></i>
+                <i style="--x:95%;--y:25%;--s:2px;--o:0.22;--c:162 155 254"></i>
+              </div>
+              
+            </div>
+            <div class="hero-particles-track particles-mid">
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:6%;--y:37%;--s:2px;--o:0.31;--b:5px;--d:19s;--t:-12s;--c:0 206 201"></i>
+                <i style="--x:14%;--y:46%;--s:3px;--o:0.42;--b:8px;--d:23s;--t:-23s;--c:0 206 201"></i>
+                <i style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--c:162 155 254"></i>
+                <i style="--x:26%;--y:65%;--s:2px;--o:0.42;--b:5px;--d:25s;--t:-18s;--c:232 67 147"></i>
+                <i style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--c:232 67 147"></i>
+                <i style="--x:41%;--y:30%;--s:2px;--o:0.40;--b:5px;--d:14s;--t:-3s;--c:162 155 254"></i>
+                <i style="--x:45%;--y:58%;--s:3px;--o:0.46;--b:8px;--d:26s;--t:-25s;--c:162 155 254"></i>
+                <i style="--x:55%;--y:18%;--s:3px;--o:0.41;--b:6px;--d:19s;--t:-21s;--c:232 67 147"></i>
+                <i style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--c:232 67 147"></i>
+                <i style="--x:69%;--y:54%;--s:3px;--o:0.45;--b:7px;--d:28s;--t:-20s;--c:0 206 201"></i>
+                <i style="--x:75%;--y:82%;--s:3px;--o:0.30;--b:7px;--d:28s;--t:-5s;--c:162 155 254"></i>
+                <i style="--x:81%;--y:72%;--s:3px;--o:0.41;--b:7px;--d:14s;--t:-16s;--c:0 206 201"></i>
+                <i style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--c:162 155 254"></i>
+                <i style="--x:95%;--y:12%;--s:2px;--o:0.36;--b:7px;--d:18s;--t:-7s;--c:232 67 147"></i>
+              </div>
+              
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:6%;--y:37%;--s:2px;--o:0.31;--b:5px;--d:19s;--t:-12s;--c:0 206 201"></i>
+                <i style="--x:14%;--y:46%;--s:3px;--o:0.42;--b:8px;--d:23s;--t:-23s;--c:0 206 201"></i>
+                <i style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--c:162 155 254"></i>
+                <i style="--x:26%;--y:65%;--s:2px;--o:0.42;--b:5px;--d:25s;--t:-18s;--c:232 67 147"></i>
+                <i style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--c:232 67 147"></i>
+                <i style="--x:41%;--y:30%;--s:2px;--o:0.40;--b:5px;--d:14s;--t:-3s;--c:162 155 254"></i>
+                <i style="--x:45%;--y:58%;--s:3px;--o:0.46;--b:8px;--d:26s;--t:-25s;--c:162 155 254"></i>
+                <i style="--x:55%;--y:18%;--s:3px;--o:0.41;--b:6px;--d:19s;--t:-21s;--c:232 67 147"></i>
+                <i style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--c:232 67 147"></i>
+                <i style="--x:69%;--y:54%;--s:3px;--o:0.45;--b:7px;--d:28s;--t:-20s;--c:0 206 201"></i>
+                <i style="--x:75%;--y:82%;--s:3px;--o:0.30;--b:7px;--d:28s;--t:-5s;--c:162 155 254"></i>
+                <i style="--x:81%;--y:72%;--s:3px;--o:0.41;--b:7px;--d:14s;--t:-16s;--c:0 206 201"></i>
+                <i style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--c:162 155 254"></i>
+                <i style="--x:95%;--y:12%;--s:2px;--o:0.36;--b:7px;--d:18s;--t:-7s;--c:232 67 147"></i>
+              </div>
+              
+            </div>
+            <div class="hero-particles-track particles-near">
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:9%;--y:53%;--s:4px;--o:0.53;--b:11px;--d:28s;--t:-22s;--c:162 155 254"></i>
+                <i style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--c:162 155 254"></i>
+                <i style="--x:29%;--y:87%;--s:3px;--o:0.59;--b:7px;--d:14s;--t:-11s;--c:0 206 201"></i>
+                <i style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--c:232 67 147"></i>
+                <i style="--x:59%;--y:37%;--s:4px;--o:0.51;--b:8px;--d:13s;--t:-23s;--c:232 67 147"></i>
+                <i style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--c:162 155 254"></i>
+                <i style="--x:76%;--y:46%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-10s;--c:232 67 147"></i>
+                <i style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--c:232 67 147"></i>
+              </div>
+              
+              
+              
+              <div class="hero-particle-field">
+                <i style="--x:9%;--y:53%;--s:4px;--o:0.53;--b:11px;--d:28s;--t:-22s;--c:162 155 254"></i>
+                <i style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--c:162 155 254"></i>
+                <i style="--x:29%;--y:87%;--s:3px;--o:0.59;--b:7px;--d:14s;--t:-11s;--c:0 206 201"></i>
+                <i style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--c:232 67 147"></i>
+                <i style="--x:59%;--y:37%;--s:4px;--o:0.51;--b:8px;--d:13s;--t:-23s;--c:232 67 147"></i>
+                <i style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--c:162 155 254"></i>
+                <i style="--x:76%;--y:46%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-10s;--c:232 67 147"></i>
+                <i style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--c:232 67 147"></i>
+              </div>
+              
+            </div>
+          </div>
         </div>
         <p class="relative z-10 text-sm text-w-sub">hero-wave</p>
       </div>
-      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden</div>
+      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden<br>hero-particles &middot; dust in three parallax depths riding the same current, all slower than the waves &middot; particles-far / -mid / -near set --speed (240s / 165s / 110s vs 38/61/89s) and get smaller, dimmer and denser with distance &middot; each hero-particles-track is 200% wide and holds its hero-particle-field twice so the loop tiles; each &lt;i&gt; sets --x/--y/--s/--o/--c (+ --b/--d/--t on the two front layers) and only bobs vertically &mdash; horizontal travel and edge fading are the track's and the masks' job &middot; far is intentionally motionless, and far/mid are halved below 640px</div>
     </div>
   </div>
 

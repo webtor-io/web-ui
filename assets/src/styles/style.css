@@ -518,8 +518,17 @@ input:-webkit-autofill:focus {
   padding-right: 0.08em;
 }
 
+/* Slow breathing of the hero backlight. Animates `scale`/`opacity` only —
+   `scale` is an independent property, so it does not clobber Tailwind's
+   `-translate-x-1/2` (v4 emits that via the `translate` property). */
 .hero-glow {
   background: radial-gradient(circle, rgba(232,67,147,0.1) 0%, rgba(108,92,231,0.05) 40%, transparent 70%);
+  animation: hero-glow-breathe 16s ease-in-out infinite;
+  will-change: opacity, scale;
+}
+@keyframes hero-glow-breathe {
+  0%, 100% { opacity: 0.78; scale: 1; }
+  50%      { opacity: 1;    scale: 1.06; }
 }
 
 .cta-glow {
@@ -571,14 +580,83 @@ input:-webkit-autofill:focus {
 @keyframes hero-wave-drift {
   to { transform: translateX(-50%); }
 }
+
+/* Dust carried by the same current as the waves, in three parallax depths.
+   Pure CSS on purpose — a canvas particle system would cost bundle size and
+   a rAF loop on phones for pure decoration.
+   Horizontal travel belongs to the track, not the particle: one shared drift
+   per depth, same direction as the waves, so each layer reads as one current
+   rather than a swarm. Parallax comes from speed, size and brightness. */
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  /* vertical falloff; the horizontal one is inherited from .hero-wave's mask,
+     which is also what keeps the 200% tracks from overflowing the viewport */
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+}
+.hero-particles-track {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200%;
+  height: 100%;
+  will-change: transform;
+  animation: hero-wave-drift var(--speed) linear infinite;
+}
+/* the slowest wave crosses in 89s, so even the near layer lags the current */
+.particles-near { --speed: 110s; }
+.particles-mid  { --speed: 165s; }
+.particles-far  { --speed: 240s; }
+
+.hero-particle-field {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+}
+.hero-particle-field + .hero-particle-field { left: 50%; }
+.hero-particles i {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 9999px;
+  background: rgb(var(--c));
+  opacity: var(--o);
+}
+/* Only the two front layers breathe. Leaving the dense far layer static keeps
+   half the particles painted into their track instead of each becoming its
+   own compositor layer — it is a backdrop, motion there would only add noise. */
+.particles-mid i,
+.particles-near i {
+  box-shadow: 0 0 calc(var(--s) * 3) rgb(var(--c) / 0.7);
+  animation: hero-particle-bob var(--d) ease-in-out infinite;
+  animation-delay: var(--t);
+}
+@keyframes hero-particle-bob {
+  0%, 100% { transform: translate3d(0, calc(var(--b) * -1), 0); opacity: calc(var(--o) * 0.55); }
+  50%      { transform: translate3d(0, var(--b), 0);            opacity: var(--o); }
+}
+
 @media (max-width: 640px) {
   .hero-wave { height: 170px; }
   /* wider svg = longer visible period, otherwise ripples get too tight
      on narrow screens; -50% self-translate stays seamless at any width */
   .hero-wave svg { width: 400%; }
+  /* thin the two dense layers — same density feel on a much narrower band.
+     Applied inside both copies of a field identically, so tiling stays
+     seamless. The near layer is sparse already and carries the depth read. */
+  .particles-far i:nth-child(2n),
+  .particles-mid i:nth-child(2n) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-wave svg { animation: none; }
+  .hero-glow { animation: none; }
+  /* keep the dust, drop the motion */
+  .hero-particles-track,
+  .hero-particles i { animation: none; }
 }
 
 .upload-dashed {
