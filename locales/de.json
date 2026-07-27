@@ -316,6 +316,8 @@
     "resource.download": "Herunterladen",
     "resource.downloadDir": "Verzeichnis als Archiv herunterladen",
     "resource.archiveFormat": "Archivformat",
+    "resource.select": "Dateien auswählen",
+    "resource.selectCancel": "Auswahl aufheben",
     "resource.stream": "Streamen",
     "resource.status.idle": "Bereit",
     "resource.status.caching": "Zwischenspeicherung",

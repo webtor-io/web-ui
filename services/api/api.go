@@ -456,13 +456,14 @@ func (s *Api) GetSpeedtestURLs(ctx context.Context, c *Claims) ([]SpeedtestURL, 
 }
 
 func (s *Api) ExportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string) (e *ra.ExportResponse, err error) {
-	return s.ExportResourceContentWithArchiveFormat(ctx, c, infohash, itemID, imdbID, "")
+	return s.ExportResourceContentWithArchiveFormat(ctx, c, infohash, itemID, imdbID, "", nil)
 }
 
 // ExportResourceContentWithArchiveFormat additionally forwards the archive
-// format ("tar" or "zip") that rest-api uses to name directory downloads;
-// empty keeps the rest-api default (zip).
-func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string, archiveFormat string) (e *ra.ExportResponse, err error) {
+// format ("tar" or "zip") that rest-api uses to name directory downloads
+// (empty keeps the rest-api default, zip) and the optional selection of
+// file/folder paths the archive should be limited to.
+func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string, archiveFormat string, paths []string) (e *ra.ExportResponse, err error) {
 	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	q := url.Values{}
 	if imdbID != "" {
@@ -470,6 +471,9 @@ func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Cla
 	}
 	if archiveFormat != "" {
 		q.Add("archive-format", archiveFormat)
+	}
+	for _, p := range paths {
+		q.Add("paths", p)
 	}
 	if len(q) > 0 {
 		u += "?" + q.Encode()

@@ -316,6 +316,8 @@
     "resource.download": "Stáhnout",
     "resource.downloadDir": "Stáhnout složku jako archiv",
     "resource.archiveFormat": "Formát archivu",
+    "resource.select": "Vybrat soubory",
+    "resource.selectCancel": "Zrušit výběr",
     "resource.stream": "Streamovat",
     "resource.preview": "Náhled",
     "resource.status.idle": "Nečinné",

@@ -316,6 +316,8 @@
     "resource.download": "Télécharger",
     "resource.downloadDir": "Télécharger le dossier en archive",
     "resource.archiveFormat": "Format d'archive",
+    "resource.select": "Sélectionner des fichiers",
+    "resource.selectCancel": "Annuler la sélection",
     "resource.stream": "Diffuser",
     "resource.preview": "Aperçu",
     "resource.status.idle": "Inactif",

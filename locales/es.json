@@ -316,6 +316,8 @@
     "resource.download": "Descargar",
     "resource.downloadDir": "Descargar carpeta como archivo",
     "resource.archiveFormat": "Formato de compresión",
+    "resource.select": "Seleccionar archivos",
+    "resource.selectCancel": "Cancelar selección",
     "resource.stream": "Reproducir",
     "resource.status.idle": "Inactivo",
     "resource.status.caching": "Almacenando",

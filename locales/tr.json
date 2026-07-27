@@ -316,6 +316,8 @@
     "resource.download": "İndir",
     "resource.downloadDir": "Klasörü arşiv olarak indir",
     "resource.archiveFormat": "Arşiv formatı",
+    "resource.select": "Dosya seç",
+    "resource.selectCancel": "Seçimi iptal et",
     "resource.stream": "İzle",
     "resource.preview": "Önizleme",
     "resource.status.idle": "Boşta",

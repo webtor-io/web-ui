@@ -50,6 +50,15 @@
             <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
             <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
             <input type="hidden" name="force-slow" value="true" />
+            {{- /* Directory downloads must resubmit with the same archive
+                 format and partial-archive selection — without these the
+                 slow re-run would fall back to a whole-directory zip. */}}
+            {{- if .Data.ArchiveFormat }}
+            <input type="hidden" name="archive-format" value="{{ .Data.ArchiveFormat }}" />
+            {{- end }}
+            {{- range .Data.SelectedPaths }}
+            <input type="hidden" name="paths" value="{{ . }}" />
+            {{- end }}
             <button type="submit" class="btn whitespace-nowrap {{ if .Data.IsRateLimited }}btn-ghost border border-w-line{{ else }}btn-soft{{ end }}"
                     data-umami-event="slow-download-continue-slow"
                     data-umami-event-tier="{{ .Data.TierName }}"

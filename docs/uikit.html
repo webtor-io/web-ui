@@ -286,9 +286,11 @@
     </div>
 
     <h3 class="text-base font-bold mt-8 mb-3">Split button (default action + format dropdown)</h3>
-    <p class="desc">Primary submit rounded on the left only, chevron trigger rounded on the right with <code>border-l-0</code>, alternatives in a focus-driven <code>dropdown</code> (works without JS). Used by the directory download button (TAR default, ZIP in the menu; see <code>partials/list.html</code>). Each menu alternative is its own <code>&lt;form&gt;</code> &mdash; async.js posts <code>FormData</code> without the submitter, so button values would be lost in a shared form.</p>
+    <p class="desc">Primary submit rounded on the left only, chevron trigger rounded on the right with <code>border-l-0</code>, alternatives in a focus-driven <code>dropdown</code> (works without JS). Used by the directory download button (TAR default, ZIP in the menu; see <code>partials/list.html</code>). Each menu alternative is its own <code>&lt;form&gt;</code> &mdash; async.js posts <code>FormData</code> without the submitter, so button values would be lost in a shared form. A "Select files" toggle (outlined-ghost, JS-only: SSR-rendered hidden, unhidden by <code>resource/select.js</code>) sits left of the split button and switches the file browser into partial-archive selection: each row shows a <code>checkbox checkbox-sm</code> (DaisyUI, in a label outside the row anchor, <code>aria-label</code> = row name) and the size inside the button labels (<code>.js-archive-size</code> span) live-updates to the selected sum.</p>
     <div class="uikit-row">
+      <label class="mr-4 cursor-pointer" title="row selection checkbox (select mode)"><input type="checkbox" class="checkbox checkbox-sm" checked /></label>
       <div class="flex items-stretch">
+        <button class="btn btn-sm btn-ghost border border-w-line mr-2 text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">Select files</button>
         <button class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">TAR [1.4 GB]</button>
         <div class="dropdown dropdown-end -ml-px">
           <div tabindex="0" role="button" class="btn btn-sm btn-ghost border border-w-line rounded-l-none px-1.5 relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content">

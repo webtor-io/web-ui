@@ -316,6 +316,8 @@
     "resource.download": "Baixar",
     "resource.downloadDir": "Baixar diretório como arquivo",
     "resource.archiveFormat": "Formato de compactação",
+    "resource.select": "Selecionar arquivos",
+    "resource.selectCancel": "Cancelar seleção",
     "resource.stream": "Assistir",
     "resource.preview": "Pré-visualizar",
     "resource.status.idle": "Inativo",

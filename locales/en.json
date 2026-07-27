@@ -332,6 +332,8 @@
     "resource.download": "Download",
     "resource.downloadDir": "Download Directory as Archive",
     "resource.archiveFormat": "Archive format",
+    "resource.select": "Select files",
+    "resource.selectCancel": "Cancel selection",
     "resource.stream": "Stream",
     "resource.preview": "Preview",
     "resource.status.idle": "Idle",

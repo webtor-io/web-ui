@@ -316,6 +316,8 @@
     "resource.download": "Scarica",
     "resource.downloadDir": "Scarica la cartella come archivio",
     "resource.archiveFormat": "Formato archivio",
+    "resource.select": "Seleziona file",
+    "resource.selectCancel": "Annulla selezione",
     "resource.stream": "Guarda",
     "resource.preview": "Anteprima",
     "resource.status.idle": "Inattivo",

@@ -316,6 +316,8 @@
     "resource.download": "Downloaden",
     "resource.downloadDir": "Map downloaden als archief",
     "resource.archiveFormat": "Archiefformaat",
+    "resource.select": "Bestanden selecteren",
+    "resource.selectCancel": "Selectie annuleren",
     "resource.stream": "Streamen",
     "resource.preview": "Preview",
     "resource.status.idle": "Inactief",

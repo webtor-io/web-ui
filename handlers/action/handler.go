@@ -2,6 +2,9 @@ package action
 
 import (
 	"net/http"
+	"net/url"
+	"slices"
+	"sort"
 
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
@@ -15,6 +18,15 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 )
 
+// maxSelectedPaths and maxSelectedPathsEncodedLen mirror the rest-api
+// bounds on the partial-archive selection (count, and percent-encoded byte
+// length added to the signed download URL — edge proxies cap request lines
+// at ~8k).
+const (
+	maxSelectedPaths           = 1024
+	maxSelectedPathsEncodedLen = 6000
+)
+
 type PostArgs struct {
 	ResourceID          string
 	ItemID              string
@@ -24,6 +36,7 @@ type PostArgs struct {
 	ForceSlow           bool
 	Debug               string
 	ArchiveFormat       string
+	SelectedPaths       []string
 	VideoStreamUserData *models.VideoStreamUserData
 }
 
@@ -136,6 +149,33 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		}
 	}
 
+	// Optional partial-archive selection: file/folder paths ticked in the
+	// listing's select mode, one repeated "paths" field per path (select.js
+	// keeps both TAR and ZIP forms in sync). Values stay verbatim — torrent
+	// path components may legally contain whitespace — and get sorted so the
+	// job cache key and everything downstream (rest-api URL, archiver ETag)
+	// see the selection as a set. rest-api validates entries against the
+	// torrent manifest.
+	var selectedPaths []string
+	if vs, ok := c.GetPostFormArray("paths"); ok {
+		encodedLen := 0
+		for _, p := range vs {
+			if p == "" {
+				continue
+			}
+			encodedLen += len(url.QueryEscape(p)) + len("&paths=")
+			selectedPaths = append(selectedPaths, p)
+		}
+		if len(selectedPaths) > maxSelectedPaths {
+			return nil, errors.Errorf("too many paths selected (max %d)", maxSelectedPaths)
+		}
+		if encodedLen > maxSelectedPathsEncodedLen {
+			return nil, errors.Errorf("selected paths too long (max %d encoded bytes)", maxSelectedPathsEncodedLen)
+		}
+		sort.Strings(selectedPaths)
+		selectedPaths = slices.Compact(selectedPaths)
+	}
+
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 
@@ -147,6 +187,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		ForceSlow:           forceSlow,
 		Debug:               debug,
 		ArchiveFormat:       archiveFormat,
+		SelectedPaths:       selectedPaths,
 	}, nil
 }
 
@@ -178,6 +219,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		args.ForceSlow,
 		args.Debug,
 		args.ArchiveFormat,
+		args.SelectedPaths,
 	)
 	if err != nil {
 		postTpl.HTML(

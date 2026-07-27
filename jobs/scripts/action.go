@@ -105,11 +105,16 @@ type SlowDownloadData struct {
 	// rendering. Lets the "Continue at slow speed" button POST back to the
 	// originating action endpoint with force-slow=true and target the same
 	// progress-log container so the new job replaces the failed one in place.
-	Action      string
-	Endpoint    string
-	ResourceID  string
-	ItemID      string
-	LogTargetID string
+	// ArchiveFormat and SelectedPaths ride along so a directory download
+	// resubmits with the same format and partial-archive selection instead
+	// of silently falling back to a whole-directory zip.
+	Action        string
+	Endpoint      string
+	ResourceID    string
+	ItemID        string
+	LogTargetID   string
+	ArchiveFormat string
+	SelectedPaths []string
 }
 
 type SlowDownloadError struct {
@@ -620,7 +625,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	j.InProgress(s.t("job.retrievingDownloadLink"))
 	exportCtx, exportCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer exportCancel()
-	resp, err := s.api.ExportResourceContentWithArchiveFormat(exportCtx, c.ApiClaims, resourceID, itemID, "", s.archiveFormat)
+	resp, err := s.api.ExportResourceContentWithArchiveFormat(exportCtx, c.ApiClaims, resourceID, itemID, "", s.archiveFormat, s.selectedPaths)
 	if err != nil {
 		return errors.Wrap(err, "failed to retrieve download link")
 	}
@@ -1026,6 +1031,7 @@ type ActionScript struct {
 	forceSlow     bool
 	debug         string
 	archiveFormat string
+	selectedPaths []string
 }
 
 func (s *ActionScript) t(key string) string {
@@ -1053,12 +1059,14 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 type ErrorWrapperScript struct {
-	tb         template.Builder[*web.Context]
-	Script     job.Runnable
-	c          *web.Context
-	action     string
-	resourceId string
-	itemId     string
+	tb            template.Builder[*web.Context]
+	Script        job.Runnable
+	c             *web.Context
+	action        string
+	resourceId    string
+	itemId        string
+	archiveFormat string
+	selectedPaths []string
 }
 
 // actionEndpoint maps the internal action id to the public POST route the
@@ -1086,6 +1094,8 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		sde.Data.Endpoint = actionEndpoint(s.action)
 		sde.Data.ResourceID = s.resourceId
 		sde.Data.ItemID = s.itemId
+		sde.Data.ArchiveFormat = s.archiveFormat
+		sde.Data.SelectedPaths = s.selectedPaths
 		// Streaming buttons (MakeAudio/MakeVideo) wire data-async-target to
 		// "#log-{ItemID}" because MakeButton sets ButtonItem.ID = Item.ID.
 		// Mirroring that here keeps the resubmit landing in the same
@@ -1119,7 +1129,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -1159,13 +1169,18 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	if debug != "" {
 		debugKey = "dbg-" + debug
 	}
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey+"/"+archiveFormat)))
+	// NUL join: no path may alias another selection (or the other key parts)
+	// through plain concatenation.
+	selectedPathsKey := strings.Join(selectedPaths, "\x00")
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey+"/"+archiveFormat+"/"+selectedPathsKey)))
 	return &ErrorWrapperScript{
-		tb:         tb,
-		c:          c,
-		action:     action,
-		resourceId: resourceID,
-		itemId:     itemID,
+		tb:            tb,
+		c:             c,
+		action:        action,
+		resourceId:    resourceID,
+		itemId:        itemID,
+		archiveFormat: archiveFormat,
+		selectedPaths: selectedPaths,
 		Script: &ActionScript{
 			tb:            tb,
 			api:           api,
@@ -1185,6 +1200,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			forceSlow:     forceSlow,
 			debug:         debug,
 			archiveFormat: archiveFormat,
+			selectedPaths: selectedPaths,
 		},
 	}, id
 }

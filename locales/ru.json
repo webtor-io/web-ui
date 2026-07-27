@@ -316,6 +316,8 @@
     "resource.download": "Скачать",
     "resource.downloadDir": "Скачать папку архивом",
     "resource.archiveFormat": "Формат архива",
+    "resource.select": "Выбрать файлы",
+    "resource.selectCancel": "Отменить выбор",
     "resource.stream": "Смотреть",
     "resource.status.idle": "Ожидает",
     "resource.status.caching": "Кэширование",
