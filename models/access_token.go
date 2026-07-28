@@ -79,6 +79,39 @@ func MakeAccessToken(ctx context.Context, db *pg.DB, userID uuid.UUID, name stri
 	return token, nil
 }
 
+// RegenerateAccessToken issues a fresh token value for an existing
+// (user_id, name) pair, invalidating the previous one.
+//
+// MakeAccessToken deliberately keeps the current token on conflict — pressing
+// "Generate" twice must stay idempotent, otherwise every visit would silently
+// break the addon already installed in the user's Stremio. Rotating a leaked
+// URL therefore needs its own path, and it is destructive by design: the old
+// URL stops resolving the moment this returns.
+func RegenerateAccessToken(ctx context.Context, db *pg.DB, userID uuid.UUID, name string, scope []string) (*AccessToken, error) {
+	token := &AccessToken{
+		Token:     uuid.NewV4(),
+		UserID:    userID,
+		Name:      name,
+		Scope:     scope,
+		CreatedAt: time.Now(),
+	}
+
+	_, err := db.Model(token).
+		Context(ctx).
+		OnConflict("(user_id, name) DO UPDATE").
+		Set("token = EXCLUDED.token").
+		Set("scope = EXCLUDED.scope").
+		Set("created_at = EXCLUDED.created_at").
+		Returning("*").
+		Insert()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
 func GetUserByAccessTokenWithUser(ctx context.Context, db *pg.DB, token uuid.UUID) (*AccessToken, error) {
 	accessToken := new(AccessToken)
 	err := db.Model(accessToken).

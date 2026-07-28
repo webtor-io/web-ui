@@ -14,16 +14,23 @@
             {{ else }}
                 <script>
                     var webdavUrl = "{{ domain }}{{ .Data.WebDAVURL }}";
-                    function copyWebDAVUrl(form, e) {
+                    function copyWebDAVUrl(e) {
                         e.preventDefault();
                         navigator.clipboard.writeText(webdavUrl);
                         if (window.toast) window.toast.success('{{ t $.Lang "profile.webdav.copied" }}');
                         return false;
                     }
                 </script>
-                <form onsubmit="copyWebDAVUrl(this, event)" class="join w-full mb-4">
-                    <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
-                    <button type="submit" class="btn btn-soft join-item" data-umami-event="webdav-copy-url">{{ t $.Lang "profile.webdav.copyUrl" }}</button>
+                {{/* Single form so URL, copy and rotate share one join row.
+                     Copy is type="button"; submit is the rotation, which is
+                     destructive — mounted drives stop authenticating. */}}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/webdav/url/regenerate" }}" data-async-target="#webdav"
+                      onsubmit="return confirm({{ t $.Lang "profile.webdav.regenerateWarning" | json }})" class="join w-full mb-4">
+                    <input name="token" readonly aria-label="{{ t $.Lang "profile.webdav.title" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data.WebDAVURL }}" />
+                    <button type="button" onclick="copyWebDAVUrl(event)" class="btn btn-soft join-item" data-umami-event="webdav-copy-url">{{ t $.Lang "profile.webdav.copyUrl" }}</button>
+                    <button type="submit" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.webdav.regenerate" }}" aria-label="{{ t $.Lang "profile.webdav.regenerate" }}" data-umami-event="webdav-regenerate-url">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+                    </button>
                 </form>
                 <div class="mt-2">
                     <a href="{{ langPath $.Lang "/instructions/webdav" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-webdav" target="_blank">{{ t $.Lang "profile.webdav.howTo" }}</a>

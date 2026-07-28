@@ -36,7 +36,12 @@
         </svg>
         <p class="text-lg font-semibold text-w-sub mb-2">{{ t $.Lang "library.noTorrents" }}</p>
         <p class="text-sm text-w-muted mb-6">{{ t $.Lang "library.noTorrentsHint" }}</p>
-        <a class="btn btn-soft" href="{{ langPath $.Lang "/" }}" data-async-target="main">{{ t $.Lang "library.browseTorrents" }}</a>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <a class="btn btn-soft" href="{{ langPath $.Lang "/" }}" data-async-target="main">{{ t $.Lang "library.browseTorrents" }}</a>
+          {{/* Anchor navigation, so no data-async-target: async swaps #main without honouring the fragment. */}}
+          <a class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="{{ langPath $.Lang "/profile" }}#stremio" data-umami-event="library-empty-connect-stremio">{{ t $.Lang "library.watchOnTv" }}</a>
+        </div>
+        <p class="text-xs text-w-muted max-w-sm mx-auto mt-5 leading-relaxed">{{ t $.Lang "library.watchOnTvHint" }}</p>
       </div>
     {{ end }}
 

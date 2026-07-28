@@ -23,16 +23,9 @@
     </div>
     {{ end }}
 
-    <!-- Preferences -->
-    <div class="flex items-center gap-3 mt-10 mb-4">
-        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.preferences" }}</h2>
-        <div class="flex-1 h-px bg-w-line/50"></div>
-    </div>
-
-    <div id="adult-content-section" data-async-layout="{{`{{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}`}}">
-        {{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}
-    </div>
-
+    {{/* Stremio sits above preferences: connecting the addon is the strongest
+         retention action we have (see docs/onboarding_empty_states.md), and it
+         used to be buried under tier / vault / adult settings. */}}
     <!-- Stremio -->
     <div class="flex items-center gap-3 mt-10 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.stremio" }}</h2>
@@ -68,6 +61,16 @@
         {{ template "profile/embed_domains" (withContext $ .Data) }}
     </div>
     {{ end }}
+
+    <!-- Preferences -->
+    <div class="flex items-center gap-3 mt-10 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.preferences" }}</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+    </div>
+
+    <div id="adult-content-section" data-async-layout="{{`{{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}`}}">
+        {{ template "profile/adult_content" (withContext $ .Data.UserSettings) }}
+    </div>
 
     <div class="text-center mt-12 flex flex-col items-center gap-3">
         <a href="{{ langPath $.Lang "/profile/export" }}" class="btn btn-ghost border border-w-line text-w-sub hover:text-w-text text-sm" data-umami-event="profile-export" download>

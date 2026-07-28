@@ -38,6 +38,20 @@ func (s *AccessToken) Generate(c *gin.Context, name string, scope []string) (*mo
 	return models.MakeAccessToken(c.Request.Context(), db, u.ID, name, scope)
 }
 
+// Regenerate rotates the token value for an existing (user, name) pair.
+// Destructive: any addon installed with the previous URL stops working.
+func (s *AccessToken) Regenerate(c *gin.Context, name string, scope []string) (*models.AccessToken, error) {
+	u := auth.GetUserFromContext(c)
+	if !u.HasAuth() {
+		return nil, fmt.Errorf("no auth")
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database not initialized")
+	}
+	return models.RegenerateAccessToken(c.Request.Context(), db, u.ID, name, scope)
+}
+
 func (s *AccessToken) GetTokenByName(c *gin.Context, name string) (*models.AccessToken, error) {
 	db := s.pg.Get()
 	if db == nil {

@@ -171,7 +171,8 @@
             <path d="M2 12l10 5 10-5"/>
           </svg>
           <p class="text-base font-semibold text-w-text mb-2">{{ t $.Lang "vault.dashboard.emptyTitle" }}</p>
-          <p class="text-sm text-w-muted max-w-sm mx-auto leading-relaxed">{{ tp $.Lang "vault.dashboard.emptyHint" "Action" (t $.Lang "vault.keepAvailable") }}</p>
+          <p class="text-sm text-w-muted max-w-sm mx-auto leading-relaxed mb-6">{{ tp $.Lang "vault.dashboard.emptyHint" "Action" (t $.Lang "vault.keepAvailable") }}</p>
+          <a class="btn btn-soft btn-sm px-5" href="{{ langPath $.Lang "/" }}" data-async-target="main" data-umami-event="vault-empty-open-torrent">{{ t $.Lang "vault.dashboard.emptyCTA" }}</a>
         </div>
       {{ end }}
     </div>

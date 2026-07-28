@@ -44,6 +44,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, at *at.AccessToke
 	gr.Use(auth.HasAuth)
 	gr.Use(claims.IsPaid)
 	gr.POST("/url/generate", h.generateUrl)
+	gr.POST("/url/regenerate", h.regenerateUrl)
 
 	// WebDAV protocol routes - these require token-based authentication
 	grapi := gr.Group("")
@@ -58,6 +59,17 @@ func (s *Handler) generateUrl(c *gin.Context) {
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "toast.webdavUrlGenerated")
+}
+
+// regenerateUrl rotates the WebDAV token. Any drive already mounted with the
+// previous URL stops authenticating — the UI gates it behind a confirm.
+func (s *Handler) regenerateUrl(c *gin.Context) {
+	_, err := s.at.Regenerate(c, "webdav", []string{"webdav:read", "webdav:write"})
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to regenerate webdav url"))
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "toast.webdavUrlRegenerated")
 }
 
 func (s *Handler) handleWebDAV(c *gin.Context) {

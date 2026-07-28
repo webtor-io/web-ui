@@ -8,6 +8,21 @@ trimmed fork of [go-webdav] under `internal/` plus our `FileSystem` interface).
 
 [go-webdav]: https://github.com/emersion/go-webdav
 
+## Token management
+
+Both routes are `POST`, under `auth.HasAuth` + `claims.IsPaid`, and render into
+`templates/partials/profile/webdav.html`:
+
+| Route | Purpose |
+|-------|---------|
+| `/webdav/url/generate` | Issues the token. **Idempotent** — `models.MakeAccessToken` keeps the existing token on conflict, so a second press never breaks a mounted drive |
+| `/webdav/url/regenerate` | Rotates it (`models.RegenerateAccessToken`). **Destructive**: the old URL stops authenticating at once and every device with the drive mounted must be reconnected |
+
+Rotation is the circular-arrow button inside the same `join` row as the URL and
+`Copy URL`; the form's submit is the rotation and is wrapped in
+`onsubmit="return confirm(...)"`, copying is a `type="button"`. Same shape as
+the Stremio addon block — see `docs/stremio.md`.
+
 ## Request routing
 
 The URL handed to the user (see `handlers/profile/handler.go:getWebDAVURL`) is a

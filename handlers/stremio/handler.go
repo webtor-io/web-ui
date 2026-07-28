@@ -50,6 +50,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	gra := gr.Group("")
 	gra.Use(auth.HasAuth)
 	gra.POST("/url/generate", h.generateUrl)
+	gra.POST("/url/regenerate", h.regenerateUrl)
 	grapi := gra.Group("")
 	grapi.Use(at.HasScope("stremio:read"))
 	grapi.GET("/catalog/:type/*id", h.catalog)
@@ -70,6 +71,17 @@ func (s *Handler) generateUrl(c *gin.Context) {
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "toast.addonUrlGenerated")
+}
+
+// regenerateUrl rotates the addon token. Invalidates the URL already installed
+// in the user's Stremio — the UI gates it behind an expanded warning.
+func (s *Handler) regenerateUrl(c *gin.Context) {
+	_, err := s.at.Regenerate(c, "stremio", []string{"stremio:read"})
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to regenerate stremio addon url"))
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "toast.addonUrlRegenerated")
 }
 
 func (s *Handler) manifest(c *gin.Context) {

@@ -1,9 +1,10 @@
 {{ define "profile/stremio" }}
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
-        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            {{ t .Ctx.Lang "profile.stremio.addonUrl" }}
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-2 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+            {{ t .Ctx.Lang "profile.stremio.title" }}
         </h2>
+        <p class="text-sm text-w-muted leading-relaxed mb-5">{{ t .Ctx.Lang "profile.stremio.intro" }}</p>
         {{ if eq .Data "" }}
             <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath .Ctx.Lang "/stremio/url/generate" }}" data-async-target="#stremio">
                 <button type="submit" class="btn btn-soft" data-umami-event="stremio-generate-addon-url">
@@ -13,22 +14,29 @@
         {{ else }}
             <script>
                 var stremioAddonUrl = "{{ domain }}{{ .Data }}";
-                function copyStremioAddonUrl(form, e) {
+                function copyStremioAddonUrl(e) {
                     e.preventDefault();
                     navigator.clipboard.writeText(stremioAddonUrl);
                     if (window.toast) window.toast.success('{{ t .Ctx.Lang "profile.stremio.copied" }}');
                     return false;
                 }
             </script>
-            <form onsubmit="copyStremioAddonUrl(this, event)" class="join w-full mb-4">
-                <input name="token" readonly class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data }}" />
-                <button type="submit" class="btn btn-soft join-item" data-umami-event="stremio-copy-addon-url">{{ t .Ctx.Lang "profile.stremio.copyUrl" }}</button>
+            {{/* One form so the URL, copy and rotate share a single join row.
+                 Copy is type="button" (clipboard only), submit is the rotation —
+                 destructive, hence the confirm, same pattern as embed domains
+                 and addon deletion. Without JS the confirm is skipped, which is
+                 an acceptable degradation: rotation is recoverable. */}}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath .Ctx.Lang "/stremio/url/regenerate" }}" data-async-target="#stremio"
+                  onsubmit="return confirm({{ t .Ctx.Lang "profile.stremio.regenerateWarning" | json }})" class="join w-full mb-4">
+                <input name="token" readonly aria-label="{{ t .Ctx.Lang "profile.stremio.addonUrl" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ domain }}{{ .Data }}" />
+                <button type="button" onclick="copyStremioAddonUrl(event)" class="btn btn-soft join-item" data-umami-event="stremio-copy-addon-url">{{ t .Ctx.Lang "profile.stremio.copyUrl" }}</button>
+                <button type="submit" class="btn btn-soft join-item btn-square" title="{{ t .Ctx.Lang "profile.stremio.regenerate" }}" aria-label="{{ t .Ctx.Lang "profile.stremio.regenerate" }}" data-umami-event="stremio-regenerate-addon-url">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+                </button>
             </form>
             <div class="flex items-center justify-between">
                 <a href="{{ langPath .Ctx.Lang "/instructions/stremio" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-stremio" target="_blank">{{ t .Ctx.Lang "profile.stremio.howTo" }}</a>
-                {{ if not (eq .Data "") }}
-                    <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="stremio://{{ domainWithoutProtocol }}{{ .Data }}" data-umami-event="stremio-install-addon" target="_blank">{{ t .Ctx.Lang "profile.stremio.install" }}</a>
-                {{ end }}
+                <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" href="stremio://{{ domainWithoutProtocol }}{{ .Data }}" data-umami-event="stremio-install-addon" target="_blank">{{ t .Ctx.Lang "profile.stremio.install" }}</a>
             </div>
         {{ end }}
     </div>

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -182,7 +183,17 @@ func (s *Handler) export(c *gin.Context) {
 func (s *Handler) get(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	if !u.HasAuth() {
-		c.Redirect(http.StatusTemporaryRedirect, "/login")
+		// Preserve the path so a deep link into the profile (e.g. the Stremio
+		// CTA on tool pages) lands back here after sign-in instead of the
+		// default page. The #stremio fragment never reaches the server, so the
+		// section anchor is lost — the block sits near the top for that reason.
+		lang := i18n.GetLang(c)
+		returnURL := i18n.LangPath(lang, c.Request.URL.Path)
+		if rq := c.Request.URL.RawQuery; rq != "" {
+			returnURL += "?" + rq
+		}
+		v := url.Values{"return-url": []string{returnURL}}
+		c.Redirect(http.StatusFound, i18n.LangPath(lang, "/login")+"?"+v.Encode())
 		return
 	}
 	stremioURL, err := s.getStremioAddonURL(c)

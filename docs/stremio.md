@@ -16,6 +16,19 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 | `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it |
 | `GET /stream/:type/*id` | Streams for a movie/episode (the pipeline below) |
 
+Token management (both `POST`, auth-gated, rendered by `templates/partials/profile/stremio.html`):
+
+| Route | Purpose |
+|-------|---------|
+| `POST /url/generate` | Issues the addon token. **Idempotent** — `models.MakeAccessToken` keeps the existing token on conflict, so pressing it twice never breaks an installed addon |
+| `POST /url/regenerate` | Rotates the token (`models.RegenerateAccessToken`). **Destructive**: the previous URL stops resolving immediately and the addon must be reinstalled on every device. Gated behind an expanded collapse in the UI |
+
+Generation stays an explicit user action rather than something issued on first
+profile view — partly as a signal of intent, and partly because
+`access_token` with scope `stremio:read` is the metric for "user connected
+Stremio" (see `docs/onboarding_empty_states.md`); auto-issuing would turn it
+into "user opened the profile" and destroy the measurement.
+
 The personalised addon URL is a short alias (`/s/<code>`, `services/url_alias`)
 that points at `/token/<token>/stremio/`. The alias **must be created with
 `proxy=true`** (`handlers/profile/handler.go` `getStremioAddonURL`) so addon

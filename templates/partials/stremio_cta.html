@@ -1,0 +1,19 @@
+{{ define "stremio_cta" }}
+{{/* Used only on the /stremio-addons-online tool page, where the visitor is
+     already looking for Stremio addons. Every other tool page keeps
+     discover_cta — see docs/onboarding_empty_states.md. */}}
+<div class="max-w-[1100px] mx-auto">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-8 p-6 sm:p-8 rounded-2xl border border-w-cyan/25 bg-gradient-to-r from-w-cyan/10 via-base-300 to-w-purple/10">
+        <a href="{{ langPath .Ctx.Lang "/profile" }}#stremio" data-umami-event="stremio-cta-click" data-umami-event-page="{{ if .Data }}{{ .Data.Url }}{{ else }}home{{ end }}" class="btn btn-lg btn-pink gap-2 px-8 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path stroke-linecap="round" d="M8 21h8"/><path stroke-linecap="round" d="M12 17v4"/>
+            </svg>
+            {{ t .Ctx.Lang "tool.stremioCta.button" }}
+        </a>
+        <div class="min-w-0 flex-1">
+            <div class="text-base font-semibold mb-1">{{ t .Ctx.Lang "tool.stremioCta.title" }}</div>
+            <div class="text-[0.92rem] text-w-sub leading-relaxed">{{ t .Ctx.Lang "tool.stremioCta.text" }}</div>
+        </div>
+    </div>
+</div>
+{{ end }}
