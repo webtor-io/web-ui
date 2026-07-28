@@ -1297,7 +1297,7 @@ log
     <div class="uikit-grid mb-6">
       <div class="hero-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">hero-glow</p>
-        <div class="uikit-label">Radial gradient: pink center, purple mid &middot; breathes via 16s opacity/scale loop (scale, not transform &mdash; keeps Tailwind translate utilities intact)</div>
+        <div class="uikit-label">Radial gradient: pink center, purple mid &middot; breathes via 13s opacity/scale loop (scale, not transform &mdash; keeps Tailwind translate utilities intact) &middot; drifts up to 46&times;34px toward the pointer via transform + --hx/--hy (see hero pointer parallax below)</div>
       </div>
       <div class="cta-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">cta-glow</p>
@@ -1450,7 +1450,7 @@ log
         </div>
         <p class="relative z-10 text-sm text-w-sub">hero-wave</p>
       </div>
-      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden<br>hero-particles &middot; dust in three parallax depths riding the same current, all slower than the waves &middot; particles-far / -mid / -near set --speed (240s / 165s / 110s vs 38/61/89s) and get smaller, dimmer and denser with distance &middot; each hero-particles-track is 200% wide and holds its hero-particle-field twice so the loop tiles; each &lt;i&gt; sets --x/--y/--s/--o/--c (+ --b/--d/--t on the two front layers) and only bobs vertically &mdash; horizontal travel and edge fading are the track's and the masks' job &middot; far is intentionally motionless, and far/mid are halved below 640px</div>
+      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden<br>hero-particles &middot; dust in three parallax depths riding the same current, all slower than the waves &middot; particles-far / -mid / -near set --speed (240s / 165s / 110s vs 38/61/89s) and get smaller, dimmer and denser with distance &middot; each hero-particles-track is 200% wide and holds its hero-particle-field twice so the loop tiles; each &lt;i&gt; sets --x/--y/--s/--o/--c (+ --b/--d/--t on the two front layers) and only bobs vertically &mdash; horizontal travel and edge fading are the track's and the masks' job &middot; far is intentionally motionless, and far/mid are halved below 640px<br>hero pointer parallax &middot; assets/src/js/lib/heroPointer.js publishes --hx/--hy (pointer offset from the hero centre, -1..1, rAF-eased and parked when settled) on the hero &lt;section&gt; &middot; hero-glow drifts with the pointer via transform, the wave layers (-14/-9/-5px) and particle tracks (-26/-15/-7px) drift against it via the independent translate property &mdash; the drift animations own transform, so the two never collide &middot; no-op on coarse pointers and prefers-reduced-motion</div>
     </div>
   </div>
 

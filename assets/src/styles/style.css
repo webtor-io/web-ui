@@ -518,17 +518,23 @@ input:-webkit-autofill:focus {
   padding-right: 0.08em;
 }
 
-/* Slow breathing of the hero backlight. Animates `scale`/`opacity` only —
-   `scale` is an independent property, so it does not clobber Tailwind's
-   `-translate-x-1/2` (v4 emits that via the `translate` property). */
+/* Slow breathing of the hero backlight, plus a soft drift toward the pointer.
+   The animation touches `scale`/`opacity` only and the pointer offset lives on
+   `transform` — both are independent of the `translate` property, so Tailwind's
+   `-translate-x-1/2` (v4 emits it via `translate`) survives untouched. */
 .hero-glow {
   background: radial-gradient(circle, rgba(232,67,147,0.1) 0%, rgba(108,92,231,0.05) 40%, transparent 70%);
-  animation: hero-glow-breathe 16s ease-in-out infinite;
-  will-change: opacity, scale;
+  animation: hero-glow-breathe 13s ease-in-out infinite;
+  /* The pointer offset rides on `transform`, which composes after the
+     individual `translate`/`scale` properties — so it stacks on top of
+     Tailwind's -translate-x-1/2 and the breathing scale instead of
+     fighting them. --hx/--hy are published by lib/heroPointer. */
+  transform: translate3d(calc(var(--hx, 0) * 46px), calc(var(--hy, 0) * 34px), 0);
+  will-change: opacity, scale, transform;
 }
 @keyframes hero-glow-breathe {
-  0%, 100% { opacity: 0.78; scale: 1; }
-  50%      { opacity: 1;    scale: 1.06; }
+  0%, 100% { opacity: 0.6; scale: 0.96; }
+  50%      { opacity: 1;   scale: 1.12; }
 }
 
 .cta-glow {
@@ -577,6 +583,14 @@ input:-webkit-autofill:focus {
   animation: hero-wave-drift 89s linear infinite;
   animation-delay: -52s;
 }
+/* Pointer parallax for the band. The drift owns `transform`, so the offset
+   goes on the independent `translate` property — the two compose. Layers
+   shift against the cursor, nearest the most, which reads as looking around
+   a scene rather than as the layers sliding. The shifts stay well inside
+   .hero-wave's edge mask, so no seam is ever exposed. */
+.hero-wave .wave-a { translate: calc(var(--hx, 0) * -14px) calc(var(--hy, 0) * -10px); }
+.hero-wave .wave-b { translate: calc(var(--hx, 0) *  -9px) calc(var(--hy, 0) *  -7px); }
+.hero-wave .wave-c { translate: calc(var(--hx, 0) *  -5px) calc(var(--hy, 0) *  -4px); }
 @keyframes hero-wave-drift {
   to { transform: translateX(-50%); }
 }
@@ -605,9 +619,9 @@ input:-webkit-autofill:focus {
   animation: hero-wave-drift var(--speed) linear infinite;
 }
 /* the slowest wave crosses in 89s, so even the near layer lags the current */
-.particles-near { --speed: 110s; }
-.particles-mid  { --speed: 165s; }
-.particles-far  { --speed: 240s; }
+.particles-near { --speed: 110s; translate: calc(var(--hx, 0) * -26px) calc(var(--hy, 0) * -18px); }
+.particles-mid  { --speed: 165s; translate: calc(var(--hx, 0) * -15px) calc(var(--hy, 0) * -11px); }
+.particles-far  { --speed: 240s; translate: calc(var(--hx, 0) *  -7px) calc(var(--hy, 0) *  -5px); }
 
 .hero-particle-field {
   position: absolute;
@@ -653,10 +667,14 @@ input:-webkit-autofill:focus {
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-wave svg { animation: none; }
-  .hero-glow { animation: none; }
+  .hero-glow { animation: none; transform: none; }
   /* keep the dust, drop the motion */
   .hero-particles-track,
   .hero-particles i { animation: none; }
+  .hero-wave .wave-a,
+  .hero-wave .wave-b,
+  .hero-wave .wave-c,
+  .hero-particles-track { translate: none; }
 }
 
 .upload-dashed {
