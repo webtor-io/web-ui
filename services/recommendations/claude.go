@@ -515,7 +515,7 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 		// tool_use streamClaudeItems — Anthropic buffers tool_use
 		// generation server-side, so the latter doesn't actually flow
 		// per-token. Plain text streams as it's generated.
-		streamErrCh <- s.streamClaudeItemsText(ctx, prompt, req.History, req.Tier, claudeCh)
+		streamErrCh <- s.streamClaudeItemsText(ctx, uc, prompt, req.History, req.Tier, claudeCh)
 	}()
 
 	recCh := make(chan Recommendation, r2BufferSize)
@@ -642,7 +642,11 @@ func buildHistoryMessages(history []Message, userPrompt string) []anthropic.Mess
 //   - Format drift is possible. Each parsed object is still validated by
 //     json.Unmarshal into claudeItem; malformed entries get logged and
 //     dropped, the rest survive.
-func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, userPrompt string, history []Message, tier Tier, out chan<- claudeItem) error {
+// uc is passed for logging only — the prompt is already rendered by the
+// caller. HistorySize / WatchlistSize land on the completion log line so
+// spend can be attributed to cold-start vs personalised traffic without
+// joining two log lines by timestamp.
+func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, uc *UserContext, userPrompt string, history []Message, tier Tier, out chan<- claudeItem) error {
 	defer close(out)
 
 	ctx, cancel := context.WithTimeout(ctx, claudeTimeout)
@@ -786,16 +790,18 @@ func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, userPrompt st
 	}
 
 	log.WithFields(log.Fields{
-		"feature":       "ai_rec",
-		"kind":          "recommend",
-		"mode":          "text",
-		"model":         modelName,
-		"input_tokens":  inputTokens,
-		"output_tokens": outputTokens,
-		"cache_read":    cacheReadTokens,
-		"cache_write":   cacheCreateTokens,
-		"deltas":        deltaCount,
-		"total_ms":      time.Since(streamStart).Milliseconds(),
+		"feature":        "ai_rec",
+		"kind":           "recommend",
+		"mode":           "text",
+		"model":          modelName,
+		"input_tokens":   inputTokens,
+		"output_tokens":  outputTokens,
+		"cache_read":     cacheReadTokens,
+		"cache_write":    cacheCreateTokens,
+		"history_size":   uc.HistorySize,
+		"watchlist_size": uc.WatchlistSize,
+		"deltas":         deltaCount,
+		"total_ms":       time.Since(streamStart).Milliseconds(),
 	}).Info("claude stream complete")
 
 	return nil

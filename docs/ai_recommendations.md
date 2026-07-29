@@ -485,6 +485,41 @@ trade-off.
 - **Metadata lookups:** already cached inside each mapper
   (`tmdb.query`, `omdb.info`, ...) — unchanged by this feature.
 
+## Observability & cost
+
+Two logrus lines carry per-call Anthropic usage, both with `feature=ai_rec`:
+
+| Message | Emitted by | Key fields |
+|---|---|---|
+| `claude stream complete` | `streamClaudeItemsText` | `kind`, `model`, `input_tokens`, `output_tokens`, `cache_read`, `cache_write`, `history_size`, `watchlist_size`, `deltas`, `total_ms` |
+| `claude chips stream complete` | `streamClaudeChipsText` | same, minus the history/watchlist pair |
+
+`history_size` + `watchlist_size` exist to attribute spend to cold-start vs
+personalised traffic: a call with both at zero is one where the prompt
+carried no personal signal at all, so its result is in principle shareable
+across users (see Known follow-ups). They are logged, not acted on.
+
+Note `kind` is hardcoded to `recommend` on the completion line — refine
+calls are indistinguishable there. The `quota charged` line does
+distinguish them, so a refine ratio has to be derived from that.
+
+**Measured baseline (2026-07-29, 7-day window via Loki):**
+
+| Path | Calls / week | ≈ $ / week | ≈ $ / call |
+|---|---|---|---|
+| `recommend` (Haiku, free) | 275 | 4.65 | 0.017 |
+| `recommend` (Sonnet, paid) | 86 | 4.10 | 0.051 |
+| `chips` (Haiku) | 635 | 4.10 | 0.007 |
+
+~90% of that is the input prompt (≈15.1K tokens per `recommend` call vs
+~330 output). Anthropic prompt caching is currently a **wash, not a win**:
+at ~1.6 calls/hour the 5-minute ephemeral TTL expires between calls, so
+the ×1.25 write premium cancels the ×0.1 read discount almost exactly. A
+1-hour TTL (×2 write) would be strictly worse at this traffic level. Both
+observations flip once Discover traffic grows roughly 7-8×; until then
+prompt-size work has poor ROI relative to the regression risk in
+`fresh_releases` (see Known follow-ups).
+
 ## Configuration
 
 | Flag | Env | Default | Purpose |
@@ -612,3 +647,17 @@ calling `RecommendStream`.
   and `context` all have unit tests, but the streaming `RecommendStream`
   path is only exercised manually. A fake Anthropic SSE producer would
   give us coverage on the goroutine choreography and cancel paths.
+- **Shared cold-start recommendation cache.** A user with empty history
+  *and* empty watchlist who taps a default chip produces a fully
+  deterministic request: the six English queries in `default_chips.go`,
+  the locale, and nothing else — except the `Day / time` line that
+  `userPromptForRecommend` injects, which fragments an otherwise identical
+  prompt 28 ways. Dropping that line when `HistorySize == 0` would make
+  the result cacheable in Redis under `(query_hash, locale, model)`, which
+  is what `RecsTTLSeconds` was reserved for. Serving one identical list to
+  everyone is the obvious downside; generating a pool of ~30 and returning
+  a rotating subset keeps a single cache entry while varying the output.
+  Deliberately **not** built yet — at the traffic in Observability & cost
+  the saving is small, and `history_size` / `watchlist_size` were added to
+  the completion log first so the cold-start share is measured rather than
+  assumed.
