@@ -18,6 +18,22 @@ import (
 // stay decoupled from web.Context's internal layout.
 const userSettingsContextKey = "web.user_settings"
 
+// The onboarding checklist travels on Context because the navbar counter needs
+// it on every page, and the navbar renders from Context rather than from any
+// handler's data struct.
+//
+// It is resolved lazily: the middleware only stores a closure, and the query
+// runs the first time a template actually asks. The middleware is global, so
+// without that every poster image, Stremio addon poll and WebDAV request from
+// a signed-in user would pay for a checklist nobody is rendering.
+const (
+	onboardingResolverKey = "web.onboarding_resolver"
+	onboardingContextKey  = "web.onboarding"
+)
+
+// OnboardingResolver produces the checklist for the current request.
+type OnboardingResolver func() *models.OnboardingChecklist
+
 type Context struct {
 	Data         any
 	CSRF         string
@@ -101,3 +117,39 @@ func SetUserSettings(c *gin.Context, us *models.UserSettings) {
 	c.Set(userSettingsContextKey, us)
 }
 
+// SetOnboardingResolver registers how to build the checklist for this request.
+// Written by the onboarding middleware; nothing is computed until a template
+// reads Context.Onboarding.
+func SetOnboardingResolver(c *gin.Context, r OnboardingResolver) {
+	c.Set(onboardingResolverKey, r)
+}
+
+// Onboarding returns the activation checklist, or nil when there is nothing to
+// show. It is a method rather than a field so the work is deferred to the
+// templates that actually use it — Go templates call it exactly like a field,
+// so `{{ if .Onboarding }}` reads the same either way.
+//
+// The result is memoised on the gin context, not on Context itself: handlers
+// build several Context values per request (WithData, WithErrKey), and the home
+// page renders both the navbar counter and the card from them.
+func (c *Context) Onboarding() *models.OnboardingChecklist {
+	if c.ginCtx == nil {
+		return nil
+	}
+	// Memo first: once resolved for this request, the answer stands.
+	if v, ok := c.ginCtx.Get(onboardingContextKey); ok {
+		cl, _ := v.(*models.OnboardingChecklist)
+		return cl
+	}
+	v, ok := c.ginCtx.Get(onboardingResolverKey)
+	if !ok {
+		return nil
+	}
+	resolve, ok := v.(OnboardingResolver)
+	if !ok {
+		return nil
+	}
+	cl := resolve()
+	c.ginCtx.Set(onboardingContextKey, cl)
+	return cl
+}

@@ -302,6 +302,13 @@ type User struct {
 	PatreonUserID *string
 	IsNew         bool
 	Tier          string
+	// CreatedAt is the account's registration time, surfaced so handlers can
+	// answer "how old is this account" without a query. Populated on every
+	// path that yields a user: GetOrCreateUser selects the full row on lookup
+	// and go-pg adds RETURNING for the defaulted column on insert. Callers
+	// should still treat a zero value as "don't know" rather than "very old",
+	// since it only occurs when there is no user row at all.
+	CreatedAt time.Time
 }
 
 func (s *User) HasAuth() bool {
@@ -317,6 +324,7 @@ func makeUserFromContext(c *gin.Context) *User {
 		u.Email = su.Email
 		u.PatreonUserID = su.PatreonUserID
 		u.Tier = su.Tier
+		u.CreatedAt = su.CreatedAt
 	}
 	inc := c.Request.Context().Value(IsNewContext{})
 	isNew, ok := inc.(bool)

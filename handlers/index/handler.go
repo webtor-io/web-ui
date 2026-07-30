@@ -18,6 +18,7 @@ type Data struct {
 	Instruction      string
 	Tool             *common.Tool
 	ContinueWatching []*models.WatchHistory
+	Onboarding       *models.OnboardingChecklist
 }
 
 type Handler struct {
@@ -54,7 +55,8 @@ func (s *Handler) index(c *gin.Context) {
 		Tool:        currentTool,
 	}
 
-	// Fetch continue watching for authenticated users
+	// Continue-watching is home-page only: tool pages are SEO landings and
+	// carry their own CTA.
 	if currentTool == nil {
 		user := auth.GetUserFromContext(c)
 		if user.HasAuth() {
@@ -65,6 +67,12 @@ func (s *Handler) index(c *gin.Context) {
 	}
 
 	ctx := web.NewContext(c).WithData(data)
+	// The checklist is loaded by the onboarding middleware for every page (the
+	// navbar counter needs it); the home page just renders the full card from
+	// the same value, so both always agree.
+	if currentTool == nil {
+		data.Onboarding = ctx.Onboarding()
+	}
 
 	if c.Query("status") == "error" && c.Query("err") != "" {
 		ctx = ctx.WithErrKey(c.Query("err"))

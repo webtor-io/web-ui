@@ -1,0 +1,172 @@
+{{ define "onboarding_checklist" }}
+{{/* Activation checklist for accounts younger than two weeks; the two
+     paid-tier steps render locked for free users. The service returns nil once
+     every step the user can act on is done or the window closes, so there is no
+     dismiss control and nothing about it is persisted — see services/onboarding
+     and docs/onboarding.md.
+
+     Every step renders the same three parts — title, description, link — and
+     points at its own section. No step is visually privileged. The account
+     step carries no Path: it is already done and has nowhere to send anyone. */}}
+{{ if .Data }}
+{{/* The counts ride on the element so the module can report an impression
+     without a second server round-trip — this is how we learn how many people
+     actually see the card, which decides whether it is worth more surfaces.
+
+     html/template pads these numeric values with spaces in attribute context
+     (" 2 "); the reader uses Number(), which trims, so leave them alone. Do NOT
+     "fix" it with printf — the quotes inside the action break the escaper and
+     you get &#34;2&#34;. */}}
+<div class="mt-10 relative z-10 w-full" id="onboarding-checklist" data-onboarding-done="{{ .Data.Done }}" data-onboarding-total="{{ .Data.Total }}" data-onboarding-locked="{{ .Data.LockedCount }}">
+    {{/* text-left is explicit: the home-page section sets text-center, which
+         would otherwise centre every row away from its status icon. */}}
+    <div class="max-w-[680px] mx-auto text-left rounded-2xl border border-w-line bg-base-300/60 p-5 sm:p-6">
+
+        <div class="flex items-center justify-between gap-3" id="onboarding-checklist-header">
+            <span class="text-xs font-semibold tracking-widest uppercase text-w-sub">{{ t .Ctx.Lang "onboarding.title" }}</span>
+            <span class="flex items-center gap-2 shrink-0">
+                {{/* Dots and counter cover only the steps this user can act on;
+                     locked rows are excluded so the total is never a target
+                     they cannot reach. */}}
+                <span class="flex gap-1.5" aria-hidden="true">
+                    {{ range .Data.Steps }}{{ if not .Locked }}
+                    <span class="w-1.5 h-1.5 rounded-full {{ if .Done }}bg-w-pink{{ else }}bg-w-muted/50{{ end }}"></span>
+                    {{ end }}{{ end }}
+                </span>
+                {{ template "onboarding_checklist/counter" $ }}
+                {{/* Hidden until JS upgrades it: without JS the button would be
+                     focusable and announced with aria-expanded, yet do nothing. */}}
+                <button type="button" class="hidden text-w-muted hover:text-base-content transition-colors" data-checklist-toggle aria-expanded="true" aria-controls="onboarding-checklist-steps" aria-label="{{ t .Ctx.Lang "onboarding.toggle" }}">
+                    <svg class="w-4 h-4 transition-transform duration-200" data-checklist-chevron viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+                </button>
+            </span>
+        </div>
+
+        <ul class="flex flex-col gap-5 mt-5" id="onboarding-checklist-steps">
+            {{ template "onboarding_checklist/rows" $ }}
+        </ul>
+    </div>
+    {{/* Inline and synchronous on purpose: the module below is loaded async, so
+         restoring the collapsed state there would flash the list open on every
+         visit. This runs before paint, right after the markup it touches. */}}
+    <script>(function(){try{var r=document.getElementById('onboarding-checklist');if(!r)return;var b=r.querySelector('[data-checklist-toggle]');if(!b)return;b.classList.remove('hidden');var c=false;try{c=localStorage.getItem('onboarding-checklist-collapsed')==='1';}catch(e){}if(!c)return;r.querySelector('#onboarding-checklist-steps').style.display='none';b.setAttribute('aria-expanded','false');var v=r.querySelector('[data-checklist-chevron]');if(v)v.style.transform='rotate(180deg)';}catch(e){}})();</script>
+    {{ "onboarding_checklist.js" | asset }}
+</div>
+{{ end }}
+{{ end }}
+
+{{ define "onboarding_checklist/rows" }}
+{{/* Shared by the home-page card and the navbar modal so the two can never
+     drift apart. Receives the same CtxData both do. */}}
+            {{ range .Data.Steps }}
+            <li class="flex items-start gap-3">
+                {{/* Status is conveyed by icon and colour, so each row carries an
+                     sr-only equivalent — otherwise done, pending and locked rows
+                     are indistinguishable to a screen reader. */}}
+                {{ if .Done }}
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
+                </svg>
+                <span class="sr-only">{{ t $.Ctx.Lang "onboarding.status.done" }}</span>
+                {{ else if .Locked }}
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+                </svg>
+                <span class="sr-only">{{ t $.Ctx.Lang "onboarding.status.locked" }}</span>
+                {{ else }}
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                </svg>
+                <span class="sr-only">{{ t $.Ctx.Lang "onboarding.status.todo" }}</span>
+                {{ end }}
+
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-semibold {{ if or .Locked .Done }}text-w-sub{{ else }}text-w-text{{ end }}">{{ t $.Ctx.Lang .TitleKey }}</span>
+                        {{ if .Locked }}
+                        <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide font-semibold uppercase px-2">{{ t $.Ctx.Lang "onboarding.proBadge" }}</span>
+                        {{ end }}
+                    </div>
+                    {{/* text-w-sub, not text-w-muted: at 12px the latter measures
+                         ~3.6:1 on the card and ~3.3:1 in the modal, under AA — and
+                         this is the copy telling the user what to do. */}}
+                    <div class="text-xs text-w-sub leading-relaxed mt-1">{{ t $.Ctx.Lang .DescKey }}</div>
+                    {{ if .Path }}
+                    {{/* Locked rows link to /donate without the pink accent: the
+                         upsell should be findable, not the loudest thing in an
+                         onboarding card. It still has to be legible, so it uses
+                         text-w-sub rather than a faded muted. */}}
+                    <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="inline-flex items-center gap-1.5 text-xs font-medium mt-2 {{ if .Locked }}text-w-sub hover:text-base-content underline underline-offset-2 decoration-w-sub/40{{ else }}text-w-pinkL hover:text-w-pink{{ end }}">
+                        {{ t $.Ctx.Lang .CTAKey }}
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    {{ end }}
+                </div>
+            </li>
+            {{ end }}
+{{ end }}
+
+{{ define "onboarding_checklist/modal" }}
+{{/* Same checklist, opened from the navbar counter on any page — bouncing the
+     user to the home page just to read it was the whole complaint.
+
+     Rendered on demand, not baked into every page: the container in
+     layouts/main.html carries data-async-layout and the counter targets it, so clicking re-runs
+     this partial against a freshly built context. That is what keeps it honest
+     — steps get completed by async actions elsewhere on the page, and markup
+     rendered at page load would show them still outstanding.
+
+     The dialog id must differ from the container's: they nest, and
+     getElementById returns the first match in document order — the container —
+     which has no close().
+
+     It is opened with showModal(), NOT the `open` attribute: `open` renders a
+     non-modal dialog — no Esc, no focus trap, no inert background — and DaisyUI
+     styling makes that look correct, which is how it hides. The fragment only
+     ever arrives via JS, so there is no no-JS case to degrade to. Native <dialog> then gives backdrop, Esc and focus trapping for
+     without JS the counter stays an ordinary link to the home card, so nothing
+     is lost. */}}
+{{ if .Data }}
+<dialog class="modal" id="onboarding-checklist-dialog" aria-labelledby="onboarding-checklist-dialog-title">
+    <div class="modal-box max-w-[600px] text-left bg-w-card border border-w-line/50 rounded-2xl">
+        <div class="flex items-center justify-between gap-3 mb-5">
+            <h2 id="onboarding-checklist-dialog-title" class="text-xs font-semibold tracking-widest uppercase text-w-sub">{{ t .Ctx.Lang "onboarding.title" }}</h2>
+            {{ template "onboarding_checklist/counter" $ }}
+        </div>
+
+        <ul class="flex flex-col gap-5">
+            {{ template "onboarding_checklist/rows" $ }}
+        </ul>
+
+        <form method="dialog" class="mt-6 flex justify-end">
+            <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t .Ctx.Lang "onboarding.close" }}</button>
+        </form>
+    </div>
+    {{/* Literal, untranslated, like the other modals: this button is visually
+         hidden but focusable, and translating it makes a screen reader announce
+         "Close" twice in a row. */}}
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{{/* Opens the dialog and closes it again when a step link is followed: async
+     nav swaps #main underneath, and the dialog would stay up over the page the
+     user just asked for.
+
+     The listener MUST be in the capture phase. async.js calls
+     stopPropagation() inside the link's own click handler, so a bubble-phase
+     listener on the dialog never runs — and every step link except Stremio is
+     async, which is to say the bubble version was dead exactly where it was
+     needed. Inline because this markup is injected per open, same as the
+     rating modal. */}}
+<script>(function(){var d=document.getElementById('onboarding-checklist-dialog');if(!d)return;if(!d.open)d.showModal();d.addEventListener('click',function(e){if(e.target.closest('a[href]'))d.close();},true);})();</script>
+{{ end }}
+{{ end }}
+
+{{ define "onboarding_checklist/counter" }}
+{{/* Shared by the card and the modal. The digits are hidden from assistive tech
+     and paired with an sr-only sentence: aria-label on a bare <span> is dropped,
+     because ARIA does not allow naming role=generic, so screen readers would
+     otherwise just hear "2/3". */}}
+<span class="text-xs text-w-muted tabular-nums" aria-hidden="true">{{ .Data.Done }}/{{ .Data.Total }}</span><span class="sr-only">{{ tp .Ctx.Lang "onboarding.progress" "Done" .Data.Done "Total" .Data.Total }}</span>
+{{ end }}

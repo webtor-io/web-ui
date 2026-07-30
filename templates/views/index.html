@@ -171,6 +171,12 @@
         </div>
     </div>
 
+    {{/* `has` is required, not defensive: this view is also rendered by
+         handlers/resource.post with PostData, which has no Onboarding field,
+         and a missing field is a template execution error — it would break
+         every magnet/search/upload submit. Same reason as "Job" and "Args"
+         above. */}}
+    {{ if has . "Onboarding" }}{{ template "onboarding_checklist" (withContext $ .Onboarding) }}{{ end }}
     {{ template "continue_watching" (withContext $ .ContinueWatching) }}
     {{ template "discover" (withContext $ .Tool) }}
 

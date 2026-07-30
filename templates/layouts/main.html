@@ -61,6 +61,21 @@
             {{ template "footer" . }}
         </div>
         <div id="toast-container" class="toast toast-end toast-bottom z-toast" role="status" aria-live="assertive" aria-atomic="false"></div>
+        {{/* Target for the navbar activation counter. It lives at body level,
+             not inside <nav>: the navbar is backdrop-blur-xl, and a filtered
+             ancestor becomes the containing block for position:fixed children,
+             so a dialog rendered in there is measured against the 72px bar and
+             gets clipped instead of covering the viewport.
+
+             Always present, even for users with no checklist — the container
+             is empty until the counter asks for it, and rendering it
+             conditionally would leave the target missing after an async
+             navigation that changed the checklist state.
+
+             data-async-update-nav re-renders the navbar from the same response,
+             so the counter cannot disagree with the modal the user is looking
+             at. */}}
+        <div id="onboarding-modal" data-async-layout="{{`{{ template "onboarding_checklist/modal" (withContext $ .Onboarding) }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}"></div>
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}
         {{ "auth.js" | asset }}

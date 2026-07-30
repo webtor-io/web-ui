@@ -1994,6 +1994,94 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
   <hr class="uikit-divider">
 
+  <div class="uikit-section" id="onboarding-checklist">
+    <h2>18. Onboarding Checklist Card</h2>
+    <p class="desc">
+      Activation checklist on the home page, shown to accounts younger than two weeks
+      (<code>templates/partials/onboarding_checklist.html</code>). A collapsible card whose rows all
+      share one shape &mdash; <strong>status icon &rarr; title &rarr; description &rarr; link</strong>.
+      No row is visually privileged: there is no "current step" highlight, because every step leads
+      to a different section and can be done in any order.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Row states</h3>
+    <div class="uikit-note mb-4">
+      <table class="w-full text-sm">
+        <tr><td class="pr-4 py-1"><strong>done</strong></td><td>check-circle in <code>text-w-pink</code>; title <code>text-w-sub</code>; link keeps the pink accent</td></tr>
+        <tr><td class="pr-4 py-1"><strong>to&nbsp;do</strong></td><td>empty circle in <code>text-w-muted</code>; title <code>text-w-text</code>; link <code>text-w-pinkL</code></td></tr>
+        <tr><td class="pr-4 py-1"><strong>locked</strong></td><td>padlock in <code>text-w-muted</code>; title <code>text-w-sub</code> + <code>PRO</code> badge; link is <code>text-w-sub</code> underlined, pointing at <code>/donate</code></td></tr>
+      </table>
+    </div>
+    <p class="desc">
+      <strong>Locked rows must stay legible.</strong> The temptation is to fade them out
+      (<code>text-w-muted/60</code> and friends) &mdash; that lands around 2.2:1 contrast, well under
+      AA, on the one element the upsell wants clicked. Quiet means "no pink accent", not "barely
+      visible": use the sanctioned <code>text-w-sub</code> / <code>text-w-muted</code> tokens and let
+      the missing accent colour carry the hierarchy. Opacity-suffixed text tokens
+      (<code>/40</code>&hellip;<code>/70</code>) are for decorative glyphs only, never body copy.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">PRO badge</h3>
+    <p class="desc">
+      <code>badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide font-semibold uppercase px-2</code>
+      &mdash; the standard small feature tag (&sect;3), purple family, marking a row the current plan
+      cannot complete.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Progress header</h3>
+    <p class="desc">
+      Dots + <code>done/total</code> counter, then the collapse chevron. <strong>Both count only rows
+      the user can act on</strong> &mdash; locked rows get no dot and are excluded from the total, so
+      the counter is always reachable. Un-done dots use <code>bg-w-muted/50</code>;
+      <code>bg-w-line</code> is invisible against the card and must not be used for state.
+      The counter carries an <code>aria-label</code> because "2/3" alone is meaningless aloud.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Modal variant</h3>
+    <p class="desc">
+      The navbar counter opens the same rows as a DaisyUI <code>&lt;dialog class="modal"&gt;</code>
+      instead of navigating to the home page. Rows come from the shared
+      <code>onboarding_checklist/rows</code> define, so card and modal cannot drift apart.
+      The modal is rendered <strong>on demand</strong> (container carries
+      <code>data-async-layout</code>, counter targets it) and is opened with
+      <code>showModal()</code> — baking it into every page would show completed steps as outstanding,
+      since steps get finished by async actions without a page reload.
+      Step links inside close the dialog on the way out, otherwise async nav swaps the page
+      underneath it — and that listener must be in the <strong>capture</strong> phase, because
+      <code>async.js</code> calls <code>stopPropagation()</code> in the link's own handler.
+      <strong>Never open it with the <code>open</code> attribute:</strong> that is a non-modal
+      dialog — no Esc, no focus trap, no inert background — and DaisyUI styling makes it look
+      correct anyway, which is how the mistake survives review.
+    </p>
+    <div class="uikit-note">
+      <strong>Where the container lives matters.</strong> Put the modal target at body level
+      (<code>layouts/main.html</code>), never inside <code>&lt;nav&gt;</code>: the navbar is
+      <code>fixed backdrop-blur-xl</code>, and an element with <code>backdrop-filter</code> becomes the
+      containing block for its <code>position: fixed</code> descendants. A dialog rendered inside it is
+      measured against the 72px bar — measured at <code>height: 71px</code> with the modal-box at
+      <code>top: -265px</code>, i.e. clipped off the top of the screen. Same trap applies to any future
+      overlay triggered from the navbar.<br><br>
+      <strong>Give the dialog its own id.</strong> It nests inside the async container, and
+      <code>getElementById</code> returns the first match in document order — the container, a
+      <code>&lt;div&gt;</code> with no <code>close()</code>. Sharing the id makes every
+      <code>close()</code> call throw and leaves the dialog stranded over the page.
+    </p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Collapse &amp; a11y</h3>
+    <div class="uikit-note">
+      &bull; The chevron button ships with <code>hidden</code> and is revealed by script &mdash; without JS a
+      focusable control announced with <code>aria-expanded</code> that does nothing is worse than no control.<br>
+      &bull; Collapsed state is restored by a small <strong>inline, synchronous</strong> snippet, not by the
+      async module: restoring it late flashes the list open on every visit.<br>
+      &bull; Status is conveyed by icon + colour, so every row also carries an <code>sr-only</code> status
+      word (Done / To do / Locked). Icons themselves are <code>aria-hidden</code>.<br>
+      &bull; State lives in <code>localStorage</code> (<code>onboarding-checklist-collapsed</code>), guarded by
+      <code>try/catch</code> &mdash; blocked site data must degrade to "always expanded", not kill the toggle.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>

@@ -51,6 +51,7 @@ import (
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
+	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
@@ -305,6 +306,17 @@ func serve(c *cli.Context) error {
 	userSettingsSvc := usettings.New(pg)
 	r.Use(usettings.Middleware(userSettingsSvc))
 
+	// Setting Vault API early: the onboarding middleware below needs to know
+	// whether Vault is configured, and vault.New is nil exactly when this is.
+	vaultApi := vault.NewApi(c, cl)
+
+	// Setting Onboarding. Derives the activation checklist from existing
+	// feature tables and keeps no state of its own. Mounted globally, before
+	// any route is registered, because the navbar shows a progress counter on
+	// every page — and after auth/claims, which the resolver reads.
+	onboardingSvc := onboarding.New(pg, vaultApi != nil)
+	r.Use(w.OnboardingMiddleware(onboardingSvc))
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
@@ -340,10 +352,8 @@ func serve(c *cli.Context) error {
 		return err
 	}
 
-	// Setting Vault API
-	vaultApi := vault.NewApi(c, cl)
-
-	// Setting Vault
+	// Setting Vault (vaultApi is built earlier — the onboarding middleware
+	// needs to know whether Vault is configured before any route is mounted)
 	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
 
 	// Setting Notification
