@@ -14,10 +14,15 @@ func NewVideoContentHelper() *VideoContentHelper {
 }
 
 func (s *VideoContentHelper) GetTitle(m models.VideoContentWithMetadata) string {
-	if m.GetMetadata() != nil {
-		return m.GetMetadata().Title
+	if md := m.GetMetadata(); md != nil {
+		return md.Title
 	}
-	return m.GetContent().Title
+	// GetContent returns the embedded *VideoContent, which is nil when the
+	// relation was not loaded — see GetCachedPoster240, which already guards it.
+	if c := m.GetContent(); c != nil {
+		return c.Title
+	}
+	return ""
 }
 
 func (s *VideoContentHelper) HasYear(m models.VideoContentWithMetadata) bool {
@@ -25,15 +30,18 @@ func (s *VideoContentHelper) HasYear(m models.VideoContentWithMetadata) bool {
 }
 
 func (s *VideoContentHelper) GetYear(m models.VideoContentWithMetadata) int {
-	if m.GetMetadata() != nil {
-		y := *m.GetMetadata().Year
-		return int(y)
+	// Both Year fields are nullable, and a title can be enriched without one.
+	// The metadata branch used to dereference it unconditionally while the
+	// content branch below already guarded it — that asymmetry panicked inside
+	// the template, which surfaced as "failed to render main view ... hasYear:
+	// invalid memory address or nil pointer dereference" on the library page.
+	if md := m.GetMetadata(); md != nil && md.Year != nil {
+		return int(*md.Year)
 	}
-	if m.GetContent().Year == nil {
-		return 0
+	if c := m.GetContent(); c != nil && c.Year != nil {
+		return int(*c.Year)
 	}
-	y := *m.GetContent().Year
-	return int(y)
+	return 0
 }
 
 func (s *VideoContentHelper) HasRating(m models.VideoContentWithMetadata) bool {

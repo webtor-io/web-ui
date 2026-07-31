@@ -159,7 +159,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
-                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
+                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
                     <div class="sm:ml-auto shrink-0">
@@ -233,7 +233,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
-                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ template "library/button" (withContext $ .Data.Resource) }}`}}">
+                    <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
                     <div class="sm:ml-auto shrink-0">

@@ -11,9 +11,14 @@
 {{ define "list" }}
     {{ with .Data }}
         {{/* No listing to show — e.g. an async #list reload that resolves to
-             a single file or an out-of-range page leaves .List nil. Guard so
-             .List.* never nil-derefs the template. */}}
-        {{ if .List }}
+             a single file or an out-of-range page leaves .List nil.
+
+             `has` rather than a plain `{{ if .List }}`: the id "list" is also
+             used by the library page (partials/library/list.html), so a stale
+             X-Layout can run this snippet against *library.IndexData, which
+             has no List field at all. Evaluating a missing field is a template
+             error even inside an if, and it 500s the whole fragment. */}}
+        {{ if has . "List" }}
         {{ $Args := .Args}}
         {{ $Resource := .Resource}}
         {{ $List := .List}}
