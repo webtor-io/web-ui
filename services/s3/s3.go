@@ -206,17 +206,10 @@ func (h *Handler) listObjects(w http.ResponseWriter, r *http.Request, bucketName
 		}
 		req.MaxKeys = min(mk, defaultMaxKeys)
 	}
-	// Clients percent-encode the values they send when they ask for URL
-	// encoding back, so decode before the prefix ever touches the filesystem.
-	if req.EncodeURL {
-		var err error
-		if req.Prefix, err = decodeListValue(req.Prefix); err != nil {
-			return newError(http.StatusBadRequest, ErrCodeInvalidArgument, "Invalid prefix encoding", err)
-		}
-		if req.StartAfter, err = decodeListValue(req.StartAfter); err != nil {
-			return newError(http.StatusBadRequest, ErrCodeInvalidArgument, "Invalid marker encoding", err)
-		}
-	}
+	// encoding-type applies to the *response*. Request parameters arrive
+	// encoded once, like every query parameter, and net/url has already decoded
+	// them by the time we read them — decoding again would turn a literal "+"
+	// inside a name into a space and the prefix would match nothing.
 
 	if hasDotSegment(req.Prefix) {
 		return newError(http.StatusBadRequest, ErrCodeInvalidArgument, "Invalid prefix", nil)
@@ -254,9 +247,8 @@ func (h *Handler) listObjects(w http.ResponseWriter, r *http.Request, bucketName
 		keyCount := len(out.Contents) + len(out.CommonPrefixes)
 		out.KeyCount = &keyCount
 		out.ContinuationToken = req.Token
-		// Echo what the client sent, already in its own encoding — re-encoding
-		// the decoded value would hand back a double-escaped marker.
-		out.StartAfter = query.Get("start-after")
+		// Echo what the client sent, in its own encoding.
+		out.StartAfter = encodeListValue(req.StartAfter, req.EncodeURL)
 		if res.Truncated {
 			out.NextContinuationToken = res.NextToken
 		}
@@ -535,19 +527,15 @@ func writeError(w http.ResponseWriter, r *http.Request, e *Error) {
 }
 
 // encodeListValue applies encoding-type=url when the client asked for it.
-// Clients decode with QueryUnescape, so QueryEscape is the matching direction —
-// and it is what keeps torrent names with spaces, brackets or Cyrillic from
-// coming back mangled.
+//
+// Percent-encoding, the way Amazon does it — NOT url.QueryEscape. The two
+// differ on the space: QueryEscape writes "+", which only decodes back to a
+// space in a form decoder. Clients that percent-decode (Cyberduck among them)
+// would render "+" literally and then ask for a key nobody has. Slashes stay
+// readable; everything else, "+" included, goes out as %XX.
 func encodeListValue(v string, encode bool) string {
 	if !encode || v == "" {
 		return v
 	}
-	return url.QueryEscape(v)
-}
-
-func decodeListValue(v string) (string, error) {
-	if v == "" {
-		return v, nil
-	}
-	return url.QueryUnescape(v)
+	return uriEncode(v, false)
 }

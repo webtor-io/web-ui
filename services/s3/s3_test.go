@@ -24,6 +24,8 @@ const (
 	testAccessKey = "99999999-8888-7777-6666-555555555555"
 	testSecret    = "signing-secret"
 	movieDir      = "Movie One (2020)"
+	// A real library name that broke listings: a literal "+" among the spaces.
+	plusDir = "Windows 11 25H2 + LTSC (x64) 28in1 +- Office 2024"
 )
 
 var testModTime = time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
@@ -48,11 +50,13 @@ func newFakeFS() *fakeFS {
 			"/all/" + movieDir + "/":      true,
 			"/all/" + movieDir + "/subs/": true,
 			"/all/Другой Фильм/":          true,
+			"/all/" + plusDir + "/":       true,
 		},
 		files: map[string]int64{
 			"/all/" + movieDir + "/video.mkv":    1024,
 			"/all/" + movieDir + "/subs/eng.srt": 12,
 			"/all/Другой Фильм/video.mkv":        2048,
+			"/all/" + plusDir + "/setup.iso":     4096,
 			"/torrents/" + movieDir + ".torrent": 64,
 		},
 	}
@@ -218,8 +222,8 @@ func TestListObjectsWithDelimiter(t *testing.T) {
 	for _, p := range out.CommonPrefixes {
 		prefixes = append(prefixes, aws.StringValue(p.Prefix))
 	}
-	if len(prefixes) != 2 {
-		t.Fatalf("expected two folders, got %v", prefixes)
+	if len(prefixes) != 3 {
+		t.Fatalf("expected three folders, got %v", prefixes)
 	}
 
 	out, err = newSignedClient(t, srv.URL).ListObjectsV2(&awss3.ListObjectsV2Input{
@@ -254,7 +258,7 @@ func TestListObjectsRecursive(t *testing.T) {
 	for _, o := range out.Contents {
 		keys = append(keys, aws.StringValue(o.Key))
 	}
-	want := []string{movieDir + "/subs/eng.srt", movieDir + "/video.mkv", "Другой Фильм/video.mkv"}
+	want := []string{movieDir + "/subs/eng.srt", movieDir + "/video.mkv", plusDir + "/setup.iso", "Другой Фильм/video.mkv"}
 	if len(keys) != len(want) {
 		t.Fatalf("got %v, want %v", keys, want)
 	}
@@ -289,7 +293,7 @@ func TestListObjectsPagination(t *testing.T) {
 		all = append(all, aws.StringValue(o.Key))
 	}
 	token := first.NextContinuationToken
-	for i := 0; i < 10 && token != nil && aws.StringValue(token) != ""; i++ {
+	for i := 0; i < 20 && token != nil && aws.StringValue(token) != ""; i++ {
 		page, err := cl.ListObjectsV2(&awss3.ListObjectsV2Input{
 			Bucket:            aws.String("all"),
 			MaxKeys:           aws.Int64(1),
@@ -307,8 +311,8 @@ func TestListObjectsPagination(t *testing.T) {
 		}
 		token = page.NextContinuationToken
 	}
-	if len(all) != 3 {
-		t.Errorf("paged listing returned %v, want all three keys", all)
+	if len(all) != 4 {
+		t.Errorf("paged listing returned %v, want every key", all)
 	}
 }
 
@@ -502,7 +506,7 @@ func TestListObjectsURLEncoding(t *testing.T) {
 		}
 		decoded = append(decoded, d)
 	}
-	want := map[string]bool{movieDir + "/": true, "Другой Фильм/": true}
+	want := map[string]bool{movieDir + "/": true, "Другой Фильм/": true, plusDir + "/": true}
 	for _, d := range decoded {
 		if !want[d] {
 			t.Errorf("unexpected prefix %q (decoded from the listing)", d)
@@ -518,7 +522,7 @@ func TestListObjectsURLEncoding(t *testing.T) {
 		Bucket:       aws.String("all"),
 		Delimiter:    aws.String("/"),
 		EncodingType: aws.String("url"),
-		Prefix:       aws.String(url.QueryEscape("Другой Фильм/")),
+		Prefix:       aws.String("Другой Фильм/"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -529,6 +533,74 @@ func TestListObjectsURLEncoding(t *testing.T) {
 	key, _ := url.QueryUnescape(aws.StringValue(out.Contents[0].Key))
 	if key != "Другой Фильм/video.mkv" {
 		t.Errorf("got key %q", key)
+	}
+}
+
+// A literal "+" in a name is where form-encoding and percent-encoding disagree,
+// and it broke real listings: the response encoded spaces as "+", and the prefix
+// coming back was decoded a second time, turning the name's own "+" into a
+// space. Neither side may use form encoding.
+func TestPlusInNamesSurvivesListing(t *testing.T) {
+	srv := newTestServer(t, newFakeFS())
+	defer srv.Close()
+	cl := newSignedClient(t, srv.URL)
+
+	out, err := cl.ListObjectsV2(&awss3.ListObjectsV2Input{
+		Bucket:       aws.String("all"),
+		Delimiter:    aws.String("/"),
+		EncodingType: aws.String("url"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encoded string
+	for _, p := range out.CommonPrefixes {
+		if strings.Contains(aws.StringValue(p.Prefix), "Windows") {
+			encoded = aws.StringValue(p.Prefix)
+		}
+	}
+	if encoded == "" {
+		t.Fatal("the folder is missing from the listing")
+	}
+	if strings.Contains(encoded, "+") {
+		t.Errorf("%q uses form encoding: a client that percent-decodes reads those as literal plusses", encoded)
+	}
+	// A percent-only decoder — the strict reading, and what Cyberduck does —
+	// has to recover the name exactly.
+	if got, err := url.PathUnescape(encoded); err != nil || got != plusDir+"/" {
+		t.Errorf("percent-decoded to %q (err %v), want %q", got, err, plusDir+"/")
+	}
+
+	// And the client can descend into it: the prefix it sends must not be
+	// decoded twice.
+	inner, err := cl.ListObjectsV2(&awss3.ListObjectsV2Input{
+		Bucket:       aws.String("all"),
+		Delimiter:    aws.String("/"),
+		EncodingType: aws.String("url"),
+		Prefix:       aws.String(plusDir + "/"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inner.Contents) != 1 {
+		t.Fatalf("listing inside the folder returned %v", inner.Contents)
+	}
+	key, _ := url.PathUnescape(aws.StringValue(inner.Contents[0].Key))
+	if key != plusDir+"/setup.iso" {
+		t.Errorf("got key %q", key)
+	}
+
+	// The same name has to work without encoding-type too.
+	plain, err := cl.ListObjectsV2(&awss3.ListObjectsV2Input{
+		Bucket:    aws.String("all"),
+		Delimiter: aws.String("/"),
+		Prefix:    aws.String(plusDir + "/"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plain.Contents) != 1 || aws.StringValue(plain.Contents[0].Key) != plusDir+"/setup.iso" {
+		t.Errorf("unencoded listing returned %v", plain.Contents)
 	}
 }
 
