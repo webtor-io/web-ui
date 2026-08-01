@@ -5,20 +5,24 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
+	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
-	tb    template.Builder[*web.Context]
-	vault *vault.Vault
+	tb         template.Builder[*web.Context]
+	vault      *vault.Vault
+	s3Endpoint string
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], v *vault.Vault) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], v *vault.Vault) {
 	h := &Handler{
-		tb:    tm.MustRegisterViews("instructions/**/*").WithLayout("main"),
-		vault: v,
+		tb:         tm.MustRegisterViews("instructions/**/*").WithLayout("main"),
+		vault:      v,
+		s3Endpoint: s3.PublicEndpoint(c),
 	}
 
 	r.GET("/instructions/*template", h.get)
@@ -32,10 +36,13 @@ type VaultData struct {
 
 type Data struct {
 	Vault *VaultData
+	// S3Endpoint is rendered into the rclone snippet, so the page cannot drift
+	// from what the profile hands out.
+	S3Endpoint string
 }
 
 func (s *Handler) get(c *gin.Context) {
-	data := &Data{}
+	data := &Data{S3Endpoint: s.s3Endpoint}
 	if s.vault != nil {
 		data.Vault = &VaultData{
 			FreezePeriod:          s.vault.GetFreezePeriod(),

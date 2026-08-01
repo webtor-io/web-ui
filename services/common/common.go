@@ -25,6 +25,7 @@ var (
 	DisableWebDAVFlag = "disable-webdav"
 	DisableS3Flag     = "disable-s3"
 	S3SecretFlag      = "s3-signing-secret"
+	S3DomainFlag      = "s3-domain"
 	DisableEmbedFlag  = "disable-embed"
 )
 
@@ -99,6 +100,15 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   DisableS3Flag,
 			Usage:  "disable s3",
 			EnvVar: "DISABLE_S3",
+		},
+		cli.StringFlag{
+			Name: S3DomainFlag,
+			// Hostnames that serve the S3 API at their root, comma-separated.
+			// A dedicated host is what lets clients use a bare endpoint, and it
+			// is the hook for keeping a header-rewriting CDN out of the path
+			// (see docs/s3.md). Empty means S3 is only reachable at DOMAIN/s3.
+			Usage:  "hostnames serving the s3 api at the root (comma-separated)",
+			EnvVar: "S3_DOMAIN",
 		},
 		cli.StringFlag{
 			Name: S3SecretFlag,

@@ -1160,7 +1160,7 @@
     "instructions.s3.rcloneIntro": "Añade esto a tu rclone.conf:",
     "instructions.s3.rcloneUsage": "Después, <code>rclone lsd webtor:</code> lista tus buckets y <code>rclone mount webtor:all /mnt/webtor</code> monta la biblioteca.",
     "instructions.s3.clientsTitle": "Clientes recomendados",
-    "instructions.s3.clientAws": "<strong>AWS CLI:</strong> <code>aws --endpoint-url https://webtor.io/s3 s3 ls s3://all/</code>",
+    "instructions.s3.clientAws": "<strong>AWS CLI:</strong> <code>aws --endpoint-url {{.Endpoint}} s3 ls s3://all/</code>",
     "instructions.s3.clientCyberduck": "<strong>Cyberduck / Mountain Duck:</strong> una conexión S3 con endpoint personalizado",
     "instructions.s3.clientMount": "<strong>Montaje:</strong> <a href='https://rclone.org/' class='text-w-pinkL hover:underline' target='_blank'>rclone</a> mount o s3fs",
     "instructions.s3.bucketsTitle": "Tus buckets",

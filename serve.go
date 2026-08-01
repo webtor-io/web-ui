@@ -178,7 +178,8 @@ func serve(c *cli.Context) error {
 	// Setting Gin
 	r := gin.Default()
 	r.Use(w.ErrorHandler(tm.MustRegisterViews("error/*").WithLayout("main")))
-	if redirect := w.RedirectNonCanonical(c.String(common.DomainFlag), c.String(w.RedirectDomainFlag)); redirect != nil {
+	s3Hosts := s3svc.Hosts(c)
+	if redirect := w.RedirectNonCanonical(c.String(common.DomainFlag), c.String(w.RedirectDomainFlag), s3Hosts...); redirect != nil {
 		r.Use(redirect)
 	}
 	r.Use(w.NoindexDefault(c.Bool(w.StagingFlag)))
@@ -195,6 +196,10 @@ func serve(c *cli.Context) error {
 
 	// Setting i18n handler (HTTP middleware + Gin middleware)
 	hi18n.RegisterHandler(r, web, i18nSvc)
+
+	// Setting S3 host routing — before the session middleware, whose CSRF
+	// exemption is keyed on the /s3 prefix this rewrite produces.
+	s3svc.RegisterHostMiddleware(r, s3Hosts, s3svc.MountPath)
 
 	// Setting URL Alias
 	ual := ua.New(pg, r)
@@ -486,7 +491,7 @@ func serve(c *cli.Context) error {
 	tests.RegisterHandler(r, tm)
 
 	// Setting Instructions
-	instructions.RegisterHandler(r, tm, v)
+	instructions.RegisterHandler(c, r, tm, v)
 
 	// Setting Events
 	if nats != nil {

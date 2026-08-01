@@ -117,6 +117,49 @@ func TestWrongProtocolIsNamed(t *testing.T) {
 	}
 }
 
+// A dedicated hostname serves the API at its root. The rewrite must land on the
+// mount path, must not touch other hosts, and must leave RequestURI alone —
+// that is what the signature is verified against.
+func TestHostRoutingRewritesOntoMountPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterHostMiddleware(r, []string{"s3.webtor.io"}, mountPath)
+	var seenPath, seenURI string
+	handler := func(c *gin.Context) {
+		seenPath, seenURI = c.Request.URL.Path, c.Request.RequestURI
+		c.Status(http.StatusOK)
+	}
+	r.GET(mountPath+"/*rest", handler)
+	r.GET(mountPath, handler)
+	r.GET("/library", handler)
+
+	for _, tc := range []struct {
+		host, uri, wantPath string
+	}{
+		{"s3.webtor.io", "/all/Movie/video.mkv", "/s3/all/Movie/video.mkv"},
+		{"s3.webtor.io", "/", "/s3/"},
+		{"S3.Webtor.IO:443", "/all/", "/s3/all/"},
+		// Other hosts keep their own routing, including the path-mounted form.
+		{"webtor.io", "/library", "/library"},
+		{"webtor.io", "/s3/all/", "/s3/all/"},
+	} {
+		seenPath, seenURI = "", ""
+		req := httptest.NewRequest(http.MethodGet, tc.uri, nil)
+		req.Host = tc.host
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s%s: status %d", tc.host, tc.uri, w.Code)
+		}
+		if seenPath != tc.wantPath {
+			t.Errorf("%s%s: routed to %q, want %q", tc.host, tc.uri, seenPath, tc.wantPath)
+		}
+		if seenURI != tc.uri {
+			t.Errorf("%s%s: RequestURI became %q — the signature covers it and must survive", tc.host, tc.uri, seenURI)
+		}
+	}
+}
+
 // signV4 signs req the way aws-sdk-go-v2 does, including accept-encoding in the
 // signed headers, and returns the value the Authorization header should carry.
 func signV4(req *http.Request, signedHeaders []string, headerValues map[string]string, secret string) string {

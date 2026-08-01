@@ -1160,7 +1160,7 @@
     "instructions.s3.rcloneIntro": "Добавьте в rclone.conf:",
     "instructions.s3.rcloneUsage": "После этого <code>rclone lsd webtor:</code> покажет бакеты, а <code>rclone mount webtor:all /mnt/webtor</code> смонтирует библиотеку.",
     "instructions.s3.clientsTitle": "Рекомендуемые клиенты",
-    "instructions.s3.clientAws": "<strong>AWS CLI:</strong> <code>aws --endpoint-url https://webtor.io/s3 s3 ls s3://all/</code>",
+    "instructions.s3.clientAws": "<strong>AWS CLI:</strong> <code>aws --endpoint-url {{.Endpoint}} s3 ls s3://all/</code>",
     "instructions.s3.clientCyberduck": "<strong>Cyberduck / Mountain Duck:</strong> подключение S3 со своим endpoint",
     "instructions.s3.clientMount": "<strong>Монтирование:</strong> <a href='https://rclone.org/' class='text-w-pinkL hover:underline' target='_blank'>rclone</a> mount или s3fs",
     "instructions.s3.bucketsTitle": "Ваши бакеты",

@@ -28,7 +28,7 @@
     <pre class="bg-base-300/50 border border-w-line rounded-xl p-4 mb-4 overflow-x-auto text-sm"><code>[webtor]
 type = s3
 provider = Other
-endpoint = https://webtor.io/s3
+endpoint = {{ .Data.S3Endpoint }}
 access_key_id = &lt;access key&gt;
 secret_access_key = &lt;secret key&gt;
 region = us-east-1
@@ -39,7 +39,7 @@ force_path_style = true</code></pre>
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.s3.clientsTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>{{ tHTML $.Lang "instructions.s3.clientAws" }}</li>
+        <li>{{ tpHTML $.Lang "instructions.s3.clientAws" "Endpoint" .Data.S3Endpoint }}</li>
         <li>{{ tHTML $.Lang "instructions.s3.clientCyberduck" }}</li>
         <li>{{ tHTML $.Lang "instructions.s3.clientMount" }}</li>
     </ul>

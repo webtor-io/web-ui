@@ -83,6 +83,7 @@ type Handler struct {
 	disableS3     bool
 	disableEmbed  bool
 	s3Secret      string
+	s3Endpoint    string
 	domain        string
 }
 
@@ -100,6 +101,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		disableS3:     c.Bool(common.DisableS3Flag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 		s3Secret:      s3.SigningSecret(c),
+		s3Endpoint:    s3.PublicEndpoint(c),
 		domain:        c.String(common.DomainFlag),
 	}
 	r.GET("/profile", h.get)
@@ -143,7 +145,7 @@ func (s *Handler) getS3Credentials(c *gin.Context) (*S3Credentials, error) {
 	}
 	key := at.Token.String()
 	return &S3Credentials{
-		Endpoint:  s.domain + s3.MountPath,
+		Endpoint:  s.s3Endpoint,
 		AccessKey: key,
 		SecretKey: s3.DeriveSecretKey(s.s3Secret, key),
 		Region:    s3.DefaultRegion,

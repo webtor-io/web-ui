@@ -20,14 +20,24 @@ import (
 // 302, not 301: browsers cache 301 per-URL indefinitely, which would
 // keep bouncing clients even after the hostnames are reshuffled.
 // Returns nil when redirectDomain is empty (production).
-func RedirectNonCanonical(domain string, redirectDomain string) gin.HandlerFunc {
+//
+// exempt lists hostnames this deployment also answers on in its own right —
+// the S3 endpoint's dedicated host. Bouncing those would break every client:
+// an S3 client does not follow a 302 to a different service, and a signature
+// is not valid for the host it lands on anyway.
+func RedirectNonCanonical(domain string, redirectDomain string, exempt ...string) gin.HandlerFunc {
 	if redirectDomain == "" {
 		return nil
 	}
 	target := strings.TrimSuffix(redirectDomain, "/")
 	canonical := hostOnly(domain)
+	allowed := map[string]bool{}
+	for _, h := range exempt {
+		allowed[hostOnly(h)] = true
+	}
 	return func(c *gin.Context) {
-		if strings.EqualFold(hostOnly(c.Request.Host), canonical) {
+		host := hostOnly(c.Request.Host)
+		if strings.EqualFold(host, canonical) || allowed[host] {
 			c.Next()
 			return
 		}
