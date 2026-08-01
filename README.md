@@ -51,6 +51,7 @@ Some features to mention:
   - [x] Stremio
   - [x] Stremio Addons
   - [x] WebDAV
+  - [x] S3
   - [x] RealDebrid
   - [x] TorBox
 - [x] i18n

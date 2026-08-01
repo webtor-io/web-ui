@@ -56,6 +56,11 @@
         {{ template "profile/webdav" $ }}
     </div>
     {{ end }}
+    {{ if not .Data.DisableS3 }}
+    <div id="s3" data-async-layout="{{`{{ template "profile/s3" $ }}`}}">
+        {{ template "profile/s3" $ }}
+    </div>
+    {{ end }}
     {{ if not .Data.DisableEmbed }}
     <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" (withContext $ .Data) }}`}}">
         {{ template "profile/embed_domains" (withContext $ .Data) }}

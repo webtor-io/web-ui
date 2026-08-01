@@ -20,9 +20,10 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/data_export"
 	"github.com/webtor-io/web-ui/services/i18n"
+	pay "github.com/webtor-io/web-ui/services/payments"
+	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
-	pay "github.com/webtor-io/web-ui/services/payments"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
@@ -37,9 +38,20 @@ type BackendTypeInfo struct {
 	DisplayName string
 }
 
+// S3Credentials is what a user pastes into rclone, the aws CLI or Cyberduck.
+// The secret is derived from the access key (services/s3.DeriveSecretKey), so
+// there is nothing extra to store and rotating the key rotates both.
+type S3Credentials struct {
+	Endpoint  string
+	AccessKey string
+	SecretKey string
+	Region    string
+}
+
 type Data struct {
 	StremioAddonURL       string
 	WebDAVURL             string
+	S3                    *S3Credentials
 	EmbedDomains          []models.EmbedDomain
 	AddonUrls             []models.StremioAddonUrl
 	StremioSettings       *models.StremioSettingsData
@@ -51,6 +63,7 @@ type Data struct {
 	UserSettings          *models.UserSettings
 	ErrKey                string
 	DisableWebDAV         bool
+	DisableS3             bool
 	DisableEmbed          bool
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
@@ -67,7 +80,10 @@ type Handler struct {
 	userSettings  *usettings.Service
 	payments      *pay.Client
 	disableWebDAV bool
+	disableS3     bool
 	disableEmbed  bool
+	s3Secret      string
+	domain        string
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client) {
@@ -81,7 +97,10 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		userSettings:  us,
 		payments:      payments,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
+		disableS3:     c.Bool(common.DisableS3Flag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
+		s3Secret:      s3.SigningSecret(c),
+		domain:        c.String(common.DomainFlag),
 	}
 	r.GET("/profile", h.get)
 	gr := r.Group("/profile")
@@ -112,6 +131,23 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	}
 	return al + "/manifest.json", nil
 
+}
+
+// getS3Credentials returns the endpoint/key/secret triple, or nil when the user
+// has not issued S3 credentials yet (the profile then shows the generate
+// button, same as WebDAV).
+func (s *Handler) getS3Credentials(c *gin.Context) (*S3Credentials, error) {
+	at, err := s.at.GetTokenByName(c, s3.TokenName)
+	if at == nil {
+		return nil, err
+	}
+	key := at.Token.String()
+	return &S3Credentials{
+		Endpoint:  s.domain + s3.MountPath,
+		AccessKey: key,
+		SecretKey: s3.DeriveSecretKey(s.s3Secret, key),
+		Region:    s3.DefaultRegion,
+	}, nil
 }
 
 func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
@@ -206,6 +242,11 @@ func (s *Handler) get(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get webdav url"))
 		return
 	}
+	s3Creds, err := s.getS3Credentials(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get s3 credentials"))
+		return
+	}
 
 	// Get user domains
 	db := s.pg.Get()
@@ -277,6 +318,7 @@ func (s *Handler) get(c *gin.Context) {
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
+		S3:                    s3Creds,
 		EmbedDomains:          domains,
 		AddonUrls:             addonUrls,
 		StremioSettings:       ss,
@@ -287,6 +329,7 @@ func (s *Handler) get(c *gin.Context) {
 		ErrKey:                c.Query("err"),
 		HasPayments:           hasPayments,
 		DisableWebDAV:         s.disableWebDAV,
+		DisableS3:             s.disableS3,
 		DisableEmbed:          s.disableEmbed,
 	}))
 }

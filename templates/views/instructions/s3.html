@@ -1,0 +1,65 @@
+{{ define "title" }}
+    {{ t $.Lang "instructions.s3.title" }}
+{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+  <div class="max-w-[900px] mx-auto">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      {{ t $.Lang "instructions.guide" }}
+    </div>
+
+    <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "instructions.s3.heading" }}</h1>
+
+    <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.s3.intro" }}</p>
+
+    <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>{{ tpHTML $.Lang "instructions.s3.step1" "ProfileURL" (langPath $.Lang "/profile") }}</li>
+        <li>{{ t $.Lang "instructions.s3.step2" }}</li>
+        <li>{{ t $.Lang "instructions.s3.step3" }}</li>
+    </ol>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.s3.rcloneTitle" }}</h2>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-3">{{ t $.Lang "instructions.s3.rcloneIntro" }}</p>
+
+    <pre class="bg-base-300/50 border border-w-line rounded-xl p-4 mb-4 overflow-x-auto text-sm"><code>[webtor]
+type = s3
+provider = Other
+endpoint = https://webtor.io/s3
+access_key_id = &lt;access key&gt;
+secret_access_key = &lt;secret key&gt;
+region = us-east-1
+force_path_style = true</code></pre>
+
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ tHTML $.Lang "instructions.s3.rcloneUsage" }}</p>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.s3.clientsTitle" }}</h2>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>{{ tHTML $.Lang "instructions.s3.clientAws" }}</li>
+        <li>{{ tHTML $.Lang "instructions.s3.clientCyberduck" }}</li>
+        <li>{{ tHTML $.Lang "instructions.s3.clientMount" }}</li>
+    </ul>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.s3.bucketsTitle" }}</h2>
+
+    <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
+        <li>{{ tHTML $.Lang "instructions.s3.bucketTorrents" }}</li>
+        <li>{{ tHTML $.Lang "instructions.s3.bucketAll" }}</li>
+        <li>{{ tHTML $.Lang "instructions.s3.bucketMovies" }}</li>
+        <li>{{ tHTML $.Lang "instructions.s3.bucketSeries" }}</li>
+    </ul>
+
+    <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-6 text-sm text-w-sub">
+      <strong>{{ t $.Lang "instructions.note" }}</strong> {{ tHTML $.Lang "instructions.s3.noteReadOnly" }}
+    </div>
+
+    <div class="bg-base-300/50 border border-w-line rounded-xl p-4 mt-4 text-sm text-w-sub">
+      <strong>{{ t $.Lang "instructions.note" }}</strong> {{ tHTML $.Lang "instructions.s3.notePaid" }}
+    </div>
+  </div>
+</section>
+{{ end }}

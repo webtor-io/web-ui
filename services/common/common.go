@@ -23,6 +23,8 @@ var (
 	UseDirectLinks    = "use-direct-links"
 	SessionSecretFlag = "secret"
 	DisableWebDAVFlag = "disable-webdav"
+	DisableS3Flag     = "disable-s3"
+	S3SecretFlag      = "s3-signing-secret"
 	DisableEmbedFlag  = "disable-embed"
 )
 
@@ -92,6 +94,21 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   DisableWebDAVFlag,
 			Usage:  "disable webdav",
 			EnvVar: "DISABLE_WEBDAV",
+		},
+		cli.BoolFlag{
+			Name:   DisableS3Flag,
+			Usage:  "disable s3",
+			EnvVar: "DISABLE_S3",
+		},
+		cli.StringFlag{
+			Name: S3SecretFlag,
+			// The S3 secret access key is derived from this and the user's
+			// access token (see services/s3.DeriveSecretKey) instead of being
+			// stored, so rotating it invalidates every user's S3 config the
+			// same way rotating SESSION_SECRET drops every session. Empty falls
+			// back to the session secret.
+			Usage:  "s3 signing secret (falls back to session secret)",
+			EnvVar: "S3_SIGNING_SECRET",
 		},
 		cli.BoolFlag{
 			Name:   DisableEmbedFlag,

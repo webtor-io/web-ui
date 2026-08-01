@@ -2,9 +2,20 @@
 
 Read-only WebDAV view of a user's library, so they can mount it with
 `rclone`, Finder, Windows Explorer, Cyberduck, etc. and browse/stream their
-torrents as files. Paid-only (`claims.IsPaid`). Implementation lives in
-`handlers/webdav/` (the virtual filesystem) and `services/webdav/` (a vendored,
-trimmed fork of [go-webdav] under `internal/` plus our `FileSystem` interface).
+torrents as files. Paid-only (`claims.IsPaid`).
+
+The filesystem itself is **not** WebDAV-specific — S3 serves the same tree, see
+[s3.md](s3.md):
+
+| Package | Role |
+|---------|------|
+| `services/vfs` | `FileInfo` / `FileSystem` / `HTTPError` — the protocol-neutral contract |
+| `services/libfs` | the library tree: roots, library-backed content, torrent files |
+| `services/webdav` | RFC 4918 — a vendored, trimmed fork of [go-webdav] under `internal/` |
+| `handlers/webdav` | routing, token management, and the WebDAV-only `PrefixDirectory` |
+
+`services/webdav` re-exports the `vfs` types as aliases (`type FileInfo =
+vfs.FileInfo`), so code and docs here keep reading as WebDAV code.
 
 [go-webdav]: https://github.com/emersion/go-webdav
 
@@ -43,11 +54,13 @@ is rewritten twice, in-process, before it reaches the WebDAV handler:
 ### Why the path still works: the `webdav` separator
 
 `PrefixDirectory` (`handlers/webdav/prefix.go`) splits the path on the literal
-string `"webdav"` (the `sep` passed to `NewFileSystem`). The user-facing URL
+string `"webdav"` (the `Separator` it is built with). It is the one piece of the
+tree that stayed WebDAV-only — S3 addresses `services/libfs` directly as bucket
++ key and needs no prefix. The user-facing URL
 deliberately ends in `/webdav/`, so a request to `…/webdav/all/` splits into
 prefix `…/webdav` + inner path `/all/`. The prefix is re-prepended to every
-`href` in the response (`addPrefix`) so clients get absolute, round-trippable
-paths. Below `PrefixDirectory`:
+`href` in the response (`libfs.AddPrefix`) so clients get absolute,
+round-trippable paths. Below `PrefixDirectory` (all in `services/libfs`):
 
 - `RootDirectory` — the four virtual top-level dirs: `all`, `movies`, `series`,
   `torrents`. Listing `/` returns these; deeper paths route to a child by name.

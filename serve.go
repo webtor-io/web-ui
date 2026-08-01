@@ -26,6 +26,7 @@ import (
 	wm "github.com/webtor-io/web-ui/handlers/migration"
 	p "github.com/webtor-io/web-ui/handlers/profile"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
+	s3 "github.com/webtor-io/web-ui/handlers/s3"
 	sess "github.com/webtor-io/web-ui/handlers/session"
 	"github.com/webtor-io/web-ui/handlers/sitemap"
 	"github.com/webtor-io/web-ui/handlers/speedtest"
@@ -55,6 +56,7 @@ import (
 	npg "github.com/webtor-io/web-ui/services/payments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
+	s3svc "github.com/webtor-io/web-ui/services/s3"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
@@ -203,6 +205,7 @@ func serve(c *cli.Context) error {
 		"/s/",
 		"/token/",
 		"/webdav/",
+		"/s3/",
 		"/transcoder-session/",
 	})
 	if err != nil {
@@ -219,6 +222,10 @@ func serve(c *cli.Context) error {
 		}
 		a.RegisterHandler(r)
 	}
+
+	// Setting S3 access key extraction — must run before the access token
+	// middleware below, which is what it feeds (see services/s3).
+	s3svc.RegisterAccessKeyMiddleware(r, s3svc.MountPath)
 
 	// Setting Access Token
 	ats := at.New(pg)
@@ -471,6 +478,9 @@ func serve(c *cli.Context) error {
 
 	// Setting WebDAV
 	webdav.RegisterHandler(c, r, pg, ats, sapi, jobs)
+
+	// Setting S3 (same library tree as WebDAV, different protocol)
+	s3.RegisterHandler(c, r, pg, ats, sapi, jobs)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

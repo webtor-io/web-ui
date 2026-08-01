@@ -1,0 +1,84 @@
+{{ define "profile/s3" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+            {{ t $.Lang "profile.s3.title" }}
+        </h2>
+        {{ if .Claims | isPaid }}
+            {{ if not .Data.S3 }}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/s3-credentials/generate" }}" data-async-target="#s3">
+                    <button type="submit" class="btn btn-soft" data-umami-event="s3-generate-credentials">
+                        {{ t $.Lang "profile.s3.generate" }}
+                    </button>
+                </form>
+            {{ else }}
+                <script>
+                    var s3Values = {
+                        endpoint: {{ .Data.S3.Endpoint }},
+                        accessKey: {{ .Data.S3.AccessKey }},
+                        secretKey: {{ .Data.S3.SecretKey }},
+                        region: {{ .Data.S3.Region }}
+                    };
+                    function copyS3Value(e, name) {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(s3Values[name]);
+                        if (window.toast) window.toast.success('{{ t $.Lang "profile.s3.copied" }}');
+                        return false;
+                    }
+                    {{/* The secret is derived, not stored, so it can be shown again
+                         at any time — the reveal is about shoulder-surfing, not
+                         about the value being unrecoverable. */}}
+                    function toggleS3Secret(e) {
+                        e.preventDefault();
+                        var input = document.getElementById('s3-secret-input');
+                        input.type = input.type === 'password' ? 'text' : 'password';
+                        return false;
+                    }
+                </script>
+                <div class="join w-full mb-3">
+                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.endpoint" }}</span>
+                    <input readonly aria-label="{{ t $.Lang "profile.s3.endpoint" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.Endpoint }}" />
+                    <button type="button" onclick="copyS3Value(event, 'endpoint')" class="btn btn-soft join-item" data-umami-event="s3-copy-endpoint">{{ t $.Lang "profile.s3.copy" }}</button>
+                </div>
+                <div class="join w-full mb-3">
+                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.accessKey" }}</span>
+                    <input readonly aria-label="{{ t $.Lang "profile.s3.accessKey" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.AccessKey }}" />
+                    <button type="button" onclick="copyS3Value(event, 'accessKey')" class="btn btn-soft join-item" data-umami-event="s3-copy-access-key">{{ t $.Lang "profile.s3.copy" }}</button>
+                </div>
+                {{/* Single form so the secret row, copy, reveal and rotate share
+                     one join row. Copy/reveal are type="button"; the submit is
+                     the rotation, which is destructive — every configured client
+                     stops authenticating, and the secret changes with the key. */}}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/s3-credentials/regenerate" }}" data-async-target="#s3"
+                      onsubmit="return confirm({{ t $.Lang "profile.s3.regenerateWarning" | json }})" class="join w-full mb-4">
+                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.secretKey" }}</span>
+                    <input id="s3-secret-input" type="password" readonly aria-label="{{ t $.Lang "profile.s3.secretKey" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.SecretKey }}" />
+                    <button type="button" onclick="toggleS3Secret(event)" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.s3.reveal" }}" aria-label="{{ t $.Lang "profile.s3.reveal" }}">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button type="button" onclick="copyS3Value(event, 'secretKey')" class="btn btn-soft join-item" data-umami-event="s3-copy-secret-key">{{ t $.Lang "profile.s3.copy" }}</button>
+                    <button type="submit" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.s3.regenerate" }}" aria-label="{{ t $.Lang "profile.s3.regenerate" }}" data-umami-event="s3-regenerate-credentials">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+                    </button>
+                </form>
+                <p class="text-sm text-w-muted mb-2">{{ tp $.Lang "profile.s3.regionHint" "Region" .Data.S3.Region }}</p>
+            {{ end }}
+        {{ else }}
+            <button disabled class="btn bg-base-300 text-w-muted border-w-line cursor-not-allowed">
+                {{ t $.Lang "profile.s3.generate" }}
+            </button>
+            <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4">
+                <p class="text-sm text-w-sub">
+                    {{ t $.Lang "profile.s3.premiumOnly" }}
+                </p>
+                <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" data-async-target="main" data-umami-event="donate-s3">{{ t $.Lang "profile.s3.upgrade" }}</a>
+            </div>
+        {{ end }}
+        {{/* Outside every branch: the guide answers "what would I even do with
+             this?", which is the question people have *before* they press
+             generate — and the one a locked-out free user is asking too. */}}
+        <div class="mt-4">
+            <a href="{{ langPath $.Lang "/instructions/s3" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-s3" target="_blank">{{ t $.Lang "profile.s3.howTo" }}</a>
+        </div>
+    </div>
+{{ end }}
