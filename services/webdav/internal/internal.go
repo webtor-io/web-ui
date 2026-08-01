@@ -2,9 +2,9 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
+
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 // Depth indicates whether a request applies to the resource's members. It's
@@ -68,43 +68,21 @@ func FormatOverwrite(overwrite bool) string {
 	}
 }
 
-type HTTPError struct {
-	Code int
-	Err  error
-}
+// HTTPError is defined in services/vfs so that the filesystem tree can return
+// status-carrying errors without importing a protocol package — every protocol
+// layer (WebDAV here, S3 in services/s3) maps the same type onto its own error
+// format. Aliased rather than redeclared to keep this vendored fork untouched
+// everywhere else.
+type HTTPError = vfs.HTTPError
 
 func HTTPErrorFromError(err error) *HTTPError {
-	if err == nil {
-		return nil
-	}
-	if httpErr, ok := err.(*HTTPError); ok {
-		return httpErr
-	} else {
-		return &HTTPError{http.StatusInternalServerError, err}
-	}
+	return vfs.HTTPErrorFromError(err)
 }
 
 func IsNotFound(err error) bool {
-	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
-		return httpErr.Code == http.StatusNotFound
-	}
-	return false
+	return vfs.IsNotFound(err)
 }
 
 func HTTPErrorf(code int, format string, a ...interface{}) *HTTPError {
-	return &HTTPError{code, fmt.Errorf(format, a...)}
-}
-
-func (err *HTTPError) Error() string {
-	s := fmt.Sprintf("%v %v", err.Code, http.StatusText(err.Code))
-	if err.Err != nil {
-		return fmt.Sprintf("%v: %v", s, err.Err)
-	} else {
-		return s
-	}
-}
-
-func (err *HTTPError) Unwrap() error {
-	return err.Err
+	return vfs.HTTPErrorf(code, format, a...)
 }

@@ -1,4 +1,4 @@
-package webdav
+package libfs
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/webdav"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 // torrentAPI is the slice of *api.Api that TorrentDirectory needs. Declaring
@@ -26,25 +26,25 @@ type TorrentDirectory struct {
 	api torrentAPI
 }
 
-func (s *TorrentDirectory) Stat(ctx context.Context, tr *models.TorrentResource, path string) (*webdav.FileInfo, error) {
+func (s *TorrentDirectory) Stat(ctx context.Context, tr *models.TorrentResource, path string) (*vfs.FileInfo, error) {
 	li, err := s.retrieveTorrentItemWithoutPrefix(ctx, tr.ResourceID, path)
 	if err != nil {
 		return nil, err
 	}
 	if li == nil {
-		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	fi := s.listItemToFileInfo(li, tr)
 	return &fi, nil
 }
 
-func (s *TorrentDirectory) ReadDir(ctx context.Context, tr *models.TorrentResource, path string, recursive bool) ([]webdav.FileInfo, error) {
+func (s *TorrentDirectory) ReadDir(ctx context.Context, tr *models.TorrentResource, path string, recursive bool) ([]vfs.FileInfo, error) {
 	items, err := s.retrieveTorrentItemsWithoutPrefix(ctx, tr.ResourceID, path)
 	if err != nil {
 		return nil, err
 	}
 
-	fis := make([]webdav.FileInfo, len(items))
+	fis := make([]vfs.FileInfo, len(items))
 	for n, i := range items {
 		fis[n] = s.listItemToFileInfo(&i, tr)
 	}
@@ -58,7 +58,7 @@ func (s *TorrentDirectory) Open(ctx context.Context, tr *models.TorrentResource,
 		return nil, nil, err
 	}
 	if ti == nil {
-		return nil, nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	cu, err := s.getContentURL(ctx, tr.ResourceID, ti.ID)
 	if err != nil {
@@ -68,16 +68,16 @@ func (s *TorrentDirectory) Open(ctx context.Context, tr *models.TorrentResource,
 
 }
 
-func (s *TorrentDirectory) listItemToFileInfo(i *ra.ListItem, tr *models.TorrentResource) webdav.FileInfo {
+func (s *TorrentDirectory) listItemToFileInfo(i *ra.ListItem, tr *models.TorrentResource) vfs.FileInfo {
 	if i.Type == ra.ListTypeDirectory {
-		return webdav.FileInfo{
+		return vfs.FileInfo{
 			Path:    i.PathStr + "/",
 			ModTime: tr.CreatedAt,
 			IsDir:   true,
 			Size:    i.Size,
 		}
 	} else {
-		return webdav.FileInfo{
+		return vfs.FileInfo{
 			Path:     i.PathStr,
 			ModTime:  tr.CreatedAt,
 			IsDir:    false,

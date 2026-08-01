@@ -1,4 +1,4 @@
-package webdav
+package libfs
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/webdav"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 type TorrentLibraryDirectory struct {
@@ -31,39 +31,39 @@ func (s *TorrentLibraryDirectory) Open(ctx context.Context, name string) (io.Rea
 		return nil, nil, err
 	}
 	if l == nil {
-		return nil, nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	return s.readTorrent(ctx, l)
 
 }
 
-func (s *TorrentLibraryDirectory) Stat(ctx context.Context, name string) (*webdav.FileInfo, error) {
+func (s *TorrentLibraryDirectory) Stat(ctx context.Context, name string) (*vfs.FileInfo, error) {
 	l, err := s.getLibraryByName(ctx, torrentToName(name))
 	if err != nil {
 		return nil, err
 	}
 	if l == nil {
-		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	fi := s.libraryToFileInfo(l)
 	return &fi, nil
 }
 
-func (s *TorrentLibraryDirectory) ReadDir(ctx context.Context, name string, recursive bool) ([]webdav.FileInfo, error) {
+func (s *TorrentLibraryDirectory) ReadDir(ctx context.Context, name string, recursive bool) ([]vfs.FileInfo, error) {
 	ls, err := s.getLibraryList(ctx)
 	if err != nil {
 		return nil, err
 	}
-	fi := make([]webdav.FileInfo, len(ls))
+	fi := make([]vfs.FileInfo, len(ls))
 	for i, v := range ls {
 		fi[i] = s.libraryToFileInfo(v)
 	}
 	return fi, nil
 }
 
-func (s *TorrentLibraryDirectory) Create(ctx context.Context, name string, body io.ReadCloser, opts *webdav.CreateOptions) (*webdav.FileInfo, bool, error) {
+func (s *TorrentLibraryDirectory) Create(ctx context.Context, name string, body io.ReadCloser, opts *vfs.CreateOptions) (*vfs.FileInfo, bool, error) {
 	if !strings.HasSuffix(name, ".torrent") {
-		return nil, false, webdav.NewHTTPError(400, errors.New("bad request"))
+		return nil, false, vfs.NewHTTPError(400, errors.New("bad request"))
 	}
 
 	t, err := io.ReadAll(body)
@@ -84,24 +84,24 @@ func (s *TorrentLibraryDirectory) Create(ctx context.Context, name string, body 
 	return &fi, true, nil
 }
 
-func (s *TorrentLibraryDirectory) RemoveAll(ctx context.Context, name string, opts *webdav.RemoveAllOptions) error {
+func (s *TorrentLibraryDirectory) RemoveAll(ctx context.Context, name string, opts *vfs.RemoveAllOptions) error {
 	l, err := s.getLibraryByName(ctx, torrentToName(name))
 	if err != nil {
 		return err
 	}
 	if l == nil {
-		return webdav.NewHTTPError(404, errors.New("file not found"))
+		return vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	return s.removeFromLibrary(ctx, l)
 }
 
-func (s *TorrentLibraryDirectory) Move(ctx context.Context, name, dest string, options *webdav.MoveOptions) (bool, error) {
+func (s *TorrentLibraryDirectory) Move(ctx context.Context, name, dest string, options *vfs.MoveOptions) (bool, error) {
 	ls, err := s.getLibraryByName(ctx, torrentToName(name))
 	if err != nil {
 		return false, err
 	}
 	if ls == nil {
-		return false, webdav.NewHTTPError(404, errors.New("file not found"))
+		return false, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	ls.Name = torrentToName(filepath.Base(dest))
 	err = s.updateLibraryName(ctx, ls)
@@ -205,14 +205,14 @@ func (s *TorrentLibraryDirectory) getLibraryByName(ctx context.Context, name str
 	return models.GetLibraryByName(ctx, db, wcc.User.ID, name)
 }
 
-var _ webdav.FileSystem = (*TorrentLibraryDirectory)(nil)
+var _ vfs.FileSystem = (*TorrentLibraryDirectory)(nil)
 
 func torrentToName(path string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(path, "/"), ".torrent")
 }
 
-func (s *TorrentLibraryDirectory) libraryToFileInfo(l *models.Library) webdav.FileInfo {
-	return webdav.FileInfo{
+func (s *TorrentLibraryDirectory) libraryToFileInfo(l *models.Library) vfs.FileInfo {
+	return vfs.FileInfo{
 		Path:     l.Name + ".torrent",
 		ModTime:  l.CreatedAt,
 		MIMEType: "application/x-bittorrent",
@@ -220,8 +220,8 @@ func (s *TorrentLibraryDirectory) libraryToFileInfo(l *models.Library) webdav.Fi
 	}
 }
 
-func (s *TorrentLibraryDirectory) libraryToFileInfoNew(l *models.Library, size int64) webdav.FileInfo {
-	return webdav.FileInfo{
+func (s *TorrentLibraryDirectory) libraryToFileInfoNew(l *models.Library, size int64) vfs.FileInfo {
+	return vfs.FileInfo{
 		Path:     l.Name + ".torrent",
 		ModTime:  l.CreatedAt,
 		MIMEType: "application/x-bittorrent",

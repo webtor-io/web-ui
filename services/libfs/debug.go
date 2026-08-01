@@ -1,4 +1,4 @@
-package webdav
+package libfs
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"net/url"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/webtor-io/web-ui/services/webdav"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 type DebugDirectory struct {
 	BaseDirectory
 	Debug bool
-	Inner webdav.FileSystem
+	Inner vfs.FileSystem
 }
 
 func (s *DebugDirectory) Open(ctx context.Context, path string) (io.ReadCloser, *url.URL, error) {
@@ -25,7 +25,7 @@ func (s *DebugDirectory) Open(ctx context.Context, path string) (io.ReadCloser, 
 	return ic, u, nil
 }
 
-func (s *DebugDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]webdav.FileInfo, error) {
+func (s *DebugDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]vfs.FileInfo, error) {
 	fis, err := s.Inner.ReadDir(ctx, path, recursive)
 	if err != nil {
 		log.WithError(err).WithField("path", path).Error("read dir")
@@ -35,7 +35,7 @@ func (s *DebugDirectory) ReadDir(ctx context.Context, path string, recursive boo
 	return fis, nil
 }
 
-func (s *DebugDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo, error) {
+func (s *DebugDirectory) Stat(ctx context.Context, path string) (*vfs.FileInfo, error) {
 	fi, err := s.Inner.Stat(ctx, path)
 	if err != nil {
 		log.WithError(err).WithField("path", path).Error("stat")
@@ -45,7 +45,7 @@ func (s *DebugDirectory) Stat(ctx context.Context, path string) (*webdav.FileInf
 	return fi, nil
 }
 
-func (s *DebugDirectory) RemoveAll(ctx context.Context, path string, opts *webdav.RemoveAllOptions) error {
+func (s *DebugDirectory) RemoveAll(ctx context.Context, path string, opts *vfs.RemoveAllOptions) error {
 	err := s.Inner.RemoveAll(ctx, path, opts)
 	if err != nil {
 		log.WithError(err).WithField("path", path).Error("remove all")
@@ -55,7 +55,7 @@ func (s *DebugDirectory) RemoveAll(ctx context.Context, path string, opts *webda
 	return nil
 }
 
-func (s *DebugDirectory) Create(ctx context.Context, path string, body io.ReadCloser, opts *webdav.CreateOptions) (*webdav.FileInfo, bool, error) {
+func (s *DebugDirectory) Create(ctx context.Context, path string, body io.ReadCloser, opts *vfs.CreateOptions) (*vfs.FileInfo, bool, error) {
 	fi, ok, err := s.Inner.Create(ctx, path, body, opts)
 	if err != nil {
 		log.WithError(err).WithField("path", path).Error("create")
@@ -65,7 +65,7 @@ func (s *DebugDirectory) Create(ctx context.Context, path string, body io.ReadCl
 	return fi, ok, nil
 }
 
-func (s *DebugDirectory) Move(ctx context.Context, path, dest string, options *webdav.MoveOptions) (bool, error) {
+func (s *DebugDirectory) Move(ctx context.Context, path, dest string, options *vfs.MoveOptions) (bool, error) {
 	ok, err := s.Inner.Move(ctx, path, dest, options)
 	if err != nil {
 		log.WithError(err).WithField("path", path).Error("move")
@@ -75,4 +75,4 @@ func (s *DebugDirectory) Move(ctx context.Context, path, dest string, options *w
 	return ok, nil
 }
 
-var _ webdav.FileSystem = (*DebugDirectory)(nil)
+var _ vfs.FileSystem = (*DebugDirectory)(nil)

@@ -1,30 +1,20 @@
 package webdav
 
 import (
-	"context"
 	"encoding/xml"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/webtor-io/web-ui/services/vfs"
 	"github.com/webtor-io/web-ui/services/webdav/internal"
 )
 
 // FileSystem is a WebDAV server backend.
-type FileSystem interface {
-	Open(ctx context.Context, name string) (io.ReadCloser, *url.URL, error)
-	Stat(ctx context.Context, name string) (*FileInfo, error)
-	ReadDir(ctx context.Context, name string, recursive bool) ([]FileInfo, error)
-	Create(ctx context.Context, name string, body io.ReadCloser, opts *CreateOptions) (fileInfo *FileInfo, created bool, err error)
-	RemoveAll(ctx context.Context, name string, opts *RemoveAllOptions) error
-	Mkdir(ctx context.Context, name string) error
-	Copy(ctx context.Context, name, dest string, options *CopyOptions) (created bool, err error)
-	Move(ctx context.Context, name, dest string, options *MoveOptions) (created bool, err error)
-}
+type FileSystem = vfs.FileSystem
 
 // Handler handles WebDAV HTTP requests. It can be used to create a WebDAV
 // server.
@@ -50,7 +40,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // denied, etc.) while also providing an (optional) arbitrary error context
 // (intended for humans).
 func NewHTTPError(statusCode int, cause error) error {
-	return &internal.HTTPError{Code: statusCode, Err: cause}
+	return vfs.NewHTTPError(statusCode, cause)
 }
 
 type backend struct {

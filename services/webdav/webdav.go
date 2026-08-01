@@ -1,71 +1,28 @@
 // Package webdav provides a client and server WebDAV filesystem implementation.
 //
 // WebDAV is defined in RFC 4918.
+//
+// The filesystem itself is protocol-neutral and lives in services/vfs (types)
+// and handlers/vfs (the tree); the names below are aliases so that this package
+// and its callers keep reading as WebDAV code.
 package webdav
 
 import (
-	"time"
-
-	"github.com/webtor-io/web-ui/services/webdav/internal"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 // FileInfo holds information about a WebDAV file.
-type FileInfo struct {
-	Path     string
-	Size     int64
-	ModTime  time.Time
-	IsDir    bool
-	MIMEType string
-	ETag     string
-}
+type FileInfo = vfs.FileInfo
 
-type CreateOptions struct {
-	IfMatch     ConditionalMatch
-	IfNoneMatch ConditionalMatch
-}
+type CreateOptions = vfs.CreateOptions
 
-type RemoveAllOptions struct {
-	IfMatch     ConditionalMatch
-	IfNoneMatch ConditionalMatch
-}
+type RemoveAllOptions = vfs.RemoveAllOptions
 
-type CopyOptions struct {
-	NoRecursive bool
-	NoOverwrite bool
-}
+type CopyOptions = vfs.CopyOptions
 
-type MoveOptions struct {
-	NoOverwrite bool
-}
+type MoveOptions = vfs.MoveOptions
 
 // ConditionalMatch represents the value of a conditional header
 // according to RFC 2068 section 14.25 and RFC 2068 section 14.26
 // The (optional) value can either be a wildcard or an ETag.
-type ConditionalMatch string
-
-func (val ConditionalMatch) IsSet() bool {
-	return val != ""
-}
-
-func (val ConditionalMatch) IsWildcard() bool {
-	return val == "*"
-}
-
-func (val ConditionalMatch) ETag() (string, error) {
-	var e internal.ETag
-	if err := e.UnmarshalText([]byte(val)); err != nil {
-		return "", err
-	}
-	return string(e), nil
-}
-
-func (val ConditionalMatch) MatchETag(etag string) (bool, error) {
-	if etag == "" {
-		return false, nil
-	}
-	if val.IsWildcard() {
-		return true, nil
-	}
-	t, err := val.ETag()
-	return t == etag, err
-}
+type ConditionalMatch = vfs.ConditionalMatch

@@ -16,6 +16,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	co "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/libfs"
 	"github.com/webtor-io/web-ui/services/web"
 	webdav "github.com/webtor-io/web-ui/services/webdav"
 )
@@ -31,7 +32,13 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, at *at.AccessToke
 	if c.Bool(co.DisableWebDAVFlag) {
 		return
 	}
-	fs := NewFileSystem(pg, sapi, jobs, "webdav")
+	// The tree is shared with S3 (services/libfs); WebDAV only adds the prefix
+	// split, because its URLs reach us as /s/<code>/webdav/… and every href in
+	// the response has to be echoed back with that prefix intact.
+	fs := &PrefixDirectory{
+		Separator: "webdav",
+		Inner:     libfs.New(pg, sapi, jobs),
+	}
 	wh := &webdav.Handler{FileSystem: fs}
 	h := &Handler{
 		pg:   pg,

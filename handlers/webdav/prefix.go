@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/webdav"
+	"github.com/webtor-io/web-ui/services/libfs"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 type PrefixDirectory struct {
-	BaseDirectory
+	libfs.BaseDirectory
 	Separator string
-	Inner     webdav.FileSystem
+	Inner     vfs.FileSystem
 }
 
 func (s *PrefixDirectory) Open(ctx context.Context, path string) (io.ReadCloser, *url.URL, error) {
@@ -24,7 +25,7 @@ func (s *PrefixDirectory) Open(ctx context.Context, path string) (io.ReadCloser,
 	return s.Inner.Open(ctx, newPath)
 }
 
-func (s *PrefixDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]webdav.FileInfo, error) {
+func (s *PrefixDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]vfs.FileInfo, error) {
 	prefix, newPath, err := s.splitPath(path)
 	if err != nil {
 		return nil, err
@@ -33,10 +34,10 @@ func (s *PrefixDirectory) ReadDir(ctx context.Context, path string, recursive bo
 	if err != nil {
 		return nil, err
 	}
-	return addPrefixes(fis, prefix), nil
+	return libfs.AddPrefixes(fis, prefix), nil
 }
 
-func (s *PrefixDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo, error) {
+func (s *PrefixDirectory) Stat(ctx context.Context, path string) (*vfs.FileInfo, error) {
 	prefix, newPath, err := s.splitPath(path)
 	if err != nil {
 		return nil, err
@@ -45,10 +46,10 @@ func (s *PrefixDirectory) Stat(ctx context.Context, path string) (*webdav.FileIn
 	if err != nil {
 		return nil, err
 	}
-	return addPrefix(fi, prefix), nil
+	return libfs.AddPrefix(fi, prefix), nil
 }
 
-func (s *PrefixDirectory) RemoveAll(ctx context.Context, path string, opts *webdav.RemoveAllOptions) error {
+func (s *PrefixDirectory) RemoveAll(ctx context.Context, path string, opts *vfs.RemoveAllOptions) error {
 	_, newPath, err := s.splitPath(path)
 	if err != nil {
 		return err
@@ -56,7 +57,7 @@ func (s *PrefixDirectory) RemoveAll(ctx context.Context, path string, opts *webd
 	return s.Inner.RemoveAll(ctx, newPath, opts)
 }
 
-func (s *PrefixDirectory) Create(ctx context.Context, path string, body io.ReadCloser, opts *webdav.CreateOptions) (*webdav.FileInfo, bool, error) {
+func (s *PrefixDirectory) Create(ctx context.Context, path string, body io.ReadCloser, opts *vfs.CreateOptions) (*vfs.FileInfo, bool, error) {
 	prefix, newPath, err := s.splitPath(path)
 	if err != nil {
 		return nil, false, err
@@ -65,10 +66,10 @@ func (s *PrefixDirectory) Create(ctx context.Context, path string, body io.ReadC
 	if err != nil {
 		return nil, false, err
 	}
-	return addPrefix(fi, prefix), ok, nil
+	return libfs.AddPrefix(fi, prefix), ok, nil
 }
 
-func (s *PrefixDirectory) Move(ctx context.Context, path, dest string, options *webdav.MoveOptions) (bool, error) {
+func (s *PrefixDirectory) Move(ctx context.Context, path, dest string, options *vfs.MoveOptions) (bool, error) {
 	_, newPath, err := s.splitPath(path)
 	if err != nil {
 		return false, err
@@ -87,4 +88,4 @@ func (s *PrefixDirectory) splitPath(path string) (string, string, error) {
 	return prefix, newPath, nil
 }
 
-var _ webdav.FileSystem = (*PrefixDirectory)(nil)
+var _ vfs.FileSystem = (*PrefixDirectory)(nil)

@@ -1,4 +1,4 @@
-package webdav
+package libfs
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/webdav"
+	"github.com/webtor-io/web-ui/services/vfs"
 )
 
 type ContentDirectory struct {
@@ -25,21 +25,21 @@ func (s *ContentDirectory) Open(ctx context.Context, path string) (io.ReadCloser
 		return nil, nil, err
 	}
 	if lr == nil {
-		return nil, nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	return s.TorrentDirectory.Open(ctx, lr.Item.Torrent, lr.NewPath)
 }
 
-func (s *ContentDirectory) Stat(ctx context.Context, path string) (*webdav.FileInfo, error) {
+func (s *ContentDirectory) Stat(ctx context.Context, path string) (*vfs.FileInfo, error) {
 	lr, err := s.getContentItem(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	if lr == nil {
-		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	if isRoot(lr.NewPath) {
-		return &webdav.FileInfo{
+		return &vfs.FileInfo{
 			Path:    lr.Item.Torrent.Name + "/",
 			ModTime: lr.Item.Torrent.CreatedAt,
 			IsDir:   true,
@@ -49,16 +49,16 @@ func (s *ContentDirectory) Stat(ctx context.Context, path string) (*webdav.FileI
 	if err != nil {
 		return nil, err
 	}
-	return addPrefix(fi, lr.Root), nil
+	return AddPrefix(fi, lr.Root), nil
 }
 
-func (s *ContentDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]webdav.FileInfo, error) {
+func (s *ContentDirectory) ReadDir(ctx context.Context, path string, recursive bool) ([]vfs.FileInfo, error) {
 	if isRoot(path) {
 		ls, err := s.getContentWithContext(ctx)
 		if err != nil {
 			return nil, err
 		}
-		var fis = make([]webdav.FileInfo, len(ls))
+		var fis = make([]vfs.FileInfo, len(ls))
 		for i, v := range ls {
 			fis[i] = s.libraryToFileInfo(v)
 		}
@@ -69,13 +69,13 @@ func (s *ContentDirectory) ReadDir(ctx context.Context, path string, recursive b
 		return nil, err
 	}
 	if lr == nil {
-		return nil, webdav.NewHTTPError(404, errors.New("file not found"))
+		return nil, vfs.NewHTTPError(404, errors.New("file not found"))
 	}
 	fis, err := s.TorrentDirectory.ReadDir(ctx, lr.Item.Torrent, lr.NewPath, recursive)
 	if err != nil {
 		return nil, err
 	}
-	return addPrefixes(fis, lr.Root), nil
+	return AddPrefixes(fis, lr.Root), nil
 }
 
 func (s *ContentDirectory) getContentWithContext(ctx context.Context) ([]*models.Library, error) {
@@ -122,12 +122,12 @@ type ContentItemResponse struct {
 	Root    string
 }
 
-func (s *ContentDirectory) libraryToFileInfo(l *models.Library) webdav.FileInfo {
-	return webdav.FileInfo{
+func (s *ContentDirectory) libraryToFileInfo(l *models.Library) vfs.FileInfo {
+	return vfs.FileInfo{
 		Path:    l.Torrent.Name + "/",
 		ModTime: l.Torrent.CreatedAt,
 		IsDir:   true,
 	}
 }
 
-var _ webdav.FileSystem = (*ContentDirectory)(nil)
+var _ vfs.FileSystem = (*ContentDirectory)(nil)
