@@ -178,34 +178,75 @@ func verifyRequest(r *http.Request, uri *url.URL, signingSecret string, now time
 	}
 
 	canonicalQuery := canonicalQueryString(query, sig.Presigned)
-	headers, err := canonicalHeaders(r, sig.SignedHeaders)
-	if err != nil {
-		return nil, err
+	key := signingKey(DeriveSecretKey(signingSecret, sig.AccessKeyID), sig)
+
+	var canonicalRequest, stringToSign string
+	for _, override := range headerCandidates(sig.SignedHeaders) {
+		headers, err := canonicalHeaders(r, sig.SignedHeaders, override)
+		if err != nil {
+			return nil, err
+		}
+
+		canonicalRequest = strings.Join([]string{
+			r.Method,
+			canonicalURI(uri),
+			canonicalQuery,
+			headers,
+			strings.Join(sig.SignedHeaders, ";"),
+			payloadHash,
+		}, "\n")
+
+		stringToSign = strings.Join([]string{
+			signV4Algorithm,
+			sig.AmzDate,
+			sig.scope(),
+			hashHex([]byte(canonicalRequest)),
+		}, "\n")
+
+		expected := hex.EncodeToString(sign(key, []byte(stringToSign)))
+		if hmac.Equal([]byte(expected), []byte(sig.Signature)) {
+			return sig, nil
+		}
 	}
 
-	canonicalRequest := strings.Join([]string{
-		r.Method,
-		canonicalURI(uri),
-		canonicalQuery,
-		headers,
-		strings.Join(sig.SignedHeaders, ";"),
-		payloadHash,
-	}, "\n")
+	// Hand back what we computed, the way Amazon does. Without it the only way
+	// to find out which component a proxy rewrote is to add logging and deploy.
+	// Nothing here is secret: it is a restatement of the request the caller just
+	// made, and it proves nothing about the key.
+	e := newError(http.StatusForbidden, ErrCodeSignatureMismatch,
+		"The request signature we calculated does not match the signature you provided",
+		errors.Errorf("signature mismatch for key %s", sig.AccessKeyID))
+	e.CanonicalRequest = canonicalRequest
+	e.StringToSign = stringToSign
+	return nil, e
+}
 
-	stringToSign := strings.Join([]string{
-		signV4Algorithm,
-		sig.AmzDate,
-		sig.scope(),
-		hashHex([]byte(canonicalRequest)),
-	}, "\n")
-
-	expected := hex.EncodeToString(sign(signingKey(DeriveSecretKey(signingSecret, sig.AccessKeyID), sig), []byte(stringToSign)))
-	if !hmac.Equal([]byte(expected), []byte(sig.Signature)) {
-		return nil, newError(http.StatusForbidden, ErrCodeSignatureMismatch,
-			"The request signature we calculated does not match the signature you provided",
-			errors.Errorf("signature mismatch for key %s", sig.AccessKeyID))
+// headerCandidates yields the header overrides to try, in order: first the
+// request exactly as received, then values a CDN is known to substitute.
+//
+// aws-sdk-go-v2 — and therefore rclone — signs `accept-encoding`, and Cloudflare
+// rewrites that header on its way to the origin. Nothing about the request the
+// client signed survives that, so an untouched verification cannot succeed no
+// matter how correct it is. Re-checking against the value the SDK actually sends
+// costs one HMAC and gives up nothing: the signature still binds the method,
+// path, query, host, date and payload hash, and it still cannot be produced
+// without the secret.
+//
+// The durable fix is to stop a header-rewriting proxy from sitting in front of
+// the S3 endpoint (see docs/s3.md); this keeps clients working until then, and
+// covers whatever CDN ends up in front of us next.
+func headerCandidates(signed []string) []map[string]string {
+	candidates := []map[string]string{nil}
+	for _, h := range signed {
+		if h == "accept-encoding" {
+			candidates = append(candidates,
+				map[string]string{"accept-encoding": "identity"},
+				map[string]string{"accept-encoding": ""},
+			)
+			break
+		}
 	}
-	return sig, nil
+	return candidates
 }
 
 func (s *signature) checkTime(now time.Time) *Error {
@@ -262,10 +303,17 @@ func canonicalQueryString(query url.Values, presigned bool) string {
 	return strings.Join(parts, "&")
 }
 
-func canonicalHeaders(r *http.Request, signed []string) (string, *Error) {
+func canonicalHeaders(r *http.Request, signed []string, override map[string]string) (string, *Error) {
 	var b strings.Builder
 	for _, name := range signed {
 		var value string
+		if v, ok := override[name]; ok {
+			b.WriteString(name)
+			b.WriteString(":")
+			b.WriteString(trimAll(v))
+			b.WriteString("\n")
+			continue
+		}
 		switch name {
 		case "host":
 			value = r.Host

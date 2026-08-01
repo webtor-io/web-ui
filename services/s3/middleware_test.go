@@ -1,10 +1,12 @@
 package s3
 
 import (
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	co "github.com/webtor-io/web-ui/services/common"
@@ -112,6 +114,80 @@ func TestWrongProtocolIsNamed(t *testing.T) {
 		if err := WrongProtocolError(m); err != nil {
 			t.Errorf("%s: must be allowed through, got %v", m, err)
 		}
+	}
+}
+
+// signV4 signs req the way aws-sdk-go-v2 does, including accept-encoding in the
+// signed headers, and returns the value the Authorization header should carry.
+func signV4(req *http.Request, signedHeaders []string, headerValues map[string]string, secret string) string {
+	amzDate := req.Header.Get(amzDateHeader)
+	scope := amzDate[:8] + "/us-east-1/s3/aws4_request"
+	var canonicalHdrs strings.Builder
+	for _, h := range signedHeaders {
+		canonicalHdrs.WriteString(h + ":" + headerValues[h] + "\n")
+	}
+	canonicalRequest := strings.Join([]string{
+		req.Method, req.URL.EscapedPath(), "", canonicalHdrs.String(),
+		strings.Join(signedHeaders, ";"), req.Header.Get(amzContentSHA256),
+	}, "\n")
+	stringToSign := strings.Join([]string{
+		signV4Algorithm, amzDate, scope, hashHex([]byte(canonicalRequest)),
+	}, "\n")
+	sig := &signature{Date: amzDate[:8], Region: "us-east-1", Service: "s3"}
+	return hex.EncodeToString(sign(signingKey(secret, sig), []byte(stringToSign)))
+}
+
+// rclone (aws-sdk-go-v2) signs accept-encoding, and Cloudflare rewrites that
+// header before the request reaches us — which invalidates an otherwise perfect
+// signature. Verification retries against the value the SDK sends.
+func TestSignatureSurvivesRewrittenAcceptEncoding(t *testing.T) {
+	const signingSecret = "signing-secret"
+	secret := DeriveSecretKey(signingSecret, attackerKey)
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	amzDate := now.Format(iso8601Format)
+	signed := []string{"accept-encoding", "host", "x-amz-content-sha256", "x-amz-date"}
+
+	build := func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, mountPath+"/", nil)
+		req.Host = "webtor.io"
+		req.Header.Set(amzDateHeader, amzDate)
+		req.Header.Set(amzContentSHA256, emptyPayloadHash)
+		return req
+	}
+
+	req := build()
+	// Signed with what the client actually sent…
+	sigHex := signV4(req, signed, map[string]string{
+		"accept-encoding":      "identity",
+		"host":                 "webtor.io",
+		"x-amz-content-sha256": emptyPayloadHash,
+		"x-amz-date":           amzDate,
+	}, secret)
+	req.Header.Set("Authorization", signV4Algorithm+" Credential="+attackerKey+
+		"/"+amzDate[:8]+"/us-east-1/s3/aws4_request, SignedHeaders="+strings.Join(signed, ";")+
+		", Signature="+sigHex)
+	// …and delivered with what the CDN substituted.
+	req.Header.Set("Accept-Encoding", "gzip, br")
+
+	if _, err := verifyRequest(req, req.URL, signingSecret, now); err != nil {
+		t.Fatalf("a rewritten accept-encoding must not break verification: %v", err)
+	}
+
+	// A genuinely wrong signature still fails, and says what we computed.
+	bad := build()
+	bad.Header.Set("Authorization", signV4Algorithm+" Credential="+attackerKey+
+		"/"+amzDate[:8]+"/us-east-1/s3/aws4_request, SignedHeaders="+strings.Join(signed, ";")+
+		", Signature=deadbeef")
+	bad.Header.Set("Accept-Encoding", "gzip, br")
+	err := func() *Error { _, e := verifyRequest(bad, bad.URL, signingSecret, now); return e }()
+	if err == nil {
+		t.Fatal("expected a mismatch")
+	}
+	if err.Code != ErrCodeSignatureMismatch {
+		t.Errorf("got code %q", err.Code)
+	}
+	if !strings.Contains(err.CanonicalRequest, "x-amz-date:"+amzDate) {
+		t.Errorf("the error must carry the canonical request we computed, got %q", err.CanonicalRequest)
 	}
 }
 

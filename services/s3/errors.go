@@ -32,6 +32,12 @@ type Error struct {
 	Status  int
 	Message string
 	Err     error
+
+	// CanonicalRequest/StringToSign are echoed back on a signature mismatch,
+	// as Amazon does, so a client can see which component disagreed without
+	// server-side logging.
+	CanonicalRequest string
+	StringToSign     string
 }
 
 func (e *Error) Error() string {
@@ -110,9 +116,11 @@ func errorFromVFS(err error, bucketOnly bool) *Error {
 // errorResponse is the S3 error document. Amazon sends it for every failed
 // request, including HEAD (where the body is dropped but the status stands).
 type errorResponse struct {
-	XMLName   xml.Name `xml:"Error"`
-	Code      string   `xml:"Code"`
-	Message   string   `xml:"Message"`
-	Resource  string   `xml:"Resource,omitempty"`
-	RequestID string   `xml:"RequestId,omitempty"`
+	XMLName          xml.Name `xml:"Error"`
+	Code             string   `xml:"Code"`
+	Message          string   `xml:"Message"`
+	Resource         string   `xml:"Resource,omitempty"`
+	RequestID        string   `xml:"RequestId,omitempty"`
+	CanonicalRequest string   `xml:"CanonicalRequest,omitempty"`
+	StringToSign     string   `xml:"StringToSign,omitempty"`
 }

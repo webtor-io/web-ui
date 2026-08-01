@@ -514,9 +514,11 @@ func writeError(w http.ResponseWriter, r *http.Request, e *Error) {
 		entry.Warn("s3 request rejected")
 	}
 	body, err := xml.Marshal(&errorResponse{
-		Code:     e.Code,
-		Message:  e.Message,
-		Resource: r.URL.Path,
+		Code:             e.Code,
+		Message:          e.Message,
+		Resource:         r.URL.Path,
+		CanonicalRequest: e.CanonicalRequest,
+		StringToSign:     e.StringToSign,
 	})
 	if err != nil {
 		http.Error(w, e.Message, e.Status)
