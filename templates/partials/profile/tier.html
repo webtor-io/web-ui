@@ -30,7 +30,11 @@
                     </span>
                 {{ end }}
                 {{ if $.Data.HasPayments }}
-                <a href="{{ langPath $.Lang "/profile/payments" }}" data-async-target="main" data-umami-event="profile-payments" class="ml-auto inline-flex items-center gap-1.5 text-xs text-w-muted hover:text-w-sub link link-hover transition-colors">
+                {{/* ml-auto only once there is room for it to share the row with
+                     the badges. Narrow screens wrap it anyway, and a wrapped
+                     ml-auto lands hard against the right edge, reading as a
+                     stray label rather than as part of the card. */}}
+                <a href="{{ langPath $.Lang "/profile/payments" }}" data-async-target="main" data-umami-event="profile-payments" class="w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0 inline-flex items-center gap-1.5 text-xs text-w-muted hover:text-w-sub link link-hover transition-colors">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14l2 2 4-4"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2z"/></svg>
                     {{ t $.Lang "profile.payments.link" }}
                 </a>
