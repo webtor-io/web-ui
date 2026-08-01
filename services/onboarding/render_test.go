@@ -222,16 +222,18 @@ func TestRenderLockedStepsShowProBadgeAndQuietPlansLink(t *testing.T) {
 		if got := strings.Count(out, `href="[`+lang+`]/donate"`); got != 2 {
 			t.Errorf("lang=%s: expected 2 donate links, got %d", lang, got)
 		}
-		// Quiet, not the pink accent that actionable steps use.
+		// A real button, because a quiet text link got 0 clicks from 219 free
+		// users — but still not the pink accent, which belongs to the steps
+		// the user can actually complete.
 		for _, line := range strings.Split(out, "\n") {
 			if !strings.Contains(line, `href="[`+lang+`]/donate"`) {
 				continue
 			}
-			if strings.Contains(line, "text-w-pinkL") {
-				t.Errorf("lang=%s: the plans link must not use the accent colour: %s", lang, strings.TrimSpace(line))
+			if strings.Contains(line, "text-w-pinkL") || strings.Contains(line, "btn-pink") {
+				t.Errorf("lang=%s: the upsell must not take the steps' accent: %s", lang, strings.TrimSpace(line))
 			}
-			if !strings.Contains(line, "text-w-sub") {
-				t.Errorf("lang=%s: the plans link must render quiet but legible: %s", lang, strings.TrimSpace(line))
+			if !strings.Contains(line, "btn btn-xs btn-soft") {
+				t.Errorf("lang=%s: the upsell must be a button, not a text link: %s", lang, strings.TrimSpace(line))
 			}
 		}
 		// The steps a free user can act on stay clickable.

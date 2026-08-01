@@ -82,7 +82,10 @@
 
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-semibold {{ if or .Locked .Done }}text-w-sub{{ else }}text-w-text{{ end }}">{{ t $.Ctx.Lang .TitleKey }}</span>
+                        {{/* Locked rows keep the full-strength title: greying it out made the row
+                             read as "not for you", and 219 free users clicked the upsell
+                             zero times. Done rows stay muted — that work is behind them. */}}
+                        <span class="text-sm font-semibold {{ if .Done }}text-w-sub{{ else }}text-w-text{{ end }}">{{ t $.Ctx.Lang .TitleKey }}</span>
                         {{ if .Locked }}
                         <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide font-semibold uppercase px-2">{{ t $.Ctx.Lang "onboarding.proBadge" }}</span>
                         {{ end }}
@@ -96,10 +99,20 @@
                          upsell should be findable, not the loudest thing in an
                          onboarding card. It still has to be legible, so it uses
                          text-w-sub rather than a faded muted. */}}
-                    <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="inline-flex items-center gap-1.5 text-xs font-medium mt-2 {{ if .Locked }}text-w-sub hover:text-base-content underline underline-offset-2 decoration-w-sub/40{{ else }}text-w-pinkL hover:text-w-pink{{ end }}">
+                    {{ if .Locked }}
+                    {{/* A button, not a text link: the same shape the Vault upsell uses
+                         (views/vault/index.html). btn-soft rather than btn-pink — visible
+                         without outshouting the steps the user can actually do. */}}
+                    <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="btn btn-xs btn-soft gap-1.5 mt-2">
                         {{ t $.Ctx.Lang .CTAKey }}
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </a>
+                    {{ else }}
+                    <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="inline-flex items-center gap-1.5 text-xs font-medium mt-2 text-w-pinkL hover:text-w-pink">
+                        {{ t $.Ctx.Lang .CTAKey }}
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    {{ end }}
                     {{ end }}
                 </div>
             </li>

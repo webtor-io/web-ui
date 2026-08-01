@@ -1341,7 +1341,7 @@
     "onboarding.stremio.desc": "Podłącz webtor jako backend streamingu i oglądaj bibliotekę na TV, telefonie lub tablecie.",
     "onboarding.stremio.cta": "Skonfiguruj Stremio",
     "onboarding.proBadge": "PRO",
-    "onboarding.proCta": "Zobacz plany",
+    "onboarding.proCta": "Odblokuj w planie",
     "onboarding.progress": "Ukończono {{.Done}} z {{.Total}} kroków",
     "onboarding.toggle": "Pokaż lub ukryj kroki",
     "onboarding.status.done": "Ukończono:",

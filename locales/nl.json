@@ -1341,7 +1341,7 @@
     "onboarding.stremio.desc": "Verbind webtor als streaming-backend en kijk je bibliotheek op tv, telefoon of tablet.",
     "onboarding.stremio.cta": "Stremio instellen",
     "onboarding.proBadge": "PRO",
-    "onboarding.proCta": "Bekijk de abonnementen",
+    "onboarding.proCta": "Ontgrendel met een abonnement",
     "onboarding.progress": "{{.Done}} van {{.Total}} stappen klaar",
     "onboarding.toggle": "Stappen tonen of verbergen",
     "onboarding.status.done": "Klaar:",

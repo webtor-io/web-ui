@@ -1341,7 +1341,7 @@
     "onboarding.stremio.desc": "webtor'u Stremio'da streaming backend olarak bağla ve kütüphaneni TV'de, telefonda veya tablette izle.",
     "onboarding.stremio.cta": "Stremio'yu kur",
     "onboarding.proBadge": "PRO",
-    "onboarding.proCta": "Ücretli planlara bak",
+    "onboarding.proCta": "Planla kilidi aç",
     "onboarding.progress": "{{.Total}} adımdan {{.Done}} tanesi tamamlandı",
     "onboarding.toggle": "Adımları göster veya gizle",
     "onboarding.status.done": "Tamamlandı:",

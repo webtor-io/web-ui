@@ -1341,7 +1341,7 @@
     "onboarding.stremio.desc": "Připoj webtor jako streamovací backend a sleduj knihovnu na TV, telefonu nebo tabletu.",
     "onboarding.stremio.cta": "Nastavit Stremio",
     "onboarding.proBadge": "PRO",
-    "onboarding.proCta": "Zobrazit tarify",
+    "onboarding.proCta": "Odemknout s tarifem",
     "onboarding.progress": "Hotovo {{.Done}} z {{.Total}} kroků",
     "onboarding.toggle": "Zobrazit nebo skrýt kroky",
     "onboarding.status.done": "Hotovo:",

@@ -1341,7 +1341,7 @@
     "onboarding.stremio.desc": "Подключите webtor как бэкенд стриминга в Stremio и смотрите библиотеку на телевизоре, телефоне или планшете.",
     "onboarding.stremio.cta": "Настроить Stremio",
     "onboarding.proBadge": "PRO",
-    "onboarding.proCta": "Посмотреть тарифы",
+    "onboarding.proCta": "Разблокировать",
     "onboarding.progress": "Выполнено {{.Done}} из {{.Total}} шагов",
     "onboarding.toggle": "Показать или скрыть шаги",
     "onboarding.status.done": "Выполнено:",
