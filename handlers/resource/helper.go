@@ -7,6 +7,7 @@ import (
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/pagination"
 	w "github.com/webtor-io/web-ui/services/web"
 )
 
@@ -36,13 +37,9 @@ type Breadcrumb struct {
 	Active  bool
 }
 
-type Pagination struct {
-	Page   uint
-	Active bool
-	Prev   bool
-	Next   bool
-	Number bool
-}
+// Pagination aliases the shared model so templates keep referring to
+// .Page/.Active/.Number/.Prev/.Next/.Gap unchanged.
+type Pagination = pagination.Item
 
 func (s *Helper) MakeButton(ctx *w.Context, gd *GetData, name string, action string, endpoint string) *ButtonItem {
 	return &ButtonItem{
@@ -139,34 +136,7 @@ func (s *Helper) HasPagination(lr *ra.ListResponse) bool {
 }
 
 func (s *Helper) MakePagination(lr *ra.ListResponse, page uint, pageSize uint) []Pagination {
-	var res []Pagination
-	pages := uint(lr.Count)/pageSize + 1
-	prev := page - 1
-	if prev < 1 {
-		prev = 1
-	}
-	next := page + 1
-	if next > pages {
-		next = pages
-	}
-	res = append(res, Pagination{
-		Page:   prev,
-		Active: prev != page,
-		Prev:   true,
-	})
-	for i := uint(1); i < pages+1; i++ {
-		res = append(res, Pagination{
-			Page:   i,
-			Active: i != page,
-			Number: true,
-		})
-	}
-	res = append(res, Pagination{
-		Page:   next,
-		Active: next != page,
-		Next:   true,
-	})
-	return res
+	return pagination.Build(lr.Count, page, pageSize)
 }
 
 type Helper struct {

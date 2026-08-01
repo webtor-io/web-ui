@@ -216,6 +216,9 @@
             {{ if .List | hasPagination }}
             <div class="flex items-center gap-1 px-4 py-3 border-t border-w-line/50">
                 {{ range makePagination .List .Args.Page .Args.PageSize }}
+                {{ if .Gap }}
+                <span class="btn btn-sm min-w-[2rem] text-w-muted/40 border-none pointer-events-none" aria-hidden="true">&hellip;</span>
+                {{ else }}
                 {{ if .Active }}
                 <a class="btn btn-sm btn-ghost min-w-[2rem]" href="{{ langPath $.Lang (printf "/%s" $Resource.ID) }}?pwd={{ $List.ListItem.PathStr }}&page={{ .Page }}{{ if $Args.File }}&file={{ $Args.File }}{{ end }}" data-async-target="#list" data-async-layout="async_list">
                 {{ else if .Number }}
@@ -227,6 +230,7 @@
                 {{ if .Next }}&rarr;{{ end }}
                 {{ if .Number }}{{ .Page }}{{ end }}
                 {{ if .Active }}</a>{{ else }}</span>{{ end }}
+                {{ end }}
                 {{ end }}
             </div>
             {{ end }}

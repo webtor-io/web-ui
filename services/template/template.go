@@ -2,7 +2,9 @@ package template
 
 import (
 	"bytes"
+	"container/list"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"html/template"
@@ -125,6 +127,35 @@ func NewContext(_ *gin.Context, obj any, err error) any {
 	}
 }
 
+// defaultLayoutCacheCap bounds how many distinct request-supplied layout
+// bodies we keep parsed at once.
+//
+// Layout bodies arrive as raw client headers (`X-Layout`, `X-Update-*`), so
+// the set of possible values is decided by the caller, not by us. They used to
+// be retained for the process lifetime — one `*View` appended to Manager.views
+// plus one fully-parsed template set in the shared renderer per distinct value,
+// with no eviction. Retained heap therefore grew with the number of distinct
+// values a client chose to send, which is not a bound we control.
+//
+// Our own frontend emits ~10 distinct values in total — the
+// `data-async-layout` and `data-async-update-*` directives baked into the
+// templates, plus `{{ template "main" . }}` from jobs/scripts/action.go. A cap
+// of 32 leaves generous headroom for real traffic while making the worst case
+// bounded: values beyond the cap now churn the LRU (costing a re-parse)
+// instead of accumulating.
+const defaultLayoutCacheCap = 32
+
+// maxConcurrentLayoutBuilds caps parallel parses of layout template sets.
+// Cache misses are rare in normal operation (the handful of real layout
+// directives warm up on first use), so this only ever bites a caller
+// generating fresh bodies — which is the case worth bounding.
+const maxConcurrentLayoutBuilds = 4
+
+type layoutEntry struct {
+	key  string
+	tmpl *template.Template
+}
+
 type Manager[K GinContext] struct {
 	re       multitemplate.Renderer
 	funcs    FuncMap
@@ -133,13 +164,31 @@ type Manager[K GinContext] struct {
 	views    []*View
 	mux      sync.Mutex
 	base     string
+
+	// layoutCache/layoutLRU hold templates built from request-supplied layout
+	// bodies. Deliberately NOT the shared multitemplate renderer: that is a
+	// bare map[string]*template.Template which gin reads (Instance) on every
+	// c.HTML with no lock, so writing to it at request time is a latent
+	// "concurrent map read and map write" fatal error, and entries there can
+	// never be evicted safely because gin resolves the name after we return.
+	// Owning the map lets us hold mux across lookup and eviction.
+	layoutCache map[string]*list.Element
+	layoutLRU   *list.List
+	layoutCap   int
+
+	// buildSem caps how many layout template sets are parsed at once. Its own
+	// sync.Once rather than the constructor so a zero-value Manager (tests)
+	// still works. Not guarded by mux: builds run outside the lock on purpose.
+	buildSem     chan struct{}
+	buildSemOnce sync.Once
 }
 
 func NewManager[K GinContext](re multitemplate.Renderer) *Manager[K] {
 	return &Manager[K]{
-		re:    re,
-		funcs: FuncMap{},
-		base:  "templates/",
+		re:        re,
+		funcs:     FuncMap{},
+		base:      "templates/",
+		layoutCap: defaultLayoutCacheCap,
 	}
 }
 
@@ -295,27 +344,116 @@ func (s *Manager[K]) RenderViewByNameAndLayout(name string, layout string) (stri
 	return "", errors.New("view not found")
 }
 
-func (s *Manager[K]) RenderViewByNameAndLayoutBody(name string, layout string) (string, error) {
+// ExecuteLayoutBody renders `name` wrapped in a caller-supplied layout body
+// and returns the output directly.
+//
+// It replaces the old RenderViewByNameAndLayoutBody, which returned a template
+// *name* and required the template to stay registered in the shared renderer
+// for the caller to look it up. Every call site executed immediately anyway,
+// so the registry round-trip bought nothing and cost an unbounded, un-evictable
+// cache — see defaultLayoutCacheCap.
+func (s *Manager[K]) ExecuteLayoutBody(name string, layoutBody string, obj any) (string, error) {
+	t, err := s.layoutTemplate(name, layoutBody)
+	if err != nil {
+		return "", err
+	}
+	var b bytes.Buffer
+	if err = t.Execute(&b, obj); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// layoutTemplate returns the parsed template for (name, layoutBody), building
+// it on a miss. The build runs OUTSIDE the lock: parsing the whole template
+// set is the expensive part and holding mux across it would serialise every
+// concurrent AJAX render. Two goroutines racing on the same cold key both
+// build; the loser drops its copy and takes the winner's.
+func (s *Manager[K]) layoutTemplate(name string, layoutBody string) (*template.Template, error) {
+	// Key on a digest, not the body itself: the body is a client-sized header
+	// and using it as a map key would retain the whole string.
+	//
+	// SHA-256, not MD5, precisely because the body is caller-supplied and the
+	// cache is shared across everyone. Under a collision-prone digest a caller
+	// able to craft a second preimage for one of our own layout directives
+	// would get its template served to every other request that asks for the
+	// real one — the digest is the only thing standing between two different
+	// templates here.
+	hash := sha256.Sum256([]byte(layoutBody))
+	key := name + "_" + hex.EncodeToString(hash[:])
+
+	s.mux.Lock()
+	if el, ok := s.layoutCache[key]; ok {
+		s.layoutLRU.MoveToFront(el)
+		t := el.Value.(*layoutEntry).tmpl
+		s.mux.Unlock()
+		return t, nil
+	}
+	s.mux.Unlock()
+
+	t, err := s.buildLayoutTemplate(name, layoutBody)
+	if err != nil {
+		return nil, err
+	}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	var cv, mv *View
-	for _, v := range s.views {
-		if v.Name == name && v.LayoutBody == layout {
-			cv = v
+	if el, ok := s.layoutCache[key]; ok {
+		s.layoutLRU.MoveToFront(el)
+		return el.Value.(*layoutEntry).tmpl, nil
+	}
+	if s.layoutCache == nil {
+		s.layoutCache = map[string]*list.Element{}
+		s.layoutLRU = list.New()
+	}
+	if s.layoutCap <= 0 {
+		s.layoutCap = defaultLayoutCacheCap
+	}
+	s.layoutCache[key] = s.layoutLRU.PushFront(&layoutEntry{key: key, tmpl: t})
+	for s.layoutLRU.Len() > s.layoutCap {
+		oldest := s.layoutLRU.Back()
+		if oldest == nil {
+			break
 		}
+		s.layoutLRU.Remove(oldest)
+		delete(s.layoutCache, oldest.Value.(*layoutEntry).key)
+	}
+	return t, nil
+}
+
+// buildLayoutTemplate parses a fresh template set for the given layout body.
+// The result is intentionally NOT added to Manager.views or to the shared
+// renderer, so an evicted entry becomes garbage with no dangling references.
+//
+// s.views is append-only during RegisterViews (startup) and immutable once
+// serving starts, so reading it here without the lock is safe.
+//
+// Builds are throttled by buildSem. Parsing a whole template set is the one
+// genuinely expensive, allocation-heavy step on this path, and cache misses are
+// exactly what a caller sending never-before-seen layout bodies produces. Left
+// unthrottled, concurrent misses would multiply that cost by the number of
+// in-flight requests — trading the retention problem this cache exists to fix
+// for a transient one. Steady-state traffic is all cache hits and never reaches
+// the semaphore.
+func (s *Manager[K]) buildLayoutTemplate(name string, layoutBody string) (*template.Template, error) {
+	s.buildSemOnce.Do(func() {
+		s.buildSem = make(chan struct{}, maxConcurrentLayoutBuilds)
+	})
+	s.buildSem <- struct{}{}
+	defer func() { <-s.buildSem }()
+
+	var mv *View
+	for _, v := range s.views {
 		if v.Name == name && v.LayoutBody == "" {
 			mv = v
 		}
 	}
-	if cv != nil {
-		return s.renderView(cv)
+	if mv == nil {
+		return nil, errors.New("view not found")
 	}
-	if mv != nil {
-		cv = s.makeViewWithLayoutBody(mv, layout)
-		s.views = append(s.views, cv)
-		return s.renderView(cv)
-	}
-	return "", errors.New("view not found")
+	// makeTemplate ignores LayoutPath when LayoutBody is set, so any view
+	// registered under this name yields the same parsed set (path + partials).
+	return s.makeViewWithLayoutBody(mv, layoutBody).makeTemplate()
 }
 
 func (s *Manager[K]) renderView(v *View) (string, error) {
@@ -390,20 +528,16 @@ func writeFragment(buf *bytes.Buffer, name, body string) {
 }
 
 func (s *Template[K]) ToString(obj K) (res string, err error) {
-	var b bytes.Buffer
-	var v string
-	if s.layoutBody == "" {
-		v, err = s.tm.RenderViewByNameAndLayout(s.name, s.layout)
-		if err != nil {
-			return
-		}
-	} else {
-		v, err = s.tm.RenderViewByNameAndLayoutBody(s.name, s.layoutBody)
-		if err != nil {
-			return
-		}
+	// Request-supplied layout bodies are rendered straight from the bounded
+	// LRU and never touch the shared renderer.
+	if s.layoutBody != "" {
+		return s.tm.ExecuteLayoutBody(s.name, s.layoutBody, obj)
 	}
-	//log.Infof("action template %v data: %+v", s.name, data)
+	v, err := s.tm.RenderViewByNameAndLayout(s.name, s.layout)
+	if err != nil {
+		return
+	}
+	var b bytes.Buffer
 	re, _ := s.tm.re.Instance(v, obj).(render.HTML)
 	err = re.Template.Execute(&b, re.Data)
 	if err != nil {
@@ -411,7 +545,6 @@ func (s *Template[K]) ToString(obj K) (res string, err error) {
 	}
 	res = b.String()
 	return
-
 }
 
 func (s *Manager[K]) Build(name string) *Template[K] {
