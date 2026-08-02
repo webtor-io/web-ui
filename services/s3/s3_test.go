@@ -24,8 +24,8 @@ const (
 	testAccessKey = "99999999-8888-7777-6666-555555555555"
 	testSecret    = "signing-secret"
 	movieDir      = "Movie One (2020)"
-	// A real library name that broke listings: a literal "+" among the spaces.
-	plusDir = "Windows 11 25H2 + LTSC (x64) 28in1 +- Office 2024"
+	// The shape that broke listings: a literal "+" among the spaces.
+	plusDir = "Some Release (Deluxe + Bonus) [2024]"
 )
 
 var testModTime = time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
@@ -555,7 +555,8 @@ func TestPlusInNamesSurvivesListing(t *testing.T) {
 	}
 	var encoded string
 	for _, p := range out.CommonPrefixes {
-		if strings.Contains(aws.StringValue(p.Prefix), "Windows") {
+		// Match on the decoded value: the encoded form is what is under test.
+		if d, err := url.PathUnescape(aws.StringValue(p.Prefix)); err == nil && d == plusDir+"/" {
 			encoded = aws.StringValue(p.Prefix)
 		}
 	}
