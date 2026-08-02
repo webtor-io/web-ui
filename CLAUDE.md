@@ -185,6 +185,11 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - DB: PostgreSQL via `common-services` flags (`PG_HOST`, etc.) — migrations auto-apply on startup
 - Redis: for job queues via `common-services`
 
+### Library Access
+
+- **WebDAV + S3** — one filesystem tree (`services/libfs`), two wire formats. Adding an operation lands in both at once. `DISABLE_WEBDAV`; `DISABLE_S3`, `S3_SIGNING_SECRET`, `S3_DOMAIN`. См. `docs/webdav.md`, `docs/s3.md`
+- **JSON API** (`/api/v1`, `docs/api.md`) — `/resource`, `/list`, `/export` это **пробросы в rest-api с его же контрактом** (возвращаются его структуры, не копии); `/library`, `/vault`, `/profile` — только здесь. Не заводить параллельную файловую абстракцию: `/fs`-вариант отвергнут, стрим-ссылки даёт `/export`. `DISABLE_API`, `API_DOMAIN` (выделенный хост `api.webtor.io` → `/v1/...`). Swagger UI на `/api/v1/docs/index.html`; спека — `make swagger`, **обязательно** с `--instanceName libraryapi`, иначе коллизия со спекой rest-api и паника на старте процесса
+
 ### Optional Integrations
 
 - Umami analytics: `USE_UMAMI`, `UMAMI_WEBSITE_ID`, `UMAMI_HOST_URL`

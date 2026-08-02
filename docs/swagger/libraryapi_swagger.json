@@ -1,0 +1,1530 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Programmatic access to Webtor resources, your library, your Vault and your account preferences.\n\n## Two halves\n\n`/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same\nparameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your\naccount key instead of an API key + secret. Code written against rest-api works here unchanged.\n\n`/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same\none WebDAV and S3 serve, so a torrent added through this API shows up in a mounted drive\nimmediately — it is one library, not a copy.\n\nA typical flow: `POST /resource` with a magnet or `.torrent` → `POST /library` with the id it\nreturns → `GET /resource/{id}/list` to see the files → `GET /resource/{id}/export/{file}` for the\nstream and download URLs.\n\n## Authentication\n\nIssue a key on your profile page and send it as `Authorization: Bearer \u003ckey\u003e` (or `X-Api-Key: \u003ckey\u003e`\nwhere a proxy strips `Authorization`). Rotating the key on the profile page revokes the old one at\nonce.\n\nThe API is available on paid plans; a free account gets `402 payment_required`.\n\n## Errors\n\nEvery failure answers `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`. Branch on `code`, not on the\nstatus: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free\nplan), `not_found`, `conflict`, `bad_request`, `upstream_error` / `upstream_timeout` (the services\nbehind this one — often worth retrying), `unavailable`, `internal_error`.",
+        "title": "Webtor Account API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "paths": {
+        "/library": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The torrents saved to the account, newest first by default.\n\n`type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least\none recognized film or show, which is decided by enrichment — a torrent added a moment ago may not\nbe classified yet and shows up only under `all`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "List your library",
+                "parameters": [
+                    {
+                        "enum": [
+                            "all",
+                            "movies",
+                            "series"
+                        ],
+                        "type": "string",
+                        "default": "all",
+                        "description": "Filter",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "recent",
+                            "name"
+                        ],
+                        "type": "string",
+                        "default": "recent",
+                        "description": "Sort order",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 100, max 1000)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Takes a resource id that is already in the store — `POST /resource` puts it there and returns one.\n\nIdempotent: adding a resource already in the library answers `200` with the existing entry, and only\na real insert answers `201`. Adding also queues\nenrichment (title, year, poster, movie/series classification), which runs in the background — the\nentry is usable immediately but may not answer to `type=movies` for a little while.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "Add a torrent to your library",
+                "parameters": [
+                    {
+                        "description": "Resource to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Already in the library",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryItem"
+                        }
+                    },
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "The resource is not in the store",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/library/{resource_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Answers `404` when the resource is not in your library, which is how a client checks membership\nbefore offering to add or remove it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "Get one library entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryItem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the entry from your library. The resource itself stays in the store and keeps working —\nthis is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).\n\nNot idempotent: removing something that is not there answers `404`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "Remove a torrent from your library",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Removed"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Changes the name the item is shown under everywhere — the library, WebDAV and S3 all read this\nrow. It does not touch the torrent itself.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "library"
+                ],
+                "summary": "Rename a library entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New name",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryRenameRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.LibraryItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Who the key belongs to, which plan the account is on, what the key is allowed to do, and the\npreferences that affect what the other endpoints return.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Account state",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update: a field left out of the body keeps its current value. Requires the `api:write`\nscope.\n\nPreferences are read on the hot path and cached for a few minutes, so a change can take that long\nto show up in poster URLs — this endpoint invalidates its own cache entry, but other replicas\nexpire on their own schedule.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Update account preferences",
+                "parameters": [
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ProfileSettingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/resource": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Takes a `.torrent` file or a magnet URI in the request body and puts it in the store, returning the\nresource id (its infohash) that every other endpoint takes. A magnet is resolved against the\nBitTorrent network first, which can take minutes for a torrent nobody is seeding.\n\nStoring does **not** add the torrent to your library — `POST /library` does, and takes the id this\nreturns.\n\nIdentical in shape to rest-api's `POST /resource/`.",
+                "consumes": [
+                    "*/*"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "resource"
+                ],
+                "summary": "Store a resource",
+                "parameters": [
+                    {
+                        "example": "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Raw .torrent bytes, or a magnet URI",
+                        "name": "resource",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ResourceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "408": {
+                        "description": "Request Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/resource/{resource_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Name, size, file count and magnet URI of a stored resource. Single-file torrents also carry the\nfile itself, so the common case needs no `/list` round-trip.\n\nAppending `.torrent` to the id returns the torrent file instead\n(`GET /resource/{resource_id}.torrent`, `application/x-bittorrent`) — same convention as rest-api.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "resource"
+                ],
+                "summary": "Get a resource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash, optionally suffixed with .torrent",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ResourceResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/resource/{resource_id}/export/{content_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the URLs a file is served from: `download` for the bytes, `stream` for the player sources\nand subtitle tracks, plus the auxiliary outputs. Same shape as rest-api's\n`/resource/{id}/export/{content_id}`.\n\n`content_id` is either the `id` from `/list` or the file's index in the torrent's natural order.\nExporting a directory produces an archive URL — `archive-format` picks zip or tar, and `paths`\nlimits it to a selection.\n\n**The URLs carry their own authorization and are short-lived.** Resolve them when you are about to\nuse them; do not store them.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "export"
+                ],
+                "summary": "Export a file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "ca2453df3e7691c28934eebed5a253ee0aabd29f",
+                        "description": "File id from /list, or its index",
+                        "name": "content_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "download",
+                            "stream",
+                            "torrent_client_stat",
+                            "subtitles",
+                            "media_probe"
+                        ],
+                        "type": "string",
+                        "description": "Return only this export",
+                        "name": "output",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "IMDb id, used to match subtitles",
+                        "name": "imdb-id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "zip",
+                            "tar"
+                        ],
+                        "type": "string",
+                        "default": "zip",
+                        "description": "Archive format for directory exports",
+                        "name": "archive-format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Limit a directory archive to these paths (repeatable)",
+                        "name": "paths",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ExportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/resource/{resource_id}/list": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Files and directories of a resource. The `id` of each item is what `/export` takes.\n\n`output=tree` lists one directory level at a time (use `path` to descend); `output=list` returns the\nflat file list. Identical in shape to rest-api's `/resource/{id}/list`, including the `items` /\n`items_count` envelope.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "list"
+                ],
+                "summary": "List resource contents",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Infohash",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "/",
+                        "description": "Directory to list (with output=tree)",
+                        "name": "path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "list",
+                            "tree"
+                        ],
+                        "type": "string",
+                        "default": "list",
+                        "description": "Listing shape",
+                        "name": "output",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "name",
+                            "size"
+                        ],
+                        "type": "string",
+                        "default": "name",
+                        "description": "Sort order",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vault": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Vault Points balance plus every pledge the account holds. 1 VP = 1 GB of torrent size; a `total` of\n`null` means an unlimited plan.\n\nA pledge is frozen for a period after it is created and cannot be removed while it is — `frozen` says\nwhether that applies right now, not whether the content is stored.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vault"
+                ],
+                "summary": "Vault balance and pledges",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.VaultResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Vault is not configured on this deployment",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vault/pledges": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a pledge, which is what keeps a torrent available long-term. Idempotent per resource: an\naccount holds at most one pledge for a given resource, and pledging again answers `409`.\n\nThe required amount is derived from the torrent size, so a pledge fails with `403` when the account\ndoes not have that many points available.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vault"
+                ],
+                "summary": "Pledge Vault Points to a torrent",
+                "parameters": [
+                    {
+                        "description": "Resource to pledge to",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/libapi.PledgeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.Pledge"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Not enough Vault Points",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "A pledge for this resource already exists",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Vault is not configured on this deployment",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vault/pledges/{resource_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes the pledge for a resource and returns its points to the balance. A pledge that is still\nfrozen cannot be removed and answers `409`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vault"
+                ],
+                "summary": "Claim Vault Points back",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Resource (infohash) the pledge is held against",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Removed"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Pledge is frozen",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Vault is not configured on this deployment",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "libapi.Error": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "not_found"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "the specified path does not exist"
+                }
+            }
+        },
+        "libapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/libapi.Error"
+                }
+            }
+        },
+        "libapi.LibraryAddRequest": {
+            "type": "object",
+            "required": [
+                "resource_id"
+            ],
+            "properties": {
+                "resource_id": {
+                    "type": "string",
+                    "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                }
+            }
+        },
+        "libapi.LibraryItem": {
+            "type": "object",
+            "properties": {
+                "added_at": {
+                    "type": "string",
+                    "example": "2026-01-02T15:04:05Z"
+                },
+                "files_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "name": {
+                    "description": "Name is the library name, which the user may have renamed; it starts as\nthe torrent name.",
+                    "type": "string",
+                    "example": "Sintel"
+                },
+                "resource_id": {
+                    "description": "ResourceID is the infohash, and the id every /resource endpoint takes.",
+                    "type": "string",
+                    "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 734003200
+                }
+            }
+        },
+        "libapi.LibraryListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/libapi.LibraryItem"
+                    }
+                },
+                "items_count": {
+                    "description": "Count is the total number of matching items, not the size of this page.",
+                    "type": "integer",
+                    "example": 42
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "sort": {
+                    "type": "string",
+                    "example": "recent"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "all"
+                }
+            }
+        },
+        "libapi.LibraryRenameRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Sintel (2010)"
+                }
+            }
+        },
+        "libapi.Pledge": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 2
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-01-02T15:04:05Z"
+                },
+                "expired": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "frozen": {
+                    "description": "Frozen means the points cannot be claimed back yet. It says nothing\nabout whether the content is stored — Vaulted does.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "funded": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "funded_vp": {
+                    "type": "number",
+                    "example": 2
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Sintel"
+                },
+                "pledge_id": {
+                    "type": "string",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                },
+                "required_vp": {
+                    "type": "number",
+                    "example": 2
+                },
+                "resource_id": {
+                    "type": "string",
+                    "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                },
+                "vaulted": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "libapi.PledgeRequest": {
+            "type": "object",
+            "required": [
+                "resource_id"
+            ],
+            "properties": {
+                "resource_id": {
+                    "type": "string",
+                    "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                }
+            }
+        },
+        "libapi.ProfileResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "scopes": {
+                    "description": "Scopes are what the key used for this request may do.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "api:read",
+                        "api:write"
+                    ]
+                },
+                "settings": {
+                    "$ref": "#/definitions/libapi.ProfileSettings"
+                },
+                "tier": {
+                    "$ref": "#/definitions/libapi.ProfileTier"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                }
+            }
+        },
+        "libapi.ProfileSettings": {
+            "type": "object",
+            "properties": {
+                "show_adult": {
+                    "description": "ShowAdult opts out of the server-side blur on adult content.",
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "libapi.ProfileSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "show_adult": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "libapi.ProfileTier": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Pro"
+                }
+            }
+        },
+        "libapi.VaultContent": {
+            "type": "object",
+            "properties": {
+                "expiring": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "loading": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "vaulted": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "libapi.VaultPoints": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 40
+                },
+                "claimable": {
+                    "type": "number",
+                    "example": 40
+                },
+                "frozen": {
+                    "type": "number",
+                    "example": 20
+                },
+                "funded": {
+                    "type": "number",
+                    "example": 60
+                },
+                "total": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 100
+                }
+            }
+        },
+        "libapi.VaultResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "$ref": "#/definitions/libapi.VaultContent"
+                },
+                "pledges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/libapi.Pledge"
+                    }
+                },
+                "points": {
+                    "$ref": "#/definitions/libapi.VaultPoints"
+                }
+            }
+        },
+        "services.ExportItem": {
+            "type": "object",
+            "properties": {
+                "html_tag": {
+                    "$ref": "#/definitions/services.ExportTag"
+                },
+                "meta": {
+                    "$ref": "#/definitions/services.ExportMeta"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ExportKindType": {
+            "type": "string",
+            "enum": [
+                "subtitles"
+            ],
+            "x-enum-varnames": [
+                "ExportKindTypeSubtitles"
+            ]
+        },
+        "services.ExportMeta": {
+            "type": "object",
+            "properties": {
+                "cache": {
+                    "type": "boolean"
+                },
+                "multibitrate": {
+                    "type": "boolean"
+                },
+                "transcode": {
+                    "type": "boolean"
+                },
+                "transcode_cache": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "services.ExportPreloadType": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "none"
+            ],
+            "x-enum-varnames": [
+                "ExportPreloadTypeAuto",
+                "ExportPreloadTypeNone"
+            ]
+        },
+        "services.ExportResponse": {
+            "type": "object",
+            "properties": {
+                "exports": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/services.ExportItem"
+                    }
+                },
+                "source": {
+                    "$ref": "#/definitions/services.ListItem"
+                }
+            }
+        },
+        "services.ExportSource": {
+            "type": "object",
+            "properties": {
+                "src": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ExportTag": {
+            "type": "object",
+            "properties": {
+                "alt": {
+                    "type": "string"
+                },
+                "poster": {
+                    "type": "string"
+                },
+                "preload": {
+                    "$ref": "#/definitions/services.ExportPreloadType"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ExportSource"
+                    }
+                },
+                "src": {
+                    "type": "string"
+                },
+                "tag": {
+                    "$ref": "#/definitions/services.ExportTagName"
+                },
+                "tracks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ExportTrack"
+                    }
+                }
+            }
+        },
+        "services.ExportTagName": {
+            "type": "string",
+            "enum": [
+                "video",
+                "audio",
+                "img"
+            ],
+            "x-enum-varnames": [
+                "ExportTagNameVideo",
+                "ExportTagNameAudio",
+                "ExportTagNameImage"
+            ]
+        },
+        "services.ExportTrack": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "$ref": "#/definitions/services.ExportKindType"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "src": {
+                    "type": "string"
+                },
+                "srclang": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ListItem": {
+            "type": "object",
+            "properties": {
+                "ext": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "index": {
+                    "description": "Index is the file's position in the torrent's natural file order\n(r.Files), i.e. the content_id accepted by /resource/\u003chash\u003e/export/\u003cidx\u003e.\nValid only for Type == file items; directory items leave it zero. Lets\nclients address the file directly without re-deriving the index from\nthe sorted/paginated list order.",
+                    "type": "integer"
+                },
+                "media_format": {
+                    "$ref": "#/definitions/services.MediaFormat"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/services.ListType"
+                }
+            }
+        },
+        "services.ListResponse": {
+            "type": "object",
+            "properties": {
+                "ext": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "index": {
+                    "description": "Index is the file's position in the torrent's natural file order\n(r.Files), i.e. the content_id accepted by /resource/\u003chash\u003e/export/\u003cidx\u003e.\nValid only for Type == file items; directory items leave it zero. Lets\nclients address the file directly without re-deriving the index from\nthe sorted/paginated list order.",
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.ListItem"
+                    }
+                },
+                "items_count": {
+                    "type": "integer"
+                },
+                "media_format": {
+                    "$ref": "#/definitions/services.MediaFormat"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/services.ListType"
+                }
+            }
+        },
+        "services.ListType": {
+            "type": "string",
+            "enum": [
+                "file",
+                "directory"
+            ],
+            "x-enum-varnames": [
+                "ListTypeFile",
+                "ListTypeDirectory"
+            ]
+        },
+        "services.MediaFormat": {
+            "type": "string",
+            "enum": [
+                "audio",
+                "video",
+                "image",
+                "subtitle",
+                "unknown"
+            ],
+            "x-enum-varnames": [
+                "Audio",
+                "Video",
+                "Image",
+                "Subtitle",
+                "Unknown"
+            ]
+        },
+        "services.ResourceResponse": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "description": "File is the single file of a single-file torrent (nil when MultiFile).\nLets clients skip /list for the common single-file case.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/services.ListItem"
+                        }
+                    ]
+                },
+                "files_count": {
+                    "description": "FilesCount is the number of files in the torrent.",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "magnet_uri": {
+                    "type": "string"
+                },
+                "multi_file": {
+                    "description": "MultiFile is false for single-file-mode torrents (one file sitting at\nthe torrent root). Clients can render such a torrent straight away\nwithout a /list round-trip.",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "description": "Size is the torrent's total size in bytes (sum of all files). Lets\nclients read the size without paginating /list — a real win on torrents\nwith tens of thousands of files.",
+                    "type": "integer"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "API key from your profile page, as `Bearer \u003ckey\u003e`.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "tags": [
+        {
+            "description": "Storing and reading torrents. Same contract as rest-api.",
+            "name": "resource"
+        },
+        {
+            "description": "Files and directories inside a resource. Same contract as rest-api.",
+            "name": "list"
+        },
+        {
+            "description": "Stream and download URLs for a file. Same contract as rest-api.",
+            "name": "export"
+        },
+        {
+            "description": "The torrents saved to your account — the library WebDAV and S3 mount.",
+            "name": "library"
+        },
+        {
+            "description": "Vault Points and the pledges that keep content available long-term.",
+            "name": "vault"
+        },
+        {
+            "description": "Account state and preferences.",
+            "name": "profile"
+        }
+    ]
+}

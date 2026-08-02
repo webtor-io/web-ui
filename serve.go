@@ -6,6 +6,7 @@ import (
 
 	"github.com/webtor-io/web-ui/handlers/about"
 	wa "github.com/webtor-io/web-ui/handlers/action"
+	japi "github.com/webtor-io/web-ui/handlers/api"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
@@ -50,6 +51,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/geoip"
 	si18n "github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/libapi"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/notification"
 	"github.com/webtor-io/web-ui/services/onboarding"
@@ -179,7 +181,10 @@ func serve(c *cli.Context) error {
 	r := gin.Default()
 	r.Use(w.ErrorHandler(tm.MustRegisterViews("error/*").WithLayout("main")))
 	s3Hosts := s3svc.Hosts(c)
-	if redirect := w.RedirectNonCanonical(c.String(common.DomainFlag), c.String(w.RedirectDomainFlag), s3Hosts...); redirect != nil {
+	apiHosts := libapi.Hosts(c)
+	// Both protocol hosts are exempt from the canonical-domain redirect, or
+	// every request to them answers 302 instead of doing the work.
+	if redirect := w.RedirectNonCanonical(c.String(common.DomainFlag), c.String(w.RedirectDomainFlag), append(append([]string{}, s3Hosts...), apiHosts...)...); redirect != nil {
 		r.Use(redirect)
 	}
 	r.Use(w.NoindexDefault(c.Bool(w.StagingFlag)))
@@ -201,6 +206,11 @@ func serve(c *cli.Context) error {
 	// exemption is keyed on the /s3 prefix this rewrite produces.
 	s3svc.RegisterHostMiddleware(r, s3Hosts, s3svc.MountPath)
 
+	// Setting API host routing — same reasoning as S3 above: it has to run
+	// before the session middleware, whose CSRF exemption is keyed on the /api
+	// prefix this rewrite produces.
+	libapi.RegisterHostMiddleware(r, apiHosts, libapi.HostPrefix)
+
 	// Setting URL Alias
 	ual := ua.New(pg, r)
 	ual.RegisterHandler(r)
@@ -211,6 +221,7 @@ func serve(c *cli.Context) error {
 		"/token/",
 		"/webdav/",
 		"/s3/",
+		"/api/",
 		"/transcoder-session/",
 	})
 	if err != nil {
@@ -231,6 +242,10 @@ func serve(c *cli.Context) error {
 	// Setting S3 access key extraction — must run before the access token
 	// middleware below, which is what it feeds (see services/s3).
 	s3svc.RegisterAccessKeyMiddleware(r, s3svc.MountPath)
+
+	// Setting API key extraction — same rule: it feeds the access token
+	// middleware below, so it has to run first.
+	libapi.RegisterAPIKeyMiddleware(r, libapi.MountPath)
 
 	// Setting Access Token
 	ats := at.New(pg)
@@ -486,6 +501,9 @@ func serve(c *cli.Context) error {
 
 	// Setting S3 (same library tree as WebDAV, different protocol)
 	s3.RegisterHandler(c, r, pg, ats, sapi, jobs)
+
+	// Setting JSON API (same library tree again, plus vault and profile)
+	japi.RegisterHandler(c, r, pg, ats, sapi, jobs, v, userSettingsSvc)
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

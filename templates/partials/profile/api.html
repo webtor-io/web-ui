@@ -1,0 +1,78 @@
+{{ define "profile/api" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            {{ t $.Lang "profile.api.title" }}
+        </h2>
+        {{ if .Claims | isPaid }}
+            {{ if not .Data.API }}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/api-credentials/generate" }}" data-async-target="#api">
+                    <button type="submit" class="btn btn-soft" data-umami-event="api-generate-key">
+                        {{ t $.Lang "profile.api.generate" }}
+                    </button>
+                </form>
+            {{ else }}
+                <script>
+                    var apiValues = {
+                        endpoint: {{ .Data.API.Endpoint }},
+                        key: {{ .Data.API.Key }}
+                    };
+                    function copyApiValue(e, name) {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(apiValues[name]);
+                        if (window.toast) window.toast.success('{{ t $.Lang "profile.api.copied" }}');
+                        return false;
+                    }
+                    {{/* The key is stored, not derived, so hiding it is the only
+                         protection there is against shoulder-surfing — unlike the
+                         S3 secret it cannot be recomputed if it leaks, only
+                         rotated. */}}
+                    function toggleApiKey(e) {
+                        e.preventDefault();
+                        var input = document.getElementById('api-key-input');
+                        input.type = input.type === 'password' ? 'text' : 'password';
+                        return false;
+                    }
+                </script>
+                <div class="join w-full mb-3">
+                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.endpoint" }}</span>
+                    <input readonly aria-label="{{ t $.Lang "profile.api.endpoint" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.API.Endpoint }}" />
+                    <button type="button" onclick="copyApiValue(event, 'endpoint')" class="btn btn-soft join-item" data-umami-event="api-copy-endpoint">{{ t $.Lang "profile.api.copy" }}</button>
+                </div>
+                {{/* Single form so the key row, copy, reveal and rotate share one
+                     join row. Copy/reveal are type="button"; the submit is the
+                     rotation, which is destructive — every integration using the
+                     old key stops authenticating at once. */}}
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/api-credentials/regenerate" }}" data-async-target="#api"
+                      onsubmit="return confirm({{ t $.Lang "profile.api.regenerateWarning" | json }})" class="join w-full mb-4">
+                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.key" }}</span>
+                    <input id="api-key-input" type="password" readonly aria-label="{{ t $.Lang "profile.api.key" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.API.Key }}" />
+                    <button type="button" onclick="toggleApiKey(event)" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.api.reveal" }}" aria-label="{{ t $.Lang "profile.api.reveal" }}">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button type="button" onclick="copyApiValue(event, 'key')" class="btn btn-soft join-item" data-umami-event="api-copy-key">{{ t $.Lang "profile.api.copy" }}</button>
+                    <button type="submit" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.api.regenerate" }}" aria-label="{{ t $.Lang "profile.api.regenerate" }}" data-umami-event="api-regenerate-key">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+                    </button>
+                </form>
+                <p class="text-sm text-w-muted mb-2">{{ t $.Lang "profile.api.authHint" }}</p>
+            {{ end }}
+        {{ else }}
+            <button disabled class="btn bg-base-300 text-w-muted border-w-line cursor-not-allowed">
+                {{ t $.Lang "profile.api.generate" }}
+            </button>
+            <div class="mt-4 bg-w-pink/5 border border-w-pink/20 rounded-xl p-4">
+                <p class="text-sm text-w-sub">
+                    {{ t $.Lang "profile.api.premiumOnly" }}
+                </p>
+                <a href="{{ langPath $.Lang "/donate" }}" class="text-sm font-semibold text-w-pinkL link link-hover mt-2 inline-block" data-async-target="main" data-umami-event="donate-api">{{ t $.Lang "profile.api.upgrade" }}</a>
+            </div>
+        {{ end }}
+        {{/* Outside every branch: the reference answers "what would I even do
+             with this?", which is the question people have *before* they press
+             generate — and the one a locked-out free user is asking too. */}}
+        <div class="mt-4">
+            <a href="{{ .Data.APIDocsURL }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="api-docs" target="_blank" rel="noopener">{{ t $.Lang "profile.api.docs" }}</a>
+        </div>
+    </div>
+{{ end }}

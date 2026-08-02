@@ -1,0 +1,1136 @@
+definitions:
+  libapi.Error:
+    properties:
+      code:
+        example: not_found
+        type: string
+      message:
+        example: the specified path does not exist
+        type: string
+    type: object
+  libapi.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/libapi.Error'
+    type: object
+  libapi.LibraryAddRequest:
+    properties:
+      resource_id:
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        type: string
+    required:
+    - resource_id
+    type: object
+  libapi.LibraryItem:
+    properties:
+      added_at:
+        example: "2026-01-02T15:04:05Z"
+        type: string
+      files_count:
+        example: 3
+        type: integer
+      name:
+        description: |-
+          Name is the library name, which the user may have renamed; it starts as
+          the torrent name.
+        example: Sintel
+        type: string
+      resource_id:
+        description: ResourceID is the infohash, and the id every /resource endpoint
+          takes.
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        type: string
+      size:
+        example: 734003200
+        type: integer
+    type: object
+  libapi.LibraryListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/libapi.LibraryItem'
+        type: array
+      items_count:
+        description: Count is the total number of matching items, not the size of
+          this page.
+        example: 42
+        type: integer
+      limit:
+        example: 100
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      sort:
+        example: recent
+        type: string
+      type:
+        example: all
+        type: string
+    type: object
+  libapi.LibraryRenameRequest:
+    properties:
+      name:
+        example: Sintel (2010)
+        type: string
+    required:
+    - name
+    type: object
+  libapi.Pledge:
+    properties:
+      amount:
+        example: 2
+        type: number
+      created_at:
+        example: "2026-01-02T15:04:05Z"
+        type: string
+      expired:
+        example: false
+        type: boolean
+      frozen:
+        description: |-
+          Frozen means the points cannot be claimed back yet. It says nothing
+          about whether the content is stored — Vaulted does.
+        example: true
+        type: boolean
+      funded:
+        example: true
+        type: boolean
+      funded_vp:
+        example: 2
+        type: number
+      name:
+        example: Sintel
+        type: string
+      pledge_id:
+        example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        type: string
+      required_vp:
+        example: 2
+        type: number
+      resource_id:
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        type: string
+      vaulted:
+        example: false
+        type: boolean
+    type: object
+  libapi.PledgeRequest:
+    properties:
+      resource_id:
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        type: string
+    required:
+    - resource_id
+    type: object
+  libapi.ProfileResponse:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      scopes:
+        description: Scopes are what the key used for this request may do.
+        example:
+        - api:read
+        - api:write
+        items:
+          type: string
+        type: array
+      settings:
+        $ref: '#/definitions/libapi.ProfileSettings'
+      tier:
+        $ref: '#/definitions/libapi.ProfileTier'
+      user_id:
+        example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        type: string
+    type: object
+  libapi.ProfileSettings:
+    properties:
+      show_adult:
+        description: ShowAdult opts out of the server-side blur on adult content.
+        example: false
+        type: boolean
+    type: object
+  libapi.ProfileSettingsRequest:
+    properties:
+      show_adult:
+        example: true
+        type: boolean
+    type: object
+  libapi.ProfileTier:
+    properties:
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Pro
+        type: string
+    type: object
+  libapi.VaultContent:
+    properties:
+      expiring:
+        example: 0
+        type: integer
+      loading:
+        example: 1
+        type: integer
+      vaulted:
+        example: 3
+        type: integer
+    type: object
+  libapi.VaultPoints:
+    properties:
+      available:
+        example: 40
+        type: number
+        x-nullable: true
+      claimable:
+        example: 40
+        type: number
+      frozen:
+        example: 20
+        type: number
+      funded:
+        example: 60
+        type: number
+      total:
+        example: 100
+        type: number
+        x-nullable: true
+    type: object
+  libapi.VaultResponse:
+    properties:
+      content:
+        $ref: '#/definitions/libapi.VaultContent'
+      pledges:
+        items:
+          $ref: '#/definitions/libapi.Pledge'
+        type: array
+      points:
+        $ref: '#/definitions/libapi.VaultPoints'
+    type: object
+  services.ExportItem:
+    properties:
+      html_tag:
+        $ref: '#/definitions/services.ExportTag'
+      meta:
+        $ref: '#/definitions/services.ExportMeta'
+      url:
+        type: string
+    type: object
+  services.ExportKindType:
+    enum:
+    - subtitles
+    type: string
+    x-enum-varnames:
+    - ExportKindTypeSubtitles
+  services.ExportMeta:
+    properties:
+      cache:
+        type: boolean
+      multibitrate:
+        type: boolean
+      transcode:
+        type: boolean
+      transcode_cache:
+        type: boolean
+    type: object
+  services.ExportPreloadType:
+    enum:
+    - auto
+    - none
+    type: string
+    x-enum-varnames:
+    - ExportPreloadTypeAuto
+    - ExportPreloadTypeNone
+  services.ExportResponse:
+    properties:
+      exports:
+        additionalProperties:
+          $ref: '#/definitions/services.ExportItem'
+        type: object
+      source:
+        $ref: '#/definitions/services.ListItem'
+    type: object
+  services.ExportSource:
+    properties:
+      src:
+        type: string
+      type:
+        type: string
+    type: object
+  services.ExportTag:
+    properties:
+      alt:
+        type: string
+      poster:
+        type: string
+      preload:
+        $ref: '#/definitions/services.ExportPreloadType'
+      sources:
+        items:
+          $ref: '#/definitions/services.ExportSource'
+        type: array
+      src:
+        type: string
+      tag:
+        $ref: '#/definitions/services.ExportTagName'
+      tracks:
+        items:
+          $ref: '#/definitions/services.ExportTrack'
+        type: array
+    type: object
+  services.ExportTagName:
+    enum:
+    - video
+    - audio
+    - img
+    type: string
+    x-enum-varnames:
+    - ExportTagNameVideo
+    - ExportTagNameAudio
+    - ExportTagNameImage
+  services.ExportTrack:
+    properties:
+      kind:
+        $ref: '#/definitions/services.ExportKindType'
+      label:
+        type: string
+      src:
+        type: string
+      srclang:
+        type: string
+    type: object
+  services.ListItem:
+    properties:
+      ext:
+        type: string
+      id:
+        type: string
+      index:
+        description: |-
+          Index is the file's position in the torrent's natural file order
+          (r.Files), i.e. the content_id accepted by /resource/<hash>/export/<idx>.
+          Valid only for Type == file items; directory items leave it zero. Lets
+          clients address the file directly without re-deriving the index from
+          the sorted/paginated list order.
+        type: integer
+      media_format:
+        $ref: '#/definitions/services.MediaFormat'
+      mime_type:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      type:
+        $ref: '#/definitions/services.ListType'
+    type: object
+  services.ListResponse:
+    properties:
+      ext:
+        type: string
+      id:
+        type: string
+      index:
+        description: |-
+          Index is the file's position in the torrent's natural file order
+          (r.Files), i.e. the content_id accepted by /resource/<hash>/export/<idx>.
+          Valid only for Type == file items; directory items leave it zero. Lets
+          clients address the file directly without re-deriving the index from
+          the sorted/paginated list order.
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/services.ListItem'
+        type: array
+      items_count:
+        type: integer
+      media_format:
+        $ref: '#/definitions/services.MediaFormat'
+      mime_type:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      type:
+        $ref: '#/definitions/services.ListType'
+    type: object
+  services.ListType:
+    enum:
+    - file
+    - directory
+    type: string
+    x-enum-varnames:
+    - ListTypeFile
+    - ListTypeDirectory
+  services.MediaFormat:
+    enum:
+    - audio
+    - video
+    - image
+    - subtitle
+    - unknown
+    type: string
+    x-enum-varnames:
+    - Audio
+    - Video
+    - Image
+    - Subtitle
+    - Unknown
+  services.ResourceResponse:
+    properties:
+      file:
+        allOf:
+        - $ref: '#/definitions/services.ListItem'
+        description: |-
+          File is the single file of a single-file torrent (nil when MultiFile).
+          Lets clients skip /list for the common single-file case.
+      files_count:
+        description: FilesCount is the number of files in the torrent.
+        type: integer
+      id:
+        type: string
+      magnet_uri:
+        type: string
+      multi_file:
+        description: |-
+          MultiFile is false for single-file-mode torrents (one file sitting at
+          the torrent root). Clients can render such a torrent straight away
+          without a /list round-trip.
+        type: boolean
+      name:
+        type: string
+      size:
+        description: |-
+          Size is the torrent's total size in bytes (sum of all files). Lets
+          clients read the size without paginating /list — a real win on torrents
+          with tens of thousands of files.
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: |-
+    Programmatic access to Webtor resources, your library, your Vault and your account preferences.
+
+    ## Two halves
+
+    `/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same
+    parameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your
+    account key instead of an API key + secret. Code written against rest-api works here unchanged.
+
+    `/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same
+    one WebDAV and S3 serve, so a torrent added through this API shows up in a mounted drive
+    immediately — it is one library, not a copy.
+
+    A typical flow: `POST /resource` with a magnet or `.torrent` → `POST /library` with the id it
+    returns → `GET /resource/{id}/list` to see the files → `GET /resource/{id}/export/{file}` for the
+    stream and download URLs.
+
+    ## Authentication
+
+    Issue a key on your profile page and send it as `Authorization: Bearer <key>` (or `X-Api-Key: <key>`
+    where a proxy strips `Authorization`). Rotating the key on the profile page revokes the old one at
+    once.
+
+    The API is available on paid plans; a free account gets `402 payment_required`.
+
+    ## Errors
+
+    Every failure answers `{"error": {"code": "...", "message": "..."}}`. Branch on `code`, not on the
+    status: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free
+    plan), `not_found`, `conflict`, `bad_request`, `upstream_error` / `upstream_timeout` (the services
+    behind this one — often worth retrying), `unavailable`, `internal_error`.
+  title: Webtor Account API
+  version: "1.0"
+paths:
+  /library:
+    get:
+      description: |-
+        The torrents saved to the account, newest first by default.
+
+        `type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least
+        one recognized film or show, which is decided by enrichment — a torrent added a moment ago may not
+        be classified yet and shows up only under `all`.
+      parameters:
+      - default: all
+        description: Filter
+        enum:
+        - all
+        - movies
+        - series
+        in: query
+        name: type
+        type: string
+      - default: recent
+        description: Sort order
+        enum:
+        - recent
+        - name
+        in: query
+        name: sort
+        type: string
+      - description: Page size (default 100, max 1000)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.LibraryListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List your library
+      tags:
+      - library
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Takes a resource id that is already in the store — `POST /resource` puts it there and returns one.
+
+        Idempotent: adding a resource already in the library answers `200` with the existing entry, and only
+        a real insert answers `201`. Adding also queues
+        enrichment (title, year, poster, movie/series classification), which runs in the background — the
+        entry is usable immediately but may not answer to `type=movies` for a little while.
+      parameters:
+      - description: Resource to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/libapi.LibraryAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Already in the library
+          schema:
+            $ref: '#/definitions/libapi.LibraryItem'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/libapi.LibraryItem'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: The resource is not in the store
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a torrent to your library
+      tags:
+      - library
+  /library/{resource_id}:
+    delete:
+      description: |-
+        Removes the entry from your library. The resource itself stays in the store and keeps working —
+        this is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).
+
+        Not idempotent: removing something that is not there answers `404`.
+      parameters:
+      - description: Infohash
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Removed
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a torrent from your library
+      tags:
+      - library
+    get:
+      description: |-
+        Answers `404` when the resource is not in your library, which is how a client checks membership
+        before offering to add or remove it.
+      parameters:
+      - description: Infohash
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.LibraryItem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one library entry
+      tags:
+      - library
+    patch:
+      consumes:
+      - application/json
+      description: |-
+        Changes the name the item is shown under everywhere — the library, WebDAV and S3 all read this
+        row. It does not touch the torrent itself.
+      parameters:
+      - description: Infohash
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      - description: New name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/libapi.LibraryRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.LibraryItem'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Rename a library entry
+      tags:
+      - library
+  /profile:
+    get:
+      description: |-
+        Who the key belongs to, which plan the account is on, what the key is allowed to do, and the
+        preferences that affect what the other endpoints return.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.ProfileResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Account state
+      tags:
+      - profile
+    patch:
+      consumes:
+      - application/json
+      description: |-
+        Partial update: a field left out of the body keeps its current value. Requires the `api:write`
+        scope.
+
+        Preferences are read on the hot path and cached for a few minutes, so a change can take that long
+        to show up in poster URLs — this endpoint invalidates its own cache entry, but other replicas
+        expire on their own schedule.
+      parameters:
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/libapi.ProfileSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.ProfileResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update account preferences
+      tags:
+      - profile
+  /resource:
+    post:
+      consumes:
+      - '*/*'
+      description: |-
+        Takes a `.torrent` file or a magnet URI in the request body and puts it in the store, returning the
+        resource id (its infohash) that every other endpoint takes. A magnet is resolved against the
+        BitTorrent network first, which can take minutes for a torrent nobody is seeding.
+
+        Storing does **not** add the torrent to your library — `POST /library` does, and takes the id this
+        returns.
+
+        Identical in shape to rest-api's `POST /resource/`.
+      parameters:
+      - description: Raw .torrent bytes, or a magnet URI
+        example: magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10
+        in: body
+        name: resource
+        required: true
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ResourceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "408":
+          description: Request Timeout
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Store a resource
+      tags:
+      - resource
+  /resource/{resource_id}:
+    get:
+      description: |-
+        Name, size, file count and magnet URI of a stored resource. Single-file torrents also carry the
+        file itself, so the common case needs no `/list` round-trip.
+
+        Appending `.torrent` to the id returns the torrent file instead
+        (`GET /resource/{resource_id}.torrent`, `application/x-bittorrent`) — same convention as rest-api.
+      parameters:
+      - description: Infohash, optionally suffixed with .torrent
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ResourceResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a resource
+      tags:
+      - resource
+  /resource/{resource_id}/export/{content_id}:
+    get:
+      description: |-
+        Returns the URLs a file is served from: `download` for the bytes, `stream` for the player sources
+        and subtitle tracks, plus the auxiliary outputs. Same shape as rest-api's
+        `/resource/{id}/export/{content_id}`.
+
+        `content_id` is either the `id` from `/list` or the file's index in the torrent's natural order.
+        Exporting a directory produces an archive URL — `archive-format` picks zip or tar, and `paths`
+        limits it to a selection.
+
+        **The URLs carry their own authorization and are short-lived.** Resolve them when you are about to
+        use them; do not store them.
+      parameters:
+      - description: Infohash
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      - description: File id from /list, or its index
+        example: ca2453df3e7691c28934eebed5a253ee0aabd29f
+        in: path
+        name: content_id
+        required: true
+        type: string
+      - description: Return only this export
+        enum:
+        - download
+        - stream
+        - torrent_client_stat
+        - subtitles
+        - media_probe
+        in: query
+        name: output
+        type: string
+      - description: IMDb id, used to match subtitles
+        in: query
+        name: imdb-id
+        type: string
+      - default: zip
+        description: Archive format for directory exports
+        enum:
+        - zip
+        - tar
+        in: query
+        name: archive-format
+        type: string
+      - collectionFormat: csv
+        description: Limit a directory archive to these paths (repeatable)
+        in: query
+        items:
+          type: string
+        name: paths
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ExportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Export a file
+      tags:
+      - export
+  /resource/{resource_id}/list:
+    get:
+      description: |-
+        Files and directories of a resource. The `id` of each item is what `/export` takes.
+
+        `output=tree` lists one directory level at a time (use `path` to descend); `output=list` returns the
+        flat file list. Identical in shape to rest-api's `/resource/{id}/list`, including the `items` /
+        `items_count` envelope.
+      parameters:
+      - description: Infohash
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      - default: /
+        description: Directory to list (with output=tree)
+        in: query
+        name: path
+        type: string
+      - default: 10
+        description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      - default: list
+        description: Listing shape
+        enum:
+        - list
+        - tree
+        in: query
+        name: output
+        type: string
+      - default: name
+        description: Sort order
+        enum:
+        - name
+        - size
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List resource contents
+      tags:
+      - list
+  /vault:
+    get:
+      description: |-
+        Vault Points balance plus every pledge the account holds. 1 VP = 1 GB of torrent size; a `total` of
+        `null` means an unlimited plan.
+
+        A pledge is frozen for a period after it is created and cannot be removed while it is — `frozen` says
+        whether that applies right now, not whether the content is stored.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.VaultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "503":
+          description: Vault is not configured on this deployment
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Vault balance and pledges
+      tags:
+      - vault
+  /vault/pledges:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates a pledge, which is what keeps a torrent available long-term. Idempotent per resource: an
+        account holds at most one pledge for a given resource, and pledging again answers `409`.
+
+        The required amount is derived from the torrent size, so a pledge fails with `403` when the account
+        does not have that many points available.
+      parameters:
+      - description: Resource to pledge to
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/libapi.PledgeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/libapi.Pledge'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "403":
+          description: Not enough Vault Points
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "409":
+          description: A pledge for this resource already exists
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "503":
+          description: Vault is not configured on this deployment
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Pledge Vault Points to a torrent
+      tags:
+      - vault
+  /vault/pledges/{resource_id}:
+    delete:
+      description: |-
+        Removes the pledge for a resource and returns its points to the balance. A pledge that is still
+        frozen cannot be removed and answers `409`.
+      parameters:
+      - description: Resource (infohash) the pledge is held against
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Removed
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "409":
+          description: Pledge is frozen
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "503":
+          description: Vault is not configured on this deployment
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Claim Vault Points back
+      tags:
+      - vault
+securityDefinitions:
+  BearerAuth:
+    description: API key from your profile page, as `Bearer <key>`.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Storing and reading torrents. Same contract as rest-api.
+  name: resource
+- description: Files and directories inside a resource. Same contract as rest-api.
+  name: list
+- description: Stream and download URLs for a file. Same contract as rest-api.
+  name: export
+- description: The torrents saved to your account — the library WebDAV and S3 mount.
+  name: library
+- description: Vault Points and the pledges that keep content available long-term.
+  name: vault
+- description: Account state and preferences.
+  name: profile

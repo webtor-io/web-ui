@@ -61,6 +61,11 @@
         {{ template "profile/s3" $ }}
     </div>
     {{ end }}
+    {{ if not .Data.DisableAPI }}
+    <div id="api" data-async-layout="{{`{{ template "profile/api" $ }}`}}">
+        {{ template "profile/api" $ }}
+    </div>
+    {{ end }}
     {{ if not .Data.DisableEmbed }}
     <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" (withContext $ .Data) }}`}}">
         {{ template "profile/embed_domains" (withContext $ .Data) }}

@@ -2,6 +2,13 @@ build:
 	npm run build \
 	&& go build .
 
+# Regenerates docs/swagger from the annotations in handlers/api. The output is
+# committed, so a normal build does not need the swag binary — run this after
+# touching an endpoint's annotations.
+#   go install github.com/swaggo/swag/cmd/swag@latest
+swagger:
+	swag init -g handlers/api/docs.go -d ./,./handlers/api,./services/libapi -o docs/swagger --instanceName libraryapi --parseDependency --parseDepth 2
+
 run:
 	./web-ui s
 

@@ -4,8 +4,9 @@ Read-only WebDAV view of a user's library, so they can mount it with
 `rclone`, Finder, Windows Explorer, Cyberduck, etc. and browse/stream their
 torrents as files. Paid-only (`claims.IsPaid`).
 
-The filesystem itself is **not** WebDAV-specific — S3 serves the same tree, see
-[s3.md](s3.md):
+The filesystem itself is **not** WebDAV-specific — S3 ([s3.md](s3.md)) serves
+the same tree, and the JSON API ([api.md](api.md)) serves the same library in a
+non-filesystem shape:
 
 | Package | Role |
 |---------|------|

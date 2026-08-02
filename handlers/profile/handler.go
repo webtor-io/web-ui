@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/data_export"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/libapi"
 	pay "github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/stremio"
@@ -48,10 +49,20 @@ type S3Credentials struct {
 	Region    string
 }
 
+// APICredentials is what a script sends as `Authorization: Bearer <key>`.
+// Unlike the S3 secret the key is stored, not derived, so it is shown once per
+// page render and can only be rotated, never recovered.
+type APICredentials struct {
+	Endpoint string
+	Key      string
+}
+
 type Data struct {
 	StremioAddonURL       string
 	WebDAVURL             string
 	S3                    *S3Credentials
+	API                   *APICredentials
+	APIDocsURL            string
 	EmbedDomains          []models.EmbedDomain
 	AddonUrls             []models.StremioAddonUrl
 	StremioSettings       *models.StremioSettingsData
@@ -64,6 +75,7 @@ type Data struct {
 	ErrKey                string
 	DisableWebDAV         bool
 	DisableS3             bool
+	DisableAPI            bool
 	DisableEmbed          bool
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
@@ -81,9 +93,11 @@ type Handler struct {
 	payments      *pay.Client
 	disableWebDAV bool
 	disableS3     bool
+	disableAPI    bool
 	disableEmbed  bool
 	s3Secret      string
 	s3Endpoint    string
+	apiEndpoint   string
 	domain        string
 }
 
@@ -99,9 +113,11 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		payments:      payments,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableS3:     c.Bool(common.DisableS3Flag),
+		disableAPI:    c.Bool(common.DisableAPIFlag),
 		disableEmbed:  c.Bool(common.DisableEmbedFlag),
 		s3Secret:      s3.SigningSecret(c),
 		s3Endpoint:    s3.PublicEndpoint(c),
+		apiEndpoint:   libapi.PublicEndpoint(c),
 		domain:        c.String(common.DomainFlag),
 	}
 	r.GET("/profile", h.get)
@@ -149,6 +165,19 @@ func (s *Handler) getS3Credentials(c *gin.Context) (*S3Credentials, error) {
 		AccessKey: key,
 		SecretKey: s3.DeriveSecretKey(s.s3Secret, key),
 		Region:    s3.DefaultRegion,
+	}, nil
+}
+
+// getAPICredentials returns the endpoint/key pair, or nil when the user has not
+// issued a key yet (the profile then shows the generate button, same as S3).
+func (s *Handler) getAPICredentials(c *gin.Context) (*APICredentials, error) {
+	at, err := s.at.GetTokenByName(c, libapi.TokenName)
+	if at == nil {
+		return nil, err
+	}
+	return &APICredentials{
+		Endpoint: s.apiEndpoint,
+		Key:      at.Token.String(),
 	}, nil
 }
 
@@ -249,6 +278,11 @@ func (s *Handler) get(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get s3 credentials"))
 		return
 	}
+	apiCreds, err := s.getAPICredentials(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get api credentials"))
+		return
+	}
 
 	// Get user domains
 	db := s.pg.Get()
@@ -321,6 +355,8 @@ func (s *Handler) get(c *gin.Context) {
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
 		S3:                    s3Creds,
+		API:                   apiCreds,
+		APIDocsURL:            s.apiEndpoint + "/docs/index.html",
 		EmbedDomains:          domains,
 		AddonUrls:             addonUrls,
 		StremioSettings:       ss,
@@ -332,6 +368,7 @@ func (s *Handler) get(c *gin.Context) {
 		HasPayments:           hasPayments,
 		DisableWebDAV:         s.disableWebDAV,
 		DisableS3:             s.disableS3,
+		DisableAPI:            s.disableAPI,
 		DisableEmbed:          s.disableEmbed,
 	}))
 }

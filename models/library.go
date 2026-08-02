@@ -77,6 +77,27 @@ func GetLibraryByName(ctx context.Context, db *pg.DB, uID uuid.UUID, name string
 	return &lib, nil
 }
 
+// GetLibraryByResourceID returns the user's entry for a resource, or nil when
+// there is none. Nil is "not in this user's library" and covers both the
+// missing row and someone else's row — the caller must not distinguish them.
+func GetLibraryByResourceID(ctx context.Context, db *pg.DB, uID uuid.UUID, resourceID string) (*Library, error) {
+	var lib Library
+	err := db.Model(&lib).
+		Context(ctx).
+		Where("library.user_id = ?", uID).
+		Where("library.resource_id = ?", resourceID).
+		Relation("Torrent").
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch library entry by resource id")
+	}
+	return &lib, nil
+}
+
 func GetLibraryByTorrentName(ctx context.Context, db *pg.DB, uID uuid.UUID, name string) (*Library, error) {
 	var lib Library
 	err := db.Model(&lib).

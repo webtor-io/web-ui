@@ -26,6 +26,8 @@ var (
 	DisableS3Flag     = "disable-s3"
 	S3SecretFlag      = "s3-signing-secret"
 	S3DomainFlag      = "s3-domain"
+	DisableAPIFlag    = "disable-api"
+	APIDomainFlag     = "api-domain"
 	DisableEmbedFlag  = "disable-embed"
 )
 
@@ -119,6 +121,20 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			// back to the session secret.
 			Usage:  "s3 signing secret (falls back to session secret)",
 			EnvVar: "S3_SIGNING_SECRET",
+		},
+		cli.BoolFlag{
+			Name:   DisableAPIFlag,
+			Usage:  "disable json api",
+			EnvVar: "DISABLE_API",
+		},
+		cli.StringFlag{
+			Name: APIDomainFlag,
+			// Hostnames that serve the JSON API at their root, comma-separated
+			// (api.webtor.io). Requests to them are rewritten onto /api,
+			// keeping the version in the path: api.webtor.io/v1/fs. Empty means
+			// the API is only reachable at DOMAIN/api/v1.
+			Usage:  "hostnames serving the json api at the root (comma-separated)",
+			EnvVar: "API_DOMAIN",
 		},
 		cli.BoolFlag{
 			Name:   DisableEmbedFlag,
