@@ -7,6 +7,10 @@ node_modules
 assets/dist
 *.md
 docs/
+# ...except the generated swagger package: docs/ is prose and stays out of the
+# image, but docs/swagger is Go code the binary imports (handlers/api/docs.go),
+# so excluding it builds fine locally and fails only in the image.
+!docs/swagger/
 .env*
 .air.toml
 .dockerignore
