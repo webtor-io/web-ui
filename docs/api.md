@@ -237,6 +237,12 @@ make swagger
 `--parseDependency` is what pulls rest-api's response types into the spec, so
 the documented `services.*` schemas are literally upstream's.
 
+> **`docs/swagger` is compiled into the binary, unlike the rest of `docs/`.**
+> `.dockerignore` drops `docs/` wholesale — it was prose until this landed —
+> which made the build succeed locally and fail only inside the image with
+> *"no required module provides package …/docs/swagger"*. The directory is
+> excepted there (`!docs/swagger/`); keep the exception if either path moves.
+
 > **The instance name must not be swaggo's default.** Every generated docs
 > package registers itself globally by instance name at `init`, and rest-api's
 > own spec — linked into this binary through `services/api` — already claims
