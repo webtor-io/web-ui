@@ -38,6 +38,20 @@ type Cause int
 
 var hashRegexp = regexp.MustCompile("[0-9a-f]{40}")
 
+// extractInfohash pulls the infohash out of whatever the reporter pasted — a
+// bare hash, a magnet link, a webtor URL.
+//
+// Lower-casing happens BEFORE matching: the pattern is lower-case hex only, so
+// an upper-case hash (which plenty of trackers emit in magnet links) matched
+// nothing and left the field empty. A report naming no torrent cannot be
+// enforced, and abuse-store used to store it anyway and choke on it.
+func extractInfohash(in string) string {
+	if in == "" {
+		return ""
+	}
+	return hashRegexp.FindString(strings.ToLower(in))
+}
+
 var CauseTypes = map[int]string{
 	-1: "support.selectCause",
 	0:  "support.illegalContent",
@@ -88,10 +102,7 @@ func (s *Handler) sendForm(c *gin.Context, form *Form) error {
 	if err != nil {
 		return err
 	}
-	infohash := form.Infohash
-	if form.Infohash != "" {
-		infohash = strings.ToLower(hashRegexp.FindString(form.Infohash))
-	}
+	infohash := extractInfohash(form.Infohash)
 	pr := &proto.PushRequest{
 		NoticeId:    uuid.New().String(),
 		Infohash:    infohash,
