@@ -141,7 +141,7 @@ func TestAuthorizeRejectsForeignScope(t *testing.T) {
 func TestDocsServeTheSpec(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	registerDocs(r, libapi.MountPath, "https://api.example.com/v1")
+	registerDocs(r, libapi.MountPath, "https://api.example.com/v1", "/api-credentials/key")
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, libapi.MountPath+"/swagger.json", nil))

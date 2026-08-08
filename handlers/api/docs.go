@@ -79,29 +79,38 @@ const docsInstanceName = "libraryapi"
 // prefillJS is appended to Swagger UI's generated initializer. When the reader
 // has a session and an issued key, "Try it out" is preauthorized with it — no
 // copy-paste round-trip through the profile page. It fails closed: anonymous
-// readers, a lapsed session, the dedicated api host (no session cookie there,
-// and the host rewrite doesn't expose /api-credentials) and any fetch error all
-// just leave the Authorize dialog empty, exactly as before.
+// readers, a lapsed session and any fetch error just leave the Authorize
+// dialog empty, exactly as before.
+//
+// keyURL points at the MAIN domain absolutely when one is configured: on a
+// dedicated api host a relative fetch would be rewritten onto /api/... (404),
+// and the session cookie is host-only anyway. Cross-origin but same-site, so
+// the cookie travels with credentials:"include", and getCredentialsKey answers
+// the api-host origins with credentialed CORS.
 //
 // "BearerAuth" must match the @securityDefinitions.apikey name above; the value
 // carries the "Bearer " prefix because the definition is a verbatim
 // Authorization header, not swagger's bearer scheme.
-const prefillJS = ";(function(){" +
-	"var prev=window.onload;" +
-	"window.onload=function(){" +
-	"if(prev)prev();" +
-	"fetch(" + `"` + CredentialsPath + `/key"` + ",{credentials:\"same-origin\"})" +
-	".then(function(r){return r.status===200?r.json():null})" +
-	".then(function(d){if(d&&d.key&&window.ui){window.ui.preauthorizeApiKey(\"BearerAuth\",\"Bearer \"+d.key);}})" +
-	".catch(function(){});" +
-	"};" +
-	"})();"
+func prefillJS(keyURL string) string {
+	return ";(function(){" +
+		"var prev=window.onload;" +
+		"window.onload=function(){" +
+		"if(prev)prev();" +
+		"fetch(" + `"` + keyURL + `"` + ",{credentials:\"include\"})" +
+		".then(function(r){return r.status===200?r.json():null})" +
+		".then(function(d){if(d&&d.key&&window.ui){window.ui.preauthorizeApiKey(\"BearerAuth\",\"Bearer \"+d.key);}})" +
+		".catch(function(){});" +
+		"};" +
+		"})();"
+}
 
 // registerDocs publishes the reference and the raw spec.
 //
 // Both are public: an API reference you need a key to read is a reference
 // nobody evaluates before signing up. Nothing user-specific is in it.
-func registerDocs(r *gin.Engine, mountPath string, endpoint string) {
+// keyURL is where the prefill snippet fetches the session user's key — see
+// prefillJS for why it is absolute in production.
+func registerDocs(r *gin.Engine, mountPath string, endpoint string, keyURL string) {
 	// The generated spec is host-agnostic; point it at whatever this
 	// deployment actually serves (a dedicated api.<domain> or <domain>/api/v1)
 	// so "Try it out" hits the right origin.
@@ -145,7 +154,7 @@ func registerDocs(r *gin.Engine, mountPath string, endpoint string) {
 		// the template streams (no Content-Length); the status guard keeps the
 		// snippet off 404 bodies.
 		if strings.HasSuffix(c.Request.URL.Path, "/swagger-initializer.js") && c.Writer.Status() == http.StatusOK {
-			_, _ = c.Writer.WriteString(prefillJS)
+			_, _ = c.Writer.WriteString(prefillJS(keyURL))
 		}
 	})
 }

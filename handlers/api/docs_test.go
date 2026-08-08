@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/webtor-io/web-ui/services/libapi"
 )
 
 func docsEngine() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	registerDocs(r, "/api/v1", "http://localhost:8080/api/v1")
+	registerDocs(r, "/api/v1", "http://localhost:8080/api/v1", "https://example.com/api-credentials/key")
 	return r
 }
 
@@ -109,5 +110,86 @@ func TestCredentialsKeyRejectsAnonymous(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != 401 || w.Body.Len() != 0 {
 		t.Errorf("anonymous key request: got %d (%d bytes), want 401 with empty body", w.Code, w.Body.Len())
+	}
+}
+
+// The prefill must fetch the key from the configured absolute URL with
+// credentials — on the dedicated api host a relative fetch would be
+// host-rewritten into /api/... and 404, exactly what broke auto-authorize
+// there first time around.
+func TestDocsPrefillUsesConfiguredKeyURL(t *testing.T) {
+	r := docsEngine()
+	p := "/api/v1/docs/swagger-initializer.js"
+	body := getDocs(r, p, p).Body.String()
+	if !strings.Contains(body, `fetch("https://example.com/api-credentials/key"`) {
+		t.Errorf("prefill does not fetch the configured absolute key URL")
+	}
+	if !strings.Contains(body, `credentials:"include"`) {
+		t.Errorf("prefill fetch does not include credentials")
+	}
+}
+
+// The API surface must answer browser preflights and carry a wildcard CORS
+// header — with a dedicated host in the spec, "Try it out" always calls
+// cross-origin. Bearer auth (no cookies) is what makes the wildcard safe.
+func TestAPICORSPreflightAndResponses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	libapi.RegisterCORSMiddleware(r, libapi.MountPath)
+	r.GET(libapi.MountPath+"/library", func(c *gin.Context) { c.Status(200) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("OPTIONS", "/api/v1/library", nil)
+	req.Header.Set("Origin", "https://webtor.io")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Headers", "authorization")
+	r.ServeHTTP(w, req)
+	if w.Code != 204 || w.Header().Get("Access-Control-Allow-Origin") != "*" ||
+		w.Header().Get("Access-Control-Allow-Headers") == "" {
+		t.Errorf("preflight: got %d ACAO=%q, want 204 with wildcard and headers",
+			w.Code, w.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/library", nil))
+	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Errorf("plain response lacks wildcard CORS header")
+	}
+
+	// Non-API paths stay untouched.
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("OPTIONS", "/profile", nil))
+	if w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("CORS header leaked onto a non-API path")
+	}
+}
+
+// The key endpoint answers credentialed CORS ONLY to the configured api-host
+// origins: reflecting arbitrary origins would hand the session user's secret
+// to any website.
+func TestCredentialsKeyCORSRestrictedToAPIHosts(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	h := &Handler{keyOrigins: libapi.AllowedKeyOrigins([]string{"api.example.com"})}
+	r.GET(CredentialsPath+"/key", h.getCredentialsKey)
+
+	get := func(origin string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", CredentialsPath+"/key", nil)
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	w := get("https://api.example.com")
+	if w.Header().Get("Access-Control-Allow-Origin") != "https://api.example.com" ||
+		w.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Errorf("allowed origin: ACAO=%q ACAC=%q, want echo + true",
+			w.Header().Get("Access-Control-Allow-Origin"), w.Header().Get("Access-Control-Allow-Credentials"))
+	}
+	if w := get("https://evil.example.net"); w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("foreign origin got a CORS grant")
 	}
 }

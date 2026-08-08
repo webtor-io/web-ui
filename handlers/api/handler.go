@@ -20,6 +20,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -52,6 +53,10 @@ type Handler struct {
 	vault        *vault.Vault
 	userSettings *usettings.Service
 	limiter      *libapi.RateLimiter
+	// keyOrigins are the dedicated API-host origins the key endpoint answers
+	// to with credentials — the Swagger page there runs cross-origin from the
+	// session cookie's host.
+	keyOrigins map[string]bool
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessToken, sapi *restapi.Api, jobs *j.Jobs, v *vault.Vault, us *usettings.Service) {
@@ -66,7 +71,13 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 		vault:        v,
 		userSettings: us,
 		limiter:      libapi.NewRateLimiter(c),
+		keyOrigins:   libapi.AllowedKeyOrigins(libapi.Hosts(c)),
 	}
+
+	// Browser callers (the reference's "Try it out") reach the API from
+	// whichever docs origin they read it on; bearer auth makes a wildcard
+	// safe. Must come before the group handlers so preflights are answered.
+	libapi.RegisterCORSMiddleware(r, libapi.MountPath)
 
 	cr := r.Group(CredentialsPath)
 	cr.Use(auth.HasAuth)
@@ -84,7 +95,14 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 
 	// Docs are public: the point of an API reference is that you can read it
 	// before you have a key.
-	registerDocs(r, libapi.MountPath, libapi.PublicEndpoint(c))
+	// The prefill fetch must address the main domain absolutely: on the
+	// dedicated api host a relative URL gets host-rewritten into /api/... and
+	// 404s. Locally (no domain configured) relative keeps it same-origin.
+	keyURL := CredentialsPath + "/key"
+	if domain := strings.TrimSuffix(c.String(co.DomainFlag), "/"); domain != "" {
+		keyURL = domain + keyURL
+	}
+	registerDocs(r, libapi.MountPath, libapi.PublicEndpoint(c), keyURL)
 
 	gr := r.Group(libapi.MountPath)
 	gr.Use(h.authorize)
@@ -190,6 +208,15 @@ func (s *Handler) generateCredentials(c *gin.Context) {
 // must not be able to answer.
 func (s *Handler) getCredentialsKey(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
+	// The Swagger page on a dedicated api host fetches this cross-origin
+	// (same site, so the session cookie still travels). Only those exact
+	// origins get a credentialed CORS answer; for everyone else the browser
+	// withholds the response. NOT a wildcard — the body is a secret.
+	if origin := c.GetHeader("Origin"); s.keyOrigins[origin] {
+		c.Header("Access-Control-Allow-Origin", origin)
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Vary", "Origin")
+	}
 	u := auth.GetUserFromContext(c)
 	if u == nil || !u.HasAuth() {
 		c.Status(http.StatusUnauthorized)
