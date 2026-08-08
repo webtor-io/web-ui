@@ -81,6 +81,21 @@ func TestDocsPrefillInjectedIntoInitializerOnly(t *testing.T) {
 	}
 }
 
+// Cloudflare caches .js by extension with a default browser TTL, so the
+// initializer (which changes with every release) must carry an explicit
+// revalidation header; the immutable UI bundles must not.
+func TestDocsInitializerIsNotCacheable(t *testing.T) {
+	r := docsEngine()
+	p := "/api/v1/docs/swagger-initializer.js"
+	if cc := getDocs(r, p, p).Header().Get("Cache-Control"); cc != "no-cache" {
+		t.Errorf("initializer Cache-Control: got %q, want no-cache", cc)
+	}
+	p = "/api/v1/docs/swagger-ui-bundle.js"
+	if cc := getDocs(r, p, p).Header().Get("Cache-Control"); cc != "" {
+		t.Errorf("bundle Cache-Control: got %q, want none", cc)
+	}
+}
+
 // The key endpoint must never answer without a session: its body is a secret,
 // and the in-handler auth check (not just the middleware) is what this pins.
 func TestCredentialsKeyRejectsAnonymous(t *testing.T) {

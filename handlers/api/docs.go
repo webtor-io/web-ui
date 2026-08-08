@@ -130,6 +130,15 @@ func registerDocs(r *gin.Engine, mountPath string, endpoint string) {
 		// poisoned until restart. Aligning RequestURI keeps them agreed; the
 		// query string it drops is not used by anything downstream here.
 		c.Request.RequestURI = c.Request.URL.Path
+		// The initializer and the page must revalidate: Cloudflare caches .js
+		// by extension with a default 30-minute browser TTL, which kept a
+		// pre-release initializer (without the key prefill) alive in browsers
+		// for half an hour after a deploy. The versioned UI bundles are the
+		// same bytes across releases and may cache normally.
+		if strings.HasSuffix(c.Request.URL.Path, "/swagger-initializer.js") ||
+			strings.HasSuffix(c.Request.URL.Path, "/index.html") {
+			c.Header("Cache-Control", "no-cache")
+		}
 		docsHandler(c)
 		// The initializer is templated by ginSwagger with no extension hook,
 		// so the prefill rides on the end of its body. Appending works because
