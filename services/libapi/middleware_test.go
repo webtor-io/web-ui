@@ -146,3 +146,35 @@ func TestAlreadyPrefixedPathIsNotRewrittenTwice(t *testing.T) {
 		t.Errorf("routed to %q, want %q", got, want)
 	}
 }
+
+// A handler that writes its body without an explicit status must answer 200
+// through the host rewrite. The original path matches no gin route, so the
+// NoRoute chain pre-sets 404 — without the reset in RegisterHostMiddleware the
+// re-dispatched handler flushed that 404 with a healthy body (this is exactly
+// how the Swagger pages, templated without an explicit status, broke on the
+// dedicated host).
+func TestHostRewriteDoesNotLeakNoRoute404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterHostMiddleware(r, []string{"api.example.com"}, HostPrefix)
+	r.GET(MountPath+"/docs", func(c *gin.Context) {
+		_, _ = c.Writer.Write([]byte("docs page"))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/docs", nil)
+	req.Host = "api.example.com"
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || w.Body.String() != "docs page" {
+		t.Fatalf("got %d %q, want 200 \"docs page\"", w.Code, w.Body.String())
+	}
+
+	// A rewritten path that still matches nothing must stay an honest 404.
+	req = httptest.NewRequest(http.MethodGet, "/v1/definitely-not-a-route", nil)
+	req.Host = "api.example.com"
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unmatched path: got %d, want 404", w.Code)
+	}
+}

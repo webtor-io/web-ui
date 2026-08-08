@@ -133,6 +133,16 @@ func RegisterHostMiddleware(r *gin.Engine, hosts []string, prefix string) {
 		p = prefix + p
 		c.Request.URL.Path = p
 		c.Request.URL.RawPath = co.EscapePath(p)
+		// The original /v1/... path matched no route, so gin entered its
+		// NoRoute chain with the response status pre-set to 404. HandleContext
+		// re-dispatches but does not reset that pending status — a handler
+		// that writes its body without an explicit status (ginSwagger's
+		// templated docs pages) would flush the phantom 404 with a perfectly
+		// good body. Resetting to 200 here restores the implicit-status
+		// default; handlers that set a status explicitly still override it,
+		// and a rewritten path that matches nothing re-enters NoRoute and
+		// becomes an honest 404 again.
+		c.Status(http.StatusOK)
 		c.Abort()
 		r.HandleContext(c)
 	})

@@ -248,10 +248,11 @@ filter.
 
 ## Dedicated hostname
 
-`API_DOMAIN=<host>` serves the API at that host's root. **`api.webtor.io` itself
-is NOT available** — it has routed torrent-http-proxy's streaming traffic since
-2022 (a 2026-08-08 attempt to claim it collided with that ingress and was
-reverted); pick a fresh hostname when enabling this.
+`API_DOMAIN=<host>` serves the API at that host's root; production uses
+`api.webtor.io` (taken over from torrent-http-proxy on 2026-08-08 — its
+clients moved to their own hostname). The DNS record is deliberately
+NOT Cloudflare-proxied: CF bot challenges answer "Just a moment..." HTML
+to programmatic clients.
 `libapi.RegisterHostMiddleware` rewrites those requests onto `/api` and
 re-dispatches, so:
 
