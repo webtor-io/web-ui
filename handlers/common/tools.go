@@ -24,6 +24,7 @@ var Tools = []Tool{
 	{Url: "stream-torrent-online", Title: "tool.streamTorrentOnline.title", Benefit: "tool.streamTorrentOnline.benefit", Description: "tool.streamTorrentOnline.description"},
 	{Url: "torrent-player", Title: "tool.torrentPlayer.title", Benefit: "tool.torrentPlayer.benefit", Description: "tool.torrentPlayer.description"},
 	{Url: "web-torrent-client", Title: "tool.webTorrentClient.title", Benefit: "tool.webTorrentClient.benefit", Description: "tool.webTorrentClient.description"},
+	{Url: "cloud-torrent-client", Title: "tool.cloudTorrentClient.title", Benefit: "tool.cloudTorrentClient.benefit", Description: "tool.cloudTorrentClient.description"},
 	{Url: "stremio-addons-online", Title: "tool.stremioAddonsOnline.title", Benefit: "tool.stremioAddonsOnline.benefit", Description: "tool.stremioAddonsOnline.description"},
 	{Url: "webtor-stremio-addon", Title: "tool.webtorStremioAddon.title", Benefit: "tool.webtorStremioAddon.benefit", Description: "tool.webtorStremioAddon.description"},
 }

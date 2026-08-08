@@ -145,6 +145,8 @@
                     <div class="card-actions mt-2">
                         <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide uppercase">Vault</span>
                         <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">AI</span>
+                        <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">WebDAV</span>
+                        <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">S3</span>
                     </div>
                 </div>
             </div>
@@ -172,16 +174,6 @@
                 </div>
             </div>
 
-            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
-                <div class="card-body">
-                    <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                    </div>
-                    <h3 class="card-title text-[1.05rem] mt-3">{{ t $.Lang "about.features.webdav.title" }}</h3>
-                    <p class="text-[0.9rem] text-w-sub leading-relaxed">{{ t $.Lang "about.features.webdav.text" }}</p>
-                </div>
-            </div>
-
             <a href="https://chromewebstore.google.com/detail/webtorio-watch-torrents-o/ngkpdaefpmokglfnmienfiaioffjodam" target="_blank" rel="noopener" class="group card bg-base-300 border border-w-line hover:border-w-pink/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
                 <div class="card-body">
                     <div class="flex items-start justify-between gap-2">
@@ -195,7 +187,7 @@
                 </div>
             </a>
 
-            <a href="https://github.com/webtor-io/embed-sdk-js" target="_blank" rel="noopener" class="group card bg-base-300 border border-w-line hover:border-w-cyan/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+            <a href="https://github.com/webtor-io/embed-sdk-js" target="_blank" rel="noopener" data-umami-event="home-embed-sdk" class="group card bg-base-300 border border-w-line hover:border-w-cyan/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
                 <div class="card-body">
                     <div class="flex items-start justify-between gap-2">
                         <div class="w-12 h-12 rounded-xl bg-w-cyan/12 text-w-cyan flex items-center justify-center">
@@ -207,6 +199,23 @@
                     <p class="text-[0.9rem] text-w-sub leading-relaxed">{{ t $.Lang "about.features.sdk.text" }}</p>
                     <div class="card-actions mt-2">
                         <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">MIT License</span>
+                    </div>
+                </div>
+            </a>
+
+            <a href="{{ apiDocsURL }}" target="_blank" rel="noopener" data-umami-event="home-api-docs" class="group card bg-base-300 border border-w-line hover:border-w-purple/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V7a2 2 0 012-2h12a2 2 0 012 2v10"/><path d="M2 17h20v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2z"/><path d="M9 9l-2 2 2 2"/><path d="M15 9l2 2-2 2"/></svg>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-w-muted group-hover:text-w-purpleL group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all duration-300"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+                    </div>
+                    <h3 class="card-title text-[1.05rem] mt-3 group-hover:text-w-purpleL transition-colors duration-300">{{ t $.Lang "about.features.api.title" }}</h3>
+                    <p class="text-[0.9rem] text-w-sub leading-relaxed">{{ t $.Lang "about.features.api.text" }}</p>
+                    <div class="card-actions mt-2">
+                        <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide uppercase">REST</span>
+                        <span class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL text-[0.7rem] tracking-wide uppercase">Beta</span>
                     </div>
                 </div>
             </a>
