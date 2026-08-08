@@ -239,7 +239,9 @@ func serve(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		a.RegisterHandler(r)
+		// /api/v1 owns its own CORS (wildcard, bearer-auth, PATCH) — the
+		// SuperTokens policy must not answer its preflights.
+		a.RegisterHandler(r, libapi.MountPath)
 	}
 
 	// Setting S3 access key extraction — must run before the access token

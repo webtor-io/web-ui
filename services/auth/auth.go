@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -448,7 +449,14 @@ func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.Handl
 	}
 }
 
-func (s *Auth) RegisterHandler(r *gin.Engine) {
+// RegisterHandler wires SuperTokens session handling and its CORS policy.
+//
+// corsExemptPrefixes are path prefixes the SuperTokens CORS middleware must
+// leave alone — the JSON API under /api/v1 owns its own CORS (wildcard,
+// bearer-auth, PATCH included), and this global one would otherwise answer
+// its preflights first with an origin-echo + credentials policy that both
+// lacks PATCH and is wrong for a cookie-less API.
+func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 	if !s.hasSupetokens {
 		r.Use(func(c *gin.Context) {
 			s.registerAdminUser(c)
@@ -458,7 +466,7 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 		return
 	}
 	// CORS
-	r.Use(cors.New(cors.Config{
+	corsHandler := cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
 			return true
 		},
@@ -466,7 +474,16 @@ func (s *Auth) RegisterHandler(r *gin.Engine) {
 		AllowHeaders:     append([]string{"content-type"}, supertokens.GetAllCORSHeaders()...),
 		MaxAge:           1 * time.Minute,
 		AllowCredentials: true,
-	}))
+	})
+	r.Use(func(c *gin.Context) {
+		for _, p := range corsExemptPrefixes {
+			if strings.HasPrefix(c.Request.URL.Path, p) {
+				c.Next()
+				return
+			}
+		}
+		corsHandler(c)
+	})
 
 	r.Use(func(c *gin.Context) {
 		supertokens.Middleware(http.HandlerFunc(
