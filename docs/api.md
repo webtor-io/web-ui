@@ -248,7 +248,10 @@ filter.
 
 ## Dedicated hostname
 
-`API_DOMAIN=api.webtor.io` serves the API at that host's root.
+`API_DOMAIN=<host>` serves the API at that host's root. **`api.webtor.io` itself
+is NOT available** — it has routed torrent-http-proxy's streaming traffic since
+2022 (a 2026-08-08 attempt to claim it collided with that ingress and was
+reverted); pick a fresh hostname when enabling this.
 `libapi.RegisterHostMiddleware` rewrites those requests onto `/api` and
 re-dispatches, so:
 
