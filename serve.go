@@ -200,8 +200,10 @@ func serve(c *cli.Context) error {
 	servers = append(servers, web)
 	defer web.Close()
 
-	// Setting i18n handler (HTTP middleware + Gin middleware)
-	hi18n.RegisterHandler(r, web, i18nSvc)
+	// Setting i18n handler (HTTP middleware + Gin middleware). The dedicated
+	// API hosts bypass language routing entirely — a lang cookie must never
+	// 302 api.<domain>/v1/... onto a /ru/ URL.
+	hi18n.RegisterHandler(r, web, i18nSvc, apiHosts)
 
 	// Setting S3 host routing — before the session middleware, whose CSRF
 	// exemption is keyed on the /s3 prefix this rewrite produces.

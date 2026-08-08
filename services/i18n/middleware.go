@@ -23,92 +23,167 @@ const (
 //     /{cookie}/path so external entry points (OAuth callbacks, bookmarks,
 //     shared links) honour the user's language preference
 //  6. No prefix + cookie has default language → serve English
-func HTTPMiddleware(next http.Handler) http.Handler {
+//
+// skipHosts are hostnames whose requests bypass language routing entirely —
+// the dedicated API hosts (api.webtor.io), where a language cookie must never
+// 302 a docs page or an API call onto a /ru/ URL.
+func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 	supported := make(map[string]bool, len(SupportedLangs))
 	for _, l := range SupportedLangs {
 		supported[l] = true
 	}
+	skip := make(map[string]bool, len(skipHosts))
+	for _, h := range skipHosts {
+		skip[strings.ToLower(h)] = true
+	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		// Static and API paths are never language-prefixed.
-		if strings.HasPrefix(path, "/assets/") ||
-			strings.HasPrefix(path, "/api/") ||
-			strings.HasPrefix(path, "/pub/") ||
-			strings.HasPrefix(path, "/s/") ||
-			strings.HasPrefix(path, "/token/") ||
-			strings.HasPrefix(path, "/embed/") ||
-			strings.HasPrefix(path, "/stremio/") ||
-			strings.HasPrefix(path, "/user-subtitle/file/") ||
-			strings.HasPrefix(path, "/lib/poster/") ||
-			strings.HasPrefix(path, "/lib/movie/poster/") ||
-			strings.HasPrefix(path, "/lib/series/poster/") ||
-			strings.HasPrefix(path, "/lib/episode/still/") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Only GET/HEAD go through language redirects. POST/PUT/DELETE/PATCH
-		// targets are state-mutating endpoints (form actions like /lib/add)
-		// where a 302 would drop the request body in most browsers. They
-		// still get prefix-stripping so handlers see the same URL shape.
-		isSafe := r.Method == http.MethodGet || r.Method == http.MethodHead
-
-		// ?lang=X — explicit switch from the language dropdown (step 1).
-		// The switcher renders as <a>, so only GET requests reach this
-		// branch in practice. Set the cookie and redirect to the canonical
-		// URL for that language with the query stripped. The follow-up
-		// request goes through the normal prefix / no-prefix branches below.
-		if reqLang := r.URL.Query().Get("lang"); reqLang != "" && isSafe {
-			if supported[reqLang] {
-				http.SetCookie(w, &http.Cookie{
-					Name:     langCookie,
-					Value:    reqLang,
-					Path:     "/",
-					MaxAge:   365 * 24 * 3600,
-					SameSite: http.SameSiteLaxMode,
-				})
-				q := r.URL.Query()
-				q.Del("lang")
-				// Build the canonical path for the requested language:
-				// strip any existing language prefix, then re-add if needed.
-				basePath := path
-				if len(basePath) >= 3 && basePath[0] == '/' {
-					seg := basePath[1:3]
-					if supported[seg] && (len(basePath) == 3 || basePath[3] == '/') {
-						basePath = basePath[3:]
-						if basePath == "" {
-							basePath = "/"
-						}
-					}
-				}
-				target := basePath
-				if reqLang != DefaultLang {
-					if basePath == "/" {
-						target = "/" + reqLang + "/"
-					} else {
-						target = "/" + reqLang + basePath
-					}
-				}
-				if encoded := q.Encode(); encoded != "" {
-					target += "?" + encoded
-				}
-				http.Redirect(w, r, target, http.StatusFound)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if skip[requestHost(r)] {
+				next.ServeHTTP(w, r)
 				return
 			}
-		}
+			path := r.URL.Path
 
-		// Try to extract a two-letter language code from the first path segment.
-		if len(path) >= 3 && path[0] == '/' {
-			seg := path[1:3]
-			rest := path[3:]
+			// Static and API paths are never language-prefixed.
+			if strings.HasPrefix(path, "/assets/") ||
+				strings.HasPrefix(path, "/api/") ||
+				strings.HasPrefix(path, "/api-credentials/") ||
+				strings.HasPrefix(path, "/pub/") ||
+				strings.HasPrefix(path, "/s/") ||
+				strings.HasPrefix(path, "/token/") ||
+				strings.HasPrefix(path, "/embed/") ||
+				strings.HasPrefix(path, "/stremio/") ||
+				strings.HasPrefix(path, "/user-subtitle/file/") ||
+				strings.HasPrefix(path, "/lib/poster/") ||
+				strings.HasPrefix(path, "/lib/movie/poster/") ||
+				strings.HasPrefix(path, "/lib/series/poster/") ||
+				strings.HasPrefix(path, "/lib/episode/still/") {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-			if (rest == "" || rest[0] == '/') && supported[seg] {
-				// /en/* → redirect to /* (canonical English has no prefix).
-				// Also flip the cookie to English so the next bare-path
-				// visit doesn't auto-redirect back to the old preference.
-				if seg == DefaultLang {
+			// Only GET/HEAD go through language redirects. POST/PUT/DELETE/PATCH
+			// targets are state-mutating endpoints (form actions like /lib/add)
+			// where a 302 would drop the request body in most browsers. They
+			// still get prefix-stripping so handlers see the same URL shape.
+			isSafe := r.Method == http.MethodGet || r.Method == http.MethodHead
+
+			// ?lang=X — explicit switch from the language dropdown (step 1).
+			// The switcher renders as <a>, so only GET requests reach this
+			// branch in practice. Set the cookie and redirect to the canonical
+			// URL for that language with the query stripped. The follow-up
+			// request goes through the normal prefix / no-prefix branches below.
+			if reqLang := r.URL.Query().Get("lang"); reqLang != "" && isSafe {
+				if supported[reqLang] {
+					http.SetCookie(w, &http.Cookie{
+						Name:     langCookie,
+						Value:    reqLang,
+						Path:     "/",
+						MaxAge:   365 * 24 * 3600,
+						SameSite: http.SameSiteLaxMode,
+					})
+					q := r.URL.Query()
+					q.Del("lang")
+					// Build the canonical path for the requested language:
+					// strip any existing language prefix, then re-add if needed.
+					basePath := path
+					if len(basePath) >= 3 && basePath[0] == '/' {
+						seg := basePath[1:3]
+						if supported[seg] && (len(basePath) == 3 || basePath[3] == '/') {
+							basePath = basePath[3:]
+							if basePath == "" {
+								basePath = "/"
+							}
+						}
+					}
+					target := basePath
+					if reqLang != DefaultLang {
+						if basePath == "/" {
+							target = "/" + reqLang + "/"
+						} else {
+							target = "/" + reqLang + basePath
+						}
+					}
+					if encoded := q.Encode(); encoded != "" {
+						target += "?" + encoded
+					}
+					http.Redirect(w, r, target, http.StatusFound)
+					return
+				}
+			}
+
+			// Try to extract a two-letter language code from the first path segment.
+			if len(path) >= 3 && path[0] == '/' {
+				seg := path[1:3]
+				rest := path[3:]
+
+				if (rest == "" || rest[0] == '/') && supported[seg] {
+					// /en/* → redirect to /* (canonical English has no prefix).
+					// Also flip the cookie to English so the next bare-path
+					// visit doesn't auto-redirect back to the old preference.
+					if seg == DefaultLang {
+						http.SetCookie(w, &http.Cookie{
+							Name:     langCookie,
+							Value:    DefaultLang,
+							Path:     "/",
+							MaxAge:   365 * 24 * 3600,
+							SameSite: http.SameSiteLaxMode,
+						})
+						target := rest
+						if target == "" {
+							target = "/"
+						}
+						if r.URL.RawQuery != "" {
+							target += "?" + r.URL.RawQuery
+						}
+						http.Redirect(w, r, target, http.StatusMovedPermanently)
+						return
+					}
+
+					// Remember language preference in cookie.
+					http.SetCookie(w, &http.Cookie{
+						Name:     langCookie,
+						Value:    seg,
+						Path:     "/",
+						MaxAge:   365 * 24 * 3600,
+						SameSite: http.SameSiteLaxMode,
+					})
+
+					// Strip the prefix and set the language header.
+					r.Header.Set(LangHeader, seg)
+					r.URL.Path = rest
+					if r.URL.Path == "" {
+						r.URL.Path = "/"
+					}
+					r.URL.RawPath = ""
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			// No language prefix.
+			cookie, err := r.Cookie(langCookie)
+			if err != nil {
+				// No cookie → first visit. Detect browser language.
+				if bl := detectBrowserLang(r); bl != "" && isSafe {
+					http.SetCookie(w, &http.Cookie{
+						Name:     langCookie,
+						Value:    bl,
+						Path:     "/",
+						MaxAge:   365 * 24 * 3600,
+						SameSite: http.SameSiteLaxMode,
+					})
+					target := "/" + bl + path
+					if r.URL.RawQuery != "" {
+						target += "?" + r.URL.RawQuery
+					}
+					http.Redirect(w, r, target, http.StatusFound)
+					return
+				}
+				// Browser prefers English (or non-safe method) → set cookie so
+				// we don't re-check on every request.
+				if isSafe {
 					http.SetCookie(w, &http.Cookie{
 						Name:     langCookie,
 						Value:    DefaultLang,
@@ -116,84 +191,35 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 						MaxAge:   365 * 24 * 3600,
 						SameSite: http.SameSiteLaxMode,
 					})
-					target := rest
-					if target == "" {
-						target = "/"
-					}
-					if r.URL.RawQuery != "" {
-						target += "?" + r.URL.RawQuery
-					}
-					http.Redirect(w, r, target, http.StatusMovedPermanently)
-					return
 				}
-
-				// Remember language preference in cookie.
-				http.SetCookie(w, &http.Cookie{
-					Name:     langCookie,
-					Value:    seg,
-					Path:     "/",
-					MaxAge:   365 * 24 * 3600,
-					SameSite: http.SameSiteLaxMode,
-				})
-
-				// Strip the prefix and set the language header.
-				r.Header.Set(LangHeader, seg)
-				r.URL.Path = rest
-				if r.URL.Path == "" {
-					r.URL.Path = "/"
-				}
-				r.URL.RawPath = ""
-				next.ServeHTTP(w, r)
-				return
-			}
-		}
-
-		// No language prefix.
-		cookie, err := r.Cookie(langCookie)
-		if err != nil {
-			// No cookie → first visit. Detect browser language.
-			if bl := detectBrowserLang(r); bl != "" && isSafe {
-				http.SetCookie(w, &http.Cookie{
-					Name:     langCookie,
-					Value:    bl,
-					Path:     "/",
-					MaxAge:   365 * 24 * 3600,
-					SameSite: http.SameSiteLaxMode,
-				})
-				target := "/" + bl + path
+			} else if cookie != nil && cookie.Value != DefaultLang && IsSupported(cookie.Value) && isSafe {
+				// Cookie indicates a non-default language preference. The user
+				// arrived at a bare path (external OAuth callback, bookmark,
+				// shared link) — honour their preference by redirecting to the
+				// prefixed URL. Explicit English switches come through the
+				// ?lang=en branch above and clear the cookie before reaching here.
+				target := "/" + cookie.Value + path
 				if r.URL.RawQuery != "" {
 					target += "?" + r.URL.RawQuery
 				}
 				http.Redirect(w, r, target, http.StatusFound)
 				return
 			}
-			// Browser prefers English (or non-safe method) → set cookie so
-			// we don't re-check on every request.
-			if isSafe {
-				http.SetCookie(w, &http.Cookie{
-					Name:     langCookie,
-					Value:    DefaultLang,
-					Path:     "/",
-					MaxAge:   365 * 24 * 3600,
-					SameSite: http.SameSiteLaxMode,
-				})
-			}
-		} else if cookie != nil && cookie.Value != DefaultLang && IsSupported(cookie.Value) && isSafe {
-			// Cookie indicates a non-default language preference. The user
-			// arrived at a bare path (external OAuth callback, bookmark,
-			// shared link) — honour their preference by redirecting to the
-			// prefixed URL. Explicit English switches come through the
-			// ?lang=en branch above and clear the cookie before reaching here.
-			target := "/" + cookie.Value + path
-			if r.URL.RawQuery != "" {
-				target += "?" + r.URL.RawQuery
-			}
-			http.Redirect(w, r, target, http.StatusFound)
-			return
-		}
 
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// requestHost normalizes the Host header to a bare lowercase hostname: a port
+// is present whenever the service is off 443, and matching would silently fail
+// without stripping it.
+func requestHost(r *http.Request) string {
+	h := r.Host
+	if i := strings.LastIndexByte(h, ':'); i >= 0 && strings.IndexByte(h[i:], ']') < 0 {
+		h = h[:i]
+	}
+	return strings.ToLower(h)
 }
 
 // detectBrowserLang returns the user's preferred supported non-English language
