@@ -21,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/libapi"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hako/durafmt"
@@ -157,6 +158,7 @@ type Helper struct {
 	ah             *AssetHashes
 	useAbuseStore  bool
 	useSuperTokens bool
+	apiDocsURL     string
 }
 
 func NewHelper(c *cli.Context) *Helper {
@@ -169,7 +171,17 @@ func NewHelper(c *cli.Context) *Helper {
 		domain:         c.String(common.DomainFlag),
 		ah:             NewAssetHashes(c.String(static.AssetsPathFlag)),
 		useSuperTokens: c.String(auth.SupertokensHostFlag) != "",
+		apiDocsURL:     libapi.PublicEndpoint(c) + "/docs/index.html",
 	}
+}
+
+// ApiDocsURL is where the Swagger reference lives for this deployment — the
+// dedicated api.<domain> host when one is configured, the mount path otherwise.
+// Same derivation the profile page uses; a hardcoded /api/v1/... link would be
+// wrong exactly when API_DOMAIN is set.
+// Template usage: {{ apiDocsURL }}
+func (s *Helper) ApiDocsURL() string {
+	return s.apiDocsURL
 }
 
 func (s *Helper) TimeBetween(from string, to string) bool {

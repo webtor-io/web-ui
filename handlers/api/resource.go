@@ -39,6 +39,7 @@ const maxResourceBody = 8 << 20
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse	"The torrent could not be fetched"
 //	@Failure		408			{object}	libapi.ErrorResponse	"A magnet took too long to resolve"
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource [post]
 func (s *Handler) postResource(c *gin.Context) {
 	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxResourceBody+1))
@@ -87,6 +88,7 @@ func (s *Handler) postResource(c *gin.Context) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id} [get]
 func (s *Handler) getResource(c *gin.Context) {
 	id := normalizeResourceID(c.Param("resource_id"))
@@ -143,6 +145,7 @@ func (s *Handler) getResourceTorrent(c *gin.Context, id string) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id}/list [get]
 func (s *Handler) listResource(c *gin.Context) {
 	args := &restapi.ListResourceContentArgs{
@@ -218,7 +221,8 @@ func (s *Handler) listResource(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			resource_id		path		string		true	"Infohash"		example(08ada5a7a6183aae1e09d831df6748d566095a10)
 //	@Param			content_id		path		string		true	"File id from /list, or its index"	example(ca2453df3e7691c28934eebed5a253ee0aabd29f)
-//	@Param			output			query		string		false	"Return only this export"			Enums(download, stream, torrent_client_stat, subtitles, media_probe)
+//	@Param			types			query		string		false	"Comma-separated list of exports to return; omitted means all. rest-api's parameter, same semantics: an export that does not apply is silently absent."	example(download,stream)
+//	@Param			output			query		string		false	"Return exactly this one export; 404 when the file does not have it. Mutually exclusive with types."	Enums(download, stream, torrent_client_stat, subtitles, media_probe)
 //	@Param			imdb-id			query		string		false	"IMDb id, used to match subtitles"
 //	@Param			archive-format	query		string		false	"Archive format for directory exports"	Enums(zip, tar)	default(zip)
 //	@Param			paths			query		[]string	false	"Limit a directory archive to these paths (repeatable)"
@@ -227,6 +231,7 @@ func (s *Handler) listResource(c *gin.Context) {
 //	@Failure		401				{object}	libapi.ErrorResponse
 //	@Failure		402				{object}	libapi.ErrorResponse
 //	@Failure		404				{object}	libapi.ErrorResponse
+//	@Failure		429				{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id}/export/{content_id} [get]
 func (s *Handler) exportResource(c *gin.Context) {
 	format := c.Query("archive-format")
@@ -234,6 +239,21 @@ func (s *Handler) exportResource(c *gin.Context) {
 	case "", "zip", "tar":
 	default:
 		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "archive-format must be zip or tar", nil))
+		return
+	}
+	// Two selection parameters, one honest and one historical. `types` is
+	// rest-api's own (CSV, absent exports silently omitted) and is what makes a
+	// client portable between the two hosts; `output` predates the alignment
+	// and stays because it answers a question `types` cannot — "give me exactly
+	// this one, error if it is not there". Accepting both at once would need a
+	// merged semantics neither contract defines.
+	wantedTypes, terr := parseExportTypes(c.Query("types"))
+	if terr != nil {
+		s.abort(c, terr)
+		return
+	}
+	if wantedTypes != nil && c.Query("output") != "" {
+		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "use either types or output, not both", nil))
 		return
 	}
 	res, err := s.api.ExportResourceContentWithArchiveFormat(
@@ -249,9 +269,18 @@ func (s *Handler) exportResource(c *gin.Context) {
 		s.abort(c, notFound("no such resource or file"))
 		return
 	}
-	// `output` filters the response here rather than upstream: the client we
-	// proxy through always asks for the full set, and every export it can
-	// return is already in hand by the time we get here.
+	// Both filters run here rather than upstream: the client we proxy through
+	// always asks for the full set, and every export it can return is already
+	// in hand by the time we get here.
+	if wantedTypes != nil {
+		filtered := make(map[string]ra.ExportItem, len(wantedTypes))
+		for k, v := range res.ExportItems {
+			if wantedTypes[k] {
+				filtered[k] = v
+			}
+		}
+		res = &ra.ExportResponse{Source: res.Source, ExportItems: filtered}
+	}
 	if out := c.Query("output"); out != "" {
 		item, ok := res.ExportItems[out]
 		if !ok {
@@ -261,6 +290,34 @@ func (s *Handler) exportResource(c *gin.Context) {
 		res = &ra.ExportResponse{Source: res.Source, ExportItems: map[string]ra.ExportItem{out: item}}
 	}
 	c.PureJSON(http.StatusOK, res)
+}
+
+// parseExportTypes parses rest-api's `types` CSV. nil means "not given" —
+// distinct from an empty selection, which cannot be expressed (upstream treats
+// an empty parameter as "all", and so does absence here). The valid set is
+// ra.ExportTypes itself, so a type added upstream is accepted here without a
+// change on this side.
+func parseExportTypes(param string) (map[string]bool, *libapi.Error) {
+	if param == "" {
+		return nil, nil
+	}
+	wanted := make(map[string]bool)
+	for _, k := range strings.Split(param, ",") {
+		kk := strings.TrimSpace(k)
+		valid := false
+		for _, t := range ra.ExportTypes {
+			if string(t) == kk {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest,
+				"unknown export type \""+kk+"\"", nil)
+		}
+		wanted[kk] = true
+	}
+	return wanted, nil
 }
 
 // upstreamError turns a rest-api client failure into an API error.

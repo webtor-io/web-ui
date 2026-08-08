@@ -11,9 +11,12 @@ import (
 	"github.com/webtor-io/web-ui/services/libapi"
 )
 
-//	@title			Webtor Account API
+//	@title			Webtor API
 //	@version		1.0
 //	@description	Programmatic access to Webtor resources, your library, your Vault and your account preferences.
+//	@description
+//	@description	**The API is in beta.** The endpoints below are stable in intent, but details may still change;
+//	@description	breaking changes will bump the version prefix, not silently change `/v1`.
 //	@description
 //	@description	## Two halves
 //	@description
@@ -41,8 +44,9 @@ import (
 //	@description
 //	@description	Every failure answers `{"error": {"code": "...", "message": "..."}}`. Branch on `code`, not on the
 //	@description	status: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free
-//	@description	plan), `not_found`, `conflict`, `bad_request`, `upstream_error` / `upstream_timeout` (the services
-//	@description	behind this one — often worth retrying), `unavailable`, `internal_error`.
+//	@description	plan), `not_found`, `conflict`, `bad_request`, `rate_limited` (too many requests with this key — the
+//	@description	`Retry-After` header says how many seconds to wait), `upstream_error` / `upstream_timeout` (the
+//	@description	services behind this one — often worth retrying), `unavailable`, `internal_error`.
 
 //	@securityDefinitions.apikey	BearerAuth
 //	@in							header
@@ -72,6 +76,27 @@ import (
 // request. That is what the named instance buys.
 const docsInstanceName = "libraryapi"
 
+// prefillJS is appended to Swagger UI's generated initializer. When the reader
+// has a session and an issued key, "Try it out" is preauthorized with it — no
+// copy-paste round-trip through the profile page. It fails closed: anonymous
+// readers, a lapsed session, the dedicated api host (no session cookie there,
+// and the host rewrite doesn't expose /api-credentials) and any fetch error all
+// just leave the Authorize dialog empty, exactly as before.
+//
+// "BearerAuth" must match the @securityDefinitions.apikey name above; the value
+// carries the "Bearer " prefix because the definition is a verbatim
+// Authorization header, not swagger's bearer scheme.
+const prefillJS = ";(function(){" +
+	"var prev=window.onload;" +
+	"window.onload=function(){" +
+	"if(prev)prev();" +
+	"fetch(" + `"` + CredentialsPath + `/key"` + ",{credentials:\"same-origin\"})" +
+	".then(function(r){return r.status===200?r.json():null})" +
+	".then(function(d){if(d&&d.key&&window.ui){window.ui.preauthorizeApiKey(\"BearerAuth\",\"Bearer \"+d.key);}})" +
+	".catch(function(){});" +
+	"};" +
+	"})();"
+
 // registerDocs publishes the reference and the raw spec.
 //
 // Both are public: an API reference you need a key to read is a reference
@@ -93,8 +118,27 @@ func registerDocs(r *gin.Engine, mountPath string, endpoint string) {
 	r.GET(specPath, func(c *gin.Context) {
 		c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(docs.SwaggerInfolibraryapi.ReadDoc()))
 	})
-	r.GET(mountPath+"/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
-		ginSwagger.URL(specPath), ginSwagger.InstanceName(docsInstanceName)))
+	docsHandler := ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.URL(specPath), ginSwagger.InstanceName(docsInstanceName))
+	r.GET(mountPath+"/docs/*any", func(c *gin.Context) {
+		// ginSwagger matches the asset name against RequestURI, but the webdav
+		// handler behind it strips URL.Path — and the prefix it strips is
+		// frozen from the FIRST matched request (once.Do on the package-global
+		// swaggerFiles.Handler). Any middleware that rewrites URL.Path while
+		// leaving RequestURI intact (i18n lang prefix, the api-host rewrite)
+		// makes the two disagree: assets 404 and the frozen prefix stays
+		// poisoned until restart. Aligning RequestURI keeps them agreed; the
+		// query string it drops is not used by anything downstream here.
+		c.Request.RequestURI = c.Request.URL.Path
+		docsHandler(c)
+		// The initializer is templated by ginSwagger with no extension hook,
+		// so the prefill rides on the end of its body. Appending works because
+		// the template streams (no Content-Length); the status guard keeps the
+		// snippet off 404 bodies.
+		if strings.HasSuffix(c.Request.URL.Path, "/swagger-initializer.js") && c.Writer.Status() == http.StatusOK {
+			_, _ = c.Writer.WriteString(prefillJS)
+		}
+	})
 }
 
 // splitEndpoint cuts "https://api.example.com/v1" into host and base path.

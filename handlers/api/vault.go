@@ -27,6 +27,7 @@ import (
 //	@Failure		401	{object}	libapi.ErrorResponse
 //	@Failure		402	{object}	libapi.ErrorResponse
 //	@Failure		503	{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
+//	@Failure		429	{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/vault [get]
 func (s *Handler) getVault(c *gin.Context) {
 	if err := s.requireVault(); err != nil {
@@ -62,6 +63,7 @@ func (s *Handler) getVault(c *gin.Context) {
 //	@Failure		403		{object}	libapi.ErrorResponse	"Not enough Vault Points"
 //	@Failure		409		{object}	libapi.ErrorResponse	"A pledge for this resource already exists"
 //	@Failure		503		{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
+//	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/vault/pledges [post]
 func (s *Handler) postVaultPledge(c *gin.Context) {
 	if err := s.requireVault(); err != nil {
@@ -83,6 +85,86 @@ func (s *Handler) postVaultPledge(c *gin.Context) {
 	c.JSON(http.StatusCreated, p)
 }
 
+// getVaultPledge godoc
+//
+//	@Summary		Pledge transfer status
+//	@Description	One pledge, plus where its transfer stands. Between "pledged" and "vaulted" this is the only place
+//	@Description	an API client can watch: `status` walks `waiting` → `queued` → `storing` → `vaulted`, with `progress`
+//	@Description	(percent) and `stored_size` / `total_size` (bytes) while a transfer is measurable.
+//	@Description
+//	@Description	`failed` means the last attempt failed and storage will retry on its own schedule — keep polling,
+//	@Description	do not re-pledge. `expired` means the resource lost its funding. Poll politely: progress moves on the
+//	@Description	order of tens of seconds, so once per 10–30 seconds is as fresh as it gets.
+//	@Tags			vault
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			resource_id	path		string	true	"Resource (infohash) the pledge is held against"	example(08ada5a7a6183aae1e09d831df6748d566095a10)
+//	@Success		200			{object}	libapi.PledgeStatusResponse
+//	@Failure		401			{object}	libapi.ErrorResponse
+//	@Failure		402			{object}	libapi.ErrorResponse
+//	@Failure		404			{object}	libapi.ErrorResponse	"No pledge for this resource"
+//	@Failure		502			{object}	libapi.ErrorResponse	"The storage backend did not answer"
+//	@Failure		503			{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
+//	@Router			/vault/pledges/{resource_id} [get]
+func (s *Handler) getVaultPledge(c *gin.Context) {
+	if err := s.requireVault(); err != nil {
+		s.abort(c, err)
+		return
+	}
+	u := auth.GetUserFromContext(c)
+	st, err := s.pledgeStatus(c.Request.Context(), normalizeResourceID(c.Param("resource_id")), u)
+	if err != nil {
+		s.abort(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
+// pledgeStatus loads the pledge and resolves its transfer status. The lookup
+// sequence mirrors removePledge; the storage API is asked only when a transfer
+// can actually be running (funded, not vaulted, not expired), so the settled
+// cases cost one DB read.
+//
+// A "no such resource" and "someone else's pledge" both answer the same 404 —
+// same reasoning as the library: answering differently would confirm that
+// another account holds a given infohash.
+func (s *Handler) pledgeStatus(ctx context.Context, resourceID string, u *auth.User) (*libapi.PledgeStatusResponse, *libapi.Error) {
+	if resourceID == "" {
+		return nil, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "resource_id is required", nil)
+	}
+	res, err := s.vault.GetResource(ctx, resourceID)
+	if err != nil {
+		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to get the vault resource", err)
+	}
+	if res == nil {
+		return nil, libapi.NewError(http.StatusNotFound, libapi.CodeNotFound, "no pledge for this resource", nil)
+	}
+	p, err := s.vault.GetPledge(ctx, u, res)
+	if err != nil {
+		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to get the pledge", err)
+	}
+	if p == nil {
+		return nil, libapi.NewError(http.StatusNotFound, libapi.CodeNotFound, "no pledge for this resource", nil)
+	}
+	frozen, err := s.vault.IsPledgeFrozen(ctx, p)
+	if err != nil {
+		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to check the freeze status", err)
+	}
+	var apiRes *vault.Resource
+	if res.Funded && !res.Vaulted && !res.Expired {
+		// Deliberately an error, not a silent nil: nil reads as `queued`, and
+		// degrading a live `storing 45%` to `queued` on a backend hiccup would
+		// misreport state rather than admit the question went unanswered.
+		apiRes, err = s.vault.GetVaultAPIResource(ctx, resourceID)
+		if err != nil {
+			return nil, libapi.NewError(http.StatusBadGateway, libapi.CodeUpstream, "failed to get the transfer status", err)
+		}
+	}
+	out := libapi.NewPledgeStatus(libapi.NewPledge(p, res, frozen), res.Funded, apiRes)
+	return &out, nil
+}
+
 // deleteVaultPledge godoc
 //
 //	@Summary		Claim Vault Points back
@@ -98,6 +180,7 @@ func (s *Handler) postVaultPledge(c *gin.Context) {
 //	@Failure		404			{object}	libapi.ErrorResponse
 //	@Failure		409			{object}	libapi.ErrorResponse	"Pledge is frozen"
 //	@Failure		503			{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/vault/pledges/{resource_id} [delete]
 func (s *Handler) deleteVaultPledge(c *gin.Context) {
 	if err := s.requireVault(); err != nil {

@@ -22,6 +22,7 @@ import (
 //	@Success		200	{object}	libapi.ProfileResponse
 //	@Failure		401	{object}	libapi.ErrorResponse
 //	@Failure		402	{object}	libapi.ErrorResponse
+//	@Failure		429	{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/profile [get]
 func (s *Handler) getProfile(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
@@ -65,6 +66,7 @@ func (s *Handler) getProfile(c *gin.Context) {
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
 //	@Failure		403		{object}	libapi.ErrorResponse
+//	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/profile [patch]
 func (s *Handler) patchProfile(c *gin.Context) {
 	var req libapi.ProfileSettingsRequest

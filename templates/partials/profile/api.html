@@ -3,6 +3,7 @@
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
             {{ t $.Lang "profile.api.title" }}
+            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">Beta</span>
         </h2>
         {{ if .Claims | isPaid }}
             {{ if not .Data.API }}

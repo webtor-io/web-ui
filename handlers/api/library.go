@@ -37,6 +37,7 @@ import (
 //	@Failure		400		{object}	libapi.ErrorResponse
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
+//	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library [get]
 func (s *Handler) listLibrary(c *gin.Context) {
 	typ := c.DefaultQuery("type", libapi.LibraryTypeAll)
@@ -106,6 +107,7 @@ func (s *Handler) listLibrary(c *gin.Context) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library/{resource_id} [get]
 func (s *Handler) getLibraryItem(c *gin.Context) {
 	l, err := s.libraryItem(c)
@@ -136,6 +138,7 @@ func (s *Handler) getLibraryItem(c *gin.Context) {
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
 //	@Failure		404		{object}	libapi.ErrorResponse	"The resource is not in the store"
+//	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library [post]
 func (s *Handler) addLibrary(c *gin.Context) {
 	var req libapi.LibraryAddRequest
@@ -227,6 +230,7 @@ func (s *Handler) addLibrary(c *gin.Context) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library/{resource_id} [patch]
 func (s *Handler) renameLibrary(c *gin.Context) {
 	var req libapi.LibraryRenameRequest
@@ -273,6 +277,7 @@ func (s *Handler) renameLibrary(c *gin.Context) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library/{resource_id} [delete]
 func (s *Handler) deleteLibrary(c *gin.Context) {
 	if _, err := s.libraryItem(c); err != nil {

@@ -91,6 +91,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             },
@@ -158,6 +164,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -211,6 +223,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             },
@@ -256,6 +274,12 @@ const docTemplatelibraryapi = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -328,6 +352,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -362,6 +392,12 @@ const docTemplatelibraryapi = `{
                     },
                     "402": {
                         "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -426,6 +462,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -485,8 +527,20 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "The torrent could not be fetched",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "408": {
-                        "description": "Request Timeout",
+                        "description": "A magnet took too long to resolve",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -543,6 +597,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -580,6 +640,13 @@ const docTemplatelibraryapi = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "example": "download,stream",
+                        "description": "Comma-separated list of exports to return; omitted means all. rest-api's parameter, same semantics: an export that does not apply is silently absent.",
+                        "name": "types",
+                        "in": "query"
+                    },
+                    {
                         "enum": [
                             "download",
                             "stream",
@@ -588,7 +655,7 @@ const docTemplatelibraryapi = `{
                             "media_probe"
                         ],
                         "type": "string",
-                        "description": "Return only this export",
+                        "description": "Return exactly this one export; 404 when the file does not have it. Mutually exclusive with types.",
                         "name": "output",
                         "in": "query"
                     },
@@ -647,6 +714,12 @@ const docTemplatelibraryapi = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -751,6 +824,12 @@ const docTemplatelibraryapi = `{
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -785,6 +864,12 @@ const docTemplatelibraryapi = `{
                     },
                     "402": {
                         "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -864,6 +949,12 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "503": {
                         "description": "Vault is not configured on this deployment",
                         "schema": {
@@ -874,6 +965,75 @@ const docTemplatelibraryapi = `{
             }
         },
         "/vault/pledges/{resource_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One pledge, plus where its transfer stands. Between \"pledged\" and \"vaulted\" this is the only place\nan API client can watch: ` + "`" + `status` + "`" + ` walks ` + "`" + `waiting` + "`" + ` → ` + "`" + `queued` + "`" + ` → ` + "`" + `storing` + "`" + ` → ` + "`" + `vaulted` + "`" + `, with ` + "`" + `progress` + "`" + `\n(percent) and ` + "`" + `stored_size` + "`" + ` / ` + "`" + `total_size` + "`" + ` (bytes) while a transfer is measurable.\n\n` + "`" + `failed` + "`" + ` means the last attempt failed and storage will retry on its own schedule — keep polling,\ndo not re-pledge. ` + "`" + `expired` + "`" + ` means the resource lost its funding. Poll politely: progress moves on the\norder of tens of seconds, so once per 10–30 seconds is as fresh as it gets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vault"
+                ],
+                "summary": "Pledge transfer status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "08ada5a7a6183aae1e09d831df6748d566095a10",
+                        "description": "Resource (infohash) the pledge is held against",
+                        "name": "resource_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.PledgeStatusResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "402": {
+                        "description": "Payment Required",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No pledge for this resource",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "The storage backend did not answer",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Vault is not configured on this deployment",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -921,6 +1081,12 @@ const docTemplatelibraryapi = `{
                     },
                     "409": {
                         "description": "Pledge is frozen",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -1099,6 +1265,83 @@ const docTemplatelibraryapi = `{
                 "resource_id": {
                     "type": "string",
                     "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                }
+            }
+        },
+        "libapi.PledgeStatusResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 2
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-01-02T15:04:05Z"
+                },
+                "expired": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "frozen": {
+                    "description": "Frozen means the points cannot be claimed back yet. It says nothing\nabout whether the content is stored — Vaulted does.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "funded": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "funded_vp": {
+                    "type": "number",
+                    "example": 2
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Sintel"
+                },
+                "pledge_id": {
+                    "type": "string",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                },
+                "progress": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 42.5
+                },
+                "required_vp": {
+                    "type": "number",
+                    "example": 2
+                },
+                "resource_id": {
+                    "type": "string",
+                    "example": "08ada5a7a6183aae1e09d831df6748d566095a10"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "waiting",
+                        "queued",
+                        "storing",
+                        "failed",
+                        "vaulted",
+                        "expired"
+                    ],
+                    "example": "storing"
+                },
+                "stored_size": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 1073741824
+                },
+                "total_size": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 2147483648
+                },
+                "vaulted": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -1543,8 +1786,8 @@ var SwaggerInfolibraryapi = &swag.Spec{
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Webtor Account API",
-	Description:      "Programmatic access to Webtor resources, your library, your Vault and your account preferences.\n\n## Two halves\n\n`/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same\nparameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your\naccount key instead of an API key + secret. Code written against rest-api works here unchanged.\n\n`/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same\none WebDAV and S3 serve, so a torrent added through this API shows up in a mounted drive\nimmediately — it is one library, not a copy.\n\nA typical flow: `POST /resource` with a magnet or `.torrent` → `POST /library` with the id it\nreturns → `GET /resource/{id}/list` to see the files → `GET /resource/{id}/export/{file}` for the\nstream and download URLs.\n\n## Authentication\n\nIssue a key on your profile page and send it as `Authorization: Bearer <key>` (or `X-Api-Key: <key>`\nwhere a proxy strips `Authorization`). Rotating the key on the profile page revokes the old one at\nonce.\n\nThe API is available on paid plans; a free account gets `402 payment_required`.\n\n## Errors\n\nEvery failure answers `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`. Branch on `code`, not on the\nstatus: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free\nplan), `not_found`, `conflict`, `bad_request`, `upstream_error` / `upstream_timeout` (the services\nbehind this one — often worth retrying), `unavailable`, `internal_error`.",
+	Title:            "Webtor API",
+	Description:      "Programmatic access to Webtor resources, your library, your Vault and your account preferences.\n\n**The API is in beta.** The endpoints below are stable in intent, but details may still change;\nbreaking changes will bump the version prefix, not silently change `/v1`.\n\n## Two halves\n\n`/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same\nparameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your\naccount key instead of an API key + secret. Code written against rest-api works here unchanged.\n\n`/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same\none WebDAV and S3 serve, so a torrent added through this API shows up in a mounted drive\nimmediately — it is one library, not a copy.\n\nA typical flow: `POST /resource` with a magnet or `.torrent` → `POST /library` with the id it\nreturns → `GET /resource/{id}/list` to see the files → `GET /resource/{id}/export/{file}` for the\nstream and download URLs.\n\n## Authentication\n\nIssue a key on your profile page and send it as `Authorization: Bearer <key>` (or `X-Api-Key: <key>`\nwhere a proxy strips `Authorization`). Rotating the key on the profile page revokes the old one at\nonce.\n\nThe API is available on paid plans; a free account gets `402 payment_required`.\n\n## Errors\n\nEvery failure answers `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`. Branch on `code`, not on the\nstatus: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free\nplan), `not_found`, `conflict`, `bad_request`, `rate_limited` (too many requests with this key — the\n`Retry-After` header says how many seconds to wait), `upstream_error` / `upstream_timeout` (the\nservices behind this one — often worth retrying), `unavailable`, `internal_error`.",
 	InfoInstanceName: "libraryapi",
 	SwaggerTemplate:  docTemplatelibraryapi,
 	LeftDelim:        "{{",

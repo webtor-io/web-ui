@@ -18,6 +18,9 @@ const (
 	CodeNotFound         = "not_found"
 	CodeConflict         = "conflict"
 	CodeMethodNotAllowed = "method_not_allowed"
+	// CodeRateLimited comes with a Retry-After header; the wait is short
+	// (seconds), so the right client reaction is to back off, not to fail over.
+	CodeRateLimited = "rate_limited"
 	CodeUnavailable      = "unavailable"
 	CodeInternal         = "internal_error"
 	// CodeUpstream / CodeUpstreamTimeout mark a failure that came from the

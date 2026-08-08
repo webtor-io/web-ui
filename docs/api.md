@@ -51,7 +51,7 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `GET` | `/resource/{id}` | `api:read` | Name, size, file count, magnet |
 | `GET` | `/resource/{id}.torrent` | `api:read` | The torrent file itself |
 | `GET` | `/resource/{id}/list` | `api:read` | Files and directories (`path`, `output`, `limit`, `offset`, `sort`) |
-| `GET` | `/resource/{id}/export/{content_id}` | `api:read` | Download / stream URLs (`output`, `archive-format`, `paths`, `imdb-id`) |
+| `GET` | `/resource/{id}/export/{content_id}` | `api:read` | Download / stream URLs (`types`, `output`, `archive-format`, `paths`, `imdb-id`) |
 | `GET` | `/library` | `api:read` | Your torrents (`type=all\|movies\|series`, `sort`, `limit`, `offset`) |
 | `POST` | `/library` | `api:write` | Add a stored resource to the library |
 | `GET` | `/library/{id}` | `api:read` | One entry; `404` = not in your library |
@@ -59,6 +59,7 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `DELETE` | `/library/{id}` | `api:write` | Remove from the library |
 | `GET` | `/vault` | `api:read` | Points, content counters, pledges |
 | `POST` | `/vault/pledges` | `api:write` | Pledge to a resource |
+| `GET` | `/vault/pledges/{id}` | `api:read` | One pledge, with transfer status and progress |
 | `DELETE` | `/vault/pledges/{id}` | `api:write` | Claim points back |
 | `GET` | `/profile` | `api:read` | User, tier, scopes, preferences |
 | `PATCH` | `/profile` | `api:write` | Partial preferences update |
@@ -125,6 +126,7 @@ the several reasons applies.
 | `not_found` | 404 | No such resource, file or library entry |
 | `conflict` | 409 | Pledge already exists, or is still frozen |
 | `bad_request` | 400 | Malformed body or query |
+| `rate_limited` | 429 | Too many requests with this key; `Retry-After` says how long to wait |
 | `upstream_error` | 502 | The services behind this one failed |
 | `upstream_timeout` | 408 / 504 | A magnet could not be resolved in time, or an upstream call ran out of time |
 | `unavailable` | 503 | Vault or the DB is not available on this deployment |
@@ -184,6 +186,56 @@ Membership is resolved with `models.GetLibraryByResourceID`, which returns nil
 for both "no such row" and "someone else's row". The API must not distinguish
 them: the difference is not the caller's business, and answering differently
 would confirm that another account holds a given infohash.
+
+## Vault pledge status
+
+Between "pledged" and "vaulted" the transfer is observable only through
+`GET /vault/pledges/{resource_id}`: `status` walks
+`waiting → queued → storing → vaulted`, with `progress` (percent) and
+`stored_size` / `total_size` (bytes) while a transfer is measurable. The
+vocabulary is deliberately finer than the UI's single "vaulting" badge — an
+API client can act on the difference between a stuck `queued` and a `failed`,
+a viewer cannot.
+
+Two statuses need their semantics spelled out. **`failed` is terminal for the
+attempt, not for the resource**: storage retries on its own schedule, so the
+right reaction is to keep polling, not to re-pledge (there is nothing to
+re-pledge — the pledge is fine). `expired` means the resource lost its
+funding. Progress advances on the order of tens of seconds on the storage
+side, so polling faster than every 10 seconds only reads the same numbers
+again.
+
+The status resolution is `libapi.NewPledgeStatus`, a pure function pinned by
+`services/libapi/vault_test.go` — including the lag case where storage reports
+finished before the completion event lands in our DB (that answers `vaulted`:
+report the truth, not the lag).
+
+## Export selection: `types` and `output`
+
+`types` is rest-api's parameter, honored here with its exact semantics: a CSV
+of export names, absent meaning all, an unknown name a `400`, and an export
+that does not apply to the file silently absent from the response. It is what
+makes an export call portable between the two hosts.
+
+`output` predates the alignment and stays because it answers a question
+`types` cannot: "give me exactly this one, and error if it is not there" —
+a missing export answers `404` instead of an empty map. The two are mutually
+exclusive (`400` when both are given): merging them would need a combined
+semantics neither contract defines.
+
+## Rate limiting
+
+Requests are limited per key — sustained `API_RATE_LIMIT` per second with an
+`API_RATE_BURST` burst (defaults 10 and 50; `0` disables). Past the burst the
+answer is `429` with code `rate_limited` and a `Retry-After` header, counted
+in seconds.
+
+This limits *requests to the API*; it is separate from the tier limits on the
+streaming chain, which meter traffic, not calls. The bucket lives in each
+replica's memory, so the effective ceiling is the configured number times the
+replica count — accepted: the limit exists to turn a runaway loop or a leaked
+key into `429`s, not to meter usage. Limiting happens by key string before the
+key is proven valid, so hammering with a wrong key is bounded the same way.
 
 ## Export URLs are short-lived
 
@@ -251,6 +303,32 @@ the documented `services.*` schemas are literally upstream's.
 > `ginSwagger.InstanceName` in `handlers/api/docs.go`, and the generated
 > `SwaggerInfolibraryapi` symbol.
 
+> **The UI route defends itself against path-rewriting middleware.** ginSwagger
+> matches asset names against `RequestURI`, but serves them through a
+> package-global webdav handler that strips `URL.Path` — with the strip-prefix
+> frozen from the *first* matched request. Any middleware that rewrites
+> `URL.Path` and leaves `RequestURI` intact (the i18n language prefix, the
+> api-host rewrite) made the two disagree: every UI asset answered 404 and the
+> reference rendered as a blank page until restart. `registerDocs` now aligns
+> `RequestURI` with `URL.Path` before delegating, and `/api/` is excluded from
+> language routing altogether (`services/i18n/middleware.go`) — API URLs are
+> never language-prefixed, same as `/assets/` or `/token/`. Regression tests:
+> `handlers/api/docs_test.go`.
+
+### Key prefill
+
+A logged-in reader gets "Try it out" preauthorized with their own key: a
+snippet appended to `swagger-initializer.js` (`prefillJS` in
+`handlers/api/docs.go`) fetches `GET /api-credentials/key` — session-only,
+`Cache-Control: no-store`, `{"key": "..."}` or `204` when no key is issued —
+and calls `ui.preauthorizeApiKey("BearerAuth", "Bearer <key>")`. The endpoint
+sits outside the `IsPaid` gate on purpose: the profile page shows an issued key
+to a lapsed account too, and the API itself still answers 402 to it. Everything
+fails closed to the pre-existing behaviour (empty Authorize dialog): anonymous
+readers get 401, the dedicated api host has neither the session cookie nor the
+`/api-credentials` route, and any fetch error is swallowed. No new exposure
+surface — the same session can already read the key off the profile page.
+
 `registerDocs` overwrites the spec's host and base path at startup from
 `libapi.PublicEndpoint`, so "Try it out" hits the origin this deployment
 actually serves — a dedicated host or `<domain>/api/v1`.
@@ -261,6 +339,8 @@ actually serves — a dedicated host or `<domain>/api/v1`.
 |------------|---------|-------------|
 | `--disable-api` / `DISABLE_API` | off | Skips route registration entirely; the profile hides the block |
 | `--api-domain` / `API_DOMAIN` | empty | Comma-separated hostnames serving the API at their root |
+| `--api-rate-limit` / `API_RATE_LIMIT` | 10 | Sustained requests per second allowed per key, per replica (0 disables) |
+| `--api-rate-burst` / `API_RATE_BURST` | 50 | Request burst allowed per key on top of the sustained rate |
 
 There is no new table and no new secret: the key is an `access_token` row, which
 the GDPR export already covers (`docs/data_export.md`).

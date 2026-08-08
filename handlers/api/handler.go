@@ -17,7 +17,9 @@
 package api
 
 import (
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -49,6 +51,7 @@ type Handler struct {
 	jobs         *j.Jobs
 	vault        *vault.Vault
 	userSettings *usettings.Service
+	limiter      *libapi.RateLimiter
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessToken, sapi *restapi.Api, jobs *j.Jobs, v *vault.Vault, us *usettings.Service) {
@@ -62,6 +65,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 		jobs:         jobs,
 		vault:        v,
 		userSettings: us,
+		limiter:      libapi.NewRateLimiter(c),
 	}
 
 	cr := r.Group(CredentialsPath)
@@ -69,6 +73,14 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 	cr.Use(claims.IsPaid)
 	cr.POST("/generate", h.generateCredentials)
 	cr.POST("/regenerate", h.regenerateCredentials)
+
+	// Deliberately outside the IsPaid gate: the profile page shows an issued
+	// key to a lapsed account too, and the Swagger prefill must not know more
+	// about plans than the page the key came from. The API itself still
+	// answers 402 to that key.
+	kr := r.Group(CredentialsPath)
+	kr.Use(auth.HasAuth)
+	kr.GET("/key", h.getCredentialsKey)
 
 	// Docs are public: the point of an API reference is that you can read it
 	// before you have a key.
@@ -95,6 +107,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 
 	gr.GET("/vault", h.getVault)
 	gr.POST("/vault/pledges", h.postVaultPledge)
+	gr.GET("/vault/pledges/:resource_id", h.getVaultPledge)
 	gr.DELETE("/vault/pledges/:resource_id", h.deleteVaultPledge)
 
 	gr.GET("/profile", h.getProfile)
@@ -121,6 +134,17 @@ func (s *Handler) authorize(c *gin.Context) {
 	if key != c.Query(co.AccessTokenParamName) {
 		s.abort(c, libapi.NewError(http.StatusUnauthorized, libapi.CodeUnauthorized, "invalid API key", nil))
 		return
+	}
+	// Limited by key string, before the key is proven valid: the bucket is the
+	// cost of answering at all, and a wrong key hammered in a loop costs the
+	// same lookups a right one does. A request with no key never gets here.
+	if s.limiter != nil {
+		if retryAfter, ok := s.limiter.Take(key); !ok {
+			c.Header("Retry-After", strconv.Itoa(int(math.Ceil(retryAfter.Seconds()))))
+			s.abort(c, libapi.NewError(http.StatusTooManyRequests, libapi.CodeRateLimited,
+				"too many requests with this key — wait and retry", nil))
+			return
+		}
 	}
 	u := auth.GetUserFromContext(c)
 	if u == nil || !u.HasAuth() {
@@ -156,6 +180,31 @@ func (s *Handler) generateCredentials(c *gin.Context) {
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, "toast.apiKeyGenerated")
+}
+
+// getCredentialsKey feeds the Swagger UI prefill (see prefillJS in docs.go):
+// the reference page asks for the session user's key and preauthorizes "Try it
+// out" with it. The docs stay public; only this call needs a session. The auth
+// check is repeated here rather than trusted to the middleware because the
+// response body is a secret — the one handler where a silently continued chain
+// must not be able to answer.
+func (s *Handler) getCredentialsKey(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	u := auth.GetUserFromContext(c)
+	if u == nil || !u.HasAuth() {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+	token, err := s.at.GetTokenByName(c, libapi.TokenName)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get api key"))
+		return
+	}
+	if token == nil {
+		c.Status(http.StatusNoContent)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"key": token.Token.String()})
 }
 
 // regenerateCredentials rotates the key. Destructive: every integration

@@ -68,3 +68,49 @@ func TestPageLimit(t *testing.T) {
 		t.Errorf("pageLimit(7) = %d, want 7", got)
 	}
 }
+
+// `types` is rest-api's parameter and must keep its semantics: CSV, trimmed,
+// unknown value rejected, absent meaning "all". The valid set comes from
+// ra.ExportTypes, so this also fails if upstream ever renames a type.
+func TestParseExportTypes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		param  string
+		want   []string
+		reject bool
+	}{
+		{name: "absent means all", param: "", want: nil},
+		{name: "single", param: "stream", want: []string{"stream"}},
+		{name: "csv with spaces", param: " download , stream ", want: []string{"download", "stream"}},
+		{name: "every documented type", param: "download,stream,torrent_client_stat,subtitles,media_probe",
+			want: []string{"download", "stream", "torrent_client_stat", "subtitles", "media_probe"}},
+		{name: "unknown type rejected", param: "stream,hls", reject: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseExportTypes(tc.param)
+			if tc.reject {
+				if err == nil || err.Code != libapi.CodeBadRequest {
+					t.Fatalf("want bad_request, got err=%v types=%v", err, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.want == nil {
+				if got != nil {
+					t.Fatalf("want nil (not given), got %v", got)
+				}
+				return
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for _, w := range tc.want {
+				if !got[w] {
+					t.Fatalf("missing %q in %v", w, got)
+				}
+			}
+		})
+	}
+}

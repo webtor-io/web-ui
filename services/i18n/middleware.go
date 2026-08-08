@@ -34,6 +34,7 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 
 		// Static and API paths are never language-prefixed.
 		if strings.HasPrefix(path, "/assets/") ||
+			strings.HasPrefix(path, "/api/") ||
 			strings.HasPrefix(path, "/pub/") ||
 			strings.HasPrefix(path, "/s/") ||
 			strings.HasPrefix(path, "/token/") ||

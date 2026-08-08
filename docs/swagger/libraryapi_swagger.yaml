@@ -123,6 +123,67 @@ definitions:
     required:
     - resource_id
     type: object
+  libapi.PledgeStatusResponse:
+    properties:
+      amount:
+        example: 2
+        type: number
+      created_at:
+        example: "2026-01-02T15:04:05Z"
+        type: string
+      expired:
+        example: false
+        type: boolean
+      frozen:
+        description: |-
+          Frozen means the points cannot be claimed back yet. It says nothing
+          about whether the content is stored — Vaulted does.
+        example: true
+        type: boolean
+      funded:
+        example: true
+        type: boolean
+      funded_vp:
+        example: 2
+        type: number
+      name:
+        example: Sintel
+        type: string
+      pledge_id:
+        example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        type: string
+      progress:
+        example: 42.5
+        type: number
+        x-nullable: true
+      required_vp:
+        example: 2
+        type: number
+      resource_id:
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        type: string
+      status:
+        enum:
+        - waiting
+        - queued
+        - storing
+        - failed
+        - vaulted
+        - expired
+        example: storing
+        type: string
+      stored_size:
+        example: 1073741824
+        type: integer
+        x-nullable: true
+      total_size:
+        example: 2147483648
+        type: integer
+        x-nullable: true
+      vaulted:
+        example: false
+        type: boolean
+    type: object
   libapi.ProfileResponse:
     properties:
       email:
@@ -418,6 +479,9 @@ info:
   description: |-
     Programmatic access to Webtor resources, your library, your Vault and your account preferences.
 
+    **The API is in beta.** The endpoints below are stable in intent, but details may still change;
+    breaking changes will bump the version prefix, not silently change `/v1`.
+
     ## Two halves
 
     `/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same
@@ -444,9 +508,10 @@ info:
 
     Every failure answers `{"error": {"code": "...", "message": "..."}}`. Branch on `code`, not on the
     status: `unauthorized` (no or bad key), `forbidden` (wrong scope or plan), `payment_required` (free
-    plan), `not_found`, `conflict`, `bad_request`, `upstream_error` / `upstream_timeout` (the services
-    behind this one — often worth retrying), `unavailable`, `internal_error`.
-  title: Webtor Account API
+    plan), `not_found`, `conflict`, `bad_request`, `rate_limited` (too many requests with this key — the
+    `Retry-After` header says how many seconds to wait), `upstream_error` / `upstream_timeout` (the
+    services behind this one — often worth retrying), `unavailable`, `internal_error`.
+  title: Webtor API
   version: "1.0"
 paths:
   /library:
@@ -502,6 +567,11 @@ paths:
           description: Payment Required
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List your library
@@ -551,6 +621,11 @@ paths:
           description: The resource is not in the store
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Add a torrent to your library
@@ -587,6 +662,11 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Remove a torrent from your library
@@ -620,6 +700,11 @@ paths:
             $ref: '#/definitions/libapi.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
       security:
@@ -669,6 +754,11 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Rename a library entry
@@ -692,6 +782,11 @@ paths:
             $ref: '#/definitions/libapi.ErrorResponse'
         "402":
           description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
       security:
@@ -739,6 +834,11 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update account preferences
@@ -784,8 +884,17 @@ paths:
           description: Payment Required
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: The torrent could not be fetched
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
         "408":
-          description: Request Timeout
+          description: A magnet took too long to resolve
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
       security:
@@ -827,6 +936,11 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a resource
@@ -858,7 +972,15 @@ paths:
         name: content_id
         required: true
         type: string
-      - description: Return only this export
+      - description: 'Comma-separated list of exports to return; omitted means all.
+          rest-api''s parameter, same semantics: an export that does not apply is
+          silently absent.'
+        example: download,stream
+        in: query
+        name: types
+        type: string
+      - description: Return exactly this one export; 404 when the file does not have
+          it. Mutually exclusive with types.
         enum:
         - download
         - stream
@@ -908,6 +1030,11 @@ paths:
             $ref: '#/definitions/libapi.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
       security:
@@ -983,6 +1110,11 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List resource contents
@@ -1009,6 +1141,11 @@ paths:
             $ref: '#/definitions/libapi.ErrorResponse'
         "402":
           description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "503":
@@ -1064,6 +1201,11 @@ paths:
           description: A pledge for this resource already exists
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
         "503":
           description: Vault is not configured on this deployment
           schema:
@@ -1105,6 +1247,11 @@ paths:
           description: Pledge is frozen
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
         "503":
           description: Vault is not configured on this deployment
           schema:
@@ -1112,6 +1259,59 @@ paths:
       security:
       - BearerAuth: []
       summary: Claim Vault Points back
+      tags:
+      - vault
+    get:
+      description: |-
+        One pledge, plus where its transfer stands. Between "pledged" and "vaulted" this is the only place
+        an API client can watch: `status` walks `waiting` → `queued` → `storing` → `vaulted`, with `progress`
+        (percent) and `stored_size` / `total_size` (bytes) while a transfer is measurable.
+
+        `failed` means the last attempt failed and storage will retry on its own schedule — keep polling,
+        do not re-pledge. `expired` means the resource lost its funding. Poll politely: progress moves on the
+        order of tens of seconds, so once per 10–30 seconds is as fresh as it gets.
+      parameters:
+      - description: Resource (infohash) the pledge is held against
+        example: 08ada5a7a6183aae1e09d831df6748d566095a10
+        in: path
+        name: resource_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.PledgeStatusResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "404":
+          description: No pledge for this resource
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "429":
+          description: Too many requests with this key — the `Retry-After` header
+            says how long to wait
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "502":
+          description: The storage backend did not answer
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "503":
+          description: Vault is not configured on this deployment
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Pledge transfer status
       tags:
       - vault
 securityDefinitions:

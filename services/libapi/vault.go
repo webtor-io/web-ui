@@ -4,6 +4,7 @@ import (
 	"time"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	vaultsvc "github.com/webtor-io/web-ui/services/vault"
 )
 
 // VaultPoints is the balance side of the Vault. Total and Available are
@@ -52,6 +53,91 @@ type VaultResponse struct {
 // PledgeRequest creates a pledge.
 type PledgeRequest struct {
 	ResourceID string `json:"resource_id" binding:"required" example:"08ada5a7a6183aae1e09d831df6748d566095a10"`
+}
+
+// Pledge transfer statuses. The vocabulary is the storage lifecycle, not the
+// UI's state machine: the UI collapses queued/storing/failed into one
+// "vaulting" badge because a viewer cannot act on the difference, but an API
+// client can — a stuck `queued` and a `failed` are debugged differently.
+const (
+	// PledgeStatusWaiting: the pledge exists but the resource is not funded
+	// yet, so no transfer has been asked for.
+	PledgeStatusWaiting = "waiting"
+	// PledgeStatusQueued: funded and handed to storage, transfer not started.
+	PledgeStatusQueued = "queued"
+	// PledgeStatusStoring: the transfer is running; progress applies.
+	PledgeStatusStoring = "storing"
+	// PledgeStatusFailed: the last transfer attempt failed. Terminal for the
+	// attempt, not for the resource — storage retries on its own schedule, so
+	// the right client reaction is to keep polling, not to re-pledge.
+	PledgeStatusFailed = "failed"
+	// PledgeStatusVaulted: the content is stored. Terminal.
+	PledgeStatusVaulted = "vaulted"
+	// PledgeStatusExpired: the resource lost its funding. Terminal.
+	PledgeStatusExpired = "expired"
+)
+
+// PledgeStatusResponse is a pledge plus where its transfer stands. Progress and
+// the sizes are pointers because absence is a real answer: a `waiting` or
+// `expired` pledge has no transfer to measure, and 0 would read as "started".
+type PledgeStatusResponse struct {
+	Pledge
+	Status     string   `json:"status" enums:"waiting,queued,storing,failed,vaulted,expired" example:"storing"`
+	Progress   *float64 `json:"progress,omitempty" extensions:"x-nullable" example:"42.5"`
+	StoredSize *int64   `json:"stored_size,omitempty" extensions:"x-nullable" example:"1073741824"`
+	TotalSize  *int64   `json:"total_size,omitempty" extensions:"x-nullable" example:"2147483648"`
+}
+
+// NewPledgeStatus resolves the transfer status from what the web-ui DB knows
+// (flattened into the Pledge) and what the storage API reports. Pure so the
+// mapping is testable without either backend.
+//
+// resourceFunded is the resource-level flag, deliberately not Pledge.Funded:
+// a resource funded by other accounts transfers all the same, and this
+// pledge's status must say so.
+//
+// apiResource may be nil in two honest cases — the transfer has not been
+// picked up yet, or this deployment runs without the storage API — and both
+// read as `queued`: funded, nothing measurable yet.
+func NewPledgeStatus(p Pledge, resourceFunded bool, apiResource *vaultsvc.Resource) PledgeStatusResponse {
+	out := PledgeStatusResponse{Pledge: p}
+	full := 100.0
+	switch {
+	case p.Expired:
+		out.Status = PledgeStatusExpired
+	case p.Vaulted:
+		out.Status = PledgeStatusVaulted
+	case !resourceFunded:
+		out.Status = PledgeStatusWaiting
+	case apiResource == nil:
+		out.Status = PledgeStatusQueued
+	default:
+		switch apiResource.Status {
+		case vaultsvc.StatusQueued:
+			out.Status = PledgeStatusQueued
+		case vaultsvc.StatusCompleted:
+			// Storage finished but the completion event has not reached the
+			// web-ui DB yet. Report the truth, not the lag.
+			out.Status = PledgeStatusVaulted
+		case vaultsvc.StatusFailed:
+			out.Status = PledgeStatusFailed
+		default:
+			// StatusProcessing, and any status newer than this code: a
+			// transfer state we cannot name is still a transfer in progress.
+			out.Status = PledgeStatusStoring
+		}
+		if apiResource.TotalSize > 0 {
+			progress := apiResource.GetProgress()
+			out.Progress = &progress
+			stored, total := apiResource.StoredSize, apiResource.TotalSize
+			out.StoredSize = &stored
+			out.TotalSize = &total
+		}
+	}
+	if out.Status == PledgeStatusVaulted {
+		out.Progress = &full
+	}
+	return out
 }
 
 // NewPledge flattens the pledge and its resource into the wire shape. The

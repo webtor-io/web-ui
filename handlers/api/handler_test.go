@@ -178,3 +178,47 @@ func TestDocsServeTheSpec(t *testing.T) {
 		t.Errorf("docs status = %d, want 200", w.Code)
 	}
 }
+
+// Past the burst the answer must be a 429 error document with Retry-After —
+// and scoped to the offending key: one abusive integration must not starve
+// the rest.
+func TestAuthorizeRateLimitsPerKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	libapi.RegisterAPIKeyMiddleware(r, libapi.MountPath)
+	r.Use(func(c *gin.Context) {
+		ctx := c.Request.Context()
+		ctx = context.WithValue(ctx, auth.UserContext{}, &models.User{UserID: uuid.NewV4(), Email: "u@example.com"})
+		ctx = context.WithValue(ctx, at.TokenScope{}, []string{libapi.ScopeRead})
+		ctx = context.WithValue(ctx, claims.Context{}, &claims.Data{
+			Context: &proto.Context{Tier: &proto.Tier{Id: 1, Name: "test"}},
+		})
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	h := &Handler{limiter: libapi.NewRateLimiterWith(1, 2)}
+	gr := r.Group(libapi.MountPath)
+	gr.Use(h.authorize)
+	gr.GET("/library", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for i := 0; i < 2; i++ {
+		if w := do(r, http.MethodGet, libapi.MountPath+"/library", testKey); w.Code != http.StatusOK {
+			t.Fatalf("request %d within burst: status = %d (%s)", i+1, w.Code, w.Body.String())
+		}
+	}
+	w := do(r, http.MethodGet, libapi.MountPath+"/library", testKey)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429 (%s)", w.Code, w.Body.String())
+	}
+	if code := errCode(t, w); code != libapi.CodeRateLimited {
+		t.Errorf("code = %q, want %q", code, libapi.CodeRateLimited)
+	}
+	if w.Header().Get("Retry-After") == "" {
+		t.Error("Retry-After header is missing")
+	}
+
+	otherKey := "11111111-2222-3333-4444-555555555555"
+	if w := do(r, http.MethodGet, libapi.MountPath+"/library", otherKey); w.Code != http.StatusOK {
+		t.Errorf("another key hit the spent bucket: status = %d (%s)", w.Code, w.Body.String())
+	}
+}
