@@ -73,7 +73,7 @@ require (
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
-	github.com/anacrolix/generics v0.2.0 // indirect
+	github.com/anacrolix/generics v0.2.0
 	github.com/anacrolix/missinggo v1.3.0 // indirect
 	github.com/anacrolix/missinggo/v2 v2.10.0 // indirect
 	github.com/anacrolix/torrent v1.60.1-0.20251217073903-486bcbe758e0

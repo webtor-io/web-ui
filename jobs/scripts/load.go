@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/anacrolix/torrent/metainfo"
@@ -76,14 +75,11 @@ func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (re
 
 func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (res *ra.ResourceResponse, err error) {
 	j.InProgress(s.t("job.checkingMagnet"))
-	sha1Hash := common.SHA1R.Find([]byte(query))
-	if sha1Hash == nil {
+	hash, magnet, err := common.ResolveQueryHash(query)
+	if err != nil {
 		return nil, errors.Wrap(err, "wrong resource provided")
 	}
-	hash := strings.ToLower(string(sha1Hash))
-	if !strings.HasPrefix(query, "magnet:") {
-		query = "magnet:?xt=urn:btih:" + hash
-	}
+	query = magnet
 	apiCtx, apiCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer apiCancel()
 	res, err = s.api.GetResource(apiCtx, s.c.ApiClaims, hash)
@@ -109,11 +105,10 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 
 func Load(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *LoadArgs) (r job.Runnable, hash string, err error) {
 	if args.Query != "" {
-		sha1Hash := common.SHA1R.Find([]byte(args.Query))
-		if sha1Hash == nil {
-			return nil, "", errors.Errorf("wrong resource provided query=%v", args.Query)
+		hash, _, err = common.ResolveQueryHash(args.Query)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "wrong resource provided query=%v", args.Query)
 		}
-		hash = strings.ToLower(string(sha1Hash))
 	} else if args.File != nil {
 		b := io.NopCloser(bytes.NewReader(args.File))
 		mi, err := metainfo.Load(b)

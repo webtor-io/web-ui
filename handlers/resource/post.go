@@ -36,9 +36,8 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 		query = strings.TrimPrefix(c.Request.URL.Path, "/") + c.Request.URL.RawQuery
 	}
 	if query != "" {
-		sha1 := sv.SHA1R.Find([]byte(query))
-		if sha1 == nil {
-			return &PostArgs{Query: query}, errors.Errorf("wrong resource provided query=%v", query)
+		if _, _, err := sv.ResolveQueryHash(query); err != nil {
+			return &PostArgs{Query: query}, errors.Wrapf(err, "wrong resource provided query=%v", query)
 		}
 	}
 

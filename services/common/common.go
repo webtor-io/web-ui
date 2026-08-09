@@ -5,10 +5,46 @@ import (
 	"regexp"
 	"strings"
 
+	g "github.com/anacrolix/generics"
+	"github.com/anacrolix/torrent/metainfo"
+	infohash_v2 "github.com/anacrolix/torrent/types/infohash-v2"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
 var SHA1R = regexp.MustCompile("(?i)[0-9a-f]{5,40}")
+
+// ResolveQueryHash resolves a user query (magnet URI, bare infohash or text
+// containing one) to a lowercase v1 infohash plus a magnet URI safe to pass
+// downstream. Hybrid magnets may list urn:btmh before urn:btih, and both
+// SHA1R first-match extraction and magnet2torrent's parser take the first xt,
+// so the magnet is rebuilt with the v1 hash only.
+func ResolveQueryHash(query string) (hash string, magnet string, err error) {
+	if strings.HasPrefix(query, "magnet:") {
+		// The /magnet route reassembles the URI as path + RawQuery, losing "?"
+		if !strings.HasPrefix(query, "magnet:?") {
+			query = "magnet:?" + strings.TrimPrefix(query, "magnet:")
+		}
+		m, err := metainfo.ParseMagnetV2Uri(query)
+		if err != nil {
+			return "", "", errors.Wrap(err, "failed to parse magnet")
+		}
+		if !m.InfoHash.Ok {
+			if m.V2InfoHash.Ok {
+				return "", "", errors.New("v2-only (btmh) magnets are not supported, use a magnet with a btih infohash or upload the .torrent file")
+			}
+			return "", "", errors.New("no infohash found in magnet")
+		}
+		m.V2InfoHash = g.Option[infohash_v2.T]{}
+		return m.InfoHash.Value.HexString(), m.String(), nil
+	}
+	h := SHA1R.Find([]byte(query))
+	if h == nil {
+		return "", "", errors.New("no infohash found in query")
+	}
+	hash = strings.ToLower(string(h))
+	return hash, "magnet:?xt=urn:btih:" + hash, nil
+}
 
 var (
 	DomainFlag        = "domain"
