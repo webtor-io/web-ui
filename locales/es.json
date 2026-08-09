@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "¿Es seguro un cliente de torrent en la nube?",
     "tool.cloudTorrentClient.about.safety.text": "Más seguro que usar torrents localmente: no se instala nada, los demás pares ven los servidores de Webtor en lugar de tu dirección IP y todo te llega por HTTPS. Webtor solo procesa los torrents que tú añades: es un reproductor y descargador para tu propio contenido, no un catálogo.",
     "about.features.api.title": "API para desarrolladores",
-    "about.features.api.text": "Añade torrents, lista archivos y obtén enlaces de streaming desde tu propio código: tu biblioteca y tu Vault, controlados por una API REST."
+    "about.features.api.text": "Añade torrents, lista archivos y obtén enlaces de streaming desde tu propio código: tu biblioteca y tu Vault, controlados por una API REST.",
+    "device.title": "Conectar un dispositivo",
+    "device.subtitle": "Un dispositivo (una CLI, una app de TV) pidió acceso a tu cuenta de Webtor y te mostró un código corto.",
+    "device.codeLabel": "Introduce el código de tu dispositivo",
+    "device.continue": "Continuar",
+    "device.grantNote": "Al confirmar, el dispositivo recibe su propia clave de API con acceso completo a tus recursos, biblioteca, Vault y preferencias. Puedes revocarla en cualquier momento desde tu perfil.",
+    "device.confirm": "Conceder acceso",
+    "device.cancel": "Cancelar",
+    "device.doneTitle": "Dispositivo conectado",
+    "device.doneText": "Vuelve al dispositivo: recibirá su clave en unos segundos.",
+    "device.invalidText": "Este código no existe o ha caducado. Pide un código nuevo en el dispositivo e inténtalo de nuevo.",
+    "profile.devices.title": "Dispositivos conectados",
+    "profile.devices.hint": "Dispositivos autorizados mediante un código (CLI, apps de TV). Cada uno tiene su propia clave de API; revocar uno no afecta a los demás ni a tu clave principal.",
+    "profile.devices.revoke": "Revocar",
+    "toast.deviceRevoked": "Acceso del dispositivo revocado"
 }

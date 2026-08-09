@@ -53,6 +53,13 @@ type Handler struct {
 	vault        *vault.Vault
 	userSettings *usettings.Service
 	limiter      *libapi.RateLimiter
+	// domain is the site's public base URL; device verification URIs and the
+	// prefill key URL are built from it.
+	domain string
+	// deviceCodeLimiter bounds anonymous code creation per client IP;
+	// devicePollLimiter paces polling per device_code (the RFC's slow_down).
+	deviceCodeLimiter *libapi.RateLimiter
+	devicePollLimiter *libapi.RateLimiter
 	// keyOrigins are the dedicated API-host origins the key endpoint answers
 	// to with credentials — the Swagger page there runs cross-origin from the
 	// session cookie's host.
@@ -71,7 +78,12 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 		vault:        v,
 		userSettings: us,
 		limiter:      libapi.NewRateLimiter(c),
-		keyOrigins:   libapi.AllowedKeyOrigins(libapi.Hosts(c)),
+		domain:       strings.TrimSuffix(c.String(co.DomainFlag), "/"),
+		// A person confirms within minutes; three codes per minute per
+		// address with a small burst covers every legitimate retry.
+		deviceCodeLimiter: libapi.NewRateLimiterWith(0.05, 3),
+		devicePollLimiter: libapi.NewRateLimiterWith(libapi.DevicePollRPS, 1),
+		keyOrigins:        libapi.AllowedKeyOrigins(libapi.Hosts(c)),
 	}
 
 	// Browser callers (the reference's "Try it out") reach the API from
@@ -99,8 +111,8 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 	// dedicated api host a relative URL gets host-rewritten into /api/... and
 	// 404s. Locally (no domain configured) relative keeps it same-origin.
 	keyURL := CredentialsPath + "/key"
-	if domain := strings.TrimSuffix(c.String(co.DomainFlag), "/"); domain != "" {
-		keyURL = domain + keyURL
+	if h.domain != "" {
+		keyURL = h.domain + keyURL
 	}
 	registerDocs(r, libapi.MountPath, libapi.PublicEndpoint(c), keyURL)
 
@@ -130,6 +142,11 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 
 	gr.GET("/profile", h.getProfile)
 	gr.PATCH("/profile", h.patchProfile)
+
+	// Device authorization is how a machine obtains a key, so it cannot sit
+	// behind authorize; each endpoint carries its own limiter.
+	r.POST(libapi.MountPath+"/device/code", h.deviceCode)
+	r.POST(libapi.MountPath+"/device/token", h.deviceToken)
 }
 
 // authorize answers who is calling, in JSON.

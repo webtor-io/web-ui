@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Is een cloud torrent client veilig?",
     "tool.cloudTorrentClient.about.safety.text": "Veiliger dan lokaal torrenten: er wordt niets geïnstalleerd, andere peers zien de servers van Webtor in plaats van jouw IP-adres, en alles bereikt je via HTTPS. Webtor verwerkt alleen torrents die je zelf toevoegt — het is een speler en downloader voor je eigen content, geen catalogus.",
     "about.features.api.title": "Developer-API",
-    "about.features.api.text": "Voeg torrents toe, toon bestanden en haal streamlinks op vanuit je eigen code — je bibliotheek en Vault, aangestuurd via een REST API."
+    "about.features.api.text": "Voeg torrents toe, toon bestanden en haal streamlinks op vanuit je eigen code — je bibliotheek en Vault, aangestuurd via een REST API.",
+    "device.title": "Apparaat koppelen",
+    "device.subtitle": "Een apparaat (een CLI, een tv-app) vroeg toegang tot je Webtor-account en toonde je een korte code.",
+    "device.codeLabel": "Voer de code van je apparaat in",
+    "device.continue": "Doorgaan",
+    "device.grantNote": "Bij bevestiging krijgt het apparaat een eigen API-sleutel met volledige toegang tot je bronnen, bibliotheek, Vault en voorkeuren. Je kunt hem op elk moment intrekken op je profielpagina.",
+    "device.confirm": "Toegang verlenen",
+    "device.cancel": "Annuleren",
+    "device.doneTitle": "Apparaat gekoppeld",
+    "device.doneText": "Ga terug naar het apparaat — het ontvangt zijn sleutel binnen enkele seconden.",
+    "device.invalidText": "Deze code is onbekend of verlopen. Vraag op het apparaat een nieuwe code aan en probeer het opnieuw.",
+    "profile.devices.title": "Gekoppelde apparaten",
+    "profile.devices.hint": "Apparaten die via een code zijn aangemeld (CLI, tv-apps). Elk heeft een eigen API-sleutel; er één intrekken raakt de andere en je hoofdsleutel niet.",
+    "profile.devices.revoke": "Intrekken",
+    "toast.deviceRevoked": "Apparaattoegang ingetrokken"
 }

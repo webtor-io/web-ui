@@ -1,0 +1,26 @@
+{{ define "profile/devices" }}
+    {{ if .Data.Devices }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            {{ t $.Lang "profile.devices.title" }}
+            <span class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan text-[0.7rem] tracking-wide uppercase">Beta</span>
+        </h2>
+        <p class="text-sm text-w-sub leading-relaxed mb-4">{{ t $.Lang "profile.devices.hint" }}</p>
+        <div class="flex flex-col gap-2">
+            {{ range .Data.Devices }}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-w-line bg-base-300 px-4 py-3">
+                <div class="min-w-0">
+                    <div class="text-sm font-medium truncate">{{ .Name }}</div>
+                    <div class="text-xs text-w-muted">{{ .CreatedAt.Format "2006-01-02" }}</div>
+                </div>
+                <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/device/revoke" }}" data-async-target="#devices">
+                    <input type="hidden" name="name" value="{{ .FullName }}">
+                    <button type="submit" class="btn btn-ghost btn-sm" data-umami-event="device-revoke">{{ t $.Lang "profile.devices.revoke" }}</button>
+                </form>
+            </div>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+{{ end }}

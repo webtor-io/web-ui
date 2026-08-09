@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Ist ein Cloud-Torrent-Client sicher?",
     "tool.cloudTorrentClient.about.safety.text": "Sicherer als lokales Torrenting: Es wird nichts installiert, andere Peers sehen Webtors Server statt Ihrer IP-Adresse, und alles erreicht Sie per HTTPS. Webtor verarbeitet nur Torrents, die Sie selbst hinzufügen — ein Player und Downloader für Ihre eigenen Inhalte, kein Katalog.",
     "about.features.api.title": "Entwickler-API",
-    "about.features.api.text": "Fügen Sie Torrents hinzu, listen Sie Dateien auf und holen Sie Stream-Links aus Ihrem eigenen Code — Ihre Bibliothek und Ihr Vault, gesteuert über eine REST-API."
+    "about.features.api.text": "Fügen Sie Torrents hinzu, listen Sie Dateien auf und holen Sie Stream-Links aus Ihrem eigenen Code — Ihre Bibliothek und Ihr Vault, gesteuert über eine REST-API.",
+    "device.title": "Gerät verbinden",
+    "device.subtitle": "Ein Gerät (eine CLI, eine TV-App) hat Zugriff auf Ihr Webtor-Konto angefragt und Ihnen einen kurzen Code angezeigt.",
+    "device.codeLabel": "Geben Sie den Code vom Gerät ein",
+    "device.continue": "Weiter",
+    "device.grantNote": "Mit der Bestätigung erhält das Gerät einen eigenen API-Schlüssel mit vollem Zugriff auf Ressourcen, Bibliothek, Vault und Einstellungen. Sie können ihn jederzeit auf Ihrer Profilseite widerrufen.",
+    "device.confirm": "Zugriff gewähren",
+    "device.cancel": "Abbrechen",
+    "device.doneTitle": "Gerät verbunden",
+    "device.doneText": "Kehren Sie zum Gerät zurück — es erhält seinen Schlüssel innerhalb weniger Sekunden.",
+    "device.invalidText": "Dieser Code ist unbekannt oder abgelaufen. Fordern Sie am Gerät einen neuen Code an und versuchen Sie es erneut.",
+    "profile.devices.title": "Verbundene Geräte",
+    "profile.devices.hint": "Geräte, die per Code angemeldet wurden (CLI, TV-Apps). Jedes hat einen eigenen API-Schlüssel; ein Widerruf betrifft weder die anderen noch Ihren Hauptschlüssel.",
+    "profile.devices.revoke": "Widerrufen",
+    "toast.deviceRevoked": "Gerätezugriff widerrufen"
 }

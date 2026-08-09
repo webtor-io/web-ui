@@ -23,14 +23,19 @@ readers, CORS for browser callers and 429 documentation on every endpoint:
    rest-api's spec corrected to document it).
 3. **Per-key rate limit** — 429 + `Retry-After`, `rate_limited` error code.
 
+## Shipped (2026-08-09)
+
+**Device/PIN key issuance** — `POST /device/code` + `/device/token` (RFC 8628
+shaped), confirmation page at `/device`, per-device keys with revocation from
+the profile. See [api.md](api.md#device-authorization).
+
 ## Now (next up)
 
-### Device/PIN key issuance
+### Completion callbacks
 
-A device shows a short code, the user confirms it on the site, the device
-receives a key. The single feature every service with a real third-party
-ecosystem has; the profile-page copy-paste is the main thing standing between
-this API and TV/CLI clients.
+An optional `callback_url` on a pledge: one POST when the transfer finishes or
+fails, following the Standard Webhooks spec. The internal event already
+exists; this forwards it.
 
 ## Original "Now" notes (kept for context)
 
@@ -61,10 +66,6 @@ code.
 
 ## Later, roughly in order
 
-- **Completion callbacks.** An optional `callback_url` on a pledge (and later
-  on resource store): one POST when the transfer finishes or fails. The
-  internal event already exists; this forwards it. Follow the Standard
-  Webhooks spec (signature, event type, timestamp) rather than inventing one.
 - **Async magnet resolve.** `POST /resource` blocks up to 3 minutes while a
   magnet resolves against the network — longer than mobile OS and proxy
   timeouts. Add `202` + a status resource for the resolve job; keep the

@@ -1495,5 +1495,19 @@
     "tool.cloudTorrentClient.about.safety.text": "Safer than torrenting locally: nothing gets installed, other peers see Webtor's servers instead of your IP address, and everything reaches you over HTTPS. Webtor only processes torrents you add yourself — it is a player and downloader for your own content, not a content catalog.",
     "about.features.api.title": "Developer API",
     "about.features.api.text": "Add torrents, list files and get stream links from your own code — your library and Vault, driven over a REST API.",
-    "@about.features.api.text": "Home-page Developer API card. REST API, Vault stay untranslated. The card links to the Swagger reference."
+    "@about.features.api.text": "Home-page Developer API card. REST API, Vault stay untranslated. The card links to the Swagger reference.",
+    "device.title": "Connect a device",
+    "device.subtitle": "A device (a CLI, a TV app) asked for access to your Webtor account and showed you a short code.",
+    "device.codeLabel": "Enter the code from your device",
+    "device.continue": "Continue",
+    "device.grantNote": "Confirming gives this device its own API key with full access to your resources, library, Vault and preferences. You can revoke it on your profile page at any time.",
+    "device.confirm": "Grant access",
+    "device.cancel": "Cancel",
+    "device.doneTitle": "Device connected",
+    "device.doneText": "You can return to the device — it will pick up its key within a few seconds.",
+    "device.invalidText": "This code is unknown or has expired. Ask the device for a fresh one and try again.",
+    "profile.devices.title": "Connected devices",
+    "profile.devices.hint": "Devices you signed in through a code (CLI, TV apps). Each holds its own API key; revoking one does not affect the others or your main key.",
+    "profile.devices.revoke": "Revoke",
+    "toast.deviceRevoked": "Device access revoked"
 }

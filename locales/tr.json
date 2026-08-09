@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Bulut torrent istemcisi güvenli mi?",
     "tool.cloudTorrentClient.about.safety.text": "Yerel torrentten daha güvenli: hiçbir şey kurulmaz, diğer eşler IP adresin yerine Webtor'un sunucularını görür ve her şey sana HTTPS ile ulaşır. Webtor yalnızca senin eklediğin torrentleri işler — kendi içeriğin için bir oynatıcı ve indiricidir, katalog değildir.",
     "about.features.api.title": "Geliştirici API'si",
-    "about.features.api.text": "Kendi kodundan torrent ekle, dosyaları listele ve akış bağlantıları al — kütüphanen ve Vault'un, REST API ile yönetilir."
+    "about.features.api.text": "Kendi kodundan torrent ekle, dosyaları listele ve akış bağlantıları al — kütüphanen ve Vault'un, REST API ile yönetilir.",
+    "device.title": "Cihaz bağla",
+    "device.subtitle": "Bir cihaz (CLI, TV uygulaması) Webtor hesabına erişim istedi ve sana kısa bir kod gösterdi.",
+    "device.codeLabel": "Cihazdaki kodu gir",
+    "device.continue": "Devam et",
+    "device.grantNote": "Onayladığında cihaz; kaynaklarına, kütüphanene, Vault'una ve ayarlarına tam erişimi olan kendi API anahtarını alır. İstediğin zaman profil sayfandan iptal edebilirsin.",
+    "device.confirm": "Erişim ver",
+    "device.cancel": "İptal",
+    "device.doneTitle": "Cihaz bağlandı",
+    "device.doneText": "Cihaza dön — anahtarını birkaç saniye içinde alacak.",
+    "device.invalidText": "Bu kod bilinmiyor veya süresi dolmuş. Cihazdan yeni bir kod isteyip tekrar dene.",
+    "profile.devices.title": "Bağlı cihazlar",
+    "profile.devices.hint": "Kodla giriş yapılan cihazlar (CLI, TV uygulamaları). Her birinin kendi API anahtarı vardır; birini iptal etmek diğerlerini ve ana anahtarını etkilemez.",
+    "profile.devices.revoke": "İptal et",
+    "toast.deviceRevoked": "Cihaz erişimi iptal edildi"
 }

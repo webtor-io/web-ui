@@ -24,23 +24,27 @@ const SchemaVersion = 1
 
 // Export is the full per-user dump. Field tags drive the JSON output.
 type Export struct {
-	SchemaVersion     int                  `json:"schema_version"`
-	GeneratedAt       time.Time            `json:"generated_at"`
-	User              UserData             `json:"user"`
-	Library           []LibraryItem        `json:"library"`
-	WatchHistory      []WatchHistoryItem   `json:"watch_history"`
-	MovieStatuses     []MovieStatusItem    `json:"movie_statuses"`
-	SeriesStatuses    []SeriesStatusItem   `json:"series_statuses"`
-	EpisodeStatuses   []EpisodeStatusItem  `json:"episode_statuses"`
-	MovieWatchlist    []WatchlistItem      `json:"movie_watchlist"`
-	SeriesWatchlist   []WatchlistItem      `json:"series_watchlist"`
-	StremioAddonURLs  []StremioAddonItem   `json:"stremio_addon_urls"`
-	StremioSettings   *StremioSettings     `json:"stremio_settings,omitempty"`
-	EmbedDomains      []EmbedDomainItem    `json:"embed_domains"`
-	StreamingBackends []StreamingBackend   `json:"streaming_backends"`
-	UserSubtitles     []UserSubtitleItem   `json:"user_subtitles"`
-	AccessTokens      []AccessTokenItem    `json:"access_tokens"`
-	Vault             *VaultData           `json:"vault,omitempty"`
+	SchemaVersion     int                 `json:"schema_version"`
+	GeneratedAt       time.Time           `json:"generated_at"`
+	User              UserData            `json:"user"`
+	Library           []LibraryItem       `json:"library"`
+	WatchHistory      []WatchHistoryItem  `json:"watch_history"`
+	MovieStatuses     []MovieStatusItem   `json:"movie_statuses"`
+	SeriesStatuses    []SeriesStatusItem  `json:"series_statuses"`
+	EpisodeStatuses   []EpisodeStatusItem `json:"episode_statuses"`
+	MovieWatchlist    []WatchlistItem     `json:"movie_watchlist"`
+	SeriesWatchlist   []WatchlistItem     `json:"series_watchlist"`
+	StremioAddonURLs  []StremioAddonItem  `json:"stremio_addon_urls"`
+	StremioSettings   *StremioSettings    `json:"stremio_settings,omitempty"`
+	EmbedDomains      []EmbedDomainItem   `json:"embed_domains"`
+	StreamingBackends []StreamingBackend  `json:"streaming_backends"`
+	UserSubtitles     []UserSubtitleItem  `json:"user_subtitles"`
+	AccessTokens      []AccessTokenItem   `json:"access_tokens"`
+	// PendingDeviceAuth lists in-flight device authorizations. Rows live
+	// minutes (confirmed ones are deleted on the device's next poll), so the
+	// list is almost always empty — included because the table is user-keyed.
+	PendingDeviceAuth []DeviceAuthItem `json:"pending_device_auth"`
+	Vault             *VaultData       `json:"vault,omitempty"`
 }
 
 type UserData struct {
@@ -104,13 +108,13 @@ type EpisodeStatusItem struct {
 }
 
 type WatchlistItem struct {
-	VideoID   string `json:"video_id"`
-	Type      string `json:"type"`
-	Title     string `json:"title,omitempty"`
-	Year      *int16 `json:"year,omitempty"`
+	VideoID   string   `json:"video_id"`
+	Type      string   `json:"type"`
+	Title     string   `json:"title,omitempty"`
+	Year      *int16   `json:"year,omitempty"`
 	Rating    *float64 `json:"rating,omitempty"`
-	Source    string `json:"source,omitempty"`
-	CreatedAt int64  `json:"created_at_unix"`
+	Source    string   `json:"source,omitempty"`
+	CreatedAt int64    `json:"created_at_unix"`
 }
 
 type StremioAddonItem struct {
@@ -143,15 +147,15 @@ type EmbedDomainItem struct {
 // AccessToken is included because the user supplied it and can see it on
 // the profile page; the export is delivered over an authenticated session.
 type StreamingBackend struct {
-	Type        string                              `json:"type"`
-	AccessToken string                              `json:"access_token,omitempty"`
-	Config      models.StreamingBackendConfig       `json:"config,omitempty"`
-	Priority    int16                               `json:"priority"`
-	Enabled     bool                                `json:"enabled"`
-	LastStatus  *models.StreamingBackendStatus      `json:"last_status,omitempty"`
-	LastChecked *time.Time                          `json:"last_checked_at,omitempty"`
-	CreatedAt   time.Time                           `json:"created_at"`
-	UpdatedAt   time.Time                           `json:"updated_at"`
+	Type        string                         `json:"type"`
+	AccessToken string                         `json:"access_token,omitempty"`
+	Config      models.StreamingBackendConfig  `json:"config,omitempty"`
+	Priority    int16                          `json:"priority"`
+	Enabled     bool                           `json:"enabled"`
+	LastStatus  *models.StreamingBackendStatus `json:"last_status,omitempty"`
+	LastChecked *time.Time                     `json:"last_checked_at,omitempty"`
+	CreatedAt   time.Time                      `json:"created_at"`
+	UpdatedAt   time.Time                      `json:"updated_at"`
 }
 
 type UserSubtitleItem struct {
@@ -176,10 +180,20 @@ type AccessTokenItem struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
+// DeviceAuthItem is one in-flight device authorization (a confirmed code the
+// device has not picked up yet).
+type DeviceAuthItem struct {
+	UserCode   string    `json:"user_code"`
+	DeviceName string    `json:"device_name,omitempty"`
+	Status     string    `json:"status"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type VaultData struct {
-	Balance     *float64       `json:"balance,omitempty"`
-	UpdatedAt   *time.Time     `json:"updated_at,omitempty"`
-	Pledges     []VaultPledge  `json:"pledges"`
+	Balance      *float64      `json:"balance,omitempty"`
+	UpdatedAt    *time.Time    `json:"updated_at,omitempty"`
+	Pledges      []VaultPledge `json:"pledges"`
 	Transactions []VaultTxLog  `json:"transactions"`
 }
 
@@ -489,6 +503,21 @@ func (e *Export) fillSubtitlesAndTokens(ctx context.Context, db *pg.DB, uID uuid
 			Scope:     t.Scope,
 			ExpiresAt: t.ExpiresAt,
 			CreatedAt: t.CreatedAt,
+		})
+	}
+
+	das, err := models.ListUserDeviceAuth(ctx, db, uID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load device authorizations")
+	}
+	e.PendingDeviceAuth = make([]DeviceAuthItem, 0, len(das))
+	for _, d := range das {
+		e.PendingDeviceAuth = append(e.PendingDeviceAuth, DeviceAuthItem{
+			UserCode:   d.UserCode,
+			DeviceName: d.DeviceName,
+			Status:     d.Status,
+			ExpiresAt:  d.ExpiresAt,
+			CreatedAt:  d.CreatedAt,
 		})
 	}
 	return nil

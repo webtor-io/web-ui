@@ -63,6 +63,8 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `DELETE` | `/vault/pledges/{id}` | `api:write` | Claim points back |
 | `GET` | `/profile` | `api:read` | User, tier, scopes, preferences |
 | `PATCH` | `/profile` | `api:write` | Partial preferences update |
+| `POST` | `/device/code` | — | Start device authorization: `user_code` for the person, `device_code` for the machine |
+| `POST` | `/device/token` | — | Poll for the key; `authorization_pending` / `slow_down` / `expired_token` until confirmed |
 | `GET` | `/docs/index.html`, `/swagger.json` | — | Reference and spec (public) |
 
 The intended flow is `POST /resource` → `POST /library` → `/list` → `/export`.
@@ -75,6 +77,25 @@ take it out of the store.
 rest-api documents it and `RedirectTrailingSlash` is off globally.
 `GET /resource/{id}.torrent` is routed inside the `{id}` handler, the same trick
 rest-api uses.
+
+## Device authorization
+
+How a browserless client (CLI, TV app) obtains a key — RFC 8628 shaped.
+`POST /device/code` (public, per-IP limited) returns a secret `device_code`
+for the machine and a short `user_code` for the person, who confirms it at
+`/device` on the main site (session + paid plan, per-user attempt limit
+against code guessing). The machine polls `POST /device/token` at the
+advertised `interval`; polling faster answers `slow_down`, and the key is
+delivered **exactly once** — the parked row is deleted in the transaction
+that returns it.
+
+Every confirmation issues its own `access_token` row named
+`device:<label> · <user_code>`, so the profile's "Connected devices" section
+can revoke one device without touching the account's `api` key or the other
+devices (`POST /device/revoke`, prefix-guarded so it can never delete a
+non-device token). Pending authorizations live in `device_auth`
+(migration 63), minutes-lived, purged opportunistically on code creation and
+listed in the GDPR export like every user-keyed table.
 
 ## Authentication
 

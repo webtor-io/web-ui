@@ -21,8 +21,14 @@ const (
 	// CodeRateLimited comes with a Retry-After header; the wait is short
 	// (seconds), so the right client reaction is to back off, not to fail over.
 	CodeRateLimited = "rate_limited"
-	CodeUnavailable      = "unavailable"
-	CodeInternal         = "internal_error"
+	// Device-flow polling codes, named as RFC 8628 §3.5 names them so client
+	// libraries written against the RFC branch correctly. All answer 400,
+	// like the RFC's token endpoint.
+	CodeAuthorizationPending = "authorization_pending"
+	CodeSlowDown             = "slow_down"
+	CodeExpiredToken         = "expired_token"
+	CodeUnavailable          = "unavailable"
+	CodeInternal             = "internal_error"
 	// CodeUpstream / CodeUpstreamTimeout mark a failure that came from the
 	// services behind this one (rest-api, the torrent store, the BitTorrent
 	// network). They are kept apart from internal_error because they are often

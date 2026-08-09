@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Je cloudový torrent klient bezpečný?",
     "tool.cloudTorrentClient.about.safety.text": "Bezpečnější než torrentovat lokálně: nic se neinstaluje, ostatní peery vidí servery Webtoru místo tvé IP adresy a všechno k tobě jde přes HTTPS. Webtor zpracovává jen torrenty, které sám přidáš — je to přehrávač a stahovač tvého vlastního obsahu, ne katalog.",
     "about.features.api.title": "API pro vývojáře",
-    "about.features.api.text": "Přidávej torrenty, vypisuj soubory a získávej streamovací odkazy z vlastního kódu — tvoje knihovna a Vault ovládané přes REST API."
+    "about.features.api.text": "Přidávej torrenty, vypisuj soubory a získávej streamovací odkazy z vlastního kódu — tvoje knihovna a Vault ovládané přes REST API.",
+    "device.title": "Připojit zařízení",
+    "device.subtitle": "Zařízení (CLI, aplikace v TV) požádalo o přístup k tvému účtu Webtor a zobrazilo krátký kód.",
+    "device.codeLabel": "Zadej kód ze zařízení",
+    "device.continue": "Pokračovat",
+    "device.grantNote": "Potvrzením dostane zařízení vlastní API klíč s plným přístupem ke zdrojům, knihovně, Vaultu a nastavení. Kdykoli ho můžeš odvolat na stránce profilu.",
+    "device.confirm": "Povolit přístup",
+    "device.cancel": "Zrušit",
+    "device.doneTitle": "Zařízení připojeno",
+    "device.doneText": "Vrať se k zařízení — klíč obdrží během několika sekund.",
+    "device.invalidText": "Tento kód není známý nebo vypršel. Vyžádej si na zařízení nový kód a zkus to znovu.",
+    "profile.devices.title": "Připojená zařízení",
+    "profile.devices.hint": "Zařízení přihlášená kódem (CLI, aplikace v TV). Každé má vlastní API klíč; odvolání jednoho neovlivní ostatní ani tvůj hlavní klíč.",
+    "profile.devices.revoke": "Odvolat",
+    "toast.deviceRevoked": "Přístup zařízení odvolán"
 }

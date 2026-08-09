@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -63,6 +64,7 @@ type Data struct {
 	S3                    *S3Credentials
 	API                   *APICredentials
 	APIDocsURL            string
+	Devices               []DeviceItem
 	EmbedDomains          []models.EmbedDomain
 	AddonUrls             []models.StremioAddonUrl
 	StremioSettings       *models.StremioSettingsData
@@ -166,6 +168,42 @@ func (s *Handler) getS3Credentials(c *gin.Context) (*S3Credentials, error) {
 		SecretKey: s3.DeriveSecretKey(s.s3Secret, key),
 		Region:    s3.DefaultRegion,
 	}, nil
+}
+
+// DeviceItem is one row of the profile's connected-devices list: a per-device
+// API key issued through the device flow (/device).
+type DeviceItem struct {
+	// Name is the display label; FullName is the access_token row name the
+	// revoke form posts back.
+	Name      string
+	FullName  string
+	CreatedAt time.Time
+}
+
+// getDevices lists the device-flow keys. The account's own "api", WebDAV and
+// Stremio tokens are filtered out by prefix — they have their own sections.
+func (s *Handler) getDevices(c *gin.Context) ([]DeviceItem, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database is not available")
+	}
+	u := auth.GetUserFromContext(c)
+	tokens, err := models.ListUserAccessTokens(c.Request.Context(), db, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	var out []DeviceItem
+	for _, t := range tokens {
+		if !strings.HasPrefix(t.Name, libapi.DeviceTokenPrefix) {
+			continue
+		}
+		out = append(out, DeviceItem{
+			Name:      strings.TrimPrefix(t.Name, libapi.DeviceTokenPrefix),
+			FullName:  t.Name,
+			CreatedAt: t.CreatedAt,
+		})
+	}
+	return out, nil
 }
 
 // getAPICredentials returns the endpoint/key pair, or nil when the user has not
@@ -284,6 +322,12 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	devices, err := s.getDevices(c)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get devices"))
+		return
+	}
+
 	// Get user domains
 	db := s.pg.Get()
 	domains, err := models.GetUserDomains(c.Request.Context(), db, u.ID)
@@ -357,6 +401,7 @@ func (s *Handler) get(c *gin.Context) {
 		S3:                    s3Creds,
 		API:                   apiCreds,
 		APIDocsURL:            s.apiEndpoint + "/docs/index.html",
+		Devices:               devices,
 		EmbedDomains:          domains,
 		AddonUrls:             addonUrls,
 		StremioSettings:       ss,

@@ -7,6 +7,97 @@
         "version": "1.0"
     },
     "paths": {
+        "/device/code": {
+            "post": {
+                "description": "For devices without a browser (CLI, TV): returns a `user_code` for the person and a secret\n`device_code` for the machine. Show `user_code` and send the person to `verification_uri`\n(or render `verification_uri_complete` as a QR code / link), then poll `POST /device/token`\nevery `interval` seconds until the code expires or the key arrives.\n\nNo authentication — this is how a device obtains its key in the first place. The optional\n`name` labels the issued key in the profile's device list.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "device"
+                ],
+                "summary": "Start device authorization",
+                "parameters": [
+                    {
+                        "description": "Optional device label",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.DeviceCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.DeviceCodeResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes requested from this address",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/device/token": {
+            "post": {
+                "description": "Poll with the `device_code` every `interval` seconds. Branch on the error `code`:\n`authorization_pending` (keep polling), `slow_down` (add a few seconds to the interval),\n`expired_token` (the person did not confirm in time — start over with `POST /device/code`).\nOn success the response carries the key **exactly once**; store it, it is not retrievable again.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "device"
+                ],
+                "summary": "Poll for the device key",
+                "parameters": [
+                    {
+                        "description": "The device_code from /device/code",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/libapi.DeviceTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.DeviceTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "authorization_pending, slow_down or expired_token",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/library": {
             "get": {
                 "security": [
@@ -1094,6 +1185,67 @@
         }
     },
     "definitions": {
+        "libapi.DeviceCodeRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "Name labels the issued key in the profile's device list,\ne.g. \"webtor-cli @ macbook\". Optional.",
+                    "type": "string",
+                    "example": "webtor-cli @ macbook"
+                }
+            }
+        },
+        "libapi.DeviceCodeResponse": {
+            "type": "object",
+            "properties": {
+                "device_code": {
+                    "type": "string",
+                    "example": "6c0b8bad-4b41-4bcb-9d10-4c0a0a8e1e3f"
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 600
+                },
+                "interval": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "user_code": {
+                    "type": "string",
+                    "example": "F7KQ-29XD"
+                },
+                "verification_uri": {
+                    "type": "string",
+                    "example": "https://webtor.io/device"
+                },
+                "verification_uri_complete": {
+                    "type": "string",
+                    "example": "https://webtor.io/device?code=F7KQ-29XD"
+                }
+            }
+        },
+        "libapi.DeviceTokenRequest": {
+            "type": "object",
+            "required": [
+                "device_code"
+            ],
+            "properties": {
+                "device_code": {
+                    "type": "string",
+                    "example": "6c0b8bad-4b41-4bcb-9d10-4c0a0a8e1e3f"
+                }
+            }
+        },
+        "libapi.DeviceTokenResponse": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "Key is a per-device API key; send it as `Authorization: Bearer \u003ckey\u003e`.\nRevocable on the profile page without touching other devices.",
+                    "type": "string",
+                    "example": "99999999-8888-7777-6666-555555555555"
+                }
+            }
+        },
         "libapi.Error": {
             "type": "object",
             "properties": {

@@ -1,4 +1,51 @@
 definitions:
+  libapi.DeviceCodeRequest:
+    properties:
+      name:
+        description: |-
+          Name labels the issued key in the profile's device list,
+          e.g. "webtor-cli @ macbook". Optional.
+        example: webtor-cli @ macbook
+        type: string
+    type: object
+  libapi.DeviceCodeResponse:
+    properties:
+      device_code:
+        example: 6c0b8bad-4b41-4bcb-9d10-4c0a0a8e1e3f
+        type: string
+      expires_in:
+        example: 600
+        type: integer
+      interval:
+        example: 5
+        type: integer
+      user_code:
+        example: F7KQ-29XD
+        type: string
+      verification_uri:
+        example: https://webtor.io/device
+        type: string
+      verification_uri_complete:
+        example: https://webtor.io/device?code=F7KQ-29XD
+        type: string
+    type: object
+  libapi.DeviceTokenRequest:
+    properties:
+      device_code:
+        example: 6c0b8bad-4b41-4bcb-9d10-4c0a0a8e1e3f
+        type: string
+    required:
+    - device_code
+    type: object
+  libapi.DeviceTokenResponse:
+    properties:
+      key:
+        description: |-
+          Key is a per-device API key; send it as `Authorization: Bearer <key>`.
+          Revocable on the profile page without touching other devices.
+        example: 99999999-8888-7777-6666-555555555555
+        type: string
+    type: object
   libapi.Error:
     properties:
       code:
@@ -514,6 +561,76 @@ info:
   title: Webtor API
   version: "1.0"
 paths:
+  /device/code:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        For devices without a browser (CLI, TV): returns a `user_code` for the person and a secret
+        `device_code` for the machine. Show `user_code` and send the person to `verification_uri`
+        (or render `verification_uri_complete` as a QR code / link), then poll `POST /device/token`
+        every `interval` seconds until the code expires or the key arrives.
+
+        No authentication — this is how a device obtains its key in the first place. The optional
+        `name` labels the issued key in the profile's device list.
+      parameters:
+      - description: Optional device label
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/libapi.DeviceCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.DeviceCodeResponse'
+        "429":
+          description: Too many codes requested from this address
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      summary: Start device authorization
+      tags:
+      - device
+  /device/token:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Poll with the `device_code` every `interval` seconds. Branch on the error `code`:
+        `authorization_pending` (keep polling), `slow_down` (add a few seconds to the interval),
+        `expired_token` (the person did not confirm in time — start over with `POST /device/code`).
+        On success the response carries the key **exactly once**; store it, it is not retrievable again.
+      parameters:
+      - description: The device_code from /device/code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/libapi.DeviceTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/libapi.DeviceTokenResponse'
+        "400":
+          description: authorization_pending, slow_down or expired_token
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+      summary: Poll for the device key
+      tags:
+      - device
   /library:
     get:
       description: |-

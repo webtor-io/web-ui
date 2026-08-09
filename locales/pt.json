@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Um cliente de torrent na nuvem é seguro?",
     "tool.cloudTorrentClient.about.safety.text": "Mais seguro do que usar torrent localmente: nada é instalado, os outros peers veem os servidores do Webtor em vez do seu IP e tudo chega até você via HTTPS. O Webtor só processa os torrents que você mesmo adiciona — é um player e um baixador para o seu próprio conteúdo, não um catálogo.",
     "about.features.api.title": "API para desenvolvedores",
-    "about.features.api.text": "Adicione torrents, liste arquivos e obtenha links de streaming a partir do seu próprio código — sua biblioteca e seu Vault, controlados por uma API REST."
+    "about.features.api.text": "Adicione torrents, liste arquivos e obtenha links de streaming a partir do seu próprio código — sua biblioteca e seu Vault, controlados por uma API REST.",
+    "device.title": "Conectar um dispositivo",
+    "device.subtitle": "Um dispositivo (uma CLI, um app de TV) pediu acesso à sua conta Webtor e mostrou um código curto.",
+    "device.codeLabel": "Digite o código do seu dispositivo",
+    "device.continue": "Continuar",
+    "device.grantNote": "Ao confirmar, o dispositivo recebe sua própria chave de API com acesso completo aos seus recursos, biblioteca, Vault e preferências. Você pode revogá-la a qualquer momento na página do seu perfil.",
+    "device.confirm": "Conceder acesso",
+    "device.cancel": "Cancelar",
+    "device.doneTitle": "Dispositivo conectado",
+    "device.doneText": "Volte ao dispositivo — ele receberá a chave em alguns segundos.",
+    "device.invalidText": "Este código não existe ou expirou. Peça um novo código no dispositivo e tente novamente.",
+    "profile.devices.title": "Dispositivos conectados",
+    "profile.devices.hint": "Dispositivos autorizados por código (CLI, apps de TV). Cada um tem sua própria chave de API; revogar um não afeta os demais nem a sua chave principal.",
+    "profile.devices.revoke": "Revogar",
+    "toast.deviceRevoked": "Acesso do dispositivo revogado"
 }

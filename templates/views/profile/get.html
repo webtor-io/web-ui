@@ -65,6 +65,9 @@
     <div id="api" data-async-layout="{{`{{ template "profile/api" $ }}`}}">
         {{ template "profile/api" $ }}
     </div>
+    <div id="devices" data-async-layout="{{`{{ template "profile/devices" $ }}`}}">
+        {{ template "profile/devices" $ }}
+    </div>
     {{ end }}
     {{ if not .Data.DisableEmbed }}
     <div id="embed-domains" data-async-layout="{{`{{ template "profile/embed_domains" (withContext $ .Data) }}`}}">

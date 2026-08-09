@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Un client torrent cloud est-il sûr ?",
     "tool.cloudTorrentClient.about.safety.text": "Plus sûr que le torrent local : rien ne s'installe, les autres pairs voient les serveurs de Webtor au lieu de votre adresse IP, et tout vous parvient en HTTPS. Webtor ne traite que les torrents que vous ajoutez vous-même — c'est un lecteur et un téléchargeur pour votre propre contenu, pas un catalogue.",
     "about.features.api.title": "API développeur",
-    "about.features.api.text": "Ajoutez des torrents, listez les fichiers et obtenez des liens de streaming depuis votre propre code — votre bibliothèque et votre Vault, pilotés par une API REST."
+    "about.features.api.text": "Ajoutez des torrents, listez les fichiers et obtenez des liens de streaming depuis votre propre code — votre bibliothèque et votre Vault, pilotés par une API REST.",
+    "device.title": "Connecter un appareil",
+    "device.subtitle": "Un appareil (une CLI, une appli TV) a demandé l'accès à votre compte Webtor et vous a affiché un code court.",
+    "device.codeLabel": "Saisissez le code affiché sur l'appareil",
+    "device.continue": "Continuer",
+    "device.grantNote": "En confirmant, l'appareil reçoit sa propre clé API avec un accès complet à vos ressources, votre bibliothèque, votre Vault et vos préférences. Vous pouvez la révoquer à tout moment depuis votre profil.",
+    "device.confirm": "Autoriser l'accès",
+    "device.cancel": "Annuler",
+    "device.doneTitle": "Appareil connecté",
+    "device.doneText": "Retournez sur l'appareil : il récupérera sa clé d'ici quelques secondes.",
+    "device.invalidText": "Ce code est inconnu ou a expiré. Demandez un nouveau code sur l'appareil et réessayez.",
+    "profile.devices.title": "Appareils connectés",
+    "profile.devices.hint": "Appareils autorisés via un code (CLI, applis TV). Chacun possède sa propre clé API ; en révoquer un n'affecte ni les autres ni votre clé principale.",
+    "profile.devices.revoke": "Révoquer",
+    "toast.deviceRevoked": "Accès de l'appareil révoqué"
 }

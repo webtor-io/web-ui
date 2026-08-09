@@ -8,6 +8,7 @@ import (
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	japi "github.com/webtor-io/web-ui/handlers/api"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	wdev "github.com/webtor-io/web-ui/handlers/device"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
 	"github.com/webtor-io/web-ui/handlers/discover_watchlist"
@@ -422,6 +423,10 @@ func serve(c *cli.Context) error {
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient)
+
+	// Setting device authorization confirmation page (the human half of the
+	// device flow; the API half lives in handlers/api)
+	wdev.RegisterHandler(r, tm, pg)
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)

@@ -132,3 +132,17 @@ func GetUserByAccessTokenWithUser(ctx context.Context, db *pg.DB, token uuid.UUI
 
 	return accessToken, nil
 }
+
+// DeleteAccessToken removes one token by its (user, name) pair. Reports
+// whether anything was deleted — revoking an already-revoked device is a
+// no-op, not an error.
+func DeleteAccessToken(ctx context.Context, db *pg.DB, userID uuid.UUID, name string) (bool, error) {
+	res, err := db.Model((*AccessToken)(nil)).Context(ctx).
+		Where("user_id = ?", userID).
+		Where("name = ?", name).
+		Delete()
+	if err != nil {
+		return false, err
+	}
+	return res.RowsAffected() > 0, nil
+}

@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Czy chmurowy klient torrent jest bezpieczny?",
     "tool.cloudTorrentClient.about.safety.text": "Bezpieczniejszy niż torrentowanie lokalnie: niczego nie instalujesz, inne peery widzą serwery Webtora zamiast twojego adresu IP, a wszystko dociera do ciebie przez HTTPS. Webtor przetwarza tylko torrenty, które sam dodasz — to odtwarzacz i pobieracz twoich własnych treści, nie katalog.",
     "about.features.api.title": "API dla programistów",
-    "about.features.api.text": "Dodawaj torrenty, listuj pliki i pobieraj linki do streamingu z własnego kodu — twoja biblioteka i Vault sterowane przez REST API."
+    "about.features.api.text": "Dodawaj torrenty, listuj pliki i pobieraj linki do streamingu z własnego kodu — twoja biblioteka i Vault sterowane przez REST API.",
+    "device.title": "Połącz urządzenie",
+    "device.subtitle": "Urządzenie (CLI, aplikacja TV) poprosiło o dostęp do twojego konta Webtor i wyświetliło krótki kod.",
+    "device.codeLabel": "Wpisz kod z urządzenia",
+    "device.continue": "Dalej",
+    "device.grantNote": "Potwierdzenie nadaje urządzeniu własny klucz API z pełnym dostępem do zasobów, biblioteki, Vault i ustawień. Możesz go w każdej chwili odwołać na stronie profilu.",
+    "device.confirm": "Przyznaj dostęp",
+    "device.cancel": "Anuluj",
+    "device.doneTitle": "Urządzenie połączone",
+    "device.doneText": "Wróć do urządzenia — otrzyma klucz w ciągu kilku sekund.",
+    "device.invalidText": "Ten kod jest nieznany lub wygasł. Poproś urządzenie o nowy kod i spróbuj ponownie.",
+    "profile.devices.title": "Połączone urządzenia",
+    "profile.devices.hint": "Urządzenia zalogowane kodem (CLI, aplikacje TV). Każde ma własny klucz API; odwołanie jednego nie wpływa na pozostałe ani na twój główny klucz.",
+    "profile.devices.revoke": "Odwołaj",
+    "toast.deviceRevoked": "Dostęp urządzenia odwołany"
 }

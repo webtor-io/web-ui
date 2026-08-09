@@ -1426,5 +1426,19 @@
     "tool.cloudTorrentClient.about.safety.title": "Un client torrent cloud è sicuro?",
     "tool.cloudTorrentClient.about.safety.text": "Più sicuro del torrent locale: non si installa nulla, gli altri peer vedono i server di Webtor invece del tuo indirizzo IP e tutto ti arriva via HTTPS. Webtor elabora solo i torrent che aggiungi tu — è un player e downloader per i tuoi contenuti, non un catalogo.",
     "about.features.api.title": "API per sviluppatori",
-    "about.features.api.text": "Aggiungi torrent, elenca i file e ottieni link di streaming dal tuo codice — la tua libreria e il tuo Vault, gestiti tramite API REST."
+    "about.features.api.text": "Aggiungi torrent, elenca i file e ottieni link di streaming dal tuo codice — la tua libreria e il tuo Vault, gestiti tramite API REST.",
+    "device.title": "Collega un dispositivo",
+    "device.subtitle": "Un dispositivo (una CLI, un'app TV) ha chiesto l'accesso al tuo account Webtor e ti ha mostrato un codice breve.",
+    "device.codeLabel": "Inserisci il codice mostrato dal dispositivo",
+    "device.continue": "Continua",
+    "device.grantNote": "Confermando, il dispositivo riceve una propria chiave API con accesso completo a risorse, libreria, Vault e preferenze. Puoi revocarla in qualsiasi momento dalla pagina del profilo.",
+    "device.confirm": "Concedi accesso",
+    "device.cancel": "Annulla",
+    "device.doneTitle": "Dispositivo collegato",
+    "device.doneText": "Torna al dispositivo: riceverà la chiave entro pochi secondi.",
+    "device.invalidText": "Questo codice è sconosciuto o scaduto. Richiedi un nuovo codice sul dispositivo e riprova.",
+    "profile.devices.title": "Dispositivi collegati",
+    "profile.devices.hint": "Dispositivi autorizzati tramite codice (CLI, app TV). Ognuno ha la propria chiave API; revocarne uno non tocca gli altri né la tua chiave principale.",
+    "profile.devices.revoke": "Revoca",
+    "toast.deviceRevoked": "Accesso del dispositivo revocato"
 }

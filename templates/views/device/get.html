@@ -1,0 +1,52 @@
+{{ define "title" }}{{ t $.Lang "device.title" }}{{ end }}
+{{ define "description" }}
+    <meta name="description" content="{{ t $.Lang "device.subtitle" }}">
+    <meta name="robots" content="noindex">
+{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+    <div class="max-w-[480px] mx-auto">
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-8">
+            <h1 class="text-[1.4rem] font-bold tracking-tight mb-2">{{ t $.Lang "device.title" }}</h1>
+
+            {{ if eq .Data.State "done" }}
+                <div class="flex items-start gap-3 mt-4">
+                    <svg class="w-6 h-6 shrink-0 text-w-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    <div>
+                        <div class="font-semibold mb-1">{{ t $.Lang "device.doneTitle" }}</div>
+                        <p class="text-sm text-w-sub leading-relaxed">{{ t $.Lang "device.doneText" }}</p>
+                    </div>
+                </div>
+
+            {{ else if eq .Data.State "confirm" }}
+                <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "device.subtitle" }}</p>
+                <div class="rounded-xl border border-w-line bg-base-300 p-5 mb-6 text-center">
+                    <div class="font-mono text-[1.6rem] tracking-[0.2em]">{{ .Data.Code }}</div>
+                    {{ if .Data.DeviceName }}<div class="text-sm text-w-muted mt-2">{{ .Data.DeviceName }}</div>{{ end }}
+                </div>
+                <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "device.grantNote" }}</p>
+                <form method="post" action="{{ langPath $.Lang "/device/confirm" }}">
+                    <input type="hidden" name="code" value="{{ .Data.Code }}">
+                    <div class="flex gap-3">
+                        <button type="submit" class="btn btn-soft flex-1">{{ t $.Lang "device.confirm" }}</button>
+                        <a href="{{ langPath $.Lang "/device" }}" class="btn btn-ghost border border-w-line">{{ t $.Lang "device.cancel" }}</a>
+                    </div>
+                </form>
+
+            {{ else }}
+                {{ if eq .Data.State "invalid" }}
+                    <div class="alert bg-w-pink/10 border border-w-pink/30 text-sm mb-5">{{ t $.Lang "device.invalidText" }}</div>
+                {{ else }}
+                    <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "device.subtitle" }}</p>
+                {{ end }}
+                <form method="get" action="{{ langPath $.Lang "/device" }}">
+                    <label class="block text-sm text-w-sub mb-2" for="device-code">{{ t $.Lang "device.codeLabel" }}</label>
+                    <input id="device-code" name="code" value="{{ .Data.Code }}" placeholder="XXXX-XXXX" autocomplete="off" autofocus
+                        class="input w-full bg-base-300 border-w-line focus:border-w-pink font-mono tracking-[0.15em] uppercase mb-5" />
+                    <button type="submit" class="btn btn-soft w-full">{{ t $.Lang "device.continue" }}</button>
+                </form>
+            {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}
