@@ -12,7 +12,27 @@ spec, a machine-readable error contract, and a way for a device to obtain a key
 without a browser copy-paste. The spec and the error contract we have; the
 rest is this list.
 
-## Now
+## Shipped (2026-08-08)
+
+The original "Now" block went out in one release, together with the Swagger
+reference on its own host (`api.webtor.io`), key prefill for logged-in
+readers, CORS for browser callers and 429 documentation on every endpoint:
+
+1. **Pledge transfer status** — `GET /vault/pledges/{resource_id}`.
+2. **`types` export selection** with upstream's exact semantics (and
+   rest-api's spec corrected to document it).
+3. **Per-key rate limit** — 429 + `Retry-After`, `rate_limited` error code.
+
+## Now (next up)
+
+### Device/PIN key issuance
+
+A device shows a short code, the user confirms it on the site, the device
+receives a key. The single feature every service with a real third-party
+ecosystem has; the profile-page copy-paste is the main thing standing between
+this API and TV/CLI clients.
+
+## Original "Now" notes (kept for context)
 
 ### 1. Pledge transfer status — `GET /vault/pledges/{resource_id}`
 
@@ -41,10 +61,6 @@ code.
 
 ## Later, roughly in order
 
-- **Device/PIN key issuance.** A device shows a short code, the user confirms
-  it on the site, the device receives a key. This is the single feature every
-  service with a real third-party ecosystem has, and the profile-page
-  copy-paste is the main thing standing between this API and TV/CLI clients.
 - **Completion callbacks.** An optional `callback_url` on a pledge (and later
   on resource store): one POST when the transfer finishes or fails. The
   internal event already exists; this forwards it. Follow the Standard
