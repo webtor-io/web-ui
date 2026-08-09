@@ -21,7 +21,7 @@ import (
 //	@description	## Two halves
 //	@description
 //	@description	`/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same
-//	@description	parameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your
+//	@description	parameters, same response bodies as [rest-api](https://github.com/webtor-io/rest-api), authenticated with your
 //	@description	account key instead of an API key + secret. Code written against rest-api works here unchanged.
 //	@description
 //	@description	`/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same
@@ -121,6 +121,16 @@ func registerDocs(r *gin.Engine, mountPath string, endpoint string, keyURL strin
 		if strings.HasPrefix(endpoint, "http://") {
 			docs.SwaggerInfolibraryapi.Schemes = []string{"http"}
 		}
+	}
+
+	// The bare host and mount roots land on the reference: api.<domain>/
+	// answered something for years, and a root that 404s reads as an outage,
+	// not as "the docs moved one path segment away".
+	redirect := func(c *gin.Context) {
+		c.Redirect(http.StatusFound, endpoint+"/docs/index.html")
+	}
+	for _, p := range []string{libapi.HostPrefix, libapi.HostPrefix + "/", mountPath, mountPath + "/"} {
+		r.GET(p, redirect)
 	}
 
 	specPath := mountPath + "/swagger.json"

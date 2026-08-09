@@ -532,7 +532,7 @@ info:
     ## Two halves
 
     `/resource`, `/list` and `/export` are the public Webtor API you already know: same paths, same
-    parameters, same response bodies as [rest-api](https://api.webtor.io/), authenticated with your
+    parameters, same response bodies as [rest-api](https://github.com/webtor-io/rest-api), authenticated with your
     account key instead of an API key + secret. Code written against rest-api works here unchanged.
 
     `/library`, `/vault` and `/profile` are account-scoped and exist only here. The library is the same

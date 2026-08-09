@@ -193,3 +193,15 @@ func TestCredentialsKeyCORSRestrictedToAPIHosts(t *testing.T) {
 		t.Errorf("foreign origin got a CORS grant")
 	}
 }
+
+// The api host's root (which the host middleware rewrites onto /api/) and the
+// mount roots must land on the reference — a bare-host 404 reads as an outage.
+func TestDocsRootsRedirectToReference(t *testing.T) {
+	r := docsEngine()
+	for _, p := range []string{"/api", "/api/", "/api/v1", "/api/v1/"} {
+		w := getDocs(r, p, p)
+		if w.Code != 302 || !strings.HasSuffix(w.Header().Get("Location"), "/docs/index.html") {
+			t.Errorf("%s: got %d → %q, want 302 to the docs", p, w.Code, w.Header().Get("Location"))
+		}
+	}
+}
