@@ -15,6 +15,7 @@
                     <div class="text-xs text-w-muted">{{ .CreatedAt.Format "2006-01-02" }}</div>
                 </div>
                 <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/device/revoke" }}" data-async-target="#devices">
+                    <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
                     <input type="hidden" name="name" value="{{ .FullName }}">
                     <button type="submit" class="btn btn-ghost btn-sm" data-umami-event="device-revoke">{{ t $.Lang "profile.devices.revoke" }}</button>
                 </form>
