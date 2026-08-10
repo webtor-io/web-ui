@@ -1,0 +1,9 @@
+{
+  "input": "Vixen - Sunset Beach Session 2160p",
+  "want": {
+    "title": "Beach Session",
+    "resolution": "2160p",
+    "studio": "Vixen - Sunset",
+    "adult": true
+  }
+}

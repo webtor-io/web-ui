@@ -113,7 +113,7 @@ const (
 	// Multi-word brands embed `\.?` between tokens so both the dotted
 	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
 	// match — the parser doesn't strip dots before field matching.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|milfty|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|momswap|familyswap|sislovesme|daughterswap|dadcrush|dontfuckmydaughter|mydadshotgirlfriend|mommys?[\s.-]?girl|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|vixen\s*-\s*[a-z]|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial\.?abuse|ghetto\.?gaggers|pure\.?taboo|enature|family\.?therapy\.?xxx|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media|intimatepov|rickysroom|loveherfeet|showstars|badoinkvr|baikal[\s.-]?films|elitepain|graias|raging[\s.-]?stallion|sexmex|trickymasseur|woodmancastingx?|pornpros|castingcouch[\s.-]?hd|swallowed|swallowsalon|mommyandme|vrconk|czechvr|realjamvr|darkroomvr|tmwvrnet|vrcosplayx|vrhush|dancingbear|hijab[\s.-]?hookups|please-cuck[\s.-]?me|please-fuck[\s.-]?my[\s.-]?wife|familytherapyxxx|naturist[\s.-]?freedom|gangland[\s.-]?cream[\s.-]?pie|faphouse|fap[\s.-]?house`
+	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|milfty|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|momswap|familyswap|sislovesme|daughterswap|dadcrush|dontfuckmydaughter|mydadshotgirlfriend|mommys?[\s.-]?girl|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|vixen\s*-\s*[a-z]+|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial[\s.-]?abuse|ghetto[\s.-]?gaggers|pure[\s.-]?taboo|enature|family[\s.-]?therapy(?:[\s.-]?xxx)?|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media|intimatepov|rickysroom|loveherfeet|showstars|badoinkvr|baikal[\s.-]?films|elitepain|graias|raging[\s.-]?stallion|sexmex|trickymasseur|woodmancastingx?|pornpros|castingcouch[\s.-]?hd|swallowed|swallowsalon|mommyandme|vrconk|czechvr|realjamvr|darkroomvr|tmwvrnet|vrcosplayx|vrhush|dancingbear|hijab[\s.-]?hookups|please-cuck[\s.-]?me|please-fuck[\s.-]?my[\s.-]?wife|familytherapyxxx|naturist[\s.-]?freedom|gangland[\s.-]?cream[\s.-]?pie|faphouse|fap[\s.-]?house|corbin[\s.-]?fisher|fantia|fansly|analvids|nympho|vrspy|carib(?:beancom)?|clips4sale|private[\s.-]?(?:media|society)|roccosiffredi|cospuri|wifey\.com|familiestied|kinkclassics|cmnm|jm[\s.-]?productions|perverted[\s.-]?stories|marc[\s.-]?dorcel|dorcel|allblackx|brasileirinhas|milfvr|netvideogirls|publicbang|amateurallure|alisonprod|sleazy[\s.-]?germany|pervtherapy|filthypov|inkasex|sweetsinner|czech[\s.-]?(?:massage|streets|casting|wife|home|experiment|garden|gangbang|fantasy|sauna|spy|taxi|hunter|orgasm|parties|pool|snooper|supermodels|switch|twins)`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -177,7 +177,13 @@ const (
 		// unflagged adult, re-recommended 3 weeks), pppe/ngod/rctd
 		// (distinct 4-char JAV codes; rctd ≠ existing rct — the `\d`
 		// serial requirement means "rct" never matches the "rctd" form).
-		`|mida|pppe|ngod|rctd`
+		`|mida|pppe|ngod|rctd` +
+		// Added 2026-08-10 from weekly skiplist TP-mining (CARRY 03.08 + NEW).
+		// NOT added: `stars` ("Dallas Stars 28"), `jul` ("Video Jul 01") —
+		// see prune note above; STARS handled as hyphenated form in adultMatcher.
+		`|buena|imbd|mvsd|ebwh|lcdv|nsps|3dsvr` +
+		`|royd|siro|orec|husr|fjin|cawb|ymdd|marr|kmeg|mdx|gone|oyc|natr|dandy` +
+		`|tsds|cosh|sivr|miqd`
 )
 
 var fieldParsers = FieldParsers{
@@ -557,6 +563,19 @@ var adultMatcher = NewRegexpMatcher(
 	// `4k2 me@juvr00260 1`). Audit 2026-05-18 found 38 hits of
 	// `489155 com@` slipping past the dot-only form.
 	`(?i)(([a-z0-9]{3,}[\s.](?:com|vip|net|cc|me|la|io|tv|xyz)[@-]))`,
+	// [xfans] releaser tag — adult-exclusive in ai_enrich telemetry
+	// (weekly skiplist mining 2026-08-03/10).
+	`(?i)((\[xfans\]))`,
+	// Bracketed CN adult-aggregator site tags. Named alternation ONLY —
+	// generalising to "any bracketed domain" would flag mainstream
+	// releaser tags ([ OxTorrent.com ], [EZTVx.to], [www.DivxTotaL.com]).
+	`(?i)(([\[【]\s*(?:thz\.la|thzu\.cc|52iv|mitaocang|psk\.la|4k2|mm3456)[a-z0-9.]*\s*[\]】]))`,
+	// CN adult-forum hostnames that appear unbracketed.
+	`(?i)\b((hhb-www\.[a-z0-9.]+|youivtv\.com))\b`,
+	// SOD STARS-NNN JAV series. Hyphen REQUIRED and 3-4 digits — the bare
+	// `stars` prefix was pruned from javPrefixAlternation ("Dallas Stars
+	// 28" collision); the hyphenated catalog form has no such clashes.
+	`(?i)\b((stars-\d{3,4}))\b`,
 )
 
 // sportMatcher detects FieldTypeSport — used downstream to skip AI
@@ -591,6 +610,9 @@ var sportMatcher = NewRegexpMatcher(
 	// caught 8 such leaks slipping past the whitespace-only form.
 	`(?i)\b((Giro[\s.\-]+d['\x{2019}]?Italia|Tour[\s.\-]+de[\s.\-]+France|Vuelta[\s.\-]+a[\s.\-]+Espa(?:ñ|n)a))\b`,
 	`(?i)((?:^|[^а-яА-Я])(НХЛ|КХЛ|РФПЛ|РПЛ|хоккей|футбол|баскетбол|теннис|биатлон|формула[\s\-]*1|велогонк[а-я]+|велотур))`,
+	// rgfootball releaser tag — RU football broadcast rips (weekly
+	// skiplist mining 2026-08-03).
+	`(?i)\b((rgfootball(?:\.net)?))\b`,
 )
 
 // courseMatcher detects FieldTypeCourse — pirated-course / tutorial /
@@ -623,7 +645,7 @@ var sportMatcher = NewRegexpMatcher(
 //      treated as courses since they are interactive-software
 //      tutorials with no movie/TV metadata.
 var courseMatcher = NewRegexpMatcher(
-	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy))\b`,
+	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy|gumroad|john[\s.-]?danaher|master[\s.-]?toddy|chael[\s.-]?sonnen|henry[\s.-]?akins|evenant|flux[\s.-]?academy|zerotomastery|ross[\s.-]?jeffries|rsd[\s.-](?:julien|max|tyler|luke)))\b`,
 	`(?i)(\[\s*(freecoursesite|freecoursesonline|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
 	`(?i)\b([a-z0-9-]+\.(courses))\b`,
 	`(?i)\b((dlc[\s_]+\w*tutorial|ubisoft[\s.]?connect[\s.]?rip|steam[\s.-]?rip|gog[\s.-]?rip|epic[\s.-]?games[\s.-]?rip))\b`,

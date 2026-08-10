@@ -1,0 +1,8 @@
+{
+  "input": "STARS-256 Beach House 1080p",
+  "want": {
+    "title": "STARS-256 Beach House",
+    "resolution": "1080p",
+    "adult": true
+  }
+}
