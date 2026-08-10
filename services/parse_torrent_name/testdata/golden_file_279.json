@@ -1,0 +1,10 @@
+{
+  "input": "Marc Dorcel - Private Lesson 2020 FRENCH",
+  "want": {
+    "title": "Private Lesson",
+    "year": 2020,
+    "studio": "Marc Dorcel",
+    "adult": true,
+    "extra": "FRENCH"
+  }
+}

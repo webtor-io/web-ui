@@ -1,0 +1,9 @@
+{
+  "input": "rgfootball.net Зенит - Спартак 12.05.2026",
+  "want": {
+    "title": "rgfootball net Зенит - Спартак",
+    "year": 2026,
+    "date": "2026-05-12",
+    "sport": true
+  }
+}

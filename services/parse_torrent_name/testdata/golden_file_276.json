@@ -1,0 +1,10 @@
+{
+  "input": "Dallas Stars 28 NHL 2026 Highlights 720p",
+  "want": {
+    "title": "Dallas Stars 28 NHL",
+    "year": 2026,
+    "resolution": "720p",
+    "extra": "Highlights",
+    "sport": true
+  }
+}

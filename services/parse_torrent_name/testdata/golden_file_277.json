@@ -1,0 +1,7 @@
+{
+  "input": "John Danaher - Gumroad BJJ Escapes Course",
+  "want": {
+    "title": "John Danaher - Gumroad BJJ Escapes Course",
+    "course": true
+  }
+}
