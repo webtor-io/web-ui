@@ -52,7 +52,7 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `GET` | `/resource/{id}.torrent` | `api:read` | The torrent file itself |
 | `GET` | `/resource/{id}/list` | `api:read` | Files and directories (`path`, `output`, `limit`, `offset`, `sort`) |
 | `GET` | `/resource/{id}/export/{content_id}` | `api:read` | Download / stream URLs (`types`, `output`, `archive-format`, `paths`, `imdb-id`) |
-| `GET` | `/library` | `api:read` | Your torrents (`type=all\|movies\|series`, `sort`, `limit`, `offset`) |
+| `GET` | `/library` | `api:read` | Your torrents (`type=all\|movies\|series`, `sort=recent\|name\|year` — `year` needs a movies/series section, `limit`, `offset`) |
 | `POST` | `/library` | `api:write` | Add a stored resource to the library |
 | `GET` | `/library/{id}` | `api:read` | One entry; `404` = not in your library |
 | `PATCH` | `/library/{id}` | `api:write` | Rename the entry |

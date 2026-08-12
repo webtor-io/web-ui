@@ -30,7 +30,7 @@ import (
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			type	query		string	false	"Filter"	Enums(all, movies, series)	default(all)
-//	@Param			sort	query		string	false	"Sort order"	Enums(recent, name)		default(recent)
+//	@Param			sort	query		string	false	"Sort order; year needs type=movies or type=series"	Enums(recent, name, year)		default(recent)
 //	@Param			limit	query		int		false	"Page size (default 100, max 1000)"
 //	@Param			offset	query		int		false	"Page offset"
 //	@Success		200		{object}	libapi.LibraryListResponse
@@ -50,8 +50,15 @@ func (s *Handler) listLibrary(c *gin.Context) {
 	sort := c.DefaultQuery("sort", libapi.LibrarySortRecent)
 	switch sort {
 	case libapi.LibrarySortRecent, libapi.LibrarySortName:
+	case libapi.LibrarySortYear:
+		// A bare torrent has no release year; the year ordering lives in the
+		// movie/series metadata, so the section must narrow it down.
+		if typ != libapi.LibraryTypeMovies && typ != libapi.LibraryTypeSeries {
+			s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort=year needs type=movies or type=series", nil))
+			return
+		}
 	default:
-		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort must be recent or name", nil))
+		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort must be recent, name or year", nil))
 		return
 	}
 	limit, err := uintQuery(c, "limit")
@@ -326,8 +333,11 @@ func (s *Handler) db() (*pg.DB, *libapi.Error) {
 
 func loadLibrary(ctx context.Context, db *pg.DB, userID uuid.UUID, typ string, sort string) ([]*models.Library, error) {
 	st := models.SortTypeRecentlyAdded
-	if sort == libapi.LibrarySortName {
+	switch sort {
+	case libapi.LibrarySortName:
 		st = models.SortTypeName
+	case libapi.LibrarySortYear:
+		st = models.SortTypeYear
 	}
 	switch typ {
 	case libapi.LibraryTypeMovies:

@@ -286,12 +286,16 @@ func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, s
 		Context(ctx).
 		Join("join movie as m").
 		JoinOn("m.resource_id = library.resource_id").
+		Join("left join movie_metadata as mmd").
+		JoinOn("m.movie_metadata_id = mmd.movie_metadata_id").
 		Where("library.user_id = ?", uID).
 		Relation("Torrent")
 
 	switch sort {
 	case SortTypeName:
 		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
+	case SortTypeYear:
+		query.OrderExpr("mmd.year DESC NULLS LAST")
 	case SortTypeRecentlyAdded:
 		fallthrough
 	default:
@@ -313,12 +317,16 @@ func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, 
 		Context(ctx).
 		Join("join series as s").
 		JoinOn("s.resource_id = library.resource_id").
+		Join("left join series_metadata as smd").
+		JoinOn("s.series_metadata_id = smd.series_metadata_id").
 		Where("library.user_id = ?", uID).
 		Relation("Torrent")
 
 	switch sort {
 	case SortTypeName:
 		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
+	case SortTypeYear:
+		query.OrderExpr("smd.year DESC NULLS LAST")
 	case SortTypeRecentlyAdded:
 		fallthrough
 	default:

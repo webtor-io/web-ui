@@ -650,10 +650,11 @@ paths:
         name: type
         type: string
       - default: recent
-        description: Sort order
+        description: Sort order; year needs type=movies or type=series
         enum:
         - recent
         - name
+        - year
         in: query
         name: sort
         type: string

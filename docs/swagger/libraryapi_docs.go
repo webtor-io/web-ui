@@ -137,11 +137,12 @@ const docTemplatelibraryapi = `{
                     {
                         "enum": [
                             "recent",
-                            "name"
+                            "name",
+                            "year"
                         ],
                         "type": "string",
                         "default": "recent",
-                        "description": "Sort order",
+                        "description": "Sort order; year needs type=movies or type=series",
                         "name": "sort",
                         "in": "query"
                     },

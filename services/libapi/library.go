@@ -20,6 +20,9 @@ const (
 const (
 	LibrarySortRecent = "recent"
 	LibrarySortName   = "name"
+	// LibrarySortYear orders by release year (movies and series sections
+	// only — a bare torrent has no year).
+	LibrarySortYear = "year"
 )
 
 // LibraryItem is one torrent in the user's library.
