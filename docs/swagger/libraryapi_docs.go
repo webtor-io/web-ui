@@ -138,12 +138,25 @@ const docTemplatelibraryapi = `{
                         "enum": [
                             "recent",
                             "name",
-                            "year"
+                            "year",
+                            "rating"
                         ],
                         "type": "string",
                         "default": "recent",
-                        "description": "Sort order; year needs type=movies or type=series",
+                        "description": "Sort order; year and rating need type=movies or type=series",
                         "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "watched",
+                            "unwatched"
+                        ],
+                        "type": "string",
+                        "default": "all",
+                        "description": "Watched filter; needs type=movies or type=series",
+                        "name": "watched",
                         "in": "query"
                     },
                     {
@@ -1344,6 +1357,11 @@ const docTemplatelibraryapi = `{
                 "type": {
                     "type": "string",
                     "example": "all"
+                },
+                "watched": {
+                    "description": "Watched echoes the applied watched-filter; omitted when not filtering.",
+                    "type": "string",
+                    "example": "unwatched"
                 }
             }
         },

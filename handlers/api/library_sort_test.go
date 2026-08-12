@@ -36,7 +36,12 @@ func TestListLibrarySortYearValidation(t *testing.T) {
 		{"?type=all&sort=year", 400, "sort=year needs type"},
 		{"?type=movies&sort=year", 503, "unavailable"}, // validation passed, no DB in tests
 		{"?type=series&sort=year", 503, "unavailable"},
-		{"?sort=rating", 400, "sort must be recent, name or year"},
+		{"?type=movies&sort=rating", 503, "unavailable"},
+		{"?sort=rating", 400, "sort=rating needs type"},
+		{"?watched=unwatched", 400, "watched=unwatched needs type"},
+		{"?type=series&watched=unwatched", 503, "unavailable"},
+		{"?type=movies&watched=nope", 400, "watched must be all, watched or unwatched"},
+		{"?sort=size", 400, "sort must be recent, name, year or rating"},
 	} {
 		code, body := get(tc.query)
 		if code != tc.wantCode || !strings.Contains(body, tc.wantBody) {

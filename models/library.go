@@ -279,7 +279,7 @@ func GetMoviesByVideoID(ctx context.Context, db *pg.DB, uID uuid.UUID, videoID s
 	return list, nil
 }
 
-func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
+func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Library, error) {
 	var list []*Library
 
 	query := db.Model(&list).
@@ -288,14 +288,25 @@ func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, s
 		JoinOn("m.resource_id = library.resource_id").
 		Join("left join movie_metadata as mmd").
 		JoinOn("m.movie_metadata_id = mmd.movie_metadata_id").
+		Join("left join movie_status as ums").
+		JoinOn("ums.user_id = library.user_id AND ums.video_id = mmd.video_id AND ums.watched = true").
 		Where("library.user_id = ?", uID).
 		Relation("Torrent")
+
+	switch watchedFilter {
+	case "unwatched":
+		query.Where("ums.video_id IS NULL")
+	case "watched":
+		query.Where("ums.video_id IS NOT NULL")
+	}
 
 	switch sort {
 	case SortTypeName:
 		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
 	case SortTypeYear:
 		query.OrderExpr("mmd.year DESC NULLS LAST")
+	case SortTypeRating:
+		query.OrderExpr("mmd.rating DESC NULLS LAST")
 	case SortTypeRecentlyAdded:
 		fallthrough
 	default:
@@ -310,7 +321,7 @@ func GetLibraryMovieTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, s
 	return list, nil
 }
 
-func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
+func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Library, error) {
 	var list []*Library
 
 	query := db.Model(&list).
@@ -319,14 +330,25 @@ func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, 
 		JoinOn("s.resource_id = library.resource_id").
 		Join("left join series_metadata as smd").
 		JoinOn("s.series_metadata_id = smd.series_metadata_id").
+		Join("left join series_status as uss").
+		JoinOn("uss.user_id = library.user_id AND uss.video_id = smd.video_id AND uss.watched = true").
 		Where("library.user_id = ?", uID).
 		Relation("Torrent")
+
+	switch watchedFilter {
+	case "unwatched":
+		query.Where("uss.video_id IS NULL")
+	case "watched":
+		query.Where("uss.video_id IS NOT NULL")
+	}
 
 	switch sort {
 	case SortTypeName:
 		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
 	case SortTypeYear:
 		query.OrderExpr("smd.year DESC NULLS LAST")
+	case SortTypeRating:
+		query.OrderExpr("smd.rating DESC NULLS LAST")
 	case SortTypeRecentlyAdded:
 		fallthrough
 	default:

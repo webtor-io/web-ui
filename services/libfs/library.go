@@ -23,7 +23,7 @@ var _ Library = (*AllLibrary)(nil)
 type MovieLibrary struct{}
 
 func (s *MovieLibrary) GetContent(ctx context.Context, db *pg.DB, uID uuid.UUID) ([]*models.Library, error) {
-	return models.GetLibraryMovieTorrentList(ctx, db, uID, models.SortTypeName)
+	return models.GetLibraryMovieTorrentList(ctx, db, uID, models.SortTypeName, "")
 }
 
 var _ Library = (*MovieLibrary)(nil)
@@ -31,7 +31,7 @@ var _ Library = (*MovieLibrary)(nil)
 type SeriesLibrary struct{}
 
 func (s *SeriesLibrary) GetContent(ctx context.Context, db *pg.DB, uID uuid.UUID) ([]*models.Library, error) {
-	return models.GetLibrarySeriesTorrentList(ctx, db, uID, models.SortTypeName)
+	return models.GetLibrarySeriesTorrentList(ctx, db, uID, models.SortTypeName, "")
 }
 
 var _ Library = (*SeriesLibrary)(nil)

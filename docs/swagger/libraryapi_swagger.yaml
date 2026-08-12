@@ -114,6 +114,10 @@ definitions:
       type:
         example: all
         type: string
+      watched:
+        description: Watched echoes the applied watched-filter; omitted when not filtering.
+        example: unwatched
+        type: string
     type: object
   libapi.LibraryRenameRequest:
     properties:
@@ -650,13 +654,23 @@ paths:
         name: type
         type: string
       - default: recent
-        description: Sort order; year needs type=movies or type=series
+        description: Sort order; year and rating need type=movies or type=series
         enum:
         - recent
         - name
         - year
+        - rating
         in: query
         name: sort
+        type: string
+      - default: all
+        description: Watched filter; needs type=movies or type=series
+        enum:
+        - all
+        - watched
+        - unwatched
+        in: query
+        name: watched
         type: string
       - description: Page size (default 100, max 1000)
         in: query

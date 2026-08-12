@@ -30,7 +30,8 @@ import (
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			type	query		string	false	"Filter"	Enums(all, movies, series)	default(all)
-//	@Param			sort	query		string	false	"Sort order; year needs type=movies or type=series"	Enums(recent, name, year)		default(recent)
+//	@Param			sort	query		string	false	"Sort order; year and rating need type=movies or type=series"	Enums(recent, name, year, rating)		default(recent)
+//	@Param			watched	query		string	false	"Watched filter; needs type=movies or type=series"	Enums(all, watched, unwatched)		default(all)
 //	@Param			limit	query		int		false	"Page size (default 100, max 1000)"
 //	@Param			offset	query		int		false	"Page offset"
 //	@Success		200		{object}	libapi.LibraryListResponse
@@ -50,15 +51,27 @@ func (s *Handler) listLibrary(c *gin.Context) {
 	sort := c.DefaultQuery("sort", libapi.LibrarySortRecent)
 	switch sort {
 	case libapi.LibrarySortRecent, libapi.LibrarySortName:
-	case libapi.LibrarySortYear:
-		// A bare torrent has no release year; the year ordering lives in the
+	case libapi.LibrarySortYear, libapi.LibrarySortRating:
+		// A bare torrent has no release year or rating; both live in the
 		// movie/series metadata, so the section must narrow it down.
 		if typ != libapi.LibraryTypeMovies && typ != libapi.LibraryTypeSeries {
-			s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort=year needs type=movies or type=series", nil))
+			s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort="+sort+" needs type=movies or type=series", nil))
 			return
 		}
 	default:
-		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort must be recent, name or year", nil))
+		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "sort must be recent, name, year or rating", nil))
+		return
+	}
+	watched := c.DefaultQuery("watched", libapi.LibraryWatchedAll)
+	switch watched {
+	case libapi.LibraryWatchedAll:
+	case libapi.LibraryWatchedWatched, libapi.LibraryWatchedUnwatched:
+		if typ != libapi.LibraryTypeMovies && typ != libapi.LibraryTypeSeries {
+			s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "watched="+watched+" needs type=movies or type=series", nil))
+			return
+		}
+	default:
+		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "watched must be all, watched or unwatched", nil))
 		return
 	}
 	limit, err := uintQuery(c, "limit")
@@ -78,7 +91,7 @@ func (s *Handler) listLibrary(c *gin.Context) {
 		return
 	}
 	u := auth.GetUserFromContext(c)
-	rows, lerr := loadLibrary(c.Request.Context(), db, u.ID, typ, sort)
+	rows, lerr := loadLibrary(c.Request.Context(), db, u.ID, typ, sort, watched)
 	if lerr != nil {
 		s.abort(c, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to load the library", lerr))
 		return
@@ -91,6 +104,12 @@ func (s *Handler) listLibrary(c *gin.Context) {
 		Offset: int(offset),
 		Type:   typ,
 		Sort:   sort,
+		Watched: func() string {
+			if watched == libapi.LibraryWatchedAll {
+				return ""
+			}
+			return watched
+		}(),
 	}
 	// Paged in memory: the underlying queries are the library UI's, which read
 	// the whole list to render counts, and a library big enough for that to
@@ -331,19 +350,24 @@ func (s *Handler) db() (*pg.DB, *libapi.Error) {
 	return db, nil
 }
 
-func loadLibrary(ctx context.Context, db *pg.DB, userID uuid.UUID, typ string, sort string) ([]*models.Library, error) {
+func loadLibrary(ctx context.Context, db *pg.DB, userID uuid.UUID, typ string, sort string, watched string) ([]*models.Library, error) {
 	st := models.SortTypeRecentlyAdded
 	switch sort {
 	case libapi.LibrarySortName:
 		st = models.SortTypeName
 	case libapi.LibrarySortYear:
 		st = models.SortTypeYear
+	case libapi.LibrarySortRating:
+		st = models.SortTypeRating
+	}
+	if watched == libapi.LibraryWatchedAll {
+		watched = "" // the models treat empty as "no filter"
 	}
 	switch typ {
 	case libapi.LibraryTypeMovies:
-		return models.GetLibraryMovieTorrentList(ctx, db, userID, st)
+		return models.GetLibraryMovieTorrentList(ctx, db, userID, st, watched)
 	case libapi.LibraryTypeSeries:
-		return models.GetLibrarySeriesTorrentList(ctx, db, userID, st)
+		return models.GetLibrarySeriesTorrentList(ctx, db, userID, st, watched)
 	default:
 		return models.GetLibraryTorrentsList(ctx, db, userID, st)
 	}

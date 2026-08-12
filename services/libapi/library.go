@@ -23,6 +23,8 @@ const (
 	// LibrarySortYear orders by release year (movies and series sections
 	// only — a bare torrent has no year).
 	LibrarySortYear = "year"
+	// LibrarySortRating orders by rating (movies and series sections only).
+	LibrarySortRating = "rating"
 )
 
 // LibraryItem is one torrent in the user's library.
@@ -47,6 +49,8 @@ type LibraryListResponse struct {
 	Offset int    `json:"offset" example:"0"`
 	Type   string `json:"type" example:"all"`
 	Sort   string `json:"sort" example:"recent"`
+	// Watched echoes the applied watched-filter; omitted when not filtering.
+	Watched string `json:"watched,omitempty" example:"unwatched"`
 }
 
 // LibraryAddRequest adds an existing resource to the library. The resource has
@@ -81,3 +85,11 @@ func NewLibraryItem(l *models.Library) LibraryItem {
 	}
 	return item
 }
+
+// Watched-filter values for the library listing (movies and series sections
+// only — watched state hangs off their metadata).
+const (
+	LibraryWatchedAll       = "all"
+	LibraryWatchedWatched   = "watched"
+	LibraryWatchedUnwatched = "unwatched"
+)
