@@ -8,6 +8,10 @@ type Tool struct {
 	Title       string
 	Benefit     string
 	Description string
+	// Guide marks a page whose title is the user's question rather than a
+	// capability ("How to Open a .torrent File" vs "Torrent → ZIP"). They
+	// serve a different intent and are listed apart in the footer.
+	Guide bool
 }
 
 // Tools contains the list of all available tool pages.
@@ -31,9 +35,9 @@ var Tools = []Tool{
 	// has its own page (/watch-torrents-ios) converts at 7-10% from
 	// position 4. The titles are phrased as the question for that reason —
 	// what loses the click is a product headline answering a how-to query.
-	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description"},
-	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description"},
-	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description"},
+	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description", Guide: true},
+	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description", Guide: true},
+	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description", Guide: true},
 	{Url: "online-torrent-downloader", Title: "tool.onlineTorrentDownloader.title", Benefit: "tool.onlineTorrentDownloader.benefit", Description: "tool.onlineTorrentDownloader.description"},
 	{Url: "stream-torrent-online", Title: "tool.streamTorrentOnline.title", Benefit: "tool.streamTorrentOnline.benefit", Description: "tool.streamTorrentOnline.description"},
 	{Url: "torrent-player", Title: "tool.torrentPlayer.title", Benefit: "tool.torrentPlayer.benefit", Description: "tool.torrentPlayer.description"},

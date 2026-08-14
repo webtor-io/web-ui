@@ -1,15 +1,24 @@
 {{ define "footer"}}
     <footer class="bg-base-200 border-t border-w-line">
-        <div class="grid gap-8 grid-cols-2 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] p-10 max-w-[1100px] mx-auto">
+        <div class="grid gap-8 grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr] p-10 max-w-[1100px] mx-auto">
             <aside>
                 <a href="{{ langPath $.Lang "/" }}" data-async-target="main" class="font-logo text-[1.4rem] font-light no-underline">web<span class="text-w-pink">tor</span></a>
                 <p class="text-w-muted text-sm max-w-[280px] leading-relaxed mt-2">{{ t $.Lang "footer.description" }}</p>
             </aside>
             <nav class="flex flex-col gap-2">
                 <h6 class="footer-title text-w-muted">{{ t $.Lang "footer.tools" }}</h6>
-                {{ range tools }}
+                {{ range tools }}{{ if not .Guide }}
                     <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL whitespace-nowrap" href="{{ langPath $.Lang (printf "/%s" .Url) }}" data-async-target="main">{{ t $.Lang .Title }}</a>
-                {{ end }}
+                {{ end }}{{ end }}
+            </nav>
+            {{/* Pages whose title is the user's question. They answer a
+                 different need than the capability pages above, and mixing
+                 the two made one column of eighteen links nobody scans. */}}
+            <nav class="flex flex-col gap-2">
+                <h6 class="footer-title text-w-muted">{{ t $.Lang "footer.guides" }}</h6>
+                {{ range tools }}{{ if .Guide }}
+                    <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL" href="{{ langPath $.Lang (printf "/%s" .Url) }}" data-async-target="main">{{ t $.Lang .Title }}</a>
+                {{ end }}{{ end }}
             </nav>
             <nav class="flex flex-col gap-2">
                 <h6 class="footer-title text-w-muted">{{ t $.Lang "footer.resources" }}</h6>
