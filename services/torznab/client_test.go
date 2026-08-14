@@ -365,3 +365,24 @@ func TestSearchClampsImplausibleSwarmCounts(t *testing.T) {
 		t.Errorf("clamped seeders = %d, want 0", results[1].Seeders)
 	}
 }
+
+func TestProxiedClientStillRefusesPrivateTargets(t *testing.T) {
+	// With a proxy the dialer only ever sees the proxy, so the egress guard
+	// stops covering the target. The URL check has to take over, or
+	// configuring a proxy would quietly turn the add form into an SSRF
+	// primitive again.
+	c := NewWithOptions(Options{Proxy: "socks5://127.0.0.1:1080"})
+	_, err := c.Caps(context.Background(), Endpoint{URL: "http://localhost:9117/torznab"})
+	if err == nil {
+		t.Fatal("Caps() accepted a loopback target through a proxy")
+	}
+	if !strings.Contains(err.Error(), "private address") {
+		t.Errorf("error = %v, want the private-address refusal", err)
+	}
+
+	// Self-hosted deployments opt out of the guard as a whole.
+	c = NewWithOptions(Options{Proxy: "socks5://127.0.0.1:1080", AllowPrivateNetwork: true})
+	if err := c.validateEndpointURL("http://localhost:9117/torznab"); err != nil {
+		t.Errorf("validateEndpointURL() = %v, want nil when private networks are allowed", err)
+	}
+}

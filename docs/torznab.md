@@ -251,7 +251,23 @@ it on, only the user's library reaches Stremio.
 | `--torznab-timeout` | `TORZNAB_TIMEOUT` | `12s` | Per-search budget |
 | `--torznab-max-results` | `TORZNAB_MAX_RESULTS` | `30` | Results kept per indexer per query, highest seeded first |
 | `--torznab-user-agent` | `TORZNAB_USER_AGENT` | `webtor.io` | UA sent to indexers |
+| `--torznab-proxy` | `TORZNAB_PROXY` | — | HTTP/SOCKS5 proxy for indexer requests |
 | `--torznab-allow-private-network` | `TORZNAB_ALLOW_PRIVATE_NETWORK` | `false` | Allow indexer URLs resolving to private/loopback addresses |
+
+`TORZNAB_PROXY` exists because "reachable from the internet" and "reachable
+from our cluster" are not the same thing. Consumer ISPs drop inbound
+connections from datacenter ranges, so a user's indexer can answer their
+browser and their phone while timing out from every node we run on. Measured
+on one such setup: the same host answered from two providers and was filtered
+from OVH and one more, with both traceroutes converging on the same last
+transit hop — i.e. the drop happens at the subscriber's edge, not on our
+side and not in their router config.
+
+The proxy applies to searches, caps probes and .torrent downloads alike. Note
+that with one configured the dialer only sees the proxy, so the egress guard
+no longer covers the target; `validateEndpointURL` resolves the host itself
+to keep most of that protection (everything except a rebind between our
+lookup and the proxy's).
 
 `TORZNAB_ALLOW_PRIVATE_NETWORK` is the self-hosted escape hatch. It is off by
 default because the URL is user-supplied: the guard sits in the dialer

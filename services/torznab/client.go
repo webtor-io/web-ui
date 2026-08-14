@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	jackett "github.com/webtor-io/go-jackett"
@@ -35,11 +37,13 @@ const maxPlausibleSeeders = 1 << 20
 // It is safe for concurrent use and holds no per-user state — the endpoint
 // travels with each call.
 type Client struct {
-	cl         *http.Client
-	dl         *http.Client
-	ua         string
-	timeout    time.Duration
-	maxResults int
+	cl           *http.Client
+	dl           *http.Client
+	ua           string
+	timeout      time.Duration
+	maxResults   int
+	proxied      bool
+	allowPrivate bool
 }
 
 // Options is the client configuration, separated from the cli.Context so
@@ -49,6 +53,12 @@ type Options struct {
 	MaxResults          int
 	UserAgent           string
 	AllowPrivateNetwork bool
+	// Proxy routes indexer requests through another host. Needed because a
+	// home ISP may drop inbound connections from datacenter ranges: the
+	// user's indexer answers their browser and their phone, and times out
+	// from every cluster node. Measured on one such setup: reachable from
+	// two providers, filtered from OVH.
+	Proxy string
 }
 
 func New(c *cli.Context) *Client {
@@ -57,6 +67,7 @@ func New(c *cli.Context) *Client {
 		MaxResults:          c.Int(MaxResultsFlag),
 		UserAgent:           c.String(UserAgentFlag),
 		AllowPrivateNetwork: c.Bool(AllowPrivateNetworkFlag),
+		Proxy:               c.String(ProxyFlag),
 	})
 }
 
@@ -68,11 +79,13 @@ func NewWithOptions(o Options) *Client {
 		o.MaxResults = 30
 	}
 	return &Client{
-		cl:         newHTTPClient(o.AllowPrivateNetwork, o.Timeout, false),
-		dl:         newHTTPClient(o.AllowPrivateNetwork, o.Timeout, true),
-		ua:         o.UserAgent,
-		timeout:    o.Timeout,
-		maxResults: o.MaxResults,
+		cl:           newHTTPClient(o.AllowPrivateNetwork, o.Timeout, false, o.Proxy),
+		dl:           newHTTPClient(o.AllowPrivateNetwork, o.Timeout, true, o.Proxy),
+		ua:           o.UserAgent,
+		timeout:      o.Timeout,
+		maxResults:   o.MaxResults,
+		proxied:      o.Proxy != "",
+		allowPrivate: o.AllowPrivateNetwork,
 	}
 }
 
@@ -103,7 +116,7 @@ func (c *Client) HTTP() *http.Client {
 // forDownload clients stop at the first redirect instead of following it:
 // download links commonly 302 to a magnet: URI, which the transport cannot
 // dial, and we want to read that Location rather than fail on it.
-func newHTTPClient(allowPrivate bool, timeout time.Duration, forDownload bool) *http.Client {
+func newHTTPClient(allowPrivate bool, timeout time.Duration, forDownload bool, proxy string) *http.Client {
 	d := &net.Dialer{
 		Timeout:   10 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -124,14 +137,22 @@ func newHTTPClient(allowPrivate bool, timeout time.Duration, forDownload bool) *
 			return nil
 		}
 	}
+	tr := &http.Transport{
+		DialContext:           d.DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: timeout,
+		MaxIdleConnsPerHost:   4,
+	}
+	if proxy != "" {
+		if u, err := url.Parse(proxy); err == nil {
+			tr.Proxy = http.ProxyURL(u)
+		} else {
+			log.WithError(err).Warn("ignoring unparsable torznab proxy")
+		}
+	}
 	cl := &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			DialContext:           d.DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: timeout,
-			MaxIdleConnsPerHost:   4,
-		},
+		Timeout:   timeout,
+		Transport: tr,
 	}
 	if forDownload {
 		cl.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -185,7 +206,7 @@ func isPrivateIP(ip net.IP) bool {
 // the API key to the client, so one client per user endpoint is what keeps
 // two users of the same host from borrowing each other's key.
 func (c *Client) jackettClient(ep Endpoint) (*jackett.Client, error) {
-	if err := validateEndpointURL(ep.URL); err != nil {
+	if err := c.validateEndpointURL(ep.URL); err != nil {
 		return nil, err
 	}
 	j, err := jackett.NewTorznab(jackett.Settings{
@@ -200,7 +221,7 @@ func (c *Client) jackettClient(ep Endpoint) (*jackett.Client, error) {
 	return j, nil
 }
 
-func validateEndpointURL(raw string) error {
+func (c *Client) validateEndpointURL(raw string) error {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return errors.Wrap(err, "invalid indexer URL")
@@ -210,6 +231,21 @@ func validateEndpointURL(raw string) error {
 	}
 	if u.Host == "" {
 		return errors.New("indexer URL has no host")
+	}
+	// A proxy resolves and dials the target itself, so the dialer guard sees
+	// only the proxy. Resolving here restores most of the protection: it
+	// still misses a rebind between this lookup and the proxy's, which is
+	// why the guard proper stays in the dialer for the no-proxy case.
+	if c.proxied && !c.allowPrivate {
+		ips, err := net.LookupIP(u.Hostname())
+		if err != nil {
+			return errors.Wrap(err, "cannot resolve indexer host")
+		}
+		for _, ip := range ips {
+			if isPrivateIP(ip) {
+				return errors.Errorf("refusing to reach private address %s", ip)
+			}
+		}
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ const (
 	MaxResultsFlag          = "torznab-max-results"
 	UserAgentFlag           = "torznab-user-agent"
 	AllowPrivateNetworkFlag = "torznab-allow-private-network"
+	ProxyFlag               = "torznab-proxy"
 )
 
 // DefaultTimeout is deliberately well above the 5s CompositeStream budget
@@ -38,6 +39,13 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "user agent sent to Torznab indexers",
 			Value:  "webtor.io",
 			EnvVar: "TORZNAB_USER_AGENT",
+		},
+		cli.StringFlag{
+			Name: ProxyFlag,
+			Usage: "HTTP/SOCKS5 proxy for Torznab requests, e.g. socks5://user:pass@host:1080. " +
+				"Consumer ISPs routinely drop inbound connections from datacenter ranges, so an " +
+				"indexer that is reachable from a browser can still be unreachable from the cluster",
+			EnvVar: "TORZNAB_PROXY",
 		},
 		cli.BoolFlag{
 			Name: AllowPrivateNetworkFlag,
