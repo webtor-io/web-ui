@@ -20,7 +20,11 @@
          parallax depths: farther = slower, smaller, dimmer. Each track is
          200% wide and holds its field twice, so translateX(-50%) tiles
          seamlessly — same trick as the svg layers, just longer periods.
-         Particles only bob vertically; entry/exit fading is the masks' job. -->
+         Particles only bob vertically; entry/exit fading is the masks' job.
+         A few carry class="spark" plus --k/--kt: those twinkle once per --k
+         seconds (see .hero-particles i.spark in style.css). They all sit on
+         odd indices inside their field, so the mobile nth-child(2n) thinning
+         never removes one. -->
     <div class="hero-particles">
         <div class="hero-particles-track particles-far">
             {{ template "hero_particle_field_far" }}
@@ -69,17 +73,17 @@
 <div class="hero-particle-field">
     <i style="--x:6%;--y:37%;--s:2px;--o:0.31;--b:5px;--d:19s;--t:-12s;--c:0 206 201"></i>
     <i style="--x:14%;--y:46%;--s:3px;--o:0.42;--b:8px;--d:23s;--t:-23s;--c:0 206 201"></i>
-    <i style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--c:162 155 254"></i>
+    <i class="spark" style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--k:17s;--kt:-11s;--c:162 155 254"></i>
     <i style="--x:26%;--y:65%;--s:2px;--o:0.42;--b:5px;--d:25s;--t:-18s;--c:232 67 147"></i>
-    <i style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--c:232 67 147"></i>
+    <i class="spark" style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--k:23s;--kt:-4s;--c:232 67 147"></i>
     <i style="--x:41%;--y:30%;--s:2px;--o:0.40;--b:5px;--d:14s;--t:-3s;--c:162 155 254"></i>
     <i style="--x:45%;--y:58%;--s:3px;--o:0.46;--b:8px;--d:26s;--t:-25s;--c:162 155 254"></i>
     <i style="--x:55%;--y:18%;--s:3px;--o:0.41;--b:6px;--d:19s;--t:-21s;--c:232 67 147"></i>
-    <i style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--c:232 67 147"></i>
+    <i class="spark" style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--k:13s;--kt:-18s;--c:232 67 147"></i>
     <i style="--x:69%;--y:54%;--s:3px;--o:0.45;--b:7px;--d:28s;--t:-20s;--c:0 206 201"></i>
     <i style="--x:75%;--y:82%;--s:3px;--o:0.30;--b:7px;--d:28s;--t:-5s;--c:162 155 254"></i>
     <i style="--x:81%;--y:72%;--s:3px;--o:0.41;--b:7px;--d:14s;--t:-16s;--c:0 206 201"></i>
-    <i style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--c:162 155 254"></i>
+    <i class="spark" style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--k:29s;--kt:-25s;--c:162 155 254"></i>
     <i style="--x:95%;--y:12%;--s:2px;--o:0.36;--b:7px;--d:18s;--t:-7s;--c:232 67 147"></i>
 </div>
 {{ end }}
@@ -88,12 +92,12 @@
 <!-- closest — biggest, brightest, widest bob -->
 <div class="hero-particle-field">
     <i style="--x:9%;--y:53%;--s:4px;--o:0.53;--b:11px;--d:28s;--t:-22s;--c:162 155 254"></i>
-    <i style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--c:162 155 254"></i>
+    <i class="spark" style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--k:19s;--kt:-7s;--c:162 155 254"></i>
     <i style="--x:29%;--y:87%;--s:3px;--o:0.59;--b:7px;--d:14s;--t:-11s;--c:0 206 201"></i>
-    <i style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--c:232 67 147"></i>
+    <i class="spark" style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--k:11s;--kt:-3s;--c:232 67 147"></i>
     <i style="--x:59%;--y:37%;--s:4px;--o:0.51;--b:8px;--d:13s;--t:-23s;--c:232 67 147"></i>
-    <i style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--c:162 155 254"></i>
+    <i class="spark" style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--k:27s;--kt:-16s;--c:162 155 254"></i>
     <i style="--x:76%;--y:46%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-10s;--c:232 67 147"></i>
-    <i style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--c:232 67 147"></i>
+    <i class="spark" style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--k:15s;--kt:-9s;--c:232 67 147"></i>
 </div>
 {{ end }}

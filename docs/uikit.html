@@ -1297,7 +1297,7 @@ log
     <div class="uikit-grid mb-6">
       <div class="hero-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">hero-glow</p>
-        <div class="uikit-label">Radial gradient: pink center, purple mid &middot; breathes via 13s opacity/scale loop (scale, not transform &mdash; keeps Tailwind translate utilities intact) &middot; drifts up to 46&times;34px toward the pointer via transform + --hx/--hy (see hero pointer parallax below)</div>
+        <div class="uikit-label">Radial gradient: warm core, pink center, purple mid &middot; incandescent-bulb behaviour &mdash; brightness holds at 0.72 and only sags to 0.57&ndash;0.64 for a few tenths of a second (hero-glow-flicker, 9.7s; a warm ::after core flickers on its own 13.3s period so the two never line up), while hero-glow-breathe drifts the size 5% over 23s (scale, not transform &mdash; keeps Tailwind translate utilities intact) &middot; drifts up to 46&times;34px toward the pointer via transform + --hx/--hy (see hero pointer parallax below)</div>
       </div>
       <div class="cta-glow rounded-2xl p-8 text-center border border-w-line/30">
         <p class="text-sm text-w-sub">cta-glow</p>
@@ -1384,17 +1384,17 @@ log
               <div class="hero-particle-field">
                 <i style="--x:6%;--y:37%;--s:2px;--o:0.31;--b:5px;--d:19s;--t:-12s;--c:0 206 201"></i>
                 <i style="--x:14%;--y:46%;--s:3px;--o:0.42;--b:8px;--d:23s;--t:-23s;--c:0 206 201"></i>
-                <i style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--c:162 155 254"></i>
+                <i class="spark" style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--k:17s;--kt:-11s;--c:162 155 254"></i>
                 <i style="--x:26%;--y:65%;--s:2px;--o:0.42;--b:5px;--d:25s;--t:-18s;--c:232 67 147"></i>
-                <i style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--c:232 67 147"></i>
+                <i class="spark" style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--k:23s;--kt:-4s;--c:232 67 147"></i>
                 <i style="--x:41%;--y:30%;--s:2px;--o:0.40;--b:5px;--d:14s;--t:-3s;--c:162 155 254"></i>
                 <i style="--x:45%;--y:58%;--s:3px;--o:0.46;--b:8px;--d:26s;--t:-25s;--c:162 155 254"></i>
                 <i style="--x:55%;--y:18%;--s:3px;--o:0.41;--b:6px;--d:19s;--t:-21s;--c:232 67 147"></i>
-                <i style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--c:232 67 147"></i>
+                <i class="spark" style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--k:13s;--kt:-18s;--c:232 67 147"></i>
                 <i style="--x:69%;--y:54%;--s:3px;--o:0.45;--b:7px;--d:28s;--t:-20s;--c:0 206 201"></i>
                 <i style="--x:75%;--y:82%;--s:3px;--o:0.30;--b:7px;--d:28s;--t:-5s;--c:162 155 254"></i>
                 <i style="--x:81%;--y:72%;--s:3px;--o:0.41;--b:7px;--d:14s;--t:-16s;--c:0 206 201"></i>
-                <i style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--c:162 155 254"></i>
+                <i class="spark" style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--k:29s;--kt:-25s;--c:162 155 254"></i>
                 <i style="--x:95%;--y:12%;--s:2px;--o:0.36;--b:7px;--d:18s;--t:-7s;--c:232 67 147"></i>
               </div>
               
@@ -1403,17 +1403,17 @@ log
               <div class="hero-particle-field">
                 <i style="--x:6%;--y:37%;--s:2px;--o:0.31;--b:5px;--d:19s;--t:-12s;--c:0 206 201"></i>
                 <i style="--x:14%;--y:46%;--s:3px;--o:0.42;--b:8px;--d:23s;--t:-23s;--c:0 206 201"></i>
-                <i style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--c:162 155 254"></i>
+                <i class="spark" style="--x:19%;--y:75%;--s:3px;--o:0.38;--b:8px;--d:24s;--t:-6s;--k:17s;--kt:-11s;--c:162 155 254"></i>
                 <i style="--x:26%;--y:65%;--s:2px;--o:0.42;--b:5px;--d:25s;--t:-18s;--c:232 67 147"></i>
-                <i style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--c:232 67 147"></i>
+                <i class="spark" style="--x:31%;--y:26%;--s:3px;--o:0.36;--b:5px;--d:16s;--t:-21s;--k:23s;--kt:-4s;--c:232 67 147"></i>
                 <i style="--x:41%;--y:30%;--s:2px;--o:0.40;--b:5px;--d:14s;--t:-3s;--c:162 155 254"></i>
                 <i style="--x:45%;--y:58%;--s:3px;--o:0.46;--b:8px;--d:26s;--t:-25s;--c:162 155 254"></i>
                 <i style="--x:55%;--y:18%;--s:3px;--o:0.41;--b:6px;--d:19s;--t:-21s;--c:232 67 147"></i>
-                <i style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--c:232 67 147"></i>
+                <i class="spark" style="--x:63%;--y:87%;--s:2px;--o:0.41;--b:7px;--d:26s;--t:-34s;--k:13s;--kt:-18s;--c:232 67 147"></i>
                 <i style="--x:69%;--y:54%;--s:3px;--o:0.45;--b:7px;--d:28s;--t:-20s;--c:0 206 201"></i>
                 <i style="--x:75%;--y:82%;--s:3px;--o:0.30;--b:7px;--d:28s;--t:-5s;--c:162 155 254"></i>
                 <i style="--x:81%;--y:72%;--s:3px;--o:0.41;--b:7px;--d:14s;--t:-16s;--c:0 206 201"></i>
-                <i style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--c:162 155 254"></i>
+                <i class="spark" style="--x:90%;--y:41%;--s:2px;--o:0.41;--b:8px;--d:18s;--t:-28s;--k:29s;--kt:-25s;--c:162 155 254"></i>
                 <i style="--x:95%;--y:12%;--s:2px;--o:0.36;--b:7px;--d:18s;--t:-7s;--c:232 67 147"></i>
               </div>
               
@@ -1423,26 +1423,26 @@ log
               
               <div class="hero-particle-field">
                 <i style="--x:9%;--y:53%;--s:4px;--o:0.53;--b:11px;--d:28s;--t:-22s;--c:162 155 254"></i>
-                <i style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--c:162 155 254"></i>
+                <i class="spark" style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--k:19s;--kt:-7s;--c:162 155 254"></i>
                 <i style="--x:29%;--y:87%;--s:3px;--o:0.59;--b:7px;--d:14s;--t:-11s;--c:0 206 201"></i>
-                <i style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--c:232 67 147"></i>
+                <i class="spark" style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--k:11s;--kt:-3s;--c:232 67 147"></i>
                 <i style="--x:59%;--y:37%;--s:4px;--o:0.51;--b:8px;--d:13s;--t:-23s;--c:232 67 147"></i>
-                <i style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--c:162 155 254"></i>
+                <i class="spark" style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--k:27s;--kt:-16s;--c:162 155 254"></i>
                 <i style="--x:76%;--y:46%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-10s;--c:232 67 147"></i>
-                <i style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--c:232 67 147"></i>
+                <i class="spark" style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--k:15s;--kt:-9s;--c:232 67 147"></i>
               </div>
               
               
               
               <div class="hero-particle-field">
                 <i style="--x:9%;--y:53%;--s:4px;--o:0.53;--b:11px;--d:28s;--t:-22s;--c:162 155 254"></i>
-                <i style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--c:162 155 254"></i>
+                <i class="spark" style="--x:18%;--y:16%;--s:4px;--o:0.52;--b:9px;--d:13s;--t:-32s;--k:19s;--kt:-7s;--c:162 155 254"></i>
                 <i style="--x:29%;--y:87%;--s:3px;--o:0.59;--b:7px;--d:14s;--t:-11s;--c:0 206 201"></i>
-                <i style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--c:232 67 147"></i>
+                <i class="spark" style="--x:44%;--y:27%;--s:3px;--o:0.58;--b:7px;--d:14s;--t:-7s;--k:11s;--kt:-3s;--c:232 67 147"></i>
                 <i style="--x:59%;--y:37%;--s:4px;--o:0.51;--b:8px;--d:13s;--t:-23s;--c:232 67 147"></i>
-                <i style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--c:162 155 254"></i>
+                <i class="spark" style="--x:71%;--y:66%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-20s;--k:27s;--kt:-16s;--c:162 155 254"></i>
                 <i style="--x:76%;--y:46%;--s:4px;--o:0.50;--b:7px;--d:20s;--t:-10s;--c:232 67 147"></i>
-                <i style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--c:232 67 147"></i>
+                <i class="spark" style="--x:91%;--y:78%;--s:4px;--o:0.60;--b:11px;--d:27s;--t:-14s;--k:15s;--kt:-9s;--c:232 67 147"></i>
               </div>
               
             </div>
@@ -1450,7 +1450,7 @@ log
         </div>
         <p class="relative z-10 text-sm text-w-sub">hero-wave</p>
       </div>
-      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden<br>hero-particles &middot; dust in three parallax depths riding the same current, all slower than the waves &middot; particles-far / -mid / -near set --speed (240s / 165s / 110s vs 38/61/89s) and get smaller, dimmer and denser with distance &middot; each hero-particles-track is 200% wide and holds its hero-particle-field twice so the loop tiles; each &lt;i&gt; sets --x/--y/--s/--o/--c (+ --b/--d/--t on the two front layers) and only bobs vertically &mdash; horizontal travel and edge fading are the track's and the masks' job &middot; far is intentionally motionless, and far/mid are halved below 640px<br>hero pointer parallax &middot; assets/src/js/lib/heroPointer.js publishes --hx/--hy (pointer offset from the hero centre, -1..1, rAF-eased and parked when settled) on the hero &lt;section&gt; &middot; hero-glow drifts with the pointer via transform, the wave layers (-14/-9/-5px) and particle tracks (-26/-15/-7px) drift against it via the independent translate property &mdash; the drift animations own transform, so the two never collide &middot; no-op on coarse pointers and prefers-reduced-motion</div>
+      <div class="uikit-label">hero-wave &middot; ambient drifting wave lines behind the homepage slogan &middot; 3 layers (wave-a gradient / wave-b purple / wave-c cyan), seamless translateX(-50%) loop, edge fade via mask, respects prefers-reduced-motion &middot; parent needs relative + overflow-hidden<br>hero-particles &middot; dust in three parallax depths riding the same current, all slower than the waves &middot; particles-far / -mid / -near set --speed (240s / 165s / 110s vs 38/61/89s) and get smaller, dimmer and denser with distance &middot; each hero-particles-track is 200% wide and holds its hero-particle-field twice so the loop tiles; each &lt;i&gt; sets --x/--y/--s/--o/--c (+ --b/--d/--t on the two front layers) and only bobs vertically &mdash; horizontal travel and edge fading are the track's and the masks' job &middot; far is intentionally motionless, and far/mid are halved below 640px &middot; a few particles add class=&quot;spark&quot; with --k/--kt: they twinkle once per --k seconds (a bloom on ::after, plus a lens-cross on ::before in the near layer) &mdash; the flare occupies the last ~13% of the cycle, and it lives on pseudo-elements because the bob already owns transform/opacity on the &lt;i&gt;; every spark sits on an odd index so the mobile thinning never removes one<br>hero pointer parallax &middot; assets/src/js/lib/heroPointer.js publishes --hx/--hy (pointer offset from the hero centre, -1..1, rAF-eased and parked when settled) on the hero &lt;section&gt; &middot; hero-glow drifts with the pointer via transform, the wave layers (-14/-9/-5px) and particle tracks (-26/-15/-7px) drift against it via the independent translate property &mdash; the drift animations own transform, so the two never collide &middot; no-op on coarse pointers and prefers-reduced-motion</div>
     </div>
   </div>
 

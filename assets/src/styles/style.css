@@ -523,8 +523,18 @@ input:-webkit-autofill:focus {
    `transform` — both are independent of the `translate` property, so Tailwind's
    `-translate-x-1/2` (v4 emits it via `translate`) survives untouched. */
 .hero-glow {
-  background: radial-gradient(circle, rgba(232,67,147,0.1) 0%, rgba(108,92,231,0.05) 40%, transparent 70%);
-  animation: hero-glow-breathe 13s ease-in-out infinite;
+  /* A hint of warm amber in the innermost stop — at 6% alpha it never reads as
+     a colour of its own, it just keeps the core from looking like cold screen
+     light. The pink/violet body of the gradient is unchanged. */
+  background: radial-gradient(circle, rgba(255,186,120,0.06) 0%, rgba(232,67,147,0.1) 16%, rgba(108,92,231,0.05) 40%, transparent 70%);
+  /* Two animations on disjoint properties: a very slow size drift so the light
+     is never mechanically static, and a brightness track that mostly just
+     holds — the filament reads as burning steadily, with the odd short sag. */
+  /* the level the flicker track holds; also what stays when animations are off */
+  opacity: 0.72;
+  animation:
+    hero-glow-breathe 23s ease-in-out infinite,
+    hero-glow-flicker 9.7s linear infinite;
   /* The pointer offset rides on `transform`, which composes after the
      individual `translate`/`scale` properties — so it stacks on top of
      Tailwind's -translate-x-1/2 and the breathing scale instead of
@@ -532,9 +542,54 @@ input:-webkit-autofill:focus {
   transform: translate3d(calc(var(--hx, 0) * 46px), calc(var(--hy, 0) * 34px), 0);
   will-change: opacity, scale, transform;
 }
+/* Size only, and barely: the halo swells a few percent over 23s. Brightness is
+   left entirely to the flicker track below. */
 @keyframes hero-glow-breathe {
-  0%, 100% { opacity: 0.6; scale: 0.96; }
-  50%      { opacity: 1;   scale: 1.12; }
+  0%, 100% { scale: 1; }
+  47%      { scale: 1.05; }
+}
+/* Incandescent bulb on a slightly unstable mains: the level sits at 0.72 for
+   most of the cycle and only sags for a few tenths of a second at a time. The
+   dips are deliberately uneven — one lone sag, one double stutter, one short
+   surge — because an evenly spaced blink reads as a pulse animation. */
+@keyframes hero-glow-flicker {
+  0%, 11%       { opacity: 0.72; }
+  12%           { opacity: 0.6; }
+  13.2%         { opacity: 0.72; }
+  40%           { opacity: 0.72; }
+  40.8%         { opacity: 0.64; }
+  41.6%         { opacity: 0.71; }
+  42.6%         { opacity: 0.57; }
+  44%           { opacity: 0.72; }
+  67%           { opacity: 0.72; }
+  68%           { opacity: 0.8; }
+  69.5%         { opacity: 0.72; }
+  88%           { opacity: 0.72; }
+  88.9%         { opacity: 0.63; }
+  90%, 100%     { opacity: 0.72; }
+}
+/* Warm core on its own, non-harmonic flicker period. The nested opacity
+   multiplies with the parent's, so the two tracks never line up — the glow
+   keeps drifting slightly in colour temperature instead of just in size. */
+.hero-glow::after {
+  content: "";
+  position: absolute;
+  inset: 16%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255,183,110,0.08) 0%, rgba(232,67,147,0.05) 45%, transparent 72%);
+  animation: hero-glow-ember 13.3s linear infinite;
+  animation-delay: -4s;
+}
+@keyframes hero-glow-ember {
+  0%, 29%   { opacity: 0.9; }
+  30.2%     { opacity: 0.7; }
+  31.5%     { opacity: 0.9; }
+  74%       { opacity: 0.9; }
+  75%       { opacity: 0.72; }
+  75.8%     { opacity: 0.88; }
+  76.9%     { opacity: 0.66; }
+  78.5%     { opacity: 0.9; }
+  100%      { opacity: 0.9; }
 }
 
 .cta-glow {
@@ -650,8 +705,60 @@ input:-webkit-autofill:focus {
   animation-delay: var(--t);
 }
 @keyframes hero-particle-bob {
-  0%, 100% { transform: translate3d(0, calc(var(--b) * -1), 0); opacity: calc(var(--o) * 0.55); }
+  0%, 100% { transform: translate3d(0, calc(var(--b) * -1), 0); opacity: calc(var(--o) * 0.42); }
   50%      { transform: translate3d(0, var(--b), 0);            opacity: var(--o); }
+}
+
+/* Occasional twinkle on a hand-picked few. Rare by construction: the flare
+   occupies the last ~13% of a long cycle, so a marked particle is an ordinary
+   dot most of the time. The bob already owns `transform` and `opacity` on the
+   <i>, so the flare lives on pseudo-elements — both animations stay composited
+   and independent. --k is the cycle length, --kt a negative delay; picking them
+   pairwise non-harmonic is what keeps the field from blinking in unison. */
+.hero-particles i.spark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--s) * 9);
+  height: calc(var(--s) * 9);
+  margin: calc(var(--s) * -4.5) 0 0 calc(var(--s) * -4.5);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.75) 0%, rgb(var(--c) / 0.5) 34%, transparent 70%);
+  opacity: 0;
+  animation: hero-particle-spark var(--k) ease-out infinite;
+  animation-delay: var(--kt);
+}
+/* Lens-style cross flare, near layer only — at 3-4px it reads as a highlight
+   catching the light; on the smaller mid dots the same streak just smears. */
+.particles-near i.spark::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--s) * 11);
+  height: calc(var(--s) * 11);
+  margin: calc(var(--s) * -5.5) 0 0 calc(var(--s) * -5.5);
+  background:
+    linear-gradient(90deg, transparent, rgb(255 255 255 / 0.8), transparent),
+    linear-gradient(0deg, transparent, rgb(255 255 255 / 0.8), transparent);
+  background-size: 100% 1px, 1px 100%;
+  background-position: center center, center center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation: hero-particle-flare var(--k) ease-out infinite;
+  animation-delay: var(--kt);
+}
+/* fast rise, slower bloom-and-fade — the shape of a catching highlight */
+@keyframes hero-particle-spark {
+  0%, 80%, 100% { opacity: 0; scale: 0.3; }
+  86%           { opacity: 1; scale: 1; }
+  93%           { opacity: 0; scale: 1.7; }
+}
+@keyframes hero-particle-flare {
+  0%, 82%, 100% { opacity: 0;   scale: 0.2; }
+  86%           { opacity: 0.9; scale: 1; }
+  92%           { opacity: 0;   scale: 1.4; }
 }
 
 @media (max-width: 640px) {
@@ -664,13 +771,19 @@ input:-webkit-autofill:focus {
      seamless. The near layer is sparse already and carries the depth read. */
   .particles-far i:nth-child(2n),
   .particles-mid i:nth-child(2n) { display: none; }
+  /* every .spark sits on an odd index, so the thinning above never takes one */
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-wave svg { animation: none; }
   .hero-glow { animation: none; transform: none; }
+  .hero-glow::after { animation: none; opacity: 0.9; }
   /* keep the dust, drop the motion */
   .hero-particles-track,
   .hero-particles i { animation: none; }
+  /* pseudo-element animations are separate from the <i>'s, so they need
+     killing explicitly — and a stopped flare is just a stale bright blob */
+  .hero-particles i.spark::before,
+  .hero-particles i.spark::after { display: none; }
   .hero-wave .wave-a,
   .hero-wave .wave-b,
   .hero-wave .wave-c,
