@@ -14,4 +14,3 @@ type LinkResult struct {
 	ServiceType models.StreamingBackendType `json:"service_type"`
 	Cached      bool                        `json:"cached"`
 }
-

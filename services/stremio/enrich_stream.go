@@ -11,12 +11,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	sv "github.com/webtor-io/web-ui/services/common"
-	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/link_resolver/common"
 	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
@@ -30,9 +30,17 @@ import (
 // are deferred to /stremio/resolve, which only runs when the user actually
 // clicks the stream. This keeps /stream's tail latency dominated by the
 // inner addon HTTP fan-out rather than per-stream rest-api round-trips.
+// availabilityChecker is the slice of LinkResolver this layer uses. Kept as
+// an interface so the labelling rules — which of ⚡, WT and P2P a stream gets
+// — are testable without a database behind them.
+type availabilityChecker interface {
+	CheckAvailability(ctx context.Context, id uuid.UUID, cla *claims.Data, hash string, fileIdx int, requiresPayment bool) (*common.CheckAvailabilityResult, error)
+	CheckTorrentAvailability(ctx context.Context, cla *claims.Data, hash string, requiresPayment bool) (*common.CheckAvailabilityResult, error)
+}
+
 type EnrichStream struct {
 	inner        StreamsService
-	linkResolver *lr.LinkResolver
+	linkResolver availabilityChecker
 	u            *auth.User
 	cla          *claims.Data
 	domain       string
@@ -41,7 +49,7 @@ type EnrichStream struct {
 }
 
 // NewEnrichStream creates a new EnrichStream service
-func NewEnrichStream(inner StreamsService, lr *lr.LinkResolver, u *auth.User, cla *claims.Data, domain, token, secret string) *EnrichStream {
+func NewEnrichStream(inner StreamsService, lr availabilityChecker, u *auth.User, cla *claims.Data, domain, token, secret string) *EnrichStream {
 	return &EnrichStream{
 		inner:        inner,
 		linkResolver: lr,
@@ -178,17 +186,22 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem, con
 		return nil, errors.New("stream has no InfoHash")
 	}
 
-	// The availability index is a file index, so it can only be checked
-	// when the source told us which file it meant. Asking about file 0 of a
-	// torrent whose file we have not picked yet would report the cache
-	// state of the wrong file.
-	var availability *common.CheckAvailabilityResult
-	if !stream.FileIdxUnknown {
-		var err error
+	// Two different questions. When the source named a file, ask about that
+	// file. When it did not, ask about the torrent — the per-file cache
+	// index would answer for a file we have not picked, but the result
+	// still has to be non-nil, because a nil one means "no backend serves
+	// this" and shows the stream as P2P.
+	var (
+		availability *common.CheckAvailabilityResult
+		err          error
+	)
+	if stream.FileIdxUnknown {
+		availability, err = s.linkResolver.CheckTorrentAvailability(ctx, s.cla, stream.InfoHash, true)
+	} else {
 		availability, err = s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, stream.FileIdx, true)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check availability")
-		}
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check availability")
 	}
 	stream.Name = s.updateStreamName(stream.Name, availability)
 	// Mark the user's own library entries with a ⭐ so they're unmistakable

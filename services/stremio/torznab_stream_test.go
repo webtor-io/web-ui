@@ -15,6 +15,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/link_resolver/common"
 	tn "github.com/webtor-io/web-ui/services/torznab"
 )
 
@@ -650,5 +653,84 @@ func TestTorznabStreamDropsOtherSeasons(t *testing.T) {
 		if strings.Contains(tl, "Сезон: 1") {
 			t.Errorf("a season 1 release survived a season 3 request: %q", tl)
 		}
+	}
+}
+
+// fakeAvailability stands in for LinkResolver so the labelling rules can be
+// tested without a database.
+type fakeAvailability struct {
+	perFile *common.CheckAvailabilityResult
+	torrent *common.CheckAvailabilityResult
+	calls   []string
+}
+
+func (f *fakeAvailability) CheckAvailability(_ context.Context, _ uuid.UUID, _ *claims.Data, _ string, _ int, _ bool) (*common.CheckAvailabilityResult, error) {
+	f.calls = append(f.calls, "per-file")
+	return f.perFile, nil
+}
+
+func (f *fakeAvailability) CheckTorrentAvailability(_ context.Context, _ *claims.Data, _ string, _ bool) (*common.CheckAvailabilityResult, error) {
+	f.calls = append(f.calls, "torrent")
+	return f.torrent, nil
+}
+
+// TestIndexerStreamsAreLabelledWT: P2P means "no backend will serve this",
+// which is what a free user hitting the paywall sees. Indexer streams play
+// through Webtor exactly like addon streams do, so labelling them P2P — as
+// skipping the availability check did — tells the user the wrong thing about
+// their own indexer's releases.
+func TestIndexerStreamsAreLabelledWT(t *testing.T) {
+	hash := "8c4adbf9ebdc2c31e4b3d01a9e9c5c0f2a1b3c4d"
+	u := &auth.User{}
+
+	for _, tt := range []struct {
+		name     string
+		stream   StreamItem
+		fake     *fakeAvailability
+		wantCall string
+		wantMark string
+	}{
+		{
+			name:     "indexer stream asks about the torrent and is served by webtor",
+			stream:   StreamItem{InfoHash: hash, Name: "Jackett · rutracker\n1080p", FileIdxUnknown: true},
+			fake:     &fakeAvailability{torrent: &common.CheckAvailabilityResult{ServiceType: models.StreamingBackendTypeWebtor}},
+			wantCall: "torrent",
+			wantMark: "[WT]",
+		},
+		{
+			name:     "a vaulted torrent still gets the cache marker",
+			stream:   StreamItem{InfoHash: hash, Name: "Jackett · rutracker\n1080p", FileIdxUnknown: true},
+			fake:     &fakeAvailability{torrent: &common.CheckAvailabilityResult{Cached: true, ServiceType: models.StreamingBackendTypeWebtor}},
+			wantCall: "torrent",
+			wantMark: "[⚡WT]",
+		},
+		{
+			name:     "paywalled free user is the case P2P is for",
+			stream:   StreamItem{InfoHash: hash, Name: "Jackett · rutracker\n1080p", FileIdxUnknown: true},
+			fake:     &fakeAvailability{torrent: nil},
+			wantCall: "torrent",
+			wantMark: "[P2P]",
+		},
+		{
+			name:     "a stream that named its file is still asked about per file",
+			stream:   StreamItem{InfoHash: hash, Name: "Torrentio\n1080p", FileIdx: 3},
+			fake:     &fakeAvailability{perFile: &common.CheckAvailabilityResult{ServiceType: models.StreamingBackendTypeWebtor}},
+			wantCall: "per-file",
+			wantMark: "[WT]",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			es := NewEnrichStream(nil, tt.fake, u, nil, "https://webtor.io", "tok", "secret")
+			got, err := es.enrichStream(context.Background(), &tt.stream, "tt0133093")
+			if err != nil {
+				t.Fatalf("enrichStream() error = %v", err)
+			}
+			if len(tt.fake.calls) != 1 || tt.fake.calls[0] != tt.wantCall {
+				t.Errorf("availability calls = %v, want one %q", tt.fake.calls, tt.wantCall)
+			}
+			if !strings.HasPrefix(got.Name, tt.wantMark) {
+				t.Errorf("name = %q, want it to start with %s", got.Name, tt.wantMark)
+			}
+		})
 	}
 }

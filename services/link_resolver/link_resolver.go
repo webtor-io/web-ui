@@ -312,6 +312,35 @@ func pickLargestVideo(items []ra.ListItem) (int, int64, bool) {
 	return bestIdx, bestSize, found
 }
 
+// CheckTorrentAvailability answers, for a stream whose file is not known yet
+// (see stremio.StreamItem.FileIdxUnknown), the two things that do not depend
+// on which file it is: whether this user gets a Webtor-served link at all,
+// and whether the torrent is already in hot storage.
+//
+// It deliberately skips the per-file cache index. A lookup keyed on a file we
+// have not picked would describe a different file — but skipping the check
+// entirely, as this used to, is worse: a nil result reads as "no backend will
+// serve this" and labels the stream P2P, which is exactly what a paid user
+// seeing their own indexer's releases must not be told.
+func (s *LinkResolver) CheckTorrentAvailability(ctx context.Context, cla *claims.Data, hash string, requiresPayment bool) (*co.CheckAvailabilityResult, error) {
+	if requiresPayment && !s.isPaidUser(cla) {
+		return nil, nil
+	}
+	cached := false
+	if db := s.pg.Get(); db != nil {
+		res, err := vmodels.GetResource(ctx, db, hash)
+		if err != nil {
+			log.WithError(err).WithField("hash", hash).Debug("vault resource lookup failed")
+		} else if res != nil && res.Vaulted {
+			cached = true
+		}
+	}
+	return &co.CheckAvailabilityResult{
+		Cached:      cached,
+		ServiceType: models.StreamingBackendTypeWebtor,
+	}, nil
+}
+
 // isPaidUser checks if the user has paid tier
 func (s *LinkResolver) isPaidUser(userClaims *claims.Data) bool {
 	if userClaims == nil || userClaims.Context == nil || userClaims.Context.Tier == nil {
