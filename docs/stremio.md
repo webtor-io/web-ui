@@ -62,6 +62,15 @@ Jackett query fans out to every configured tracker). `CompositeStream`
 reports the max of its children, so nesting one composite inside another
 does not clamp the inner budget back to the default.
 
+**Language detection falls back to the script.** `ExtractLanguages` matches
+explicit tags first (`rus`, `рус`, `ukr`, …); when a title carries none, a
+Cyrillic title counts as Russian, or Ukrainian if it has letters Russian does
+not (`і ї є ґ`), and the Russian-scene voice-over markers `AVO`/`MVO`/`DVO`
+count as Russian on their own. Found in production: a user with Russian as
+their preferred language had a rutracker release dropped from their Stremio
+list because the title was transliterated English tagged only "AVO". Keep
+`assets/src/js/lib/discover/lang.js` in sync — Discover shows the same chips.
+
 **Library streams are exempt from PreferredStream and LangFilterStream.** They
 carry a `webtorio|<resourceID>` bingeGroup (`libraryBingeGroupPrefix`); both
 filters skip anything with that prefix, because the user already opted into

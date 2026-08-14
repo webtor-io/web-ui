@@ -91,3 +91,52 @@ func TestSortVaultFirstByResolution(t *testing.T) {
 		t.Fatalf("720p[1]: want non-cached after cached, got %+v", streams[4])
 	}
 }
+
+// TestExtractLanguagesOnTrackerTitles uses titles as they actually arrive
+// from a Russian tracker. Found in production: a user whose preferred
+// language is Russian got a rutracker release filtered out of their Stremio
+// list, because the title was transliterated English and carried no "rus"
+// token — only "AVO".
+func TestExtractLanguagesOnTrackerTitles(t *testing.T) {
+	has := func(langs []*Language, name string) bool {
+		for _, l := range langs {
+			if l.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, tt := range []struct {
+		title string
+		want  string
+		not   string
+	}{
+		// The exact title from the production check.
+		{title: "Breaking Bad / S1E1-62 of 62 [2008-2013, BDRip 720p] AVO ( «Goblin» )", want: "Russian"},
+		{title: "Silo / S3E1-6 of 10 [2026, WEB-DL] MVO (LostFilm) + Original", want: "Russian"},
+		{title: "Some.Release.2024.1080p.DVO", want: "Russian"},
+		// Cyrillic anywhere is the tag by itself.
+		{title: "Во все тяжкие / Breaking Bad [S01-05] BDRemux 1080p", want: "Russian"},
+		// Ukrainian-only letters win over the Russian default.
+		{title: "Укриття / Silo / Сезон 3 [укр. озвучення]", want: "Ukrainian", not: "Russian"},
+		{title: "Укриття / Сезон 3 [українська озвучка]", want: "Ukrainian", not: "Russian"},
+		// Explicit tags still work and must not be crowded out.
+		{title: "Movie.2024.1080p.rus.eng", want: "English"},
+		// Control: another scene's dub must not become Russian.
+		{title: "Film.2024.German.DL.1080p.BluRay", want: "German", not: "Russian"},
+		{title: "Movie.2024.1080p.WEB-DL.x264", not: "Russian"},
+	} {
+		got := ExtractLanguages(tt.title)
+		if tt.want != "" && !has(got, tt.want) {
+			names := []string{}
+			for _, l := range got {
+				names = append(names, l.Name)
+			}
+			t.Errorf("ExtractLanguages(%.50q…) = %v, want it to include %s", tt.title, names, tt.want)
+		}
+		if tt.not != "" && has(got, tt.not) {
+			t.Errorf("ExtractLanguages(%.50q…) wrongly reports %s", tt.title, tt.not)
+		}
+	}
+}

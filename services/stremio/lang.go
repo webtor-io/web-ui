@@ -17,8 +17,8 @@ type Language struct {
 // sync with assets/src/js/lib/discover/lang.js.
 var Languages = []Language{
 	{Code: "en", Name: "English", Flag: "🇬🇧", Aliases: []string{"eng", "english", "en"}},
-	{Code: "ru", Name: "Russian", Flag: "🇷🇺", Aliases: []string{"rus", "russian", "ru"}},
-	{Code: "uk", Name: "Ukrainian", Flag: "🇺🇦", Aliases: []string{"ukr", "ukrainian", "ua"}},
+	{Code: "ru", Name: "Russian", Flag: "🇷🇺", Aliases: []string{"rus", "russian", "ru", "рус", "русский"}},
+	{Code: "uk", Name: "Ukrainian", Flag: "🇺🇦", Aliases: []string{"ukr", "ukrainian", "ua", "укр", "українська"}},
 	{Code: "it", Name: "Italian", Flag: "🇮🇹", Aliases: []string{"ita", "italian", "it"}},
 	{Code: "fr", Name: "French", Flag: "🇫🇷", Aliases: []string{"fre", "french", "fr"}},
 	{Code: "es", Name: "Spanish", Flag: "🇪🇸", Aliases: []string{"spa", "spanish", "es"}},
@@ -104,8 +104,57 @@ func ExtractLanguages(title string) []*Language {
 			seen[l.Name] = true
 			out = append(out, l)
 		}
+		// Voice-over abbreviations that only the Russian scene uses. A
+		// rutracker release is routinely titled in transliterated English
+		// with nothing but "AVO"/"MVO"/"DVO" to say what language it is in,
+		// and a user who asked for Russian would otherwise have exactly
+		// those releases filtered out.
+		if ruVoiceOver[lower] {
+			addLang(&out, seen, "ru")
+		}
+	}
+	// Only when nothing was tagged explicitly: Cyrillic in the title is
+	// itself the tag. Ukrainian-only letters mean Ukrainian, anything else
+	// Cyrillic is Russian in practice on the trackers these titles come
+	// from. Running this as a fallback rather than an addition keeps a
+	// Ukrainian release from also counting as Russian.
+	if len(out) == 0 && hasCyrillic(title) {
+		if hasUkrainianLetters(title) {
+			addLang(&out, seen, "uk")
+		} else {
+			addLang(&out, seen, "ru")
+		}
 	}
 	return out
+}
+
+// ruVoiceOver are dubbing markers specific to the Russian scene: авторский,
+// многоголосый and двухголосый voice-over. Deliberately excludes the bare
+// "VO" and "DUB", which every scene uses.
+var ruVoiceOver = map[string]bool{"avo": true, "mvo": true, "dvo": true}
+
+func addLang(out *[]*Language, seen map[string]bool, code string) {
+	l := LanguageByCode(code)
+	if l == nil || seen[l.Name] {
+		return
+	}
+	seen[l.Name] = true
+	*out = append(*out, l)
+}
+
+func hasCyrillic(s string) bool {
+	for _, r := range s {
+		if r >= 0x0400 && r <= 0x04FF {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUkrainianLetters looks for the letters Ukrainian has and Russian does
+// not, in either case.
+func hasUkrainianLetters(s string) bool {
+	return strings.ContainsAny(s, "іїєґІЇЄҐ")
 }
 
 // LanguageByCode returns the Language entry with the given 2-letter code, or nil.

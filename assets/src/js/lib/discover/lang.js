@@ -2,8 +2,8 @@
 
 const LANGUAGES = [
     { name: 'English',    flag: '🇬🇧', aliases: ['eng', 'english', 'en'], extraFlags: ['🇺🇸', '🇦🇺'] },
-    { name: 'Russian',    flag: '🇷🇺', aliases: ['rus', 'russian', 'ru'] },
-    { name: 'Ukrainian',  flag: '🇺🇦', aliases: ['ukr', 'ukrainian', 'ua'] },
+    { name: 'Russian',    flag: '🇷🇺', aliases: ['rus', 'russian', 'ru', 'рус', 'русский'] },
+    { name: 'Ukrainian',  flag: '🇺🇦', aliases: ['ukr', 'ukrainian', 'ua', 'укр', 'українська'] },
     { name: 'Italian',    flag: '🇮🇹', aliases: ['ita', 'italian', 'it'] },
     { name: 'French',     flag: '🇫🇷', aliases: ['fre', 'french', 'fr'] },
     { name: 'Spanish',    flag: '🇪🇸', aliases: ['spa', 'spanish', 'es'] },
@@ -81,6 +81,8 @@ export function supportsFlagEmoji() {
     return flagEmojiSupport;
 }
 
+const RU_VOICE_OVER = new Set(['avo', 'mvo', 'dvo']);
+
 export function extractLanguages(title) {
     if (!title) return [];
     const found = {};
@@ -94,6 +96,21 @@ export function extractLanguages(title) {
         if (lang && !found[lang.name]) {
             found[lang.name] = lang;
         }
+        // Voice-over abbreviations only the Russian scene uses. A tracker
+        // release is routinely titled in transliterated English with
+        // nothing but "AVO"/"MVO"/"DVO" to say what language it is in.
+        if (RU_VOICE_OVER.has(lower)) {
+            const ru = LANG_MAP['ru'];
+            if (ru && !found[ru.name]) found[ru.name] = ru;
+        }
+    }
+    // Only when nothing was tagged explicitly: Cyrillic is itself the tag.
+    // Ukrainian-only letters mean Ukrainian, anything else Cyrillic is
+    // Russian on the trackers these titles come from. Keep in sync with
+    // ExtractLanguages in services/stremio/lang.go.
+    if (Object.keys(found).length === 0 && /[\u0400-\u04FF]/.test(title)) {
+        const lang = LANG_MAP[/[іїєґІЇЄҐ]/.test(title) ? 'ukr' : 'ru'];
+        if (lang) found[lang.name] = lang;
     }
     return Object.values(found);
 }
