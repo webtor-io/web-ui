@@ -25,6 +25,15 @@ var Tools = []Tool{
 	{Url: "torrent-to-mp4", Title: "tool.torrentToMp4.title", Benefit: "tool.torrentToMp4.benefit", Description: "tool.torrentToMp4.description"},
 	{Url: "watch-torrents-online", Title: "tool.watchTorrentsOnline.title", Benefit: "tool.watchTorrentsOnline.benefit", Description: "tool.watchTorrentsOnline.description"},
 	{Url: "watch-torrents-ios", Title: "tool.watchTorrentsIos.title", Benefit: "tool.watchTorrentsIos.benefit", Description: "tool.watchTorrentsIos.description"},
+	// Question-shaped landings. GSC, 28 days: the "how to open/download a
+	// torrent file" queries bring ~7k impressions a month, land on the home
+	// page at positions 6-8 and convert at 1-3%, while the one question that
+	// has its own page (/watch-torrents-ios) converts at 7-10% from
+	// position 4. The titles are phrased as the question for that reason —
+	// what loses the click is a product headline answering a how-to query.
+	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description"},
+	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description"},
+	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description"},
 	{Url: "online-torrent-downloader", Title: "tool.onlineTorrentDownloader.title", Benefit: "tool.onlineTorrentDownloader.benefit", Description: "tool.onlineTorrentDownloader.description"},
 	{Url: "stream-torrent-online", Title: "tool.streamTorrentOnline.title", Benefit: "tool.streamTorrentOnline.benefit", Description: "tool.streamTorrentOnline.description"},
 	{Url: "torrent-player", Title: "tool.torrentPlayer.title", Benefit: "tool.torrentPlayer.benefit", Description: "tool.torrentPlayer.description"},
