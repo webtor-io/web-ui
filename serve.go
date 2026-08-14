@@ -39,6 +39,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/stremio/stremio_addon_url"
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
+	"github.com/webtor-io/web-ui/handlers/torznab_indexer"
 	ush "github.com/webtor-io/web-ui/handlers/user_subtitle"
 	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
@@ -84,6 +85,7 @@ import (
 	w "github.com/webtor-io/web-ui/services/web"
 
 	stremios "github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/torznab"
 )
 
 func makeServeCMD() cli.Command {
@@ -120,6 +122,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = embed.RegisterFlags(c.Flags)
 	c.Flags = rum.RegisterFlags(c.Flags)
 	c.Flags = stremios.RegisterClientFlags(c.Flags)
+	c.Flags = torznab.RegisterFlags(c.Flags)
 	c.Flags = ac.RegisterFlags(c.Flags)
 	c.Flags = configureEnricher(c.Flags)
 	c.Flags = configureRecommendations(c.Flags)
@@ -446,8 +449,24 @@ func serve(c *cli.Context) error {
 	// Setting Donate (crypto checkout appears when the gateway is configured)
 	donate.RegisterHandler(c, r, tm, payClient, jobs)
 
+	// Setting RequestURLMapper
+	requestURLMapper, err := rum.NewRequestURLMapper(c)
+	if err != nil {
+		return err
+	}
+
+	// Setting StremioBuilder
+	stremioAddonCl := stremios.NewClient(c)
+
+	// Setting Torznab
+	torznabCl := torznab.New(c)
+	torznabTitles := torznab.NewCinemetaTitles(torznabCl.HTTP(), c.String(torznab.UserAgentFlag))
+	torznabValidator := torznab.NewValidator(torznabCl)
+
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper, torznabCl, torznabTitles)
+
 	// Setting Discover
-	discover.RegisterHandler(r, tm, pg, en)
+	discover.RegisterHandler(r, tm, pg, en, sb)
 
 	// Setting AI Recommendations (Discover)
 	//
@@ -475,16 +494,6 @@ func serve(c *cli.Context) error {
 	// Setting CacheIndex
 	cacheIndex := ci.New(c, pg)
 
-	// Setting RequestURLMapper
-	requestURLMapper, err := rum.NewRequestURLMapper(c)
-	if err != nil {
-		return err
-	}
-
-	// Setting StremioBuilder
-	stremioAddonCl := stremios.NewClient(c)
-	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper)
-
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
 
@@ -496,6 +505,12 @@ func serve(c *cli.Context) error {
 
 	// Setting Handler
 	err = stremio_addon_url.RegisterHandler(c, av, r, pg)
+	if err != nil {
+		return err
+	}
+
+	// Setting Torznab Indexers
+	err = torznab_indexer.RegisterHandler(c, torznabValidator, r, pg)
 	if err != nil {
 		return err
 	}

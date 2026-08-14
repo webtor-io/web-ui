@@ -15,6 +15,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
+	tn "github.com/webtor-io/web-ui/services/torznab"
 )
 
 type Builder struct {
@@ -26,9 +27,12 @@ type Builder struct {
 	userAgent        string
 	secret           string
 	requestURLMapper *rum.RequestURLMapper
+	tn               *tn.Client
+	titles           tn.TitleResolver
+	tnCache          *lazymap.LazyMap[*StreamsResponse]
 }
 
-func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, requestURLMapper *rum.RequestURLMapper) *Builder {
+func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, requestURLMapper *rum.RequestURLMapper, tnClient *tn.Client, titles tn.TitleResolver) *Builder {
 	return &Builder{
 		pg: pg,
 		cache: lazymap.New[*StreamsResponse](&lazymap.Config{
@@ -41,6 +45,18 @@ func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, reque
 		cl:               cl,
 		userAgent:        c.String(StremioUserAgentFlag),
 		requestURLMapper: requestURLMapper,
+		tn:               tnClient,
+		titles:           titles,
+		// Indexers get their own map. lazymap serialises work per map with
+		// a default concurrency of 10, and a Torznab fetch occupies its
+		// slot for up to 12s against an addon's 5s — sharing one map lets
+		// a handful of slow indexers starve every addon fetch on the
+		// replica. Concurrency is raised for the same reason.
+		tnCache: lazymap.New[*StreamsResponse](&lazymap.Config{
+			Concurrency: 32,
+			Expire:      1 * time.Minute,
+			ErrorExpire: 10 * time.Second,
+		}),
 	}
 }
 
@@ -68,6 +84,25 @@ func (s *Builder) BuildMetaService(u *auth.User) (MetaService, error) {
 	return mes, nil
 }
 
+// BuildTorznabStreamsService builds only the Torznab half of the stream
+// pipeline. Discover needs it because the browser cannot query an indexer
+// itself: Jackett and Prowlarr send no CORS headers, and a self-hosted
+// indexer on http:// is blocked as mixed content from an https:// page
+// regardless. Everything else Discover does still happens client-side.
+//
+// Returns nil when Torznab is not configured, so callers can skip the
+// endpoint entirely.
+func (s *Builder) BuildTorznabStreamsService(ctx context.Context, u *auth.User) (StreamsService, error) {
+	if s.tn == nil {
+		return nil, nil
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database not initialized")
+	}
+	return NewTorznabCompositeStreamsByUserID(ctx, db, s.tn, u.ID, s.titles, s.tnCache)
+}
+
 func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {
@@ -87,6 +122,17 @@ func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.
 			return nil, err
 		}
 		services = append(services, acs)
+
+		// Torznab indexers come after the addons on purpose: DedupStream
+		// keeps the first stream per infohash, and an addon result carries
+		// a file index the indexer has no way of knowing.
+		if s.tn != nil {
+			tcs, err := NewTorznabCompositeStreamsByUserID(ctx, db, s.tn, u.ID, s.titles, s.tnCache)
+			if err != nil {
+				return nil, err
+			}
+			services = append(services, tcs)
+		}
 	}
 
 	cs := NewCompositeStream(services)

@@ -41,6 +41,9 @@
     <div id="addon-urls" data-async-layout="{{`{{ template "profile/addon_urls" $ }}`}}">
         {{ template "profile/addon_urls" $ }}
     </div>
+    <div id="torznab-indexers" data-async-layout="{{`{{ template "profile/torznab_indexers" $ }}`}}">
+        {{ template "profile/torznab_indexers" $ }}
+    </div>
     <div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}`}}">
         {{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}
     </div>

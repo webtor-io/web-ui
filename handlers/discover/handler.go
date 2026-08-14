@@ -13,6 +13,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -36,8 +37,17 @@ type addonView struct {
 	FetchedAt  *time.Time `json:"fetchedAt,omitempty"`
 }
 
+// indexerView is the per-indexer bootstrap. Only what the stream modal
+// needs to label results and to decide whether asking the server for
+// indexer streams is worth a round-trip at all.
+type indexerView struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type indexData struct {
-	Addons []addonView
+	Addons   []addonView
+	Indexers []indexerView
 }
 
 // enricher is the slice of enrich.Enricher the localize endpoint needs.
@@ -52,17 +62,22 @@ type Handler struct {
 	tb template.Builder[*web.Context]
 	pg *cs.PG
 	en *enrich.Enricher
+	// sb builds the Torznab half of the stream pipeline — see torznab.go
+	// for why that half cannot run in the browser.
+	sb *stremio.Builder
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("discover/*").WithLayout("main"),
 		pg: pg,
 		en: en,
+		sb: sb,
 	}
 	r.GET("/discover", h.index)
 	r.POST("/discover/localize", auth.HasAuth, h.localize)
 	r.POST("/discover/reviews", auth.HasAuth, h.reviews)
+	r.POST("/discover/torznab/streams", auth.HasAuth, h.torznabStreams)
 }
 
 func (h *Handler) index(c *gin.Context) {
@@ -112,8 +127,22 @@ func (h *Handler) index(c *gin.Context) {
 		}
 	}
 
+	indexers, err := models.GetUserTorznabIndexers(c.Request.Context(), db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get torznab indexers"))
+		return
+	}
+	indexerViews := make([]indexerView, len(indexers))
+	for i, ix := range indexers {
+		indexerViews[i] = indexerView{
+			ID:   ix.ID.String(),
+			Name: ix.GetName(),
+		}
+	}
+
 	h.tb.Build("discover/index").HTML(http.StatusOK, web.NewContext(c).WithData(&indexData{
-		Addons: views,
+		Addons:   views,
+		Indexers: indexerViews,
 	}))
 }
 

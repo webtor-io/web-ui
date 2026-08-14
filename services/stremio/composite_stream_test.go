@@ -280,3 +280,69 @@ func TestConvertManifestURLToBaseURL(t *testing.T) {
 		})
 	}
 }
+
+// slowService reports how long it was allowed to run before its context was
+// cancelled, which is how the timeout tests below observe the budget.
+type slowService struct {
+	timeout time.Duration
+	gotCtx  chan time.Duration
+}
+
+func (s *slowService) GetName() string { return "SlowService" }
+
+func (s *slowService) GetTimeout() time.Duration { return s.timeout }
+
+func (s *slowService) GetStreams(ctx context.Context, _, _ string) (*StreamsResponse, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		s.gotCtx <- 0
+		return &StreamsResponse{}, nil
+	}
+	s.gotCtx <- time.Until(deadline)
+	return &StreamsResponse{}, nil
+}
+
+// plainService takes the default budget.
+type plainService struct {
+	gotCtx chan time.Duration
+}
+
+func (s *plainService) GetName() string { return "PlainService" }
+
+func (s *plainService) GetStreams(ctx context.Context, _, _ string) (*StreamsResponse, error) {
+	deadline, _ := ctx.Deadline()
+	s.gotCtx <- time.Until(deadline)
+	return &StreamsResponse{}, nil
+}
+
+func TestCompositeStreamHonoursServiceTimeout(t *testing.T) {
+	slow := &slowService{timeout: 12 * time.Second, gotCtx: make(chan time.Duration, 1)}
+	plain := &plainService{gotCtx: make(chan time.Duration, 1)}
+
+	cs := NewCompositeStream([]StreamsService{slow, plain})
+	if _, err := cs.GetStreams(context.Background(), "movie", "tt0133093"); err != nil {
+		t.Fatalf("GetStreams() error = %v", err)
+	}
+
+	// Torznab indexers ask for more than the addon default; without the
+	// TimeoutedService check they would be cut at 5s and dropped.
+	if got := <-slow.gotCtx; got < 10*time.Second {
+		t.Errorf("slow service budget = %v, want ~12s", got)
+	}
+	if got := <-plain.gotCtx; got > 6*time.Second {
+		t.Errorf("plain service budget = %v, want the 5s default", got)
+	}
+}
+
+func TestCompositeStreamTimeoutIsMaxOfChildren(t *testing.T) {
+	// Composites nest: the Torznab composite is one service of the outer
+	// composite, so the outer must not clamp it back to the default.
+	inner := NewCompositeStream([]StreamsService{&slowService{timeout: 12 * time.Second, gotCtx: make(chan time.Duration, 1)}})
+	if got := inner.GetTimeout(); got != 12*time.Second {
+		t.Errorf("nested composite timeout = %v, want 12s", got)
+	}
+	empty := NewCompositeStream(nil)
+	if got := empty.GetTimeout(); got != 0 {
+		t.Errorf("empty composite timeout = %v, want 0 (falls back to the default)", got)
+	}
+}

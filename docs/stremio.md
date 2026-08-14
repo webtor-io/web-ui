@@ -40,13 +40,27 @@ resource request, which some clients handle poorly.
 `Builder.BuildStreamsService` composes layers (inner → outer):
 
 ```
-Library + AddonComposite        // user's library + external addons
+Library + AddonComposite + TorznabComposite   // library, addons, indexers
   → CompositeStream             // parallel fan-out, order preserved
   → DedupStream                 // dedupe by infohash (first wins)
   → PreferredStream             // keep only enabled resolutions …
   → LangFilterStream            // … and the preferred audio language
   → EnrichStream                // attach the /resolve URL + ⚡ cache marker
 ```
+
+**Torznab indexers are a source, not a feature of their own.** They enter the
+pipeline as one more `StreamsService` and every layer below treats them like
+addon streams — see [torznab.md](./torznab.md). Two consequences worth
+knowing here: the Torznab composite is appended *after* the addon composite
+so `DedupStream` prefers the addon copy of a shared infohash (it carries a
+file index the indexer cannot know), and indexers are gated by the same
+`discover_only` setting as addons.
+
+Per-service timeouts are no longer fixed at 5s: a source may implement
+`TimeoutedService` to ask for its own budget (Torznab uses 12s, since a
+Jackett query fans out to every configured tracker). `CompositeStream`
+reports the max of its children, so nesting one composite inside another
+does not clamp the inner budget back to the default.
 
 **Library streams are exempt from PreferredStream and LangFilterStream.** They
 carry a `webtorio|<resourceID>` bingeGroup (`libraryBingeGroupPrefix`); both

@@ -196,6 +196,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - GeoIP: `USE_GEOIP_API`, `GEOIP_API_SERVICE_HOST/PORT`
 - Claims (user tiers): `USE_CLAIMS`, `CLAIMS_PROVIDER_SERVICE_HOST/PORT`
 - Stremio addon: `STREMIO_ADDON_USER_AGENT`, `STREMIO_ADDON_PROXY`
+- Torznab indexers: `TORZNAB_TIMEOUT`, `TORZNAB_MAX_RESULTS`, `TORZNAB_USER_AGENT`, `TORZNAB_ALLOW_PRIVATE_NETWORK` (последний — только для self-hosted: снимает запрет на приватные адреса, см. `docs/torznab.md`)
 
 ## Workflow
 

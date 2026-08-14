@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,7 +81,7 @@ func (s *EnrichStream) GetStreams(ctx context.Context, contentType, contentID st
 			defer wg.Done()
 
 			streamCopy := *si
-			enriched, err := s.enrichStream(eCtx, &streamCopy)
+			enriched, err := s.enrichStream(eCtx, &streamCopy, contentID)
 			if err != nil {
 				log.WithError(err).
 					WithField("infohash", streamCopy.InfoHash).
@@ -168,7 +170,7 @@ func sortVaultFirstByResolution(streams []StreamItem) {
 }
 
 // enrichStream sets the redirect URL and ⚡ marker for a single stream.
-func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*StreamItem, error) {
+func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem, contentID string) (*StreamItem, error) {
 	if stream.Url != "" {
 		return stream, nil
 	}
@@ -176,9 +178,17 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 		return nil, errors.New("stream has no InfoHash")
 	}
 
-	availability, err := s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, stream.FileIdx, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check availability")
+	// The availability index is a file index, so it can only be checked
+	// when the source told us which file it meant. Asking about file 0 of a
+	// torrent whose file we have not picked yet would report the cache
+	// state of the wrong file.
+	var availability *common.CheckAvailabilityResult
+	if !stream.FileIdxUnknown {
+		var err error
+		availability, err = s.linkResolver.CheckAvailability(ctx, s.u.ID, s.cla, stream.InfoHash, stream.FileIdx, true)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check availability")
+		}
 	}
 	stream.Name = s.updateStreamName(stream.Name, availability)
 	// Mark the user's own library entries with a ⭐ so they're unmistakable
@@ -192,7 +202,7 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 		stream.Cached = true
 	}
 
-	stream.Url = s.generateRedirectURL(stream)
+	stream.Url = s.generateRedirectURL(stream, contentID)
 	return stream, nil
 }
 
@@ -200,7 +210,7 @@ func (s *EnrichStream) enrichStream(ctx context.Context, stream *StreamItem) (*S
 // only the minimum needed to identify the file at click time: the
 // torrent's infohash and the file index inside it. /resolve resolves the
 // idx to a full path against rest-api lazily.
-func (s *EnrichStream) generateRedirectURL(stream *StreamItem) string {
+func (s *EnrichStream) generateRedirectURL(stream *StreamItem, contentID string) string {
 	// Stremio persists the selected stream (URL included) across app
 	// sessions and probes it on resume and before binge-playing the next
 	// episode. With an episode-per-evening viewing pattern those probes
@@ -210,12 +220,42 @@ func (s *EnrichStream) generateRedirectURL(stream *StreamItem) string {
 	// access to a single file and rides behind the user's addon token.
 	clms := jwt.MapClaims{
 		"hash": stream.InfoHash,
-		"idx":  stream.FileIdx,
 		"exp":  time.Now().Add(72 * time.Hour).Unix(),
+	}
+	// No idx claim when the source never named a file: /stremio/resolve
+	// picks one at click time. Sending 0 would be indistinguishable from a
+	// deliberate "play the first file".
+	if !stream.FileIdxUnknown {
+		clms["idx"] = stream.FileIdx
+	} else if season, episode, ok := episodeFromContentID(contentID); ok {
+		// Which episode was asked for. Indexers answer an episode query
+		// with season packs as often as not — on RU trackers that is the
+		// normal shape — so the resolver needs to know what to look for
+		// inside the torrent, not just "the biggest video".
+		clms["s"] = season
+		clms["e"] = episode
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, clms)
 	tokenString, _ := token.SignedString([]byte(s.secret))
 	return fmt.Sprintf("%s/%s/%s/stremio/resolve/%s", s.domain, sv.AccessTokenParamName, s.token, tokenString)
+}
+
+// episodeFromContentID splits Stremio's "tt0903747:1:5" into season and
+// episode. Movies carry no episode and yield ok=false.
+func episodeFromContentID(contentID string) (int, int, bool) {
+	parts := strings.Split(strings.TrimSpace(contentID), ":")
+	if len(parts) < 3 {
+		return 0, 0, false
+	}
+	season, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, 0, false
+	}
+	episode, err := strconv.Atoi(strings.TrimSpace(parts[2]))
+	if err != nil {
+		return 0, 0, false
+	}
+	return season, episode, true
 }
 
 func (s *EnrichStream) updateStreamName(name string, availability *common.CheckAvailabilityResult) string {

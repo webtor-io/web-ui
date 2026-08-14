@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -170,6 +170,18 @@ func (s *Handler) configure(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/profile")
 }
 
+// episodeClaims reads the season/episode a playback token was minted for.
+// Only tokens for sources that named no file carry them — see
+// StreamItem.FileIdxUnknown.
+func episodeClaims(claims jwt.MapClaims) (int, int, bool) {
+	sf, sok := claims["s"].(float64)
+	ef, eok := claims["e"].(float64)
+	if !sok || !eok {
+		return 0, 0, false
+	}
+	return int(sf), int(ef), true
+}
+
 func (s *Handler) resolve(c *gin.Context) {
 	// Step 1: Extract JWT token from URL path
 	data := strings.TrimPrefix(c.Param("data"), "/")
@@ -210,12 +222,40 @@ func (s *Handler) resolve(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	fileIdxF, _ := jwtClaims["idx"].(float64)
-	fileIdx := int(fileIdxF)
-
 	user := auth.GetUserFromContext(c)
 	apiClaims := api.GetClaimsFromContext(c)
 	userClaims := claims.GetFromContext(c)
+
+	// An absent idx claim means the stream's source named a torrent but not
+	// a file in it (Torznab indexers — see StreamItem.FileIdxUnknown). The
+	// file is picked here, at click time, rather than for all 30 results of
+	// a search that the user will never open.
+	var fileIdx int
+	if raw, ok := jwtClaims["idx"]; ok {
+		f, _ := raw.(float64)
+		fileIdx = int(f)
+	} else if season, episode, ok := episodeClaims(jwtClaims); ok {
+		// The token names the episode the user picked, so the file is
+		// chosen by name inside the torrent — the alternative, "the
+		// biggest video", plays episode one of every season pack.
+		fileIdx, err = s.lr.PickEpisodeFileIdx(c.Request.Context(), apiClaims, hash, season, episode)
+		if err != nil {
+			log.WithError(err).
+				WithField("hash", hash).
+				Warn("failed to pick an episode file to play")
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+	} else {
+		fileIdx, err = s.lr.PickPrimaryFileIdx(c.Request.Context(), apiClaims, hash)
+		if err != nil {
+			log.WithError(err).
+				WithField("hash", hash).
+				Warn("failed to pick a file to play")
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+	}
 
 	// Step 5: Resolve link using LinkResolver
 	linkResult, err := s.lr.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, fileIdx, true)

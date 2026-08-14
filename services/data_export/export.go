@@ -24,22 +24,23 @@ const SchemaVersion = 1
 
 // Export is the full per-user dump. Field tags drive the JSON output.
 type Export struct {
-	SchemaVersion     int                 `json:"schema_version"`
-	GeneratedAt       time.Time           `json:"generated_at"`
-	User              UserData            `json:"user"`
-	Library           []LibraryItem       `json:"library"`
-	WatchHistory      []WatchHistoryItem  `json:"watch_history"`
-	MovieStatuses     []MovieStatusItem   `json:"movie_statuses"`
-	SeriesStatuses    []SeriesStatusItem  `json:"series_statuses"`
-	EpisodeStatuses   []EpisodeStatusItem `json:"episode_statuses"`
-	MovieWatchlist    []WatchlistItem     `json:"movie_watchlist"`
-	SeriesWatchlist   []WatchlistItem     `json:"series_watchlist"`
-	StremioAddonURLs  []StremioAddonItem  `json:"stremio_addon_urls"`
-	StremioSettings   *StremioSettings    `json:"stremio_settings,omitempty"`
-	EmbedDomains      []EmbedDomainItem   `json:"embed_domains"`
-	StreamingBackends []StreamingBackend  `json:"streaming_backends"`
-	UserSubtitles     []UserSubtitleItem  `json:"user_subtitles"`
-	AccessTokens      []AccessTokenItem   `json:"access_tokens"`
+	SchemaVersion     int                  `json:"schema_version"`
+	GeneratedAt       time.Time            `json:"generated_at"`
+	User              UserData             `json:"user"`
+	Library           []LibraryItem        `json:"library"`
+	WatchHistory      []WatchHistoryItem   `json:"watch_history"`
+	MovieStatuses     []MovieStatusItem    `json:"movie_statuses"`
+	SeriesStatuses    []SeriesStatusItem   `json:"series_statuses"`
+	EpisodeStatuses   []EpisodeStatusItem  `json:"episode_statuses"`
+	MovieWatchlist    []WatchlistItem      `json:"movie_watchlist"`
+	SeriesWatchlist   []WatchlistItem      `json:"series_watchlist"`
+	StremioAddonURLs  []StremioAddonItem   `json:"stremio_addon_urls"`
+	StremioSettings   *StremioSettings     `json:"stremio_settings,omitempty"`
+	TorznabIndexers   []TorznabIndexerItem `json:"torznab_indexers"`
+	EmbedDomains      []EmbedDomainItem    `json:"embed_domains"`
+	StreamingBackends []StreamingBackend   `json:"streaming_backends"`
+	UserSubtitles     []UserSubtitleItem   `json:"user_subtitles"`
+	AccessTokens      []AccessTokenItem    `json:"access_tokens"`
 	// PendingDeviceAuth lists in-flight device authorizations. Rows live
 	// minutes (confirmed ones are deleted on the device's next poll), so the
 	// list is almost always empty — included because the table is user-keyed.
@@ -134,6 +135,28 @@ type StremioSettings struct {
 	DiscoverOnly         bool                       `json:"discover_only"`
 	PreferredLanguage    string                     `json:"preferred_language,omitempty"`
 	UpdatedAt            time.Time                  `json:"updated_at"`
+}
+
+// TorznabIndexerItem mirrors one user-configured Torznab indexer
+// (Jackett/Prowlarr/NZBHydra2 or a single tracker feed).
+//
+// HasAPIKey is a boolean on purpose: unlike StreamingBackend.AccessToken, the
+// Torznab key is never rendered back to the user (the profile UI shows the
+// feed URL with the credential split out, see models.TorznabIndexer), so
+// putting the raw value in a downloadable file would widen its exposure
+// instead of mirroring what the user already sees. The flag is enough for
+// portability — it tells the user which indexers they have to re-authenticate
+// after re-importing elsewhere.
+type TorznabIndexerItem struct {
+	URL           string              `json:"url"`
+	Name          *string             `json:"name,omitempty"`
+	Priority      int16               `json:"priority"`
+	Enabled       bool                `json:"enabled"`
+	HasAPIKey     bool                `json:"has_api_key"`
+	Caps          *models.TorznabCaps `json:"caps,omitempty"`
+	CapsFetchedAt *time.Time          `json:"caps_fetched_at,omitempty"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
 type EmbedDomainItem struct {
@@ -428,6 +451,26 @@ func (e *Export) fillStremio(ctx context.Context, db *pg.DB, uID uuid.UUID) erro
 			PreferredLanguage:    s.Settings.PreferredLanguage,
 			UpdatedAt:            s.UpdatedAt,
 		}
+	}
+
+	indexers, err := models.GetAllUserTorznabIndexers(ctx, db, uID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load torznab indexers")
+	}
+	e.TorznabIndexers = make([]TorznabIndexerItem, 0, len(indexers))
+	for _, i := range indexers {
+		e.TorznabIndexers = append(e.TorznabIndexers, TorznabIndexerItem{
+			URL:      i.Url,
+			Name:     i.Name,
+			Priority: i.Priority,
+			Enabled:  i.Enabled,
+			// Credential itself is deliberately omitted — see TorznabIndexerItem.
+			HasAPIKey:     i.ApiKey != nil && *i.ApiKey != "",
+			Caps:          i.Caps,
+			CapsFetchedAt: i.CapsFetchedAt,
+			CreatedAt:     i.CreatedAt,
+			UpdatedAt:     i.UpdatedAt,
+		})
 	}
 	return nil
 }

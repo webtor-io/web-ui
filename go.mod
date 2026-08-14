@@ -24,6 +24,7 @@ require (
 	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
 	github.com/webtor-io/common-services v0.0.0-20260323152956-4a4e97f013f7
+	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
 	github.com/webtor-io/lazymap v0.0.0-20251112155450-24fcf0ad4b5d
 	github.com/webtor-io/rest-api v1.0.1-0.20260702182913-e2204030bcdf
 	github.com/yargevad/filepathx v1.0.0
@@ -49,6 +50,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect

@@ -8,6 +8,10 @@ Auth model: `/discover` requires auth. Anonymous visitors are redirected to `/lo
 
 Pure frontend feature — no Go backend changes needed for browsing. All catalog and search fetches happen directly from the browser to addon URLs. Addon management uses Go backend endpoints.
 
+Streams from all sources are deduped by infohash before rendering (`dedupeStreamsByHash` in `lib/discover/stream.js`). Sources are merged in a fixed order — addons first, indexers after — so the surviving copy is the one carrying a `fileIdx`; the sources that also returned the same torrent are listed on that row as `+ <name>` chips, because "did my indexer find this?" is the question the list is read for.
+
+**One exception: Torznab indexers.** They cannot be fetched from the browser — Jackett and Prowlarr send no CORS headers, and a self-hosted indexer on plain `http` is blocked as mixed content from this `https` page anyway. So the stream modal posts to `POST /discover/torznab/streams` and merges the server's answer into the streams it fetched itself. The indexers appear as one extra row in the per-source fetch progress list. See [torznab.md](./torznab.md).
+
 The UI is built with **Preact** (lightweight React alternative) using hooks (`useReducer`, `useState`, `useMemo`, `useEffect`, `useCallback`). State is managed via a single reducer for predictable updates. The API client and utility modules remain plain JS.
 
 ### Files
@@ -33,6 +37,8 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/components/AddonHealthChip.jsx` — page-level addon health surface (warning chip + per-addon status drawer + retry)
 - `assets/src/js/lib/discover/manifestCache.js` — `localStorage` fallback for manifests, used to render disabled catalogs from currently-unreachable addons
 - `assets/src/js/lib/discover/addonsApi.js` — fetch wrapper around `/stremio/addon-url/:id/refresh-snapshot` (lazy backfill + profile refresh)
+- `assets/src/js/lib/discover/torznabClient.js` — fetch wrapper around `POST /discover/torznab/streams` (+ `hasIndexers()`, which skips the round-trip when the user has none)
+- `handlers/discover/torznab.go` — Go handler for the server-side indexer stream fetch
 - `migrations/52_add_addon_manifest_snapshot.up.sql` — snapshot columns on `stremio_addon_url`
 - `assets/src/js/lib/discover/prefs.js` — localStorage persistence for user selections
 - `assets/src/js/lib/discover/aiClient.js` — thin fetch wrapper for `/discover/ai/*` endpoints (AI recommendations)

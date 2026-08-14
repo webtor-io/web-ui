@@ -67,6 +67,7 @@ type Data struct {
 	Devices               []DeviceItem
 	EmbedDomains          []models.EmbedDomain
 	AddonUrls             []models.StremioAddonUrl
+	TorznabIndexers       []models.TorznabIndexer
 	StremioSettings       *models.StremioSettingsData
 	StreamingBackends     []*models.StreamingBackend
 	AvailableBackendTypes []BackendTypeInfo
@@ -343,6 +344,13 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
+	// Get user Torznab indexers
+	torznabIndexers, err := models.GetAllUserTorznabIndexers(c.Request.Context(), db, u.ID)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get user torznab indexers"))
+		return
+	}
+
 	// Get Stremio settings. When the user has never saved settings, prefill
 	// the preferred language with the current UI language so the dropdown
 	// shows a sensible default — saving the form locks it in.
@@ -404,6 +412,7 @@ func (s *Handler) get(c *gin.Context) {
 		Devices:               devices,
 		EmbedDomains:          domains,
 		AddonUrls:             addonUrls,
+		TorznabIndexers:       torznabIndexers,
 		StremioSettings:       ss,
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),

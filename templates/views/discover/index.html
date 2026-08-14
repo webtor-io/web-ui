@@ -2,6 +2,7 @@
 {{ define "main" }}
 <script>
     window._addons = {{ .Data.Addons | json }};
+    window._indexers = {{ .Data.Indexers | json }};
 </script>
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6" id="discover-page">
   <div class="max-w-[900px] mx-auto">

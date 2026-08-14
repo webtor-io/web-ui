@@ -3,6 +3,7 @@ import av from '../lib/av';
 import { CINEMETA_BASE } from '../lib/discover/client';
 import { DiscoverApp } from '../lib/discover/components/DiscoverApp';
 import { init as initI18n } from '../lib/discover/i18n';
+import { hasIndexers } from '../lib/discover/torznabClient';
 
 av(async function () {
     await initI18n();
@@ -28,7 +29,10 @@ av(async function () {
     if (!hasCinemeta) seeds.unshift(cinemetaSeed);
 
     const addonUrls = seeds.map(a => (a.url || '').replace(/\/manifest\.json$/, '')).filter(Boolean);
-    const hasCustomAddons = serverAddons.length > 0;
+    // Indexers count as a configured source: an indexer-only user has
+    // somewhere for streams to come from, and must not be shown the
+    // "install addons first" empty state.
+    const hasCustomAddons = serverAddons.length > 0 || hasIndexers();
     const mountEl = container.querySelector('#discover-mount') || container;
     render(<DiscoverApp addonUrls={addonUrls} addonSeeds={seeds} hasCustomAddons={hasCustomAddons} />, mountEl);
 }, function () {

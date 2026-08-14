@@ -1,0 +1,129 @@
+{{ define "profile/torznab_indexers" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            {{ t $.Lang "profile.indexers.title" }}
+        </h2>
+
+        <p class="text-sm text-w-muted mb-5">{{ t $.Lang "profile.indexers.intro" }}</p>
+
+        <!-- Add Indexer Form -->
+        <div class="mb-7">
+            {{ $indexerCount := len .Data.TorznabIndexers }}
+            {{ $canAddIndexer := or (lt $indexerCount 3) (.Claims | isPaid) }}
+            <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/torznab/indexer/add" }}" data-async-target="#torznab-indexers" class="flex flex-col sm:flex-row gap-2{{ if not $canAddIndexer }} opacity-50{{ end }}">
+                <input
+                    name="url"
+                    placeholder="{{ t $.Lang "profile.indexers.placeholder" }}"
+                    class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full"
+                    type="url"
+                    pattern="https?://.*"
+                    title="{{ t $.Lang "profile.indexers.validation" }}"
+                    {{ if $canAddIndexer }}required{{ else }}disabled{{ end }}
+                />
+                <input
+                    name="api_key"
+                    placeholder="{{ t $.Lang "profile.indexers.apiKeyPlaceholder" }}"
+                    class="input bg-base-300 border-w-line focus:border-w-pink focus:outline-none w-full sm:w-64"
+                    type="text"
+                    autocomplete="off"
+                    {{ if not $canAddIndexer }}disabled{{ end }}
+                />
+                <button type="submit" class="btn btn-soft" data-umami-event="torznab-indexer-add"{{ if not $canAddIndexer }} disabled{{ end }}>
+                    {{ t $.Lang "profile.indexers.add" }}
+                </button>
+            </form>
+            <div class="text-xs text-w-muted mt-3">
+                {{ t $.Lang "profile.indexers.reachableHint" }}
+            </div>
+            {{ if not $canAddIndexer }}
+                <div class="text-sm text-w-muted mt-3">
+                    {{ t $.Lang "profile.indexers.maxReached" }}
+                </div>
+            {{ end }}
+            {{ if .Data.ErrKey }}
+                <div class="text-sm text-error mt-3">
+                    {{ t $.Lang .Data.ErrKey }}
+                </div>
+            {{ end }}
+        </div>
+
+        <!-- Indexer List -->
+        <form method="post" data-async-push-state="false" action="{{ langPath $.Lang "/torznab/indexer/update" }}" data-async-target="#torznab-indexers">
+            <h3 class="text-sm font-semibold mb-2">{{ t $.Lang "profile.indexers.yourIndexers" }}</h3>
+            <p class="text-xs text-w-muted mb-3">{{ t $.Lang "profile.indexers.dragHint" }}</p>
+
+            <ul id="indexer-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+                {{ $indexers := .Data.TorznabIndexers }}
+                {{ range $i, $indexer := $indexers }}
+                <li class="p-3 sm:p-4 cursor-move select-none flex items-center gap-2 sm:gap-4 indexer-item hover:bg-base-300/30 transition-colors"
+                    data-indexer-id="{{ $indexer.ID }}" draggable="true">
+
+                    <span class="drag-handle flex-shrink-0" aria-label="drag" title="drag to sort">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 opacity-60">
+                            <path d="M8 6h8v2H8V6zm0 5h8v2H8v-2zm0 5h8v2H8v-2z" />
+                        </svg>
+                    </span>
+
+                    <div class="flex-1 min-w-0">
+                        {{/* GetName, not the stored name: Jackett titles every
+                             feed it serves "Jackett", so three indexers from one
+                             Jackett would render as three identical rows. The
+                             method appends the tracker id from the feed path. */}}
+                        <div class="font-semibold text-sm truncate">{{ $indexer.GetName }}</div>
+                        <div class="text-xs text-w-muted truncate">{{ $indexer.Url }}</div>
+                        <div class="flex flex-wrap gap-1 mt-1.5">
+                            {{ if $indexer.ApiKey }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">{{ t $.Lang "profile.indexers.apiKeyStored" }}</span>
+                            {{ end }}
+                            {{ if $indexer.Caps }}
+                                {{ if $indexer.Caps.SupportsMovieSearch }}
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">movie</span>
+                                {{ end }}
+                                {{ if $indexer.Caps.SupportsTVSearch }}
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">series</span>
+                                {{ end }}
+                            {{ end }}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        <button type="button" class="btn btn-ghost btn-sm btn-square text-w-muted hover:text-w-cyan refresh-indexer" data-indexer-id="{{ $indexer.ID }}" title="{{ t $.Lang "profile.indexers.refresh" }}" aria-label="{{ t $.Lang "profile.indexers.refresh" }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        </button>
+
+                        <label class="label cursor-pointer gap-2 px-1 sm:px-2">
+                            <input type="checkbox" name="indexer_{{ $indexer.ID }}_enabled" class="toggle toggle-soft" {{ if $indexer.Enabled }}checked{{ end }}>
+                            <span class="label-text text-xs hidden sm:inline">{{ t $.Lang "profile.indexers.enabled" }}</span>
+                        </label>
+
+                        <button type="button" class="btn btn-ghost btn-sm btn-square text-w-pinkL hover:bg-w-pink/10 delete-indexer" data-indexer-id="{{ $indexer.ID }}" aria-label="Delete indexer">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+                {{ end }}
+
+                <!-- Empty state message -->
+                <li class="p-8 text-center empty-state {{ if $indexers }}hidden{{ end }}" id="indexer-empty-state">
+                    <p class="text-w-muted">{{ t $.Lang "profile.indexers.noIndexers" }}</p>
+                    <p class="text-xs text-w-muted mt-2">{{ t $.Lang "profile.indexers.noIndexersHint" }}</p>
+                </li>
+            </ul>
+
+            <input type="hidden" name="indexer_order" id="indexer_order" value="{{ range $i, $ix := $indexers }}{{ if $i }},{{ end }}{{ $ix.ID }}{{ end }}">
+            <input type="hidden" name="deleted_indexers" id="deleted_indexers" value="">
+
+            <div class="mt-4 flex items-center justify-between">
+                <a href="{{ langPath $.Lang "/instructions/torznab" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-torznab" target="_blank">{{ t $.Lang "profile.indexers.howTo" }}</a>
+                <button type="submit" class="btn btn-soft" data-umami-event="torznab-indexer-save">{{ t $.Lang "profile.indexers.save" }}</button>
+            </div>
+        </form>
+    </div>
+
+    {{ "profile/torznab_indexers.js" | asset }}
+{{ end }}

@@ -2,7 +2,10 @@ package link_resolver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -10,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
+	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	vmodels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
@@ -23,6 +27,7 @@ import (
 // by checking content availability and generating direct download URLs
 type LinkResolver struct {
 	pg                   *cs.PG
+	api                  *api.Api
 	cacheIndex           *ci.CacheIndex
 	userBackends         map[models.StreamingBackendType]co.Backend
 	webtorBackend        *backends.Webtor
@@ -33,6 +38,7 @@ type LinkResolver struct {
 func New(cl *http.Client, pg *cs.PG, apiService *api.Api, cacheIndex *ci.CacheIndex) *LinkResolver {
 	return &LinkResolver{
 		pg:         pg,
+		api:        apiService,
 		cacheIndex: cacheIndex,
 		userBackends: map[models.StreamingBackendType]co.Backend{
 			models.StreamingBackendTypeRealDebrid: backends.NewRealDebrid(cl),
@@ -148,6 +154,162 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 		ServiceType: models.StreamingBackendTypeWebtor,
 		Cached:      cached,
 	}, nil
+}
+
+// listPageSize bounds a single rest-api listing page while looking for the
+// file a stream means.
+const listPageSize = 100
+
+// PickPrimaryFileIdx returns the natural file index a stream should play when
+// its source never said which file it meant.
+//
+// Torznab indexers are that case, and the only one: a search result names a
+// torrent, not a file inside it. Library streams persist file_idx (migration
+// 60) and Stremio addons send fileIdx, which is why every other caller can
+// pass an index straight through. Defaulting to 0 instead would play whatever
+// the torrent happens to list first — a sample, an .nfo, or episode 1 of a
+// season pack no matter which episode the user picked.
+//
+// Selection is the largest video file, which is what a single-episode or
+// single-movie release resolves to. A multi-episode pack has no right answer
+// at this layer; the largest file at least plays something the user can see
+// is wrong, rather than silently starting episode 1.
+func (s *LinkResolver) PickPrimaryFileIdx(ctx context.Context, apiClaims *api.Claims, hash string) (int, error) {
+	if s.api == nil {
+		return 0, errors.New("api service is not configured")
+	}
+	var (
+		bestIdx  int
+		bestSize int64
+		found    bool
+		offset   uint
+	)
+	for {
+		resp, err := s.api.ListResourceContentCached(ctx, apiClaims, hash, &api.ListResourceContentArgs{
+			Limit:  listPageSize,
+			Offset: offset,
+		})
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to list resource content")
+		}
+		if resp == nil {
+			break
+		}
+		if idx, size, ok := pickLargestVideo(resp.Items); ok && (!found || size > bestSize) {
+			bestIdx, bestSize, found = idx, size, true
+		}
+		if (resp.Count - int(offset)) <= len(resp.Items) {
+			break
+		}
+		offset += listPageSize
+	}
+	if !found {
+		return 0, errors.New("torrent has no video file")
+	}
+	return bestIdx, nil
+}
+
+// PickEpisodeFileIdx returns the index of the file holding a given episode,
+// falling back to the largest video when the torrent holds no file that
+// names it.
+//
+// This is what makes an indexer usable for series: an episode query answers
+// with season packs at least as often as with single episodes — on RU
+// trackers that is the normal shape — so "the biggest video" would start
+// episode one no matter which episode the user picked.
+func (s *LinkResolver) PickEpisodeFileIdx(ctx context.Context, apiClaims *api.Claims, hash string, season, episode int) (int, error) {
+	if s.api == nil {
+		return 0, errors.New("api service is not configured")
+	}
+	var (
+		bestIdx  int
+		bestSize int64
+		found    bool
+		fbIdx    int
+		fbSize   int64
+		fbFound  bool
+		offset   uint
+	)
+	for {
+		resp, err := s.api.ListResourceContentCached(ctx, apiClaims, hash, &api.ListResourceContentArgs{
+			Limit:  listPageSize,
+			Offset: offset,
+		})
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to list resource content")
+		}
+		if resp == nil {
+			break
+		}
+		for _, item := range resp.Items {
+			if item.MediaFormat != ra.Video {
+				continue
+			}
+			if matchesEpisode(item.PathStr, season, episode) {
+				if !found || item.Size > bestSize {
+					bestIdx, bestSize, found = item.Index, item.Size, true
+				}
+				continue
+			}
+			if !fbFound || item.Size > fbSize {
+				fbIdx, fbSize, fbFound = item.Index, item.Size, true
+			}
+		}
+		if (resp.Count - int(offset)) <= len(resp.Items) {
+			break
+		}
+		offset += listPageSize
+	}
+	if found {
+		return bestIdx, nil
+	}
+	if fbFound {
+		return fbIdx, nil
+	}
+	return 0, errors.New("torrent has no video file")
+}
+
+// matchesEpisode reports whether a file path names the given episode. The
+// patterns are the two spellings that actually appear in release names —
+// S01E05 (with any separator) and 1x05 — anchored on non-digits so S01E05
+// does not also match S01E050.
+func matchesEpisode(path string, season, episode int) bool {
+	if season <= 0 || episode <= 0 {
+		return false
+	}
+	name := strings.ToLower(path)
+	for _, tpl := range []string{
+		fmt.Sprintf(`s0*%d[\s._-]*e0*%d(\D|$)`, season, episode),
+		fmt.Sprintf(`(\D|^)0*%dx0*%d(\D|$)`, season, episode),
+	} {
+		re, err := regexp.Compile(`(?i)` + tpl)
+		if err != nil {
+			continue
+		}
+		if re.MatchString(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// pickLargestVideo returns the index and size of the largest video file in a
+// listing page, and whether the page held one at all.
+func pickLargestVideo(items []ra.ListItem) (int, int64, bool) {
+	var (
+		bestIdx  int
+		bestSize int64
+		found    bool
+	)
+	for _, item := range items {
+		if item.MediaFormat != ra.Video {
+			continue
+		}
+		if !found || item.Size > bestSize {
+			bestIdx, bestSize, found = item.Index, item.Size, true
+		}
+	}
+	return bestIdx, bestSize, found
 }
 
 // isPaidUser checks if the user has paid tier

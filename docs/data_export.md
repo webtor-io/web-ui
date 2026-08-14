@@ -32,6 +32,7 @@ breaks consumers.
   "series_watchlist": [...],
   "stremio_addon_urls": [...],
   "stremio_settings": { ... } | omitted,
+  "torznab_indexers": [...],
   "embed_domains": [...],
   "streaming_backends": [...],
   "user_subtitles": [...],
@@ -59,6 +60,7 @@ the user has never used the feature.
 | `series_watchlist`    | `models.ListSeriesWatchlistItems`                                  |
 | `stremio_addon_urls`  | `models.GetAllUserStremioAddonUrls`                                |
 | `stremio_settings`    | `models.GetUserStremioSettings`                                    |
+| `torznab_indexers`    | `models.GetAllUserTorznabIndexers`                                 |
 | `embed_domains`       | `models.GetUserDomains`                                            |
 | `streaming_backends`  | `models.GetUserStreamingBackends`                                  |
 | `user_subtitles`      | `models.ListAllUserSubtitles`                                      |
@@ -80,8 +82,15 @@ The export is delivered over an authenticated session and the user can see
 the same values in-app, so the file does not reveal anything the user
 doesn't already control.
 
+That rule cuts both ways: a credential the UI never renders back does not
+belong in the file either. `torznab_indexer.api_key` is stored in its own
+column precisely so the feed URL can be shown without it, so the export
+carries `torznab_indexers[].has_api_key` (bool) instead of the key.
+
 ## What is NOT exported
 
+- `torznab_indexer.api_key` — write-only credential, never rendered back to
+  the user; exported as the `has_api_key` boolean instead.
 - `ai_enrich.query` — global title-normalisation cache, not user-keyed.
 - AI recommendation quota counters — ephemeral Redis state that rolls over
   daily (`services/recommendations/quota.go`). Not "data we hold about the

@@ -16,6 +16,10 @@ import (
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 )
 
+// defaultStreamTimeout is the per-service budget for sources that don't ask
+// for another one via TimeoutedService.
+const defaultStreamTimeout = 5 * time.Second
+
 // CompositeStream aggregates multiple stream services and makes parallel requests
 type CompositeStream struct {
 	services []StreamsService
@@ -23,6 +27,7 @@ type CompositeStream struct {
 
 // Ensure CompositeStream implements StreamsService
 var _ StreamsService = (*CompositeStream)(nil)
+var _ TimeoutedService = (*CompositeStream)(nil)
 
 // NewCompositeStream creates a new composite stream service with the given list of services
 func NewCompositeStream(services []StreamsService) *CompositeStream {
@@ -34,6 +39,30 @@ func NewCompositeStream(services []StreamsService) *CompositeStream {
 // GetName returns the name of this composite stream service for logging purposes
 func (c *CompositeStream) GetName() string {
 	return "CompositeStream"
+}
+
+// GetTimeout reports the largest budget any inner service needs. Composites
+// nest — the Torznab composite is itself one service of the outer composite —
+// so without this the outer 5s would cut off the very indexers the inner one
+// grants 12s to.
+func (c *CompositeStream) GetTimeout() time.Duration {
+	var max time.Duration
+	for _, svc := range c.services {
+		if t := timeoutOf(svc); t > max {
+			max = t
+		}
+	}
+	return max
+}
+
+// timeoutOf returns the budget a service asks for, or the default.
+func timeoutOf(svc StreamsService) time.Duration {
+	if ts, ok := svc.(TimeoutedService); ok {
+		if t := ts.GetTimeout(); t > 0 {
+			return t
+		}
+	}
+	return defaultStreamTimeout
 }
 
 // GetStreams performs parallel requests to all inner StreamServices and merges results
@@ -58,8 +87,9 @@ func (c *CompositeStream) GetStreams(ctx context.Context, contentType, contentID
 		go func(index int, svc StreamsService) {
 			defer wg.Done()
 
-			// Create context with 5-second timeout for each inner stream
-			streamCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			// Give each inner stream its own budget — the default unless
+			// the service asks for more (see TimeoutedService).
+			streamCtx, cancel := context.WithTimeout(ctx, timeoutOf(svc))
 			defer cancel()
 
 			resp, err := svc.GetStreams(streamCtx, contentType, contentID)

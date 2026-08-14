@@ -7,6 +7,7 @@ import {
     overlayLocalized,
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
+import { dedupeStreamsByHash, interleaveBySource } from '../stream';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
@@ -22,6 +23,7 @@ import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, 
 import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
 import { t, langPath } from '../i18n';
+import { fetchTorznabStreams, hasIndexers, indexerLabel } from '../torznabClient';
 
 // episodesModalFromBack rebuilds the episodes-view modal from the
 // backToEpisodes snapshot carried by an episode-streams modal. Shared by
@@ -67,6 +69,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     const [ratingTarget, setRatingTarget] = useState(null);
     const clientRef = useRef(null);
     const abortRef = useRef(null);
+    // Stream loads are generation-guarded: closing the modal or opening
+    // another title invalidates the run in flight, so its late dispatch
+    // cannot re-open a modal the user closed or overwrite a newer one.
+    const streamGenRef = useRef(0);
+    const streamAbortRef = useRef(null);
     const searchGenRef = useRef(0);
     const searchAfterInit = useRef(null);
     const restoredPageRef = useRef(0);
@@ -351,6 +358,12 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
     // --- Card click & streams (defined before restore effects that use them) ---
     const loadStreams = useCallback(async (type, id, item, modalExtra = {}) => {
+        const gen = ++streamGenRef.current;
+        if (streamAbortRef.current) streamAbortRef.current.abort();
+        streamAbortRef.current = new AbortController();
+        const streamSignal = streamAbortRef.current.signal;
+        const current = () => streamGenRef.current === gen;
+
         const title = item.name || item.title;
         const poster = item.poster;
         const metaId = id.split(':')[0];
@@ -385,8 +398,15 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 return { name: a.manifest?.name || host, host, status: 'error', kind: a.status };
             });
 
-        if (!addons.length) {
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: [], failedAddons: inferredFailures, ...modalExtra } });
+        // Torznab indexers are fetched through the server (see
+        // lib/discover/torznabClient.js) and appear in this list as one
+        // extra source, so a user with only indexers still gets streams.
+        const useIndexers = hasIndexers();
+
+        if (!addons.length && !useIndexers) {
+            if (current()) {
+                dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: [], failedAddons: inferredFailures, ...modalExtra } });
+            }
             return;
         }
 
@@ -396,21 +416,58 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             return { name: a.manifest.name || host, host, status: 'fetching' };
         });
 
-        dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
+        const indexerIdx = useIndexers ? addonStatuses.length : -1;
+        if (useIndexers) {
+            // host, not just name: FetchingView labels every progress row
+            // from `host`, so leaving it empty renders a nameless row.
+            const label = indexerLabel();
+            addonStatuses.push({ name: label, host: label, status: 'fetching' });
+        }
 
-        const allStreams = [];
+        if (current()) {
+            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
+        }
+
+        // Per-source buckets rather than one shared array: the merge order
+        // has to be deterministic (addons before indexers) so that the
+        // dedup below keeps the addon copy of a shared torrent, which is
+        // the one carrying a file index. Completion order would hand that
+        // to whichever source answered first.
+        const bySource = addonStatuses.map(() => []);
         const promises = addons.map(async (addon, i) => {
             try {
-                const streams = await client.fetchStreamFromAddon(addon, type, id);
+                const streams = await client.fetchStreamFromAddon(addon, type, id, { signal: streamSignal });
                 addonStatuses[i] = { ...addonStatuses[i], status: 'done', count: streams.length };
-                allStreams.push(...streams);
+                bySource[i] = streams;
             } catch (e) {
                 addonStatuses[i] = { ...addonStatuses[i], status: 'error' };
             }
-            dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
+            if (current()) {
+                dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
+            }
         });
 
+        if (useIndexers) {
+            promises.push((async () => {
+                try {
+                    const streams = await fetchTorznabStreams(type, id, { signal: streamSignal });
+                    addonStatuses[indexerIdx] = { ...addonStatuses[indexerIdx], status: 'done', count: streams.length };
+                    bySource[indexerIdx] = streams;
+                } catch (e) {
+                    addonStatuses[indexerIdx] = { ...addonStatuses[indexerIdx], status: 'error' };
+                }
+                if (current()) {
+                    dispatch({ type: 'SHOW_MODAL', modal: { view: 'fetching', title, poster, metaId, itemType, ...itemMeta, addons: [...addonStatuses], ...modalExtra } });
+                }
+            })());
+        }
+
         await Promise.allSettled(promises);
+        if (!current()) return;
+        // Dedup first (order decides which copy wins), then interleave so
+        // every source is visible near the top rather than whichever one
+        // returned the most results.
+        const allStreams = interleaveBySource(dedupeStreamsByHash(bySource.flat()));
         // Carry per-addon statuses into the streams view so the modal can
         // surface "Torrentio failed" instead of degrading silently to the
         // generic "no streams" empty-state. Combines fetch-time errors
@@ -652,6 +709,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     }, [state.modal]);
 
     const closeModal = useCallback(() => {
+        streamGenRef.current++;
+        if (streamAbortRef.current) {
+            streamAbortRef.current.abort();
+            streamAbortRef.current = null;
+        }
         dispatch({ type: 'CLOSE_MODAL' });
         url.replace({ id: null, season: null, episode: null, tab: null });
     }, []);

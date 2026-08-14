@@ -414,8 +414,15 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         const sources = [];
         const labels = [];
         const seenLabelsLower = {};
-        for (const info of baseParsed) {
-            if (!sources.includes(info.source)) sources.push(info.source);
+        for (let i = 0; i < baseParsed.length; i++) {
+            const info = baseParsed[i];
+            // A source that only ever returned torrents another source also
+            // had would otherwise have no chip at all: dedup keeps one row,
+            // and that row is labelled with the winning source. Reading the
+            // chips as "what my sources found" requires the losers too.
+            for (const src of sourcesOf(baseStreams[i], info)) {
+                if (!sources.includes(src)) sources.push(src);
+            }
             for (const lbl of info.labels) {
                 const lower = lbl.toLowerCase();
                 if (!seenLabelsLower[lower]) {
@@ -473,7 +480,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         }
         return baseStreams.map((s, i) => {
             let show = true;
-            if (activeSrcKeys.length > 0 && !activeSources[baseParsed[i].source]) show = false;
+            if (activeSrcKeys.length > 0 && !sourcesOf(s, baseParsed[i]).some(src => activeSources[src])) show = false;
             if (show && activeLblKeys.length > 0) {
                 const lblLower = baseParsed[i].labels.map(l => l.toLowerCase());
                 if (!activeLblKeys.every(k => lblLower.includes(k.toLowerCase()))) show = false;
@@ -725,6 +732,16 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
     );
 }
 
+// sourcesOf lists every source that returned a stream: the one whose copy
+// survived dedup, plus the ones recorded on it (see dedupeStreamsByHash).
+function sourcesOf(stream, info) {
+    const out = [info.source];
+    for (const name of (stream?.alsoFrom || [])) {
+        if (!out.includes(name)) out.push(name);
+    }
+    return out;
+}
+
 function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLabels, activeLang, onToggleSource, onToggleLabel, onToggleLang }) {
     // Windows renders flag emoji as bare letter pairs ("RU") — drop the
     // flag there and let the language name carry the chip.
@@ -783,6 +800,13 @@ function StreamRow({ stream, info, onStreamClick }) {
                     <span class="text-sm font-medium">{info.source}</span>
                     {info.labels.map(label => (
                         <span key={label} class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{label}</span>
+                    ))}
+                    {/* Sources that returned the same torrent. Deduping to
+                        one row keeps the list readable, but which of your
+                        sources found a release is exactly what you look at
+                        when checking whether an indexer works. */}
+                    {(stream.alsoFrom || []).map(name => (
+                        <span key={name} class="border border-w-line text-w-muted text-[10px] px-1.5 py-0.5 rounded font-medium" title={t('discover.alsoFrom')}>+ {name}</span>
                     ))}
                 </div>
                 {titleLines.map((line, i) => (

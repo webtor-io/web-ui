@@ -17,6 +17,13 @@ type StreamItem struct {
 	ExternalUrl   string               `json:"externalUrl,omitempty"`
 	BehaviorHints *StreamBehaviorHints `json:"behaviorHints,omitempty"`
 	Sources       []string             `json:"sources,omitempty"`
+	// FileIdxUnknown marks a stream whose source named a torrent but not a
+	// file inside it — Torznab indexers, which return search results, not
+	// files. FileIdx 0 is a real index for every other source, so the
+	// distinction cannot be encoded in it. EnrichStream leaves the index
+	// out of the playback token when this is set, and /stremio/resolve
+	// picks the file then. Not serialised to Stremio.
+	FileIdxUnknown bool `json:"-"`
 	// Cached is set by EnrichStream when the underlying file is already
 	// available in the user's Vault (or any debrid backend). Used by the
 	// post-enrichment sort to surface "⚡" entries first within each
