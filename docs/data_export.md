@@ -33,6 +33,8 @@ breaks consumers.
   "stremio_addon_urls": [...],
   "stremio_settings": { ... } | omitted,
   "torznab_indexers": [...],
+  "release_subscriptions": [...],
+  "release_subscription_hits": [...],
   "embed_domains": [...],
   "streaming_backends": [...],
   "user_subtitles": [...],
@@ -61,6 +63,8 @@ the user has never used the feature.
 | `stremio_addon_urls`  | `models.GetAllUserStremioAddonUrls`                                |
 | `stremio_settings`    | `models.GetUserStremioSettings`                                    |
 | `torznab_indexers`    | `models.GetAllUserTorznabIndexers`                                 |
+| `release_subscriptions` | `models.GetUserReleaseSubscriptions`                             |
+| `release_subscription_hits` | `models.ListUserReleaseSubscriptionHits` (joined to the user's subscriptions) |
 | `embed_domains`       | `models.GetUserDomains`                                            |
 | `streaming_backends`  | `models.GetUserStreamingBackends`                                  |
 | `user_subtitles`      | `models.ListAllUserSubtitles`                                      |

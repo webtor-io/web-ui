@@ -1,6 +1,6 @@
 # Release Subscriptions — план работ
 
-Статус: **план, не реализовано**. Дата фиксации: 2026-08-15.
+Статус: **спринт 1 сделан** (схема, сервис, API, профиль, GDPR-экспорт), спринты 2–4 впереди. Дата фиксации плана: 2026-08-15.
 Предшественник: `docs/release_sub_fake_door.md` (fake-door 2026-05-20 → 05-24; free 1.3% CTR, paid 13.6% — фича валидирована как платная по классу, но здесь она делается для всех с лимитом 3 на free по решению владельца).
 
 ## Что строим
@@ -190,12 +190,32 @@ Umami, kebab-case как везде: `subscription-created` (property `source`),
 
 | Спринт | Содержание | Оценка |
 |---|---|---|
-| 1 | Миграции 66/67, модели, `services/release_subscription`, оба набора маршрутов, лимит free, секция профиля, `data_export` | 3 дня |
+| 1 ✅ | Миграции 66/67, модели, `services/release_subscription`, оба набора маршрутов, лимит free, секция профиля, `data_export` | 3 дня |
 | 2 | `BuildPollStreamsService`, CLI `subscription poll`, планировщик `next_check_at`, 3 шаблона писем, i18n в `notification.render`, миграция 68 + запись `user_settings.lang`, перевод 4 старых писем, unsubscribe-токен, CronJob в чарте | 3.5 дня |
 | 3 | Три UI-поверхности, ключи в 11 локалей, Umami-события | 2.5 дня |
 | 4 | Тесты (выбор эпизодов, baseline, дедуп хитов, лимиты — по образцу `services/stremio/*_test.go`), этот док в актуальное состояние, дашборд метрик | 1 день |
 
 Итого ≈ 10 рабочих дней. Спринты 1 и 2 можно вести параллельно только после того, как зафиксирована схема — поллер целиком стоит на ней.
+
+## Что уже в коде (спринт 1)
+
+| Слой | Файлы |
+|---|---|
+| Схема | `migrations/66_create_release_subscription.*`, `migrations/67_create_release_subscription_hit.*` |
+| Модели | `models/release_subscription.go`, `models/release_subscription_hit.go` |
+| Логика | `services/release_subscription/service.go` (+ тесты) |
+| HTTP | `handlers/release_subscription/handler.go` |
+| Профиль | `templates/partials/profile/subscriptions.html`, `assets/src/js/app/profile/subscriptions.js`, секция в `templates/views/profile/get.html`, `Subscriptions` в `handlers/profile` |
+| GDPR | `fillReleaseSubscriptions` в `services/data_export/export.go` (+ `docs/data_export.md`) |
+| Локали | `profile.subscriptions.*`, `discover.subscriptions.*`, `toast.subscription*`, `error.subscription*` во всех 11 файлах |
+
+Детали, которые стоит знать при продолжении:
+
+- **Уникальность контента — выражение, а не constraint.** `UNIQUE (user_id, kind, video_id, coalesce(season, -1))` индексом: у фильма сезона нет, а `NULL != NULL` пустил бы один и тот же фильм дважды.
+- **Лимит считает все строки**, включая выключенные и завершённые: строка, которую можно вернуть одним кликом, — это всё ещё работа для поллера.
+- **Eligibility спрашивается на записи**, а не только в UI: `IsAiringSeries` для сезона, фильм — всегда можно. Без энричера сезонная подписка отклоняется (консервативная ветка: непроверяемая строка иначе полилась бы вечно).
+- **Профильный список переиспользует `listEditor.js`** как есть: строки не `draggable`, поэтому общий drag-биндинг остаётся мёртвым, а из трёх полей формы читаются два (удаления и тумблеры). Порядка у подписок нет.
+- Поле `next_check_at` уже пишется (`now()` при создании) — поллер спринта 2 получает готовую очередь.
 
 ## Решения владельца (2026-08-15)
 

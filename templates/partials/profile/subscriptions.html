@@ -1,0 +1,81 @@
+{{ define "profile/subscriptions" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {{ t $.Lang "profile.subscriptions.title" }}
+        </h2>
+
+        <p class="text-sm text-w-muted mb-5">{{ t $.Lang "profile.subscriptions.intro" }}</p>
+
+        {{ $subs := .Data.Subscriptions }}
+        {{ if not ($.Claims | isPaid) }}
+            <p class="text-xs text-w-muted mb-4">{{ tp $.Lang "profile.subscriptions.usage" "Count" (len $subs) "Limit" .Data.SubscriptionLimit }}</p>
+        {{ end }}
+
+        <form method="post" data-async-push-state="false" action="{{ langPath $.Lang "/subscription/update" }}" data-async-target="#subscriptions">
+            <ul id="subscription-list" class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line">
+                {{ range $sub := $subs }}
+                <li class="p-3 sm:p-4 select-none flex items-center gap-2 sm:gap-4 subscription-item hover:bg-base-300/30 transition-colors"
+                    data-subscription-id="{{ $sub.ID }}">
+
+                    <div class="shrink-0 w-10 sm:w-12 aspect-[2/3] rounded-md overflow-hidden bg-base-300 border border-w-line/30">
+                        {{ if $sub.PosterURL }}
+                            <img src="{{ $sub.PosterURL }}" alt="" class="w-full h-full object-cover" loading="lazy" onerror="this.remove()">
+                        {{ end }}
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-sm truncate">{{ $sub.GetTitle }}</div>
+                        <div class="flex flex-wrap items-center gap-1 mt-1.5">
+                            {{ if $sub.IsSeason }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">{{ tp $.Lang "profile.subscriptions.season" "Season" $sub.GetSeason }}</span>
+                            {{ else }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-cyan/10 text-w-cyan font-medium">{{ t $.Lang "profile.subscriptions.movie" }}</span>
+                            {{ end }}
+                            {{/* State is the row's own story: waiting for its first
+                                 look at what already exists, watching, or over. */}}
+                            {{ if $sub.IsCompleted }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-base-300 text-w-muted font-medium">{{ t $.Lang "profile.subscriptions.stateCompleted" }}</span>
+                            {{ else if eq $sub.State "pending_baseline" }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-base-300 text-w-muted font-medium">{{ t $.Lang "profile.subscriptions.statePending" }}</span>
+                            {{ else }}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-w-pink/10 text-w-pinkL font-medium">{{ t $.Lang "profile.subscriptions.stateActive" }}</span>
+                            {{ end }}
+                        </div>
+                        {{ if $sub.LastCheckedAt }}
+                            <div class="text-xs text-w-muted mt-1">{{ tp $.Lang "profile.subscriptions.lastChecked" "Ago" (timeAgoLang $.Lang $sub.CheckedAt) }}</div>
+                        {{ end }}
+                    </div>
+
+                    <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        <label class="label cursor-pointer gap-2 px-1 sm:px-2">
+                            <input type="checkbox" name="subscription_{{ $sub.ID }}_enabled" class="toggle toggle-soft" {{ if $sub.Enabled }}checked{{ end }}>
+                            <span class="label-text text-xs hidden sm:inline">{{ t $.Lang "profile.subscriptions.enabled" }}</span>
+                        </label>
+
+                        <button type="button" class="btn btn-ghost btn-sm btn-square text-w-pinkL hover:bg-w-pink/10 delete-subscription" data-subscription-id="{{ $sub.ID }}" aria-label="Delete subscription">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+                {{ end }}
+
+                <!-- Empty state message -->
+                <li class="p-8 text-center empty-state {{ if $subs }}hidden{{ end }}" id="subscription-empty-state">
+                    <p class="text-w-muted">{{ t $.Lang "profile.subscriptions.none" }}</p>
+                    <p class="text-xs text-w-muted mt-2">{{ t $.Lang "profile.subscriptions.noneHint" }}</p>
+                </li>
+            </ul>
+
+            <input type="hidden" name="deleted_subscriptions" id="deleted_subscriptions" value="">
+
+            <div class="mt-4 flex items-center justify-end">
+                <button type="submit" class="btn btn-soft" data-umami-event="subscription-save">{{ t $.Lang "profile.subscriptions.save" }}</button>
+            </div>
+        </form>
+    </div>
+
+    {{ "profile/subscriptions.js" | asset }}
+{{ end }}

@@ -27,6 +27,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/library"
 	wm "github.com/webtor-io/web-ui/handlers/migration"
 	p "github.com/webtor-io/web-ui/handlers/profile"
+	"github.com/webtor-io/web-ui/handlers/release_subscription"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
 	s3 "github.com/webtor-io/web-ui/handlers/s3"
 	sess "github.com/webtor-io/web-ui/handlers/session"
@@ -59,6 +60,7 @@ import (
 	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
+	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	s3svc "github.com/webtor-io/web-ui/services/s3"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
@@ -424,8 +426,13 @@ func serve(c *cli.Context) error {
 	// Setting Payments client (shared by profile and donate)
 	payClient := npg.New(c)
 
+	// Setting release subscriptions. One service, two surfaces: the profile
+	// lists them, the Discover app and the resource banner create them.
+	releaseSubSvc := rss.New(pg, en)
+	release_subscription.RegisterHandler(r, pg, releaseSubSvc)
+
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient)
+	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)

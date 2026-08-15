@@ -47,6 +47,9 @@
     <div id="stremio-settings" data-async-layout="{{`{{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}`}}">
         {{ template "profile/stremio_settings" (withContext $ .Data.StremioSettings) }}
     </div>
+    <div id="subscriptions" data-async-layout="{{`{{ template "profile/subscriptions" $ }}`}}">
+        {{ template "profile/subscriptions" $ }}
+    </div>
 
     <!-- Integrations -->
     <div class="flex items-center gap-3 mt-10 mb-4">

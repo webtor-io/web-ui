@@ -23,6 +23,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
 	pay "github.com/webtor-io/web-ui/services/payments"
+	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/stremio"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -68,6 +69,8 @@ type Data struct {
 	EmbedDomains          []models.EmbedDomain
 	AddonUrls             []models.StremioAddonUrl
 	TorznabIndexers       []models.TorznabIndexer
+	Subscriptions         []models.ReleaseSubscription
+	SubscriptionLimit     int
 	StremioSettings       *models.StremioSettingsData
 	StreamingBackends     []*models.StreamingBackend
 	AvailableBackendTypes []BackendTypeInfo
@@ -94,6 +97,7 @@ type Handler struct {
 	vault         *vault.Vault
 	userSettings  *usettings.Service
 	payments      *pay.Client
+	releaseSubs   *rss.Service
 	disableWebDAV bool
 	disableS3     bool
 	disableAPI    bool
@@ -104,7 +108,7 @@ type Handler struct {
 	domain        string
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service) {
 	h := &Handler{
 		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:            at,
@@ -114,6 +118,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		vault:         v,
 		userSettings:  us,
 		payments:      payments,
+		releaseSubs:   releaseSubs,
 		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
 		disableS3:     c.Bool(common.DisableS3Flag),
 		disableAPI:    c.Bool(common.DisableAPIFlag),
@@ -369,6 +374,17 @@ func (s *Handler) get(c *gin.Context) {
 		ss = existingSS.Settings
 	}
 
+	// Release subscriptions the user holds. The section lists them; the
+	// entry points that create them live in Discover and on resource pages.
+	var subscriptions []models.ReleaseSubscription
+	if s.releaseSubs != nil {
+		subscriptions, err = s.releaseSubs.List(c.Request.Context(), u.ID)
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get release subscriptions"))
+			return
+		}
+	}
+
 	// Get user streaming backends
 	streamingBackends, err := models.GetUserStreamingBackends(c.Request.Context(), db, u.ID)
 	if err != nil {
@@ -413,6 +429,8 @@ func (s *Handler) get(c *gin.Context) {
 		EmbedDomains:          domains,
 		AddonUrls:             addonUrls,
 		TorznabIndexers:       torznabIndexers,
+		Subscriptions:         subscriptions,
+		SubscriptionLimit:     rss.FreeTierLimit,
 		StremioSettings:       ss,
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),

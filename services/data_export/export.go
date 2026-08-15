@@ -24,23 +24,28 @@ const SchemaVersion = 1
 
 // Export is the full per-user dump. Field tags drive the JSON output.
 type Export struct {
-	SchemaVersion     int                  `json:"schema_version"`
-	GeneratedAt       time.Time            `json:"generated_at"`
-	User              UserData             `json:"user"`
-	Library           []LibraryItem        `json:"library"`
-	WatchHistory      []WatchHistoryItem   `json:"watch_history"`
-	MovieStatuses     []MovieStatusItem    `json:"movie_statuses"`
-	SeriesStatuses    []SeriesStatusItem   `json:"series_statuses"`
-	EpisodeStatuses   []EpisodeStatusItem  `json:"episode_statuses"`
-	MovieWatchlist    []WatchlistItem      `json:"movie_watchlist"`
-	SeriesWatchlist   []WatchlistItem      `json:"series_watchlist"`
-	StremioAddonURLs  []StremioAddonItem   `json:"stremio_addon_urls"`
-	StremioSettings   *StremioSettings     `json:"stremio_settings,omitempty"`
-	TorznabIndexers   []TorznabIndexerItem `json:"torznab_indexers"`
-	EmbedDomains      []EmbedDomainItem    `json:"embed_domains"`
-	StreamingBackends []StreamingBackend   `json:"streaming_backends"`
-	UserSubtitles     []UserSubtitleItem   `json:"user_subtitles"`
-	AccessTokens      []AccessTokenItem    `json:"access_tokens"`
+	SchemaVersion    int                  `json:"schema_version"`
+	GeneratedAt      time.Time            `json:"generated_at"`
+	User             UserData             `json:"user"`
+	Library          []LibraryItem        `json:"library"`
+	WatchHistory     []WatchHistoryItem   `json:"watch_history"`
+	MovieStatuses    []MovieStatusItem    `json:"movie_statuses"`
+	SeriesStatuses   []SeriesStatusItem   `json:"series_statuses"`
+	EpisodeStatuses  []EpisodeStatusItem  `json:"episode_statuses"`
+	MovieWatchlist   []WatchlistItem      `json:"movie_watchlist"`
+	SeriesWatchlist  []WatchlistItem      `json:"series_watchlist"`
+	StremioAddonURLs []StremioAddonItem   `json:"stremio_addon_urls"`
+	StremioSettings  *StremioSettings     `json:"stremio_settings,omitempty"`
+	TorznabIndexers  []TorznabIndexerItem `json:"torznab_indexers"`
+	// ReleaseSubscriptions and their hits are two user-keyed tables: the
+	// standing request, and every infohash it has ever seen (which is what
+	// decides whether a release reaches the user again).
+	ReleaseSubscriptions    []ReleaseSubscriptionItem    `json:"release_subscriptions"`
+	ReleaseSubscriptionHits []ReleaseSubscriptionHitItem `json:"release_subscription_hits"`
+	EmbedDomains            []EmbedDomainItem            `json:"embed_domains"`
+	StreamingBackends       []StreamingBackend           `json:"streaming_backends"`
+	UserSubtitles           []UserSubtitleItem           `json:"user_subtitles"`
+	AccessTokens            []AccessTokenItem            `json:"access_tokens"`
 	// PendingDeviceAuth lists in-flight device authorizations. Rows live
 	// minutes (confirmed ones are deleted on the device's next poll), so the
 	// list is almost always empty — included because the table is user-keyed.
@@ -162,6 +167,35 @@ type TorznabIndexerItem struct {
 	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
+type ReleaseSubscriptionItem struct {
+	SubscriptionID uuid.UUID  `json:"subscription_id"`
+	Kind           string     `json:"kind"`
+	VideoID        string     `json:"video_id"`
+	Season         *int16     `json:"season,omitempty"`
+	Title          *string    `json:"title,omitempty"`
+	Lang           string     `json:"lang"`
+	Source         string     `json:"source"`
+	Enabled        bool       `json:"enabled"`
+	State          string     `json:"state"`
+	LastCheckedAt  *time.Time `json:"last_checked_at,omitempty"`
+	LastNotifiedAt *time.Time `json:"last_notified_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type ReleaseSubscriptionHitItem struct {
+	SubscriptionID uuid.UUID  `json:"subscription_id"`
+	InfoHash       string     `json:"infohash"`
+	Name           *string    `json:"name,omitempty"`
+	Size           *int64     `json:"size,omitempty"`
+	SourceName     *string    `json:"source_name,omitempty"`
+	Season         *int16     `json:"season,omitempty"`
+	Episode        *int16     `json:"episode,omitempty"`
+	IsBaseline     bool       `json:"is_baseline"`
+	FirstSeenAt    time.Time  `json:"first_seen_at"`
+	NotifiedAt     *time.Time `json:"notified_at,omitempty"`
+}
+
 type EmbedDomainItem struct {
 	Domain    string    `json:"domain"`
 	Ads       bool      `json:"ads"`
@@ -274,6 +308,9 @@ func Build(ctx context.Context, db *pg.DB, u *models.User) (*Export, error) {
 		return nil, err
 	}
 	if err := exp.fillStremio(ctx, db, u.UserID); err != nil {
+		return nil, err
+	}
+	if err := exp.fillReleaseSubscriptions(ctx, db, u.UserID); err != nil {
 		return nil, err
 	}
 	if err := exp.fillEmbedAndBackends(ctx, db, u.UserID); err != nil {
@@ -474,6 +511,52 @@ func (e *Export) fillStremio(ctx context.Context, db *pg.DB, uID uuid.UUID) erro
 			CapsFetchedAt: i.CapsFetchedAt,
 			CreatedAt:     i.CreatedAt,
 			UpdatedAt:     i.UpdatedAt,
+		})
+	}
+	return nil
+}
+
+func (e *Export) fillReleaseSubscriptions(ctx context.Context, db *pg.DB, uID uuid.UUID) error {
+	subs, err := models.GetUserReleaseSubscriptions(ctx, db, uID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load release subscriptions")
+	}
+	e.ReleaseSubscriptions = make([]ReleaseSubscriptionItem, 0, len(subs))
+	for _, s := range subs {
+		e.ReleaseSubscriptions = append(e.ReleaseSubscriptions, ReleaseSubscriptionItem{
+			SubscriptionID: s.ID,
+			Kind:           s.Kind,
+			VideoID:        s.VideoID,
+			Season:         s.Season,
+			Title:          s.Title,
+			Lang:           s.Lang,
+			Source:         s.Source,
+			Enabled:        s.Enabled,
+			State:          s.State,
+			LastCheckedAt:  s.LastCheckedAt,
+			LastNotifiedAt: s.LastNotifiedAt,
+			CreatedAt:      s.CreatedAt,
+			UpdatedAt:      s.UpdatedAt,
+		})
+	}
+
+	hits, err := models.ListUserReleaseSubscriptionHits(ctx, db, uID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load release subscription hits")
+	}
+	e.ReleaseSubscriptionHits = make([]ReleaseSubscriptionHitItem, 0, len(hits))
+	for _, h := range hits {
+		e.ReleaseSubscriptionHits = append(e.ReleaseSubscriptionHits, ReleaseSubscriptionHitItem{
+			SubscriptionID: h.SubscriptionID,
+			InfoHash:       h.InfoHash,
+			Name:           h.Name,
+			Size:           h.Size,
+			SourceName:     h.SourceName,
+			Season:         h.Season,
+			Episode:        h.Episode,
+			IsBaseline:     h.IsBaseline,
+			FirstSeenAt:    h.FirstSeenAt,
+			NotifiedAt:     h.NotifiedAt,
 		})
 	}
 	return nil
