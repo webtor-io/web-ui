@@ -114,7 +114,11 @@
 
                 <p class="pt-4 pb-2 text-sm text-w-sub">{{ $sub.GetTitle }}{{ if $sub.IsSeason }} · {{ tp $.Lang "profile.subscriptions.season" "Season" $sub.GetSeason }}{{ end }}</p>
 
-                <form method="post" data-async-push-state="false" data-async-target="#subscriptions"
+                {{/* The submit button lives in modal-action below, tied to
+                     this form by id: both buttons have to sit in one
+                     modal-action to line up, and the cancel one is a
+                     <form method="dialog"> that cannot nest inside this. */}}
+                <form id="subscription-prefs-form-{{ $sub.ID }}" method="post" data-async-push-state="false" data-async-target="#subscriptions"
                       action="{{ langPath $.Lang (printf "/subscription/preferences/%s" $sub.ID) }}">
                     <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
 
@@ -139,14 +143,14 @@
                         </select>
                     </div>
 
-                    <p class="text-sm text-w-muted">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
-
-                    <div class="modal-action justify-center">
-                        <button type="submit" class="btn btn-soft" data-umami-event="subscription-prefs-saved">{{ t $.Lang "profile.subscriptions.save" }}</button>
-                    </div>
                 </form>
 
-                <div class="modal-action justify-center -mt-4">
+                <p class="text-sm text-w-sub">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
+
+                <div class="modal-action justify-center">
+                    <button type="submit" form="subscription-prefs-form-{{ $sub.ID }}" class="btn btn-soft" data-umami-event="subscription-prefs-saved">
+                        {{ t $.Lang "profile.subscriptions.save" }}
+                    </button>
                     <form method="dialog">
                         <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "profile.subscriptions.prefsCancel" }}</button>
                     </form>

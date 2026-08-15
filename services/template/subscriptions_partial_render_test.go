@@ -141,6 +141,9 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			// The per-row preference editor renders for every row: the
 			// resolution vocabulary and the language dropdown.
 			if len(tt.data) > 0 {
+				if strings.Count(out, "modal-action") != 1 {
+					t.Errorf("want exactly one modal-action per dialog, got %d:\n%s", strings.Count(out, "modal-action"), out)
+				}
 				// The editor is a dialog behind a gear, built like every
 				// other modal in the product: modal-box, its own form
 				// posting to its own endpoint, method="dialog" to close.
@@ -148,6 +151,9 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 					"prefs-subscription", "<dialog", "modal-box",
 					"/subscription/preferences/", `name="res" value="1080p"`, `name="lang"`,
 					`method="dialog"`, "Quality and language",
+					// One modal-action holds both buttons, so the submit is
+					// tied to the form by id rather than nested in it.
+					`form="subscription-prefs-form-`,
 				} {
 					if !strings.Contains(out, want) {
 						t.Errorf("preference dialog is missing %q:\n%s", want, out)
