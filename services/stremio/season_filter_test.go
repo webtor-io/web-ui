@@ -31,6 +31,27 @@ func TestMatchesRequestedSeason(t *testing.T) {
 		// Two-digit seasons must not be truncated.
 		{"Long Show S10E02", 10, true},
 		{"Long Show S10E02", 1, false},
+		// Number-first word order — what RuTor, Kinozal and NNM-Club use.
+		// Every one of these passed the filter before the pattern existed.
+		{"Мандалорец / The Mandalorian [3 сезон: 1-8 серии из 8] (2023)", 3, true},
+		{"Мандалорец / The Mandalorian [3 сезон: 1-8 серии из 8] (2023)", 1, false},
+		{"Ведьмак / The Witcher (2 сезон) 2021 WEB-DL", 4, false},
+		{"Во все тяжкие 5 сезон", 5, true},
+		{"Во все тяжкие 5 сезон", 2, false},
+		{"Сваты (1-7 сезоны) 2008-2021", 3, true},
+		{"Сваты (1-7 сезоны) 2008-2021", 8, false},
+		{"Клиника 3-й сезон", 3, true},
+		{"Клиника 3-й сезон", 1, false},
+		// A count is a pack of 1..N, not season N. Reading "10 сезонов" as
+		// season 10 would drop a complete-series pack from every request but
+		// the tenth.
+		{"Друзья / Friends [10 сезонов] (1994-2004)", 3, true},
+		{"Друзья / Friends [10 сезонов] (1994-2004)", 10, true},
+		{"Друзья / Friends [10 сезонов] (1994-2004)", 11, false},
+		{"The Office (US) 9 seasons complete", 4, true},
+		{"The Office (US) 9 seasons complete", 10, false},
+		// Episode counts must not be read as seasons.
+		{"Silo / 1-8 серии из 10 [2023]", 3, true},
 	} {
 		if got := matchesRequestedSeason(tt.title, tt.season); got != tt.want {
 			t.Errorf("matchesRequestedSeason(%q, %d) = %v, want %v", tt.title, tt.season, got, tt.want)
