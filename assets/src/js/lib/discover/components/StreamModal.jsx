@@ -7,10 +7,12 @@ import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
 import { ExpandableText } from './ExpandableText';
 import { ReviewsList, useReviews } from './Reviews';
+import { SubscribeButton } from './SubscribeButton';
+import { isSeasonUnfinished } from '../seasonStatus';
 import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -58,7 +60,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     </button>
                 </div>
                 <div class="overflow-y-auto px-3 sm:px-6 pb-4 sm:pb-6">
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} onTabChange={onTabChange} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -68,7 +70,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
     const videoId = modal.metaId || modal.itemId;
     const videoType = modal.itemType;
     const isImdb = videoId && videoId.startsWith('tt') && !videoId.includes(':');
@@ -112,11 +114,11 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     const reviewsVideoId = isImdb && videoType ? videoId : null;
 
     if (modal.view === 'episodes') {
-        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} />;
+        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} />;
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} />;
     }
 
     return null;
@@ -360,7 +362,7 @@ function is4kStream(parsedInfo) {
     return parsedInfo.labels.some(l => l === '4K');
 }
 
-function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta, videoId, videoType, onTabChange }) {
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
     const { title, poster, streams, error, failedAddons } = modal;
     const failed = failedAddons || [];
     // Tab state lives in the modal (synced to the ?tab= URL param by
@@ -544,6 +546,24 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         });
     }, []);
 
+    // The subscribe offer both empty states end with. A user with no
+    // sources configured is offered nothing here: the poller searches the
+    // addons and indexers they set up, so a subscription would be a promise
+    // we cannot keep. That case already has its own "set up addons" prompt.
+    const subscribeCTA = (note, source) => {
+        if (!modal.subTarget || !hasSources) return null;
+        return (
+            <div class="mt-5 pt-4 border-t border-w-line/60 text-center">
+                <p class="text-sm text-w-sub mb-3">{note}</p>
+                <SubscribeButton
+                    target={{ ...modal.subTarget, source }}
+                    subscriptionKeys={subscriptionKeys}
+                    onToggle={onToggleSubscription}
+                />
+            </div>
+        );
+    };
+
     // Streams-tab content. Empty states render inside the tab so the
     // Streams/Reviews row stays visible — a title with zero streams can
     // still have readable reviews.
@@ -602,6 +622,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                         </button>
                     </>
                 )}
+                {subscribeCTA(t('discover.subscriptions.emptyText'), 'empty_streams')}
             </div>
         );
     } else {
@@ -655,7 +676,13 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                     </div>
 
                     {hasActiveFilters && visibleCount === 0 && (
-                        <p class="text-w-muted text-sm text-center py-6">{t('discover.noFilterMatch')}</p>
+                        <div class="py-6">
+                            <p class="text-w-muted text-sm text-center">{t('discover.noFilterMatch')}</p>
+                            {/* The copy has to be honest here: a subscription
+                                is on the title, not on these chips, so it
+                                will report releases the filters would hide. */}
+                            {subscribeCTA(t('discover.subscriptions.filtersText'), 'empty_filters')}
+                        </div>
                     )}
                 </>
             )}
@@ -839,7 +866,7 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta, videoId, videoType, onTabChange }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
     // Same tab mechanics as StreamContent — Episodes (N) / Reviews (M),
@@ -891,6 +918,16 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
     // videos) under 0.
     const totalEpisodes = videos.length - (seasons[0]?.length || 0);
 
+    // Subscribe target for the season currently in view. Null for specials,
+    // for a finished season, and for anything whose id no external source
+    // could resolve.
+    const subTarget = useMemo(() => {
+        const id = modal.itemId;
+        if (!id || !id.startsWith('tt') || activeSeason <= 0) return null;
+        if (!isSeasonUnfinished(videos, activeSeason, { status: meta?.status })) return null;
+        return { kind: 'season', videoId: id, season: activeSeason, source: 'discover_season' };
+    }, [modal.itemId, activeSeason, videos, meta]);
+
     if (!videos.length) {
         return (
             <div>
@@ -914,19 +951,34 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
 
             {tab === 'reviews' ? <ReviewsTabContent reviews={reviews} /> : (
             <>
-            {seasonNums.length > 1 && (
-                <div class="flex gap-1.5 mb-3 flex-wrap">
-                    {seasonNums.map(sn => (
-                        <button
-                            key={sn}
-                            class={chipClass(sn === activeSeason, 'xs')}
-                            onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
-                        >
-                            {sn === 0 ? t('discover.specials') : `S${sn}`}
-                        </button>
-                    ))}
-                </div>
-            )}
+            <div class="flex items-center gap-2 mb-3">
+                {seasonNums.length > 1 && (
+                    <div class="flex gap-1.5 flex-wrap">
+                        {seasonNums.map(sn => (
+                            <button
+                                key={sn}
+                                class={chipClass(sn === activeSeason, 'xs')}
+                                onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
+                            >
+                                {sn === 0 ? t('discover.specials') : `S${sn}`}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {/* The bell only appears on a season that still has episodes
+                    coming — subscribing to a finished one would be a poll
+                    that can never fire, and the server refuses it anyway. */}
+                {subTarget && (
+                    <div class="ml-auto shrink-0">
+                        <SubscribeButton
+                            target={subTarget}
+                            subscriptionKeys={subscriptionKeys}
+                            onToggle={onToggleSubscription}
+                            size="xs"
+                        />
+                    </div>
+                )}
+            </div>
 
             <div class="max-h-[350px] overflow-y-auto">
                 <div class="flex flex-col gap-1.5">

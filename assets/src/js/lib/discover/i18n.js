@@ -1,4 +1,4 @@
-import { makeI18n, getLang, langPath } from '../i18n';
+import { makeI18n, getLang, langPath } from '../i18n.js';
 export { langPath };
 
 // Webpack 5 turns the template-literal dynamic import into a per-locale

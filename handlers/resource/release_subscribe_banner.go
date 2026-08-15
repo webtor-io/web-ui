@@ -3,31 +3,126 @@ package resource
 import (
 	"context"
 
-	ra "github.com/webtor-io/rest-api/services"
+	"github.com/go-pg/pg/v10"
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/webtor-io/web-ui/models"
-	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/auth"
 )
 
-// ReleaseSubscribeBanner is the fake-door experiment surface for release-level
-// subscription. Populated on resource page render when the resource maps to a
-// currently-airing series; rendered as a non-blocking banner with Yes/No/Close
-// actions, all tracked via Umami only (no DB writes). See
-// docs/release_sub_fake_door.md for the experiment plan and decision gates.
+// ReleaseSubscribeBanner is the subscribe surface on a torrent page: when
+// the torrent is an episode of a season that is still airing, the page
+// offers to watch for new releases of that season.
+//
+// It is the same slot the 2026 fake-door used (see
+// docs/release_sub_fake_door.md); what was a survey is now the feature.
 type ReleaseSubscribeBanner struct {
-	Visible         bool
-	SeriesTitle     string
-	SeriesVideoID   string
-	Season          int
-	ReleaseGroupRaw string
+	SeriesTitle   string
+	SeriesVideoID string
+	Season        int
+	// Subscribed and SubscriptionID turn the banner into its other state:
+	// the viewer already follows this season, and the button unsubscribes.
+	Subscribed     bool
+	SubscriptionID string
+	// Anonymous viewers see the offer but cannot act on it — the button
+	// becomes a login link rather than disappearing, because "we can tell
+	// you when this updates" is a reason to have an account.
+	Anonymous bool
 }
 
-// prepareReleaseSubscribeBanner — experiment concluded 2026-05-24, banner
-// disabled. Decision: aggregate CTR 2.2% < 5% gate (broad hypothesis
-// rejected), but paid CTR 11-25% validated future-engagement signaling as a
-// paid-tier feature class. See docs/release_sub_fake_door.md "Результаты"
-// for full breakdown. Type + template + JS + locale keys kept as scaffold
-// for the real paid feature; helpers (dominantSeason / extractReleaseGroup)
-// removed — re-add from git when reviving.
-func prepareReleaseSubscribeBanner(ctx context.Context, en *enrich.Enricher, res *ra.ResourceResponse, series *models.Series) *ReleaseSubscribeBanner {
-	return nil
+// bannerAiring is the "is this series still producing episodes" capability,
+// as an interface so the banner's rule can be tested without a TMDB cache.
+type bannerAiring interface {
+	IsAiringSeries(ctx context.Context, videoID string) bool
+}
+
+// bannerSubs answers "does this viewer already follow this season".
+type bannerSubs interface {
+	Find(ctx context.Context, userID uuid.UUID, videoID string, season int) (*models.ReleaseSubscription, error)
+}
+
+// pgBannerSubs is the production lookup.
+type pgBannerSubs struct{ db *pg.DB }
+
+func (s pgBannerSubs) Find(ctx context.Context, userID uuid.UUID, videoID string, season int) (*models.ReleaseSubscription, error) {
+	if s.db == nil {
+		return nil, nil
+	}
+	sn := int16(season)
+	return models.FindUserReleaseSubscription(ctx, s.db, userID, models.ReleaseSubscriptionKindSeason, videoID, &sn)
+}
+
+// prepareReleaseSubscribeBanner decides whether the page shows the offer,
+// and in which of its two states.
+//
+// Three things have to hold: the torrent maps to a series we have metadata
+// for, the torrent is about one identifiable season, and that series is
+// still in production. The last one goes through the Enricher's
+// mapper-agnostic AiringChecker capability — this layer never reads TMDB's
+// `status` itself.
+//
+// Everything here comes from the local enrichment cache, so it costs the
+// page no external call.
+func prepareReleaseSubscribeBanner(ctx context.Context, airing bannerAiring, subs bannerSubs, user *auth.User, series *models.Series) *ReleaseSubscribeBanner {
+	if airing == nil || series == nil || series.SeriesMetadata == nil || series.SeriesMetadata.VideoID == "" {
+		return nil
+	}
+	season := dominantSeason(series)
+	if season == 0 {
+		// A torrent whose episodes carry no season number cannot address a
+		// subscription: the poller would not know what to ask for.
+		return nil
+	}
+	if !airing.IsAiringSeries(ctx, series.SeriesMetadata.VideoID) {
+		return nil
+	}
+
+	b := &ReleaseSubscribeBanner{
+		SeriesTitle:   series.SeriesMetadata.Title,
+		SeriesVideoID: series.SeriesMetadata.VideoID,
+		Season:        season,
+	}
+
+	if user == nil || !user.HasAuth() {
+		b.Anonymous = true
+		return b
+	}
+	if subs == nil {
+		return b
+	}
+	// A failed lookup renders the subscribe state. Offering to subscribe to
+	// something already subscribed is a no-op on the server (the write path
+	// answers from the existing row), while the reverse would show an
+	// unsubscribe button that removes nothing.
+	sub, err := subs.Find(ctx, user.ID, b.SeriesVideoID, season)
+	if err == nil && sub != nil {
+		b.Subscribed = true
+		b.SubscriptionID = sub.ID.String()
+	}
+	return b
+}
+
+// dominantSeason returns the season number that has the largest number of
+// episodes in this torrent. For per-episode torrents this is just that
+// episode's season; for season packs it's the pack's season. Returns 0 when
+// no episode has a season set.
+//
+// Ties are broken by the lower season number, so a torrent holding two half
+// seasons resolves the same way on every render rather than following map
+// iteration order.
+func dominantSeason(series *models.Series) int {
+	counts := map[int]int{}
+	for _, ep := range series.Episodes {
+		if ep.Season == nil {
+			continue
+		}
+		counts[int(*ep.Season)]++
+	}
+	best, bestCount := 0, 0
+	for s, c := range counts {
+		if c > bestCount || (c == bestCount && best != 0 && s < best) {
+			best, bestCount = s, c
+		}
+	}
+	return best
 }

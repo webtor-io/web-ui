@@ -203,7 +203,7 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		// treat that as "no flags" so old resources render normally
 		// until the metadata-only backfill catches up.
 		d.ResourceMetadata, _ = models.GetResourceMetadataByResourceID(ctx, db, args.ID)
-		d.ReleaseSubBanner = prepareReleaseSubscribeBanner(ctx, s.enricher, res, d.Series)
+		d.ReleaseSubBanner = prepareReleaseSubscribeBanner(ctx, s.enricher, pgBannerSubs{db: db}, args.User, d.Series)
 		// Load watch history for file list
 		if args.User.HasAuth() {
 			d.WatchedPaths, _ = models.GetWatchedPaths(ctx, db, args.User.ID, args.ID)

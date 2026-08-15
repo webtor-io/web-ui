@@ -4,7 +4,7 @@
   "description": "Web UI v2",
   "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test 'assets/src/js/**/*.test.js'",
     "build": "webpack --mode=production",
     "start": "npm run webpack-dev-server",
     "webpack-dev-server": "webpack-dev-server --mode=development"

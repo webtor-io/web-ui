@@ -54,6 +54,7 @@
 - `make run` — runs `./web-ui s` (serve)
 - `npm start` — webpack-dev-server only; the Go binary is run/debugged from GoLand (air was removed 2026-07)
 - `go test ./...` — run all Go tests
+- `npm test` — browser-side tests via `node --test` (no test framework installed). Works because `assets/src/js/package.json` declares `{"type": "module"}`; that also puts webpack into strict-ESM mode for the tree, which is why the js rule carries `resolve: { fullySpecified: false }` and the Babel config is a root `babel.config.json` rather than a `.babelrc`. Testable logic lives in plain `.js` modules — `node --test` cannot parse JSX
 - `go test ./services/parse_torrent_name -v` — parser tests (golden-file based)
 - `go test ./services/parse_torrent_name -run TestParser -update` — update golden files
 

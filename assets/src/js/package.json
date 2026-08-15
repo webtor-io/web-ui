@@ -1,0 +1,4 @@
+{
+    "//": "Scopes the browser sources to ESM so `node --test` can import them directly (see npm test). Webpack already treats them as ESM; this only tells Node the same thing, and keeps the root package.json — which webpack.config.js needs as CommonJS — untouched.",
+    "type": "module"
+}

@@ -527,10 +527,15 @@ func IsAdmin(c *gin.Context) bool {
 	return isAdmin
 }
 
+// HasAuth rejects anonymous requests. It must abort, not merely return:
+// gin's handler chain is a loop over a slice, and a middleware that returns
+// without aborting hands control straight to the next handler — the 401
+// status set here would then be overwritten by whatever that handler wrote,
+// and every route behind this middleware would run with an empty user.
 func HasAuth(c *gin.Context) {
 	u := GetUserFromContext(c)
 	if !u.HasAuth() {
-		c.Status(http.StatusUnauthorized)
+		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	c.Next()

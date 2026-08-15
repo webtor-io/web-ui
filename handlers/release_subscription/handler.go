@@ -20,6 +20,7 @@
 package release_subscription
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,9 +41,22 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
+// subscriptions is the business half, as an interface so the HTTP contract
+// — which refusal becomes which status code — can be tested without a
+// database behind it. *release_subscription.Service is the only production
+// implementation.
+type subscriptions interface {
+	Subscribe(ctx context.Context, u *auth.User, req rs.Request, limit int) (*models.ReleaseSubscription, bool, error)
+	Unsubscribe(ctx context.Context, u *auth.User, req rs.Request) (bool, error)
+	List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error)
+	Delete(ctx context.Context, u *auth.User, id uuid.UUID) error
+	SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled bool) error
+	DeleteByToken(ctx context.Context, token string) (*models.ReleaseSubscription, error)
+}
+
 type Handler struct {
 	pg  *cs.PG
-	svc *rs.Service
+	svc subscriptions
 	tb  template.Builder[*web.Context]
 }
 
@@ -52,7 +66,12 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 		svc: svc,
 		tb:  tm.MustRegisterViews("subscription/*").WithLayout("main"),
 	}
+	h.routes(r)
+}
 
+// routes is separate from RegisterHandler so a test can mount the same
+// routing on a bare engine with a fake service.
+func (h *Handler) routes(r gin.IRouter) {
 	jr := r.Group("/discover/subscriptions")
 	jr.Use(auth.HasAuth)
 	jr.GET("", h.list)

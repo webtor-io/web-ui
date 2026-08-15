@@ -181,6 +181,14 @@ export const initialState = {
     // lazy fetch so we don't refetch the grid every time the toggle is
     // turned on. Limit comes from the server (free-tier soft cap, -1 means
     // unlimited for paid).
+    // Release subscriptions: a Set of content keys (see
+    // subscriptionsClient.subscriptionKey), not video ids — a subscription
+    // is per season, so one series can be in the set several times over.
+    // Only the keys live here; the rows themselves are the profile's
+    // business.
+    subscriptionKeys: new Set(),
+    subscriptionLimit: -1,
+    subscriptionCount: 0,
     watchlistIds: new Set(),
     watchlistItems: [],
     watchlistItemsLoaded: false,
@@ -310,6 +318,29 @@ export function discoverReducer(state, action) {
             ids.delete(action.videoId);
             const items = state.watchlistItems.filter(it => it.id !== action.videoId);
             return { ...state, watchlistIds: ids, watchlistItems: items };
+        }
+
+        // --- Release subscriptions slice ---
+        case 'SUBSCRIPTIONS_LOADED': {
+            return {
+                ...state,
+                subscriptionKeys: new Set(action.keys || []),
+                subscriptionCount: action.count ?? (action.keys || []).length,
+                subscriptionLimit: action.limit ?? state.subscriptionLimit,
+            };
+        }
+        case 'SUBSCRIPTION_ADD': {
+            // Optimistic: the bell fills on click. A server refusal (the
+            // free-tier cap, a season that has finished airing) dispatches
+            // SUBSCRIPTION_REMOVE to put it back.
+            const keys = new Set(state.subscriptionKeys);
+            keys.add(action.key);
+            return { ...state, subscriptionKeys: keys, subscriptionCount: keys.size };
+        }
+        case 'SUBSCRIPTION_REMOVE': {
+            const keys = new Set(state.subscriptionKeys);
+            keys.delete(action.key);
+            return { ...state, subscriptionKeys: keys, subscriptionCount: keys.size };
         }
 
         // --- AI recommendations slice ---

@@ -126,8 +126,15 @@ module.exports = async (env, options) => {
         module: {
             rules: [
                 {
+                    // assets/src/js/package.json declares "type": "module" so
+                    // Node's test runner can import these files directly. That
+                    // also puts webpack into strict-ESM mode for the tree,
+                    // where extensionless imports are an error — this rule
+                    // hands back the extension guessing the whole codebase is
+                    // written against. See `npm test`.
                     test: /\.jsx?$/,
                     include: path.resolve(__dirname, 'assets', 'src'),
+                    resolve: { fullySpecified: false },
                     loader: 'babel-loader'
                 },
                 {

@@ -13,6 +13,8 @@ import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
 import { restoreModalFromUrl, loadManifests, fetchUserStatuses, toggleWatched, rateVideo, unrateVideo, catalogChipClass, watchlistChipClass, viewModeChipClass, reviewsTab } from './discoverUtils';
 import { fetchWatchlistIds, fetchWatchlist, addToWatchlist, removeFromWatchlist } from '../watchlistClient';
+import { fetchSubscriptionIds, subscribe, unsubscribe, subscriptionKey } from '../subscriptionsClient';
+import { subscriptionTargetFor } from '../seasonStatus';
 import { fetchLocalized, getCachedLocalized, withLocalized, localizedTitle } from '../localizeClient';
 import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
@@ -376,7 +378,13 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         // Seed the tab from the URL so deep links / reloads with
         // ?tab=reviews land on the reviews tab — a freshly built modal
         // object otherwise defaults to the primary tab.
-        const itemMeta = { year, releaseInfo, imdbRating, description, tab: reviewsTab() };
+        // What a subscription from this modal would be about. An episode id
+        // (tt…:S:E) means the season; a movie means the film. Anything else —
+        // a series opened without an episode, a library item whose id no
+        // external source can resolve — offers nothing, and the empty states
+        // render without the CTA.
+        const subTarget = subscriptionTargetFor(type, id, metaId, modalExtra?.backToEpisodes?.meta);
+        const itemMeta = { year, releaseInfo, imdbRating, description, tab: reviewsTab(), subTarget };
 
         // Addons we couldn't even probe for streams because their manifest
         // is unreachable or returned a 4xx. Without surfacing these, an
@@ -1219,6 +1227,17 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         return () => { cancelled = true; };
     }, []);
 
+    // Same cheap prefetch for subscriptions: which bells are already filled.
+    // Keys only — the rows themselves belong to the profile page.
+    useEffect(() => {
+        let cancelled = false;
+        fetchSubscriptionIds().then(({ keys, count, limit }) => {
+            if (cancelled) return;
+            dispatch({ type: 'SUBSCRIPTIONS_LOADED', keys, count, limit });
+        });
+        return () => { cancelled = true; };
+    }, []);
+
     const loadWatchlistItems = useCallback(async () => {
         const data = await fetchWatchlist();
         dispatch({ type: 'WATCHLIST_ITEMS_LOADED', items: data.items, ids: data.ids, limit: data.limit });
@@ -1314,6 +1333,45 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             }
         }
     }, [state.watchlistIds, state.watchlistItems, state.selectedType, state.isSearchMode]);
+
+    // handleToggleSubscription drives every subscribe affordance in the
+    // modal: the bell next to an airing season, and the two empty states.
+    // The target is {kind, videoId, season, source}; the key it maps to is
+    // what the Set holds.
+    const handleToggleSubscription = useCallback(async (target) => {
+        if (!target || !target.videoId || !target.videoId.startsWith('tt')) return;
+        const key = subscriptionKey(target.kind, target.videoId, target.season);
+        const subscribed = state.subscriptionKeys.has(key);
+
+        if (subscribed) {
+            dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
+            window.umami?.track?.('subscription-removed', { kind: target.kind, id: target.videoId, source: target.source });
+            const result = await unsubscribe(target);
+            if (!result.ok) {
+                dispatch({ type: 'SUBSCRIPTION_ADD', key });
+                if (window.toast) window.toast.error(result.message || t('discover.networkError'));
+            } else if (window.toast && result.message) {
+                window.toast.success(result.message);
+            }
+            return;
+        }
+
+        dispatch({ type: 'SUBSCRIPTION_ADD', key });
+        window.umami?.track?.('subscription-created', { kind: target.kind, id: target.videoId, source: target.source });
+        const result = await subscribe(target);
+        if (!result.ok) {
+            // Rolled back on every refusal — the cap, a season that turned
+            // out to be over, a network failure. The message is the
+            // server's, so it explains which.
+            dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
+            if (result.code === 'limit_exceeded') {
+                window.umami?.track?.('subscription-limit-hit', { limit: result.limit });
+            }
+            if (window.toast) window.toast.error(result.message || t('discover.networkError'));
+        } else if (window.toast && result.message) {
+            window.toast.success(result.message);
+        }
+    }, [state.subscriptionKeys]);
 
     const handleRate = useCallback(async (rating) => {
         if (!ratingTarget) return;
@@ -1697,6 +1755,9 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     onRate={handleOpenRating}
                     onToggleWatchlist={handleToggleWatchlist}
                     onTabChange={handleModalTabChange}
+                    subscriptionKeys={state.subscriptionKeys}
+                    onToggleSubscription={handleToggleSubscription}
+                    hasSources={hasCustomAddons || addonsInstalled || hasIndexers()}
                 />
             )}
 
