@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
@@ -19,6 +21,16 @@ type torznabStreamsRequest struct {
 
 type torznabStreamsResponse struct {
 	Streams []stremio.StreamItem `json:"streams"`
+	// Indexers is the current name of every indexer that was queried.
+	//
+	// The page bootstrap (window._indexers) is rendered once, at page load,
+	// and an indexer's name changes the first time it is searched: the human
+	// name lives in the search results, not in the caps probe, so it is
+	// learned there (see stremio.TorznabStream.learnTrackerName). Without
+	// this the progress row keeps the name the page was loaded with for the
+	// rest of the session, while the result rows below it already show the
+	// new one — two names for one source in one modal.
+	Indexers []indexerView `json:"indexers"`
 }
 
 // torznabStreams is the Level 1 handler for POST /discover/torznab/streams.
@@ -53,31 +65,54 @@ func (h *Handler) torznabStreams(c *gin.Context) {
 	}
 
 	u := auth.GetUserFromContext(c)
-	streams, err := torznabStreamsFor(c.Request.Context(), h.sb, u, contentType, contentID)
+	resp, err := torznabStreamsFor(c.Request.Context(), h.sb, h.pg.Get(), u, contentType, contentID)
 	if err != nil {
 		log.WithError(err).Error("failed to fetch torznab streams")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch streams"})
 		return
 	}
-	c.JSON(http.StatusOK, torznabStreamsResponse{Streams: streams})
+	c.JSON(http.StatusOK, resp)
 }
 
 // torznabStreamsFor is the Level 2 half: no gin, so it is testable with a
 // stub builder.
-func torznabStreamsFor(ctx context.Context, sb *stremio.Builder, u *auth.User, contentType, contentID string) ([]stremio.StreamItem, error) {
+func torznabStreamsFor(ctx context.Context, sb *stremio.Builder, db *pg.DB, u *auth.User, contentType, contentID string) (*torznabStreamsResponse, error) {
+	out := &torznabStreamsResponse{Streams: []stremio.StreamItem{}, Indexers: []indexerView{}}
 	svc, err := sb.BuildTorznabStreamsService(ctx, u)
 	if err != nil {
 		return nil, err
 	}
 	if svc == nil {
-		return []stremio.StreamItem{}, nil
+		return out, nil
 	}
 	resp, err := svc.GetStreams(ctx, contentType, contentID)
 	if err != nil {
 		return nil, err
 	}
-	if resp == nil || resp.Streams == nil {
-		return []stremio.StreamItem{}, nil
+	if resp != nil && resp.Streams != nil {
+		out.Streams = resp.Streams
 	}
-	return resp.Streams, nil
+	// Read the names back after the search, not before: this is the request
+	// that teaches them.
+	out.Indexers = indexerViews(ctx, db, u)
+	return out, nil
+}
+
+// indexerViews is the per-indexer bootstrap, used both by the page and by the
+// streams response so the two cannot disagree. A failure is logged and
+// swallowed: the names are cosmetic, and the streams they came with are not.
+func indexerViews(ctx context.Context, db *pg.DB, u *auth.User) []indexerView {
+	out := []indexerView{}
+	if db == nil || u == nil {
+		return out
+	}
+	indexers, err := models.GetUserTorznabIndexers(ctx, db, u.ID)
+	if err != nil {
+		log.WithError(err).Warn("failed to list torznab indexers for the client bootstrap")
+		return out
+	}
+	for _, ix := range indexers {
+		out = append(out, indexerView{ID: ix.ID.String(), Name: ix.GetName()})
+	}
+	return out
 }

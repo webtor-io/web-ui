@@ -50,6 +50,15 @@ export async function fetchTorznabStreams(type, id, { signal } = {}) {
         });
         if (!res.ok) throw new Error(`Indexer search failed with ${res.status}`);
         const data = await res.json();
+        // An indexer's name is learned from its first search — the human name
+        // ("RuTracker.org") lives in the results, not in the capabilities
+        // document — so the page bootstrap goes stale the moment it is. The
+        // server sends the current names back with every search; without
+        // taking them the progress row keeps the old name for the rest of
+        // the session while the rows under it already show the new one.
+        if (Array.isArray(data.indexers) && data.indexers.length) {
+            window._indexers = data.indexers;
+        }
         return (data.streams || []).map(s => ({
             ...s,
             // First line of name is the indexer label, same convention the

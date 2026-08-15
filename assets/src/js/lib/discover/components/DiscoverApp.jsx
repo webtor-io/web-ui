@@ -451,7 +451,13 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             promises.push((async () => {
                 try {
                     const streams = await fetchTorznabStreams(type, id, { signal: streamSignal });
-                    addonStatuses[indexerIdx] = { ...addonStatuses[indexerIdx], status: 'done', count: streams.length };
+                    // Relabel: the response carries the indexer's current
+                    // name, which the first search of a freshly added
+                    // indexer is what teaches. Without this the row keeps
+                    // the name the page was loaded with while the results
+                    // under it already carry the new one.
+                    const done = indexerLabel();
+                    addonStatuses[indexerIdx] = { ...addonStatuses[indexerIdx], name: done, host: done, status: 'done', count: streams.length };
                     bySource[indexerIdx] = streams;
                 } catch (e) {
                     addonStatuses[indexerIdx] = { ...addonStatuses[indexerIdx], status: 'error' };

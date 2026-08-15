@@ -127,22 +127,9 @@ func (h *Handler) index(c *gin.Context) {
 		}
 	}
 
-	indexers, err := models.GetUserTorznabIndexers(c.Request.Context(), db, u.ID)
-	if err != nil {
-		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get torznab indexers"))
-		return
-	}
-	indexerViews := make([]indexerView, len(indexers))
-	for i, ix := range indexers {
-		indexerViews[i] = indexerView{
-			ID:   ix.ID.String(),
-			Name: ix.GetName(),
-		}
-	}
-
 	h.tb.Build("discover/index").HTML(http.StatusOK, web.NewContext(c).WithData(&indexData{
 		Addons:   views,
-		Indexers: indexerViews,
+		Indexers: indexerViews(c.Request.Context(), db, u),
 	}))
 }
 
