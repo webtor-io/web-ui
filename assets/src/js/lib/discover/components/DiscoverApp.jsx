@@ -1345,7 +1345,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
         if (subscribed) {
             dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
-            window.umami?.track?.('subscription-removed', { kind: target.kind, id: target.videoId, source: target.source });
+            window.umami?.track?.('release-sub-removed', { kind: target.kind, id: target.videoId, source: target.source });
             const result = await unsubscribe(target);
             if (!result.ok) {
                 dispatch({ type: 'SUBSCRIPTION_ADD', key });
@@ -1357,7 +1357,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         }
 
         dispatch({ type: 'SUBSCRIPTION_ADD', key });
-        window.umami?.track?.('subscription-created', { kind: target.kind, id: target.videoId, source: target.source });
+        window.umami?.track?.('release-sub-created', { kind: target.kind, id: target.videoId, source: target.source });
         const result = await subscribe(target);
         if (!result.ok) {
             // Rolled back on every refusal — the cap, a season that turned
@@ -1365,7 +1365,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // server's, so it explains which.
             dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
             if (result.code === 'limit_exceeded') {
-                window.umami?.track?.('subscription-limit-hit', { limit: result.limit });
+                window.umami?.track?.('release-sub-limit-hit', { limit: result.limit });
             }
             if (window.toast) window.toast.error(result.message || t('discover.networkError'));
         } else if (window.toast && result.message) {

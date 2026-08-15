@@ -24,7 +24,7 @@ av(async function(){
     initListEditor({
         kind: 'subscription',
         i18nPrefix: 'profile.subscriptions',
-        umamiDeleteEvent: 'subscription-delete',
+        umamiDeleteEvent: 'release-sub-delete',
     });
 
     initPrefsDialogs(this);

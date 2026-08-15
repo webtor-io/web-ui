@@ -39,14 +39,14 @@
                 {{/* Nothing to post without an account; the offer stays
                      visible because it is a reason to have one. */}}
                 <a href="{{ langPath $.Lang "/login" }}?return-url={{ langPath $.Lang (printf "/%s" .Data.Resource.ID) }}"
-                   class="btn btn-sm btn-soft-cyan" data-umami-event="subscription-login-click">
+                   class="btn btn-sm btn-soft-cyan" data-umami-event="release-sub-login-click">
                     {{ t .Lang "release_sub.btn_subscribe" }}
                 </a>
             {{ else if $b.Subscribed }}
                 <form method="post" data-async-push-state="false" data-async-target="#release-subscribe-banner"
                       action="{{ langPath $.Lang (printf "/subscription/delete/%s" $b.SubscriptionID) }}">
                     <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
-                    <button type="submit" class="btn btn-sm btn-ghost border border-w-line" data-umami-event="subscription-removed">
+                    <button type="submit" class="btn btn-sm btn-ghost border border-w-line" data-umami-event="release-sub-removed">
                         {{ t .Lang "release_sub.btn_unsubscribe" }}
                     </button>
                 </form>
@@ -58,7 +58,7 @@
                     <input type="hidden" name="video_id" value="{{ $b.SeriesVideoID }}">
                     <input type="hidden" name="season" value="{{ $b.Season }}">
                     <input type="hidden" name="source" value="resource_banner">
-                    <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="subscription-created">
+                    <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="release-sub-created">
                         {{ t .Lang "release_sub.btn_subscribe" }}
                     </button>
                 </form>

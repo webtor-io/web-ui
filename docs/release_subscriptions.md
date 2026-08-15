@@ -184,7 +184,11 @@ Eligibility проверяется **на сервере** при POST (`IsAirin
 
 ### Аналитика
 
-Umami, kebab-case как везде: `subscription-created` (property `source`), `subscription-removed`, `subscription-limit-hit`, `subscription-email-click`. Первые цифры к разбору — доля подписок из каждой из трёх точек входа и CTR письма-обновления.
+Umami, kebab-case как везде: `release-sub-created` (property `source`), `release-sub-removed`, `release-sub-limit-hit`, `release-sub-email-click`.
+
+Префикс `release-sub-`, а не `subscription-`, намеренно: событие `subscription-started` уже занято — оно про **платную** подписку (см. `assets/src/js/app/nav.js`), и в дашборде два семейства с одним префиксом читались бы как одно.
+
+Из Umami принципиально не видно ничего, что происходит после подписки: поллер — это cron, браузера там нет. Сколько писем ушло и сколько подписок дожило до второго письма — считается SQL'ем по `release_subscription`, `release_subscription_hit` и `notification` (ключи `sub-upd-<id>-…`). Это содержание фазы 4. Первые цифры к разбору — доля подписок из каждой из трёх точек входа и CTR письма-обновления.
 
 ## Спринты
 

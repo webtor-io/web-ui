@@ -102,7 +102,7 @@
             <input type="hidden" name="deleted_subscriptions" id="deleted_subscriptions" value="">
 
             <div class="mt-4 flex items-center justify-end">
-                <button type="submit" class="btn btn-soft" data-umami-event="subscription-save">{{ t $.Lang "profile.subscriptions.save" }}</button>
+                <button type="submit" class="btn btn-soft" data-umami-event="release-sub-save">{{ t $.Lang "profile.subscriptions.save" }}</button>
             </div>
         </form>
 
@@ -154,7 +154,7 @@
                 <p class="text-sm text-w-sub">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
 
                 <div class="modal-action justify-center">
-                    <button type="submit" form="subscription-prefs-form-{{ $sub.ID }}" class="btn btn-soft" data-umami-event="subscription-prefs-saved">
+                    <button type="submit" form="subscription-prefs-form-{{ $sub.ID }}" class="btn btn-soft" data-umami-event="release-sub-prefs-saved">
                         {{ t $.Lang "profile.subscriptions.save" }}
                     </button>
                     <form method="dialog">
