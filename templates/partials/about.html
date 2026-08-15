@@ -33,7 +33,9 @@
     </div>
 </div>
 
-{{ dynamicTemplate (printf "about_instruction_%s_how_to" $instruction) $ }}
+{{/* A tool page renders the sections it declares; the home page falls
+     through to the generic body below. See handlers/common/about.go. */}}
+{{ if $.Data.Tool }}{{ template "about_sections" $ }}{{ end }}
 
 {{ if eq $instruction "default" }}
 <!-- How It Works -->

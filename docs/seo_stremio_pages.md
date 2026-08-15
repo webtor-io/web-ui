@@ -43,9 +43,11 @@ URL намеренно **не менялся**: точное вхождение 
 работает. Файлы:
 
 - `handlers/common/tools.go` — запись в `Tools` (роут, sitemap и перелинковка
-  подхватываются автоматически)
-- `templates/partials/about/webtor_stremio_addon.html` — секции how-to,
-  explained, benefits, devices, safety; CTA — `stremio_cta`
+  подхватываются автоматически) вместе со списком секций: how-to, explained,
+  benefits (+ врезка про индексеры), devices, safety; CTA — `stremio_cta`.
+  Разметку рендерит общий `templates/partials/about/sections.html` — с
+  2026-08-15 постраничных партиалов больше нет, см.
+  [tool_pages.md](./tool_pages.md)
 - ключи `tool.webtorStremioAddon.*` (28 штук) во всех 11 локалях
 
 **Копирайт-ограничение:** тексты нигде не утверждают, что Webtor ищет или

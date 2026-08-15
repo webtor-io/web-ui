@@ -2,65 +2,14 @@ package common
 
 import (
 	"encoding/json"
-	"html/template"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
 
 // repoRoot is two levels up from handlers/common.
 const repoRoot = "../.."
-
-// snakeName mirrors the kebabToSnake template helper: tools.go holds kebab
-// URLs, the partial file and its define use snake.
-func snakeName(url string) string {
-	return strings.ReplaceAll(url, "-", "_")
-}
-
-// camelName mirrors the i18n key prefix: torrent-to-mp4 → torrentToMp4.
-func camelName(url string) string {
-	parts := strings.Split(url, "-")
-	out := parts[0]
-	for _, p := range parts[1:] {
-		if p == "" {
-			continue
-		}
-		out += strings.ToUpper(p[:1]) + p[1:]
-	}
-	return out
-}
-
-// aboutPartials parses every about partial into one template set, the way the
-// template manager does at startup.
-func aboutPartials(t *testing.T) *template.Template {
-	t.Helper()
-	stub := func(args ...interface{}) interface{} { return "" }
-	funcs := template.FuncMap{}
-	for _, name := range []string{
-		"t", "tp", "tHTML", "tpHTML", "langPath", "asset", "deref", "isPaid",
-		"withContext", "json", "raw", "dict", "slice", "kebabToSnake",
-		"dynamicTemplate", "faqSchema", "hasPrefix", "add", "seq",
-	} {
-		funcs[name] = stub
-	}
-	paths, err := filepath.Glob(filepath.Join(repoRoot, "templates/partials/about/*.html"))
-	if err != nil || len(paths) == 0 {
-		t.Fatalf("no about partials found: %v", err)
-	}
-	tpl := template.New("about").Funcs(funcs)
-	for _, p := range paths {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatalf("read %s: %v", p, err)
-		}
-		if _, err := tpl.Parse(string(b)); err != nil {
-			t.Fatalf("parse %s: %v", p, err)
-		}
-	}
-	return tpl
-}
 
 func locales(t *testing.T) map[string]map[string]string {
 	t.Helper()
@@ -83,48 +32,84 @@ func locales(t *testing.T) map[string]map[string]string {
 	return out
 }
 
-// TestEveryToolHasItsAboutPartial guards the failure mode that shipped once:
-// a tool registered here without its partial renders a blank page on that URL
-// alone. Nothing else catches it — the lookup is dynamic, so the build and the
-// rest of the suite pass while the live page is empty.
-func TestEveryToolHasItsAboutPartial(t *testing.T) {
-	tpl := aboutPartials(t)
+// TestEveryToolDeclaresItsBody guards the failure mode that shipped once: a
+// tool registered here without a body renders a URL with nothing between the
+// hero and the footer. It used to be possible because the body was a partial
+// looked up by name at render time; now it is this list, and an empty one is
+// the same blank page.
+func TestEveryToolDeclaresItsBody(t *testing.T) {
 	for _, tool := range Tools {
-		name := "about_instruction_" + snakeName(tool.Url) + "_how_to"
-		if tpl.Lookup(name) == nil {
-			t.Errorf("/%s has no partial defining %q — that page renders blank", tool.Url, name)
+		if len(tool.Sections) == 0 {
+			t.Errorf("/%s declares no sections — that page renders blank", tool.Url)
+			continue
+		}
+		if tool.Sections[0].Kind != AboutSteps {
+			t.Errorf("/%s opens with %q — every tool page opens with the steps section, which carries the #how anchor", tool.Url, tool.Sections[0].Kind)
+		}
+		for _, s := range tool.Sections {
+			if s.Prefix != tool.AboutKey() {
+				t.Errorf("/%s: section %q has prefix %q, want %q — the init stamp did not run", tool.Url, s.Key, s.Prefix, tool.AboutKey())
+			}
+			switch s.Kind {
+			case AboutCompare:
+				if len(s.Cols) != 2 {
+					t.Errorf("/%s: comparison %q has %d columns, want 2", tool.Url, s.Key, len(s.Cols))
+				}
+			case AboutChecklist:
+				if s.Items == 0 {
+					t.Errorf("/%s: checklist %q lists no items", tool.Url, s.Key)
+				}
+			case AboutProse:
+				if len(s.Paras) == 0 {
+					t.Errorf("/%s: prose section %q has no paragraphs", tool.Url, s.Key)
+				}
+			}
 		}
 	}
 }
 
-// TestEveryToolHasItsCopyInEveryLocale covers the other half: a missing key
-// renders as the raw key on a page meant for search traffic.
+// TestEveryToolHasItsCopyInEveryLocale covers the tool's own labels — the
+// footer link, the tools grid, the meta description. The page body's keys are
+// checked against the rendered markup in services/template, which is exact
+// rather than a guess at what the template asks for.
 func TestEveryToolHasItsCopyInEveryLocale(t *testing.T) {
 	locs := locales(t)
-	keyRe := regexp.MustCompile(`"(tool\.[a-zA-Z0-9]+\.[a-zA-Z0-9._]+)"`)
-
 	for _, tool := range Tools {
-		camel := camelName(tool.Url)
-		want := map[string]bool{
-			tool.Title:       true,
-			tool.Benefit:     true,
-			tool.Description: true,
-		}
-		// Plus whatever the tool's own partial asks for.
-		b, err := os.ReadFile(filepath.Join(repoRoot, "templates/partials/about", snakeName(tool.Url)+".html"))
-		if err == nil {
-			for _, m := range keyRe.FindAllStringSubmatch(string(b), -1) {
-				if strings.HasPrefix(m[1], "tool."+camel+".") {
-					want[m[1]] = true
-				}
-			}
-		}
 		for lang, d := range locs {
-			for k := range want {
+			for _, k := range []string{tool.Title, tool.Benefit, tool.Description} {
 				if strings.TrimSpace(d[k]) == "" {
 					t.Errorf("/%s: %s missing in locales/%s.json", tool.Url, k, lang)
 				}
 			}
 		}
 	}
+}
+
+// TestAboutKeyFollowsTheURL pins the kebab-URL/camel-key convention every
+// locale key on these pages is built from.
+func TestAboutKeyFollowsTheURL(t *testing.T) {
+	for _, tool := range Tools {
+		want := "tool." + camelName(tool.Url) + ".about"
+		if got := tool.AboutKey(); got != want {
+			t.Errorf("/%s: AboutKey() = %q, want %q", tool.Url, got, want)
+		}
+		// The title key is written out by hand; if it disagrees with the
+		// derived prefix, the page body reads another tool's copy.
+		if !strings.HasPrefix(tool.Title, "tool."+camelName(tool.Url)+".") {
+			t.Errorf("/%s: title key %q does not match the URL", tool.Url, tool.Title)
+		}
+	}
+}
+
+// camelName mirrors the i18n key prefix: torrent-to-mp4 → torrentToMp4.
+func camelName(url string) string {
+	parts := strings.Split(url, "-")
+	out := parts[0]
+	for _, p := range parts[1:] {
+		if p == "" {
+			continue
+		}
+		out += strings.ToUpper(p[:1]) + p[1:]
+	}
+	return out
 }

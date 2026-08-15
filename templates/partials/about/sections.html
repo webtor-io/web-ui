@@ -1,0 +1,165 @@
+{{/*
+    The body of every tool page, rendered from the section list the tool
+    declares in handlers/common/tools.go. There used to be one 130-line
+    partial per page — 19 copies of this markup, and a 20th for every landing
+    page added.
+
+    Each section template receives `withContext $ <section>`, so $.Ctx is the
+    page context and $.Data the section. Key fragments come from the section
+    (FieldKey/ItemKeys) rather than being spelled out here, which is what
+    keeps a page from ever rendering another page's copy.
+*/}}
+
+{{ define "about_sections" }}
+{{ $ctx := $ }}
+{{ range $.Data.Tool.Sections }}
+{{ if eq .Kind "steps" }}{{ template "about_section_steps" (withContext $ctx .) }}
+{{ else if eq .Kind "prose" }}{{ template "about_section_prose" (withContext $ctx .) }}
+{{ else if eq .Kind "checklist" }}{{ template "about_section_checklist" (withContext $ctx .) }}
+{{ else if eq .Kind "compare" }}{{ template "about_section_compare" (withContext $ctx .) }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{/* The badge above a section heading: a coloured pill with a glyph. */}}
+{{ define "about_badge" }}
+<div class="badge badge-lg bg-w-{{ $.Data.Accent }}/10 border-w-{{ $.Data.Accent }}/30 text-w-{{ if eq $.Data.Accent "cyan" }}cyan{{ else }}{{ $.Data.Accent }}L{{ end }} gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+    {{ template "about_badge_icon" $.Data.IconName }}
+    {{ t $.Ctx.Lang (printf "tool.about.badges.%s" $.Data.Badge) }}
+</div>
+{{ end }}
+
+{{ define "about_badge_icon" }}
+{{- if eq . "howItWorks" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+{{- else if eq . "explained" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+{{- else if eq . "benefits" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+{{- else if eq . "useCases" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+{{- else if eq . "formats" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><circle cx="12" cy="12" r="10"/></svg>
+{{- else if eq . "devices" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+{{- else if eq . "videoStreaming" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+{{- else if eq . "safety" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+{{- else if eq . "comparison" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/></svg>
+{{- else if eq . "download" }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+{{- end }}
+{{ end }}
+
+{{/* Three numbered cards. Always the first section, and the anchor the
+     hero's "how it works" link points at. */}}
+{{ define "about_section_steps" }}
+<section id="how" class="py-16 px-3 sm:px-6{{ if $.Data.Alt }} bg-base-200{{ end }}">
+    <div class="max-w-[1100px] mx-auto">
+        {{ template "about_badge" $ }}
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Ctx.Lang ($.Data.FieldKey "title") }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">{{ tHTML $.Ctx.Lang ($.Data.FieldKey "subtitle") }}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {{ range $i := seq 1 3 }}
+            <div class="card bg-base-300 border border-w-line hover:border-w-pink/30 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(232,67,147,0.1)] transition-all duration-300">
+                <div class="card-body">
+                    <div class="w-11 h-11 rounded-xl bg-w-pink/15 text-w-pink flex items-center justify-center font-bold text-lg">{{ $i }}</div>
+                    <h3 class="card-title text-[1.15rem] mt-3">{{ t $.Ctx.Lang ($.Data.FieldKey (printf "step%d.title" $i)) }}</h3>
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Ctx.Lang ($.Data.FieldKey (printf "step%d.text" $i)) }}</p>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+
+        {{ if $.Data.CTA }}
+        <div class="mt-10">
+            {{ if eq $.Data.CTA "stremio" }}{{ template "stremio_cta" (withContext $.Ctx $.Ctx.Data.Tool) }}{{ else }}{{ template "discover_cta" (withContext $.Ctx $.Ctx.Data.Tool) }}{{ end }}
+        </div>
+        {{ end }}
+    </div>
+</section>
+{{ end }}
+
+{{/* A heading over one to three paragraphs — "what this thing is", "is it
+     safe". Prose is rendered as HTML: about a third of these values carry a
+     <strong> in at least one locale. */}}
+{{ define "about_section_prose" }}
+<section class="py-16 px-3 sm:px-6{{ if $.Data.Alt }} bg-base-200{{ end }}">
+    <div class="max-w-[1100px] mx-auto">
+        {{ template "about_badge" $ }}
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Ctx.Lang ($.Data.FieldKey "title") }}</h2>
+        <div class="max-w-[700px]">
+            {{ range $.Data.ParaList }}
+            <p class="text-[1.05rem] text-w-sub leading-relaxed{{ if not .Last }} mb-4{{ end }}">{{ tHTML $.Ctx.Lang .Key }}</p>
+            {{ end }}
+            {{ with $.Data.Link }}
+            <p class="text-[1.05rem] leading-relaxed mt-4"><a href="{{ langPath $.Ctx.Lang .Url }}" data-async-target="main" class="link link-hover text-w-cyan">{{ t $.Ctx.Lang .TitleKey }} →</a></p>
+            {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}
+
+{{/* A grid of ticked items: benefits, supported formats, devices, use cases. */}}
+{{ define "about_section_checklist" }}
+<section class="py-16 px-3 sm:px-6{{ if $.Data.Alt }} bg-base-200{{ end }}">
+    <div class="max-w-[1100px] mx-auto">
+        {{ template "about_badge" $ }}
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Ctx.Lang ($.Data.FieldKey "title") }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mb-10">{{ tHTML $.Ctx.Lang ($.Data.FieldKey "subtitle") }}</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[700px]">
+            {{ range $key := $.Data.ItemKeys }}
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 shrink-0 mt-0.5 text-w-{{ $.Data.Accent }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Ctx.Lang $key }}</span>
+            </div>
+            {{ end }}
+        </div>
+
+        {{ if $.Data.Footer }}
+        <p class="text-[1.05rem] text-w-sub max-w-[700px] leading-relaxed mt-6">{{ tHTML $.Ctx.Lang ($.Data.FieldKey "footer") }}</p>
+        {{ end }}
+        {{ if $.Data.Extra }}
+        <div class="mt-10 max-w-[700px] border border-w-line rounded-2xl p-6">
+            <h3 class="text-[1.15rem] font-bold tracking-tight mb-2 flex items-center gap-2">
+                <svg class="w-4 h-4 text-w-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                {{ t $.Ctx.Lang (printf "%s.%s.title" $.Data.Prefix $.Data.Extra) }}
+            </h3>
+            <p class="text-[0.95rem] text-w-sub leading-relaxed">{{ t $.Ctx.Lang (printf "%s.%s.text" $.Data.Prefix $.Data.Extra) }}</p>
+        </div>
+        {{ end }}
+    </div>
+</section>
+{{ end }}
+
+{{/* Two labelled columns of bullets. The first column is the thing the page
+     is about, the second what it is being compared against. */}}
+{{ define "about_section_compare" }}
+<section class="py-16 px-3 sm:px-6{{ if $.Data.Alt }} bg-base-200{{ end }}">
+    <div class="max-w-[1100px] mx-auto">
+        {{ template "about_badge" $ }}
+        <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Ctx.Lang ($.Data.FieldKey "title") }}</h2>
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mb-10">{{ t $.Ctx.Lang ($.Data.FieldKey "subtitle") }}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {{ $sec := $.Data }}{{ $ctx := $.Ctx }}
+            {{ range $i, $col := $.Data.Cols }}
+            {{ $accent := "cyan" }}{{ if eq $i 0 }}{{ $accent = "pink" }}{{ end }}
+            <div class="card bg-base-300 border border-w-line">
+                <div class="card-body">
+                    <div class="badge badge-lg bg-w-{{ $accent }}/10 border-w-{{ $accent }}/30 text-w-{{ if eq $accent "cyan" }}cyan{{ else }}pinkL{{ end }} text-xs font-semibold tracking-widest uppercase mb-3">{{ t $ctx.Lang ($sec.FieldKey (printf "%s.label" $col)) }}</div>
+                    <ul class="space-y-3">
+                        {{ range $key := $sec.ColItemKeys $col }}
+                        <li class="flex items-start gap-3 text-[0.92rem] text-w-sub leading-relaxed">
+                            <span class="shrink-0 mt-0.5 text-w-{{ $accent }}">&#x2022;</span> {{ t $ctx.Lang $key }}
+                        </li>
+                        {{ end }}
+                    </ul>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+
+        {{ if $.Data.Footer }}
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">{{ tHTML $.Ctx.Lang ($.Data.FieldKey "footer") }}</p>
+        {{ end }}
+        {{ if $.Data.Note }}
+        <p class="text-[0.95rem] text-w-sub max-w-[700px] leading-relaxed mt-8">{{ t $.Ctx.Lang ($.Data.FieldKey "note") }}</p>
+        {{ end }}
+    </div>
+</section>
+{{ end }}
