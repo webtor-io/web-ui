@@ -57,6 +57,7 @@ func newTestStream(t *testing.T, srvURL string, caps *models.TorznabCaps, titles
 		},
 		titles,
 		lazymap.New[*StreamsResponse](&lazymap.Config{Expire: time.Minute}),
+		nil,
 	)
 }
 
@@ -125,8 +126,11 @@ func TestTorznabStreamGetStreams(t *testing.T) {
 	if !strings.Contains(first.Name, "1080p") {
 		t.Errorf("name = %q, want a resolution token", first.Name)
 	}
+	// The first line names the source: the tracker's own name when the feed
+	// gives one, and this feed tags no <jackettindexer>, so the indexer's
+	// label stands in. See TestStreamNameIsTheTrackersOwnName.
 	if !strings.HasPrefix(first.Name, "My Jackett") {
-		t.Errorf("name = %q, want the indexer name on the first line", first.Name)
+		t.Errorf("name = %q, want the indexer label on the first line", first.Name)
 	}
 	// LangFilterStream reads languages out of Title, so the raw release
 	// name has to survive into it.
@@ -554,25 +558,105 @@ func TestTorznabStreamBoundsTorrentDownloads(t *testing.T) {
 	}
 }
 
-func TestMakeStreamNameDoesNotRepeatTheTracker(t *testing.T) {
-	// The indexer label already ends with the tracker id when the feed URL
-	// names one, and an aggregate feed's results name theirs per item. Both
-	// have to end up with exactly one tracker in the label.
+// TestStreamNameIsTheTrackersOwnName pins the label a stream row carries.
+// It used to be built out of three sources at once — the caps server title,
+// the slug in the feed URL and the name the result gives itself — which on a
+// single-tracker feed printed "Jackett · rutracker · RuTracker.org".
+func TestStreamNameIsTheTrackersOwnName(t *testing.T) {
 	perTracker := NewTorznabStream(nil, models.TorznabIndexer{
 		Name: strp("Jackett"),
 		Url:  "https://jackett.example.com/api/v2.0/indexers/rutracker-ru/results/torznab",
-	}, nil, nil)
-	if got := perTracker.makeStreamName(tn.Result{Title: "Release.1080p", Tracker: "rutracker-ru"}); got != "Jackett · rutracker-ru\n1080p" {
-		t.Errorf("name = %q, want the tracker exactly once", got)
+	}, nil, nil, nil)
+	if got := perTracker.makeStreamName(tn.Result{Title: "Release.1080p", Tracker: "RuTracker.org"}); got != "RuTracker.org\n1080p" {
+		t.Errorf("name = %q, want the tracker named once, the way it names itself", got)
 	}
 
+	// An aggregate feed names the tracker that actually has the torrent.
 	aggregate := NewTorznabStream(nil, models.TorznabIndexer{
 		Name: strp("Jackett"),
 		Url:  "https://jackett.example.com/api/v2.0/indexers/all/results/torznab",
-	}, nil, nil)
-	if got := aggregate.makeStreamName(tn.Result{Title: "Release.1080p", Tracker: "nnmclub"}); got != "Jackett · nnmclub\n1080p" {
-		t.Errorf("name = %q, want the per-result tracker appended", got)
+	}, nil, nil, nil)
+	if got := aggregate.makeStreamName(tn.Result{Title: "Release.1080p", Tracker: "NNM-Club"}); got != "NNM-Club\n1080p" {
+		t.Errorf("name = %q, want the per-result tracker", got)
 	}
+
+	// A feed that tags nothing falls back to the indexer's own label.
+	untagged := NewTorznabStream(nil, models.TorznabIndexer{
+		Name: strp("Jackett"),
+		Url:  "https://feed.example.com/torznab",
+	}, nil, nil, nil)
+	if got := untagged.makeStreamName(tn.Result{Title: "Release.1080p"}); got != "Jackett\n1080p" {
+		t.Errorf("name = %q, want the indexer label", got)
+	}
+}
+
+// TestLearnTrackerName covers where the human name comes from at all: the
+// caps probe cannot supply it (Jackett titles every feed "Jackett"), so it is
+// read off the search results and stored for the profile row.
+func TestLearnTrackerName(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		stored  *string
+		results []tn.Result
+		want    string
+	}{
+		{
+			name:    "one tracker, one name",
+			results: []tn.Result{{Tracker: "RuTracker.org"}, {Tracker: "RuTracker.org"}},
+			want:    "RuTracker.org",
+		},
+		{
+			// A Jackett "all" endpoint. Naming the indexer after whichever
+			// tracker answered first would relabel the whole row wrongly.
+			name:    "aggregate feed is not named after one of its trackers",
+			results: []tn.Result{{Tracker: "RuTracker.org"}, {Tracker: "NNM-Club"}},
+			want:    "",
+		},
+		{
+			name:    "a feed that tags nothing teaches nothing",
+			results: []tn.Result{{Tracker: "RuTracker.org"}, {Tracker: ""}},
+			want:    "",
+		},
+		{
+			name:    "no results, no write",
+			results: nil,
+			want:    "",
+		},
+		{
+			// Written once: the second search must not touch the database.
+			name:    "already known",
+			stored:  strp("RuTracker.org"),
+			results: []tn.Result{{Tracker: "RuTracker.org"}},
+			want:    "",
+		},
+		{
+			name:    "renamed upstream",
+			stored:  strp("rutracker"),
+			results: []tn.Result{{Tracker: "RuTracker.org"}},
+			want:    "RuTracker.org",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakeTrackerNames{}
+			s := NewTorznabStream(nil, models.TorznabIndexer{
+				ID:          uuid.NewV4(),
+				Name:        strp("Jackett"),
+				TrackerName: tt.stored,
+				Url:         "https://jackett.example.com/api/v2.0/indexers/all/results/torznab",
+			}, nil, nil, store)
+			s.learnTrackerName(context.Background(), tt.results)
+			if store.name != tt.want {
+				t.Errorf("stored %q, want %q", store.name, tt.want)
+			}
+		})
+	}
+}
+
+type fakeTrackerNames struct{ name string }
+
+func (f *fakeTrackerNames) SetTrackerName(_ context.Context, _ uuid.UUID, name string) error {
+	f.name = name
+	return nil
 }
 
 // TestEnrichCarriesTheEpisodeForIndexerStreams: an indexer answers an

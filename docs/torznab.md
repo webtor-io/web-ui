@@ -102,7 +102,36 @@ one number to remember rather than two.
 | `api_key` | Split out of the pasted URL (`torznab.ParseFeedURL`) |
 | `priority`, `enabled` | Same ordering/toggle contract as `stremio_addon_url` |
 | `name` | `<server title>` from the caps probe, falling back to the host |
+| `tracker_name` | What the feed calls itself, learned from its own results — see below |
 | `caps`, `caps_fetched_at` | Snapshot of the search modes and their params |
+
+### What an indexer is called
+
+One string is used everywhere an indexer is named — the profile row, the
+Discover source chip, the stream label — and it is `TorznabIndexer.GetName()`.
+Three sources feed it, in this order:
+
+1. **`tracker_name`** — the name the feed gives itself, `RuTracker.org`.
+2. **`<server title>` + the slug in the feed URL** — `Jackett · rutracker`.
+   Jackett titles *every* feed it serves "Jackett", so the slug is what tells
+   a user's three Jackett indexers apart.
+3. the host.
+
+The good name cannot be had at add time: `t=caps` answers
+`<server title="Jackett"/>` and nothing else. Every *search result*, though,
+carries it in `<jackettindexer>`, so `TorznabStream.learnTrackerName` reads it
+off the first search and stores it — at most one UPDATE per indexer, ever.
+Until then the row reads `Jackett · rutracker`, and it fixes itself the first
+time the indexer is queried.
+
+Only when the whole result page agrees on one name. A Jackett endpoint pointed
+at "all" answers from many trackers, and naming the indexer after whichever
+came first would be wrong; those keep the server-title label.
+
+`Result.Tracker` holds **only** what the feed said. It used to be backfilled
+from the item's URL when the feed tagged nothing, which put an id we invented
+(`rutracker`, Prowlarr's `#3`) in the same field as a name the feed chose
+(`RuTracker.org`) — indistinguishable to the layer that now stores it.
 
 **Why the API key is a separate column** even though Torznab passes it as a
 query parameter: the feed URL is rendered back into the profile page, and
@@ -162,14 +191,35 @@ one of a series they opened at season three. A title naming a different
 season is dropped; one naming a range that covers the request, or naming no
 season at all, is kept — a parsing miss must not cost a good result.
 
+The number sits on either side of the word depending on the tracker, and the
+side decides what the *other* numbers mean:
+
+| Title | Reading |
+|---|---|
+| `Сезон: 1 / Серии: 1-10` | season 1 — rutracker's canonical shape |
+| `Сезоны: 1-3` | seasons 1-3 |
+| `[3 сезон: 1-8 серии]` | season 3 — RuTor/Kinozal/NNM word order; the numbers after the word are episodes |
+| `1-7 сезоны` | seasons 1-7 |
+| `10 сезонов` / `9 seasons` | a count: seasons 1-10 / 1-9, not season 10 |
+
+All of it is one pattern (`wordySeasons`) rather than one per spelling: read
+separately, `[3 сезон: 1-8 серии]` parses as "seasons 1-8" and passes a
+request for season 1. The number-first order was unread until 2026-08-15 —
+i.e. on the trackers where it is the norm, the filter passed every wrong
+season, because "names no season" means "keep".
+
 ## From result to StreamItem
 
 Two things have to survive the mapping because downstream layers parse them
 out of specific fields:
 
-- `Name` = `<indexer> · <tracker>\n<resolution>` — `PreferredStream` parses
-  the resolution token out of `Name`, and Discover renders the extra lines as
-  chips.
+- `Name` = `<tracker>\n<resolution>` — `PreferredStream` parses the resolution
+  token out of `Name`, and Discover renders the extra lines as chips. The
+  first line is the tracker's own name (`RuTracker.org`), falling back to the
+  indexer label when the feed tags nothing. It was `<indexer> · <tracker>`
+  until 2026-08-15, which on a single-tracker Jackett feed printed the same
+  tracker three ways — `Jackett · rutracker · RuTracker.org` — because the
+  server title, the URL slug and the feed's own name were all appended.
 - `Title` = `<release name>\n👤 seeders 💾 size ⚙️ tracker` — `LangFilterStream`
   extracts languages from `Title`, so the untouched release name has to be
   its first line.
@@ -192,10 +242,22 @@ of a search.
 
 For an episode, the token also carries the season and episode numbers, and
 `PickEpisodeFileIdx` matches them against the file names inside the torrent
-(`S01E05` with any separator, or `1x05`) before falling back to the largest
-video. Indexers answer an episode query with season packs at least as often
-as with single episodes — on RU trackers that is the normal shape — so
-without this every episode of a pack would play episode one.
+before falling back to the largest video. Indexers answer an episode query
+with season packs at least as often as with single episodes — on RU trackers
+that is the normal shape — so without this every episode of a pack would play
+episode one.
+
+The markers are `S01E05` with any separator, `1x05`, and the RU pack shape
+(`05 серия`, `5-я серия`, `Эпизод 5`), where the season lives in the
+directory above and only the episode number is on the file. They are compiled
+once per listing walk (`newEpisodeMatcher`), not per file: a season pack is
+hundreds of files and this runs on the playback click.
+
+Both pickers share one paginated walk (`pickFileIdx`) that advances by the
+number of items a page actually returned rather than by the requested limit —
+a server free to answer with a shorter page would otherwise have whole blocks
+of files skipped silently. The page is 1000, the cap rest-api enforces and
+the size `services/libfs` settled on.
 
 ### Infohash resolution
 
@@ -297,3 +359,8 @@ SSRF primitive.
   indexer.
 - `services/stremio/composite_stream_test.go` — that a service's own timeout
   is honoured and that nested composites report the max.
+- `services/stremio/season_filter_test.go` — both word orders, counts vs
+  ordinals, and titles captured from a live Jackett.
+- `services/link_resolver/pick_file_test.go` — the file picker over a fake
+  lister: the requested episode beating the largest file, the fallback when
+  nothing names it, and a match that lives on the third listing page.

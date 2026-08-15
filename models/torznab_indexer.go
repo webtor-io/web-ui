@@ -40,6 +40,14 @@ type TorznabIndexer struct {
 	Caps          *TorznabCaps `pg:"caps,type:jsonb"`
 	CapsFetchedAt *time.Time   `pg:"caps_fetched_at"`
 
+	// TrackerName is what the feed calls itself — "RuTracker.org", not the
+	// "rutracker" slug in its URL. It cannot come from the caps probe:
+	// Jackett answers t=caps with <server title="Jackett"/> for every feed
+	// it serves. Search results carry it in <jackettindexer>, so it is
+	// learned from the first search and stored (see stremio.TorznabStream).
+	// Nil until then, and for feeds that tag nothing.
+	TrackerName *string `pg:"tracker_name"`
+
 	UserID uuid.UUID `pg:"user_id"`
 	User   *User     `pg:"rel:has-one,fk:user_id"`
 }
@@ -110,14 +118,32 @@ func (i *TorznabIndexer) GetApiKey() string {
 	return *i.ApiKey
 }
 
-// GetName returns a human-readable label for the indexer.
+// GetTrackerName returns the feed's own display name, or "" before the first
+// search has taught us one.
+func (i *TorznabIndexer) GetTrackerName() string {
+	if i.TrackerName == nil {
+		return ""
+	}
+	return strings.TrimSpace(*i.TrackerName)
+}
+
+// GetName returns a human-readable label for the indexer, used everywhere the
+// indexer is named: the profile row, the Discover source chip, the stream
+// label.
 //
-// The caps probe alone is not enough to tell two indexers apart: Jackett
+// The name the feed gives itself wins — "RuTracker.org" is what a user
+// recognises, and it is the same string the search results carry, so the
+// stream rows and the profile agree.
+//
+// Without it the caps probe is not enough to tell two indexers apart: Jackett
 // reports `<server title="Jackett">` for every feed it serves, so a user
 // with three Jackett indexers gets three rows all called "Jackett". What
 // distinguishes them is the tracker id in the feed path, so it is appended
 // when present.
 func (i *TorznabIndexer) GetName() string {
+	if n := i.GetTrackerName(); n != "" {
+		return n
+	}
 	server := ""
 	if i.Name != nil {
 		server = strings.TrimSpace(*i.Name)
@@ -314,6 +340,17 @@ func UpdateTorznabIndexerCaps(ctx context.Context, db *pg.DB, indexerID, userID 
 		return pg.ErrNoRows
 	}
 	return nil
+}
+
+// SetTorznabIndexerTrackerName records the display name a feed's own results
+// carry. Called at most once per indexer: the caller compares first.
+func SetTorznabIndexerTrackerName(ctx context.Context, db *pg.DB, indexerID uuid.UUID, name string) error {
+	_, err := db.Model(&TorznabIndexer{}).
+		Context(ctx).
+		Set("tracker_name = ?", name).
+		Where("torznab_indexer_id = ?", indexerID).
+		Update()
+	return err
 }
 
 // DeleteUserTorznabIndexer deletes an indexer owned by a specific user.

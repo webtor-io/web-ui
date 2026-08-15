@@ -285,9 +285,13 @@ func (c *Client) Search(ctx context.Context, ep Endpoint, q Query) ([]Result, er
 		return nil, errors.Wrap(RedactError(err), "indexer search failed")
 	}
 	for i := range results {
-		if results[i].Tracker == "" {
-			results[i].Tracker = trackerFromURLs(results[i].ID, results[i].Link)
-		}
+		// Tracker is deliberately left as the feed set it. It used to be
+		// backfilled from the item's URLs, which put an id we invented
+		// ("rutracker", Prowlarr's "#3") in the same field as a name the
+		// feed gave itself ("RuTracker.org") — and the label layer, which
+		// now stores that name, cannot tell the two apart. Untagged feeds
+		// are labelled by their indexer instead; see
+		// stremio.TorznabStream.makeStreamName.
 		// Feeds that report "unknown" as seeders="-1" parse into a huge
 		// uint. Left alone those items sort above everything real and, at
 		// 30 of them, evict every genuine result before the cap.
@@ -305,30 +309,6 @@ func (c *Client) Search(ctx context.Context, ep Endpoint, q Query) ([]Result, er
 		results = results[:c.maxResults]
 	}
 	return results, nil
-}
-
-// trackerFromURLs extracts the indexer id out of a Jackett URL
-// (…/indexers/<id>/results/torznab/…), or falls back to the host. Only used
-// for feeds that don't name themselves — Jackett tags every item with
-// <jackettindexer>, Prowlarr and bare feeds do not.
-func trackerFromURLs(candidates ...string) string {
-	for _, raw := range candidates {
-		if raw == "" {
-			continue
-		}
-		if _, after, ok := strings.Cut(raw, "/indexers/"); ok {
-			id, _, _ := strings.Cut(after, "/")
-			if id != "" && id != "all" {
-				return id
-			}
-		}
-	}
-	for _, raw := range candidates {
-		if u, err := url.Parse(raw); err == nil && u.Host != "" {
-			return u.Hostname()
-		}
-	}
-	return ""
 }
 
 // IsUnreachable reports whether an error means "our servers cannot reach

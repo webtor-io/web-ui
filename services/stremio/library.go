@@ -313,13 +313,16 @@ func humanizeBytes(n int64) string {
 	if n < unit {
 		return fmt.Sprintf("%d B", n)
 	}
+	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	div, exp := int64(unit), 0
-	for v := n / unit; v >= unit; v /= unit {
+	// Bounded by the unit table rather than by the value: sizes now also
+	// arrive from Torznab feeds, which are free to report an exabyte, and
+	// walking past "PB" would index off the end.
+	for v := n / unit; v >= unit && exp < len(units)-1; v /= unit {
 		div *= unit
 		exp++
 	}
 	value := float64(n) / float64(div)
-	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	if value >= 100 {
 		return fmt.Sprintf("%.0f %s", value, units[exp])
 	}

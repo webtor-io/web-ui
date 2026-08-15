@@ -149,8 +149,12 @@ func TestSearchParsesFeed(t *testing.T) {
 	if first.Size != 2147483648 {
 		t.Errorf("size = %d, want 2147483648", first.Size)
 	}
-	if first.Tracker != "rutracker" {
-		t.Errorf("tracker = %q, want rutracker (from the guid path)", first.Tracker)
+	// Tracker carries what the feed said about itself and nothing else. This
+	// one tags no <jackettindexer>, and inventing a name from the item's URL
+	// would be indistinguishable from a real one to the layer that stores it
+	// as the indexer's display name.
+	if first.Tracker != "" {
+		t.Errorf("tracker = %q, want empty: the feed named none", first.Tracker)
 	}
 	if first.PublishDate.IsZero() {
 		t.Error("pubDate was not parsed")

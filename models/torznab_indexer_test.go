@@ -59,6 +59,27 @@ func TestGetNameDistinguishesIndexers(t *testing.T) {
 			},
 			want: "rutracker-ru",
 		},
+		{
+			// Once a search has run, the tracker's own name replaces both
+			// the server title and the slug: it is the one a user
+			// recognises, and it is what the stream rows already show.
+			name: "the name the feed gives itself wins",
+			indexer: TorznabIndexer{
+				Name:        strPtrT("Jackett"),
+				TrackerName: strPtrT("RuTracker.org"),
+				Url:         "https://jackett.example.com/api/v2.0/indexers/rutracker-ru/results/torznab",
+			},
+			want: "RuTracker.org",
+		},
+		{
+			name: "a blank stored name does not blank the label",
+			indexer: TorznabIndexer{
+				Name:        strPtrT("Jackett"),
+				TrackerName: strPtrT("  "),
+				Url:         "https://jackett.example.com/api/v2.0/indexers/rutracker-ru/results/torznab",
+			},
+			want: "Jackett · rutracker-ru",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.indexer.GetName(); got != tt.want {

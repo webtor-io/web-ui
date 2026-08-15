@@ -148,8 +148,11 @@ type StremioSettings struct {
 // portability — it tells the user which indexers they have to re-authenticate
 // after re-importing elsewhere.
 type TorznabIndexerItem struct {
-	URL           string              `json:"url"`
-	Name          *string             `json:"name,omitempty"`
+	URL  string  `json:"url"`
+	Name *string `json:"name,omitempty"`
+	// TrackerName is what the feed calls itself, learned from its own
+	// results — the label the profile row shows.
+	TrackerName   *string             `json:"tracker_name,omitempty"`
 	Priority      int16               `json:"priority"`
 	Enabled       bool                `json:"enabled"`
 	HasAPIKey     bool                `json:"has_api_key"`
@@ -460,10 +463,11 @@ func (e *Export) fillStremio(ctx context.Context, db *pg.DB, uID uuid.UUID) erro
 	e.TorznabIndexers = make([]TorznabIndexerItem, 0, len(indexers))
 	for _, i := range indexers {
 		e.TorznabIndexers = append(e.TorznabIndexers, TorznabIndexerItem{
-			URL:      i.Url,
-			Name:     i.Name,
-			Priority: i.Priority,
-			Enabled:  i.Enabled,
+			URL:         i.Url,
+			Name:        i.Name,
+			TrackerName: i.TrackerName,
+			Priority:    i.Priority,
+			Enabled:     i.Enabled,
 			// Credential itself is deliberately omitted — see TorznabIndexerItem.
 			HasAPIKey:     i.ApiKey != nil && *i.ApiKey != "",
 			Caps:          i.Caps,

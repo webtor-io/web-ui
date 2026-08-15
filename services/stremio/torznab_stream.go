@@ -3,6 +3,7 @@ package stremio
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,17 +44,33 @@ type TorznabStream struct {
 	indexer models.TorznabIndexer
 	titles  tn.TitleResolver
 	cache   *lazymap.LazyMap[*StreamsResponse]
+	names   trackerNameStore
+}
+
+// trackerNameStore persists the display name an indexer's own results carry.
+// An interface so the stream layer keeps its single DB touch behind one
+// method, and so tests need no database.
+type trackerNameStore interface {
+	SetTrackerName(ctx context.Context, indexerID uuid.UUID, name string) error
+}
+
+// pgTrackerNames is the production trackerNameStore.
+type pgTrackerNames struct{ db *pg.DB }
+
+func (s pgTrackerNames) SetTrackerName(ctx context.Context, indexerID uuid.UUID, name string) error {
+	return models.SetTorznabIndexerTrackerName(ctx, s.db, indexerID, name)
 }
 
 var _ StreamsService = (*TorznabStream)(nil)
 var _ TimeoutedService = (*TorznabStream)(nil)
 
-func NewTorznabStream(cl *tn.Client, indexer models.TorznabIndexer, titles tn.TitleResolver, cache *lazymap.LazyMap[*StreamsResponse]) *TorznabStream {
+func NewTorznabStream(cl *tn.Client, indexer models.TorznabIndexer, titles tn.TitleResolver, cache *lazymap.LazyMap[*StreamsResponse], names trackerNameStore) *TorznabStream {
 	return &TorznabStream{
 		cl:      cl,
 		indexer: indexer,
 		titles:  titles,
 		cache:   cache,
+		names:   names,
 	}
 }
 
@@ -129,6 +146,8 @@ func (s *TorznabStream) fetchStreams(ctx context.Context, contentType, contentID
 		return &StreamsResponse{Streams: []StreamItem{}}, nil
 	}
 
+	s.learnTrackerName(ctx, results)
+
 	if season != nil {
 		results = filterBySeason(results, *season, s.indexer.GetName())
 		if len(results) == 0 {
@@ -137,6 +156,48 @@ func (s *TorznabStream) fetchStreams(ctx context.Context, contentType, contentID
 	}
 
 	return &StreamsResponse{Streams: s.toStreamItems(ctx, results)}, nil
+}
+
+// learnTrackerName records the name a feed gives itself, so the profile row,
+// the Discover chip and the stream label all read "RuTracker.org" rather than
+// the "rutracker" slug the feed URL happens to carry.
+//
+// It has to be learned here because there is nowhere earlier to learn it: a
+// caps probe answers <server title="Jackett"/> for every feed Jackett serves,
+// while every search result carries the real name in <jackettindexer>.
+//
+// Only when the whole page agrees on one name. A Jackett endpoint pointed at
+// "all" fans out to every tracker it has, and naming the indexer after
+// whichever answered first would be wrong — those keep the server-title
+// label, and their rows are named per result instead.
+//
+// Writes at most once per indexer: the stored value is compared first.
+func (s *TorznabStream) learnTrackerName(ctx context.Context, results []tn.Result) {
+	if s.names == nil || len(results) == 0 {
+		return
+	}
+	name := ""
+	for _, r := range results {
+		t := strings.TrimSpace(r.Tracker)
+		if t == "" {
+			return
+		}
+		if name == "" {
+			name = t
+			continue
+		}
+		if !strings.EqualFold(t, name) {
+			return
+		}
+	}
+	if name == s.indexer.GetTrackerName() {
+		return
+	}
+	if err := s.names.SetTrackerName(ctx, s.indexer.ID, name); err != nil {
+		log.WithError(err).
+			WithField("indexer_id", s.indexer.ID).
+			Warn("failed to store torznab tracker name")
+	}
 }
 
 // filterBySeason drops results that name a season other than the one asked
@@ -302,13 +363,17 @@ func (s *TorznabStream) toStreamItems(ctx context.Context, results []tn.Result) 
 // makeStreamName follows the addon convention: first line names the source,
 // the rest are labels. PreferredStream parses the resolution out of this
 // field, and Discover renders the extra lines as chips.
+//
+// The result's own tracker name is the label, not the indexer's: it is the
+// name the user recognises ("RuTracker.org"), it is what learnTrackerName
+// stores for the profile row so both agree, and on an aggregate feed it names
+// the tracker that actually has this torrent. Appending it to the indexer
+// label instead produced "Jackett · rutracker · RuTracker.org" — the same
+// tracker spelled three ways.
 func (s *TorznabStream) makeStreamName(r tn.Result) string {
 	name := s.indexer.GetName()
-	// The label already carries the tracker id when the feed URL names one
-	// (models.TorznabIndexer.GetName), so appending the per-result tracker
-	// would repeat it: "Jackett · rutracker · rutracker".
-	if r.Tracker != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(r.Tracker)) {
-		name = fmt.Sprintf("%s · %s", name, r.Tracker)
+	if t := strings.TrimSpace(r.Tracker); t != "" {
+		name = t
 	}
 	if res := parseResolution(r.Title); res != "" {
 		return name + "\n" + res
@@ -343,8 +408,11 @@ func (s *TorznabStream) makeStreamTitle(r tn.Result) string {
 	if r.Seeders > 0 {
 		parts = append(parts, fmt.Sprintf("👤 %d", r.Seeders))
 	}
-	if r.Size > 0 {
-		parts = append(parts, fmt.Sprintf("💾 %s", humanSize(r.Size)))
+	if r.Size > 0 && r.Size <= math.MaxInt64 {
+		// Same formatter the library rows use: indexer and library streams
+		// sit in one list, so "700 MB" must not become "700.00 MB" halfway
+		// down it.
+		parts = append(parts, fmt.Sprintf("💾 %s", humanizeBytes(int64(r.Size))))
 	}
 	if r.Tracker != "" {
 		parts = append(parts, fmt.Sprintf("⚙️ %s", r.Tracker))
@@ -353,19 +421,6 @@ func (s *TorznabStream) makeStreamTitle(r tn.Result) string {
 		return r.Title
 	}
 	return r.Title + "\n" + strings.Join(parts, " ")
-}
-
-func humanSize(size uint64) string {
-	const unit = 1024
-	if size < unit {
-		return fmt.Sprintf("%d B", size)
-	}
-	div, exp := uint64(unit), 0
-	for n := size / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.2f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
 // parseContentID splits Stremio's content id into its parts: "tt0898266" for
@@ -399,9 +454,10 @@ func NewTorznabCompositeStreamsByUserID(ctx context.Context, db *pg.DB, cl *tn.C
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get user torznab indexers")
 	}
+	names := pgTrackerNames{db: db}
 	services := make([]StreamsService, 0, len(indexers))
 	for _, indexer := range indexers {
-		services = append(services, NewTorznabStream(cl, indexer, titles, cache))
+		services = append(services, NewTorznabStream(cl, indexer, titles, cache, names))
 	}
 	return NewCompositeStream(services), nil
 }
