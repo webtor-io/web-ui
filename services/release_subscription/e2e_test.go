@@ -280,6 +280,10 @@ func (m *memStore) SeasonEpisodes(context.Context, string, int16) ([]models.Epis
 	return m.eps, nil
 }
 
+func (m *memStore) UpsertMetadata(context.Context, models.ContentType, *models.VideoMetadata) error {
+	return nil
+}
+
 func (m *memStore) StreamPrefs(_ context.Context, userID uuid.UUID) ([]string, string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

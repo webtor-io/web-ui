@@ -34,9 +34,17 @@ type subStore struct {
 	prefLang         string
 	savedResolutions []string
 	savedLang        *string
+	cachedMetadata   *models.VideoMetadata
+	cachedType       models.ContentType
 }
 
 func (f *subStore) AccountLang(context.Context, uuid.UUID) string { return f.accountLang }
+
+func (f *subStore) UpsertMetadata(_ context.Context, ct models.ContentType, md *models.VideoMetadata) error {
+	f.cachedMetadata = md
+	f.cachedType = ct
+	return nil
+}
 
 func (f *subStore) StreamPrefs(context.Context, uuid.UUID) ([]string, string) {
 	return f.prefResolutions, f.prefLang
@@ -312,6 +320,11 @@ func TestSubscribeSnapshotsTitleAndPoster(t *testing.T) {
 	}
 	if st.created.PosterURL == nil || *st.created.PosterURL != "https://img/poster.jpg" {
 		t.Errorf("poster: %v", st.created.PosterURL)
+	}
+	// The profile serves posters from our own endpoint, which resolves them
+	// out of the metadata tables — so subscribing has to leave a row there.
+	if st.cachedMetadata == nil || st.cachedType != models.ContentTypeSeries {
+		t.Errorf("metadata was not cached for the poster endpoint: %v / %q", st.cachedMetadata, st.cachedType)
 	}
 }
 

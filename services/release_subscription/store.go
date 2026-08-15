@@ -40,6 +40,10 @@ type store interface {
 	// StreamPrefs reads the account's stream settings, which a new
 	// subscription starts out as a copy of.
 	StreamPrefs(ctx context.Context, userID uuid.UUID) (resolutions []string, lang string)
+	// UpsertMetadata makes sure movie_metadata / series_metadata has a row
+	// for this video id. The profile renders posters through our own
+	// endpoint, which resolves them from exactly those tables.
+	UpsertMetadata(ctx context.Context, ct models.ContentType, md *models.VideoMetadata) error
 	UpdatePreferences(ctx context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error
 }
 
@@ -238,6 +242,19 @@ func (s pgStore) StreamPrefs(ctx context.Context, userID uuid.UUID) ([]string, s
 		resolutions = nil
 	}
 	return resolutions, strings.TrimSpace(settings.PreferredLanguage)
+}
+
+func (s pgStore) UpsertMetadata(ctx context.Context, ct models.ContentType, md *models.VideoMetadata) error {
+	db, err := s.db()
+	if err != nil {
+		return err
+	}
+	if ct == models.ContentTypeSeries {
+		_, err = models.UpsertSeriesMetadata(ctx, db, md)
+	} else {
+		_, err = models.UpsertMovieMetadata(ctx, db, md)
+	}
+	return err
 }
 
 func (s pgStore) UpdatePreferences(ctx context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error {

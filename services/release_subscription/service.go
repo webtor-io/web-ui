@@ -387,6 +387,16 @@ func (s *Service) fillMetadata(ctx context.Context, sub *models.ReleaseSubscript
 		poster := md.PosterURL
 		sub.PosterURL = &poster
 	}
+	// The profile renders the poster through our own endpoint, which reads
+	// movie_metadata / series_metadata. Without a row there the image 404s
+	// and the card falls back to its placeholder — so the row is written
+	// here, the same way the watchlist does on add.
+	if err := s.store.UpsertMetadata(ctx, sub.ContentType(), md); err != nil {
+		log.WithError(err).
+			WithField("feature", "release_subscription").
+			WithField("video_id", sub.VideoID).
+			Warn("failed to cache metadata; the poster will fall back to a placeholder")
+	}
 }
 
 // normalize validates the request and returns the storage shape of its

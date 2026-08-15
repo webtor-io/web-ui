@@ -141,6 +141,14 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			// The per-row preference editor renders for every row: the
 			// resolution vocabulary and the language dropdown.
 			if len(tt.data) > 0 {
+				// The poster goes through our endpoint, not the upstream URL
+				// the metadata snapshot carries.
+				if !strings.Contains(out, "/lib/series/poster/tt1190634/160.jpg") && !strings.Contains(out, "/lib/movie/poster/") {
+					t.Errorf("poster is not served through our endpoint:\n%s", out)
+				}
+				if strings.Contains(out, "https://img/poster.jpg") {
+					t.Errorf("the upstream poster URL reached the page:\n%s", out)
+				}
 				if strings.Count(out, "modal-action") != 1 {
 					t.Errorf("want exactly one modal-action per dialog, got %d:\n%s", strings.Count(out, "modal-action"), out)
 				}

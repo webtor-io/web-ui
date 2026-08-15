@@ -18,10 +18,16 @@
                 <li class="p-3 sm:p-4 select-none flex items-center gap-2 sm:gap-4 subscription-item hover:bg-base-300/30 transition-colors"
                     data-subscription-id="{{ $sub.ID }}">
 
-                    <div class="shrink-0 w-10 sm:w-12 aspect-[2/3] rounded-md overflow-hidden bg-base-300 border border-w-line/30">
-                        {{ if $sub.PosterURL }}
-                            <img src="{{ $sub.PosterURL }}" alt="" class="w-full h-full object-cover" loading="lazy" onerror="this.remove()">
-                        {{ end }}
+                    {{/* Through our own poster endpoint, not the upstream
+                         URL the metadata carries: it is cached and resized
+                         on our side, and the browser never talks to TMDB.
+                         Same placeholder-under-image pattern as the library
+                         cards — on 404 the <img> removes itself and the
+                         gradient shows through. */}}
+                    <div class="shrink-0 w-10 sm:w-12 aspect-[2/3] rounded-md overflow-hidden border border-w-line/30 relative">
+                        <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15"></div>
+                        <img src="/lib/{{ $sub.ContentType }}/poster/{{ $sub.VideoID }}/160.jpg" alt=""
+                             class="absolute inset-0 w-full h-full object-cover" loading="lazy" onerror="this.remove()">
                     </div>
 
                     <div class="flex-1 min-w-0">

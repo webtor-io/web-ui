@@ -105,6 +105,15 @@ func (s *ReleaseSubscription) GetSeason() int {
 	return int(*s.Season)
 }
 
+// ContentType names the kind in the vocabulary the metadata tables and the
+// poster endpoint use: a season subscription is about a series.
+func (s *ReleaseSubscription) ContentType() ContentType {
+	if s.IsSeason() {
+		return ContentTypeSeries
+	}
+	return ContentTypeMovie
+}
+
 // IsSeason reports whether this subscription follows a season of a series.
 func (s *ReleaseSubscription) IsSeason() bool {
 	return s.Kind == ReleaseSubscriptionKindSeason
