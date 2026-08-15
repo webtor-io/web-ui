@@ -35,7 +35,6 @@ type pollStore interface {
 	MarkHitsNotified(ctx context.Context, subscriptionID uuid.UUID, infohashes []string) error
 	MarkChecked(ctx context.Context, id uuid.UUID, state string, nextCheckAt time.Time) error
 	MarkNotified(ctx context.Context, id uuid.UUID) error
-	MarkCompleted(ctx context.Context, id uuid.UUID) error
 	SeasonEpisodes(ctx context.Context, videoID string, season int16) ([]models.EpisodeMetadata, error)
 	AccountLang(ctx context.Context, userID uuid.UUID) string
 }
@@ -176,7 +175,7 @@ func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) e
 	if sub.User == nil || sub.User.Email == "" {
 		// Nothing to mail. Push the row far out rather than leaving it due,
 		// or it comes back every run.
-		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.jitter(time.Now().Add(p.cfg.IntervalMax)))
+		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt())
 	}
 
 	u := &auth.User{
@@ -187,43 +186,87 @@ func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) e
 
 	episodes, err := p.seasonEpisodes(ctx, sub)
 	if err != nil {
-		return err
+		return p.rescheduleAfter(ctx, sub, err)
 	}
 
-	hits, err := p.collect(ctx, u, sub, episodes)
+	hits, searched, err := p.collect(ctx, u, sub, episodes)
 	if err != nil {
-		return err
+		return p.rescheduleAfter(ctx, sub, err)
 	}
 
 	baseline := sub.State == models.ReleaseSubscriptionStatePendingBaseline
 	if len(hits) > 0 {
 		if _, err := p.store.InsertHits(ctx, hits, baseline); err != nil {
-			return err
+			return p.rescheduleAfter(ctx, sub, err)
 		}
 	}
 
 	state := sub.State
+	notified := false
 	if baseline {
 		// The first look is a snapshot, not news: everything found now is
-		// what the user could already see when they subscribed.
-		state = models.ReleaseSubscriptionStateActive
-	} else if err := p.notify(ctx, sub); err != nil {
-		// A failed letter must not stop the schedule from moving on, and
-		// must not mark anything delivered. Both hold: hits stay pending
-		// and we fall through to MarkChecked.
-		log.WithError(err).
-			WithField("subscription_id", sub.ID).
-			Error("failed to send subscription update")
+		// what the user could already see when they subscribed. But only a
+		// look that actually reached a source counts as one — promoting
+		// after a run where every query failed would make the next poll
+		// treat the entire back catalogue as new.
+		if searched {
+			state = models.ReleaseSubscriptionStateActive
+		}
+	} else {
+		sent, err := p.notify(ctx, sub, false)
+		notified = sent
+		if err != nil {
+			// A failed letter must not stop the schedule from moving on, and
+			// must not mark anything delivered. Both hold: hits stay pending
+			// and we fall through to MarkChecked.
+			log.WithError(err).
+				WithField("subscription_id", sub.ID).
+				Error("failed to send subscription update")
+		}
 	}
 
 	if p.seasonIsOver(ctx, sub, episodes) {
-		if err := p.complete(ctx, sub); err != nil {
-			return err
+		// Last call. Whatever is still pending goes out now, interval or
+		// not: a completed row is never polled again, so anything left
+		// behind here is never mentioned to anyone.
+		if _, err := p.notify(ctx, sub, true); err != nil {
+			log.WithError(err).
+				WithField("subscription_id", sub.ID).
+				Error("failed to send the final subscription update")
 		}
-		return p.store.MarkChecked(ctx, sub.ID, models.ReleaseSubscriptionStateCompleted, p.jitter(time.Now().Add(p.cfg.IntervalMax)))
+		p.announceCompletion(ctx, sub)
+		return p.store.MarkChecked(ctx, sub.ID, models.ReleaseSubscriptionStateCompleted, p.retryAt())
 	}
 
-	return p.store.MarkChecked(ctx, sub.ID, state, p.nextCheckAt(sub, u, episodes))
+	return p.store.MarkChecked(ctx, sub.ID, state, p.nextCheckAt(sub, u, episodes, notified))
+}
+
+// rescheduleAfter moves a failed poll to the back of the queue before
+// returning its error.
+//
+// Without it a row that fails deterministically — one addon answering with
+// an infohash the column cannot hold, say — keeps its past-due
+// next_check_at, and ListDue orders by that ascending. It would sit at the
+// head of every batch forever, re-running its whole outbound search each
+// run and never getting further.
+func (p *Poller) rescheduleAfter(ctx context.Context, sub *models.ReleaseSubscription, cause error) error {
+	if err := p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt()); err != nil {
+		log.WithError(err).
+			WithField("subscription_id", sub.ID).
+			Error("failed to reschedule a subscription after an error")
+	}
+	return cause
+}
+
+// retryAt is the far-out due time used when a poll could not do its job.
+// The ceiling is a flag and may be set to zero; falling back keeps a
+// misconfiguration from turning into a hot loop.
+func (p *Poller) retryAt() time.Time {
+	d := p.cfg.IntervalMax
+	if d <= 0 {
+		d = 24 * time.Hour
+	}
+	return p.jitter(time.Now().Add(d))
 }
 
 // seasonEpisodes loads the season's episode metadata. Movies have none, and
@@ -242,11 +285,16 @@ func (p *Poller) seasonEpisodes(ctx context.Context, sub *models.ReleaseSubscrip
 
 // collect runs the searches for one subscription and turns the results into
 // hit rows.
-func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription, episodes []models.EpisodeMetadata) ([]models.ReleaseSubscriptionHit, error) {
+// The bool reports whether any query actually reached the user's sources.
+// "Found nothing" and "could not ask" look identical in the returned slice,
+// and the baseline decision turns on the difference.
+func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription, episodes []models.EpisodeMetadata) ([]models.ReleaseSubscriptionHit, bool, error) {
 	var out []models.ReleaseSubscriptionHit
 	seen := map[string]bool{}
+	answered := 0
 
-	for _, q := range p.queries(sub, episodes) {
+	queries := p.queries(sub, episodes)
+	for _, q := range queries {
 		items, err := p.search.Search(ctx, u, q.contentType, q.contentID)
 		if err != nil {
 			// One dead source must not cost the whole poll: the composite
@@ -258,6 +306,7 @@ func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseS
 				Warn("stream search failed")
 			continue
 		}
+		answered++
 		for _, item := range items {
 			hash := strings.ToLower(strings.TrimSpace(item.InfoHash))
 			if hash == "" || seen[hash] {
@@ -282,7 +331,7 @@ func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseS
 			out = append(out, hit)
 		}
 	}
-	return out, nil
+	return out, answered > 0 || len(queries) == 0, nil
 }
 
 // query is one search to run.
@@ -340,18 +389,19 @@ func (p *Poller) queries(sub *models.ReleaseSubscription, episodes []models.Epis
 
 // notify sends whatever the subscription still owes the user, if enough time
 // has passed since the last letter.
-func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if sub.LastNotifiedAt != nil && time.Since(*sub.LastNotifiedAt) < p.cfg.NotifyInterval {
+func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, force bool) (bool, error) {
+	if !force && sub.LastNotifiedAt != nil && time.Since(*sub.LastNotifiedAt) < p.cfg.NotifyInterval {
 		// Not silence — accumulation. The hits stay pending and go out
-		// together once the window is up.
-		return nil
+		// together once the window is up. force skips the window for the
+		// one send that has no "next time": a subscription about to close.
+		return false, nil
 	}
 	pending, err := p.store.ListPendingHits(ctx, sub.ID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(pending) == 0 {
-		return nil
+		return false, nil
 	}
 
 	releases := make([]notification.ReleaseView, 0, len(pending))
@@ -368,25 +418,22 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription) er
 	}
 
 	if err := p.mail.SendSubscriptionUpdate(sub.User.Email, p.view(ctx, sub), releases); err != nil {
-		return err
+		return false, err
 	}
 	if err := p.store.MarkHitsNotified(ctx, sub.ID, hashes); err != nil {
-		return err
+		return true, err
 	}
-	return p.store.MarkNotified(ctx, sub.ID)
+	return true, p.store.MarkNotified(ctx, sub.ID)
 }
 
-// complete ends a season subscription and says so.
-func (p *Poller) complete(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if err := p.store.MarkCompleted(ctx, sub.ID); err != nil {
-		return err
-	}
+// announceCompletion tells the user their season is done. The state itself
+// is written by the MarkChecked that follows — one UPDATE, not two.
+func (p *Poller) announceCompletion(ctx context.Context, sub *models.ReleaseSubscription) {
 	if err := p.mail.SendSubscriptionOff(sub.User.Email, p.view(ctx, sub), true); err != nil {
 		log.WithError(err).
 			WithField("subscription_id", sub.ID).
 			Error("failed to send subscription completion notice")
 	}
-	return nil
 }
 
 // seasonIsOver reports whether a season subscription has run out of future:
@@ -429,7 +476,7 @@ func (p *Poller) seasonIsOver(ctx context.Context, sub *models.ReleaseSubscripti
 // has produced nothing for weeks is a subscription whose show is between
 // seasons, and it does not need eight looks a day. It reads the timestamps
 // the row already carries, so nothing has to be tracked to make it work.
-func (p *Poller) nextCheckAt(sub *models.ReleaseSubscription, u *auth.User, episodes []models.EpisodeMetadata) time.Time {
+func (p *Poller) nextCheckAt(sub *models.ReleaseSubscription, u *auth.User, episodes []models.EpisodeMetadata, justNotified bool) time.Time {
 	now := time.Now()
 	free := p.tiers == nil || p.tiers.IsFree(u.Email, u.PatreonUserID)
 
@@ -441,8 +488,14 @@ func (p *Poller) nextCheckAt(sub *models.ReleaseSubscription, u *auth.User, epis
 		}
 	}
 
+	// The row in hand was read before this run's letter went out, so its
+	// LastNotifiedAt is stale by exactly the event that matters: a
+	// subscription that has just delivered something is the opposite of
+	// idle, and must not be backed off for the silence that preceded it.
 	idleSince := sub.CreatedAt
-	if sub.LastNotifiedAt != nil {
+	if justNotified {
+		idleSince = now
+	} else if sub.LastNotifiedAt != nil {
 		idleSince = *sub.LastNotifiedAt
 	}
 	switch idle := now.Sub(idleSince); {
@@ -496,22 +549,8 @@ func (p *Poller) jitter(t time.Time) time.Time {
 	return time.Now().Add(p.jitterDuration(time.Until(t)))
 }
 
-// view builds the mail-facing shape of a subscription, including the
-// language decision: what the account is browsing in wins, and the language
-// captured when the subscription was created is the fallback for accounts
-// that have never been seen since the column was added.
 func (p *Poller) view(ctx context.Context, sub *models.ReleaseSubscription) notification.SubscriptionView {
-	lang := p.store.AccountLang(ctx, sub.UserID)
-	if lang == "" {
-		lang = sub.Lang
-	}
-	return notification.SubscriptionView{
-		ID:             sub.ID,
-		Title:          sub.GetTitle(),
-		Season:         sub.GetSeason(),
-		Lang:           lang,
-		UnsubscribeURL: UnsubscribeURL(p.cfg.Domain, p.cfg.Secret, sub.ID),
-	}
+	return subscriptionView(ctx, p.store, sub, p.cfg.Domain, p.cfg.Secret)
 }
 
 // magnetURL builds the link an email row points at. Webtor accepts a magnet

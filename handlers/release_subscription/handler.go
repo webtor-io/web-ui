@@ -194,7 +194,7 @@ func (h *Handler) add(c *gin.Context) {
 func (h *Handler) remove(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
 
-	season, err := parseSeasonQuery(c.Query("season"))
+	season, err := parseSeason(c.Query("season"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, errorBody{
 			Status: "error", Code: "bad_season",
@@ -266,7 +266,7 @@ func writeInternal(c *gin.Context) {
 
 func (h *Handler) formAdd(c *gin.Context) {
 	user := auth.GetUserFromContext(c)
-	season, err := parseSeasonQuery(c.PostForm("season"))
+	season, err := parseSeason(c.PostForm("season"))
 	if err != nil {
 		web.RedirectWithError(c, web.NewUserError("error.subscriptionFailed", err))
 		return
@@ -391,9 +391,10 @@ func toItem(s *models.ReleaseSubscription) item {
 	return it
 }
 
-// parseSeasonQuery reads the optional season parameter. An absent value is
-// not an error — that is what a movie subscription looks like.
-func parseSeasonQuery(raw string) (int, error) {
+// parseSeason reads the optional season, from a query parameter or a form
+// field. An absent value is not an error — that is what a movie
+// subscription looks like.
+func parseSeason(raw string) (int, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return 0, nil

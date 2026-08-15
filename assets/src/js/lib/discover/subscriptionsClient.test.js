@@ -55,20 +55,18 @@ test('fetchSubscriptionIds maps the server list into keys', async () => {
             limit: 3,
         },
     });
-    const { keys, count, limit } = await fetchSubscriptionIds();
+    const { keys } = await fetchSubscriptionIds();
     assert.deepEqual(keys, ['season:tt1190634:3', 'movie:tt0111161']);
-    assert.equal(count, 2);
-    assert.equal(limit, 3);
 });
 
 // A failed prefetch must not take the page down with it: an unfilled bell is
 // a smaller wrong than a modal that refuses to render.
 test('fetchSubscriptionIds degrades to an empty set', async () => {
     stubFetch({ status: 500, body: {} });
-    assert.deepEqual(await fetchSubscriptionIds(), { keys: [], count: 0, limit: -1 });
+    assert.deepEqual(await fetchSubscriptionIds(), { keys: [] });
 
     stubFetch(new Error('offline'));
-    assert.deepEqual(await fetchSubscriptionIds(), { keys: [], count: 0, limit: -1 });
+    assert.deepEqual(await fetchSubscriptionIds(), { keys: [] });
 });
 
 test('subscribe posts the content key and the CSRF token', async () => {

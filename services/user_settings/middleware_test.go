@@ -150,3 +150,64 @@ func TestWriteFailureIsSurvivable(t *testing.T) {
 		t.Errorf("status: got %d, want 200 — a failed language write must not break the page", w.Code)
 	}
 }
+
+// A state-mutating request never goes through the language redirect — see
+// isSafe in services/i18n/middleware.go — so a Russian user's POST to a
+// bare path (the player's /watch/position, for one) resolves to English
+// while still carrying lang=ru. Learning from it would anglicise the
+// account mid-video.
+func TestBarePathPostDoesNotAngliciseTheAccount(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+
+	ru := "ru"
+	svc := &fakeSettings{row: &models.UserSettings{Lang: &ru}}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(i18n.GinMiddleware(i18n.New(locales.FS())))
+	r.Use(Middleware(svc))
+	r.POST("/watch/position", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	req := httptest.NewRequest(http.MethodPost, "/watch/position?token=test", nil)
+	req.AddCookie(&http.Cookie{Name: "lang", Value: "ru"}) // set by an earlier /ru/ page
+	req = req.WithContext(context.WithValue(req.Context(),
+		auth.UserContext{}, &models.User{UserID: uuid.NewV4(), Email: "viewer@example.com"}))
+	r.ServeHTTP(httptest.NewRecorder(), req)
+
+	if len(svc.written) != 0 {
+		t.Errorf("written: %v, want nothing — a bare-path POST is not evidence of a language", svc.written)
+	}
+}
+
+// The cookie still counts when it agrees with what was resolved: that is an
+// ordinary English page for a user whose cookie says English.
+func TestBarePathGetWithAgreeingCookieStillCounts(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+
+	de := "de"
+	svc := &fakeSettings{row: &models.UserSettings{Lang: &de}}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(i18n.GinMiddleware(i18n.New(locales.FS())))
+	r.Use(Middleware(svc))
+	r.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	req := httptest.NewRequest(http.MethodGet, "/?token=test", nil)
+	req.AddCookie(&http.Cookie{Name: "lang", Value: "en"})
+	req = req.WithContext(context.WithValue(req.Context(),
+		auth.UserContext{}, &models.User{UserID: uuid.NewV4(), Email: "viewer@example.com"}))
+	r.ServeHTTP(httptest.NewRecorder(), req)
+
+	if len(svc.written) != 1 || svc.written[0] != "en" {
+		t.Errorf("written: %v, want one write of \"en\"", svc.written)
+	}
+}

@@ -178,3 +178,18 @@ func TestDominantSeasonIgnoresEpisodesWithoutASeason(t *testing.T) {
 		t.Errorf("dominantSeason: got %d, want 7", got)
 	}
 }
+
+// Season 0 is both "specials" and the sentinel for "no season found", so a
+// torrent whose extras outnumber its episodes would suppress the banner for
+// a season the poller could perfectly well follow.
+func TestDominantSeasonIgnoresSpecials(t *testing.T) {
+	s := seriesWith("tt1190634", 0, 0, 0, 0, 0, 1, 1, 1)
+	if got := dominantSeason(s); got != 1 {
+		t.Errorf("dominantSeason: got %d, want 1 — specials must not win", got)
+	}
+
+	// A torrent of nothing but extras still names no subscribable season.
+	if got := dominantSeason(seriesWith("tt1190634", 0, 0)); got != 0 {
+		t.Errorf("dominantSeason: got %d, want 0 for a specials-only torrent", got)
+	}
+}

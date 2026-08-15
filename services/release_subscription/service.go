@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -56,114 +55,6 @@ type Mailer interface {
 	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
 }
 
-// store is the database behind the service. An interface for the same
-// reason the poller has one: the rules worth testing here are the free-tier
-// cap, the eligibility gate and which letter goes out when — none of which
-// should need Postgres to exercise.
-type store interface {
-	Find(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (*models.ReleaseSubscription, error)
-	FindByID(ctx context.Context, id, userID uuid.UUID) (*models.ReleaseSubscription, error)
-	Get(ctx context.Context, id uuid.UUID) (*models.ReleaseSubscription, error)
-	Count(ctx context.Context, userID uuid.UUID) (int, error)
-	List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error)
-	Create(ctx context.Context, sub *models.ReleaseSubscription) (bool, error)
-	DeleteByContent(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (bool, error)
-	Delete(ctx context.Context, id, userID uuid.UUID) error
-	DeleteByID(ctx context.Context, id uuid.UUID) error
-	SetEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error
-}
-
-// pgStore is the production store.
-type pgStore struct{ pg *cs.PG }
-
-func (s pgStore) db() (*pg.DB, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return nil, errors.New("no db")
-	}
-	return db, nil
-}
-
-func (s pgStore) Find(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (*models.ReleaseSubscription, error) {
-	db, err := s.db()
-	if err != nil {
-		return nil, err
-	}
-	return models.FindUserReleaseSubscription(ctx, db, userID, kind, videoID, season)
-}
-
-func (s pgStore) FindByID(ctx context.Context, id, userID uuid.UUID) (*models.ReleaseSubscription, error) {
-	db, err := s.db()
-	if err != nil {
-		return nil, err
-	}
-	return models.GetUserReleaseSubscriptionByID(ctx, db, id, userID)
-}
-
-func (s pgStore) Get(ctx context.Context, id uuid.UUID) (*models.ReleaseSubscription, error) {
-	db, err := s.db()
-	if err != nil {
-		return nil, err
-	}
-	return models.GetReleaseSubscriptionByID(ctx, db, id)
-}
-
-func (s pgStore) Count(ctx context.Context, userID uuid.UUID) (int, error) {
-	db, err := s.db()
-	if err != nil {
-		return 0, err
-	}
-	return models.CountUserReleaseSubscriptions(ctx, db, userID)
-}
-
-func (s pgStore) List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error) {
-	db, err := s.db()
-	if err != nil {
-		return nil, err
-	}
-	return models.GetUserReleaseSubscriptions(ctx, db, userID)
-}
-
-func (s pgStore) Create(ctx context.Context, sub *models.ReleaseSubscription) (bool, error) {
-	db, err := s.db()
-	if err != nil {
-		return false, err
-	}
-	return models.CreateReleaseSubscription(ctx, db, sub)
-}
-
-func (s pgStore) DeleteByContent(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (bool, error) {
-	db, err := s.db()
-	if err != nil {
-		return false, err
-	}
-	return models.DeleteUserReleaseSubscriptionByContent(ctx, db, userID, kind, videoID, season)
-}
-
-func (s pgStore) Delete(ctx context.Context, id, userID uuid.UUID) error {
-	db, err := s.db()
-	if err != nil {
-		return err
-	}
-	return models.DeleteUserReleaseSubscription(ctx, db, id, userID)
-}
-
-func (s pgStore) DeleteByID(ctx context.Context, id uuid.UUID) error {
-	db, err := s.db()
-	if err != nil {
-		return err
-	}
-	return models.DeleteReleaseSubscriptionByID(ctx, db, id)
-}
-
-func (s pgStore) SetEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error {
-	db, err := s.db()
-	if err != nil {
-		return err
-	}
-	return models.SetUserReleaseSubscriptionEnabled(ctx, db, id, userID, enabled)
-}
-
 // airingCheck is the "is this series still producing episodes" capability —
 // the Enricher's AiringChecker facade, behind an interface so the
 // eligibility rule can be tested without a TMDB cache.
@@ -194,7 +85,7 @@ type Service struct {
 }
 
 func New(pg *cs.PG, en *enrich.Enricher, mail Mailer, domain, secret string) *Service {
-	s := &Service{store: pgStore{pg: pg}, mail: mail, domain: domain, secret: secret}
+	s := &Service{store: NewStore(pg), mail: mail, domain: domain, secret: secret}
 	// A mapper-less enricher answers nothing useful, so it is left out
 	// entirely rather than nil-checked at every call site.
 	if en != nil && en.HasMappers() {
@@ -280,7 +171,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 		return nil, false, err
 	}
 	if created {
-		s.mailOn(u, sub)
+		s.mailOn(ctx, u, sub)
 	}
 	if !created {
 		// Lost a race with a concurrent add. Read back what won so the
@@ -312,7 +203,7 @@ func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (b
 		return false, err
 	}
 	if removed && sub != nil {
-		s.mailOff(u, sub)
+		s.mailOff(ctx, u, sub)
 	}
 	return removed, nil
 }
@@ -320,12 +211,6 @@ func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (b
 // List returns the user's subscriptions for the profile section.
 func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error) {
 	return s.store.List(ctx, userID)
-}
-
-// Count returns how many subscriptions a user holds, for the "you have used
-// N of 3" line on the profile.
-func (s *Service) Count(ctx context.Context, userID uuid.UUID) (int, error) {
-	return s.store.Count(ctx, userID)
 }
 
 // Delete removes one subscription by row id, scoped to its owner.
@@ -340,7 +225,7 @@ func (s *Service) Delete(ctx context.Context, u *auth.User, id uuid.UUID) error 
 	if err := s.store.Delete(ctx, id, u.ID); err != nil {
 		return err
 	}
-	s.mailOff(u, sub)
+	s.mailOff(ctx, u, sub)
 	return nil
 }
 
@@ -377,11 +262,11 @@ func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled 
 // mailOn and mailOff send off the request goroutine. An SMTP dial is a
 // remote round-trip, and the user is waiting on a toast that says what
 // already happened in the database — the letter is not part of that answer.
-func (s *Service) mailOn(u *auth.User, sub *models.ReleaseSubscription) {
+func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
 	if s.mail == nil || u.Email == "" {
 		return
 	}
-	view := s.view(sub)
+	view := s.view(ctx, sub)
 	s.run(func() {
 		if err := s.mail.SendSubscriptionOn(u.Email, view); err != nil {
 			log.WithError(err).
@@ -392,11 +277,11 @@ func (s *Service) mailOn(u *auth.User, sub *models.ReleaseSubscription) {
 	})
 }
 
-func (s *Service) mailOff(u *auth.User, sub *models.ReleaseSubscription) {
+func (s *Service) mailOff(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
 	if s.mail == nil || u.Email == "" {
 		return
 	}
-	view := s.view(sub)
+	view := s.view(ctx, sub)
 	s.run(func() {
 		if err := s.mail.SendSubscriptionOff(u.Email, view, false); err != nil {
 			log.WithError(err).
@@ -417,21 +302,8 @@ func (s *Service) run(f func()) {
 	go f()
 }
 
-func (s *Service) view(sub *models.ReleaseSubscription) notification.SubscriptionView {
-	return notification.SubscriptionView{
-		ID:             sub.ID,
-		Title:          sub.GetTitle(),
-		Season:         sub.GetSeason(),
-		Lang:           sub.Lang,
-		UnsubscribeURL: UnsubscribeURL(s.domain, s.secret, sub.ID),
-	}
-}
-
-// Eligible reports whether content can be subscribed to. Exposed so the
-// resource-page banner and the Discover surfaces can ask the same question
-// the write path asks, instead of each inventing its own rule.
-func (s *Service) Eligible(ctx context.Context, kind, videoID string) bool {
-	return s.checkEligible(ctx, kind, videoID) == nil
+func (s *Service) view(ctx context.Context, sub *models.ReleaseSubscription) notification.SubscriptionView {
+	return subscriptionView(ctx, s.store, sub, s.domain, s.secret)
 }
 
 // checkEligible is the one rule that decides whether a subscription makes

@@ -269,15 +269,6 @@ func (m *memStore) MarkNotified(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (m *memStore) MarkCompleted(_ context.Context, id uuid.UUID) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if s, ok := m.subs[id]; ok {
-		s.State = models.ReleaseSubscriptionStateCompleted
-	}
-	return nil
-}
-
 func (m *memStore) SeasonEpisodes(context.Context, string, int16) ([]models.EpisodeMetadata, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

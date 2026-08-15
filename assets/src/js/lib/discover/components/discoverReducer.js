@@ -185,10 +185,9 @@ export const initialState = {
     // subscriptionsClient.subscriptionKey), not video ids — a subscription
     // is per season, so one series can be in the set several times over.
     // Only the keys live here; the rows themselves are the profile's
-    // business.
+    // business, and the free-tier cap is the server's (it answers 402 with
+    // a message, so the client needs no copy of the number).
     subscriptionKeys: new Set(),
-    subscriptionLimit: -1,
-    subscriptionCount: 0,
     watchlistIds: new Set(),
     watchlistItems: [],
     watchlistItemsLoaded: false,
@@ -321,26 +320,20 @@ export function discoverReducer(state, action) {
         }
 
         // --- Release subscriptions slice ---
-        case 'SUBSCRIPTIONS_LOADED': {
-            return {
-                ...state,
-                subscriptionKeys: new Set(action.keys || []),
-                subscriptionCount: action.count ?? (action.keys || []).length,
-                subscriptionLimit: action.limit ?? state.subscriptionLimit,
-            };
-        }
+        case 'SUBSCRIPTIONS_LOADED':
+            return { ...state, subscriptionKeys: new Set(action.keys || []) };
         case 'SUBSCRIPTION_ADD': {
             // Optimistic: the bell fills on click. A server refusal (the
             // free-tier cap, a season that has finished airing) dispatches
             // SUBSCRIPTION_REMOVE to put it back.
             const keys = new Set(state.subscriptionKeys);
             keys.add(action.key);
-            return { ...state, subscriptionKeys: keys, subscriptionCount: keys.size };
+            return { ...state, subscriptionKeys: keys };
         }
         case 'SUBSCRIPTION_REMOVE': {
             const keys = new Set(state.subscriptionKeys);
             keys.delete(action.key);
-            return { ...state, subscriptionKeys: keys, subscriptionCount: keys.size };
+            return { ...state, subscriptionKeys: keys };
         }
 
         // --- AI recommendations slice ---

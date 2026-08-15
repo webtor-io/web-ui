@@ -100,7 +100,7 @@ func pollSubscriptions(c *cli.Context) error {
 	ns := notification.New(c, db, newI18n())
 
 	poller := rss.NewPoller(
-		rss.NewPGPollStore(db),
+		rss.NewStore(pg),
 		rss.NewBuilderSearch(sb),
 		ns,
 		rss.NewClaimsTier(claimsSvc),

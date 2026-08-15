@@ -342,19 +342,3 @@ func DeleteReleaseSubscriptionByID(ctx context.Context, db *pg.DB, id uuid.UUID)
 	}
 	return nil
 }
-
-// MarkReleaseSubscriptionCompleted ends a subscription that has run out of
-// future: the season finished airing and the series is no longer in
-// production. Movie subscriptions never reach this — see the state
-// constants.
-func MarkReleaseSubscriptionCompleted(ctx context.Context, db *pg.DB, id uuid.UUID) error {
-	_, err := db.Model((*ReleaseSubscription)(nil)).
-		Context(ctx).
-		Set("state = ?", ReleaseSubscriptionStateCompleted).
-		Where("release_subscription_id = ?", id).
-		Update()
-	if err != nil {
-		return pkgerrors.Wrap(err, "failed to complete release subscription")
-	}
-	return nil
-}

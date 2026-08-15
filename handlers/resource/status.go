@@ -347,4 +347,3 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	log.WithField("resourceID", resourceID).Info("status: connected to torrent stats SSE")
 	return ch, "connected"
 }
-

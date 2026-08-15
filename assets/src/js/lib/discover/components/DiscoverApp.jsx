@@ -1231,9 +1231,9 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     // Keys only — the rows themselves belong to the profile page.
     useEffect(() => {
         let cancelled = false;
-        fetchSubscriptionIds().then(({ keys, count, limit }) => {
+        fetchSubscriptionIds().then(({ keys }) => {
             if (cancelled) return;
-            dispatch({ type: 'SUBSCRIPTIONS_LOADED', keys, count, limit });
+            dispatch({ type: 'SUBSCRIPTIONS_LOADED', keys });
         });
         return () => { cancelled = true; };
     }, []);

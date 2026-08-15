@@ -23,11 +23,12 @@ type fakeStore struct {
 
 	inserted       []models.ReleaseSubscriptionHit
 	insertBaseline bool
+	insertErr      error
+	episodesErr    error
 	notifiedHashes []string
 	checkedState   string
 	checkedNext    time.Time
 	markedNotified bool
-	markedComplete bool
 	lang           string
 }
 
@@ -36,6 +37,9 @@ func (s *fakeStore) ListDue(context.Context, time.Time, int) ([]models.ReleaseSu
 }
 
 func (s *fakeStore) InsertHits(_ context.Context, hits []models.ReleaseSubscriptionHit, baseline bool) (int, error) {
+	if s.insertErr != nil {
+		return 0, s.insertErr
+	}
 	s.inserted = append(s.inserted, hits...)
 	s.insertBaseline = baseline
 	return len(hits), nil
@@ -61,13 +65,8 @@ func (s *fakeStore) MarkNotified(context.Context, uuid.UUID) error {
 	return nil
 }
 
-func (s *fakeStore) MarkCompleted(context.Context, uuid.UUID) error {
-	s.markedComplete = true
-	return nil
-}
-
 func (s *fakeStore) SeasonEpisodes(context.Context, string, int16) ([]models.EpisodeMetadata, error) {
-	return s.episodes, nil
+	return s.episodes, s.episodesErr
 }
 
 func (s *fakeStore) AccountLang(context.Context, uuid.UUID) string { return s.lang }
@@ -442,7 +441,7 @@ func TestNextCheckAt(t *testing.T) {
 			sub.LastNotifiedAt = tt.notified
 			u := &auth.User{Email: "viewer@example.com"}
 
-			got := time.Until(p.nextCheckAt(sub, u, tt.episodes))
+			got := time.Until(p.nextCheckAt(sub, u, tt.episodes, false))
 			if got < tt.wantMin || got > tt.wantMax {
 				t.Errorf("next check in %v, want between %v and %v", got.Round(time.Minute), tt.wantMin, tt.wantMax)
 			}
@@ -465,7 +464,7 @@ func TestCollectReadsNamesFromTheRightLines(t *testing.T) {
 	}}
 	p := NewPoller(&fakeStore{}, search, &fakeMailer{}, fakeTier{}, fakeAiring{}, testConfig())
 
-	hits, err := p.collect(context.Background(), &auth.User{}, sub, []models.EpisodeMetadata{episode(5, time.Hour)})
+	hits, _, err := p.collect(context.Background(), &auth.User{}, sub, []models.EpisodeMetadata{episode(5, time.Hour)})
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -500,7 +499,7 @@ func TestCollectDedupesAcrossEpisodeQueries(t *testing.T) {
 	p := NewPoller(&fakeStore{}, search, &fakeMailer{}, fakeTier{}, fakeAiring{}, testConfig())
 
 	episodes := []models.EpisodeMetadata{episode(1, 21*24*time.Hour), episode(2, 14*24*time.Hour), episode(3, 7*24*time.Hour)}
-	hits, err := p.collect(context.Background(), &auth.User{}, seasonSub(), episodes)
+	hits, _, err := p.collect(context.Background(), &auth.User{}, seasonSub(), episodes)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -525,9 +524,6 @@ func TestCompletionSendsNotice(t *testing.T) {
 
 	if _, err := p.Run(context.Background()); err != nil {
 		t.Fatalf("run: %v", err)
-	}
-	if !store.markedComplete {
-		t.Error("a finished season must be marked completed")
 	}
 	if len(mail.offs) != 1 || !mail.offs[0] {
 		t.Errorf("completion notice: got %v, want one marked as completed", mail.offs)
@@ -578,5 +574,169 @@ func TestUnsubscribeURL(t *testing.T) {
 	}
 	if UnsubscribeURL("https://webtor.io", "", uuid.NewV4()) != "" {
 		t.Error("without a secret there is no link to render")
+	}
+}
+
+// --- regressions found in review ---
+
+// A completed subscription is never polled again, so anything still pending
+// when it closes is pending forever. The finale's releases arriving inside
+// the batching window is exactly when this happens.
+func TestCompletionFlushesPendingHitsFirst(t *testing.T) {
+	sub := seasonSub()
+	recent := time.Now().Add(-time.Hour) // well inside the 12h notify window
+	sub.LastNotifiedAt = &recent
+	store := &fakeStore{
+		due: []models.ReleaseSubscription{*sub},
+		// Everything has aired, and the show is done — the season closes.
+		episodes: []models.EpisodeMetadata{episode(1, 60*24*time.Hour), episode(2, 53*24*time.Hour)},
+		pending:  []models.ReleaseSubscriptionHit{{SubscriptionID: sub.ID, InfoHash: "aa"}},
+	}
+	mail := &fakeMailer{}
+	p := NewPoller(store, &fakeSearch{}, mail, fakeTier{}, fakeAiring{airing: false}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(mail.updates) != 1 {
+		t.Fatalf("update letters: got %d, want 1 — the last finds must go out before the row closes", len(mail.updates))
+	}
+	if len(store.notifiedHashes) != 1 {
+		t.Errorf("hits marked: %v, want the pending one", store.notifiedHashes)
+	}
+	if len(mail.offs) != 1 || !mail.offs[0] {
+		t.Errorf("completion notice: %v", mail.offs)
+	}
+}
+
+// "Found nothing" and "could not ask" look the same in the result slice.
+// Promoting to active on the second one makes the next poll read the whole
+// back catalogue as new — a 40-line email for a season that has been out
+// for months.
+func TestBaselineStaysPendingWhenEverySourceFailed(t *testing.T) {
+	sub := seasonSub()
+	sub.State = models.ReleaseSubscriptionStatePendingBaseline
+	store := &fakeStore{
+		due:      []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{episode(1, 7*24*time.Hour)},
+	}
+	search := &fakeSearch{err: errors.New("addon unreachable")}
+	p := NewPoller(store, search, &fakeMailer{}, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if store.checkedState != models.ReleaseSubscriptionStatePendingBaseline {
+		t.Errorf("state: got %q, want it to stay pending_baseline", store.checkedState)
+	}
+	if !store.checkedNext.After(time.Now()) {
+		t.Error("the row was not rescheduled")
+	}
+}
+
+// The same distinction the other way round: a baseline poll that reached a
+// source and legitimately found nothing has done its job.
+func TestBaselineCompletesWhenSourcesAnsweredEmpty(t *testing.T) {
+	sub := seasonSub()
+	sub.State = models.ReleaseSubscriptionStatePendingBaseline
+	store := &fakeStore{
+		due:      []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{episode(1, 7*24*time.Hour)},
+	}
+	p := NewPoller(store, &fakeSearch{}, &fakeMailer{}, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if store.checkedState != models.ReleaseSubscriptionStateActive {
+		t.Errorf("state: got %q, want active", store.checkedState)
+	}
+}
+
+// A row that fails deterministically keeps its past-due next_check_at, and
+// the queue is ordered by it — so without a reschedule it sits at the head
+// of every batch forever, re-running its whole outbound search each time.
+func TestFailedPollIsStillRescheduled(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		store func(sub *models.ReleaseSubscription) *fakeStore
+	}{
+		{
+			name: "episode metadata unavailable",
+			store: func(sub *models.ReleaseSubscription) *fakeStore {
+				return &fakeStore{due: []models.ReleaseSubscription{*sub}, episodesErr: errors.New("db down")}
+			},
+		},
+		{
+			name: "the hit could not be stored",
+			store: func(sub *models.ReleaseSubscription) *fakeStore {
+				return &fakeStore{
+					due:       []models.ReleaseSubscription{*sub},
+					episodes:  []models.EpisodeMetadata{episode(1, 7*24*time.Hour)},
+					insertErr: errors.New("value too long for type character varying(40)"),
+				}
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := seasonSub()
+			store := tt.store(sub)
+			search := &fakeSearch{byContentID: map[string][]stremio.StreamItem{
+				"tt1190634:3:1": {{InfoHash: "aa", Title: "The.Boys.S03E01"}},
+			}}
+			p := NewPoller(store, search, &fakeMailer{}, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+			if _, err := p.Run(context.Background()); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if store.checkedNext.IsZero() || !store.checkedNext.After(time.Now()) {
+				t.Errorf("next check: %v, want a future time so the row leaves the head of the queue", store.checkedNext)
+			}
+		})
+	}
+}
+
+// The row in hand was read before the letter went out, so its
+// LastNotifiedAt is stale by exactly the event that matters. Reading it
+// literally backs off a subscription on the run where it finally delivered.
+func TestASubscriptionThatJustDeliveredIsNotBackedOff(t *testing.T) {
+	sub := seasonSub()
+	sub.CreatedAt = time.Now().Add(-40 * 24 * time.Hour) // long silent
+	store := &fakeStore{
+		due:      []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{episode(5, 24*time.Hour)},
+		pending:  []models.ReleaseSubscriptionHit{{SubscriptionID: sub.ID, InfoHash: "aa"}},
+	}
+	mail := &fakeMailer{}
+	p := NewPoller(store, &fakeSearch{}, mail, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(mail.updates) != 1 {
+		t.Fatalf("updates: got %d, want 1", len(mail.updates))
+	}
+	// Paid account with an episode inside the hot window: 3h, not the 24h
+	// ceiling the stale idle counter would have produced.
+	if d := time.Until(store.checkedNext); d > 4*time.Hour {
+		t.Errorf("next check in %v, want the hot cadence — the show just delivered", d.Round(time.Minute))
+	}
+}
+
+// The ceiling is a flag and can be misconfigured to zero; the retry path
+// must not turn that into a row that is due again immediately.
+func TestRetryDoesNotBecomeAHotLoopWithoutACeiling(t *testing.T) {
+	cfg := testConfig()
+	cfg.IntervalMax = 0
+	sub := seasonSub()
+	sub.User = nil // nothing to mail: the early-return retry path
+	store := &fakeStore{due: []models.ReleaseSubscription{*sub}}
+	p := NewPoller(store, &fakeSearch{}, &fakeMailer{}, fakeTier{}, fakeAiring{}, cfg)
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !store.checkedNext.After(time.Now().Add(time.Hour)) {
+		t.Errorf("next check: %v, want it comfortably in the future", store.checkedNext)
 	}
 }

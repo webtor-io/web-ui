@@ -105,7 +105,12 @@ func prepareReleaseSubscribeBanner(ctx context.Context, airing bannerAiring, sub
 // dominantSeason returns the season number that has the largest number of
 // episodes in this torrent. For per-episode torrents this is just that
 // episode's season; for season packs it's the pack's season. Returns 0 when
-// no episode has a season set.
+// the torrent names no subscribable season.
+//
+// Specials are excluded rather than counted: season 0 doubles as the "none
+// found" answer, so a torrent carrying five extras and three first-season
+// episodes would otherwise resolve to 0 and suppress the banner for a
+// season that is perfectly addressable.
 //
 // Ties are broken by the lower season number, so a torrent holding two half
 // seasons resolves the same way on every render rather than following map
@@ -113,7 +118,7 @@ func prepareReleaseSubscribeBanner(ctx context.Context, airing bannerAiring, sub
 func dominantSeason(series *models.Series) int {
 	counts := map[int]int{}
 	for _, ep := range series.Episodes {
-		if ep.Season == nil {
+		if ep.Season == nil || *ep.Season <= 0 {
 			continue
 		}
 		counts[int(*ep.Season)]++

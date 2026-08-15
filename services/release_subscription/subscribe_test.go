@@ -29,7 +29,10 @@ type subStore struct {
 	removedByContent bool
 	deletedIDs       []uuid.UUID
 	enabledCalls     int
+	accountLang      string
 }
+
+func (f *subStore) AccountLang(context.Context, uuid.UUID) string { return f.accountLang }
 
 func (f *subStore) Find(context.Context, uuid.UUID, string, string, *int16) (*models.ReleaseSubscription, error) {
 	return f.found, f.findErr
@@ -438,3 +441,46 @@ func TestNoMailerIsNotAFailure(t *testing.T) {
 
 func strptr(s string) *string { return &s }
 func int16ptr(n int16) *int16 { return &n }
+
+// The account's current language wins over the one captured when the
+// subscription was created — otherwise a user who switched to English would
+// keep getting Russian notices about subscriptions made before the switch,
+// while their update letters (sent from the poller, which has always read
+// the account) arrived in English. One letter, one language.
+func TestLettersFollowTheAccountLanguage(t *testing.T) {
+	st := &subStore{createOK: true, accountLang: "de"}
+	mail := &subMail{}
+	s := newTestService(st, mail, true)
+
+	req := movieReq() // captured lang: "ru"
+	if _, _, err := s.Subscribe(context.Background(), viewer, req, -1); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if len(mail.on) != 1 || mail.on[0].Lang != "de" {
+		t.Errorf("confirmation language: got %q, want the account's \"de\"", mail.on[0].Lang)
+	}
+
+	st.found = &models.ReleaseSubscription{ID: uuid.NewV4(), Lang: "ru"}
+	st.removedByContent = true
+	if _, err := s.Unsubscribe(context.Background(), viewer, req); err != nil {
+		t.Fatalf("unsubscribe: %v", err)
+	}
+	if len(mail.off) != 1 || mail.off[0].Lang != "de" {
+		t.Errorf("removal notice language: got %q, want the account's \"de\"", mail.off[0].Lang)
+	}
+}
+
+// An account that has never been seen since the language column existed
+// falls back to what the subscription itself captured.
+func TestLettersFallBackToTheSubscriptionLanguage(t *testing.T) {
+	st := &subStore{createOK: true} // no account language
+	mail := &subMail{}
+	s := newTestService(st, mail, true)
+
+	if _, _, err := s.Subscribe(context.Background(), viewer, movieReq(), -1); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if len(mail.on) != 1 || mail.on[0].Lang != "ru" {
+		t.Errorf("confirmation language: got %q, want the captured \"ru\"", mail.on[0].Lang)
+	}
+}

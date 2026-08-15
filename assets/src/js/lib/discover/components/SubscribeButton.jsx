@@ -10,7 +10,7 @@ import { subscriptionKey } from '../subscriptionsClient';
 // DiscoverApp keeps. Rendering nothing when there is no target is deliberate:
 // a library item or a series opened without an episode has nothing a poller
 // could search for.
-export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm', full = false }) {
+export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm' }) {
     const handle = useCallback((e) => {
         e?.stopPropagation?.();
         if (onToggle && target) onToggle(target);
@@ -36,7 +36,6 @@ export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm
                 'btn',
                 size === 'xs' ? 'btn-xs' : 'btn-sm',
                 subscribed ? 'btn-ghost border border-w-line text-w-cyan' : 'btn-soft-cyan',
-                full ? 'w-full sm:w-auto' : '',
             ].join(' ')}
         >
             <BellIcon filled={subscribed} />

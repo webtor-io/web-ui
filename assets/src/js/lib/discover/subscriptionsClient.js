@@ -25,24 +25,23 @@ export function itemKey(item) {
 }
 
 // fetchSubscriptionIds is the prefetch that decides which bells render as
-// already-subscribed. Failures return an empty set: a missing highlight is
-// a smaller wrong than a modal that refuses to open.
+// already-subscribed. Only the keys are kept — the response also carries the
+// count and the free-tier cap, but nothing renders them: the server states
+// the cap in its own words when it refuses a subscribe.
+//
+// Failures return an empty set: a missing highlight is a smaller wrong than
+// a modal that refuses to open.
 export async function fetchSubscriptionIds() {
     try {
         const res = await fetch(langPath('/discover/subscriptions/ids'), {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
         });
-        if (!res.ok) return { keys: [], count: 0, limit: -1 };
+        if (!res.ok) return { keys: [] };
         const data = await res.json();
-        const items = data.items || [];
-        return {
-            keys: items.map(itemKey),
-            count: data.count ?? items.length,
-            limit: data.limit ?? -1,
-        };
+        return { keys: (data.items || []).map(itemKey) };
     } catch (e) {
-        return { keys: [], count: 0, limit: -1 };
+        return { keys: [] };
     }
 }
 

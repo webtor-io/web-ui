@@ -123,20 +123,6 @@ func MarkReleaseSubscriptionHitsNotified(ctx context.Context, db *pg.DB, subscri
 	return nil
 }
 
-// CountReleaseSubscriptionHits returns how many releases a subscription has
-// seen in total — the "found N releases" figure in the profile row.
-func CountReleaseSubscriptionHits(ctx context.Context, db *pg.DB, subscriptionID uuid.UUID) (int, error) {
-	n, err := db.Model((*ReleaseSubscriptionHit)(nil)).
-		Context(ctx).
-		Where("release_subscription_id = ?", subscriptionID).
-		Where("is_baseline = ?", false).
-		Count()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to count release subscription hits")
-	}
-	return n, nil
-}
-
 // ListUserReleaseSubscriptionHits returns every hit of every subscription a
 // user owns. Used by the GDPR export, which has to include the rows keyed to
 // the account, not just the subscriptions themselves.

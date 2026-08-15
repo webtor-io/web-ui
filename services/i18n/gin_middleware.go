@@ -96,14 +96,19 @@ func GetLocalizer(c *gin.Context) *goI18n.Localizer {
 // (see services/user_settings.Middleware) has to ask this first, or an API
 // call would rewrite a Russian account's language to English.
 //
-// The evidence is what the routing leaves behind: the X-Lang header it sets
-// from a URL prefix, or the lang cookie it writes whenever it resolves one.
+// The evidence is the X-Lang header the routing sets from a URL prefix. A
+// cookie counts only when it agrees with the language that was resolved:
+// state-mutating requests never go through the redirect that would have
+// added the prefix (see isSafe in middleware.go), so a Russian user's POST
+// to a bare path — /watch/position, /stremio/addon-url/batch-add — resolves
+// to English while still carrying lang=ru. Reading that as "this account is
+// English" is the very mistake this function exists to prevent.
 func Routed(c *gin.Context) bool {
 	if h := c.GetHeader(LangHeader); h != "" && IsSupported(h) {
 		return true
 	}
 	if v, err := c.Cookie(langCookie); err == nil && IsSupported(v) {
-		return true
+		return v == GetLang(c)
 	}
 	return false
 }
