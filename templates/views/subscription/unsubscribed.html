@@ -1,0 +1,27 @@
+{{ define "title" }}{{ t $.Lang "subscription.unsubscribed.title" }}{{ end }}
+{{ define "description" }}
+    <meta name="robots" content="noindex">
+{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+    <div class="max-w-[480px] mx-auto">
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-8">
+            {{ if .Data.Failed }}
+                <h1 class="text-[1.4rem] font-bold tracking-tight mb-2">{{ t $.Lang "subscription.unsubscribed.failedTitle" }}</h1>
+                <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "subscription.unsubscribed.failedText" }}</p>
+            {{ else }}
+                <h1 class="text-[1.4rem] font-bold tracking-tight mb-2">{{ t $.Lang "subscription.unsubscribed.title" }}</h1>
+                {{/* The title is only known when the link actually removed
+                     something; a second click on the same link lands here
+                     with nothing to name, and says the same thing. */}}
+                {{ if .Data.Title }}
+                    <p class="text-sm text-w-sub leading-relaxed mb-6">{{ tp $.Lang "subscription.unsubscribed.text" "Title" .Data.Title }}</p>
+                {{ else }}
+                    <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "subscription.unsubscribed.textPlain" }}</p>
+                {{ end }}
+            {{ end }}
+            <a href="{{ langPath $.Lang "/profile" }}" class="btn btn-soft w-full">{{ t $.Lang "subscription.unsubscribed.manage" }}</a>
+        </div>
+    </div>
+</section>
+{{ end }}

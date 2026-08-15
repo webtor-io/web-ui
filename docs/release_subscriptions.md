@@ -1,6 +1,6 @@
 # Release Subscriptions — план работ
 
-Статус: **спринт 1 сделан** (схема, сервис, API, профиль, GDPR-экспорт), спринты 2–4 впереди. Дата фиксации плана: 2026-08-15.
+Статус: **спринты 1–2 сделаны** (схема, сервис, API, профиль, GDPR-экспорт; поллер, письма, язык аккаунта, CronJob). Осталось: спринт 3 — три точки входа в UI. Дата фиксации плана: 2026-08-15.
 Предшественник: `docs/release_sub_fake_door.md` (fake-door 2026-05-20 → 05-24; free 1.3% CTR, paid 13.6% — фича валидирована как платная по классу, но здесь она делается для всех с лимитом 3 на free по решению владельца).
 
 ## Что строим
@@ -191,7 +191,7 @@ Umami, kebab-case как везде: `subscription-created` (property `source`),
 | Спринт | Содержание | Оценка |
 |---|---|---|
 | 1 ✅ | Миграции 66/67, модели, `services/release_subscription`, оба набора маршрутов, лимит free, секция профиля, `data_export` | 3 дня |
-| 2 | `BuildPollStreamsService`, CLI `subscription poll`, планировщик `next_check_at`, 3 шаблона писем, i18n в `notification.render`, миграция 68 + запись `user_settings.lang`, перевод 4 старых писем, unsubscribe-токен, CronJob в чарте | 3.5 дня |
+| 2 ✅ | `BuildPollStreamsService`, CLI `subscription poll`, планировщик `next_check_at`, 3 шаблона писем, i18n в `notification.render`, миграция 68 + запись `user_settings.lang`, unsubscribe-токен, CronJob в чарте | 3.5 дня |
 | 3 | Три UI-поверхности, ключи в 11 локалей, Umami-события | 2.5 дня |
 | 4 | Тесты (выбор эпизодов, baseline, дедуп хитов, лимиты — по образцу `services/stremio/*_test.go`), этот док в актуальное состояние, дашборд метрик | 1 день |
 
@@ -216,6 +216,41 @@ Umami, kebab-case как везде: `subscription-created` (property `source`),
 - **Eligibility спрашивается на записи**, а не только в UI: `IsAiringSeries` для сезона, фильм — всегда можно. Без энричера сезонная подписка отклоняется (консервативная ветка: непроверяемая строка иначе полилась бы вечно).
 - **Профильный список переиспользует `listEditor.js`** как есть: строки не `draggable`, поэтому общий drag-биндинг остаётся мёртвым, а из трёх полей формы читаются два (удаления и тумблеры). Порядка у подписок нет.
 - Поле `next_check_at` уже пишется (`now()` при создании) — поллер спринта 2 получает готовую очередь.
+
+## Что уже в коде (спринт 2)
+
+| Слой | Файлы |
+|---|---|
+| Поиск | `Builder.BuildPollStreamsService` в `services/stremio/builder.go` |
+| Поллер | `services/release_subscription/poller.go` (логика) + `poll_adapters.go` (БД, поиск, claims) + `flags.go` |
+| CLI | `subscription.go` → `web-ui subscription poll`, зарегистрирована в `configure.go` |
+| Письма | `templates/notification/subscription-{on,off,update}.html`, `services/notification/subscription.go`, i18n в `notification.render` |
+| Язык | миграция `68_user_settings_lang`, `models.SetUserSettingsLang`, `Service.SetLang`, запись в `user_settings.Middleware` |
+| Отписка | `services/release_subscription/token.go`, `GET /subscription/unsubscribe/:token`, `templates/views/subscription/unsubscribed.html` |
+| Cron | `subscription-poll` в `chart/templates/cronjobs.yaml`, `17 * * * *` |
+| Тесты | `poller_test.go` (12 кейсов на фейках), `render_test.go` для писем |
+
+Что стоит знать:
+
+- **Порядок в `notify` — не стилистика.** Хиты помечаются доставленными **после** успешной отправки. Если поменять местами, упавший SMTP навсегда съедает пачку: хэши уже «доставлены», а письма не было. На это есть тест `TestFailedMailKeepsHitsPending` и негативный контроль.
+- **Baseline** проверяется тестом `TestBaselineDoesNotMail` — худшее первое впечатление фичи было бы «подписался на идущий сезон и получил простыню из старых раздач».
+- **Джиттер применяется до потолка**, а не после: ±10% поверх cap выводили бы часть интервалов выше 24 ч, и потолок перестал бы быть потолком.
+- **Бэкофф без колонки-счётчика.** «Давно ничего не находили» считается по `last_notified_at` (или `created_at`): >7 дней — интервал ×2, >21 дня — ×4, до `IntervalMax`. Ничего дополнительно хранить не нужно.
+- **`DiscoverOnly` поллер сознательно игнорирует.** Настройка отвечает на «где показывать результаты моих аддонов» (в Discover, а не в списке Stremio), а не «можно ли Webtor'у их опрашивать». Подписка — это и есть просьба опрашивать.
+- **Cron — это разрешение опроса, а не частота.** Джоба ходит раз в час и берёт только то, у чего наступил `next_check_at`; реальную частоту задают `SUBSCRIPTION_INTERVAL_*`.
+- **Размер раздачи не пишем.** Индексеры отдают его внутрь текста тайтла (`💾 3.1 GB`), структурного поля в `StreamItem` нет; колонка `size` в схеме есть и ждёт источника, который отдаст число.
+
+### Флаги поллера
+
+| Флаг / env | По умолчанию | Смысл |
+|---|---|---|
+| `SUBSCRIPTION_POLL_BATCH` | 300 | сколько подписок берётся за прогон |
+| `SUBSCRIPTION_POLL_CONCURRENCY` | 4 | сколько аккаунтов параллельно (внутри аккаунта — строго последовательно, у них общие индексеры) |
+| `SUBSCRIPTION_POLL_MAX_EPISODES` | 3 | сколько эпизодов сезона спрашивать за прогон |
+| `SUBSCRIPTION_NOTIFY_INTERVAL` | 12h | минимальный зазор между письмами одной подписки |
+| `SUBSCRIPTION_INTERVAL_HOT` / `_PAID` / `_FREE` | 3h / 6h / 12h | интервалы опроса |
+| `SUBSCRIPTION_INTERVAL_MAX` | 24h | потолок бэкоффа |
+| `SUBSCRIPTION_HOT_WINDOW` | 72h | насколько близко к дате выхода считается «сейчас выходит» |
 
 ## Решения владельца (2026-08-15)
 

@@ -198,6 +198,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Claims (user tiers): `USE_CLAIMS`, `CLAIMS_PROVIDER_SERVICE_HOST/PORT`
 - Stremio addon: `STREMIO_ADDON_USER_AGENT`, `STREMIO_ADDON_PROXY`
 - Torznab indexers: `TORZNAB_TIMEOUT`, `TORZNAB_MAX_RESULTS`, `TORZNAB_USER_AGENT`, `TORZNAB_PROXY` (домашние провайдеры режут входящие с дата-центров — индексер, доступный из браузера, может быть недоступен с нод), `TORZNAB_ALLOW_PRIVATE_NETWORK` (последний — только для self-hosted: снимает запрет на приватные адреса, см. `docs/torznab.md`)
+- Release subscriptions: подписка на новые раздачи фильма или сезона, письма из cron-джобы `subscription poll`. Интервалы и батчи — `SUBSCRIPTION_*` (см. `docs/release_subscriptions.md`). Поллер гоняет **тот же** пользовательский стрим-пайплайн, что и Discover (`Builder.BuildPollStreamsService`), поэтому аккаунт без аддонов и индексеров подписку не получит — предлагать её там нечего
 
 ## Workflow
 

@@ -11,5 +11,6 @@ func configure(app *cli.App) {
 	cacheIndexCMD := makeCacheIndexCMD()
 	vaultCMD := makeVaultCMD()
 	notificationCMD := makeNotificationCMD()
-	app.Commands = []cli.Command{serveCMD, migrationCMD, enrichCMD, cacheIndexCMD, vaultCMD, notificationCMD}
+	subscriptionCMD := makeSubscriptionCMD()
+	app.Commands = []cli.Command{serveCMD, migrationCMD, enrichCMD, cacheIndexCMD, vaultCMD, notificationCMD, subscriptionCMD}
 }

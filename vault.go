@@ -158,7 +158,7 @@ func initializeReaper(c *cli.Context) (*reaper, error) {
 	}
 
 	// Setting Notification Service
-	notificationService := notification.New(c, db)
+	notificationService := notification.New(c, db, newI18n())
 
 	r := &reaper{
 		store:                  &pgReaperStore{db: db},

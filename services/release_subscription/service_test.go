@@ -133,7 +133,7 @@ func TestLimit(t *testing.T) {
 // refused rather than accepted blind. A movie stays acceptable — nothing
 // local could tell us whether a release is coming anyway.
 func TestCheckEligibleWithoutEnricher(t *testing.T) {
-	s := New(nil, nil)
+	s := New(nil, nil, nil, "", "")
 	if err := s.checkEligible(t.Context(), models.ReleaseSubscriptionKindSeason, "tt1190634"); !errors.Is(err, ErrNotEligible) {
 		t.Errorf("season without enricher: got %v, want ErrNotEligible", err)
 	}

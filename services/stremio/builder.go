@@ -103,6 +103,52 @@ func (s *Builder) BuildTorznabStreamsService(ctx context.Context, u *auth.User) 
 	return NewTorznabCompositeStreamsByUserID(ctx, db, s.tn, u.ID, s.titles, s.tnCache)
 }
 
+// BuildPollStreamsService builds the pipeline the release-subscription
+// poller runs: the user's own addons and indexers, deduplicated by infohash
+// and filtered to their preferred language.
+//
+// It stops where the interactive pipeline continues. Library is left out —
+// the poller asks "has anything new appeared", and what the user already has
+// in their Vault is by definition not new. EnrichStream is left out because
+// everything it adds (playback tokens, availability marks, /stremio/resolve
+// URLs) exists to make a stream clickable, and a cron job clicks nothing; it
+// also needs a request-scoped token this job has no way to mint.
+//
+// What stays matters: dedup gives one row per infohash, which is the key the
+// subscription remembers releases by, and the language filter keeps a user
+// from being mailed about releases their own settings would hide.
+func (s *Builder) BuildPollStreamsService(ctx context.Context, u *auth.User) (StreamsService, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("database not initialized")
+	}
+
+	// DiscoverOnly is deliberately not honoured here. It answers "where do
+	// my addon results show up" — Discover on the web, and not in the
+	// Stremio app's stream list — not "may Webtor query my sources at all".
+	// A subscription is the user asking us to query them; skipping would
+	// hand a DiscoverOnly user a subscription that can never fire.
+	services := []StreamsService{}
+
+	acs, err := NewAddonCompositeStreamsByUserID(ctx, db, s.cl, u.ID, s.cache, s.userAgent, s.requestURLMapper)
+	if err != nil {
+		return nil, err
+	}
+	services = append(services, acs)
+
+	if s.tn != nil {
+		tcs, err := NewTorznabCompositeStreamsByUserID(ctx, db, s.tn, u.ID, s.titles, s.tnCache)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, tcs)
+	}
+
+	cs := NewCompositeStream(services)
+	ds := NewDedupStream(cs)
+	return NewLangFilterStream(ds, db, u), nil
+}
+
 func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {

@@ -18,9 +18,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/webtor-io/web-ui/models"
 )
@@ -94,5 +94,24 @@ func (s *Service) Set(ctx context.Context, us *models.UserSettings) error {
 	// (lazymap has no Set/overwrite — Drop + next-Get-rehydrates is
 	// the idiomatic pattern.)
 	s.LazyMap.Drop(us.UserID.String())
+	return nil
+}
+
+// SetLang records the account's interface language. Separate from Set
+// because it writes one column: a language change must not touch the
+// adult-content toggle, and the caller (the request middleware) has no
+// business loading and re-saving the whole row to change a string.
+func (s *Service) SetLang(ctx context.Context, userID uuid.UUID, lang string) error {
+	if userID == uuid.Nil {
+		return errors.New("user_settings: empty user_id")
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("user_settings: no db")
+	}
+	if err := models.SetUserSettingsLang(ctx, db, userID, lang); err != nil {
+		return errors.Wrap(err, "failed to store user language")
+	}
+	s.LazyMap.Drop(userID.String())
 	return nil
 }

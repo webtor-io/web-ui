@@ -68,7 +68,7 @@ func sendExpiringNotifications(c *cli.Context) error {
 	}
 
 	// Setting Notification
-	ns := notification.New(c, db)
+	ns := notification.New(c, db, newI18n())
 
 	expirePeriod := c.Duration(vService.VaultResourceExpirePeriodFlag)
 

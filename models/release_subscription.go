@@ -307,3 +307,54 @@ func MarkReleaseSubscriptionNotified(ctx context.Context, db *pg.DB, id uuid.UUI
 	}
 	return nil
 }
+
+// GetReleaseSubscriptionByID reads a subscription without scoping it to an
+// owner. Only two callers may use it: the poller, which works across
+// accounts, and the one-click unsubscribe link, where the signed token is
+// the authorization. Everything reached from a session must go through
+// GetUserReleaseSubscriptionByID instead.
+func GetReleaseSubscriptionByID(ctx context.Context, db *pg.DB, id uuid.UUID) (*ReleaseSubscription, error) {
+	s := &ReleaseSubscription{}
+	err := db.Model(s).
+		Context(ctx).
+		Relation("User").
+		Where("release_subscription.release_subscription_id = ?", id).
+		Limit(1).
+		Select()
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to get release subscription")
+	}
+	return s, nil
+}
+
+// DeleteReleaseSubscriptionByID removes a subscription addressed by id
+// alone. Same restricted audience as GetReleaseSubscriptionByID.
+func DeleteReleaseSubscriptionByID(ctx context.Context, db *pg.DB, id uuid.UUID) error {
+	_, err := db.Model((*ReleaseSubscription)(nil)).
+		Context(ctx).
+		Where("release_subscription_id = ?", id).
+		Delete()
+	if err != nil {
+		return pkgerrors.Wrap(err, "failed to delete release subscription")
+	}
+	return nil
+}
+
+// MarkReleaseSubscriptionCompleted ends a subscription that has run out of
+// future: the season finished airing and the series is no longer in
+// production. Movie subscriptions never reach this — see the state
+// constants.
+func MarkReleaseSubscriptionCompleted(ctx context.Context, db *pg.DB, id uuid.UUID) error {
+	_, err := db.Model((*ReleaseSubscription)(nil)).
+		Context(ctx).
+		Set("state = ?", ReleaseSubscriptionStateCompleted).
+		Where("release_subscription_id = ?", id).
+		Update()
+	if err != nil {
+		return pkgerrors.Wrap(err, "failed to complete release subscription")
+	}
+	return nil
+}

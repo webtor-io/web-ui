@@ -15,7 +15,9 @@ import (
 	cs "github.com/webtor-io/common-services"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/notification"
 )
 
 // FreeTierLimit caps how many subscriptions a free account may hold. Each
@@ -44,16 +46,28 @@ var (
 	ErrBadRequest = errors.New("invalid subscription request")
 )
 
+// Mailer sends the two letters a subscription's life produces outside the
+// poller: the confirmation when it starts, and the notice when the user ends
+// it. An interface so the service does not depend on SMTP being configured —
+// a nil mailer simply sends nothing.
+type Mailer interface {
+	SendSubscriptionOn(to string, sub notification.SubscriptionView) error
+	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
+}
+
 // Service is the subscription business logic. The enricher is optional —
 // without it eligibility cannot be verified and season subscriptions are
 // refused rather than accepted blind.
 type Service struct {
-	pg *cs.PG
-	en *enrich.Enricher
+	pg     *cs.PG
+	en     *enrich.Enricher
+	mail   Mailer
+	domain string
+	secret string
 }
 
-func New(pg *cs.PG, en *enrich.Enricher) *Service {
-	return &Service{pg: pg, en: en}
+func New(pg *cs.PG, en *enrich.Enricher, mail Mailer, domain, secret string) *Service {
+	return &Service{pg: pg, en: en, mail: mail, domain: domain, secret: secret}
 }
 
 // Request is one "subscribe me to this" from any of the entry points.
@@ -78,11 +92,12 @@ func Limit(freeTier bool) int {
 // Subscribe validates the request, enforces the cap and writes the row.
 // Returns the subscription and whether it was created now — subscribing
 // twice is not an error, it just doesn't produce a second row.
-func (s *Service) Subscribe(ctx context.Context, userID uuid.UUID, req Request, limit int) (*models.ReleaseSubscription, bool, error) {
+func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limit int) (*models.ReleaseSubscription, bool, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, false, errors.New("no db")
 	}
+	userID := u.ID
 
 	kind, season, err := normalize(req)
 	if err != nil {
@@ -127,6 +142,9 @@ func (s *Service) Subscribe(ctx context.Context, userID uuid.UUID, req Request, 
 	if err != nil {
 		return nil, false, err
 	}
+	if created {
+		s.mailOn(u, sub)
+	}
 	if !created {
 		// Lost a race with a concurrent add. Read back what won so the
 		// caller still gets a subscription to render.
@@ -141,7 +159,7 @@ func (s *Service) Subscribe(ctx context.Context, userID uuid.UUID, req Request, 
 
 // Unsubscribe removes a subscription addressed by content. Returns whether
 // anything was removed.
-func (s *Service) Unsubscribe(ctx context.Context, userID uuid.UUID, req Request) (bool, error) {
+func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (bool, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return false, errors.New("no db")
@@ -150,7 +168,20 @@ func (s *Service) Unsubscribe(ctx context.Context, userID uuid.UUID, req Request
 	if err != nil {
 		return false, err
 	}
-	return models.DeleteUserReleaseSubscriptionByContent(ctx, db, userID, kind, req.VideoID, season)
+	// Read before deleting: the notice names what it is about, and after the
+	// DELETE there is nothing left to name it with.
+	sub, err := models.FindUserReleaseSubscription(ctx, db, u.ID, kind, req.VideoID, season)
+	if err != nil {
+		return false, err
+	}
+	removed, err := models.DeleteUserReleaseSubscriptionByContent(ctx, db, u.ID, kind, req.VideoID, season)
+	if err != nil {
+		return false, err
+	}
+	if removed && sub != nil {
+		s.mailOff(u, sub)
+	}
+	return removed, nil
 }
 
 // List returns the user's subscriptions for the profile section.
@@ -173,12 +204,52 @@ func (s *Service) Count(ctx context.Context, userID uuid.UUID) (int, error) {
 }
 
 // Delete removes one subscription by row id, scoped to its owner.
-func (s *Service) Delete(ctx context.Context, userID, id uuid.UUID) error {
+func (s *Service) Delete(ctx context.Context, u *auth.User, id uuid.UUID) error {
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no db")
 	}
-	return models.DeleteUserReleaseSubscription(ctx, db, id, userID)
+	sub, err := models.GetUserReleaseSubscriptionByID(ctx, db, id, u.ID)
+	if err != nil {
+		return err
+	}
+	if sub == nil {
+		return nil
+	}
+	if err := models.DeleteUserReleaseSubscription(ctx, db, id, u.ID); err != nil {
+		return err
+	}
+	s.mailOff(u, sub)
+	return nil
+}
+
+// DeleteByToken serves the one-click unsubscribe link from an email, where
+// the signed token is the only authorization there is — the reader is not
+// logged in, and requiring them to be defeats the point of the link.
+// Returns the subscription that was removed, or nil when the token addresses
+// one that is already gone.
+func (s *Service) DeleteByToken(ctx context.Context, raw string) (*models.ReleaseSubscription, error) {
+	id, err := ParseUnsubscribeToken(s.secret, raw)
+	if err != nil {
+		return nil, err
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+	sub, err := models.GetReleaseSubscriptionByID(ctx, db, id)
+	if err != nil {
+		return nil, err
+	}
+	if sub == nil {
+		// Already unsubscribed. Idempotent by design: a link clicked twice
+		// must read as "done", not as an error.
+		return nil, nil
+	}
+	if err := models.DeleteReleaseSubscriptionByID(ctx, db, id); err != nil {
+		return nil, err
+	}
+	return sub, nil
 }
 
 // SetEnabled flips the profile toggle for one subscription.
@@ -188,6 +259,49 @@ func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled 
 		return errors.New("no db")
 	}
 	return models.SetUserReleaseSubscriptionEnabled(ctx, db, id, userID, enabled)
+}
+
+// mailOn and mailOff send off the request goroutine. An SMTP dial is a
+// remote round-trip, and the user is waiting on a toast that says what
+// already happened in the database — the letter is not part of that answer.
+func (s *Service) mailOn(u *auth.User, sub *models.ReleaseSubscription) {
+	if s.mail == nil || u.Email == "" {
+		return
+	}
+	view := s.view(sub)
+	go func() {
+		if err := s.mail.SendSubscriptionOn(u.Email, view); err != nil {
+			log.WithError(err).
+				WithField("feature", "release_subscription").
+				WithField("subscription_id", sub.ID).
+				Error("failed to send subscription confirmation")
+		}
+	}()
+}
+
+func (s *Service) mailOff(u *auth.User, sub *models.ReleaseSubscription) {
+	if s.mail == nil || u.Email == "" {
+		return
+	}
+	view := s.view(sub)
+	go func() {
+		if err := s.mail.SendSubscriptionOff(u.Email, view, false); err != nil {
+			log.WithError(err).
+				WithField("feature", "release_subscription").
+				WithField("subscription_id", sub.ID).
+				Error("failed to send subscription removal notice")
+		}
+	}()
+}
+
+func (s *Service) view(sub *models.ReleaseSubscription) notification.SubscriptionView {
+	return notification.SubscriptionView{
+		ID:             sub.ID,
+		Title:          sub.GetTitle(),
+		Season:         sub.GetSeason(),
+		Lang:           sub.Lang,
+		UnsubscribeURL: UnsubscribeURL(s.domain, s.secret, sub.ID),
+	}
 }
 
 // Eligible reports whether content can be subscribed to. Exposed so the

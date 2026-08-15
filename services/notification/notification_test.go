@@ -78,7 +78,7 @@ func TestRender_Success(t *testing.T) {
 	})
 	svc := newTestService(nil, nil, tmplDir)
 
-	body, err := svc.render("test.html", map[string]any{"Name": "World"})
+	body, err := svc.render("test.html", "", map[string]any{"Name": "World"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -92,7 +92,7 @@ func TestRender_NotFound(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{})
 	svc := newTestService(nil, nil, tmplDir)
 
-	_, err := svc.render("nonexistent.html", nil)
+	_, err := svc.render("nonexistent.html", "", nil)
 	if err == nil {
 		t.Fatal("expected error for missing template")
 	}
@@ -107,7 +107,7 @@ func TestRender_InvalidTemplate(t *testing.T) {
 	})
 	svc := newTestService(nil, nil, tmplDir)
 
-	_, err := svc.render("bad.html", nil)
+	_, err := svc.render("bad.html", "", nil)
 	if err == nil {
 		t.Fatal("expected error for invalid template")
 	}
@@ -119,7 +119,7 @@ func TestRender_ExecutionError(t *testing.T) {
 	})
 	svc := newTestService(nil, nil, tmplDir)
 
-	_, err := svc.render("exec_err.html", map[string]any{"Name": "plain string"})
+	_, err := svc.render("exec_err.html", "", map[string]any{"Name": "plain string"})
 	if err == nil {
 		t.Fatal("expected error for template execution failure")
 	}

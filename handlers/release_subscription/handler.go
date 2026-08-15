@@ -36,16 +36,22 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
 	rs "github.com/webtor-io/web-ui/services/release_subscription"
+	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
 	pg  *cs.PG
 	svc *rs.Service
+	tb  template.Builder[*web.Context]
 }
 
-func RegisterHandler(r *gin.Engine, pg *cs.PG, svc *rs.Service) {
-	h := &Handler{pg: pg, svc: svc}
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, svc *rs.Service) {
+	h := &Handler{
+		pg:  pg,
+		svc: svc,
+		tb:  tm.MustRegisterViews("subscription/*").WithLayout("main"),
+	}
 
 	jr := r.Group("/discover/subscriptions")
 	jr.Use(auth.HasAuth)
@@ -59,6 +65,17 @@ func RegisterHandler(r *gin.Engine, pg *cs.PG, svc *rs.Service) {
 	fr.POST("/add", h.formAdd)
 	fr.POST("/delete/:id", h.formDelete)
 	fr.POST("/update", h.formUpdate)
+
+	// Deliberately outside the auth group: this is the link in an email,
+	// and the signed token is what authorizes it. Requiring a session would
+	// mean the reader has to log in to stop receiving mail.
+	r.GET("/subscription/unsubscribe/:token", h.unsubscribeByToken)
+}
+
+// unsubscribedData drives the confirmation page.
+type unsubscribedData struct {
+	Title  string
+	Failed bool
 }
 
 // --- DTOs ---
@@ -132,7 +149,7 @@ func (h *Handler) add(c *gin.Context) {
 		return
 	}
 
-	sub, added, err := h.svc.Subscribe(c.Request.Context(), user.ID, rs.Request{
+	sub, added, err := h.svc.Subscribe(c.Request.Context(), user, rs.Request{
 		Kind:    req.Kind,
 		VideoID: req.VideoID,
 		Season:  req.Season,
@@ -167,7 +184,7 @@ func (h *Handler) remove(c *gin.Context) {
 		return
 	}
 
-	removed, err := h.svc.Unsubscribe(c.Request.Context(), user.ID, rs.Request{
+	removed, err := h.svc.Unsubscribe(c.Request.Context(), user, rs.Request{
 		Kind:    c.Param("kind"),
 		VideoID: c.Param("video_id"),
 		Season:  season,
@@ -235,7 +252,7 @@ func (h *Handler) formAdd(c *gin.Context) {
 		web.RedirectWithError(c, web.NewUserError("error.subscriptionFailed", err))
 		return
 	}
-	_, _, err = h.svc.Subscribe(c.Request.Context(), user.ID, rs.Request{
+	_, _, err = h.svc.Subscribe(c.Request.Context(), user, rs.Request{
 		Kind:    c.PostForm("kind"),
 		VideoID: c.PostForm("video_id"),
 		Season:  season,
@@ -257,7 +274,7 @@ func (h *Handler) formDelete(c *gin.Context) {
 		web.RedirectWithError(c, web.NewUserError("error.subscriptionFailed", err))
 		return
 	}
-	if err := h.svc.Delete(c.Request.Context(), user.ID, id); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), user, id); err != nil {
 		log.WithError(err).WithField("feature", "release_subscription").Error("form delete failed")
 		web.RedirectWithError(c, err)
 		return
@@ -282,6 +299,23 @@ func (h *Handler) formUpdate(c *gin.Context) {
 	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }
 
+// unsubscribeByToken serves the one-click link. It answers with a page
+// either way: a token that no longer resolves means the subscription is
+// already gone, which is the outcome the reader wanted.
+func (h *Handler) unsubscribeByToken(c *gin.Context) {
+	sub, err := h.svc.DeleteByToken(c.Request.Context(), c.Param("token"))
+	if err != nil {
+		log.WithError(err).WithField("feature", "release_subscription").Warn("unsubscribe link rejected")
+		h.tb.Build("subscription/unsubscribed").HTML(http.StatusOK, web.NewContext(c).WithData(&unsubscribedData{Failed: true}))
+		return
+	}
+	data := &unsubscribedData{}
+	if sub != nil {
+		data.Title = sub.GetTitle()
+	}
+	h.tb.Build("subscription/unsubscribed").HTML(http.StatusOK, web.NewContext(c).WithData(data))
+}
+
 // --- Level 2 ---
 
 // updateSubscriptions applies deletions first, then writes only the rows
@@ -296,7 +330,7 @@ func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabl
 		if err != nil {
 			continue
 		}
-		if err := h.svc.Delete(ctx, user.ID, id); err != nil {
+		if err := h.svc.Delete(ctx, user, id); err != nil {
 			return err
 		}
 	}

@@ -103,3 +103,30 @@ func GetEpisodeMetadata(
 
 	return &meta, nil
 }
+
+// ListEpisodeMetadataBySeason returns one season's episodes, in broadcast
+// order. The release-subscription poller reads it twice: to pick which
+// episodes are worth querying (the ones that have already aired), and to
+// decide whether the season still has a future (any air_date ahead of now).
+//
+// Episodes with no air date are included — a season the mapper knows only
+// partially is still a season, and the caller decides what to make of the
+// gap.
+func ListEpisodeMetadataBySeason(
+	ctx context.Context,
+	db *pg.DB,
+	videoID string,
+	season int16,
+) ([]EpisodeMetadata, error) {
+	var out []EpisodeMetadata
+	err := db.Model(&out).
+		Context(ctx).
+		Where("video_id = ?", videoID).
+		Where("season = ?", season).
+		Order("episode ASC").
+		Select()
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}

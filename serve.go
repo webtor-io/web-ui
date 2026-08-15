@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/fs"
 	"net/http"
 
 	"github.com/webtor-io/web-ui/handlers/about"
@@ -158,8 +157,7 @@ func serve(c *cli.Context) error {
 
 	// Setting TemplateManager
 	// Setting i18n (must be before template manager for helper registration)
-	locales, _ := fs.Sub(localeFS, "locales")
-	i18nSvc := si18n.New(locales)
+	i18nSvc := newI18n()
 
 	tm := template.NewManager[*w.Context](re).
 		WithHelper(w.NewHelper(c)).
@@ -395,7 +393,7 @@ func serve(c *cli.Context) error {
 	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
 
 	// Setting Notification
-	ns := notification.New(c, pg.Get())
+	ns := notification.New(c, pg.Get(), i18nSvc)
 
 	// Setting VaultHandler
 	if v != nil {
@@ -428,8 +426,8 @@ func serve(c *cli.Context) error {
 
 	// Setting release subscriptions. One service, two surfaces: the profile
 	// lists them, the Discover app and the resource banner create them.
-	releaseSubSvc := rss.New(pg, en)
-	release_subscription.RegisterHandler(r, pg, releaseSubSvc)
+	releaseSubSvc := rss.New(pg, en, ns, c.String(common.DomainFlag), c.String(common.SessionSecretFlag))
+	release_subscription.RegisterHandler(r, tm, pg, releaseSubSvc)
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)

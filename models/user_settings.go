@@ -21,7 +21,13 @@ type UserSettings struct {
 	// /raw/ variant (no Gaussian blur) and the 18+ overlay-badge
 	// isn't rendered on cards. Default false — accidental-view
 	// protection is the safer baseline.
-	ShowAdult bool      `pg:"show_adult,use_zero,notnull"`
+	ShowAdult bool `pg:"show_adult,use_zero,notnull"`
+	// Lang is the interface language last seen on an authenticated request.
+	// It exists because notifications are sent from a cron job, where the
+	// URL prefix and the lang cookie that carry the language everywhere else
+	// are both out of reach. Nil means "never observed" — a different thing
+	// from "chose English", so senders fall back rather than assume.
+	Lang      *string   `pg:"lang"`
 	CreatedAt time.Time `pg:"created_at,notnull"`
 	UpdatedAt time.Time `pg:"updated_at,notnull"`
 }
@@ -71,4 +77,33 @@ func UpsertUserSettings(ctx context.Context, db *pg.DB, us *UserSettings) error 
 		Set("updated_at = now()").
 		Insert()
 	return err
+}
+
+// SetUserSettingsLang records the interface language for an account. Writes
+// only that column: the row also carries ShowAdult, and a language change
+// must never reset a preference the user set deliberately.
+func SetUserSettingsLang(ctx context.Context, db *pg.DB, userID uuid.UUID, lang string) error {
+	if userID == uuid.Nil {
+		return errors.New("user_settings: empty user_id")
+	}
+	if lang == "" {
+		return nil
+	}
+	now := time.Now()
+	us := &UserSettings{UserID: userID, Lang: &lang, CreatedAt: now, UpdatedAt: now}
+	_, err := db.Model(us).
+		Context(ctx).
+		OnConflict("(user_id) DO UPDATE").
+		Set("lang = EXCLUDED.lang").
+		Set("updated_at = now()").
+		Insert()
+	return err
+}
+
+// GetLang returns the stored language, or "" when the account has none yet.
+func (s *UserSettings) GetLang() string {
+	if s == nil || s.Lang == nil {
+		return ""
+	}
+	return *s.Lang
 }

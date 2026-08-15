@@ -17,19 +17,28 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
 type Service struct {
 	store                 notificationStore
 	mail                  mailer
+	i18n                  *i18n.Service
 	domain                string
 	templateDir           string
 	transferTimeoutPeriod time.Duration
 }
 
-func New(c *cli.Context, db *pg.DB) *Service {
+// New builds the mailer. The i18n service is what lets a template say
+// {{ t "email.something" }} instead of carrying English text: notifications
+// are rendered in a cron job, where the URL prefix and the lang cookie that
+// pick a language everywhere else do not exist. It may be nil, in which case
+// templates fall back to their message keys — callers that have a bundle
+// should always pass it.
+func New(c *cli.Context, db *pg.DB, i18nSvc *i18n.Service) *Service {
 	return &Service{
+		i18n:  i18nSvc,
 		store: &pgNotificationStore{db: db},
 		mail: &smtpMailer{
 			host:   c.String(common.SMTPHostFlag),
@@ -51,6 +60,9 @@ type SendOptions struct {
 	Title    string
 	Template string
 	Data     any
+	// Lang renders the template through the i18n bundle. Empty means the
+	// default language, which is what the older English-only templates use.
+	Lang string
 }
 
 func (s *Service) Send(opts SendOptions) error {
@@ -70,7 +82,7 @@ func (s *Service) Send(opts SendOptions) error {
 	}
 
 	// 2. Render template
-	body, err := s.render(opts.Template, opts.Data)
+	body, err := s.render(opts.Template, opts.Lang, opts.Data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render notification template")
 	}
@@ -96,13 +108,13 @@ func (s *Service) Send(opts SendOptions) error {
 	return nil
 }
 
-func (s *Service) render(templateName string, data any) (string, error) {
+func (s *Service) render(templateName string, lang string, data any) (string, error) {
 	path := filepath.Join(s.templateDir, templateName)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return "", fmt.Errorf("template not found: %s", path)
 	}
 
-	t, err := template.ParseFiles(path)
+	t, err := template.New(filepath.Base(path)).Funcs(s.funcs(lang)).ParseFiles(path)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to parse template")
 	}
@@ -113,6 +125,44 @@ func (s *Service) render(templateName string, data any) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// funcs binds the translation helpers to one language, so a template writes
+// {{ t "key" }} rather than threading the language through every call.
+// Without a bundle both helpers return the key, which renders a readable
+// placeholder instead of an empty email.
+func (s *Service) funcs(lang string) template.FuncMap {
+	if lang == "" {
+		lang = i18n.DefaultLang
+	}
+	return template.FuncMap{
+		"t": func(key string) string {
+			if s.i18n == nil {
+				return key
+			}
+			return i18n.TranslateWithLocalizer(s.i18n.Localizer(lang), key)
+		},
+		"tp": func(key string, args ...any) string {
+			if s.i18n == nil {
+				return key
+			}
+			data := make(map[string]any, len(args)/2)
+			for i := 0; i+1 < len(args); i += 2 {
+				data[fmt.Sprintf("%v", args[i])] = args[i+1]
+			}
+			return i18n.TranslateWithLocalizerData(s.i18n.Localizer(lang), key, data)
+		},
+	}
+}
+
+// T translates a key in the given language. Exposed because a subject line
+// is not part of the template body but still has to be localised.
+func (s *Service) T(lang, key string, args ...any) string {
+	f, _ := s.funcs(lang)["tp"].(func(string, ...any) string)
+	if f == nil {
+		return key
+	}
+	return f(key, args...)
 }
 
 func (s *Service) resourceURL(resourceID string) string {
