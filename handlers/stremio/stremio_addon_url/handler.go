@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
+	hc "github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -259,7 +260,10 @@ func (s *Handler) update(c *gin.Context) {
 	deletedAddonsStr := c.PostForm("deleted_addons")
 	addonOrder := c.PostForm("addon_order")
 
-	err := s.updateAddonUrls(deletedAddonsStr, addonOrder, c, user)
+	enabled := func(id uuid.UUID) bool {
+		return c.PostForm("addon_"+id.String()+"_enabled") == "on"
+	}
+	err := s.updateAddonUrls(c.Request.Context(), deletedAddonsStr, addonOrder, enabled, user)
 	if err != nil {
 		log.WithError(err).Error("failed to update addon URLs")
 		web.RedirectWithError(c, err)
@@ -268,91 +272,50 @@ func (s *Handler) update(c *gin.Context) {
 	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }
 
-func (s *Handler) updateAddonUrls(deletedAddonsStr, addonOrder string, c *gin.Context, user *auth.User) error {
-	// Get database connection
+// updateAddonUrls applies the three things the list form can change:
+// deletions, per-addon enable state and priority order. isEnabled is passed
+// in so this stays free of gin.Context, and the form-field parsing is shared
+// with the Torznab indexer list, which submits the same shape.
+func (s *Handler) updateAddonUrls(ctx context.Context, deletedAddonsStr, addonOrder string, isEnabled func(uuid.UUID) bool, user *auth.User) error {
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no database connection available")
 	}
 
-	// Process deleted addons first
-	if deletedAddonsStr != "" {
-		deletedAddonIDs := strings.Split(deletedAddonsStr, ",")
-		for _, idStr := range deletedAddonIDs {
-			idStr = strings.TrimSpace(idStr)
-			if idStr == "" {
-				continue
-			}
-
-			addonID, err := uuid.FromString(idStr)
-			if err != nil {
-				log.WithField("user_id", user.ID).
-					WithField("addon_id", idStr).
-					Warn("invalid addon ID in deleted list")
-				continue
-			}
-
-			err = s.deleteAddonUrl(c.Request.Context(), idStr, user)
-			if err != nil {
-				log.WithError(err).
-					WithField("user_id", user.ID).
-					WithField("addon_id", addonID).
-					Error("failed to delete addon URL")
-			}
+	for _, idStr := range hc.SplitIDs(deletedAddonsStr) {
+		if err := s.deleteAddonUrl(ctx, idStr, user); err != nil {
+			log.WithError(err).
+				WithField("user_id", user.ID).
+				WithField("addon_id", idStr).
+				Error("failed to delete addon URL")
 		}
 	}
 
-	// Get user's remaining addons
-	addons, err := models.GetAllUserStremioAddonUrls(c.Request.Context(), db, user.ID)
+	addons, err := models.GetAllUserStremioAddonUrls(ctx, db, user.ID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get user addon URLs")
 	}
 
-	// Update enabled status for each addon based on form data
-	for _, addon := range addons {
-		enabledFieldName := "addon_" + addon.ID.String() + "_enabled"
-		enabled := c.PostForm(enabledFieldName) == "on"
+	// One UPDATE per row that changed, rather than one per changed field:
+	// a reorder that also toggles a row used to write it twice.
+	order := hc.NewListOrder(addonOrder)
+	for i := range addons {
+		addon := &addons[i]
+		changed := false
 
-		if addon.Enabled != enabled {
+		if enabled := isEnabled(addon.ID); addon.Enabled != enabled {
 			addon.Enabled = enabled
-			err = models.UpdateStremioAddonUrl(c.Request.Context(), db, &addon)
-			if err != nil {
-				return errors.Wrap(err, "failed to update addon URL")
-			}
+			changed = true
 		}
-	}
-
-	// Handle addon reordering if order is provided
-	if addonOrder != "" {
-		orderSlice := strings.Split(addonOrder, ",")
-		for i, idStr := range orderSlice {
-			idStr = strings.TrimSpace(idStr)
-			if idStr == "" {
-				continue
-			}
-
-			addonID, err := uuid.FromString(idStr)
-			if err != nil {
-				continue // skip invalid IDs
-			}
-
-			// Find addon and update priority
-			for _, addon := range addons {
-				if addon.ID == addonID {
-					newPriority := int16(len(orderSlice) - i) // Higher index = lower priority
-					if addon.Priority != newPriority {
-						addon.Priority = newPriority
-						err = models.UpdateStremioAddonUrl(c.Request.Context(), db, &addon)
-						if err != nil {
-							log.WithError(err).
-								WithField("user_id", user.ID).
-								WithField("addon_id", addon.ID).
-								Error("failed to update addon URL priority")
-						}
-					}
-					break
-				}
-			}
+		if priority, ok := order.Priority(addon.ID.String()); ok && addon.Priority != priority {
+			addon.Priority = priority
+			changed = true
+		}
+		if !changed {
+			continue
+		}
+		if err := models.UpdateStremioAddonUrl(ctx, db, addon); err != nil {
+			return errors.Wrap(err, "failed to update addon URL")
 		}
 	}
 

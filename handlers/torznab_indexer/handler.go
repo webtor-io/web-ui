@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
+	hc "github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -199,7 +200,7 @@ func (s *Handler) updateIndexers(ctx context.Context, deletedStr, orderStr strin
 		return errors.New("no database connection available")
 	}
 
-	for _, idStr := range splitIDs(deletedStr) {
+	for _, idStr := range hc.SplitIDs(deletedStr) {
 		if err := s.deleteIndexer(ctx, idStr, user); err != nil {
 			log.WithError(err).
 				WithField("user_id", user.ID).
@@ -213,7 +214,7 @@ func (s *Handler) updateIndexers(ctx context.Context, deletedStr, orderStr strin
 		return errors.Wrap(err, "failed to get user indexers")
 	}
 
-	order := splitIDs(orderStr)
+	order := hc.NewListOrder(orderStr)
 	for i := range indexers {
 		indexer := &indexers[i]
 		changed := false
@@ -222,14 +223,9 @@ func (s *Handler) updateIndexers(ctx context.Context, deletedStr, orderStr strin
 			indexer.Enabled = enabled
 			changed = true
 		}
-		if pos := indexOf(order, indexer.ID.String()); pos >= 0 {
-			// Higher index in the submitted order = lower priority, same
-			// convention as the addon list.
-			priority := int16(len(order) - pos)
-			if indexer.Priority != priority {
-				indexer.Priority = priority
-				changed = true
-			}
+		if priority, ok := order.Priority(indexer.ID.String()); ok && indexer.Priority != priority {
+			indexer.Priority = priority
+			changed = true
 		}
 		if !changed {
 			continue
@@ -296,9 +292,15 @@ func (s *Handler) refreshCaps(c *gin.Context) {
 		return
 	}
 
-	// The row shows the derived label, not the bare server title — see
+	// The row shows the derived label, not the bare server title — and a
+	// caps refresh must not undo the name learned from the feed's own
+	// results, which is the one the user recognises. See
 	// models.TorznabIndexer.GetName.
-	display := (&models.TorznabIndexer{Name: &name, Url: indexer.Url}).GetName()
+	display := (&models.TorznabIndexer{
+		Name:        &name,
+		Url:         indexer.Url,
+		TrackerName: indexer.TrackerName,
+	}).GetName()
 	c.JSON(http.StatusOK, refreshCapsResponse{
 		ID:        indexerID.String(),
 		Name:      display,
@@ -306,25 +308,3 @@ func (s *Handler) refreshCaps(c *gin.Context) {
 	})
 }
 
-func splitIDs(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-func indexOf(ids []string, want string) int {
-	for i, id := range ids {
-		if id == want {
-			return i
-		}
-	}
-	return -1
-}
