@@ -1,7 +1,8 @@
 # Discover — Calendar View
 
-Статус: **v1 shipped** (2026-05-20). Local-only — push/deploy ещё не выполнен.
+Статус: **v1 в проде**. Коммит `81be751` от 2026-05-21, в `origin/main`; в прод уехал не позже 2026-06-10 (входит в задеплоенную `sha-74ff5ab`).
 Дата фиксации плана: 2026-05-20.
+**Adoption-замер не проведён** — секция «После запуска — что мерим» так и осталась незакрытой (на 2026-08-15). Цифр по `discover-view-mode-calendar` / `discover-calendar-shown` нет.
 Связано: `docs/release_sub_fake_door.md` — параллельный эксперимент в том же "future-engagement" кластере (Calendar — pull, fake-door — push).
 
 ## v1 — что вошло
@@ -270,3 +271,10 @@ Properties: `catalog_id`, `addon_base_url`, `tier`, `is_anon`, `episodes_in_wind
 - Если **fake-door passes** но **Calendar fails** → юзер хочет push, но не pull discovery. Уходим в email digest + Telegram bot.
 
 Поэтому **запускать параллельно** — правильно: они проверяют **смежные**, но не идентичные гипотезы, и любая комбинация исходов даёт ясный next step.
+
+### Где мы по факту (на 2026-08-15)
+
+- **Fake-door: завершён 2026-05-24, failed на агрегате.** Aggregate CTR 2.2% (<5% gate), free 1.3%, paid 13.6%. Баннер выключен (`prepareReleaseSubscribeBanner` возвращает `nil`). Разбор — `docs/release_sub_fake_door.md`.
+- **Calendar: adoption не измерен.** Ни одна из четырёх метрик выше не снята, хотя фича в проде с начала июня.
+
+Значит развилка «fake-door fails + Calendar ?» осталась неразрешённой: pull-половина кластера формально не проверена. Вывод fake-door'а (future-engagement работает только на платных) — пока единственный сигнал по кластеру, и на free-аудитории он отрицательный. Прежде чем вкладываться в iCal/push/standalone-calendar, надо снять adoption по Calendar с той же tier-сегментацией (см. `feedback_validate_cluster_not_feature.md` — гейт на смешанной аудитории всегда сегментируем по тарифу).
