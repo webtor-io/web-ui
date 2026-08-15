@@ -157,8 +157,18 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 }
 
 // listPageSize bounds a single rest-api listing page while looking for the
-// file a stream means.
-const listPageSize = 100
+// file a stream means. rest-api caps a page at 1000 and serves listings from
+// the lightweight torrent-store manifest, so one page covers all but the
+// largest torrents — same size services/libfs uses, and ~10x fewer round
+// trips than a 100-item page on a season pack.
+const listPageSize = 1000
+
+// torrentLister is the slice of *api.Api the file picker needs. Narrowed to
+// an interface so the selection rules are testable without an HTTP client
+// behind them; services/libfs declares the same one for the same reason.
+type torrentLister interface {
+	ListResourceContentCached(ctx context.Context, c *api.Claims, infohash string, args *api.ListResourceContentArgs) (*ra.ListResponse, error)
+}
 
 // PickPrimaryFileIdx returns the natural file index a stream should play when
 // its source never said which file it meant.
@@ -178,35 +188,7 @@ func (s *LinkResolver) PickPrimaryFileIdx(ctx context.Context, apiClaims *api.Cl
 	if s.api == nil {
 		return 0, errors.New("api service is not configured")
 	}
-	var (
-		bestIdx  int
-		bestSize int64
-		found    bool
-		offset   uint
-	)
-	for {
-		resp, err := s.api.ListResourceContentCached(ctx, apiClaims, hash, &api.ListResourceContentArgs{
-			Limit:  listPageSize,
-			Offset: offset,
-		})
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to list resource content")
-		}
-		if resp == nil {
-			break
-		}
-		if idx, size, ok := pickLargestVideo(resp.Items); ok && (!found || size > bestSize) {
-			bestIdx, bestSize, found = idx, size, true
-		}
-		if (resp.Count - int(offset)) <= len(resp.Items) {
-			break
-		}
-		offset += listPageSize
-	}
-	if !found {
-		return 0, errors.New("torrent has no video file")
-	}
-	return bestIdx, nil
+	return pickFileIdx(ctx, s.api, apiClaims, hash, nil)
 }
 
 // PickEpisodeFileIdx returns the index of the file holding a given episode,
@@ -221,17 +203,20 @@ func (s *LinkResolver) PickEpisodeFileIdx(ctx context.Context, apiClaims *api.Cl
 	if s.api == nil {
 		return 0, errors.New("api service is not configured")
 	}
-	var (
-		bestIdx  int
-		bestSize int64
-		found    bool
-		fbIdx    int
-		fbSize   int64
-		fbFound  bool
-		offset   uint
-	)
+	return pickFileIdx(ctx, s.api, apiClaims, hash, newEpisodeMatcher(season, episode))
+}
+
+// pickFileIdx walks a torrent's listing and returns the index of the video
+// file to play: the largest one the preferred predicate accepts, or — when
+// nothing does — the largest video overall.
+//
+// The fallback is what makes the predicate safe to be strict: a pack whose
+// files are named in a way no pattern covers still plays something.
+func pickFileIdx(ctx context.Context, lister torrentLister, apiClaims *api.Claims, hash string, preferred func(ra.ListItem) bool) (int, error) {
+	var best, fallback largestVideo
+	var offset uint
 	for {
-		resp, err := s.api.ListResourceContentCached(ctx, apiClaims, hash, &api.ListResourceContentArgs{
+		resp, err := lister.ListResourceContentCached(ctx, apiClaims, hash, &api.ListResourceContentArgs{
 			Limit:  listPageSize,
 			Offset: offset,
 		})
@@ -245,72 +230,84 @@ func (s *LinkResolver) PickEpisodeFileIdx(ctx context.Context, apiClaims *api.Cl
 			if item.MediaFormat != ra.Video {
 				continue
 			}
-			if matchesEpisode(item.PathStr, season, episode) {
-				if !found || item.Size > bestSize {
-					bestIdx, bestSize, found = item.Index, item.Size, true
-				}
+			if preferred != nil && preferred(item) {
+				best.offer(item)
 				continue
 			}
-			if !fbFound || item.Size > fbSize {
-				fbIdx, fbSize, fbFound = item.Index, item.Size, true
-			}
+			fallback.offer(item)
 		}
-		if (resp.Count - int(offset)) <= len(resp.Items) {
+		// Advance by what the page actually held, not by what was asked
+		// for: a server free to return fewer items than the limit would
+		// otherwise have whole blocks of files skipped silently. An empty
+		// page ends the walk rather than looping on the same offset.
+		if len(resp.Items) == 0 || (resp.Count-int(offset)) <= len(resp.Items) {
 			break
 		}
-		offset += listPageSize
+		offset += uint(len(resp.Items))
 	}
-	if found {
-		return bestIdx, nil
+	if best.found {
+		return best.idx, nil
 	}
-	if fbFound {
-		return fbIdx, nil
+	if fallback.found {
+		return fallback.idx, nil
 	}
 	return 0, errors.New("torrent has no video file")
 }
 
-// matchesEpisode reports whether a file path names the given episode. The
-// patterns are the two spellings that actually appear in release names —
-// S01E05 (with any separator) and 1x05 — anchored on non-digits so S01E05
-// does not also match S01E050.
-func matchesEpisode(path string, season, episode int) bool {
-	if season <= 0 || episode <= 0 {
-		return false
+// largestVideo keeps the biggest item offered to it.
+type largestVideo struct {
+	idx   int
+	size  int64
+	found bool
+}
+
+func (l *largestVideo) offer(item ra.ListItem) {
+	if !l.found || item.Size > l.size {
+		l.idx, l.size, l.found = item.Index, item.Size, true
 	}
-	name := strings.ToLower(path)
-	for _, tpl := range []string{
-		fmt.Sprintf(`s0*%d[\s._-]*e0*%d(\D|$)`, season, episode),
-		fmt.Sprintf(`(\D|^)0*%dx0*%d(\D|$)`, season, episode),
-	} {
-		re, err := regexp.Compile(`(?i)` + tpl)
+}
+
+// episodeMarkers are the ways a file inside a pack names its episode. The
+// first two are the international spellings — S01E05 with any separator, and
+// 1x05. The last is the RU one: season packs from RU trackers routinely name
+// files "05 серия" with the season only in the directory above, so the
+// season number is not required there — the pack is already the season.
+//
+// %[1]d is the season, %[2]d the episode. The (\D|^) guards keep S01E05 from
+// matching S01E050.
+var episodeMarkers = []string{
+	`s0*%[1]d[\s._-]*e0*%[2]d(\D|$)`,
+	`(\D|^)0*%[1]dx0*%[2]d(\D|$)`,
+	`(\D|^)0*%[2]d\s*(?:-?я\s*)?(?:сери[яйи]|эпизод)`,
+	`(?:сери[яйи]|эпизод)[\s._-]*0*%[2]d(\D|$)`,
+}
+
+// newEpisodeMatcher compiles the episode patterns once for a whole listing
+// walk. Compiling them per file cost a torrent-sized number of compilations
+// on every playback click.
+func newEpisodeMatcher(season, episode int) func(ra.ListItem) bool {
+	if season <= 0 || episode <= 0 {
+		return nil
+	}
+	res := make([]*regexp.Regexp, 0, len(episodeMarkers))
+	for _, tpl := range episodeMarkers {
+		re, err := regexp.Compile(`(?i)` + fmt.Sprintf(tpl, season, episode))
 		if err != nil {
 			continue
 		}
-		if re.MatchString(name) {
-			return true
-		}
+		res = append(res, re)
 	}
-	return false
+	return func(item ra.ListItem) bool {
+		name := strings.ToLower(item.PathStr)
+		for _, re := range res {
+			if re.MatchString(name) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
-// pickLargestVideo returns the index and size of the largest video file in a
-// listing page, and whether the page held one at all.
-func pickLargestVideo(items []ra.ListItem) (int, int64, bool) {
-	var (
-		bestIdx  int
-		bestSize int64
-		found    bool
-	)
-	for _, item := range items {
-		if item.MediaFormat != ra.Video {
-			continue
-		}
-		if !found || item.Size > bestSize {
-			bestIdx, bestSize, found = item.Index, item.Size, true
-		}
-	}
-	return bestIdx, bestSize, found
-}
 
 // CheckTorrentAvailability answers, for a stream whose file is not known yet
 // (see stremio.StreamItem.FileIdxUnknown), the two things that do not depend

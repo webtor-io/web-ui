@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -253,22 +251,14 @@ func (s *EnrichStream) generateRedirectURL(stream *StreamItem, contentID string)
 	return fmt.Sprintf("%s/%s/%s/stremio/resolve/%s", s.domain, sv.AccessTokenParamName, s.token, tokenString)
 }
 
-// episodeFromContentID splits Stremio's "tt0903747:1:5" into season and
-// episode. Movies carry no episode and yield ok=false.
+// episodeFromContentID reads the season and episode out of Stremio's
+// "tt0903747:1:5". Movies carry no episode and yield ok=false.
 func episodeFromContentID(contentID string) (int, int, bool) {
-	parts := strings.Split(strings.TrimSpace(contentID), ":")
-	if len(parts) < 3 {
+	_, season, episode := parseContentID(contentID)
+	if season == nil || episode == nil {
 		return 0, 0, false
 	}
-	season, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-	if err != nil {
-		return 0, 0, false
-	}
-	episode, err := strconv.Atoi(strings.TrimSpace(parts[2]))
-	if err != nil {
-		return 0, 0, false
-	}
-	return season, episode, true
+	return *season, *episode, true
 }
 
 func (s *EnrichStream) updateStreamName(name string, availability *common.CheckAvailabilityResult) string {
