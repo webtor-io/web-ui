@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Подписка удалена",
     "profile.subscriptions.prefs": "Качество и язык",
     "profile.subscriptions.prefsHint": "Скопированы из настроек стриминга в момент подписки. Здесь их можно сузить — на что именно присылать письма.",
+    "profile.subscriptions.prefsAny": "Любое качество, любой язык",
+    "profile.subscriptions.prefsCancel": "Отмена",
     "profile.embedDomains.title": "Домены для встраивания",
     "profile.embedDomains.placeholder": "Введите домен (напр., example.com)",
     "profile.embedDomains.validation": "Введите корректное имя домена",

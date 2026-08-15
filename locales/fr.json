@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Abonnement supprimé",
     "profile.subscriptions.prefs": "Qualité et langue",
     "profile.subscriptions.prefsHint": "Copiées depuis vos réglages de lecture au moment de l'abonnement. Modifiez-les ici pour restreindre ce que cet abonnement signale.",
+    "profile.subscriptions.prefsAny": "Toute qualité, toute langue",
+    "profile.subscriptions.prefsCancel": "Annuler",
     "profile.embedDomains.title": "Domaines d'intégration",
     "profile.embedDomains.placeholder": "Saisissez un domaine (ex. example.com)",
     "profile.embedDomains.validation": "Veuillez saisir un nom de domaine valide",

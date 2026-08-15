@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Subskrypcja usunięta",
     "profile.subscriptions.prefs": "Jakość i język",
     "profile.subscriptions.prefsHint": "Skopiowane z ustawień odtwarzania w chwili subskrypcji. Tutaj możesz zawęzić, o czym ta subskrypcja ma informować.",
+    "profile.subscriptions.prefsAny": "Dowolna jakość, dowolny język",
+    "profile.subscriptions.prefsCancel": "Anuluj",
     "profile.embedDomains.title": "Domeny embed",
     "profile.embedDomains.placeholder": "Wpisz domenę (np. example.com)",
     "profile.embedDomains.validation": "Wpisz prawidłową nazwę domeny",

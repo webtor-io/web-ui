@@ -44,8 +44,9 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 		"timeAgoLang": func(lang string, tm time.Time) string { return "1 hour ago" },
 		// The real vocabulary and language list, so the per-row preference
 		// editor is exercised with what it actually renders.
-		"stremioResolutions": stremioHelper.StremioResolutions,
-		"stremioLanguages":   stremioHelper.StremioLanguages,
+		"stremioResolutions":  stremioHelper.StremioResolutions,
+		"stremioLanguages":    stremioHelper.StremioLanguages,
+		"stremioLanguageName": stremioHelper.StremioLanguageName,
 	}
 	tpl, err := template.New("subscriptions.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/profile/subscriptions.html")
@@ -140,10 +141,17 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			// The per-row preference editor renders for every row: the
 			// resolution vocabulary and the language dropdown.
 			if len(tt.data) > 0 {
-				for _, want := range []string{"_res\" value=\"1080p", "_lang", "Quality and language"} {
+				// The editor is a dialog behind a gear, and its fields have
+				// to sit inside the section's form to be submitted with it.
+				for _, want := range []string{"prefs-subscription", "<dialog", "_res\" value=\"1080p", "_lang", "Quality and language"} {
 					if !strings.Contains(out, want) {
 						t.Errorf("preference editor is missing %q:\n%s", want, out)
 					}
+				}
+				// A nested <form> would be dropped by the parser, taking the
+				// dialog's fields out of the submission with it.
+				if strings.Contains(out, "method=\"dialog\"") {
+					t.Errorf("the dialog carries a nested form:\n%s", out)
 				}
 			}
 		})

@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Odběr smazán",
     "profile.subscriptions.prefs": "Kvalita a jazyk",
     "profile.subscriptions.prefsHint": "Zkopírováno z tvého nastavení streamování při zapnutí odběru. Tady je můžeš zúžit — o čem má odběr psát.",
+    "profile.subscriptions.prefsAny": "Jakákoli kvalita, jakýkoli jazyk",
+    "profile.subscriptions.prefsCancel": "Zrušit",
     "profile.embedDomains.title": "Domény pro embed",
     "profile.embedDomains.placeholder": "Zadej doménu (např. example.com)",
     "profile.embedDomains.validation": "Zadej platný název domény",

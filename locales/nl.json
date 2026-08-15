@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Abonnement verwijderd",
     "profile.subscriptions.prefs": "Kwaliteit en taal",
     "profile.subscriptions.prefsHint": "Overgenomen uit je streaminginstellingen toen je je abonneerde. Pas ze hier aan om te beperken waarover dit abonnement bericht.",
+    "profile.subscriptions.prefsAny": "Elke kwaliteit, elke taal",
+    "profile.subscriptions.prefsCancel": "Annuleren",
     "profile.embedDomains.title": "Embed-domeinen",
     "profile.embedDomains.placeholder": "Voer domein in (bijv., example.com)",
     "profile.embedDomains.validation": "Voer een geldige domeinnaam in",

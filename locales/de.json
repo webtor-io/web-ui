@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Abo gelöscht",
     "profile.subscriptions.prefs": "Qualität und Sprache",
     "profile.subscriptions.prefsHint": "Beim Abonnieren aus deinen Stream-Einstellungen übernommen. Hier kannst du eingrenzen, worüber dieses Abo berichtet.",
+    "profile.subscriptions.prefsAny": "Beliebige Qualität, beliebige Sprache",
+    "profile.subscriptions.prefsCancel": "Abbrechen",
     "profile.embedDomains.title": "Einbettungsdomains",
     "profile.embedDomains.placeholder": "Domain eingeben (z.B. example.com)",
     "profile.embedDomains.validation": "Bitte gib einen gültigen Domainnamen ein",

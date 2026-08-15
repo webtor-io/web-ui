@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Assinatura excluída",
     "profile.subscriptions.prefs": "Qualidade e idioma",
     "profile.subscriptions.prefsHint": "Copiados das suas configurações de streaming quando você assinou. Altere aqui para restringir o que esta assinatura avisa.",
+    "profile.subscriptions.prefsAny": "Qualquer qualidade, qualquer idioma",
+    "profile.subscriptions.prefsCancel": "Cancelar",
     "profile.embedDomains.title": "Domínios para embed",
     "profile.embedDomains.placeholder": "Informe o domínio (ex.: example.com)",
     "profile.embedDomains.validation": "Informe um nome de domínio válido",

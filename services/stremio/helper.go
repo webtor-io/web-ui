@@ -24,6 +24,18 @@ func (s *Helper) StremioResolutions() []string {
 	return out
 }
 
+// StremioLanguageName resolves a language code to its display name, or ""
+// when the code is unknown. Templates need it to render a stored preference
+// ("ru") as something readable ("Russian") without carrying the whole list.
+//
+// Template usage: {{ stremioLanguageName "ru" }}.
+func (s *Helper) StremioLanguageName(code string) string {
+	if l := LanguageByCode(code); l != nil {
+		return l.Name
+	}
+	return ""
+}
+
 // StremioLanguages returns the canonical, ordered list of supported
 // languages for the Stremio addon's "preferred language" dropdown.
 // Template usage: {{ range stremioLanguages }} ... {{ end }}.

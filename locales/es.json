@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Suscripción eliminada",
     "profile.subscriptions.prefs": "Calidad e idioma",
     "profile.subscriptions.prefsHint": "Copiados de tus ajustes de streaming al suscribirte. Cámbialos aquí para acotar lo que esta suscripción avisa.",
+    "profile.subscriptions.prefsAny": "Cualquier calidad, cualquier idioma",
+    "profile.subscriptions.prefsCancel": "Cancelar",
     "profile.embedDomains.title": "Dominios de incrustación",
     "profile.embedDomains.placeholder": "Introduce un dominio (ej., example.com)",
     "profile.embedDomains.validation": "Introduce un nombre de dominio válido",

@@ -287,6 +287,8 @@
     "profile.subscriptions.deleted": "Abonelik silindi",
     "profile.subscriptions.prefs": "Kalite ve dil",
     "profile.subscriptions.prefsHint": "Abone olurken yayın ayarlarından kopyalandı. Bu aboneliğin neleri bildireceğini buradan daraltabilirsin.",
+    "profile.subscriptions.prefsAny": "Her kalite, her dil",
+    "profile.subscriptions.prefsCancel": "İptal",
     "profile.embedDomains.title": "Embed alan adları",
     "profile.embedDomains.placeholder": "Alan adı gir (örn., example.com)",
     "profile.embedDomains.validation": "Geçerli bir alan adı gir",

@@ -310,6 +310,8 @@
     "profile.subscriptions.deleted": "Subscription deleted",
     "profile.subscriptions.prefs": "Quality and language",
     "profile.subscriptions.prefsHint": "Copied from your stream settings when you subscribed. Change them here to narrow what this subscription reports.",
+    "profile.subscriptions.prefsAny": "Any quality, any language",
+    "profile.subscriptions.prefsCancel": "Cancel",
     "profile.embedDomains.title": "Embed Domains",
     "profile.embedDomains.placeholder": "Enter domain (e.g., example.com)",
     "profile.embedDomains.validation": "Please enter a valid domain name",
