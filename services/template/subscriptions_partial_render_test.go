@@ -3,12 +3,14 @@ package template
 import (
 	"bytes"
 	"html/template"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // TestSubscriptionsPartialRenders parses and executes the profile
@@ -20,9 +22,19 @@ import (
 // waiting for its first poll, an active season, a movie with no poster and
 // no title (metadata lookup failed on subscribe), and a finished one.
 func TestSubscriptionsPartialRenders(t *testing.T) {
+	// Real translation helpers for the same reason as the banner test: a
+	// key-echoing stub cannot tell `t` from `tp`, and the difference is
+	// what puts "<no value>" on the page.
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
 	funcs := template.FuncMap{
-		"t":           func(lang, key string, args ...interface{}) string { return key },
-		"tp":          func(lang, key string, args ...interface{}) string { return key },
+		"t":           helper.T,
+		"tp":          helper.Tp,
 		"langPath":    func(lang, p string) string { return p },
 		"asset":       func(p string) template.HTML { return template.HTML("<script src=\"" + p + "\"></script>") },
 		"isPaid":      func(_ interface{}) bool { return false },
@@ -109,8 +121,15 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			if err := tpl.ExecuteTemplate(&buf, "profile/subscriptions", ctx); err != nil {
 				t.Fatalf("failed to render partial: %v", err)
 			}
-			if !strings.Contains(buf.String(), "profile.subscriptions.title") {
-				t.Error("rendered output is missing the section heading")
+			out := buf.String()
+			if !strings.Contains(out, "Release subscriptions") {
+				t.Errorf("rendered output is missing the section heading:\n%s", out)
+			}
+			if strings.Contains(out, "<no value>") {
+				t.Errorf("a template parameter did not arrive:\n%s", out)
+			}
+			if strings.Contains(out, "profile.subscriptions.") {
+				t.Errorf("an untranslated message key reached the page:\n%s", out)
 			}
 		})
 	}

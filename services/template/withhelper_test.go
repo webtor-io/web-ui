@@ -18,10 +18,15 @@ func (thCtx) GetGinContext() *gin.Context { return nil }
 type testHelper struct{}
 
 func (testHelper) Greet(name string) string          { return "hi " + name }
-func (testHelper) Safe() template.HTML                { return template.HTML("<b>x</b>") }
-func (testHelper) Tp(key string, args ...any) string  { return fmt.Sprintf("%s:%v", key, args) }
-func (testHelper) Num(n int) int                      { return n * 2 }
-func (testHelper) Deref(p *string) string             { if p == nil { return "" }; return *p }
+func (testHelper) Safe() template.HTML               { return template.HTML("<b>x</b>") }
+func (testHelper) Tp(key string, args ...any) string { return fmt.Sprintf("%s:%v", key, args) }
+func (testHelper) Num(n int) int                     { return n * 2 }
+func (testHelper) Deref(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
 
 func TestWithHelperBoundMethods(t *testing.T) {
 	m := &Manager[thCtx]{funcs: FuncMap{}}

@@ -9,13 +9,16 @@
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <div class="flex-1 min-w-0">
             <h3 class="font-semibold text-base mb-1">
-                {{ if $b.Subscribed }}{{ t .Lang "release_sub.subscribed_title" }}{{ else }}{{ t .Lang "release_sub.banner_title" }}{{ end }}
+                {{/* Both titles name the season, so both need tp — with t
+                     the parameter never arrives and the line renders
+                     "<no value>". */}}
+                {{ if $b.Subscribed }}{{ tp .Lang "release_sub.subscribed_title" "Season" $b.Season }}{{ else }}{{ tp .Lang "release_sub.banner_title" "Season" $b.Season }}{{ end }}
             </h3>
             <p class="text-sm text-w-sub leading-relaxed">
                 {{ if $b.Subscribed }}
-                    {{ tp .Lang "release_sub.subscribed_desc" "Season" $b.Season }}
+                    {{ t .Lang "release_sub.subscribed_desc" }}
                 {{ else }}
-                    {{ tp .Lang "release_sub.banner_desc" "Season" $b.Season }}
+                    {{ t .Lang "release_sub.banner_desc" }}
                 {{ end }}
             </p>
         </div>
