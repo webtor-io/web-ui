@@ -989,17 +989,21 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                                 class={chipClass(sn === activeSeason, 'xs')}
                                 onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
                             >
-                                {sn === 0 ? t('discover.specials') : `S${sn}`}
                                 {/* A season that still has episodes coming
                                     says so on its own chip — it is why the
-                                    bell next to it exists. */}
-                                {airingSeasons.has(sn) && <OnAirDot />}
+                                    bell next to it exists. The label and the
+                                    dot share one flex line so the chip keeps
+                                    its height and the label its centre. */}
+                                <span class="inline-flex items-center gap-1.5 leading-none">
+                                    {sn === 0 ? t('discover.specials') : `S${sn}`}
+                                    {airingSeasons.has(sn) && <OnAirDot />}
+                                </span>
                             </button>
                         ))}
                     </div>
                 )}
                 {seasonNums.length <= 1 && airingSeasons.has(activeSeason) && (
-                    <span class="inline-flex items-center gap-1.5 text-xs text-w-cyan">
+                    <span class="inline-flex items-center gap-1.5 text-xs text-w-cyan leading-none">
                         <OnAirDot />
                         {t('discover.subscriptions.onAir')}
                     </span>

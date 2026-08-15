@@ -8,13 +8,18 @@
      data-async-layout="{{`{{ template "resource/release_subscribe_banner" $ }}`}}">
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <div class="flex-1 min-w-0">
-            <span class="inline-flex items-center gap-1.5 badge badge-sm bg-w-cyan/10 text-w-cyan border-0 uppercase tracking-widest font-semibold mb-1.5">
-                <span class="relative inline-flex h-1.5 w-1.5">
-                    <span class="absolute inline-flex h-full w-full rounded-full bg-w-cyan opacity-60 motion-safe:animate-ping"></span>
-                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-w-cyan"></span>
+            {{/* Own block, not an inline sibling of the heading: as an
+                 inline badge its margin collapsed against the h3 and the two
+                 sat on top of each other. */}}
+            <div class="mb-2.5">
+                <span class="inline-flex items-center gap-1.5 badge badge-sm bg-w-cyan/10 text-w-cyan border-0 uppercase tracking-widest font-semibold">
+                    <span class="relative flex h-1.5 w-1.5 shrink-0">
+                        <span class="absolute inline-flex h-full w-full rounded-full bg-w-cyan opacity-60 motion-safe:animate-ping"></span>
+                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-w-cyan"></span>
+                    </span>
+                    {{ t .Lang "release_sub.on_air" }}
                 </span>
-                {{ t .Lang "release_sub.on_air" }}
-            </span>
+            </div>
             <h3 class="font-semibold text-base mb-1">
                 {{/* Both titles name the season, so both need tp — with t
                      the parameter never arrives and the line renders

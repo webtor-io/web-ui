@@ -47,9 +47,14 @@ export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm
 // OnAirDot marks a season that is still being broadcast. A pulsing dot
 // rather than a word: it sits inside a season chip that is already only two
 // characters wide.
+//
+// The dot is 6px tall inside a chip whose line box is ~20px, so it has to be
+// laid out as a flex item — as an inline box it added its own baseline
+// descender to the line, growing the chip and pushing the label off centre.
+// See the wrapper in EpisodePicker.
 export function OnAirDot() {
     return (
-        <span class="relative inline-flex ml-1.5 h-1.5 w-1.5 align-middle" aria-hidden="true">
+        <span class="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
             <span class="absolute inline-flex h-full w-full rounded-full bg-w-cyan opacity-60 motion-safe:animate-ping"></span>
             <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-w-cyan"></span>
         </span>
