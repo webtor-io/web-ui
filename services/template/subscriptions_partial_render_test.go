@@ -141,17 +141,17 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			// The per-row preference editor renders for every row: the
 			// resolution vocabulary and the language dropdown.
 			if len(tt.data) > 0 {
-				// The editor is a dialog behind a gear, and its fields have
-				// to sit inside the section's form to be submitted with it.
-				for _, want := range []string{"prefs-subscription", "<dialog", "_res\" value=\"1080p", "_lang", "Quality and language"} {
+				// The editor is a dialog behind a gear, built like every
+				// other modal in the product: modal-box, its own form
+				// posting to its own endpoint, method="dialog" to close.
+				for _, want := range []string{
+					"prefs-subscription", "<dialog", "modal-box",
+					"/subscription/preferences/", `name="res" value="1080p"`, `name="lang"`,
+					`method="dialog"`, "Quality and language",
+				} {
 					if !strings.Contains(out, want) {
-						t.Errorf("preference editor is missing %q:\n%s", want, out)
+						t.Errorf("preference dialog is missing %q:\n%s", want, out)
 					}
-				}
-				// A nested <form> would be dropped by the parser, taking the
-				// dialog's fields out of the submission with it.
-				if strings.Contains(out, "method=\"dialog\"") {
-					t.Errorf("the dialog carries a nested form:\n%s", out)
 				}
 			}
 		})

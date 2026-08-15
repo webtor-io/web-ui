@@ -86,6 +86,7 @@ func (h *Handler) routes(r gin.IRouter) {
 	fr.POST("/add", h.formAdd)
 	fr.POST("/delete/:id", h.formDelete)
 	fr.POST("/update", h.formUpdate)
+	fr.POST("/preferences/:id", h.formPreferences)
 
 	// Deliberately outside the auth group: this is the link in an email,
 	// and the signed token is what authorizes it. Requiring a session would
@@ -307,16 +308,36 @@ func (h *Handler) formDelete(c *gin.Context) {
 // per-row enable toggle. There is no order to apply — subscriptions have no
 // priority between them — so of the shared list-form fields only two are
 // read.
+// formPreferences saves one subscription's quality and language overrides.
+// Its own endpoint, and its own dialog: the bulk list form handles what the
+// rows show, this handles what one subscription watches for.
+func (h *Handler) formPreferences(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	id, err := uuid.FromString(c.Param("id"))
+	if err != nil {
+		web.RedirectWithError(c, web.NewUserError("error.subscriptionFailed", err))
+		return
+	}
+	resolutions := c.PostFormArray("res")
+	// Every box ticked is the same as no preference, and storing it that way
+	// keeps the poller from re-deriving it on every run.
+	if len(resolutions) == len(allResolutions) {
+		resolutions = nil
+	}
+	if err := h.svc.SetPreferences(c.Request.Context(), user.ID, id, resolutions, c.PostForm("lang")); err != nil {
+		log.WithError(err).WithField("feature", "release_subscription").Error("failed to save subscription preferences")
+		web.RedirectWithError(c, err)
+		return
+	}
+	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
+}
+
 func (h *Handler) formUpdate(c *gin.Context) {
 	deleted := c.PostForm("deleted_subscriptions")
 	isEnabled := func(id uuid.UUID) bool {
 		return c.PostForm("subscription_"+id.String()+"_enabled") == "on"
 	}
-	prefs := func(id uuid.UUID) ([]string, string) {
-		return c.PostFormArray("subscription_" + id.String() + "_res"),
-			c.PostForm("subscription_" + id.String() + "_lang")
-	}
-	if err := h.updateSubscriptions(c, deleted, isEnabled, prefs); err != nil {
+	if err := h.updateSubscriptions(c, deleted, isEnabled); err != nil {
 		log.WithError(err).WithField("feature", "release_subscription").Error("form update failed")
 		web.RedirectWithError(c, err)
 		return
@@ -346,7 +367,7 @@ func (h *Handler) unsubscribeByToken(c *gin.Context) {
 // updateSubscriptions applies deletions first, then writes only the rows
 // whose toggle actually moved. isEnabled is passed in so this half stays
 // free of gin.Context.
-func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabled func(uuid.UUID) bool, prefs func(uuid.UUID) ([]string, string)) error {
+func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabled func(uuid.UUID) bool) error {
 	ctx := c.Request.Context()
 	user := auth.GetUserFromContext(c)
 
@@ -365,42 +386,20 @@ func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabl
 		return err
 	}
 	for _, sub := range subs {
-		if want := isEnabled(sub.ID); want != sub.Enabled {
-			if err := h.svc.SetEnabled(ctx, user.ID, sub.ID, want); err != nil {
-				return err
-			}
-		}
-		resolutions, lang := prefs(sub.ID)
-		// Every box ticked is the same as no preference at all, and storing
-		// it that way keeps the poller from re-deriving it every run.
-		if len(resolutions) == len(allResolutions) {
-			resolutions = nil
-		}
-		if sameResolutions(resolutions, sub.PreferredResolutions) && lang == sub.GetPreferredLanguage() {
+		want := isEnabled(sub.ID)
+		if want == sub.Enabled {
 			continue
 		}
-		if err := h.svc.SetPreferences(ctx, user.ID, sub.ID, resolutions, lang); err != nil {
+		if err := h.svc.SetEnabled(ctx, user.ID, sub.ID, want); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// allResolutions is the vocabulary the form renders; its length is what
-// "everything is ticked" is compared against.
+// allResolutions is the vocabulary the preferences dialog renders; its
+// length is what "everything is ticked" is compared against.
 var allResolutions = stremio.NewHelper().StremioResolutions()
-
-func sameResolutions(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
 
 // --- helpers ---
 

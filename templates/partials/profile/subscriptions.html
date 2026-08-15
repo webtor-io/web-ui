@@ -83,46 +83,6 @@
                         </button>
                     </div>
 
-                    {{/* Inside the form on purpose: a dialog moves to the
-                         top layer visually but stays where it is in the DOM,
-                         so these fields are submitted with the rest. */}}
-                    <dialog id="subscription-prefs-{{ $sub.ID }}" class="modal">
-                        <div class="modal-box max-w-sm bg-w-card border border-w-line">
-                            <h3 class="font-bold text-base mb-1">{{ t $.Lang "profile.subscriptions.prefs" }}</h3>
-                            <p class="text-xs text-w-muted mb-4">{{ $sub.GetTitle }}</p>
-
-                            <h4 class="text-sm font-semibold mb-2">{{ t $.Lang "profile.settings.resolutions" }}</h4>
-                            <div class="flex flex-wrap items-center gap-3 mb-5">
-                                {{ range $res := stremioResolutions }}
-                                <label class="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="checkbox" name="subscription_{{ $sub.ID }}_res" value="{{ $res }}" class="checkbox checkbox-sm"
-                                        {{ if $sub.WantsResolution $res }}checked{{ end }}>
-                                    <span class="text-sm">{{ $res }}</span>
-                                </label>
-                                {{ end }}
-                            </div>
-
-                            <h4 class="text-sm font-semibold mb-2">{{ t $.Lang "profile.settings.preferredLanguage" }}</h4>
-                            <select name="subscription_{{ $sub.ID }}_lang" class="select select-sm w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none">
-                                <option value="" {{ if eq $sub.GetPreferredLanguage "" }}selected{{ end }}>{{ t $.Lang "profile.settings.preferredLanguageAny" }}</option>
-                                {{ range stremioLanguages }}
-                                    <option value="{{ .Code }}" {{ if eq $sub.GetPreferredLanguage .Code }}selected{{ end }}>{{ .Flag }} {{ .Name }}</option>
-                                {{ end }}
-                            </select>
-
-                            <p class="text-xs text-w-muted mt-3">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
-
-                            <div class="modal-action">
-                                <button type="button" class="btn btn-sm btn-ghost" data-prefs-cancel>{{ t $.Lang "profile.subscriptions.prefsCancel" }}</button>
-                                <button type="button" class="btn btn-sm btn-soft" data-prefs-apply>{{ t $.Lang "profile.subscriptions.save" }}</button>
-                            </div>
-                        </div>
-                        {{/* No <form method="dialog"> for the backdrop: this
-                             dialog lives inside the settings form, and a
-                             nested form is dropped by the parser. A div the
-                             script closes on does the same job. */}}
-                        <div class="modal-backdrop" data-prefs-cancel></div>
-                    </dialog>
                 </li>
                 {{ end }}
 
@@ -139,6 +99,64 @@
                 <button type="submit" class="btn btn-soft" data-umami-event="subscription-save">{{ t $.Lang "profile.subscriptions.save" }}</button>
             </div>
         </form>
+
+        {{/* One dialog per subscription, outside the list form: each posts
+             on its own, the way the Vault modal does. Nesting them in the
+             list form would mean nesting a <form method="dialog"> inside
+             it, which the parser drops. */}}
+        {{ range $sub := $subs }}
+        <dialog id="subscription-prefs-{{ $sub.ID }}" class="modal">
+            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl">
+                <h3 class="text-xl font-bold tracking-tight flex items-center gap-2 w-full">
+                    <svg class="w-5 h-5 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    {{ t $.Lang "profile.subscriptions.prefs" }}
+                </h3>
+
+                <p class="pt-4 pb-2 text-sm text-w-sub">{{ $sub.GetTitle }}{{ if $sub.IsSeason }} · {{ tp $.Lang "profile.subscriptions.season" "Season" $sub.GetSeason }}{{ end }}</p>
+
+                <form method="post" data-async-push-state="false" data-async-target="#subscriptions"
+                      action="{{ langPath $.Lang (printf "/subscription/preferences/%s" $sub.ID) }}">
+                    <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
+
+                    <div class="bg-base-200/50 rounded-xl p-4 my-3">
+                        <h4 class="text-sm font-semibold mb-3">{{ t $.Lang "profile.settings.resolutions" }}</h4>
+                        <div class="flex flex-wrap items-center gap-4 mb-5">
+                            {{ range $res := stremioResolutions }}
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="res" value="{{ $res }}" class="checkbox checkbox-sm"
+                                    {{ if $sub.WantsResolution $res }}checked{{ end }}>
+                                <span class="text-sm">{{ $res }}</span>
+                            </label>
+                            {{ end }}
+                        </div>
+
+                        <h4 class="text-sm font-semibold mb-2">{{ t $.Lang "profile.settings.preferredLanguage" }}</h4>
+                        <select name="lang" class="select select-sm w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none">
+                            <option value="" {{ if eq $sub.GetPreferredLanguage "" }}selected{{ end }}>{{ t $.Lang "profile.settings.preferredLanguageAny" }}</option>
+                            {{ range stremioLanguages }}
+                                <option value="{{ .Code }}" {{ if eq $sub.GetPreferredLanguage .Code }}selected{{ end }}>{{ .Flag }} {{ .Name }}</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <p class="text-sm text-w-muted">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
+
+                    <div class="modal-action justify-center">
+                        <button type="submit" class="btn btn-soft" data-umami-event="subscription-prefs-saved">{{ t $.Lang "profile.subscriptions.save" }}</button>
+                    </div>
+                </form>
+
+                <div class="modal-action justify-center -mt-4">
+                    <form method="dialog">
+                        <button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "profile.subscriptions.prefsCancel" }}</button>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
+        {{ end }}
     </div>
 
     {{ "profile/subscriptions.js" | asset }}
