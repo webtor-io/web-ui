@@ -30,9 +30,23 @@ type subStore struct {
 	deletedIDs       []uuid.UUID
 	enabledCalls     int
 	accountLang      string
+	prefResolutions  []string
+	prefLang         string
+	savedResolutions []string
+	savedLang        *string
 }
 
 func (f *subStore) AccountLang(context.Context, uuid.UUID) string { return f.accountLang }
+
+func (f *subStore) StreamPrefs(context.Context, uuid.UUID) ([]string, string) {
+	return f.prefResolutions, f.prefLang
+}
+
+func (f *subStore) UpdatePreferences(_ context.Context, _, _ uuid.UUID, resolutions []string, lang *string) error {
+	f.savedResolutions = resolutions
+	f.savedLang = lang
+	return nil
+}
 
 func (f *subStore) Find(context.Context, uuid.UUID, string, string, *int16) (*models.ReleaseSubscription, error) {
 	return f.found, f.findErr
@@ -482,5 +496,62 @@ func TestLettersFallBackToTheSubscriptionLanguage(t *testing.T) {
 	}
 	if len(mail.on) != 1 || mail.on[0].Lang != "ru" {
 		t.Errorf("confirmation language: got %q, want the captured \"ru\"", mail.on[0].Lang)
+	}
+}
+
+// A new subscription starts as a copy of the account's stream settings, so
+// the first thing it does matches what the user already streams. From then
+// on the two are independent — only the profile row edits the subscription.
+func TestSubscribeSnapshotsAccountStreamPreferences(t *testing.T) {
+	st := &subStore{createOK: true, prefResolutions: []string{"1080p", "720p"}, prefLang: "ru"}
+	s := newTestService(st, &subMail{}, true)
+
+	if _, _, err := s.Subscribe(context.Background(), viewer, seasonReq(), -1); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if got := st.created.PreferredResolutions; len(got) != 2 || got[0] != "1080p" {
+		t.Errorf("resolutions: got %v, want the account's", got)
+	}
+	if st.created.GetPreferredLanguage() != "ru" {
+		t.Errorf("language: got %q, want \"ru\"", st.created.GetPreferredLanguage())
+	}
+}
+
+// An account with nothing narrowed subscribes to everything, and the row
+// says so by holding no preferences at all rather than a copy of the full
+// vocabulary.
+func TestSubscribeWithoutAccountPreferencesStoresNone(t *testing.T) {
+	st := &subStore{createOK: true}
+	s := newTestService(st, &subMail{}, true)
+
+	if _, _, err := s.Subscribe(context.Background(), viewer, movieReq(), -1); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if st.created.PreferredResolutions != nil || st.created.PreferredLanguage != nil {
+		t.Errorf("preferences: got %v/%v, want none", st.created.PreferredResolutions, st.created.PreferredLanguage)
+	}
+}
+
+func TestSetPreferences(t *testing.T) {
+	st := &subStore{}
+	s := newTestService(st, &subMail{}, true)
+
+	if err := s.SetPreferences(context.Background(), viewer.ID, uuid.NewV4(), []string{"4k"}, "de"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if len(st.savedResolutions) != 1 || st.savedResolutions[0] != "4k" {
+		t.Errorf("resolutions: %v", st.savedResolutions)
+	}
+	if st.savedLang == nil || *st.savedLang != "de" {
+		t.Errorf("language: %v", st.savedLang)
+	}
+
+	// "Any language" is stored as nothing, not as an empty string, so the
+	// poller's "no preference" branch is the one that runs.
+	if err := s.SetPreferences(context.Background(), viewer.ID, uuid.NewV4(), nil, "  "); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if st.savedLang != nil {
+		t.Errorf("language: got %v, want nil for \"any\"", *st.savedLang)
 	}
 }

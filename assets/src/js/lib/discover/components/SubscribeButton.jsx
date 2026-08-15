@@ -44,6 +44,18 @@ export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm
     );
 }
 
+// OnAirDot marks a season that is still being broadcast. A pulsing dot
+// rather than a word: it sits inside a season chip that is already only two
+// characters wide.
+export function OnAirDot() {
+    return (
+        <span class="relative inline-flex ml-1.5 h-1.5 w-1.5 align-middle" aria-hidden="true">
+            <span class="absolute inline-flex h-full w-full rounded-full bg-w-cyan opacity-60 motion-safe:animate-ping"></span>
+            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-w-cyan"></span>
+        </span>
+    );
+}
+
 function BellIcon({ filled }) {
     return (
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8">

@@ -37,6 +37,7 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
 	rs "github.com/webtor-io/web-ui/services/release_subscription"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -51,6 +52,7 @@ type subscriptions interface {
 	List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error)
 	Delete(ctx context.Context, u *auth.User, id uuid.UUID) error
 	SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled bool) error
+	SetPreferences(ctx context.Context, userID, id uuid.UUID, resolutions []string, lang string) error
 	DeleteByToken(ctx context.Context, token string) (*models.ReleaseSubscription, error)
 }
 
@@ -310,7 +312,11 @@ func (h *Handler) formUpdate(c *gin.Context) {
 	isEnabled := func(id uuid.UUID) bool {
 		return c.PostForm("subscription_"+id.String()+"_enabled") == "on"
 	}
-	if err := h.updateSubscriptions(c, deleted, isEnabled); err != nil {
+	prefs := func(id uuid.UUID) ([]string, string) {
+		return c.PostFormArray("subscription_" + id.String() + "_res"),
+			c.PostForm("subscription_" + id.String() + "_lang")
+	}
+	if err := h.updateSubscriptions(c, deleted, isEnabled, prefs); err != nil {
 		log.WithError(err).WithField("feature", "release_subscription").Error("form update failed")
 		web.RedirectWithError(c, err)
 		return
@@ -340,7 +346,7 @@ func (h *Handler) unsubscribeByToken(c *gin.Context) {
 // updateSubscriptions applies deletions first, then writes only the rows
 // whose toggle actually moved. isEnabled is passed in so this half stays
 // free of gin.Context.
-func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabled func(uuid.UUID) bool) error {
+func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabled func(uuid.UUID) bool, prefs func(uuid.UUID) ([]string, string)) error {
 	ctx := c.Request.Context()
 	user := auth.GetUserFromContext(c)
 
@@ -359,15 +365,41 @@ func (h *Handler) updateSubscriptions(c *gin.Context, deletedStr string, isEnabl
 		return err
 	}
 	for _, sub := range subs {
-		want := isEnabled(sub.ID)
-		if want == sub.Enabled {
+		if want := isEnabled(sub.ID); want != sub.Enabled {
+			if err := h.svc.SetEnabled(ctx, user.ID, sub.ID, want); err != nil {
+				return err
+			}
+		}
+		resolutions, lang := prefs(sub.ID)
+		// Every box ticked is the same as no preference at all, and storing
+		// it that way keeps the poller from re-deriving it every run.
+		if len(resolutions) == len(allResolutions) {
+			resolutions = nil
+		}
+		if sameResolutions(resolutions, sub.PreferredResolutions) && lang == sub.GetPreferredLanguage() {
 			continue
 		}
-		if err := h.svc.SetEnabled(ctx, user.ID, sub.ID, want); err != nil {
+		if err := h.svc.SetPreferences(ctx, user.ID, sub.ID, resolutions, lang); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// allResolutions is the vocabulary the form renders; its length is what
+// "everything is ticked" is compared against.
+var allResolutions = stremio.NewHelper().StremioResolutions()
+
+func sameResolutions(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // --- helpers ---

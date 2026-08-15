@@ -740,3 +740,123 @@ func TestRetryDoesNotBecomeAHotLoopWithoutACeiling(t *testing.T) {
 		t.Errorf("next check: %v, want it comfortably in the future", store.checkedNext)
 	}
 }
+
+// --- per-subscription preferences ---
+
+func withPrefs(sub *models.ReleaseSubscription, resolutions []string, lang string) *models.ReleaseSubscription {
+	sub.PreferredResolutions = resolutions
+	if lang != "" {
+		sub.PreferredLanguage = &lang
+	}
+	return sub
+}
+
+// A subscription reports only what it was asked for. Anything outside its
+// preferences is not even recorded: the hit table is the memory of "already
+// mentioned", so storing a release the user cannot be told about would bury
+// it for good if the preferences widen later.
+func TestPreferencesFilterWhatIsRecorded(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		resolutions []string
+		lang        string
+		streams     []stremio.StreamItem
+		wantHashes  []string
+	}{
+		{
+			name:        "resolution",
+			resolutions: []string{"1080p", "720p"},
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "Torrentio\n1080p", Title: "The.Boys.S03E05.1080p.WEB-DL"},
+				{InfoHash: "bb", Name: "Torrentio\n2160p", Title: "The.Boys.S03E05.2160p.WEB-DL"},
+			},
+			wantHashes: []string{"aa"},
+		},
+		{
+			// The profile's vocabulary calls 2160p "4k", and a subscription
+			// that enabled it must get it.
+			name:        "4k spelled the way the profile spells it",
+			resolutions: []string{"4k"},
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "Torrentio\n1080p", Title: "The.Boys.S03E05.1080p"},
+				{InfoHash: "bb", Name: "Torrentio\n2160p", Title: "The.Boys.S03E05.2160p"},
+			},
+			wantHashes: []string{"bb"},
+		},
+		{
+			// A release whose name carries no resolution token is "other",
+			// which is a choice the profile offers explicitly.
+			name:        "other",
+			resolutions: []string{"other"},
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "RuTracker.org", Title: "Пацаны / The Boys"},
+				{InfoHash: "bb", Name: "Torrentio\n1080p", Title: "The.Boys.S03E05.1080p"},
+			},
+			wantHashes: []string{"aa"},
+		},
+		{
+			name: "language",
+			lang: "ru",
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "RuTracker.org", Title: "The.Boys.S03E05\n🇷🇺 Русский"},
+				{InfoHash: "bb", Name: "Torrentio", Title: "The.Boys.S03E05\n🇬🇧 English"},
+			},
+			wantHashes: []string{"aa"},
+		},
+		{
+			name:        "both at once",
+			resolutions: []string{"1080p"},
+			lang:        "ru",
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "RuTracker.org\n1080p", Title: "The.Boys.S03E05.1080p\n🇷🇺 Русский"},
+				{InfoHash: "bb", Name: "RuTracker.org\n720p", Title: "The.Boys.S03E05.720p\n🇷🇺 Русский"},
+				{InfoHash: "cc", Name: "Torrentio\n1080p", Title: "The.Boys.S03E05.1080p\n🇬🇧 English"},
+			},
+			wantHashes: []string{"aa"},
+		},
+		{
+			// A subscription made before the columns existed has no
+			// preferences and still reports everything.
+			name: "no preferences at all",
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "Torrentio\n1080p", Title: "The.Boys.S03E05.1080p"},
+				{InfoHash: "bb", Name: "Torrentio\n2160p", Title: "The.Boys.S03E05.2160p"},
+			},
+			wantHashes: []string{"aa", "bb"},
+		},
+		{
+			// An unknown language code must not silence the subscription.
+			name: "unresolvable language",
+			lang: "zz",
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "Torrentio", Title: "The.Boys.S03E05"},
+			},
+			wantHashes: []string{"aa"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := withPrefs(seasonSub(), tt.resolutions, tt.lang)
+			search := &fakeSearch{byContentID: map[string][]stremio.StreamItem{
+				"tt1190634:3:5": tt.streams,
+			}}
+			p := NewPoller(&fakeStore{}, search, &fakeMailer{}, fakeTier{}, fakeAiring{}, testConfig())
+
+			hits, _, err := p.collect(context.Background(), &auth.User{}, sub, []models.EpisodeMetadata{episode(5, time.Hour)})
+			if err != nil {
+				t.Fatalf("collect: %v", err)
+			}
+			got := make([]string, 0, len(hits))
+			for _, h := range hits {
+				got = append(got, h.InfoHash)
+			}
+			if len(got) != len(tt.wantHashes) {
+				t.Fatalf("hits: got %v, want %v", got, tt.wantHashes)
+			}
+			for i := range got {
+				if got[i] != tt.wantHashes[i] {
+					t.Errorf("hit %d: got %q, want %q", i, got[i], tt.wantHashes[i])
+				}
+			}
+		})
+	}
+}

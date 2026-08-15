@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/notification"
+	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
@@ -313,6 +315,14 @@ func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseS
 				continue
 			}
 			seen[hash] = true
+			if !matchesPreferences(item, sub) {
+				// Outside what this subscription asked for. Recording it
+				// anyway would be worse than dropping it: the hit table is
+				// what "already told you about this" means, so a release
+				// stored now could never be mentioned if the preferences
+				// widen later.
+				continue
+			}
 			hit := models.ReleaseSubscriptionHit{
 				SubscriptionID: sub.ID,
 				InfoHash:       hash,
@@ -562,6 +572,51 @@ func (p *Poller) magnetURL(h *models.ReleaseSubscriptionHit) string {
 		magnet += "&dn=" + url.QueryEscape(*h.Name)
 	}
 	return strings.TrimRight(p.cfg.Domain, "/") + "/" + magnet
+}
+
+// matchesPreferences applies the subscription's own resolution and language
+// overrides — a copy of the account's stream settings at the time it was
+// created, editable in the profile since.
+//
+// Empty means no preference, which is why a subscription made before these
+// columns existed reports everything, as it always did.
+func matchesPreferences(item stremio.StreamItem, sub *models.ReleaseSubscription) bool {
+	if len(sub.PreferredResolutions) > 0 && !slices.Contains(sub.PreferredResolutions, resolutionOf(item)) {
+		return false
+	}
+	if code := sub.GetPreferredLanguage(); code != "" {
+		want := stremio.LanguageByCode(code)
+		// An unknown code is not a filter — refusing everything because a
+		// language cannot be resolved would silence the subscription.
+		if want != nil && !stremio.StreamMatchesLanguage(&item, want) {
+			return false
+		}
+	}
+	return true
+}
+
+// resolutionParser is shared and read-only, like the one in the Torznab
+// stream: GetFieldParser hands out one global parser per field.
+var resolutionParser = ptn.NewCompoundParser([]ptn.Parser{ptn.GetFieldParser(ptn.FieldTypeResolution)})
+
+// resolutionOf names a release's resolution in the vocabulary the profile
+// uses: 4k / 1080p / 720p, and "other" for everything the parser cannot
+// place — the same mapping PreferredStream applies to the interactive list.
+func resolutionOf(item stremio.StreamItem) string {
+	ms := ptn.Matches{}
+	ms, err := resolutionParser.Parse(item.Name, ms)
+	if err != nil {
+		return "other"
+	}
+	ti := &ptn.TorrentInfo{}
+	ti.Map(ms)
+	switch ti.Resolution {
+	case "":
+		return "other"
+	case "2160p":
+		return "4k"
+	}
+	return ti.Resolution
 }
 
 // releaseName reads the release name out of a stream item. Both sources put

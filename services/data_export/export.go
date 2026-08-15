@@ -168,19 +168,24 @@ type TorznabIndexerItem struct {
 }
 
 type ReleaseSubscriptionItem struct {
-	SubscriptionID uuid.UUID  `json:"subscription_id"`
-	Kind           string     `json:"kind"`
-	VideoID        string     `json:"video_id"`
-	Season         *int16     `json:"season,omitempty"`
-	Title          *string    `json:"title,omitempty"`
-	Lang           string     `json:"lang"`
-	Source         string     `json:"source"`
-	Enabled        bool       `json:"enabled"`
-	State          string     `json:"state"`
-	LastCheckedAt  *time.Time `json:"last_checked_at,omitempty"`
-	LastNotifiedAt *time.Time `json:"last_notified_at,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	Kind           string    `json:"kind"`
+	VideoID        string    `json:"video_id"`
+	Season         *int16    `json:"season,omitempty"`
+	Title          *string   `json:"title,omitempty"`
+	Lang           string    `json:"lang"`
+	Source         string    `json:"source"`
+	// The subscription's own stream preferences, copied from the account
+	// when it was created and editable in the profile since. Empty means
+	// no preference.
+	PreferredResolutions []string   `json:"preferred_resolutions,omitempty"`
+	PreferredLanguage    *string    `json:"preferred_language,omitempty"`
+	Enabled              bool       `json:"enabled"`
+	State                string     `json:"state"`
+	LastCheckedAt        *time.Time `json:"last_checked_at,omitempty"`
+	LastNotifiedAt       *time.Time `json:"last_notified_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 type ReleaseSubscriptionHitItem struct {
@@ -524,19 +529,21 @@ func (e *Export) fillReleaseSubscriptions(ctx context.Context, db *pg.DB, uID uu
 	e.ReleaseSubscriptions = make([]ReleaseSubscriptionItem, 0, len(subs))
 	for _, s := range subs {
 		e.ReleaseSubscriptions = append(e.ReleaseSubscriptions, ReleaseSubscriptionItem{
-			SubscriptionID: s.ID,
-			Kind:           s.Kind,
-			VideoID:        s.VideoID,
-			Season:         s.Season,
-			Title:          s.Title,
-			Lang:           s.Lang,
-			Source:         s.Source,
-			Enabled:        s.Enabled,
-			State:          s.State,
-			LastCheckedAt:  s.LastCheckedAt,
-			LastNotifiedAt: s.LastNotifiedAt,
-			CreatedAt:      s.CreatedAt,
-			UpdatedAt:      s.UpdatedAt,
+			SubscriptionID:       s.ID,
+			Kind:                 s.Kind,
+			VideoID:              s.VideoID,
+			Season:               s.Season,
+			Title:                s.Title,
+			Lang:                 s.Lang,
+			Source:               s.Source,
+			PreferredResolutions: s.PreferredResolutions,
+			PreferredLanguage:    s.PreferredLanguage,
+			Enabled:              s.Enabled,
+			State:                s.State,
+			LastCheckedAt:        s.LastCheckedAt,
+			LastNotifiedAt:       s.LastNotifiedAt,
+			CreatedAt:            s.CreatedAt,
+			UpdatedAt:            s.UpdatedAt,
 		})
 	}
 

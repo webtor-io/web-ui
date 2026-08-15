@@ -104,8 +104,7 @@ func (s *Builder) BuildTorznabStreamsService(ctx context.Context, u *auth.User) 
 }
 
 // BuildPollStreamsService builds the pipeline the release-subscription
-// poller runs: the user's own addons and indexers, deduplicated by infohash
-// and filtered to their preferred language.
+// poller runs: the user's own addons and indexers, deduplicated by infohash.
 //
 // It stops where the interactive pipeline continues. Library is left out —
 // the poller asks "has anything new appeared", and what the user already has
@@ -114,9 +113,14 @@ func (s *Builder) BuildTorznabStreamsService(ctx context.Context, u *auth.User) 
 // URLs) exists to make a stream clickable, and a cron job clicks nothing; it
 // also needs a request-scoped token this job has no way to mint.
 //
-// What stays matters: dedup gives one row per infohash, which is the key the
-// subscription remembers releases by, and the language filter keeps a user
-// from being mailed about releases their own settings would hide.
+// The language filter is left out too, and that one is not an omission: a
+// subscription carries its own language and resolution preferences (copied
+// from the account when it was created, editable in the profile since), and
+// the poller applies those. Filtering here as well would apply the account's
+// current setting on top of the subscription's own.
+//
+// What stays is dedup, which gives one row per infohash — the key a
+// subscription remembers releases by.
 func (s *Builder) BuildPollStreamsService(ctx context.Context, u *auth.User) (StreamsService, error) {
 	db := s.pg.Get()
 	if db == nil {
@@ -145,8 +149,7 @@ func (s *Builder) BuildPollStreamsService(ctx context.Context, u *auth.User) (St
 	}
 
 	cs := NewCompositeStream(services)
-	ds := NewDedupStream(cs)
-	return NewLangFilterStream(ds, db, u), nil
+	return NewDedupStream(cs), nil
 }
 
 func (s *Builder) BuildStreamsService(ctx context.Context, u *auth.User, lr *lr.LinkResolver, apiClaims *api.Claims, cla *claims.Data, token string) (StreamsService, error) {

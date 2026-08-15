@@ -7,6 +7,7 @@ package release_subscription
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -36,6 +37,10 @@ type store interface {
 	// AccountLang is here, not only on the poller's side, so a letter sent
 	// from a request goes out in the same language as one sent from cron.
 	AccountLang(ctx context.Context, userID uuid.UUID) string
+	// StreamPrefs reads the account's stream settings, which a new
+	// subscription starts out as a copy of.
+	StreamPrefs(ctx context.Context, userID uuid.UUID) (resolutions []string, lang string)
+	UpdatePreferences(ctx context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error
 }
 
 // pgStore is the production store.
@@ -202,6 +207,45 @@ func (s pgStore) AccountLang(ctx context.Context, userID uuid.UUID) string {
 		return ""
 	}
 	return us.GetLang()
+}
+
+// StreamPrefs returns the account's enabled resolutions and preferred
+// language — the same two settings the Stremio addon and Discover honour.
+// A read failure yields no preferences, which is the permissive answer: a
+// subscription that reports slightly too much beats one that reports
+// nothing.
+func (s pgStore) StreamPrefs(ctx context.Context, userID uuid.UUID) ([]string, string) {
+	db, err := s.db()
+	if err != nil {
+		return nil, ""
+	}
+	settings, err := models.GetUserStremioSettingsData(ctx, db, userID)
+	if err != nil || settings == nil {
+		if err != nil {
+			log.WithError(err).WithField("user_id", userID).Warn("failed to read stream settings")
+		}
+		return nil, ""
+	}
+	var resolutions []string
+	for _, r := range settings.PreferredResolutions {
+		if r.Enabled {
+			resolutions = append(resolutions, r.Resolution)
+		}
+	}
+	// Every resolution enabled is the same as no preference, and storing it
+	// as one keeps the poller from re-deriving that on every run.
+	if len(resolutions) == len(settings.PreferredResolutions) {
+		resolutions = nil
+	}
+	return resolutions, strings.TrimSpace(settings.PreferredLanguage)
+}
+
+func (s pgStore) UpdatePreferences(ctx context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error {
+	db, err := s.db()
+	if err != nil {
+		return err
+	}
+	return models.UpdateReleaseSubscriptionPreferences(ctx, db, id, userID, resolutions, lang)
 }
 
 // NewStore builds the production store. Both the web process and the poll

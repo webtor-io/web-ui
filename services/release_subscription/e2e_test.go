@@ -45,15 +45,20 @@ type memStore struct {
 	// users is what the poller's query joins in: it mails an address, so a
 	// row without an account is a row it cannot act on.
 	users map[uuid.UUID]*models.User
-	eps   []models.EpisodeMetadata
+	// the account-level stream settings a new subscription copies
+	prefResolutions map[uuid.UUID][]string
+	prefLang        map[uuid.UUID]string
+	eps             []models.EpisodeMetadata
 }
 
 func newMemStore() *memStore {
 	return &memStore{
-		subs:  map[uuid.UUID]*models.ReleaseSubscription{},
-		hits:  map[uuid.UUID][]*models.ReleaseSubscriptionHit{},
-		lang:  map[uuid.UUID]string{},
-		users: map[uuid.UUID]*models.User{},
+		subs:            map[uuid.UUID]*models.ReleaseSubscription{},
+		hits:            map[uuid.UUID][]*models.ReleaseSubscriptionHit{},
+		lang:            map[uuid.UUID]string{},
+		users:           map[uuid.UUID]*models.User{},
+		prefResolutions: map[uuid.UUID][]string{},
+		prefLang:        map[uuid.UUID]string{},
 	}
 }
 
@@ -273,6 +278,22 @@ func (m *memStore) SeasonEpisodes(context.Context, string, int16) ([]models.Epis
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.eps, nil
+}
+
+func (m *memStore) StreamPrefs(_ context.Context, userID uuid.UUID) ([]string, string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.prefResolutions[userID], m.prefLang[userID]
+}
+
+func (m *memStore) UpdatePreferences(_ context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s, ok := m.subs[id]; ok && s.UserID == userID {
+		s.PreferredResolutions = resolutions
+		s.PreferredLanguage = lang
+	}
+	return nil
 }
 
 func (m *memStore) AccountLang(_ context.Context, userID uuid.UUID) string {

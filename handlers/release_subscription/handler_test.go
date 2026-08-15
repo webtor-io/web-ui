@@ -37,6 +37,7 @@ type fakeService struct {
 	list    []models.ReleaseSubscription
 	deleted []uuid.UUID
 	enabled map[uuid.UUID]bool
+	prefs   map[uuid.UUID]prefsCall
 	listErr error
 }
 
@@ -68,6 +69,19 @@ func (f *fakeService) SetEnabled(_ context.Context, _, id uuid.UUID, enabled boo
 		f.enabled = map[uuid.UUID]bool{}
 	}
 	f.enabled[id] = enabled
+	return nil
+}
+
+type prefsCall struct {
+	resolutions []string
+	lang        string
+}
+
+func (f *fakeService) SetPreferences(_ context.Context, _, id uuid.UUID, resolutions []string, lang string) error {
+	if f.prefs == nil {
+		f.prefs = map[uuid.UUID]prefsCall{}
+	}
+	f.prefs[id] = prefsCall{resolutions: resolutions, lang: lang}
 	return nil
 }
 
@@ -305,4 +319,77 @@ func TestFormUpdateAppliesDeletionsAndChangedTogglesOnly(t *testing.T) {
 	if on, ok := svc.enabled[flip]; !ok || on {
 		t.Errorf("flipped row: got %v/%v, want written as disabled", on, ok)
 	}
+}
+
+// The two overrides are editable only here, so this form is the only path
+// that can write them — and it must write only what actually moved.
+func TestFormUpdateWritesChangedPreferencesOnly(t *testing.T) {
+	untouched := uuid.NewV4()
+	narrowed := uuid.NewV4()
+	lang := "ru"
+	svc := &fakeService{list: []models.ReleaseSubscription{
+		{ID: untouched, Enabled: true, PreferredResolutions: []string{"1080p"}, PreferredLanguage: &lang},
+		{ID: narrowed, Enabled: true},
+	}}
+
+	form := url.Values{}
+	form.Set("subscription_"+untouched.String()+"_enabled", "on")
+	form.Add("subscription_"+untouched.String()+"_res", "1080p")
+	form.Set("subscription_"+untouched.String()+"_lang", "ru")
+	form.Set("subscription_"+narrowed.String()+"_enabled", "on")
+	form.Add("subscription_"+narrowed.String()+"_res", "1080p")
+	form.Add("subscription_"+narrowed.String()+"_res", "720p")
+	form.Set("subscription_"+narrowed.String()+"_lang", "en")
+
+	postForm(t, svc, form)
+
+	if _, touched := svc.prefs[untouched]; touched {
+		t.Error("a row whose preferences did not change was written anyway")
+	}
+	got, ok := svc.prefs[narrowed]
+	if !ok {
+		t.Fatal("the changed row was not written")
+	}
+	if got.lang != "en" {
+		t.Errorf("language: got %q, want \"en\"", got.lang)
+	}
+	if len(got.resolutions) != 2 || got.resolutions[0] != "1080p" || got.resolutions[1] != "720p" {
+		t.Errorf("resolutions: got %v", got.resolutions)
+	}
+}
+
+// Ticking every box means "no preference", and it is stored as such — the
+// poller then skips the comparison entirely.
+func TestFormUpdateCollapsesEveryResolutionToNoPreference(t *testing.T) {
+	id := uuid.NewV4()
+	svc := &fakeService{list: []models.ReleaseSubscription{
+		{ID: id, Enabled: true, PreferredResolutions: []string{"1080p"}},
+	}}
+
+	form := url.Values{}
+	form.Set("subscription_"+id.String()+"_enabled", "on")
+	for _, res := range allResolutions {
+		form.Add("subscription_"+id.String()+"_res", res)
+	}
+
+	postForm(t, svc, form)
+
+	got, ok := svc.prefs[id]
+	if !ok {
+		t.Fatal("nothing was written")
+	}
+	if got.resolutions != nil {
+		t.Errorf("resolutions: got %v, want nil — everything ticked is no preference", got.resolutions)
+	}
+}
+
+func postForm(t *testing.T, svc subscriptions, form url.Values) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&Handler{svc: svc}).routes(r)
+	req := httptest.NewRequest(http.MethodPost, "/subscription/update?token=test", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(context.WithValue(req.Context(), auth.UserContext{}, testUser))
+	r.ServeHTTP(httptest.NewRecorder(), req)
 }

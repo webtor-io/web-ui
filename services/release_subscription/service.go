@@ -33,6 +33,7 @@ var validSources = map[string]struct{}{
 	"resource_banner": {}, // banner on the torrent page
 	"empty_streams":   {}, // stream modal found nothing at all
 	"empty_filters":   {}, // stream modal found nothing matching the filters
+	"prefs_miss":      {}, // stream modal found nothing in the preferred language/resolution
 	"profile":         {}, // re-added from the profile list
 }
 
@@ -164,6 +165,18 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 		Enabled:     true,
 		NextCheckAt: time.Now(),
 	}
+	// A new subscription starts as a copy of the account's stream settings:
+	// the resolutions it already streams in and the language it already
+	// filters by. From here the two are the subscription's own, editable
+	// from the profile — changing the profile later must not rewrite what
+	// an existing subscription reports.
+	if resolutions, lang := s.store.StreamPrefs(ctx, userID); len(resolutions) > 0 || lang != "" {
+		sub.PreferredResolutions = resolutions
+		if lang != "" {
+			sub.PreferredLanguage = &lang
+		}
+	}
+
 	s.fillMetadata(ctx, sub)
 
 	created, err := s.store.Create(ctx, sub)
@@ -252,6 +265,17 @@ func (s *Service) DeleteByToken(ctx context.Context, raw string) (*models.Releas
 		return nil, err
 	}
 	return sub, nil
+}
+
+// SetPreferences rewrites one subscription's resolution and language
+// overrides. The profile list form is the only caller: the subscribe
+// buttons deliberately ask nothing, so the offer stays one click.
+func (s *Service) SetPreferences(ctx context.Context, userID, id uuid.UUID, resolutions []string, lang string) error {
+	var langPtr *string
+	if lang = strings.TrimSpace(lang); lang != "" {
+		langPtr = &lang
+	}
+	return s.store.UpdatePreferences(ctx, id, userID, resolutions, langPtr)
 }
 
 // SetEnabled flips the profile toggle for one subscription.

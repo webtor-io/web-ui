@@ -45,6 +45,32 @@
                         {{ if $sub.LastCheckedAt }}
                             <div class="text-xs text-w-muted mt-1">{{ tp $.Lang "profile.subscriptions.lastChecked" "Ago" (timeAgoLang $.Lang $sub.CheckedAt) }}</div>
                         {{ end }}
+
+                        {{/* The two overrides. They are editable here and
+                             nowhere else: the subscribe buttons stay one
+                             click, and this is the page where a list of
+                             standing requests belongs. */}}
+                        <details class="mt-2">
+                            <summary class="text-xs text-w-muted cursor-pointer hover:text-w-sub select-none">{{ t $.Lang "profile.subscriptions.prefs" }}</summary>
+                            <div class="mt-2 flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    {{ range $res := stremioResolutions }}
+                                    <label class="flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" name="subscription_{{ $sub.ID }}_res" value="{{ $res }}" class="checkbox checkbox-xs"
+                                            {{ if $sub.WantsResolution $res }}checked{{ end }}>
+                                        <span class="text-xs">{{ $res }}</span>
+                                    </label>
+                                    {{ end }}
+                                </div>
+                                <select name="subscription_{{ $sub.ID }}_lang" class="select select-xs bg-base-300 border-w-line focus:border-w-pink focus:outline-none sm:ml-auto">
+                                    <option value="" {{ if eq $sub.GetPreferredLanguage "" }}selected{{ end }}>{{ t $.Lang "profile.settings.preferredLanguageAny" }}</option>
+                                    {{ range stremioLanguages }}
+                                        <option value="{{ .Code }}" {{ if eq $sub.GetPreferredLanguage .Code }}selected{{ end }}>{{ .Flag }} {{ .Name }}</option>
+                                    {{ end }}
+                                </select>
+                            </div>
+                            <p class="text-xs text-w-muted mt-2">{{ t $.Lang "profile.subscriptions.prefsHint" }}</p>
+                        </details>
                     </div>
 
                     <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">

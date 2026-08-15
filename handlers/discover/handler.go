@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
@@ -48,6 +49,18 @@ type indexerView struct {
 type indexData struct {
 	Addons   []addonView
 	Indexers []indexerView
+	// Prefs are the account's stream settings. The page needs them to say
+	// "nothing here matches what you asked for" — Discover shows every
+	// stream and lets the chips do the filtering, so without them it cannot
+	// tell an unwanted result from a missing one.
+	Prefs streamPrefsView
+}
+
+type streamPrefsView struct {
+	// Resolutions lists the enabled buckets in the profile's vocabulary
+	// (4k / 1080p / 720p / other). Empty means no preference.
+	Resolutions []string `json:"resolutions"`
+	Language    string   `json:"language"`
 }
 
 // enricher is the slice of enrich.Enricher the localize endpoint needs.
@@ -130,7 +143,29 @@ func (h *Handler) index(c *gin.Context) {
 	h.tb.Build("discover/index").HTML(http.StatusOK, web.NewContext(c).WithData(&indexData{
 		Addons:   views,
 		Indexers: indexerViews(c.Request.Context(), db, u),
+		Prefs:    streamPrefs(c.Request.Context(), db, u),
 	}))
+}
+
+// streamPrefs reads the account's stream settings for the page. A failure
+// yields no preferences, which reads as "everything is fine" — the note
+// this feeds is an extra hint, never a reason to break the page.
+func streamPrefs(ctx context.Context, db *pg.DB, u *auth.User) streamPrefsView {
+	settings, err := models.GetUserStremioSettingsData(ctx, db, u.ID)
+	if err != nil || settings == nil {
+		return streamPrefsView{}
+	}
+	out := streamPrefsView{Language: settings.PreferredLanguage}
+	for _, r := range settings.PreferredResolutions {
+		if r.Enabled {
+			out.Resolutions = append(out.Resolutions, r.Resolution)
+		}
+	}
+	// Everything enabled is the same as no preference.
+	if len(out.Resolutions) == len(settings.PreferredResolutions) {
+		out.Resolutions = nil
+	}
+	return out
 }
 
 func derefStr(p *string) string {

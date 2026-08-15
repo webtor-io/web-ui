@@ -109,6 +109,7 @@ func TestNormalizeSource(t *testing.T) {
 		{"resource_banner", "resource_banner"},
 		{"empty_streams", "empty_streams"},
 		{"empty_filters", "empty_filters"},
+		{"prefs_miss", "prefs_miss"},
 		{"profile", "profile"},
 		{"", "other"},
 		{"whatever", "other"},

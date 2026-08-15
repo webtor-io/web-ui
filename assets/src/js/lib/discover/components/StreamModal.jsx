@@ -7,8 +7,9 @@ import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
 import { ExpandableText } from './ExpandableText';
 import { ReviewsList, useReviews } from './Reviews';
-import { SubscribeButton } from './SubscribeButton';
+import { SubscribeButton, OnAirDot } from './SubscribeButton';
 import { isSeasonUnfinished } from '../seasonStatus';
+import { getStreamPrefs, noneMatchPrefs } from '../streamPrefs';
 import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
 
@@ -550,6 +551,15 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
     // sources configured is offered nothing here: the poller searches the
     // addons and indexers they set up, so a subscription would be a promise
     // we cannot keep. That case already has its own "set up addons" prompt.
+    // Nothing in the list is what this account asked for. Discover shows
+    // every stream on purpose, so this is a note above the list, not a
+    // filter: the streams stay, and the offer to be told about a better one
+    // sits next to the explanation.
+    const prefsMiss = useMemo(
+        () => noneMatchPrefs(parsed, streamLangs, getStreamPrefs()),
+        [parsed, streamLangs],
+    );
+
     const subscribeCTA = (note, source) => {
         if (!modal.subTarget || !hasSources) return null;
         return (
@@ -649,6 +659,18 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 </div>
             )}
 
+            {prefsMiss && modal.subTarget && hasSources && (
+                <div class="mb-3 px-3 py-3 rounded-lg border border-w-line/60 bg-w-surface/40 text-center">
+                    <p class="text-sm text-w-sub mb-2">{t('discover.subscriptions.prefsMiss')}</p>
+                    <SubscribeButton
+                        target={{ ...modal.subTarget, source: 'prefs_miss' }}
+                        subscriptionKeys={subscriptionKeys}
+                        onToggle={onToggleSubscription}
+                        size="xs"
+                    />
+                </div>
+            )}
+
             {hasFilters && (
                 <FilterChips
                     allSources={allSources}
@@ -678,10 +700,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                     {hasActiveFilters && visibleCount === 0 && (
                         <div class="py-6">
                             <p class="text-w-muted text-sm text-center">{t('discover.noFilterMatch')}</p>
-                            {/* The copy has to be honest here: a subscription
-                                is on the title, not on these chips, so it
-                                will report releases the filters would hide. */}
-                            {subscribeCTA(t('discover.subscriptions.filtersText'), 'empty_filters')}
+                            {subscribeCTA(t('discover.subscriptions.emptyText'), 'empty_filters')}
                         </div>
                     )}
                 </>
@@ -918,6 +937,16 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
     // videos) under 0.
     const totalEpisodes = videos.length - (seasons[0]?.length || 0);
 
+    // Which seasons are still running. The same rule the subscribe target
+    // uses, computed once for the whole chip row.
+    const airingSeasons = useMemo(() => {
+        const out = new Set();
+        for (const sn of seasonNums) {
+            if (sn > 0 && isSeasonUnfinished(videos, sn, { status: meta?.status })) out.add(sn);
+        }
+        return out;
+    }, [seasonNums, videos, meta]);
+
     // Subscribe target for the season currently in view. Null for specials,
     // for a finished season, and for anything whose id no external source
     // could resolve.
@@ -961,9 +990,19 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                                 onClick={() => { setActiveSeason(sn); if (onSeasonChange) onSeasonChange(sn); }}
                             >
                                 {sn === 0 ? t('discover.specials') : `S${sn}`}
+                                {/* A season that still has episodes coming
+                                    says so on its own chip — it is why the
+                                    bell next to it exists. */}
+                                {airingSeasons.has(sn) && <OnAirDot />}
                             </button>
                         ))}
                     </div>
+                )}
+                {seasonNums.length <= 1 && airingSeasons.has(activeSeason) && (
+                    <span class="inline-flex items-center gap-1.5 text-xs text-w-cyan">
+                        <OnAirDot />
+                        {t('discover.subscriptions.onAir')}
+                    </span>
                 )}
                 {/* The bell only appears on a season that still has episodes
                     coming — subscribing to a finished one would be a poll

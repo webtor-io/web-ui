@@ -11,6 +11,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 // TestSubscriptionsPartialRenders parses and executes the profile
@@ -31,6 +32,7 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 	}
 	defer locales.Close()
 	helper := i18n.NewHelper(i18n.New(locales.FS()))
+	stremioHelper := stremio.NewHelper()
 
 	funcs := template.FuncMap{
 		"t":           helper.T,
@@ -40,6 +42,10 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 		"isPaid":      func(_ interface{}) bool { return false },
 		"withContext": func(ctx, data interface{}) interface{} { return data },
 		"timeAgoLang": func(lang string, tm time.Time) string { return "1 hour ago" },
+		// The real vocabulary and language list, so the per-row preference
+		// editor is exercised with what it actually renders.
+		"stremioResolutions": stremioHelper.StremioResolutions,
+		"stremioLanguages":   stremioHelper.StremioLanguages,
 	}
 	tpl, err := template.New("subscriptions.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/profile/subscriptions.html")
@@ -130,6 +136,15 @@ func TestSubscriptionsPartialRenders(t *testing.T) {
 			}
 			if strings.Contains(out, "profile.subscriptions.") {
 				t.Errorf("an untranslated message key reached the page:\n%s", out)
+			}
+			// The per-row preference editor renders for every row: the
+			// resolution vocabulary and the language dropdown.
+			if len(tt.data) > 0 {
+				for _, want := range []string{"_res\" value=\"1080p", "_lang", "Quality and language"} {
+					if !strings.Contains(out, want) {
+						t.Errorf("preference editor is missing %q:\n%s", want, out)
+					}
+				}
 			}
 		})
 	}

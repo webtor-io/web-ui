@@ -2,7 +2,9 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -63,6 +65,16 @@ type ReleaseSubscription struct {
 	// entry points can be compared without touching analytics.
 	Source string `pg:"source,notnull"`
 
+	// PreferredResolutions and PreferredLanguage narrow what this
+	// subscription reports. Both are snapshots of the account's stream
+	// settings at the moment of subscribing, editable afterwards from the
+	// profile — a later change to the profile must not silently rewrite
+	// what an existing subscription watches for.
+	//
+	// Empty means no preference: every resolution, every language.
+	PreferredResolutions []string `pg:"preferred_resolutions,type:jsonb"`
+	PreferredLanguage    *string  `pg:"preferred_language"`
+
 	Enabled bool   `pg:"enabled,notnull,use_zero"`
 	State   string `pg:"state,notnull"`
 
@@ -96,6 +108,30 @@ func (s *ReleaseSubscription) GetSeason() int {
 // IsSeason reports whether this subscription follows a season of a series.
 func (s *ReleaseSubscription) IsSeason() bool {
 	return s.Kind == ReleaseSubscriptionKindSeason
+}
+
+// GetPreferredLanguage returns the language this subscription filters by,
+// or "" when it takes any.
+func (s *ReleaseSubscription) GetPreferredLanguage() string {
+	if s.PreferredLanguage == nil {
+		return ""
+	}
+	return strings.TrimSpace(*s.PreferredLanguage)
+}
+
+// WantsResolution reports whether this subscription reports releases of a
+// given resolution. No preferences at all means every resolution — which is
+// what a subscription created before the columns existed holds.
+func (s *ReleaseSubscription) WantsResolution(res string) bool {
+	if len(s.PreferredResolutions) == 0 {
+		return true
+	}
+	for _, r := range s.PreferredResolutions {
+		if r == res {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckedAt returns the last poll time as a value, zero when the poller has
@@ -341,4 +377,35 @@ func DeleteReleaseSubscriptionByID(ctx context.Context, db *pg.DB, id uuid.UUID)
 		return pkgerrors.Wrap(err, "failed to delete release subscription")
 	}
 	return nil
+}
+
+// UpdateReleaseSubscriptionPreferences rewrites the two override columns of
+// one subscription, scoped to its owner. Called from the profile list form,
+// the only place they can be edited.
+func UpdateReleaseSubscriptionPreferences(ctx context.Context, db *pg.DB, id, userID uuid.UUID, resolutions []string, lang *string) error {
+	_, err := db.Model((*ReleaseSubscription)(nil)).
+		Context(ctx).
+		Set("preferred_resolutions = ?", jsonbStrings(resolutions)).
+		Set("preferred_language = ?", lang).
+		Where("release_subscription_id = ? AND user_id = ?", id, userID).
+		Update()
+	if err != nil {
+		return pkgerrors.Wrap(err, "failed to update release subscription preferences")
+	}
+	return nil
+}
+
+// jsonbStrings renders a string slice for a jsonb column, mapping "no
+// preference" onto SQL NULL rather than an empty array — the two mean the
+// same thing to the poller, and NULL is what a row created without
+// preferences already holds.
+func jsonbStrings(v []string) any {
+	if len(v) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return string(b)
 }

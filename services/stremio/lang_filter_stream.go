@@ -67,6 +67,13 @@ func isLibraryStream(st *StreamItem) bool {
 	return st.BehaviorHints != nil && strings.HasPrefix(st.BehaviorHints.BingeGroup, libraryBingeGroupPrefix)
 }
 
+// StreamMatchesLanguage is exported because the subscription poller applies
+// the same rule per subscription rather than per account — one predicate, so
+// "has my language" cannot mean two different things depending on who asks.
+func StreamMatchesLanguage(st *StreamItem, want *Language) bool {
+	return streamMatchesLanguage(st, want)
+}
+
 func streamMatchesLanguage(st *StreamItem, want *Language) bool {
 	// Match the JS implementation, which extracts from the user-facing
 	// stream description (s.title). Fall back to Name to be safe — some
