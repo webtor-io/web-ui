@@ -36,6 +36,26 @@ type Service struct {
 // pick a language everywhere else do not exist. It may be nil, in which case
 // templates fall back to their message keys — callers that have a bundle
 // should always pass it.
+// Store is the notification journal — what makes the 24-hour duplicate
+// check possible. Mailer is the transport. Both are exported so a caller
+// can assemble a Service from parts it already has (see NewWith), which is
+// how the subscription end-to-end test drives real templates and real
+// translations without SMTP or a database.
+type Store = notificationStore
+
+type Mailer = mailer
+
+// NewWith assembles a Service from explicit parts.
+func NewWith(store Store, mail Mailer, i18nSvc *i18n.Service, domain, templateDir string) *Service {
+	return &Service{
+		store:       store,
+		mail:        mail,
+		i18n:        i18nSvc,
+		domain:      domain,
+		templateDir: templateDir,
+	}
+}
+
 func New(c *cli.Context, db *pg.DB, i18nSvc *i18n.Service) *Service {
 	return &Service{
 		i18n:  i18nSvc,

@@ -7,6 +7,7 @@ package release_subscription
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
@@ -55,19 +56,152 @@ type Mailer interface {
 	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
 }
 
+// store is the database behind the service. An interface for the same
+// reason the poller has one: the rules worth testing here are the free-tier
+// cap, the eligibility gate and which letter goes out when — none of which
+// should need Postgres to exercise.
+type store interface {
+	Find(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (*models.ReleaseSubscription, error)
+	FindByID(ctx context.Context, id, userID uuid.UUID) (*models.ReleaseSubscription, error)
+	Get(ctx context.Context, id uuid.UUID) (*models.ReleaseSubscription, error)
+	Count(ctx context.Context, userID uuid.UUID) (int, error)
+	List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error)
+	Create(ctx context.Context, sub *models.ReleaseSubscription) (bool, error)
+	DeleteByContent(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (bool, error)
+	Delete(ctx context.Context, id, userID uuid.UUID) error
+	DeleteByID(ctx context.Context, id uuid.UUID) error
+	SetEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error
+}
+
+// pgStore is the production store.
+type pgStore struct{ pg *cs.PG }
+
+func (s pgStore) db() (*pg.DB, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+	return db, nil
+}
+
+func (s pgStore) Find(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (*models.ReleaseSubscription, error) {
+	db, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	return models.FindUserReleaseSubscription(ctx, db, userID, kind, videoID, season)
+}
+
+func (s pgStore) FindByID(ctx context.Context, id, userID uuid.UUID) (*models.ReleaseSubscription, error) {
+	db, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	return models.GetUserReleaseSubscriptionByID(ctx, db, id, userID)
+}
+
+func (s pgStore) Get(ctx context.Context, id uuid.UUID) (*models.ReleaseSubscription, error) {
+	db, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	return models.GetReleaseSubscriptionByID(ctx, db, id)
+}
+
+func (s pgStore) Count(ctx context.Context, userID uuid.UUID) (int, error) {
+	db, err := s.db()
+	if err != nil {
+		return 0, err
+	}
+	return models.CountUserReleaseSubscriptions(ctx, db, userID)
+}
+
+func (s pgStore) List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error) {
+	db, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	return models.GetUserReleaseSubscriptions(ctx, db, userID)
+}
+
+func (s pgStore) Create(ctx context.Context, sub *models.ReleaseSubscription) (bool, error) {
+	db, err := s.db()
+	if err != nil {
+		return false, err
+	}
+	return models.CreateReleaseSubscription(ctx, db, sub)
+}
+
+func (s pgStore) DeleteByContent(ctx context.Context, userID uuid.UUID, kind, videoID string, season *int16) (bool, error) {
+	db, err := s.db()
+	if err != nil {
+		return false, err
+	}
+	return models.DeleteUserReleaseSubscriptionByContent(ctx, db, userID, kind, videoID, season)
+}
+
+func (s pgStore) Delete(ctx context.Context, id, userID uuid.UUID) error {
+	db, err := s.db()
+	if err != nil {
+		return err
+	}
+	return models.DeleteUserReleaseSubscription(ctx, db, id, userID)
+}
+
+func (s pgStore) DeleteByID(ctx context.Context, id uuid.UUID) error {
+	db, err := s.db()
+	if err != nil {
+		return err
+	}
+	return models.DeleteReleaseSubscriptionByID(ctx, db, id)
+}
+
+func (s pgStore) SetEnabled(ctx context.Context, id, userID uuid.UUID, enabled bool) error {
+	db, err := s.db()
+	if err != nil {
+		return err
+	}
+	return models.SetUserReleaseSubscriptionEnabled(ctx, db, id, userID, enabled)
+}
+
+// airingCheck is the "is this series still producing episodes" capability —
+// the Enricher's AiringChecker facade, behind an interface so the
+// eligibility rule can be tested without a TMDB cache.
+type airingCheck interface {
+	IsAiringSeries(ctx context.Context, videoID string) bool
+}
+
+// metadataLookup fills the title/poster snapshot a profile row and an email
+// render from. Interface-shaped so tests need no mappers.
+type metadataLookup interface {
+	LookupByVideoID(ctx context.Context, videoID string, ct models.ContentType) (*models.VideoMetadata, error)
+}
+
 // Service is the subscription business logic. The enricher is optional —
 // without it eligibility cannot be verified and season subscriptions are
 // refused rather than accepted blind.
 type Service struct {
-	pg     *cs.PG
-	en     *enrich.Enricher
+	store  store
+	airing airingCheck
+	meta   metadataLookup
 	mail   Mailer
 	domain string
 	secret string
+	// sync makes the confirmation letters block instead of firing off a
+	// goroutine. Production leaves it false; tests set it so an assertion
+	// does not race the mailer.
+	sync bool
 }
 
 func New(pg *cs.PG, en *enrich.Enricher, mail Mailer, domain, secret string) *Service {
-	return &Service{pg: pg, en: en, mail: mail, domain: domain, secret: secret}
+	s := &Service{store: pgStore{pg: pg}, mail: mail, domain: domain, secret: secret}
+	// A mapper-less enricher answers nothing useful, so it is left out
+	// entirely rather than nil-checked at every call site.
+	if en != nil && en.HasMappers() {
+		s.airing = en
+		s.meta = en
+	}
+	return s
 }
 
 // Request is one "subscribe me to this" from any of the entry points.
@@ -93,10 +227,6 @@ func Limit(freeTier bool) int {
 // Returns the subscription and whether it was created now — subscribing
 // twice is not an error, it just doesn't produce a second row.
 func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limit int) (*models.ReleaseSubscription, bool, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return nil, false, errors.New("no db")
-	}
 	userID := u.ID
 
 	kind, season, err := normalize(req)
@@ -106,7 +236,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 
 	// Already subscribed: answer from the existing row without spending a
 	// count query or an eligibility check on it.
-	existing, err := models.FindUserReleaseSubscription(ctx, db, userID, kind, req.VideoID, season)
+	existing, err := s.store.Find(ctx, userID, kind, req.VideoID, season)
 	if err != nil {
 		return nil, false, err
 	}
@@ -119,7 +249,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 	}
 
 	if limit > 0 {
-		count, err := models.CountUserReleaseSubscriptions(ctx, db, userID)
+		count, err := s.store.Count(ctx, userID)
 		if err != nil {
 			return nil, false, err
 		}
@@ -135,10 +265,17 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 		Season:  season,
 		Lang:    req.Lang,
 		Source:  normalizeSource(req.Source),
+		// The state machine is the service's, not the schema's: a new row
+		// owes the user a silent first look before it may say anything.
+		// The column default says the same thing, as a backstop for rows
+		// written any other way.
+		State:       models.ReleaseSubscriptionStatePendingBaseline,
+		Enabled:     true,
+		NextCheckAt: time.Now(),
 	}
-	s.fillMetadata(ctx, db, sub)
+	s.fillMetadata(ctx, sub)
 
-	created, err := models.CreateReleaseSubscription(ctx, db, sub)
+	created, err := s.store.Create(ctx, sub)
 	if err != nil {
 		return nil, false, err
 	}
@@ -148,7 +285,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 	if !created {
 		// Lost a race with a concurrent add. Read back what won so the
 		// caller still gets a subscription to render.
-		existing, err := models.FindUserReleaseSubscription(ctx, db, userID, kind, req.VideoID, season)
+		existing, err := s.store.Find(ctx, userID, kind, req.VideoID, season)
 		if err != nil {
 			return nil, false, err
 		}
@@ -160,21 +297,17 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 // Unsubscribe removes a subscription addressed by content. Returns whether
 // anything was removed.
 func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (bool, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return false, errors.New("no db")
-	}
 	kind, season, err := normalize(req)
 	if err != nil {
 		return false, err
 	}
 	// Read before deleting: the notice names what it is about, and after the
 	// DELETE there is nothing left to name it with.
-	sub, err := models.FindUserReleaseSubscription(ctx, db, u.ID, kind, req.VideoID, season)
+	sub, err := s.store.Find(ctx, u.ID, kind, req.VideoID, season)
 	if err != nil {
 		return false, err
 	}
-	removed, err := models.DeleteUserReleaseSubscriptionByContent(ctx, db, u.ID, kind, req.VideoID, season)
+	removed, err := s.store.DeleteByContent(ctx, u.ID, kind, req.VideoID, season)
 	if err != nil {
 		return false, err
 	}
@@ -186,37 +319,25 @@ func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (b
 
 // List returns the user's subscriptions for the profile section.
 func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]models.ReleaseSubscription, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return nil, errors.New("no db")
-	}
-	return models.GetUserReleaseSubscriptions(ctx, db, userID)
+	return s.store.List(ctx, userID)
 }
 
 // Count returns how many subscriptions a user holds, for the "you have used
 // N of 3" line on the profile.
 func (s *Service) Count(ctx context.Context, userID uuid.UUID) (int, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return 0, errors.New("no db")
-	}
-	return models.CountUserReleaseSubscriptions(ctx, db, userID)
+	return s.store.Count(ctx, userID)
 }
 
 // Delete removes one subscription by row id, scoped to its owner.
 func (s *Service) Delete(ctx context.Context, u *auth.User, id uuid.UUID) error {
-	db := s.pg.Get()
-	if db == nil {
-		return errors.New("no db")
-	}
-	sub, err := models.GetUserReleaseSubscriptionByID(ctx, db, id, u.ID)
+	sub, err := s.store.FindByID(ctx, id, u.ID)
 	if err != nil {
 		return err
 	}
 	if sub == nil {
 		return nil
 	}
-	if err := models.DeleteUserReleaseSubscription(ctx, db, id, u.ID); err != nil {
+	if err := s.store.Delete(ctx, id, u.ID); err != nil {
 		return err
 	}
 	s.mailOff(u, sub)
@@ -233,11 +354,7 @@ func (s *Service) DeleteByToken(ctx context.Context, raw string) (*models.Releas
 	if err != nil {
 		return nil, err
 	}
-	db := s.pg.Get()
-	if db == nil {
-		return nil, errors.New("no db")
-	}
-	sub, err := models.GetReleaseSubscriptionByID(ctx, db, id)
+	sub, err := s.store.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +363,7 @@ func (s *Service) DeleteByToken(ctx context.Context, raw string) (*models.Releas
 		// must read as "done", not as an error.
 		return nil, nil
 	}
-	if err := models.DeleteReleaseSubscriptionByID(ctx, db, id); err != nil {
+	if err := s.store.DeleteByID(ctx, id); err != nil {
 		return nil, err
 	}
 	return sub, nil
@@ -254,11 +371,7 @@ func (s *Service) DeleteByToken(ctx context.Context, raw string) (*models.Releas
 
 // SetEnabled flips the profile toggle for one subscription.
 func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled bool) error {
-	db := s.pg.Get()
-	if db == nil {
-		return errors.New("no db")
-	}
-	return models.SetUserReleaseSubscriptionEnabled(ctx, db, id, userID, enabled)
+	return s.store.SetEnabled(ctx, id, userID, enabled)
 }
 
 // mailOn and mailOff send off the request goroutine. An SMTP dial is a
@@ -269,14 +382,14 @@ func (s *Service) mailOn(u *auth.User, sub *models.ReleaseSubscription) {
 		return
 	}
 	view := s.view(sub)
-	go func() {
+	s.run(func() {
 		if err := s.mail.SendSubscriptionOn(u.Email, view); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).
 				Error("failed to send subscription confirmation")
 		}
-	}()
+	})
 }
 
 func (s *Service) mailOff(u *auth.User, sub *models.ReleaseSubscription) {
@@ -284,14 +397,24 @@ func (s *Service) mailOff(u *auth.User, sub *models.ReleaseSubscription) {
 		return
 	}
 	view := s.view(sub)
-	go func() {
+	s.run(func() {
 		if err := s.mail.SendSubscriptionOff(u.Email, view, false); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).
 				Error("failed to send subscription removal notice")
 		}
-	}()
+	})
+}
+
+// run sends the letter off the request goroutine in production, and inline
+// under test, where a background send would race the assertions.
+func (s *Service) run(f func()) {
+	if s.sync {
+		f()
+		return
+	}
+	go f()
 }
 
 func (s *Service) view(sub *models.ReleaseSubscription) notification.SubscriptionView {
@@ -326,13 +449,13 @@ func (s *Service) checkEligible(ctx context.Context, kind, videoID string) error
 	if kind != models.ReleaseSubscriptionKindSeason {
 		return nil
 	}
-	if s.en == nil || !s.en.HasMappers() {
-		// Without an enricher the airing check cannot run. Refusing is the
+	if s.airing == nil {
+		// Without an airing check the rule cannot run. Refusing is the
 		// conservative branch: an accepted row would be unverifiable and
 		// might poll a finished series indefinitely.
 		return ErrNotEligible
 	}
-	if !s.en.IsAiringSeries(ctx, videoID) {
+	if !s.airing.IsAiringSeries(ctx, videoID) {
 		return ErrNotEligible
 	}
 	return nil
@@ -341,15 +464,15 @@ func (s *Service) checkEligible(ctx context.Context, kind, videoID string) error
 // fillMetadata takes the title/poster snapshot the profile row and the email
 // render from. Best-effort: a subscription with no title still works, it
 // just shows its video id until the next lookup succeeds.
-func (s *Service) fillMetadata(ctx context.Context, db *pg.DB, sub *models.ReleaseSubscription) {
-	if s.en == nil || !s.en.HasMappers() {
+func (s *Service) fillMetadata(ctx context.Context, sub *models.ReleaseSubscription) {
+	if s.meta == nil {
 		return
 	}
 	ct := models.ContentTypeMovie
 	if sub.IsSeason() {
 		ct = models.ContentTypeSeries
 	}
-	md, err := s.en.LookupByVideoID(ctx, sub.VideoID, ct)
+	md, err := s.meta.LookupByVideoID(ctx, sub.VideoID, ct)
 	if err != nil {
 		log.WithError(err).
 			WithField("feature", "release_subscription").

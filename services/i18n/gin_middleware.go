@@ -85,3 +85,25 @@ func GetLocalizer(c *gin.Context) *goI18n.Localizer {
 	}
 	return nil
 }
+
+// Routed reports whether this request actually went through language
+// routing, as opposed to merely defaulting to English.
+//
+// GetLang cannot answer that: it returns DefaultLang both for a canonical
+// English page and for a request the HTTP middleware never touched. The
+// dedicated API hosts are in the second group — they bypass language
+// routing entirely — so anything that *learns* a language from a request
+// (see services/user_settings.Middleware) has to ask this first, or an API
+// call would rewrite a Russian account's language to English.
+//
+// The evidence is what the routing leaves behind: the X-Lang header it sets
+// from a URL prefix, or the lang cookie it writes whenever it resolves one.
+func Routed(c *gin.Context) bool {
+	if h := c.GetHeader(LangHeader); h != "" && IsSupported(h) {
+		return true
+	}
+	if v, err := c.Cookie(langCookie); err == nil && IsSupported(v) {
+		return true
+	}
+	return false
+}
