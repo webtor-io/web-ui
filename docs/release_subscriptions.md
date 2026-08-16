@@ -396,3 +396,11 @@ JS-тесты запускаются `npm test` — это `node --test` без 
 
 Срезано без правок (подтверждено, но не дефект): отсутствие крестика у баннера (осознанный продукт-выбор), словарь `seasonStatus` (задокументированный optimistic-UI), coalesce-index (ничтожное влияние), X-Lang-эвристика.
 
+## SEO-поверхность (2026-08-16)
+
+Спрос на фичу (DataForSEO, US) говорит языком «tracker / RSS / sonarr alternative», а не «notification»: `torrent rss feed` 260/мес KD 0, `sonarr alternative` 90/мес KD 3 — оба с форумно-скриптовой выдачей; все «notification»-формулировки — нулевые, а «tracker»-головы забиты сериалом CBS «Tracker». Поэтому:
+
+- **Лендинг `/torrent-rss-alternative`** в data-driven фреймворке tool-страниц (`handlers/common/tools.go`, ключи `tool.torrentRssAlternative.*` во всех 11 локалях). Секция-сравнение «Webtor subscriptions vs Sonarr + RSS stack» несёт вторую половину кластера; кросс-ссылка на `/stremio-addons-online`. Требование источников здесь достоинство: у аудитории Jackett уже есть.
+- **FAQ на главной** — `about.faq.releaseSubs.*`, добавлен в оба варианта `faqSchema` в `templates/partials/about.html`.
+- Кандидаты в weekly-мониторинг claudeclaw (`seo/serp-core.txt`, меняет только owner): `torrent rss feed|2840|en`, `sonarr alternative|2840|en`.
+- Не сделано сознательно: RU-лендинг (спрос ≈0 через KZ-прокси), таргет «tv show tracker» (SERP съеден одноимённым сериалом).

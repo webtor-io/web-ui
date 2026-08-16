@@ -157,4 +157,21 @@ var Tools = []Tool{
 		{Kind: AboutChecklist, Key: "devices", Badge: "devices", Accent: "pink", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
+	// Release-subscriptions landing. Keyword research 2026-08-16 (DataForSEO):
+	// the demand for this feature speaks "tracker / RSS / sonarr alternative",
+	// not "notification" — "torrent rss feed" (260/mo, KD 0) and
+	// "sonarr alternative" (90/mo, KD 3) both have forum-and-scripts SERPs,
+	// while every notification-phrased query has zero volume and the big
+	// "tracker" heads are drowned by the CBS series of that name. One page
+	// targets the whole cluster; the comparison section is what carries the
+	// "sonarr alternative" half.
+	{Url: "torrent-rss-alternative", Title: "tool.torrentRssAlternative.title", Benefit: "tool.torrentRssAlternative.benefit", Description: "tool.torrentRssAlternative.description", Sections: []AboutSection{
+		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"},
+			// Subscriptions poll the sources this page teaches how to connect.
+			Link: &AboutLink{Url: "/stremio-addons-online", TitleKey: "tool.stremioAddonsOnline.title"}},
+		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"webtor", "selfhosted"}, Footer: true},
+		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Alt: true, Items: 4},
+		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
+	}},
 }
