@@ -1189,11 +1189,11 @@ log
       <strong>Implementation:</strong> See <code>templates/partials/nav.html</code>. Uses <code>navbar-redesign</code> CSS class for hover overrides. Glass effect via inline rgba + backdrop-filter.
     </div>
 
-    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4 mt-8">Icon-only Nav Buttons Are Square</h3>
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4 mt-8">Icon-only Nav Buttons Are Near-Square</h3>
     <div class="uikit-rule">
       <ul class="list-disc list-inside space-y-1">
-        <li>When a nav button shows only its icon (labels are <code>hidden lg:inline</code>), it is <code>btn-square</code>; the label breakpoint reverts it: <code>btn-square lg:w-auto lg:px-3</code></li>
-        <li>Buttons that always carry an icon-only look (quick-search loupe) are plain <code>btn-square</code></li>
+        <li>When a nav button shows only its icon (labels are <code>hidden lg:inline</code>), it is <code>btn-square w-9</code> (36&times;32 — a true 32px square read too cramped); the label breakpoint reverts it: <code>btn-square w-9 lg:w-auto lg:px-3</code></li>
+        <li>Buttons that always carry an icon-only look (quick-search loupe) are <code>btn-square w-9</code> at every width</li>
         <li>Buttons that always show text (language switcher) never get <code>btn-square</code></li>
       </ul>
     </div>
