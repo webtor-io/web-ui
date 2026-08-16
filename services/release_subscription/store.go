@@ -40,6 +40,10 @@ type store interface {
 	// StreamPrefs reads the account's stream settings, which a new
 	// subscription starts out as a copy of.
 	StreamPrefs(ctx context.Context, userID uuid.UUID) (resolutions []string, lang string)
+	// HasStreamSources answers whether the account has anything the poller
+	// could query — an addon or an enabled indexer. What Subscribe refuses
+	// on, so a subscription that can never fire is not written.
+	HasStreamSources(ctx context.Context, userID uuid.UUID) (bool, error)
 	// UpsertMetadata makes sure movie_metadata / series_metadata has a row
 	// for this video id. The profile renders posters through our own
 	// endpoint, which resolves them from exactly those tables.
@@ -242,6 +246,28 @@ func (s pgStore) StreamPrefs(ctx context.Context, userID uuid.UUID) ([]string, s
 		resolutions = nil
 	}
 	return resolutions, strings.TrimSpace(settings.PreferredLanguage)
+}
+
+// HasStreamSources reports whether the poll pipeline would have anyone to
+// ask: an addon URL (enabled or not — BuildPollStreamsService queries them
+// all) or an enabled Torznab indexer.
+func (s pgStore) HasStreamSources(ctx context.Context, userID uuid.UUID) (bool, error) {
+	db, err := s.db()
+	if err != nil {
+		return false, err
+	}
+	addons, err := models.CountUserStremioAddonUrls(ctx, db, userID)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to count addon urls")
+	}
+	if addons > 0 {
+		return true, nil
+	}
+	indexers, err := models.GetUserTorznabIndexers(ctx, db, userID)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to list torznab indexers")
+	}
+	return len(indexers) > 0, nil
 }
 
 func (s pgStore) UpsertMetadata(ctx context.Context, ct models.ContentType, md *models.VideoMetadata) error {

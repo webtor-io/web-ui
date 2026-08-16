@@ -24,19 +24,23 @@ const SchemaVersion = 1
 
 // Export is the full per-user dump. Field tags drive the JSON output.
 type Export struct {
-	SchemaVersion    int                  `json:"schema_version"`
-	GeneratedAt      time.Time            `json:"generated_at"`
-	User             UserData             `json:"user"`
-	Library          []LibraryItem        `json:"library"`
-	WatchHistory     []WatchHistoryItem   `json:"watch_history"`
-	MovieStatuses    []MovieStatusItem    `json:"movie_statuses"`
-	SeriesStatuses   []SeriesStatusItem   `json:"series_statuses"`
-	EpisodeStatuses  []EpisodeStatusItem  `json:"episode_statuses"`
-	MovieWatchlist   []WatchlistItem      `json:"movie_watchlist"`
-	SeriesWatchlist  []WatchlistItem      `json:"series_watchlist"`
-	StremioAddonURLs []StremioAddonItem   `json:"stremio_addon_urls"`
-	StremioSettings  *StremioSettings     `json:"stremio_settings,omitempty"`
-	TorznabIndexers  []TorznabIndexerItem `json:"torznab_indexers"`
+	SchemaVersion    int                 `json:"schema_version"`
+	GeneratedAt      time.Time           `json:"generated_at"`
+	User             UserData            `json:"user"`
+	Library          []LibraryItem       `json:"library"`
+	WatchHistory     []WatchHistoryItem  `json:"watch_history"`
+	MovieStatuses    []MovieStatusItem   `json:"movie_statuses"`
+	SeriesStatuses   []SeriesStatusItem  `json:"series_statuses"`
+	EpisodeStatuses  []EpisodeStatusItem `json:"episode_statuses"`
+	MovieWatchlist   []WatchlistItem     `json:"movie_watchlist"`
+	SeriesWatchlist  []WatchlistItem     `json:"series_watchlist"`
+	StremioAddonURLs []StremioAddonItem  `json:"stremio_addon_urls"`
+	StremioSettings  *StremioSettings    `json:"stremio_settings,omitempty"`
+	// UserSettings is the account's interface preferences row — currently
+	// the adult-content toggle and the last-seen interface language. Absent
+	// when the account has never written one (everything at defaults).
+	UserSettings    *UserSettingsData    `json:"user_settings,omitempty"`
+	TorznabIndexers []TorznabIndexerItem `json:"torznab_indexers"`
 	// ReleaseSubscriptions and their hits are two user-keyed tables: the
 	// standing request, and every infohash it has ever seen (which is what
 	// decides whether a release reaches the user again).
@@ -315,6 +319,9 @@ func Build(ctx context.Context, db *pg.DB, u *models.User) (*Export, error) {
 	if err := exp.fillStremio(ctx, db, u.UserID); err != nil {
 		return nil, err
 	}
+	if err := exp.fillUserSettings(ctx, db, u.UserID); err != nil {
+		return nil, err
+	}
 	if err := exp.fillReleaseSubscriptions(ctx, db, u.UserID); err != nil {
 		return nil, err
 	}
@@ -461,6 +468,33 @@ func (e *Export) fillWatchlists(ctx context.Context, db *pg.DB, uID uuid.UUID) e
 			Source:    s.Source,
 			CreatedAt: s.CreatedAt,
 		})
+	}
+	return nil
+}
+
+// UserSettingsData mirrors the user_settings row. Lang stays a pointer:
+// nil means "never observed", which is a different fact about the account
+// than "chose English".
+type UserSettingsData struct {
+	ShowAdult bool      `json:"show_adult"`
+	Lang      *string   `json:"lang,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (e *Export) fillUserSettings(ctx context.Context, db *pg.DB, uID uuid.UUID) error {
+	us, err := models.GetUserSettings(ctx, db, uID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load user settings")
+	}
+	if us == nil {
+		return nil
+	}
+	e.UserSettings = &UserSettingsData{
+		ShowAdult: us.ShowAdult,
+		Lang:      us.Lang,
+		CreatedAt: us.CreatedAt,
+		UpdatedAt: us.UpdatedAt,
 	}
 	return nil
 }

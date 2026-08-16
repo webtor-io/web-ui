@@ -68,7 +68,7 @@ func TestNormalize(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			kind, season, err := normalize(tt.req)
+			kind, videoID, season, err := normalize(tt.req)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("want error, got kind=%q season=%v", kind, season)
@@ -83,6 +83,9 @@ func TestNormalize(t *testing.T) {
 			}
 			if kind != tt.wantKind {
 				t.Errorf("kind: got %q, want %q", kind, tt.wantKind)
+			}
+			if videoID != tt.req.VideoID {
+				t.Errorf("video id: got %q, want %q", videoID, tt.req.VideoID)
 			}
 			if tt.wantNil {
 				if season != nil {

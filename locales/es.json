@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "No se pudo cancelar la suscripción",
     "discover.subscriptions.limitReached": "Has alcanzado el límite de suscripciones. Elimina una o mejora tu plan.",
     "discover.subscriptions.notEligible": "Esta temporada ya terminó de emitirse: no hay episodios nuevos que esperar.",
+    "discover.subscriptions.noSources": "Añade primero un addon de Stremio o un indexador: las suscripciones buscan en tus propias fuentes.",
     "discover.subscriptions.subscribe": "Avisarme",
     "discover.subscriptions.unsubscribe": "Dejar de avisar",
     "discover.subscriptions.seasonTitle": "Avisarme de nuevos lanzamientos de la temporada %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "No se pudo crear la suscripción",
     "error.subscriptionLimit": "Has alcanzado el límite de suscripciones. Elimina una o mejora tu plan.",
     "error.subscriptionNotEligible": "Aquí no hay nada que esperar: esta temporada ya terminó de emitirse.",
+    "error.subscriptionNoSources": "Añade primero un addon de Stremio o un indexador: las suscripciones buscan en tus propias fuentes.",
     "vault.signInCard.intro": "Vault es un sistema de almacenamiento en Webtor que te permite:",
     "vault.signInCard.feature1": "guardar torrents por largo tiempo,",
     "vault.signInCard.feature2": "ver contenido sin esperar seeders,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Esta suscripción ya no existe. No recibirás más correos sobre ella.",
     "subscription.unsubscribed.failedTitle": "Este enlace no ha funcionado",
     "subscription.unsubscribed.failedText": "Puede que se haya dañado por el camino. Puedes eliminar la suscripción desde tu perfil.",
-    "subscription.unsubscribed.manage": "Gestionar suscripciones"
+    "subscription.unsubscribed.manage": "Gestionar suscripciones",
+    "subscription.unsubscribe.confirmTitle": "¿Dejar de recibir estos correos?",
+    "subscription.unsubscribe.confirmText": "Ya no recibirás correos sobre nuevos lanzamientos de {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Ya no recibirás correos sobre nuevos lanzamientos de esta suscripción.",
+    "subscription.unsubscribe.confirmButton": "Cancelar suscripción"
 }

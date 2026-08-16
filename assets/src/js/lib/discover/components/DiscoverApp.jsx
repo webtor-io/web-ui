@@ -1338,38 +1338,52 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     // modal: the bell next to an airing season, and the two empty states.
     // The target is {kind, videoId, season, source}; the key it maps to is
     // what the Set holds.
+    //
+    // subscriptionToggling holds the keys with a request in flight. Unlike
+    // the watchlist toggle, a bell race has an ongoing side effect: a
+    // double-click whose DELETE overtakes its own POST leaves the server
+    // subscribed (the DELETE finds nothing yet still answers success, by
+    // design) while the bell shows off — and the emails keep coming.
+    // Dropping the second click until the first settles is the whole fix.
+    const subscriptionToggling = useRef(new Set());
     const handleToggleSubscription = useCallback(async (target) => {
         if (!target || !target.videoId || !target.videoId.startsWith('tt')) return;
         const key = subscriptionKey(target.kind, target.videoId, target.season);
-        const subscribed = state.subscriptionKeys.has(key);
+        if (subscriptionToggling.current.has(key)) return;
+        subscriptionToggling.current.add(key);
+        try {
+            const subscribed = state.subscriptionKeys.has(key);
 
-        if (subscribed) {
-            dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
-            window.umami?.track?.('release-sub-removed', { kind: target.kind, id: target.videoId, source: target.source });
-            const result = await unsubscribe(target);
+            if (subscribed) {
+                dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
+                window.umami?.track?.('release-sub-removed', { kind: target.kind, id: target.videoId, source: target.source });
+                const result = await unsubscribe(target);
+                if (!result.ok) {
+                    dispatch({ type: 'SUBSCRIPTION_ADD', key });
+                    if (window.toast) window.toast.error(result.message || t('discover.networkError'));
+                } else if (window.toast && result.message) {
+                    window.toast.success(result.message);
+                }
+                return;
+            }
+
+            dispatch({ type: 'SUBSCRIPTION_ADD', key });
+            window.umami?.track?.('release-sub-created', { kind: target.kind, id: target.videoId, source: target.source });
+            const result = await subscribe(target);
             if (!result.ok) {
-                dispatch({ type: 'SUBSCRIPTION_ADD', key });
+                // Rolled back on every refusal — the cap, a season that turned
+                // out to be over, a network failure. The message is the
+                // server's, so it explains which.
+                dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
+                if (result.code === 'limit_exceeded') {
+                    window.umami?.track?.('release-sub-limit-hit', { limit: result.limit });
+                }
                 if (window.toast) window.toast.error(result.message || t('discover.networkError'));
             } else if (window.toast && result.message) {
                 window.toast.success(result.message);
             }
-            return;
-        }
-
-        dispatch({ type: 'SUBSCRIPTION_ADD', key });
-        window.umami?.track?.('release-sub-created', { kind: target.kind, id: target.videoId, source: target.source });
-        const result = await subscribe(target);
-        if (!result.ok) {
-            // Rolled back on every refusal — the cap, a season that turned
-            // out to be over, a network failure. The message is the
-            // server's, so it explains which.
-            dispatch({ type: 'SUBSCRIPTION_REMOVE', key });
-            if (result.code === 'limit_exceeded') {
-                window.umami?.track?.('release-sub-limit-hit', { limit: result.limit });
-            }
-            if (window.toast) window.toast.error(result.message || t('discover.networkError'));
-        } else if (window.toast && result.message) {
-            window.toast.success(result.message);
+        } finally {
+            subscriptionToggling.current.delete(key);
         }
     }, [state.subscriptionKeys]);
 

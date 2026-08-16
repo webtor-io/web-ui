@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Не удалось отписаться",
     "discover.subscriptions.limitReached": "Достигнут лимит подписок. Удалите одну или перейдите на платный тариф.",
     "discover.subscriptions.notEligible": "Сезон уже вышел целиком — новых серий ждать не приходится.",
+    "discover.subscriptions.noSources": "Сначала добавьте Stremio-аддон или индексер — подписки ищут по вашим собственным источникам.",
     "discover.subscriptions.subscribe": "Сообщить",
     "discover.subscriptions.unsubscribe": "Не сообщать",
     "discover.subscriptions.seasonTitle": "Сообщать о новых раздачах сезона %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Не удалось оформить подписку",
     "error.subscriptionLimit": "Достигнут лимит подписок. Удалите одну или перейдите на платный тариф.",
     "error.subscriptionNotEligible": "Здесь нечего ждать — сезон уже вышел целиком.",
+    "error.subscriptionNoSources": "Сначала добавьте Stremio-аддон или индексер — подписки ищут по вашим собственным источникам.",
     "vault.signInCard.intro": "Vault — это система хранения в Webtor, которая позволяет:",
     "vault.signInCard.feature1": "хранить торренты длительное время,",
     "vault.signInCard.feature2": "смотреть контент без ожидания сидеров,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Этой подписки уже нет. Больше писем по ней не будет.",
     "subscription.unsubscribed.failedTitle": "Ссылка не сработала",
     "subscription.unsubscribed.failedText": "Возможно, она повредилась по дороге. Подписку можно удалить в профиле.",
-    "subscription.unsubscribed.manage": "Управление подписками"
+    "subscription.unsubscribed.manage": "Управление подписками",
+    "subscription.unsubscribe.confirmTitle": "Отключить эти письма?",
+    "subscription.unsubscribe.confirmText": "Писем о новых раздачах «{{.Title}}» больше не будет.",
+    "subscription.unsubscribe.confirmTextPlain": "Писем о новых раздачах по этой подписке больше не будет.",
+    "subscription.unsubscribe.confirmButton": "Отписаться"
 }

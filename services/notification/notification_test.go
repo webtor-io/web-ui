@@ -317,8 +317,11 @@ func TestSend_StoreCreateError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to save notification to db") {
 		t.Errorf("unexpected error message: %v", err)
 	}
-	if len(mail.calls) != 0 {
-		t.Error("expected no email when DB save fails")
+	// The letter goes out before the journal write: a failed write costs at
+	// worst a duplicate send on the retry, where the reverse order cost the
+	// letter itself (see TestSend_MailError).
+	if len(mail.calls) != 1 {
+		t.Errorf("emails sent: got %d, want 1 — the send precedes the journal write", len(mail.calls))
 	}
 }
 
@@ -342,8 +345,44 @@ func TestSend_MailError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to send email") {
 		t.Errorf("unexpected error message: %v", err)
 	}
+	// No journal row for a letter that never left. A row here would make
+	// the retry — same key, inside the 24h window — dedupe against a send
+	// that failed, and the letter would be lost for good: the poller marks
+	// its hits delivered on Send's nil return.
+	if store.created != nil {
+		t.Error("a failed send must not be journaled — the retry would dedupe against it and the letter would never go out")
+	}
+}
+
+// TestSend_RetryAfterMailFailure pins the recovery path end to end: a send
+// that failed leaves no trace, so the identical retry actually mails.
+func TestSend_RetryAfterMailFailure(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	store := &mockStore{}
+	mail := &mockMailer{sendErr: fmt.Errorf("SMTP timeout")}
+	svc := newTestService(store, mail, tmplDir)
+
+	opts := SendOptions{
+		To:       "user@example.com",
+		Key:      "test-key",
+		Title:    "Test",
+		Template: "test.html",
+	}
+	if err := svc.Send(opts); err == nil {
+		t.Fatal("expected the first send to fail")
+	}
+
+	mail.sendErr = nil
+	if err := svc.Send(opts); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if len(mail.calls) != 2 {
+		t.Errorf("send attempts: got %d, want 2 — the retry must not be muted by the dedupe", len(mail.calls))
+	}
 	if store.created == nil {
-		t.Error("notification should still be saved to DB even when email fails")
+		t.Error("the successful retry must be journaled")
 	}
 }
 

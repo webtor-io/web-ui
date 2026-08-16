@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Odběr se nepodařilo zrušit",
     "discover.subscriptions.limitReached": "Dosáhl jsi limitu odběrů. Jeden smaž nebo změň tarif.",
     "discover.subscriptions.notEligible": "Tato sezóna už byla celá odvysílána — na nové díly není co čekat.",
+    "discover.subscriptions.noSources": "Nejdřív přidej Stremio addon nebo indexer — odběry prohledávají tvoje vlastní zdroje.",
     "discover.subscriptions.subscribe": "Dát vědět",
     "discover.subscriptions.unsubscribe": "Nedávat vědět",
     "discover.subscriptions.seasonTitle": "Dát vědět o nových vydáních sezóny %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Odběr se nepodařilo vytvořit",
     "error.subscriptionLimit": "Dosáhl jsi limitu odběrů. Jeden smaž nebo změň tarif.",
     "error.subscriptionNotEligible": "Není tu na co čekat — tato sezóna už byla celá odvysílána.",
+    "error.subscriptionNoSources": "Nejdřív přidej Stremio addon nebo indexer — odběry prohledávají tvoje vlastní zdroje.",
     "vault.signInCard.intro": "Vault je úložný systém ve Webtoru, který ti umožňuje:",
     "vault.signInCard.feature1": "ukládat torrenty na dlouhou dobu,",
     "vault.signInCard.feature2": "sledovat obsah bez čekání na seedery,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Tento odběr už neexistuje. Další e-maily k němu nepřijdou.",
     "subscription.unsubscribed.failedTitle": "Tento odkaz nefungoval",
     "subscription.unsubscribed.failedText": "Možná se cestou poškodil. Odběr můžeš smazat v profilu.",
-    "subscription.unsubscribed.manage": "Správa odběrů"
+    "subscription.unsubscribed.manage": "Správa odběrů",
+    "subscription.unsubscribe.confirmTitle": "Zastavit tyto e-maily?",
+    "subscription.unsubscribe.confirmText": "Další e-maily o nových vydáních {{.Title}} už nepřijdou.",
+    "subscription.unsubscribe.confirmTextPlain": "Další e-maily o nových vydáních k tomuto odběru už nepřijdou.",
+    "subscription.unsubscribe.confirmButton": "Odhlásit odběr"
 }

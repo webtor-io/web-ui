@@ -4,18 +4,14 @@ import (
 	"testing"
 
 	"github.com/webtor-io/web-ui/models"
-	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
 
-// newTestPreferredStream builds a PreferredStream with only the resolution
-// parser wired up. filterByPreferredResolutions touches nothing else (no DB,
-// no inner service), so this is enough to exercise the filtering logic.
+// newTestPreferredStream builds a bare PreferredStream.
+// filterByPreferredResolutions touches nothing on the struct (the resolution
+// bucketing is the package-level ResolutionBucket), so this is enough to
+// exercise the filtering logic.
 func newTestPreferredStream() *PreferredStream {
-	return &PreferredStream{
-		parser: ptn.NewCompoundParser([]ptn.Parser{
-			ptn.GetFieldParser(ptn.FieldTypeResolution),
-		}),
-	}
+	return &PreferredStream{}
 }
 
 // libraryStream builds a stream that isLibraryStream recognises (webtorio|

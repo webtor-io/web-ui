@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Nie udało się anulować subskrypcji",
     "discover.subscriptions.limitReached": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",
     "discover.subscriptions.notEligible": "Ten sezon został już w całości wyemitowany — nie ma na co czekać.",
+    "discover.subscriptions.noSources": "Najpierw dodaj addon Stremio lub indekser — subskrypcje przeszukują Twoje własne źródła.",
     "discover.subscriptions.subscribe": "Powiadom mnie",
     "discover.subscriptions.unsubscribe": "Nie powiadamiaj",
     "discover.subscriptions.seasonTitle": "Powiadom o nowych wydaniach sezonu %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Nie udało się utworzyć subskrypcji",
     "error.subscriptionLimit": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",
     "error.subscriptionNotEligible": "Nie ma tu na co czekać — ten sezon został już w całości wyemitowany.",
+    "error.subscriptionNoSources": "Najpierw dodaj addon Stremio lub indekser — subskrypcje przeszukują Twoje własne źródła.",
     "vault.signInCard.intro": "Vault to system przechowywania w Webtor, który pozwala:",
     "vault.signInCard.feature1": "zapisywać torrenty na długo,",
     "vault.signInCard.feature2": "oglądać zawartość bez czekania na seederów,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Tej subskrypcji już nie ma. Nie dostaniesz już o niej wiadomości.",
     "subscription.unsubscribed.failedTitle": "Ten link nie zadziałał",
     "subscription.unsubscribed.failedText": "Mógł się uszkodzić po drodze. Subskrypcję możesz usunąć w profilu.",
-    "subscription.unsubscribed.manage": "Zarządzaj subskrypcjami"
+    "subscription.unsubscribed.manage": "Zarządzaj subskrypcjami",
+    "subscription.unsubscribe.confirmTitle": "Wyłączyć te e-maile?",
+    "subscription.unsubscribe.confirmText": "Nie będziesz już dostawać e-maili o nowych wydaniach {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Nie będziesz już dostawać e-maili o nowych wydaniach dla tej subskrypcji.",
+    "subscription.unsubscribe.confirmButton": "Wypisz się"
 }

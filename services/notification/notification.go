@@ -107,7 +107,19 @@ func (s *Service) Send(opts SendOptions) error {
 		return errors.Wrap(err, "failed to render notification template")
 	}
 
-	// 3. Save to DB
+	// 3. Send, then journal. The order is what makes the duplicate check
+	// above trustworthy: a journal row exists only for a letter that
+	// actually left, so a dedupe hit genuinely means "already sent".
+	// Journaled-before-send, a failed SMTP attempt would leave a row
+	// behind, and the retry — same key, inside the 24h window — would be
+	// swallowed as a duplicate of a letter no one ever received. The
+	// price of this order is the opposite, smaller failure: a sent letter
+	// whose journal write fails may be sent again on the next run.
+	err = s.mail.Send(opts.To, opts.Title, body)
+	if err != nil {
+		return errors.Wrap(err, "failed to send email")
+	}
+
 	n := &models.Notification{
 		Key:      opts.Key,
 		Title:    opts.Title,
@@ -118,11 +130,6 @@ func (s *Service) Send(opts SendOptions) error {
 	err = s.store.Create(ctx, n)
 	if err != nil {
 		return errors.Wrap(err, "failed to save notification to db")
-	}
-
-	err = s.mail.Send(opts.To, opts.Title, body)
-	if err != nil {
-		return errors.Wrap(err, "failed to send email")
 	}
 
 	return nil

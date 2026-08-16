@@ -30,6 +30,10 @@ type subStore struct {
 	deletedIDs       []uuid.UUID
 	enabledCalls     int
 	accountLang      string
+	// noSources flips HasStreamSources to false; the zero value keeps the
+	// pre-existing tests on an account that has sources.
+	noSources        bool
+	sourcesErr       error
 	prefResolutions  []string
 	prefLang         string
 	savedResolutions []string
@@ -39,6 +43,10 @@ type subStore struct {
 }
 
 func (f *subStore) AccountLang(context.Context, uuid.UUID) string { return f.accountLang }
+
+func (f *subStore) HasStreamSources(context.Context, uuid.UUID) (bool, error) {
+	return !f.noSources, f.sourcesErr
+}
 
 func (f *subStore) UpsertMetadata(_ context.Context, ct models.ContentType, md *models.VideoMetadata) error {
 	f.cachedMetadata = md
@@ -120,6 +128,12 @@ type subAiring struct{ airing bool }
 
 func (f subAiring) IsAiringSeries(context.Context, string) bool { return f.airing }
 
+// The poller's checked variant — the e2e scenario hands the same fake to
+// both halves of the feature.
+func (f subAiring) IsAiringSeriesChecked(context.Context, string) (bool, error) {
+	return f.airing, nil
+}
+
 type subMeta struct {
 	md  *models.VideoMetadata
 	err error
@@ -171,6 +185,56 @@ func TestSubscribeCreatesAndConfirms(t *testing.T) {
 	}
 	if mail.on[0].UnsubscribeURL == "" {
 		t.Error("the confirmation carries no unsubscribe link")
+	}
+}
+
+// A padded id passes validation (it trims before checking) but must be
+// persisted trimmed: the raw string once went into the row verbatim, where
+// it polled sources for " tt0111161", matched nothing forever, and could
+// coexist with a clean duplicate the unique index reads as different.
+func TestSubscribeStoresTrimmedVideoID(t *testing.T) {
+	st := &subStore{createOK: true}
+	s := newTestService(st, &subMail{}, true)
+
+	req := movieReq()
+	req.VideoID = " tt0111161\n"
+	if _, _, err := s.Subscribe(context.Background(), viewer, req, -1); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if st.created.VideoID != "tt0111161" {
+		t.Errorf("stored video id: %q, want it trimmed", st.created.VideoID)
+	}
+}
+
+// An account with no addons and no indexers holds a subscription that can
+// never fire — the poller runs the user's own pipeline. The entry points
+// hide the offer client-side; this is the backstop for the paths that
+// don't.
+func TestSubscribeRefusesWithoutStreamSources(t *testing.T) {
+	st := &subStore{createOK: true, noSources: true}
+	mail := &subMail{}
+	s := newTestService(st, mail, true)
+
+	_, _, err := s.Subscribe(context.Background(), viewer, movieReq(), FreeTierLimit)
+	if !errors.Is(err, ErrNoStreamSources) {
+		t.Fatalf("subscribe: got %v, want ErrNoStreamSources", err)
+	}
+	if st.created != nil {
+		t.Error("no row may be written for an account with nothing to poll")
+	}
+	if len(mail.on) != 0 {
+		t.Error("no confirmation for a refused subscription")
+	}
+}
+
+// The check fails open: a flaky count query must not refuse a subscription
+// the UI just offered.
+func TestSubscribeAllowsWhenSourceCheckErrors(t *testing.T) {
+	st := &subStore{createOK: true, noSources: true, sourcesErr: errors.New("db timeout")}
+	s := newTestService(st, &subMail{}, true)
+
+	if _, added, err := s.Subscribe(context.Background(), viewer, movieReq(), -1); err != nil || !added {
+		t.Fatalf("subscribe: added=%v err=%v, want the fail-open branch to accept", added, err)
 	}
 }
 
@@ -435,6 +499,34 @@ func TestDeleteByToken(t *testing.T) {
 	sub, err = s.DeleteByToken(context.Background(), token)
 	if err != nil || sub != nil {
 		t.Errorf("second click: sub=%v err=%v, want (nil, nil)", sub, err)
+	}
+}
+
+// The GET half of the unsubscribe flow: a mail scanner prefetching the link
+// must change nothing. Peek resolves the token to a name for the confirm
+// page and deletes nothing — the deletion is the POST's, behind the button.
+func TestPeekByTokenDeletesNothing(t *testing.T) {
+	id := uuid.NewV4()
+	st := &subStore{found: &models.ReleaseSubscription{ID: id, Title: strptr("The Boys")}}
+	s := newTestService(st, &subMail{}, true)
+
+	token, err := SignUnsubscribeToken("secret", id)
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	sub, err := s.PeekByToken(context.Background(), token)
+	if err != nil {
+		t.Fatalf("peek: %v", err)
+	}
+	if sub == nil || sub.ID != id {
+		t.Fatalf("returned: %v", sub)
+	}
+	if len(st.deletedIDs) != 0 {
+		t.Errorf("a peek deleted rows: %v", st.deletedIDs)
+	}
+
+	if _, err := s.PeekByToken(context.Background(), "not-a-token"); err == nil {
+		t.Error("a garbage token was accepted")
 	}
 }
 

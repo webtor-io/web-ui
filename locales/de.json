@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Abo konnte nicht beendet werden",
     "discover.subscriptions.limitReached": "Abo-Limit erreicht. Lösche eines oder wechsle den Tarif.",
     "discover.subscriptions.notEligible": "Diese Staffel ist bereits vollständig ausgestrahlt – es kommen keine neuen Folgen mehr.",
+    "discover.subscriptions.noSources": "Füge zuerst ein Stremio-Addon oder einen Indexer hinzu — Abos durchsuchen deine eigenen Quellen.",
     "discover.subscriptions.subscribe": "Benachrichtigen",
     "discover.subscriptions.unsubscribe": "Nicht mehr benachrichtigen",
     "discover.subscriptions.seasonTitle": "Über neue Releases von Staffel %v benachrichtigen",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Abo konnte nicht angelegt werden",
     "error.subscriptionLimit": "Abo-Limit erreicht. Lösche eines oder wechsle den Tarif.",
     "error.subscriptionNotEligible": "Hier gibt es nichts zu erwarten – diese Staffel ist bereits vollständig ausgestrahlt.",
+    "error.subscriptionNoSources": "Füge zuerst ein Stremio-Addon oder einen Indexer hinzu — Abos durchsuchen deine eigenen Quellen.",
     "vault.signInCard.intro": "Vault ist ein Speichersystem in Webtor, mit dem Sie:",
     "vault.signInCard.feature1": "Torrents langfristig speichern,",
     "vault.signInCard.feature2": "Inhalte ohne Warten auf Seeder ansehen,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Dieses Abo gibt es nicht mehr. Du bekommst dazu keine weiteren E-Mails.",
     "subscription.unsubscribed.failedTitle": "Dieser Link hat nicht funktioniert",
     "subscription.unsubscribed.failedText": "Vielleicht ist er unterwegs beschädigt worden. Du kannst das Abo in deinem Profil löschen.",
-    "subscription.unsubscribed.manage": "Abos verwalten"
+    "subscription.unsubscribed.manage": "Abos verwalten",
+    "subscription.unsubscribe.confirmTitle": "Diese E-Mails beenden?",
+    "subscription.unsubscribe.confirmText": "Du bekommst keine E-Mails mehr zu neuen Releases von {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Du bekommst keine E-Mails mehr zu neuen Releases für dieses Abo.",
+    "subscription.unsubscribe.confirmButton": "Abbestellen"
 }

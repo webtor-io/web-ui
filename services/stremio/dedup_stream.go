@@ -66,5 +66,11 @@ func (d *DedupStream) GetStreams(ctx context.Context, contentType, contentID str
 		}
 	}
 
-	return &StreamsResponse{Streams: dedupedStreams}, nil
+	return &StreamsResponse{
+		Streams: dedupedStreams,
+		// Source accounting passes through untouched — dedup changes what
+		// the streams are, not where they came from.
+		Sources:       response.Sources,
+		SourcesFailed: response.SourcesFailed,
+	}, nil
 }

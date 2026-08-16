@@ -109,9 +109,15 @@ func (c *CompositeStream) GetStreams(ctx context.Context, contentType, contentID
 
 	// Collect results maintaining order
 	orderedResults := make([]*StreamsResponse, len(c.services))
+	sources, sourcesFailed := 0, 0
 
 	for res := range results {
 		if res.err != nil {
+			// A failed child counts as one leaf: composites never return
+			// errors themselves (they swallow them right here), so an error
+			// always comes from a single addon or indexer.
+			sources++
+			sourcesFailed++
 			// Get service name for better logging
 			serviceName := "unknown"
 			if res.index < len(c.services) {
@@ -132,6 +138,16 @@ func (c *CompositeStream) GetStreams(ctx context.Context, contentType, contentID
 		}
 
 		orderedResults[res.index] = res.response
+		if _, nested := c.services[res.index].(*CompositeStream); nested && res.response != nil {
+			// A nested composite reports its own leaf counts — trust them
+			// verbatim, zero included: an inner composite built over no
+			// addons has no sources, and counting it as one would mask
+			// exactly the "nothing to ask" case these fields exist for.
+			sources += res.response.Sources
+			sourcesFailed += res.response.SourcesFailed
+		} else {
+			sources++
+		}
 	}
 
 	// Merge all successful responses maintaining order
@@ -142,7 +158,7 @@ func (c *CompositeStream) GetStreams(ctx context.Context, contentType, contentID
 		}
 	}
 
-	return &StreamsResponse{Streams: allStreams}, nil
+	return &StreamsResponse{Streams: allStreams, Sources: sources, SourcesFailed: sourcesFailed}, nil
 }
 
 // convertManifestURLToBaseURL converts a manifest URL (ending with manifest.json) to base URL

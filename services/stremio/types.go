@@ -33,6 +33,15 @@ type StreamItem struct {
 
 type StreamsResponse struct {
 	Streams []StreamItem `json:"streams"`
+	// Sources and SourcesFailed count the leaf services this response drew
+	// on and how many of them errored. Composites fill them in; a response
+	// parsed off the wire (an addon's JSON) leaves both at zero, which the
+	// aggregation reads as "one leaf, answered". They exist for the one
+	// caller that must tell "found nothing" apart from "could not ask" —
+	// the subscription poller's baseline decision — and are deliberately
+	// kept out of the JSON.
+	Sources       int `json:"-"`
+	SourcesFailed int `json:"-"`
 }
 
 type MetaItem struct {

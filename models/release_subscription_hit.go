@@ -61,7 +61,11 @@ func InsertReleaseSubscriptionHits(ctx context.Context, db *pg.DB, hits []Releas
 	for i := range hits {
 		h := hits[i]
 		h.InfoHash = strings.ToLower(strings.TrimSpace(h.InfoHash))
-		if h.InfoHash == "" {
+		// The column is varchar(40) — a v1 infohash. One over-long value (a
+		// BitTorrent-v2 hash from a third-party addon) would fail the whole
+		// multi-row INSERT, valid hits included, so anything the column
+		// cannot hold is dropped here as well as at collection.
+		if h.InfoHash == "" || len(h.InfoHash) > 40 {
 			continue
 		}
 		h.FirstSeenAt = now

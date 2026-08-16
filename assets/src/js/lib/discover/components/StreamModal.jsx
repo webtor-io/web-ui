@@ -115,7 +115,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     const reviewsVideoId = isImdb && videoType ? videoId : null;
 
     if (modal.view === 'episodes') {
-        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} />;
+        return <EpisodePicker key={modal._seasonKey} modal={modal} onEpisodeSelect={onEpisodeSelect} defaultSeason={modal.defaultSeason} onSeasonChange={onSeasonChange} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} />;
     }
 
     if (modal.view === 'streams') {
@@ -885,7 +885,7 @@ function StreamRow({ stream, info, onStreamClick }) {
 
 // --- Episode Picker ---
 
-function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription }) {
+function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
     const { title, poster, meta } = modal;
     const videos = meta?.videos || [];
     // Same tab mechanics as StreamContent — Episodes (N) / Reviews (M),
@@ -1010,8 +1010,11 @@ function EpisodePicker({ modal, onEpisodeSelect, defaultSeason, onSeasonChange, 
                 )}
                 {/* The bell only appears on a season that still has episodes
                     coming — subscribing to a finished one would be a poll
-                    that can never fire, and the server refuses it anyway. */}
-                {subTarget && (
+                    that can never fire, and the server refuses it anyway.
+                    hasSources gates it like the other two subscribe
+                    affordances: the poller runs the user's own pipeline, so
+                    an account with no sources gets no offer here either. */}
+                {subTarget && hasSources && (
                     <div class="ml-auto shrink-0">
                         <SubscribeButton
                             target={subTarget}

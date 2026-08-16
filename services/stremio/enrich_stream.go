@@ -16,7 +16,6 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	sv "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/link_resolver/common"
-	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 )
 
 // EnrichStream wraps another StreamsService to enrich streams with URLs.
@@ -133,24 +132,7 @@ func sortVaultFirstByResolution(streams []StreamItem) {
 	if len(streams) < 2 {
 		return
 	}
-	parser := ptn.NewCompoundParser([]ptn.Parser{ptn.GetFieldParser(ptn.FieldTypeResolution)})
-	resolutionOf := func(name string) string {
-		ms := ptn.Matches{}
-		ms, err := parser.Parse(name, ms)
-		if err != nil {
-			return "other"
-		}
-		ti := &ptn.TorrentInfo{}
-		ti.Map(ms)
-		switch ti.Resolution {
-		case "":
-			return "other"
-		case "2160p":
-			return "4k"
-		default:
-			return ti.Resolution
-		}
-	}
+	resolutionOf := ResolutionBucket
 	start := 0
 	currentRes := resolutionOf(streams[0].Name)
 	for i := 1; i <= len(streams); i++ {

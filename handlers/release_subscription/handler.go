@@ -54,6 +54,7 @@ type subscriptions interface {
 	SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled bool) error
 	SetPreferences(ctx context.Context, userID, id uuid.UUID, resolutions []string, lang string) error
 	DeleteByToken(ctx context.Context, token string) (*models.ReleaseSubscription, error)
+	PeekByToken(ctx context.Context, token string) (*models.ReleaseSubscription, error)
 }
 
 type Handler struct {
@@ -91,13 +92,27 @@ func (h *Handler) routes(r gin.IRouter) {
 	// Deliberately outside the auth group: this is the link in an email,
 	// and the signed token is what authorizes it. Requiring a session would
 	// mean the reader has to log in to stop receiving mail.
-	r.GET("/subscription/unsubscribe/:token", h.unsubscribeByToken)
+	//
+	// Two steps on purpose. Mail scanners (SafeLinks and friends) prefetch
+	// every link in a message with a GET, so the GET only shows a page; the
+	// deletion happens on the POST behind its confirm button, which a
+	// scanner cannot produce — it has neither the intent nor the CSRF token
+	// the session middleware hands the page.
+	r.GET("/subscription/unsubscribe/:token", h.unsubscribeConfirm)
+	r.POST("/subscription/unsubscribe/:token", h.unsubscribeByToken)
 }
 
 // unsubscribedData drives the confirmation page.
 type unsubscribedData struct {
 	Title  string
 	Failed bool
+}
+
+// unsubscribeConfirmData drives the "stop these emails?" page the GET
+// renders. Token rides back in the form action.
+type unsubscribeConfirmData struct {
+	Title string
+	Token string
 }
 
 // --- DTOs ---
@@ -246,6 +261,11 @@ func (h *Handler) writeSubscribeError(c *gin.Context, err error) {
 			Status: "error", Code: "not_eligible",
 			Message: i18n.T(c, "discover.subscriptions.notEligible"),
 		})
+	case errors.Is(err, rs.ErrNoStreamSources):
+		c.JSON(http.StatusConflict, errorBody{
+			Status: "error", Code: "no_sources",
+			Message: i18n.T(c, "discover.subscriptions.noSources"),
+		})
 	case errors.Is(err, rs.ErrBadRequest):
 		c.JSON(http.StatusBadRequest, errorBody{
 			Status: "error", Code: "bad_request",
@@ -345,9 +365,31 @@ func (h *Handler) formUpdate(c *gin.Context) {
 	web.RedirectWithSuccessAndMessage(c, "toast.settingsSaved")
 }
 
-// unsubscribeByToken serves the one-click link. It answers with a page
-// either way: a token that no longer resolves means the subscription is
-// already gone, which is the outcome the reader wanted.
+// unsubscribeConfirm serves the GET: a page naming the subscription with a
+// confirm form, deleting nothing. A token that no longer resolves renders
+// the done-page — the second visit to an already-used link must read as
+// "done", not as an error.
+func (h *Handler) unsubscribeConfirm(c *gin.Context) {
+	token := c.Param("token")
+	sub, err := h.svc.PeekByToken(c.Request.Context(), token)
+	if err != nil {
+		log.WithError(err).WithField("feature", "release_subscription").Warn("unsubscribe link rejected")
+		h.tb.Build("subscription/unsubscribed").HTML(http.StatusOK, web.NewContext(c).WithData(&unsubscribedData{Failed: true}))
+		return
+	}
+	if sub == nil {
+		h.tb.Build("subscription/unsubscribed").HTML(http.StatusOK, web.NewContext(c).WithData(&unsubscribedData{}))
+		return
+	}
+	h.tb.Build("subscription/unsubscribe_confirm").HTML(http.StatusOK, web.NewContext(c).WithData(&unsubscribeConfirmData{
+		Title: sub.GetTitle(),
+		Token: token,
+	}))
+}
+
+// unsubscribeByToken serves the POST from the confirm form. It answers with
+// a page either way: a token that no longer resolves means the subscription
+// is already gone, which is the outcome the reader wanted.
 func (h *Handler) unsubscribeByToken(c *gin.Context) {
 	sub, err := h.svc.DeleteByToken(c.Request.Context(), c.Param("token"))
 	if err != nil {
@@ -445,6 +487,8 @@ func userError(err error) error {
 		return web.NewUserError("error.subscriptionLimit", err)
 	case errors.Is(err, rs.ErrNotEligible):
 		return web.NewUserError("error.subscriptionNotEligible", err)
+	case errors.Is(err, rs.ErrNoStreamSources):
+		return web.NewUserError("error.subscriptionNoSources", err)
 	case errors.Is(err, rs.ErrBadRequest):
 		return web.NewUserError("error.subscriptionFailed", err)
 	}

@@ -1,0 +1,25 @@
+{{ define "title" }}{{ t $.Lang "subscription.unsubscribe.confirmTitle" }}{{ end }}
+{{ define "description" }}
+    <meta name="robots" content="noindex">
+{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+    <div class="max-w-[480px] mx-auto">
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-8">
+            <h1 class="text-[1.4rem] font-bold tracking-tight mb-2">{{ t $.Lang "subscription.unsubscribe.confirmTitle" }}</h1>
+            {{ if .Data.Title }}
+                <p class="text-sm text-w-sub leading-relaxed mb-6">{{ tp $.Lang "subscription.unsubscribe.confirmText" "Title" .Data.Title }}</p>
+            {{ else }}
+                <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "subscription.unsubscribe.confirmTextPlain" }}</p>
+            {{ end }}
+            {{/* The deletion happens here, on the POST — the GET that
+                 rendered this page deletes nothing, so a mail scanner
+                 prefetching the link changes nothing. */}}
+            <form method="post" action="{{ langPath $.Lang (printf "/subscription/unsubscribe/%s" .Data.Token) }}">
+                <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
+                <button type="submit" class="btn btn-soft w-full">{{ t $.Lang "subscription.unsubscribe.confirmButton" }}</button>
+            </form>
+        </div>
+    </div>
+</section>
+{{ end }}

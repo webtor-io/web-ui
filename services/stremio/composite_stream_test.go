@@ -346,3 +346,69 @@ func TestCompositeStreamTimeoutIsMaxOfChildren(t *testing.T) {
 		t.Errorf("empty composite timeout = %v, want 0 (falls back to the default)", got)
 	}
 }
+
+// TestCompositeStreamSourceAccounting pins the leaf counting that lets the
+// subscription poller tell "found nothing" from "could not ask": failed
+// leaves are counted, nested composites report their own totals (zero
+// included — an inner composite over no addons must not read as an answered
+// source), and dedup passes the numbers through.
+func TestCompositeStreamSourceAccounting(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("zero services means zero sources", func(t *testing.T) {
+		resp, err := NewCompositeStream(nil).GetStreams(ctx, "movie", "tt1")
+		if err != nil {
+			t.Fatalf("GetStreams: %v", err)
+		}
+		if resp.Sources != 0 || resp.SourcesFailed != 0 {
+			t.Errorf("sources=%d failed=%d, want 0/0", resp.Sources, resp.SourcesFailed)
+		}
+	})
+
+	t.Run("failed leaves are counted", func(t *testing.T) {
+		composite := NewCompositeStream([]StreamsService{
+			&mockStreamService{response: &StreamsResponse{Streams: []StreamItem{{InfoHash: "aa"}}}},
+			&mockStreamService{err: errors.New("addon down")},
+		})
+		resp, err := composite.GetStreams(ctx, "movie", "tt1")
+		if err != nil {
+			t.Fatalf("GetStreams: %v", err)
+		}
+		if resp.Sources != 2 || resp.SourcesFailed != 1 {
+			t.Errorf("sources=%d failed=%d, want 2/1", resp.Sources, resp.SourcesFailed)
+		}
+	})
+
+	t.Run("an empty nested composite is not an answered source", func(t *testing.T) {
+		outer := NewCompositeStream([]StreamsService{
+			NewCompositeStream(nil), // the addon half of an account with no addons
+			NewCompositeStream([]StreamsService{
+				&mockStreamService{err: errors.New("indexer down")},
+			}),
+		})
+		resp, err := outer.GetStreams(ctx, "movie", "tt1")
+		if err != nil {
+			t.Fatalf("GetStreams: %v", err)
+		}
+		if resp.Sources != 1 || resp.SourcesFailed != 1 {
+			t.Errorf("sources=%d failed=%d, want 1/1 — every real source failed", resp.Sources, resp.SourcesFailed)
+		}
+	})
+
+	t.Run("dedup passes the accounting through", func(t *testing.T) {
+		inner := NewCompositeStream([]StreamsService{
+			&mockStreamService{response: &StreamsResponse{Streams: []StreamItem{{InfoHash: "aa"}, {InfoHash: "aa"}}}},
+			&mockStreamService{err: errors.New("down")},
+		})
+		resp, err := NewDedupStream(inner).GetStreams(ctx, "movie", "tt1")
+		if err != nil {
+			t.Fatalf("GetStreams: %v", err)
+		}
+		if resp.Sources != 2 || resp.SourcesFailed != 1 {
+			t.Errorf("sources=%d failed=%d, want 2/1 after dedup", resp.Sources, resp.SourcesFailed)
+		}
+		if len(resp.Streams) != 1 {
+			t.Errorf("streams: %d, want 1 after dedup", len(resp.Streams))
+		}
+	})
+}

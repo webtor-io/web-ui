@@ -3,6 +3,7 @@ package release_subscription
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,15 +73,19 @@ func (s *fakeStore) SeasonEpisodes(context.Context, string, int16) ([]models.Epi
 func (s *fakeStore) AccountLang(context.Context, uuid.UUID) string { return s.lang }
 
 type fakeSearch struct {
-	byContentID map[string][]stremio.StreamItem
-	asked       []string
-	err         error
+	byContentID  map[string][]stremio.StreamItem
+	asked        []string
+	err          error
+	errByContent map[string]error
 }
 
 func (s *fakeSearch) Search(_ context.Context, _ *auth.User, _, contentID string) ([]stremio.StreamItem, error) {
 	s.asked = append(s.asked, contentID)
 	if s.err != nil {
 		return nil, s.err
+	}
+	if err := s.errByContent[contentID]; err != nil {
+		return nil, err
 	}
 	return s.byContentID[contentID], nil
 }
@@ -108,9 +113,14 @@ type fakeTier struct{ free bool }
 
 func (t fakeTier) IsFree(string, *string) bool { return t.free }
 
-type fakeAiring struct{ airing bool }
+type fakeAiring struct {
+	airing bool
+	err    error
+}
 
-func (a fakeAiring) IsAiringSeries(context.Context, string) bool { return a.airing }
+func (a fakeAiring) IsAiringSeriesChecked(context.Context, string) (bool, error) {
+	return a.airing, a.err
+}
 
 // --- helpers ---
 
@@ -383,6 +393,52 @@ func TestSeasonIsOver(t *testing.T) {
 	}
 }
 
+// TestSeasonSurvivesAiringCheckFailure: completion is terminal, so "could
+// not ask whether the show still airs" must read as "still airs". The
+// checked interface exists for exactly this — the unchecked one folded a
+// mapper error into the false that closes the subscription forever.
+func TestSeasonSurvivesAiringCheckFailure(t *testing.T) {
+	aired := []models.EpisodeMetadata{episode(1, 60*24*time.Hour), episode(2, 53*24*time.Hour)}
+
+	p := NewPoller(&fakeStore{}, &fakeSearch{}, &fakeMailer{}, fakeTier{}, fakeAiring{airing: false, err: errors.New("tmdb cache unreachable")}, testConfig())
+	if p.seasonIsOver(context.Background(), seasonSub(), aired) {
+		t.Error("an unanswered airing check must keep the subscription open")
+	}
+
+	// And with no checker wired at all — a deployment whose enricher has no
+	// mappers — nothing ever completes.
+	p = NewPoller(&fakeStore{}, &fakeSearch{}, &fakeMailer{}, fakeTier{}, nil, testConfig())
+	if p.seasonIsOver(context.Background(), seasonSub(), aired) {
+		t.Error("without an airing checker no subscription may complete")
+	}
+}
+
+// TestCollectDropsOverlongInfohash: the hit column is varchar(40), and the
+// insert is one multi-row statement — a single 64-hex BitTorrent-v2 hash
+// from a third-party addon would fail the whole batch, valid hits included,
+// on every poll forever.
+func TestCollectDropsOverlongInfohash(t *testing.T) {
+	v2 := strings.Repeat("ab", 32) // 64 hex chars
+	search := &fakeSearch{byContentID: map[string][]stremio.StreamItem{
+		"tt1190634:3:5": {
+			{InfoHash: v2, Title: "The.Boys.S03E05.v2-only"},
+			{InfoHash: "aa", Title: "The.Boys.S03E05.1080p"},
+		},
+	}}
+	p := NewPoller(&fakeStore{}, search, &fakeMailer{}, fakeTier{}, fakeAiring{}, testConfig())
+
+	hits, searched, err := p.collect(context.Background(), &auth.User{}, seasonSub(), []models.EpisodeMetadata{episode(5, time.Hour)})
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if !searched {
+		t.Error("dropping a hash is not a failed query")
+	}
+	if len(hits) != 1 || hits[0].InfoHash != "aa" {
+		t.Errorf("hits: %+v, want only the 40-char hash", hits)
+	}
+}
+
 // TestMovieNeverCompletes: the owner decides when they have the release they
 // were waiting for. Nothing the poller can see says it for them.
 func TestMovieNeverCompletes(t *testing.T) {
@@ -631,6 +687,42 @@ func TestBaselineStaysPendingWhenEverySourceFailed(t *testing.T) {
 	}
 	if !store.checkedNext.After(time.Now()) {
 		t.Error("the row was not rescheduled")
+	}
+}
+
+// One failed episode query out of three is enough to hold the promotion:
+// that episode's releases were never seen, so a baseline that promoted past
+// them would insert them on the next poll as new — and mail them.
+func TestBaselineStaysPendingOnPartialFailure(t *testing.T) {
+	sub := seasonSub()
+	sub.State = models.ReleaseSubscriptionStatePendingBaseline
+	store := &fakeStore{
+		due: []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{
+			episode(1, 21*24*time.Hour),
+			episode(2, 14*24*time.Hour),
+			episode(3, 7*24*time.Hour),
+		},
+	}
+	search := &fakeSearch{
+		byContentID: map[string][]stremio.StreamItem{
+			"tt1190634:3:3": {{InfoHash: "aa", Title: "The.Boys.S03E03"}},
+			"tt1190634:3:1": {{InfoHash: "bb", Title: "The.Boys.S03E01"}},
+		},
+		errByContent: map[string]error{
+			"tt1190634:3:2": errors.New("indexer timed out"),
+		},
+	}
+	p := NewPoller(store, search, &fakeMailer{}, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if store.checkedState != models.ReleaseSubscriptionStatePendingBaseline {
+		t.Errorf("state: got %q, want it to stay pending_baseline until every query answers", store.checkedState)
+	}
+	if !store.insertBaseline || len(store.inserted) != 2 {
+		t.Errorf("the hits that were found must still be recorded as baseline: %+v", store.inserted)
 	}
 }
 

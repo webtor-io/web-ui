@@ -89,6 +89,10 @@ func (f *fakeService) DeleteByToken(context.Context, string) (*models.ReleaseSub
 	return nil, nil
 }
 
+func (f *fakeService) PeekByToken(context.Context, string) (*models.ReleaseSubscription, error) {
+	return nil, nil
+}
+
 var testUser = &models.User{UserID: uuid.NewV4(), Email: "viewer@example.com"}
 
 // do mounts the routes on a bare engine and runs one request as a signed-in

@@ -93,9 +93,17 @@ func pollSubscriptions(c *cli.Context) error {
 
 	// The enricher answers one question here: is this series still in
 	// production. That is what decides whether a season subscription has a
-	// future or is finished.
+	// future or is finished. A mapper-less enricher (a deployment without
+	// TMDB credentials, say) cannot answer it, so the poller gets nil and
+	// never completes anything — the same guard Service.New applies, and
+	// the alternative is every season subscription of that deployment being
+	// closed as "finished" on its first poll.
 	anthropicCl := ac.New(c)
 	en := makeEnricher(c, cl, pg, sapi, anthropicCl)
+	var airing rss.AiringChecker
+	if en != nil && en.HasMappers() {
+		airing = en
+	}
 
 	ns := notification.New(c, db, newI18n())
 
@@ -104,7 +112,7 @@ func pollSubscriptions(c *cli.Context) error {
 		rss.NewBuilderSearch(sb),
 		ns,
 		rss.NewClaimsTier(claimsSvc),
-		en,
+		airing,
 		rss.NewPollConfig(c),
 	)
 

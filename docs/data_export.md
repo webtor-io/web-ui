@@ -32,6 +32,7 @@ breaks consumers.
   "series_watchlist": [...],
   "stremio_addon_urls": [...],
   "stremio_settings": { ... } | omitted,
+  "user_settings": { ... } | omitted,
   "torznab_indexers": [...],
   "release_subscriptions": [...],
   "release_subscription_hits": [...],
@@ -45,8 +46,8 @@ breaks consumers.
 
 Empty collections are emitted as `[]` (not omitted) so consumers can detect
 "feature exists, user has nothing" vs "feature not in this schema version".
-Optional sub-objects (`stremio_settings`, `vault`) are omitted entirely when
-the user has never used the feature.
+Optional sub-objects (`stremio_settings`, `user_settings`, `vault`) are
+omitted entirely when the user has never used the feature.
 
 ## Sources
 
@@ -62,6 +63,7 @@ the user has never used the feature.
 | `series_watchlist`    | `models.ListSeriesWatchlistItems`                                  |
 | `stremio_addon_urls`  | `models.GetAllUserStremioAddonUrls`                                |
 | `stremio_settings`    | `models.GetUserStremioSettings`                                    |
+| `user_settings`       | `models.GetUserSettings`                                           |
 | `torznab_indexers`    | `models.GetAllUserTorznabIndexers`                                 |
 | `release_subscriptions` | `models.GetUserReleaseSubscriptions`                             |
 | `release_subscription_hits` | `models.ListUserReleaseSubscriptionHits` (joined to the user's subscriptions) |
@@ -90,6 +92,10 @@ That rule cuts both ways: a credential the UI never renders back does not
 belong in the file either. `torznab_indexer.api_key` is stored in its own
 column precisely so the feed URL can be shown without it, so the export
 carries `torznab_indexers[].has_api_key` (bool) instead of the key.
+
+`user_settings.lang` stays a nullable string in the export: `null`/absent
+means "never observed on an authenticated request", which is a different
+fact about the account than an explicit language choice.
 
 ## What is NOT exported
 

@@ -45,6 +45,10 @@ var (
 	ErrNotEligible = errors.New("content is not eligible for a subscription")
 	// ErrBadRequest covers malformed input the handler maps to 400.
 	ErrBadRequest = errors.New("invalid subscription request")
+	// ErrNoStreamSources means the account has no addons and no indexers —
+	// the poller runs the user's own pipeline, so a subscription without
+	// sources would poll forever and can never fire.
+	ErrNoStreamSources = errors.New("account has no stream sources to poll")
 )
 
 // Mailer sends the two letters a subscription's life produces outside the
@@ -121,14 +125,14 @@ func Limit(freeTier bool) int {
 func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limit int) (*models.ReleaseSubscription, bool, error) {
 	userID := u.ID
 
-	kind, season, err := normalize(req)
+	kind, videoID, season, err := normalize(req)
 	if err != nil {
 		return nil, false, err
 	}
 
 	// Already subscribed: answer from the existing row without spending a
 	// count query or an eligibility check on it.
-	existing, err := s.store.Find(ctx, userID, kind, req.VideoID, season)
+	existing, err := s.store.Find(ctx, userID, kind, videoID, season)
 	if err != nil {
 		return nil, false, err
 	}
@@ -136,7 +140,23 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 		return existing, false, nil
 	}
 
-	if err := s.checkEligible(ctx, kind, req.VideoID); err != nil {
+	// The poller runs the user's own pipeline, so an account with no addons
+	// and no indexers holds a subscription that can never fire. The entry
+	// points hide their offers behind the same check client-side, but two
+	// of the three can be reached without it — this is the backstop that
+	// keeps a dead row from being written (and, on the free tier, from
+	// eating one of the three slots). Fail-open on error: a flaky count
+	// query must not refuse a subscription the UI just offered.
+	if has, err := s.store.HasStreamSources(ctx, userID); err != nil {
+		log.WithError(err).
+			WithField("feature", "release_subscription").
+			WithField("user_id", userID).
+			Warn("could not check stream sources; allowing the subscription")
+	} else if !has {
+		return nil, false, ErrNoStreamSources
+	}
+
+	if err := s.checkEligible(ctx, kind, videoID); err != nil {
 		return nil, false, err
 	}
 
@@ -153,7 +173,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 	sub := &models.ReleaseSubscription{
 		UserID:  userID,
 		Kind:    kind,
-		VideoID: req.VideoID,
+		VideoID: videoID,
 		Season:  season,
 		Lang:    req.Lang,
 		Source:  normalizeSource(req.Source),
@@ -189,7 +209,7 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 	if !created {
 		// Lost a race with a concurrent add. Read back what won so the
 		// caller still gets a subscription to render.
-		existing, err := s.store.Find(ctx, userID, kind, req.VideoID, season)
+		existing, err := s.store.Find(ctx, userID, kind, videoID, season)
 		if err != nil {
 			return nil, false, err
 		}
@@ -201,17 +221,17 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 // Unsubscribe removes a subscription addressed by content. Returns whether
 // anything was removed.
 func (s *Service) Unsubscribe(ctx context.Context, u *auth.User, req Request) (bool, error) {
-	kind, season, err := normalize(req)
+	kind, videoID, season, err := normalize(req)
 	if err != nil {
 		return false, err
 	}
 	// Read before deleting: the notice names what it is about, and after the
 	// DELETE there is nothing left to name it with.
-	sub, err := s.store.Find(ctx, u.ID, kind, req.VideoID, season)
+	sub, err := s.store.Find(ctx, u.ID, kind, videoID, season)
 	if err != nil {
 		return false, err
 	}
-	removed, err := s.store.DeleteByContent(ctx, u.ID, kind, req.VideoID, season)
+	removed, err := s.store.DeleteByContent(ctx, u.ID, kind, videoID, season)
 	if err != nil {
 		return false, err
 	}
@@ -240,6 +260,21 @@ func (s *Service) Delete(ctx context.Context, u *auth.User, id uuid.UUID) error 
 	}
 	s.mailOff(ctx, u, sub)
 	return nil
+}
+
+// PeekByToken resolves an unsubscribe token to its subscription without
+// removing anything. The GET half of the unsubscribe flow: the page it
+// renders has to name what the form is about to delete, and a page fetch
+// must not be the thing that deletes it — mail scanners prefetch every link
+// in a message, and a GET that unsubscribed would let a corporate SafeLinks
+// pass silently kill the subscription minutes after it was confirmed.
+// Returns nil for a valid token whose subscription is already gone.
+func (s *Service) PeekByToken(ctx context.Context, raw string) (*models.ReleaseSubscription, error) {
+	id, err := ParseUnsubscribeToken(s.secret, raw)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.Get(ctx, id)
 }
 
 // DeleteByToken serves the one-click unsubscribe link from an email, where
@@ -400,26 +435,30 @@ func (s *Service) fillMetadata(ctx context.Context, sub *models.ReleaseSubscript
 }
 
 // normalize validates the request and returns the storage shape of its
-// content key.
-func normalize(req Request) (string, *int16, error) {
+// content key: kind, the video id as it must be persisted and compared, and
+// the season. The video id comes back trimmed — validating a cleaned copy
+// while storing the raw field is how " tt0111161" once passed validation,
+// got persisted verbatim, and could sit next to a clean duplicate that the
+// unique index and the Discover bell both read as a different subscription.
+func normalize(req Request) (string, string, *int16, error) {
 	videoID := strings.TrimSpace(req.VideoID)
 	// IMDB ids are the only identifier every stream source speaks: the
 	// addons key on them and the Torznab queries carry them. A row with
 	// anything else could never be polled.
 	if !strings.HasPrefix(videoID, "tt") || strings.Contains(videoID, ":") {
-		return "", nil, errors.Wrap(ErrBadRequest, "video_id must be a bare IMDB title id")
+		return "", "", nil, errors.Wrap(ErrBadRequest, "video_id must be a bare IMDB title id")
 	}
 	switch req.Kind {
 	case models.ReleaseSubscriptionKindMovie:
-		return models.ReleaseSubscriptionKindMovie, nil, nil
+		return models.ReleaseSubscriptionKindMovie, videoID, nil, nil
 	case models.ReleaseSubscriptionKindSeason:
 		if req.Season <= 0 {
-			return "", nil, errors.Wrap(ErrBadRequest, "season must be positive")
+			return "", "", nil, errors.Wrap(ErrBadRequest, "season must be positive")
 		}
 		season := int16(req.Season)
-		return models.ReleaseSubscriptionKindSeason, &season, nil
+		return models.ReleaseSubscriptionKindSeason, videoID, &season, nil
 	}
-	return "", nil, errors.Wrap(ErrBadRequest, "kind must be 'movie' or 'season'")
+	return "", "", nil, errors.Wrap(ErrBadRequest, "kind must be 'movie' or 'season'")
 }
 
 // normalizeSource keeps unknown source strings out of the column without

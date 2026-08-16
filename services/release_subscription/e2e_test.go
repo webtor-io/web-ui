@@ -290,6 +290,12 @@ func (m *memStore) StreamPrefs(_ context.Context, userID uuid.UUID) ([]string, s
 	return m.prefResolutions[userID], m.prefLang[userID]
 }
 
+// The scenario's account has sources: the poller half of the test drives a
+// scripted search, and the subscribe half must get past the backstop.
+func (m *memStore) HasStreamSources(context.Context, uuid.UUID) (bool, error) {
+	return true, nil
+}
+
 func (m *memStore) UpdatePreferences(_ context.Context, id, userID uuid.UUID, resolutions []string, lang *string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

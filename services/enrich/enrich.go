@@ -311,6 +311,47 @@ func (s *Enricher) IsAiringSeries(ctx context.Context, videoID string) bool {
 	return false
 }
 
+// IsAiringSeriesChecked is IsAiringSeries for callers whose "no" is
+// terminal. The plain variant folds "a mapper said no" and "no mapper could
+// answer" into one false, which is the right default for hiding a banner
+// and the wrong one for closing a subscription forever. Here false comes
+// with the guarantee that at least one mapper actually answered; when none
+// could — no mapper implements the capability, or every one errored — the
+// error says so and the caller keeps its state.
+func (s *Enricher) IsAiringSeriesChecked(ctx context.Context, videoID string) (bool, error) {
+	if videoID == "" {
+		return false, errors.New("airing check: empty video id")
+	}
+	answered := false
+	var lastErr error
+	for _, m := range s.mappers {
+		ac, ok := m.(AiringChecker)
+		if !ok {
+			continue
+		}
+		airing, err := ac.IsAiring(ctx, videoID)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", videoID).
+				Debug("airing check: mapper failed, trying next")
+			lastErr = err
+			continue
+		}
+		answered = true
+		if airing {
+			return true, nil
+		}
+	}
+	if !answered {
+		if lastErr != nil {
+			return false, errors.Wrap(lastErr, "airing check: every mapper failed")
+		}
+		return false, errors.New("airing check: no mapper supports it")
+	}
+	return false, nil
+}
+
 func NewEnricher(pg *services.PG, api *api.Api, mappers []MetadataMapper, episodeMappers []EpisodeMapper, aiResolver *AIResolver) *Enricher {
 	return &Enricher{
 		pg:             pg,

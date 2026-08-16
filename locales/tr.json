@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Abonelik kaldırılamadı",
     "discover.subscriptions.limitReached": "Abonelik sınırına ulaştın. Birini sil ya da planını yükselt.",
     "discover.subscriptions.notEligible": "Bu sezonun yayını tamamlandı — beklenecek yeni bölüm yok.",
+    "discover.subscriptions.noSources": "Önce bir Stremio eklentisi veya indeksleyici ekleyin — abonelikler kendi kaynaklarınızda arama yapar.",
     "discover.subscriptions.subscribe": "Haber ver",
     "discover.subscriptions.unsubscribe": "Haber verme",
     "discover.subscriptions.seasonTitle": "%v. sezonun yeni sürümlerini haber ver",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Abonelik oluşturulamadı",
     "error.subscriptionLimit": "Abonelik sınırına ulaştın. Birini sil ya da planını yükselt.",
     "error.subscriptionNotEligible": "Burada beklenecek bir şey yok — bu sezonun yayını tamamlandı.",
+    "error.subscriptionNoSources": "Önce bir Stremio eklentisi veya indeksleyici ekleyin — abonelikler kendi kaynaklarınızda arama yapar.",
     "vault.signInCard.intro": "Vault, Webtor'da şunları yapmana izin veren bir depolama sistemidir:",
     "vault.signInCard.feature1": "torrentleri uzun süre kaydet,",
     "vault.signInCard.feature2": "seederları beklemeden içerik izle,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Bu abonelik zaten kaldırılmış. Bununla ilgili başka e-posta almayacaksın.",
     "subscription.unsubscribed.failedTitle": "Bu bağlantı çalışmadı",
     "subscription.unsubscribed.failedText": "Yolda bozulmuş olabilir. Aboneliği profilinden kaldırabilirsin.",
-    "subscription.unsubscribed.manage": "Abonelikleri yönet"
+    "subscription.unsubscribed.manage": "Abonelikleri yönet",
+    "subscription.unsubscribe.confirmTitle": "Bu e-postalar durdurulsun mu?",
+    "subscription.unsubscribe.confirmText": "{{.Title}} için yeni sürüm e-postaları artık gelmeyecek.",
+    "subscription.unsubscribe.confirmTextPlain": "Bu abonelik için yeni sürüm e-postaları artık gelmeyecek.",
+    "subscription.unsubscribe.confirmButton": "Abonelikten çık"
 }

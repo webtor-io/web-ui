@@ -17,7 +17,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/notification"
-	ptn "github.com/webtor-io/web-ui/services/parse_torrent_name"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
@@ -58,10 +57,14 @@ type tierResolver interface {
 	IsFree(email string, patreonUserID *string) bool
 }
 
-// airingChecker is the same capability the resource-page banner uses: does
-// this series still produce episodes. Only a "no" ends a subscription.
-type airingChecker interface {
-	IsAiringSeries(ctx context.Context, videoID string) bool
+// AiringChecker is the same capability the resource-page banner uses: does
+// this series still produce episodes. Only a "no" ends a subscription — and
+// because that "no" is terminal (a completed row is never polled again), the
+// poller uses the checked variant: an answer that is really "could not ask"
+// must not close anything. Exported so the poll command can wire nil when
+// the enricher has no mappers to answer with.
+type AiringChecker interface {
+	IsAiringSeriesChecked(ctx context.Context, videoID string) (bool, error)
 }
 
 // PollConfig is the scheduling policy, all of it flag-backed.
@@ -93,7 +96,7 @@ type Poller struct {
 	search streamSearch
 	mail   pollMailer
 	tiers  tierResolver
-	airing airingChecker
+	airing AiringChecker
 	cfg    PollConfig
 	// rnd spreads next_check_at so a batch that came due together does not
 	// come due together again. Seeded per poller; no cryptographic use.
@@ -101,7 +104,7 @@ type Poller struct {
 	rndMu sync.Mutex
 }
 
-func NewPoller(store pollStore, search streamSearch, mail pollMailer, tiers tierResolver, airing airingChecker, cfg PollConfig) *Poller {
+func NewPoller(store pollStore, search streamSearch, mail pollMailer, tiers tierResolver, airing AiringChecker, cfg PollConfig) *Poller {
 	if cfg.Concurrency < 1 {
 		cfg.Concurrency = 1
 	}
@@ -287,9 +290,11 @@ func (p *Poller) seasonEpisodes(ctx context.Context, sub *models.ReleaseSubscrip
 
 // collect runs the searches for one subscription and turns the results into
 // hit rows.
-// The bool reports whether any query actually reached the user's sources.
+// The bool reports whether every query actually reached the user's sources.
 // "Found nothing" and "could not ask" look identical in the returned slice,
-// and the baseline decision turns on the difference.
+// and the baseline decision turns on the difference — per query, not per
+// run: a five-episode pass where one episode's search failed has not seen
+// that episode's releases, and promoting on it would mail them later as new.
 func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription, episodes []models.EpisodeMetadata) ([]models.ReleaseSubscriptionHit, bool, error) {
 	var out []models.ReleaseSubscriptionHit
 	seen := map[string]bool{}
@@ -315,6 +320,17 @@ func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseS
 				continue
 			}
 			seen[hash] = true
+			if len(hash) > 40 {
+				// The column is varchar(40) — a v1 infohash. Anything longer
+				// (a BitTorrent-v2 hash, mostly) would fail the whole batch
+				// INSERT, taking every valid hit in it down and putting the
+				// subscription into a retry loop that can never succeed. It
+				// is unusable anyway: the email links are btih magnets.
+				log.WithField("subscription_id", sub.ID).
+					WithField("infohash", hash).
+					Debug("dropping an infohash the hit table cannot hold")
+				continue
+			}
 			if !matchesPreferences(item, sub) {
 				// Outside what this subscription asked for. Recording it
 				// anyway would be worse than dropping it: the hit table is
@@ -341,7 +357,7 @@ func (p *Poller) collect(ctx context.Context, u *auth.User, sub *models.ReleaseS
 			out = append(out, hit)
 		}
 	}
-	return out, answered > 0 || len(queries) == 0, nil
+	return out, answered == len(queries), nil
 }
 
 // query is one search to run.
@@ -473,7 +489,17 @@ func (p *Poller) seasonIsOver(ctx context.Context, sub *models.ReleaseSubscripti
 	if p.airing == nil {
 		return false
 	}
-	return !p.airing.IsAiringSeries(ctx, sub.VideoID)
+	airing, err := p.airing.IsAiringSeriesChecked(ctx, sub.VideoID)
+	if err != nil {
+		// "Could not ask" is not "no". Completion is terminal — a closed
+		// row is never polled again — so an unanswered check keeps the
+		// subscription open and the next poll asks again.
+		log.WithError(err).
+			WithField("subscription_id", sub.ID).
+			Warn("airing check failed; keeping the subscription open")
+		return false
+	}
+	return !airing
 }
 
 // nextCheckAt picks when to look again.
@@ -581,7 +607,7 @@ func (p *Poller) magnetURL(h *models.ReleaseSubscriptionHit) string {
 // Empty means no preference, which is why a subscription made before these
 // columns existed reports everything, as it always did.
 func matchesPreferences(item stremio.StreamItem, sub *models.ReleaseSubscription) bool {
-	if len(sub.PreferredResolutions) > 0 && !slices.Contains(sub.PreferredResolutions, resolutionOf(item)) {
+	if len(sub.PreferredResolutions) > 0 && !slices.Contains(sub.PreferredResolutions, stremio.ResolutionBucket(item.Name)) {
 		return false
 	}
 	if code := sub.GetPreferredLanguage(); code != "" {
@@ -593,30 +619,6 @@ func matchesPreferences(item stremio.StreamItem, sub *models.ReleaseSubscription
 		}
 	}
 	return true
-}
-
-// resolutionParser is shared and read-only, like the one in the Torznab
-// stream: GetFieldParser hands out one global parser per field.
-var resolutionParser = ptn.NewCompoundParser([]ptn.Parser{ptn.GetFieldParser(ptn.FieldTypeResolution)})
-
-// resolutionOf names a release's resolution in the vocabulary the profile
-// uses: 4k / 1080p / 720p, and "other" for everything the parser cannot
-// place — the same mapping PreferredStream applies to the interactive list.
-func resolutionOf(item stremio.StreamItem) string {
-	ms := ptn.Matches{}
-	ms, err := resolutionParser.Parse(item.Name, ms)
-	if err != nil {
-		return "other"
-	}
-	ti := &ptn.TorrentInfo{}
-	ti.Map(ms)
-	switch ti.Resolution {
-	case "":
-		return "other"
-	case "2160p":
-		return "4k"
-	}
-	return ti.Resolution
 }
 
 // releaseName reads the release name out of a stream item. Both sources put

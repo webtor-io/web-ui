@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Opzeggen is niet gelukt",
     "discover.subscriptions.limitReached": "Abonnementslimiet bereikt. Verwijder er een of stap over op een ander plan.",
     "discover.subscriptions.notEligible": "Dit seizoen is volledig uitgezonden — er komen geen nieuwe afleveringen meer.",
+    "discover.subscriptions.noSources": "Voeg eerst een Stremio-addon of indexer toe — abonnementen zoeken in je eigen bronnen.",
     "discover.subscriptions.subscribe": "Waarschuw mij",
     "discover.subscriptions.unsubscribe": "Niet meer waarschuwen",
     "discover.subscriptions.seasonTitle": "Mail me over nieuwe releases van seizoen %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Het abonnement kon niet worden aangemaakt",
     "error.subscriptionLimit": "Abonnementslimiet bereikt. Verwijder er een of stap over op een ander plan.",
     "error.subscriptionNotEligible": "Hier valt niets te verwachten — dit seizoen is volledig uitgezonden.",
+    "error.subscriptionNoSources": "Voeg eerst een Stremio-addon of indexer toe — abonnementen zoeken in je eigen bronnen.",
     "vault.signInCard.intro": "Vault is een opslagsysteem in Webtor waarmee je:",
     "vault.signInCard.feature1": "torrents lange tijd kunt opslaan,",
     "vault.signInCard.feature2": "inhoud kunt bekijken zonder te wachten op seeders,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Dit abonnement bestaat al niet meer. Je krijgt er geen e-mails meer over.",
     "subscription.unsubscribed.failedTitle": "Deze link werkte niet",
     "subscription.unsubscribed.failedText": "Misschien is hij onderweg beschadigd. Je kunt het abonnement in je profiel verwijderen.",
-    "subscription.unsubscribed.manage": "Abonnementen beheren"
+    "subscription.unsubscribed.manage": "Abonnementen beheren",
+    "subscription.unsubscribe.confirmTitle": "Deze e-mails stoppen?",
+    "subscription.unsubscribe.confirmText": "Je krijgt geen e-mails meer over nieuwe releases van {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Je krijgt geen e-mails meer over nieuwe releases voor dit abonnement.",
+    "subscription.unsubscribe.confirmButton": "Afmelden"
 }

@@ -87,7 +87,10 @@ export async function unsubscribe({ kind, videoId, season }) {
         );
         let body = {};
         try { body = await res.json(); } catch (_) { /* ignore */ }
-        if (res.ok) return { ok: true, message: body.message || '' };
+        // removed=false on a 200 means the server had no such row — the
+        // outcome the click wanted, but a caller that tracks local state can
+        // use it as a re-sync hint.
+        if (res.ok) return { ok: true, removed: !!body.removed, message: body.message || '' };
         return { ok: false, code: body.code || `http_${res.status}`, message: body.message || '' };
     } catch (e) {
         return { ok: false, code: 'network', message: '' };

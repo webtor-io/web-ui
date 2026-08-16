@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Impossible de se désabonner",
     "discover.subscriptions.limitReached": "Limite d'abonnements atteinte. Supprimez-en un ou changez d'offre.",
     "discover.subscriptions.notEligible": "Cette saison est entièrement diffusée — il n'y a plus de nouveaux épisodes à attendre.",
+    "discover.subscriptions.noSources": "Ajoutez d’abord un addon Stremio ou un indexeur — les abonnements cherchent dans vos propres sources.",
     "discover.subscriptions.subscribe": "Me prévenir",
     "discover.subscriptions.unsubscribe": "Ne plus prévenir",
     "discover.subscriptions.seasonTitle": "Me prévenir des nouvelles sorties de la saison %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Impossible de créer l'abonnement",
     "error.subscriptionLimit": "Limite d'abonnements atteinte. Supprimez-en un ou changez d'offre.",
     "error.subscriptionNotEligible": "Il n'y a rien à attendre ici — cette saison est entièrement diffusée.",
+    "error.subscriptionNoSources": "Ajoutez d’abord un addon Stremio ou un indexeur — les abonnements cherchent dans vos propres sources.",
     "vault.signInCard.intro": "Vault est un système de stockage dans Webtor qui permet de :",
     "vault.signInCard.feature1": "sauvegarder des torrents sur la durée,",
     "vault.signInCard.feature2": "regarder du contenu sans attendre les seeders,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Cet abonnement n'existe déjà plus. Vous ne recevrez plus d'e-mails à ce sujet.",
     "subscription.unsubscribed.failedTitle": "Ce lien n'a pas fonctionné",
     "subscription.unsubscribed.failedText": "Il a peut-être été abîmé en chemin. Vous pouvez supprimer l'abonnement depuis votre profil.",
-    "subscription.unsubscribed.manage": "Gérer les abonnements"
+    "subscription.unsubscribed.manage": "Gérer les abonnements",
+    "subscription.unsubscribe.confirmTitle": "Arrêter ces e-mails ?",
+    "subscription.unsubscribe.confirmText": "Vous ne recevrez plus d’e-mails sur les nouvelles sorties de {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Vous ne recevrez plus d’e-mails sur les nouvelles sorties pour cet abonnement.",
+    "subscription.unsubscribe.confirmButton": "Se désabonner"
 }

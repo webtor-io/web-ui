@@ -652,6 +652,7 @@
     "discover.subscriptions.removeFailed": "Impossibile annullare l'iscrizione",
     "discover.subscriptions.limitReached": "Hai raggiunto il limite di abbonamenti. Eliminane uno o cambia piano.",
     "discover.subscriptions.notEligible": "Questa stagione è già andata in onda per intero: non ci sono nuovi episodi da aspettare.",
+    "discover.subscriptions.noSources": "Aggiungi prima un addon di Stremio o un indexer: gli abbonamenti cercano nelle tue fonti.",
     "discover.subscriptions.subscribe": "Avvisami",
     "discover.subscriptions.unsubscribe": "Non avvisarmi",
     "discover.subscriptions.seasonTitle": "Avvisami delle nuove release della stagione %v",
@@ -1438,6 +1439,7 @@
     "error.subscriptionFailed": "Impossibile creare l'abbonamento",
     "error.subscriptionLimit": "Hai raggiunto il limite di abbonamenti. Eliminane uno o cambia piano.",
     "error.subscriptionNotEligible": "Qui non c'è nulla da aspettare: questa stagione è già andata in onda per intero.",
+    "error.subscriptionNoSources": "Aggiungi prima un addon di Stremio o un indexer: gli abbonamenti cercano nelle tue fonti.",
     "vault.signInCard.intro": "Vault è un sistema di archiviazione in Webtor che ti consente di:",
     "vault.signInCard.feature1": "salvare i torrent a lungo,",
     "vault.signInCard.feature2": "guardare contenuti senza aspettare i seeder,",
@@ -1654,5 +1656,9 @@
     "subscription.unsubscribed.textPlain": "Questo abbonamento non esiste più. Non riceverai altre e-mail al riguardo.",
     "subscription.unsubscribed.failedTitle": "Questo link non ha funzionato",
     "subscription.unsubscribed.failedText": "Potrebbe essersi rovinato lungo la strada. Puoi eliminare l'abbonamento dal tuo profilo.",
-    "subscription.unsubscribed.manage": "Gestisci abbonamenti"
+    "subscription.unsubscribed.manage": "Gestisci abbonamenti",
+    "subscription.unsubscribe.confirmTitle": "Interrompere queste email?",
+    "subscription.unsubscribe.confirmText": "Non riceverai più email sulle nuove uscite di {{.Title}}.",
+    "subscription.unsubscribe.confirmTextPlain": "Non riceverai più email sulle nuove uscite per questo abbonamento.",
+    "subscription.unsubscribe.confirmButton": "Annulla iscrizione"
 }
