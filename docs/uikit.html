@@ -1188,6 +1188,27 @@ log
     <div class="uikit-note">
       <strong>Implementation:</strong> See <code>templates/partials/nav.html</code>. Uses <code>navbar-redesign</code> CSS class for hover overrides. Glass effect via inline rgba + backdrop-filter.
     </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4 mt-8">Icon-only Nav Buttons Are Square</h3>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li>When a nav button shows only its icon (labels are <code>hidden lg:inline</code>), it is <code>btn-square</code>; the label breakpoint reverts it: <code>btn-square lg:w-auto lg:px-3</code></li>
+        <li>Buttons that always carry an icon-only look (quick-search loupe) are plain <code>btn-square</code></li>
+        <li>Buttons that always show text (language switcher) never get <code>btn-square</code></li>
+      </ul>
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Nav Quick-Search Panel</h3>
+    <p class="desc">Loupe icon in the navbar opens a dropdown with the home-page magnet/infohash form plus a compact torrent dropzone, so the next download doesn't require navigating home. Hidden on pages that already render the hero form (home, tool landings, post-submit progress).</p>
+    <div class="uikit-rule">
+      <ul class="list-disc list-inside space-y-1">
+        <li>Focus-based DaisyUI dropdown; both forms are plain POSTs to <code>/</code> with <code>data-async-target="main"</code> — works without JS</li>
+        <li>Wrapper is <code>dropdown static</code>: the panel positions against the fixed navbar, not the icon — anchored to the icon it ran off-screen on phones. <code>inset-x-2</code> on mobile, centered 400px at <code>sm+</code></li>
+        <li>Submit button carries <code>relative</code>: DaisyUI's <code>.input</code> is <code>position:relative</code> and otherwise paints its grey border over the joined button's left edge</li>
+        <li>Upload label has <code>tabindex="0"</code> — labels aren't focusable, and clicking one would drop <code>:focus-within</code> and close the panel before the file picker opens</li>
+        <li>Dropzone auto-submit wired in <code>app/nav.js</code> (<code>change → requestSubmit</code>); no document-level drag/drop — that's home-hero behavior</li>
+      </ul>
+    </div>
   </div>
 
   <hr class="uikit-divider">
