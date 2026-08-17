@@ -50,6 +50,58 @@ func TestAPIHostBypassesLanguageRouting(t *testing.T) {
 	}
 }
 
+// The ?lang switch must be a permanent redirect (so search engines drop the
+// parametric duplicate — /?lang=en collected 2.5K impressions/week as a
+// separately indexed URL under a 302) but must never be browser-cached (a
+// cached 301 skips the Set-Cookie on the next switch, stranding the user in
+// the previous language).
+func TestLangQuerySwitchRedirectsPermanentlyUncached(t *testing.T) {
+	h := langEngine(t, nil)
+
+	// Bare path + ?lang=en (the sitewide switcher link), previous pref ru.
+	w := langGet(h, "example.com", "/?lang=en", "ru")
+	if w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/" {
+		t.Errorf("/?lang=en: got %d → %q, want 301 → /", w.Code, w.Header().Get("Location"))
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("/?lang=en: Cache-Control = %q, want no-store", cc)
+	}
+	var langSet string
+	for _, c := range w.Result().Cookies() {
+		if c.Name == langCookie {
+			langSet = c.Value
+		}
+	}
+	if langSet != "en" {
+		t.Errorf("/?lang=en: lang cookie set to %q, want en", langSet)
+	}
+
+	// Switching to EN from a prefixed page strips the prefix.
+	if w := langGet(h, "example.com", "/ru/some-page?lang=en", "ru"); w.Code != http.StatusMovedPermanently ||
+		w.Header().Get("Location") != "/some-page" {
+		t.Errorf("/ru/some-page?lang=en: got %d → %q, want 301 → /some-page", w.Code, w.Header().Get("Location"))
+	}
+
+	// Switching to a non-default language adds the prefix.
+	if w := langGet(h, "example.com", "/some-page?lang=ru", ""); w.Code != http.StatusMovedPermanently ||
+		w.Header().Get("Location") != "/ru/some-page" {
+		t.Errorf("/some-page?lang=ru: got %d → %q, want 301 → /ru/some-page", w.Code, w.Header().Get("Location"))
+	}
+}
+
+// The legacy /en/ prefix redirect also flips the cookie, so it must not be
+// browser-cached either.
+func TestEnPrefixRedirectUncached(t *testing.T) {
+	h := langEngine(t, nil)
+	w := langGet(h, "example.com", "/en/some-page", "ru")
+	if w.Code != http.StatusMovedPermanently || w.Header().Get("Location") != "/some-page" {
+		t.Errorf("/en/some-page: got %d → %q, want 301 → /some-page", w.Code, w.Header().Get("Location"))
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("/en/some-page: Cache-Control = %q, want no-store", cc)
+	}
+}
+
 // /api/... and /api-credentials/... are API surface on the main host: JSON
 // consumers (the Swagger prefill fetch among them) must not be bounced through
 // a language redirect.

@@ -15,7 +15,7 @@ const (
 // HTTPMiddleware wraps an http.Handler to handle language routing:
 //
 //  1. ?lang=X query (from the language switcher) → set cookie=X and
-//     302-redirect to the canonical URL for X (with ?lang stripped)
+//     301-redirect (no-store) to the canonical URL for X (with ?lang stripped)
 //  2. /en/* → 301 redirect to /* (English is default, no prefix; cookie→en)
 //  3. /{lang}/* → strip prefix, set X-Lang header, set lang cookie
 //  4. No prefix + no cookie → detect Accept-Language → 302 redirect
@@ -108,7 +108,13 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 					if encoded := q.Encode(); encoded != "" {
 						target += "?" + encoded
 					}
-					http.Redirect(w, r, target, http.StatusFound)
+					// 301 so search engines drop the parametric duplicate
+					// (?lang=en collected impressions as a separate URL under a
+					// 302, which keeps the source URL indexed). no-store because
+					// browsers cache permanent redirects: a cached 301 would skip
+					// the server — and the Set-Cookie above — on the next switch.
+					w.Header().Set("Cache-Control", "no-store")
+					http.Redirect(w, r, target, http.StatusMovedPermanently)
 					return
 				}
 			}
@@ -137,6 +143,10 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 						if r.URL.RawQuery != "" {
 							target += "?" + r.URL.RawQuery
 						}
+						// no-store: a browser-cached 301 would skip the
+						// cookie-flip above on a later visit to the same
+						// /en/ URL, stranding the user in the old language.
+						w.Header().Set("Cache-Control", "no-store")
 						http.Redirect(w, r, target, http.StatusMovedPermanently)
 						return
 					}
