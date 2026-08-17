@@ -241,9 +241,9 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
 .wt-player-top-title {
     flex: 1 1 auto;
     min-width: 0;
-    /* Padding-right keeps the ellipsis from butting against the share
-       button. Single positioning mechanism for layout — share uses
-       margin-left:auto, here we add a small visual gutter. */
+    /* Padding-right keeps the ellipsis from butting against the action
+       buttons. Single positioning mechanism for layout — the actions
+       group uses margin-left:auto, here we add a small visual gutter. */
     padding-right: 0.5rem;
     font-size: 1.15rem;
     font-weight: 600;
@@ -260,13 +260,24 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     }
 }
 
+/* Right-aligned action group: cast (when available) + share. Keeps the
+   two buttons on one flex mechanism instead of competing absolute
+   positions — that's exactly how cast used to end up painted over
+   share. */
+.wt-player-top-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 /* Compound selector bumps specificity past the .wt-player-btn block
    that's declared later in the file (CSS source order would otherwise
    reset our width/height/padding back to the small bottom-bar size). */
 .wt-player-top-overlay .wt-player-top-share {
     flex: 0 0 auto;
     pointer-events: auto;
-    margin-left: auto;
     width: 3.5rem;
     height: 3.5rem;
     /* Padding matches the bottom-bar buttons (.wt-player-btn 0.375rem)
@@ -541,18 +552,49 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     z-index: 1 !important;
 }
 
-/* Cast button */
+/* Cast button — lives in the top-overlay action group next to share,
+   sized to match it so the two icons read as one row. */
 .wt-player-cast-button {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    z-index: 30;
+    flex: 0 0 auto;
+    pointer-events: auto;
     cursor: pointer;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0.625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .wt-player-cast-button google-cast-launcher {
     --connected-color: #e84393;
     --disconnected-color: rgba(255, 255, 255, 0.7);
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+@media (max-width: 640px) {
+    .wt-player-cast-button {
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0.5rem;
+    }
+}
+
+/* Legacy floating position for controls-less players that render no top
+   overlay. */
+.wt-player-cast-button--floating {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 30;
+    width: auto;
+    height: auto;
+    padding: 0;
+}
+
+.wt-player-cast-button--floating google-cast-launcher {
     width: 1.5rem;
     height: 1.5rem;
 }

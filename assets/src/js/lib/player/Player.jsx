@@ -23,6 +23,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [sessionSeeking, setSessionSeeking] = useState(false);
     const sessionSeekingRef = useRef(false);
     const [controlsVisible, setControlsVisible] = useState(true);
+    const [castAvailable, setCastAvailable] = useState(false);
     const hideTimerRef = useRef(null);
     const sessionSeekerRef = useRef(null);
 
@@ -305,8 +306,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // Chromecast integration
     useEffect(() => {
         if (!features.chromecast) return;
-        let castBtn = null;
+        let cancelled = false;
         function initCast() {
+            if (cancelled) return;
             if (!window.cast || !window.chrome?.cast) return;
             const ctx = cast.framework.CastContext.getInstance();
             ctx.setOptions({
@@ -314,11 +316,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 autoJoinPolicy: chrome.cast.AutoJoinPolicy.PAGE_SCOPED,
                 androidReceiverCompatible: true,
             });
-            // Show cast button
-            castBtn = document.createElement('div');
-            castBtn.className = 'wt-player-cast-button';
-            castBtn.innerHTML = '<google-cast-launcher></google-cast-launcher>';
-            containerEl.appendChild(castBtn);
+            setCastAvailable(true);
         }
         if (window.cast) {
             initCast();
@@ -328,7 +326,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
             document.body.appendChild(s);
         }
-        return () => { if (castBtn) castBtn.remove(); };
+        return () => { cancelled = true; setCastAvailable(false); };
     }, [features.chromecast, isVideo]);
 
     // Session cleanup removed — sessions have server-side TTL
@@ -478,22 +476,39 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 The title comes from data-resource-title when provided by
                 the template, else from document.title stripped of the
                 " | Webtor.io" site-suffix that layouts/main.html appends. */}
-            {showControls && isVideo && features.share && (() => {
+            {showControls && isVideo && (features.share || castAvailable) && (() => {
                 const title = getResourceTitle(videoEl);
                 // Overlay container has pointer-events:none in CSS so the
                 // gradient stays click-through (clicks land on the video
-                // for play-toggle). Only the share button needs explicit
-                // stopPropagation — its own pointer-events:auto means it
-                // captures the click before it can reach video.
+                // for play-toggle). Only the action buttons need explicit
+                // stopPropagation — their own pointer-events:auto means they
+                // capture the click before it can reach video.
                 return (
                     <div class="wt-player-top-overlay">
                         {title && <div class="wt-player-top-title" title={title}>{title}</div>}
-                        <button type="button" class="wt-player-btn wt-player-top-share" onClick={(e) => { e.stopPropagation(); handleShareClick(); }} aria-label={t('player.share')}>
-                            <ShareIcon />
-                        </button>
+                        <div class="wt-player-top-actions">
+                            {castAvailable && (
+                                <div class="wt-player-cast-button" onClick={(e) => e.stopPropagation()}>
+                                    <google-cast-launcher></google-cast-launcher>
+                                </div>
+                            )}
+                            {features.share && (
+                                <button type="button" class="wt-player-btn wt-player-top-share" onClick={(e) => { e.stopPropagation(); handleShareClick(); }} aria-label={t('player.share')}>
+                                    <ShareIcon />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 );
             })()}
+            {/* Controls-less players (no `controls` attribute) have no top
+                overlay — keep the cast launcher reachable via the legacy
+                floating position there. */}
+            {!showControls && isVideo && castAvailable && (
+                <div class="wt-player-cast-button wt-player-cast-button--floating" onClick={(e) => e.stopPropagation()}>
+                    <google-cast-launcher></google-cast-launcher>
+                </div>
+            )}
         </>
     );
 }
