@@ -162,13 +162,22 @@
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
-                    <div class="sm:ml-auto shrink-0">
-                        <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
+                    <div class="sm:ml-auto shrink-0 join">
+                        <a href="/{{ .Resource.ID }}.torrent" class="join-item btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                             </svg>
                             .torrent
                         </a>
+                        <button type="button" class="join-item btn btn-sm btn-ghost border border-l-0 border-w-line text-w-sub hover:border-w-pink hover:text-base-content px-2.5"
+                                data-magnet-hash="{{ .Resource.ID }}" data-magnet-name="{{ .Resource.Name }}"
+                                data-copied-text="{{ t $.Lang "resource.magnetCopied" }}"
+                                onclick="copyMagnet(this)"
+                                title="{{ t $.Lang "resource.copyMagnet" }}" aria-label="{{ t $.Lang "resource.copyMagnet" }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 3v8a6 6 0 0 0 12 0V3M6 3h4v8a2 2 0 0 0 4 0V3h4M6 7h4m4 0h4" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -236,13 +245,22 @@
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
-                    <div class="sm:ml-auto shrink-0">
-                        <a href="/{{ .Resource.ID }}.torrent" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
+                    <div class="sm:ml-auto shrink-0 join">
+                        <a href="/{{ .Resource.ID }}.torrent" class="join-item btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-torrent" download>
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                             </svg>
                             .torrent
                         </a>
+                        <button type="button" class="join-item btn btn-sm btn-ghost border border-l-0 border-w-line text-w-sub hover:border-w-pink hover:text-base-content px-2.5"
+                                data-magnet-hash="{{ .Resource.ID }}" data-magnet-name="{{ .Resource.Name }}"
+                                data-copied-text="{{ t $.Lang "resource.magnetCopied" }}"
+                                onclick="copyMagnet(this)"
+                                title="{{ t $.Lang "resource.copyMagnet" }}" aria-label="{{ t $.Lang "resource.copyMagnet" }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 3v8a6 6 0 0 0 12 0V3M6 3h4v8a2 2 0 0 0 4 0V3h4M6 7h4m4 0h4" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>

@@ -80,9 +80,26 @@ export function copyShareUrl() {
     });
 }
 
-// Expose for inline onclick="shareResource()" / onclick="copyShareUrl()"
-// in templates rendered before this module loads.
+// Copy a magnet URI built from the button's data attributes
+// (data-magnet-hash, data-magnet-name). The URI is assembled client-side
+// so the torrent name never has to be escaped into an inline JS string.
+export function copyMagnet(el) {
+    const hash = el.dataset.magnetHash;
+    if (!hash) return;
+    let uri = 'magnet:?xt=urn:btih:' + hash;
+    if (el.dataset.magnetName) uri += '&dn=' + encodeURIComponent(el.dataset.magnetName);
+    if (window.umami) window.umami.track('copy-magnet');
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(uri).then(() => {
+        const msg = el.dataset.copiedText || 'Magnet link copied';
+        if (window.toast) window.toast.success(msg);
+    }).catch(() => {});
+}
+
+// Expose for inline onclick="shareResource()" / onclick="copyShareUrl()" /
+// onclick="copyMagnet(this)" in templates rendered before this module loads.
 if (typeof window !== 'undefined') {
     window.shareResource = shareResource;
     window.copyShareUrl = copyShareUrl;
+    window.copyMagnet = copyMagnet;
 }

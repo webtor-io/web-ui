@@ -46,6 +46,7 @@ var Tools = []Tool{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
 		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"magnet", "torrent"}, Footer: true},
+		{Kind: AboutProse, Key: "reverse", Badge: "explained", Accent: "cyan", Paras: []string{"p1", "p2"}},
 		{Kind: AboutChecklist, Key: "useCases", Badge: "useCases", Accent: "pink", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
