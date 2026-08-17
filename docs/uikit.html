@@ -1189,12 +1189,15 @@ log
       <strong>Implementation:</strong> See <code>templates/partials/nav.html</code>. Uses <code>navbar-redesign</code> CSS class for hover overrides. Glass effect via inline rgba + backdrop-filter.
     </div>
 
-    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4 mt-8">Icon-only Nav Buttons Are Near-Square</h3>
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4 mt-8">Mobile Navbar = Three Controls + Burger</h3>
+    <p class="desc">Below <code>lg</code> the bar keeps only the high-frequency controls: quick-search loupe, burger, Donate (rightmost). Language, Discover, Library, Vault and Profile/Login collapse into the burger panel — seven equal-weight icons overflowed a 375px viewport and gave no hierarchy.</p>
     <div class="uikit-rule">
       <ul class="list-disc list-inside space-y-1">
-        <li>When a nav button shows only its icon (labels are <code>hidden lg:inline</code>), it is <code>btn-square w-9</code> (36&times;32 — a true 32px square read too cramped); the label breakpoint reverts it: <code>btn-square w-9 lg:w-auto lg:px-3</code></li>
-        <li>Buttons that always carry an icon-only look (quick-search loupe) are <code>btn-square w-9</code> at every width</li>
-        <li>Buttons that always show text (language switcher) never get <code>btn-square</code></li>
+        <li>Icon-only bar buttons are <code>btn-square w-9</code> (36&times;32 — a true 32px square read too cramped); Donate reverts at the label breakpoint: <code>btn-square w-9 lg:w-auto lg:px-3</code></li>
+        <li>Donate also carries <code>max-lg:rounded-[var(--radius-field)]</code>: its join sibling (Profile/Login) is <code>hidden</code> below lg and DaisyUI's radius logic doesn't know about visibility</li>
+        <li>Burger panel rows carry icon + label — icon-only nav for occasional destinations is mystery meat; language is a chip grid at the panel bottom</li>
+        <li>For anonymous visitors the burger is the only mobile route to the marketing anchors (navbar-center is hidden below xl) and to Login</li>
+        <li>Buttons that always show text (language switcher, desktop) never get <code>btn-square</code></li>
       </ul>
     </div>
 
@@ -1665,12 +1668,12 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
     </div>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Navbar at Narrow Widths (320px)</h3>
-    <p class="desc">At 320px the navbar is very tight with logo + 5 buttons. Use tighter padding and gaps at small widths.</p>
+    <p class="desc">Below <code>lg</code> the navbar carries only loupe + burger + Donate (see section 10) — the old "never hide nav buttons, shrink gaps" rule was written for 5 buttons and stopped working at 7. Gap/padding tightening still applies to what remains.</p>
     <div class="uikit-rule">
       <ul class="list-disc list-inside space-y-1">
         <li>Navbar padding: <code>px-2 min-[400px]:px-3 sm:px-6</code></li>
         <li>Navbar-end gap: <code>gap-0.5 min-[400px]:gap-1 sm:gap-2</code></li>
-        <li>Don't hide nav buttons — all are important. Shrink gaps instead.</li>
+        <li>Overflow goes into the burger panel with full labels, not into tighter icon packing</li>
       </ul>
     </div>
 
