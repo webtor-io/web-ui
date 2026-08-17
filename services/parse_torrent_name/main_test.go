@@ -78,3 +78,39 @@ func TestParser(t *testing.T) {
 		})
 	}
 }
+
+// Bare-keyword additions from skip-list mining 2026-08-17 (fuck*/cock/slut*/
+// milf/tits/boobs + CJK cluster + Lethal Hardcore): each measured 0 FP over
+// two weeks of ai_enrich.query. Negative rows guard the word-boundary
+// behaviour on legitimate titles that contain the tokens as substrings.
+func TestAdultBareKeywords(t *testing.T) {
+	cases := []struct {
+		name  string
+		adult bool
+	}{
+		{"5 chechens are russian fucked a hot street babe", true},
+		{"angela august worships ten inches of cock!", true},
+		{"behind the scenes slutty bbws 2", true},
+		{"aries adore depressed milf needs bbc for motivation", true},
+		{"25 sexiest boobs ever cd1", true},
+		{"anissa kate are my tits distracting you", true},
+		{"LethalHardcore.26.08.01.Some.Scene.1080p", true},
+		{"某某巨乳女神4K合集", true},
+		{"素人自慰配信 2026", true},
+		// Substring guards: cock/tit/boob inside ordinary words must not fire.
+		{"Cocktail.1988.1080p.BluRay", false},
+		{"Peacock.S01E01.720p", false},
+		{"Titanic.1997.2160p", false},
+		{"Booba.S02.Cartoon.WEBRip", false},
+		{"Milford.Graves.Full.Mantis.2018", false},
+	}
+	for _, c := range cases {
+		ti, err := Parse(&TorrentInfo{}, c.name)
+		if err != nil {
+			t.Fatalf("%q: %v", c.name, err)
+		}
+		if ti.Adult != c.adult {
+			t.Errorf("%q: Adult = %v, want %v", c.name, ti.Adult, c.adult)
+		}
+	}
+}
