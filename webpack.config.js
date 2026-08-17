@@ -63,11 +63,20 @@ module.exports = async (env, options) => {
     for (const t of themes) {
         plugins.push(new FaviconsWebpackPlugin({
             logo: `./assets/src/images/logo-${t}.svg`,
+            logoMaskable: `./assets/src/images/logo-${t}-maskable.svg`,
             prefix: `${t}/`,
+            manifest: './assets/src/manifest.base.json',
             favicons: {
+                appName: 'Webtor',
+                appShortName: 'Webtor',
+                appDescription: 'Stream and download torrents right in your browser — free, open-source, no app to install.',
+                lang: 'en',
+                background: '#0a0e1a',
+                theme_color: '#0a0e1a',
+                start_url: '/?ref=pwa',
                 icons: {
                     android: true,
-                    appleIcon: false,
+                    appleIcon: true,
                     appleStartup: false,
                     favicons: true,
                     windows: false,

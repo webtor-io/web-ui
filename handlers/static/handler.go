@@ -69,6 +69,16 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) error {
 		"android-chrome-256x256.png",
 		"android-chrome-384x384.png",
 		"android-chrome-512x512.png",
+		"android-chrome-maskable-36x36.png",
+		"android-chrome-maskable-48x48.png",
+		"android-chrome-maskable-72x72.png",
+		"android-chrome-maskable-96x96.png",
+		"android-chrome-maskable-144x144.png",
+		"android-chrome-maskable-192x192.png",
+		"android-chrome-maskable-256x256.png",
+		"android-chrome-maskable-384x384.png",
+		"android-chrome-maskable-512x512.png",
+		"apple-touch-icon.png",
 	} {
 		r.StaticFile("/"+name, nightPath+"/"+name)
 	}
