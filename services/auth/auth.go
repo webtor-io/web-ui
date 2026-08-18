@@ -607,7 +607,11 @@ func HasAuth(c *gin.Context) {
 	u := GetUserFromContext(c)
 	if !u.HasAuth() {
 		if isNavigation(c.Request) {
-			c.Redirect(http.StatusFound, "/login?from="+url.QueryEscape(c.Request.URL.Path))
+			target := "/login"
+			if p := c.Request.URL.Path; isSafeReturnPath(p) {
+				target += "?return-url=" + url.QueryEscape(p)
+			}
+			c.Redirect(http.StatusFound, target)
 			c.Abort()
 			return
 		}
@@ -628,4 +632,15 @@ func isNavigation(r *http.Request) bool {
 		return mode == "navigate"
 	}
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+// isSafeReturnPath reports whether p is safe to hand back to /login as
+// return-url. The login template renders that value straight into an href
+// with no escaping (templates/partials/auth/form.html), so it must be a
+// site-relative path: exactly one leading slash, never two. Go keeps
+// "//evil.com/x" verbatim in r.URL.Path (it does not normalize it to a
+// host), and a leading "//" in an href is a protocol-relative URL that
+// browsers resolve off-site — so reject anything starting with "//".
+func isSafeReturnPath(p string) bool {
+	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//")
 }
