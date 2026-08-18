@@ -313,7 +313,7 @@ func serve(c *cli.Context) error {
 
 	// Setting AuthHandlers
 	if a != nil {
-		wau.RegisterHandler(r, tm)
+		wau.RegisterHandler(r, tm, a)
 	}
 
 	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).

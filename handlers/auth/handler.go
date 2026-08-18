@@ -2,9 +2,12 @@ package auth
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-contrib/sessions"
+	"github.com/webtor-io/web-ui/services/adminauth"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/libapi"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -88,12 +91,25 @@ type ProcessAuthData struct {
 }
 
 type Handler struct {
-	tb template.Builder[*web.Context]
+	tb           template.Builder[*web.Context]
+	adminStore   *adminauth.Store
+	loginLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
+// PasswordLoginData drives templates/views/auth/password.html. Err carries an
+// i18n key rather than a message so the copy stays in the locales.
+type PasswordLoginData struct {
+	Err string
+}
+
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("auth/*").WithLayout("main"),
+		// Five attempts at once, then one per five seconds. Enough that a
+		// mistyped password is never noticed, little enough that guessing is
+		// pointless.
+		loginLimiter: libapi.NewRateLimiterWith(0.2, 5),
+		adminStore:   a.AdminStore(),
 	}
 
 	r.Use(func(c *gin.Context) {
@@ -106,6 +122,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 	})
 
 	r.GET("/login", h.login)
+	r.POST("/login", h.passwordLogin)
 	r.GET("/refresh", h.refresh)
 	r.GET("/logout", h.logout)
 	r.GET("/auth/verify", h.verify)
@@ -117,7 +134,30 @@ func (s *Handler) refresh(c *gin.Context) {
 	s.tb.Build("auth/refresh").HTML(http.StatusOK, web.NewContext(c))
 }
 
+// renderPassword renders auth/password with the given status. It guards
+// against a nil tb because Handler values built directly by tests (see
+// password_login_test.go) don't wire a template.Builder — that needs the
+// full app's multitemplate renderer and i18n helpers, none of which a fast
+// handler-logic test should have to stand up. RegisterHandler always sets
+// tb, so production never takes the fallback branch.
+func (s *Handler) renderPassword(c *gin.Context, code int, data PasswordLoginData) {
+	if s.tb == nil {
+		c.Status(code)
+		return
+	}
+	s.tb.Build("auth/password").HTML(code, web.NewContext(c).WithData(data))
+}
+
 func (s *Handler) login(c *gin.Context) {
+	if c.Query("return-url") != "" {
+		session := sessions.Default(c)
+		session.Set("return-url", c.Query("return-url"))
+		_ = session.Save()
+	}
+	if s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()) {
+		s.renderPassword(c, http.StatusOK, PasswordLoginData{})
+		return
+	}
 	instruction := "default"
 	if c.Query("from") != "" {
 		instruction = c.Query("from")
@@ -126,15 +166,50 @@ func (s *Handler) login(c *gin.Context) {
 		Instruction: instruction,
 		Card:        loginCardFor(instruction),
 	}
-	if c.Query("return-url") != "" {
-		session := sessions.Default(c)
-		session.Set("return-url", c.Query("return-url"))
-		_ = session.Save()
-	}
 	s.tb.Build("auth/login").HTML(http.StatusOK, web.NewContext(c).WithData(ld))
 }
 
+// passwordLogin verifies the single administrator password. A failure returns
+// 401 with the form re-rendered — never a redirect, so a script cannot tell
+// success from failure by following one.
+func (s *Handler) passwordLogin(c *gin.Context) {
+	if s.adminStore == nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	if s.loginLimiter != nil {
+		if retryAfter, ok := s.loginLimiter.Take(c.ClientIP()); !ok {
+			c.Header("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+			s.renderPassword(c, http.StatusTooManyRequests, PasswordLoginData{Err: "auth.password.tooManyAttempts"})
+			return
+		}
+	}
+	if !s.adminStore.Verify(c.Request.Context(), c.PostForm("password")) {
+		s.renderPassword(c, http.StatusUnauthorized, PasswordLoginData{Err: "auth.password.wrong"})
+		return
+	}
+	session := sessions.Default(c)
+	session.Set(auth.AdminSessionKey, true)
+	// Task 5 sends unauthenticated navigations to /login?return-url=<path>,
+	// and the GET handler above stashes that value in the session. Send a
+	// successful login back where the visitor was headed, then clear it —
+	// the same lifecycle processAuth uses for the OAuth/magic-link paths.
+	returnURL := "/"
+	if v, ok := session.Get("return-url").(string); ok && v != "" {
+		returnURL = v
+		session.Delete("return-url")
+	}
+	if err := session.Save(); err != nil {
+		s.renderPassword(c, http.StatusInternalServerError, PasswordLoginData{Err: "auth.password.sessionFailed"})
+		return
+	}
+	c.Redirect(http.StatusFound, returnURL)
+}
+
 func (s *Handler) logout(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Delete(auth.AdminSessionKey)
+	_ = session.Save()
 	s.tb.Build("auth/logout").HTML(http.StatusOK, web.NewContext(c).WithData(LogoutData{}))
 }
 
