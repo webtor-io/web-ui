@@ -119,3 +119,10 @@ func Verify(encoded, password string) bool {
 	got := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
+
+// subtleEqual compares two plaintext strings without leaking their common
+// prefix length through timing. Used for the ADMIN_PASSWORD path, where there
+// is no hash to compare against.
+func subtleEqual(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
