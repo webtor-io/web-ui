@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net"
 	"net/http"
 	"strconv"
 
@@ -91,9 +92,16 @@ type ProcessAuthData struct {
 }
 
 type Handler struct {
-	tb           template.Builder[*web.Context]
-	adminStore   *adminauth.Store
-	loginLimiter *libapi.RateLimiter
+	tb         template.Builder[*web.Context]
+	adminStore *adminauth.Store
+	// passwordFormActive is auth.Auth.AdminPasswordActive, bound as a func
+	// value so it's the one place login and passwordLogin decide whether the
+	// password branch governs the request (see that method's doc for why
+	// AdminStore().IsConfigured() alone isn't enough), while still letting
+	// tests inject the decision directly without constructing a full
+	// *auth.Auth (its fields are unexported outside services/auth).
+	passwordFormActive func(*gin.Context) bool
+	loginLimiter       *libapi.RateLimiter
 }
 
 // PasswordLoginData drives templates/views/auth/password.html. Err carries an
@@ -108,8 +116,9 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.
 		// Five attempts at once, then one per five seconds. Enough that a
 		// mistyped password is never noticed, little enough that guessing is
 		// pointless.
-		loginLimiter: libapi.NewRateLimiterWith(0.2, 5),
-		adminStore:   a.AdminStore(),
+		loginLimiter:       libapi.NewRateLimiterWith(0.2, 5),
+		adminStore:         a.AdminStore(),
+		passwordFormActive: a.AdminPasswordActive,
 	}
 
 	r.Use(func(c *gin.Context) {
@@ -148,37 +157,75 @@ func (s *Handler) renderPassword(c *gin.Context, code int, data PasswordLoginDat
 	s.tb.Build("auth/password").HTML(code, web.NewContext(c).WithData(data))
 }
 
+// loginView picks which view GET /login renders and its data. Split out from
+// login so a test can check the decision (view name) without needing a
+// working template.Builder to render through — see renderPassword's doc for
+// why that matters.
+func (s *Handler) loginView(c *gin.Context) (view string, data any) {
+	if s.passwordFormActive != nil && s.passwordFormActive(c) {
+		return "auth/password", PasswordLoginData{}
+	}
+	instruction := "default"
+	if c.Query("from") != "" {
+		instruction = c.Query("from")
+	}
+	return "auth/login", LoginData{
+		Instruction: instruction,
+		Card:        loginCardFor(instruction),
+	}
+}
+
 func (s *Handler) login(c *gin.Context) {
 	if c.Query("return-url") != "" {
 		session := sessions.Default(c)
 		session.Set("return-url", c.Query("return-url"))
 		_ = session.Save()
 	}
-	if s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()) {
-		s.renderPassword(c, http.StatusOK, PasswordLoginData{})
+	view, data := s.loginView(c)
+	if s.tb == nil {
+		c.Status(http.StatusOK)
 		return
 	}
-	instruction := "default"
-	if c.Query("from") != "" {
-		instruction = c.Query("from")
+	s.tb.Build(view).HTML(http.StatusOK, web.NewContext(c).WithData(data))
+}
+
+// loginLimiterKey keys the login rate limiter on the direct TCP peer
+// (RemoteAddr) rather than c.ClientIP(). ClientIP() trusts X-Forwarded-For,
+// and nothing in this application calls gin's SetTrustedProxies — so it
+// trusts every proxy and returns the leftmost XFF value, which an attacker
+// controls outright. The self-hosted nginx makes this worse, not better: its
+// upstream directive is $proxy_add_x_forwarded_for, which *appends* to
+// whatever the client already sent instead of replacing it, so a script can
+// hand itself a fresh bucket on every single request just by varying that
+// header. RemoteAddr can't be spoofed that way — it's the actual socket peer,
+// which behind nginx is always 127.0.0.1. That collapses every login attempt
+// on this instance into one shared bucket, which is the right brake here, not
+// a compromise: a self-hosted instance has exactly one administrator, so
+// there is no "other tenant" a global cap could unfairly punish. It slows a
+// remote attacker to one attempt per five seconds and never locks the real
+// administrator out, since there's nothing IP-specific to lock.
+//
+// Do not change this to ClientIP(), and do not add SetTrustedProxies to make
+// ClientIP() safe here — that would change ClientIP() app-wide (geoip, the
+// API rate limiter) with production consequences well beyond this form.
+func loginLimiterKey(c *gin.Context) string {
+	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err != nil {
+		return c.Request.RemoteAddr
 	}
-	ld := LoginData{
-		Instruction: instruction,
-		Card:        loginCardFor(instruction),
-	}
-	s.tb.Build("auth/login").HTML(http.StatusOK, web.NewContext(c).WithData(ld))
+	return host
 }
 
 // passwordLogin verifies the single administrator password. A failure returns
 // 401 with the form re-rendered — never a redirect, so a script cannot tell
 // success from failure by following one.
 func (s *Handler) passwordLogin(c *gin.Context) {
-	if s.adminStore == nil {
+	if s.adminStore == nil || s.passwordFormActive == nil || !s.passwordFormActive(c) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 	if s.loginLimiter != nil {
-		if retryAfter, ok := s.loginLimiter.Take(c.ClientIP()); !ok {
+		if retryAfter, ok := s.loginLimiter.Take(loginLimiterKey(c)); !ok {
 			c.Header("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 			s.renderPassword(c, http.StatusTooManyRequests, PasswordLoginData{Err: "auth.password.tooManyAttempts"})
 			return

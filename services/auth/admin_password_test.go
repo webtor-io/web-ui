@@ -82,18 +82,18 @@ func TestAdminPasswordInertWithSupertokens(t *testing.T) {
 		adminStore:    adminauth.NewStore("some password", nil),
 	}
 
-	if a.adminPasswordActive(nil) {
+	if a.AdminPasswordActive(nil) {
 		t.Error("the admin-password branch activated while SuperTokens is configured")
 	}
 }
 
 // TestSupertokensBranchNotBypassed pins the check that actually protects
 // production: `if !s.hasSupetokens` at the top of RegisterHandler.
-// adminPasswordActive (pinned above) has no production caller — it exists
-// for handlers added in a later task. The thing that decides which branch a
-// live request takes is this one, and nothing exercised it before this test:
-// weakening it to always take the self-hosted branch left the rest of the
-// package green.
+// AdminPasswordActive (pinned above) now has a production caller —
+// handlers/auth's login and passwordLogin — but this test still matters: it
+// pins the *other* gate, the one at the top of RegisterHandler that decides
+// which middleware chain a live request takes at all, which
+// AdminPasswordActive alone does not cover.
 //
 // It does not send a request through the SuperTokens branch — that needs a
 // real supertokens.Init(), out of scope here. Instead it counts the

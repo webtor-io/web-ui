@@ -567,10 +567,18 @@ func adminSessionActive(c *gin.Context) bool {
 	return ok && active
 }
 
-// adminPasswordActive reports whether the password branch governs this
-// request. It is false wherever SuperTokens is configured, which is what keeps
-// production untouched.
-func (s *Auth) adminPasswordActive(c *gin.Context) bool {
+// AdminPasswordActive reports whether the password branch governs this
+// request. It is false wherever SuperTokens is configured, which is what
+// keeps production untouched.
+//
+// This is the single place that decision gets made. handlers/auth's GET
+// /login and POST /login both call it (via the func value RegisterHandler
+// hands them) instead of re-deriving "is the password form active" from
+// AdminStore().IsConfigured() themselves — IsConfigured alone is not enough:
+// it fails closed (returns true) on a repository error, which is correct for
+// self-hosted but would otherwise show the password form on webtor.io during
+// a transient Postgres blip if hasSupetokens weren't checked too.
+func (s *Auth) AdminPasswordActive(c *gin.Context) bool {
 	if s.hasSupetokens {
 		return false
 	}
@@ -583,6 +591,17 @@ func (s *Auth) adminPasswordActive(c *gin.Context) bool {
 // AdminStore exposes the password store to the login and profile handlers.
 func (s *Auth) AdminStore() *adminauth.Store {
 	return s.adminStore
+}
+
+// NewForAdminPasswordTest builds a minimal Auth exposing only the two fields
+// AdminPasswordActive reads. It exists so handlers/auth's tests can exercise
+// the real gating decision — not a hand-rolled stand-in for it — without
+// going through New(), which needs a live *cli.Context, *cs.PG and
+// http.Client that a fast handler-logic test has no business standing up.
+// Every other field stays zero; nothing but AdminPasswordActive should be
+// called on the result.
+func NewForAdminPasswordTest(hasSupertokens bool, store *adminauth.Store) *Auth {
+	return &Auth{hasSupetokens: hasSupertokens, adminStore: store}
 }
 
 func IsAdmin(c *gin.Context) bool {
