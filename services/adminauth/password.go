@@ -34,6 +34,33 @@ const (
 	hashSaltLen        = 16
 )
 
+// Bounds Verify enforces on the parameters it reads out of an encoded hash,
+// before ever calling argon2.IDKey. Those parameters come from the
+// database, not from this package, so they must be treated as untrusted:
+// argon2.IDKey panics outright for time=0 or threads=0, and otherwise has
+// no upper limit at all — a large enough m tries to allocate memory
+// proportional to it (a hash claiming m=4_000_000_000, i.e. ~3.7 TiB, drove
+// RSS past 4 GiB in three seconds in testing before being killed).
+//
+// The bounds below are chosen to comfortably admit what Hash writes today
+// (m=64Mi KiB, t=3, p=4) plus a generous margin for raising those constants
+// later, while rejecting anything a corrupt or hostile row could use to
+// panic or exhaust memory:
+//   - maxHashMemory is 1 GiB (in KiB) — 16x today's 64 MiB. That is still a
+//     small, safe allocation on any host capable of running this service,
+//     and it is orders of magnitude below the multi-terabyte requests the
+//     lack of a bound previously allowed through.
+//   - maxHashTime is 32 — about 10x today's t=3. Time is a linear
+//     multiplier on the cost of a single verify; this stays well within a
+//     login-path latency budget even at the ceiling.
+//   - maxHashThreads is 32 — 8x today's p=4, comfortably above any
+//     realistic core count for a box running this service.
+const (
+	maxHashMemory  uint32 = 1 << 20 // KiB, i.e. 1 GiB
+	maxHashTime    uint32 = 32
+	maxHashThreads uint8  = 32
+)
+
 // Hash returns an encoded argon2id hash of password.
 func Hash(password string) (string, error) {
 	if len([]rune(password)) < MinLength {
@@ -67,6 +94,18 @@ func Verify(encoded, password string) bool {
 	var memory, time uint32
 	var threads uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
+		return false
+	}
+	// argon2.IDKey panics for time=0 or threads=0, and has no upper bound of
+	// its own on any parameter — reject implausible values here, before the
+	// call, rather than relying on it to survive them. See maxHash* above.
+	if memory < 1 || memory > maxHashMemory {
+		return false
+	}
+	if time < 1 || time > maxHashTime {
+		return false
+	}
+	if threads < 1 || threads > maxHashThreads {
 		return false
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
