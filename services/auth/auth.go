@@ -636,11 +636,33 @@ func isNavigation(r *http.Request) bool {
 
 // isSafeReturnPath reports whether p is safe to hand back to /login as
 // return-url. The login template renders that value straight into an href
-// with no escaping (templates/partials/auth/form.html), so it must be a
-// site-relative path: exactly one leading slash, never two. Go keeps
-// "//evil.com/x" verbatim in r.URL.Path (it does not normalize it to a
-// host), and a leading "//" in an href is a protocol-relative URL that
-// browsers resolve off-site — so reject anything starting with "//".
+// with no escaping (templates/partials/auth/form.html), so p must be a
+// site-relative path that resolves the same way in every browser as it does
+// in Go — never something a browser's URL parser rewrites into a
+// scheme-relative or off-site reference.
+//
+// Two escape hatches beyond a literal "//" prefix matter here:
+//   - a leading backslash: WHATWG URL parsing normalizes a leading "\" to
+//     "/" for special schemes when a browser resolves an href, so
+//     "/\evil.com" resolves exactly like "//evil.com" — off-site — even
+//     though Go's net/url keeps the backslash verbatim in r.URL.Path and
+//     never treats it as a host separator itself.
+//   - ASCII control characters (tab, CR, LF, ...): browsers strip these
+//     while parsing a URL, so "/\t/evil.com" collapses to "//evil.com" by
+//     the time it's dereferenced, even though it looks like an ordinary
+//     same-origin path here. Go will decode a percent-encoded control byte
+//     (e.g. "%09") straight into r.URL.Path, so this is reachable.
 func isSafeReturnPath(p string) bool {
-	return strings.HasPrefix(p, "/") && !strings.HasPrefix(p, "//")
+	if p == "" || p[0] != '/' {
+		return false
+	}
+	if len(p) > 1 && (p[1] == '/' || p[1] == '\\') {
+		return false
+	}
+	for i := 0; i < len(p); i++ {
+		if p[i] < 0x20 || p[i] == 0x7f {
+			return false
+		}
+	}
+	return true
 }
