@@ -14,11 +14,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/adminauth"
 	sv "github.com/webtor-io/web-ui/services/common"
 
 	defaultErrors "errors"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/supertokens/supertokens-golang/ingredients/emaildelivery"
 	"github.com/supertokens/supertokens-golang/recipe/dashboard"
@@ -43,6 +45,7 @@ const (
 	patreonClientIDFlag     = "patreon-client-id"
 	patreonClientSecretFlag = "patreon-client-secret"
 	overrideUserEmail       = "override-user-email"
+	adminPasswordFlag       = "admin-password"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -83,6 +86,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "override user email",
 			EnvVar: "OVERRIDE_USER_EMAIL",
 		},
+		cli.StringFlag{
+			Name:   adminPasswordFlag,
+			Usage:  "password for the single self-hosted administrator; overrides the stored one and disables changing it from the profile",
+			EnvVar: "ADMIN_PASSWORD",
+		},
 	)
 }
 
@@ -103,6 +111,7 @@ type Auth struct {
 	patreonClientSecret string
 	hasSupetokens       bool
 	overrideUserEmail   string
+	adminStore          *adminauth.Store
 }
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
@@ -123,6 +132,7 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 		patreonClientID:     c.String(patreonClientIDFlag),
 		patreonClientSecret: c.String(patreonClientSecretFlag),
 		overrideUserEmail:   c.String(overrideUserEmail),
+		adminStore:          adminauth.NewStore(c.String(adminPasswordFlag), adminauth.NewPGRepo(pg)),
 	}
 }
 
@@ -459,8 +469,23 @@ func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.Handl
 func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 	if !s.hasSupetokens {
 		r.Use(func(c *gin.Context) {
-			s.registerAdminUser(c)
-
+			// Three states, in order of precedence:
+			//   no password configured → open instance, auto-admin (legacy
+			//     behaviour) plus a flag the banner renders from;
+			//   password configured and the session carries the login mark →
+			//     auto-admin;
+			//   password configured and no mark → stay anonymous, which lands
+			//     the request on HasAuth and from there on /login.
+			if !s.adminStore.IsConfigured(c.Request.Context()) {
+				ctx := context.WithValue(c.Request.Context(), IsOpenInstanceContext{}, true)
+				c.Request = c.Request.WithContext(ctx)
+				s.registerAdminUser(c)
+				c.Next()
+				return
+			}
+			if adminSessionActive(c) {
+				s.registerAdminUser(c)
+			}
 			c.Next()
 		})
 		return
@@ -516,6 +541,47 @@ func (s *Auth) registerAdminUser(c *gin.Context) {
 	ctx = context.WithValue(ctx, IsNewContext{}, isNew)
 	ctx = context.WithValue(ctx, IsAdminContext{}, true)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+// IsOpenInstanceContext marks a request served by an instance that has no
+// administrator password at all.
+type IsOpenInstanceContext struct{}
+
+// IsOpenInstance reports whether this instance is running without a password.
+// Templates use it to render the "set a password" banner.
+func IsOpenInstance(c *gin.Context) bool {
+	v := c.Request.Context().Value(IsOpenInstanceContext{})
+	open, ok := v.(bool)
+	return ok && open
+}
+
+// AdminSessionKey is the session entry that records a successful password
+// login. It lives in the session store already configured in
+// handlers/session, so it inherits that cookie's HttpOnly/Secure settings.
+const AdminSessionKey = "admin-authenticated"
+
+func adminSessionActive(c *gin.Context) bool {
+	v := sessions.Default(c).Get(AdminSessionKey)
+	active, ok := v.(bool)
+	return ok && active
+}
+
+// adminPasswordActive reports whether the password branch governs this
+// request. It is false wherever SuperTokens is configured, which is what keeps
+// production untouched.
+func (s *Auth) adminPasswordActive(c *gin.Context) bool {
+	if s.hasSupetokens {
+		return false
+	}
+	if c == nil {
+		return s.adminStore != nil
+	}
+	return s.adminStore.IsConfigured(c.Request.Context())
+}
+
+// AdminStore exposes the password store to the login and profile handlers.
+func (s *Auth) AdminStore() *adminauth.Store {
+	return s.adminStore
 }
 
 func IsAdmin(c *gin.Context) bool {
