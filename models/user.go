@@ -14,6 +14,9 @@ type User struct {
 	tableName     struct{}  `pg:"user"`
 	UserID        uuid.UUID `pg:"user_id,pk"`
 	Email         string
+	// Password holds the argon2id hash of the self-hosted administrator's
+	// password (services/adminauth). It is empty for every other user and on
+	// every SuperTokens-backed deployment.
 	Password      string
 	PatreonUserID *string `pg:"patreon_user_id"`
 	CreatedAt     time.Time
