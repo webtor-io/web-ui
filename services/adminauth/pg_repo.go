@@ -55,10 +55,19 @@ func (r *pgRepo) Set(ctx context.Context, hash string) error {
 		return errNoDB
 	}
 	u := &models.User{}
-	_, err := db.Model(u).
+	res, err := db.Model(u).
 		Context(ctx).
 		Set("password = ?", hash).
 		Where("email = ?", adminEmail).
 		Update()
-	return err
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		// Admin row does not exist; the update was a no-op.
+		// Return pg.ErrNoRows so the Store above understands the write failed
+		// the same way it understands a missing row in Get().
+		return pg.ErrNoRows
+	}
+	return nil
 }
