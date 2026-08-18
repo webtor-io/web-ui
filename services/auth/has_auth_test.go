@@ -68,3 +68,56 @@ func TestHasAuthLetsSignedInRequestsThrough(t *testing.T) {
 		t.Errorf("status: got %d, want 200", w.Code)
 	}
 }
+
+// A browser navigating to a protected page must land on the login form, not on
+// a blank 401. Everything else — XHR, the JSON API, SSE — must keep getting
+// 401, because a 302 to an HTML page is unparseable for them.
+func TestHasAuthRedirectsBrowsersButNotAPIClients(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	gr := r.Group("/guarded")
+	gr.Use(HasAuth)
+	gr.GET("", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	cases := map[string]struct {
+		headers  map[string]string
+		wantCode int
+	}{
+		"browser navigation": {
+			headers:  map[string]string{"Accept": "text/html,application/xhtml+xml", "Sec-Fetch-Mode": "navigate"},
+			wantCode: http.StatusFound,
+		},
+		"xhr": {
+			headers:  map[string]string{"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+			wantCode: http.StatusUnauthorized,
+		},
+		"api client": {
+			headers:  map[string]string{"Accept": "application/json"},
+			wantCode: http.StatusUnauthorized,
+		},
+		"html fetch that is not a navigation": {
+			headers:  map[string]string{"Accept": "text/html", "Sec-Fetch-Mode": "cors"},
+			wantCode: http.StatusUnauthorized,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/guarded", nil)
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tc.wantCode {
+				t.Errorf("status: got %d, want %d", w.Code, tc.wantCode)
+			}
+			if tc.wantCode == http.StatusFound {
+				if loc := w.Header().Get("Location"); loc != "/login?from=%2Fguarded" && loc != "/login?from=/guarded" {
+					t.Errorf("Location: got %q, want a /login redirect carrying the original path", loc)
+				}
+			}
+		})
+	}
+}

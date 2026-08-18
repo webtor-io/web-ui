@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -598,11 +599,33 @@ func IsAdmin(c *gin.Context) bool {
 // without aborting hands control straight to the next handler — the 401
 // status set here would then be overwritten by whatever that handler wrote,
 // and every route behind this middleware would run with an empty user.
+//
+// A browser navigating to a protected page gets a redirect to the login form;
+// everything else keeps the bare 401, because an XHR or an SSE stream cannot
+// do anything useful with an HTML page.
 func HasAuth(c *gin.Context) {
 	u := GetUserFromContext(c)
 	if !u.HasAuth() {
+		if isNavigation(c.Request) {
+			c.Redirect(http.StatusFound, "/login?from="+url.QueryEscape(c.Request.URL.Path))
+			c.Abort()
+			return
+		}
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	c.Next()
+}
+
+// isNavigation reports whether the request is a browser navigating to a page,
+// as opposed to a script fetching data. Sec-Fetch-Mode is authoritative where
+// the browser sends it; the Accept check covers the rest.
+func isNavigation(r *http.Request) bool {
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		return false
+	}
+	if mode := r.Header.Get("Sec-Fetch-Mode"); mode != "" {
+		return mode == "navigate"
+	}
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
