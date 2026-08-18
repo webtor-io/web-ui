@@ -83,17 +83,44 @@ export function copyShareUrl() {
 // Copy a magnet URI built from the button's data attributes
 // (data-magnet-hash, data-magnet-name). The URI is assembled client-side
 // so the torrent name never has to be escaped into an inline JS string.
+// Trackerless by design: rest-api synthesizes the same hash+dn magnet from
+// its manifest fast-path (the torrent is already in the store), pulling the
+// announce list would cost a full .torrent parse per page view.
+//
+// Toast + umami fire only after the text actually landed on the clipboard —
+// tracking before the attempt counted copies that never happened on plain
+// http (no navigator.clipboard) and on NotAllowedError rejections.
 export function copyMagnet(el) {
     const hash = el.dataset.magnetHash;
     if (!hash) return;
     let uri = 'magnet:?xt=urn:btih:' + hash;
     if (el.dataset.magnetName) uri += '&dn=' + encodeURIComponent(el.dataset.magnetName);
-    if (window.umami) window.umami.track('copy-magnet');
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(uri).then(() => {
+    const onCopied = () => {
+        if (window.umami) window.umami.track('copy-magnet');
         const msg = el.dataset.copiedText || 'Magnet link copied';
         if (window.toast) window.toast.success(msg);
-    }).catch(() => {});
+    };
+    // Legacy path for non-secure contexts (self-hosted over plain http, LAN
+    // dev), where navigator.clipboard is undefined and the button used to
+    // silently no-op.
+    const legacyCopy = () => {
+        const ta = document.createElement('textarea');
+        ta.value = uri;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { /* fall through */ }
+        document.body.removeChild(ta);
+        if (ok) onCopied();
+    };
+    if (!navigator.clipboard) {
+        legacyCopy();
+        return;
+    }
+    navigator.clipboard.writeText(uri).then(onCopied).catch(legacyCopy);
 }
 
 // Expose for inline onclick="shareResource()" / onclick="copyShareUrl()" /

@@ -30,10 +30,17 @@ Generated at `assets/dist/night/manifest.webmanifest`, served at
 
 - Level 1 `share()`: reads `title`/`text`/`url` query params, redirects.
 - Level 2 `resolveSharePath()`: pure function; extracts a magnet URI (substring
-  scan, cut at whitespace) or a bare 40-hex infohash (via
-  `common.ResolveQueryHash`) from any of the three fields. Success → `302` to
+  scan, cut at whitespace, resolved via `common.ResolveQueryHash`) or a bare
+  infohash from any of the three fields. Success → `302` to
   `/{canonical magnet}` (the existing magnet GET flow); nothing streamable →
   `302 /`.
+- The bare-infohash fallback matches a **strict standalone 40-hex token**
+  (`bareInfohashR`), NOT the search box's lenient `common.SHA1R`
+  (`[0-9a-f]{5,40}`, first match). Share-sheet input is arbitrary text/URLs:
+  under the lenient regex nearly every shared link resolved to a bogus magnet
+  (`facebook.com/story/123` → `btih:faceb`), the home fallback was dead code,
+  and a v2-only `btmh` digest mid-string got truncated to a valid-looking but
+  nonexistent v1 hash that started a never-completing resource job.
 
 Tests: `handlers/resource/share_test.go`.
 

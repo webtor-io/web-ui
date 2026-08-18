@@ -221,7 +221,13 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     padding: 0.5rem 0.75rem;
     background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
     opacity: 0;
-    transition: opacity 0.3s ease;
+    /* visibility rides along with the fade so the hidden overlay's buttons
+       (pointer-events:auto) stop being invisible-but-clickable — without it
+       a tap in the top-right corner after the controls auto-hide landed on
+       the transparent cast/share button instead of toggling play. The 0.3s
+       visibility delay keeps the element hoverable until the fade-out ends. */
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
     color: white;
     /* Click-through gradient — the player container's onClick handles
        play-toggle, the share button itself flips pointer-events back
@@ -232,6 +238,8 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
 .wt-player--controls-visible .wt-player-top-overlay,
 .wt-player-top-overlay:hover {
     opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 /* Title fills the remaining space, share button sits at the end.

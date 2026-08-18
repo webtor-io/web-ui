@@ -97,12 +97,24 @@ func TestAdultBareKeywords(t *testing.T) {
 		{"LethalHardcore.26.08.01.Some.Scene.1080p", true},
 		{"某某巨乳女神4K合集", true},
 		{"素人自慰配信 2026", true},
+		{"极品性爱视频合集", true},
+		{"巨大肉棒中出特辑", true},
+		{"ASMR 耳舐め 2026", true},
 		// Substring guards: cock/tit/boob inside ordinary words must not fire.
 		{"Cocktail.1988.1080p.BluRay", false},
 		{"Peacock.S01E01.720p", false},
 		{"Titanic.1997.2160p", false},
 		{"Booba.S02.Cartoon.WEBRip", false},
 		{"Milford.Graves.Full.Mantis.2018", false},
+		// Standalone-token guards (review 2026-08-18): mainstream releases
+		// where the bare word IS the token — the reason fuck*/cock left the
+		// single-hit tier and slut* narrowed to sluts?/slutty.
+		{"SVT.Slutspel.2026.S01E01.1080p.WEB", false},   // Swedish "playoffs"
+		{"Slutet.2020.SWEDiSH.1080p.WEB", false},        // Swedish "the end"
+		{"Fucking.Amal.1998.1080p.BluRay", false},       // Show Me Love
+		{"Zero.Fucks.Given.2021.1080p.WEB", false},      // Rien à foutre
+		{"Tristram.Shandy.A.Cock.and.Bull.Story.2005.720p", false},
+		{"Cock.2022.Stage.Play.1080p", false},
 	}
 	for _, c := range cases {
 		ti, err := Parse(&TorrentInfo{}, c.name)

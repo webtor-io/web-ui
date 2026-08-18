@@ -491,7 +491,15 @@ var adultMatcher = NewRegexpMatcher(
 	// `creampie[ds]?` covers the `creampied` / `creampies` suffixed
 	// forms — the prior `creampie\b` form failed on those because
 	// `d`/`s` is a word char so `\b` didn't fire (audit 2026-05-18).
-	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|cum(?:ming)?|blowjob|handjob|footjob|threesome|creampie[ds]?|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|titjob|titfuck|fetish|fuckermate|blackzilla|tranny|trannys|trannies|twink|pmv|anal\d*|pussy|busty|bigtit|bigass|fuck[a-z]*|cocks?|slut[a-z]*|milfs?|tits|boobs?))\b`,
+	`(?i)\b((porn(?:o|hub|star)?|hentai|gangbang|bukkake|deepthroat|fisting|cums?hot|cum(?:ming)?|blowjob|handjob|footjob|threesome|creampie[ds]?|squirter|squirting|cuckold|stepmom|stepdad|stepsis|stepson|stepbro|stepsister|stepdaughter|stepbrother|stepfather|stepmother|hotwife|pawg|gloryhole|nudism|nudist|camgirl|camslut|masturbat[a-z]*|fingering|titties|titty|titjob|titfuck|fetish|fuckermate|blackzilla|tranny|trannys|trannies|twink|pmv|anal\d*|pussy|busty|bigtit|bigass|sluts?|slutty|milfs?|tits|boobs?))\b`,
+	// NOTE (review 2026-08-18): the 17.08 skip-list additions `fuck[a-z]*`,
+	// `cocks?` and `slut[a-z]*` were trimmed — the open forms false-positive
+	// on mainstream releases the 2-week ai_enrich.query window never saw:
+	// Swedish compounds ("Slutspel"/"Slutet", slut = "end"), Fucking.Amal
+	// (1998), Zero.Fucks.Given (2021), A.Cock.and.Bull.Story (2005). What
+	// remains: `sluts?|slutty` above (Swedish compounds no longer match),
+	// and fuck/cock moved into the phrase tier below where they need an
+	// adult-shaped object next to them.
 	// Adjective+sexual-noun composites — none of these phrases occur
 	// in legitimate media titles. Covers the "rough face fuck",
 	// "fucked hard", "deep throat", "brutal anal" shape that's
@@ -499,7 +507,7 @@ var adultMatcher = NewRegexpMatcher(
 	// Audit 2026-05-18: "faphouse - amira mae - tight 19 yr old
 	// latina rough face fuck fucked hard & creampied" had zero
 	// single-word matches before this rule.
-	`(?i)\b((face[\s.-]?fuck(?:ed|ing|s)?|fuck(?:ed|ing|s)[\s.-]+(?:hard|raw|rough|deep|by)|(?:rough|brutal|raw|deep|wild)[\s.-]+(?:sex|fuck|anal|throat|pussy)|barely[\s.-]?legal|teen[\s.-]?(?:slut|whore)|amateur[\s.-]?(?:wife|couple)|big[\s.-]?(?:tits?|ass|cock|dick)))\b`,
+	`(?i)\b((face[\s.-]?fuck(?:ed|ing|s)?|fuck(?:ed|ing|s)[\s.-]+(?:hard|raw|rough|deep|by)|fuck(?:ed|ing|s)?[\s.-]+(?:a[\s.-]+)?(?:hot|teen|horny|busty|tight|bbw|milfs?|sluts?|whores?|babes?|pussy)|inch(?:es)?[\s.-]+of[\s.-]+cocks?|(?:rough|brutal|raw|deep|wild)[\s.-]+(?:sex|fuck|anal|throat|pussy)|barely[\s.-]?legal|teen[\s.-]?(?:slut|whore)|amateur[\s.-]?(?:wife|couple)|big[\s.-]?(?:tits?|ass|cock|dick)))\b`,
 	// Adult studios / sites (case-insensitive). Curated from
 	// ai_enrich.query — every name here was observed dominating
 	// the negative cache (milfy alone: 106 rows). The list itself

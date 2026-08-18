@@ -58,6 +58,32 @@ func TestResolveSharePath(t *testing.T) {
 			ok:   false,
 		},
 		{
+			// Short hex runs inside ordinary URLs must not resolve: the
+			// lenient search-box heuristic (sv.SHA1R {5,40}) turned
+			// "facebook" into btih:faceb.
+			name: "shared url with incidental hex run",
+			url:  "https://www.facebook.com/story/123",
+			ok:   false,
+		},
+		{
+			name: "torrent site url with numeric id",
+			url:  "https://1337x.to/torrent/1234567/Sintel/",
+			ok:   false,
+		},
+		{
+			// A 68-hex btmh digest must not be truncated to its first 40
+			// chars — that yields a valid-looking but nonexistent v1 hash.
+			name: "v2-only magnet mid-string",
+			text: "look at this magnet:?xt=urn:btmh:1220caf1e1c30e81cb361b9ee167c4aa64228a7fa4fa9f6105232b28ad099f3a302e wow",
+			ok:   false,
+		},
+		{
+			name:     "infohash inside a url path",
+			url:      "https://example.com/torrent/" + hash + "/details",
+			ok:       true,
+			contains: []string{hash},
+		},
+		{
 			name: "empty input",
 			ok:   false,
 		},

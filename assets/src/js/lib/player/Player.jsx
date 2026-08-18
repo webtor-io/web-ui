@@ -12,6 +12,26 @@ import '../../../styles/player.css';
 
 let _currentPlayer = null;
 
+// Cast sender SDK loader — module-level so repeated player inits (one per
+// file click) share a single <script> append and a single
+// window.__onGCastApiAvailable callback. Without this every init while the
+// SDK was still loading (or forever, with gstatic blocked by an adblocker)
+// appended another script tag and overwrote the previous player's callback.
+let castSenderPromise = null;
+function loadCastSender() {
+    if (window.cast) return Promise.resolve(true);
+    if (!castSenderPromise) {
+        castSenderPromise = new Promise((resolve) => {
+            window.__onGCastApiAvailable = (available) => resolve(!!available);
+            const s = document.createElement('script');
+            s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
+            s.onerror = () => resolve(false);
+            document.body.appendChild(s);
+        });
+    }
+    return castSenderPromise;
+}
+
 /**
  * Main Player Preact component.
  * Wraps <video>/<audio>, renders custom controls, manages HLS + session seeking.
@@ -318,14 +338,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             });
             setCastAvailable(true);
         }
-        if (window.cast) {
-            initCast();
-        } else {
-            window.__onGCastApiAvailable = (available) => { if (available) initCast(); };
-            const s = document.createElement('script');
-            s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
-            document.body.appendChild(s);
-        }
+        loadCastSender().then((available) => { if (available) initCast(); });
         return () => { cancelled = true; setCastAvailable(false); };
     }, [features.chromecast, isVideo]);
 
@@ -476,7 +489,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 The title comes from data-resource-title when provided by
                 the template, else from document.title stripped of the
                 " | Webtor.io" site-suffix that layouts/main.html appends. */}
-            {showControls && isVideo && (features.share || castAvailable) && (() => {
+            {/* Gated on features.share, NOT castAvailable: castAvailable only
+                means the Cast SDK loaded (true in every desktop Chrome), and
+                a paid embed that disabled share must not suddenly grow a
+                Webtor gradient + torrent title over its video. Share-less
+                players get the floating cast launcher below instead. */}
+            {showControls && isVideo && features.share && (() => {
                 const title = getResourceTitle(videoEl);
                 // Overlay container has pointer-events:none in CSS so the
                 // gradient stays click-through (clicks land on the video
@@ -501,10 +519,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     </div>
                 );
             })()}
-            {/* Controls-less players (no `controls` attribute) have no top
-                overlay — keep the cast launcher reachable via the legacy
-                floating position there. */}
-            {!showControls && isVideo && castAvailable && (
+            {/* Controls-less players have no top overlay, and share-less
+                embeds deliberately render none — keep the cast launcher
+                reachable via the legacy floating position in both cases. */}
+            {isVideo && castAvailable && (!showControls || !features.share) && (
                 <div class="wt-player-cast-button wt-player-cast-button--floating" onClick={(e) => e.stopPropagation()}>
                     <google-cast-launcher></google-cast-launcher>
                 </div>
