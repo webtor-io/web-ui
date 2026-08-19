@@ -81,6 +81,19 @@
     </div>
     {{ end }}
 
+    {{/* Only a self-hosted instance (no SuperTokens) has an administrator
+         password to set at all — on webtor.io this section must not render. */}}
+    {{ if .Data.SelfHosted }}
+    <!-- Administration -->
+    <div class="flex items-center gap-3 mt-10 mb-4">
+        <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.administration" }}</h2>
+        <div class="flex-1 h-px bg-w-line/50"></div>
+    </div>
+    <div id="password">
+        {{ template "profile/password" $ }}
+    </div>
+    {{ end }}
+
     <!-- Preferences -->
     <div class="flex items-center gap-3 mt-10 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.preferences" }}</h2>

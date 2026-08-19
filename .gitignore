@@ -42,3 +42,6 @@ chart
 # Local UI/visual-audit artifacts
 .playwright-mcp/
 .screenshots/
+
+# SDD scratch workspace
+.superpowers/

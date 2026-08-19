@@ -313,7 +313,7 @@ func serve(c *cli.Context) error {
 
 	// Setting AuthHandlers
 	if a != nil {
-		wau.RegisterHandler(r, tm)
+		wau.RegisterHandler(r, tm, a)
 	}
 
 	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).
@@ -430,7 +430,7 @@ func serve(c *cli.Context) error {
 	release_subscription.RegisterHandler(r, tm, pg, releaseSubSvc)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)

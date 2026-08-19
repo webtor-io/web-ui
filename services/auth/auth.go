@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,11 +15,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/adminauth"
 	sv "github.com/webtor-io/web-ui/services/common"
 
 	defaultErrors "errors"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/supertokens/supertokens-golang/ingredients/emaildelivery"
 	"github.com/supertokens/supertokens-golang/recipe/dashboard"
@@ -43,6 +46,7 @@ const (
 	patreonClientIDFlag     = "patreon-client-id"
 	patreonClientSecretFlag = "patreon-client-secret"
 	overrideUserEmail       = "override-user-email"
+	adminPasswordFlag       = "admin-password"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -83,6 +87,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "override user email",
 			EnvVar: "OVERRIDE_USER_EMAIL",
 		},
+		cli.StringFlag{
+			Name:   adminPasswordFlag,
+			Usage:  "password for the single self-hosted administrator; overrides the stored one and disables changing it from the profile",
+			EnvVar: "ADMIN_PASSWORD",
+		},
 	)
 }
 
@@ -103,6 +112,7 @@ type Auth struct {
 	patreonClientSecret string
 	hasSupetokens       bool
 	overrideUserEmail   string
+	adminStore          *adminauth.Store
 }
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
@@ -123,6 +133,7 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 		patreonClientID:     c.String(patreonClientIDFlag),
 		patreonClientSecret: c.String(patreonClientSecretFlag),
 		overrideUserEmail:   c.String(overrideUserEmail),
+		adminStore:          adminauth.NewStore(c.String(adminPasswordFlag), adminauth.NewPGRepo(pg)),
 	}
 }
 
@@ -459,8 +470,23 @@ func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.Handl
 func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 	if !s.hasSupetokens {
 		r.Use(func(c *gin.Context) {
-			s.registerAdminUser(c)
-
+			// Three states, in order of precedence:
+			//   no password configured → open instance, auto-admin (legacy
+			//     behaviour) plus a flag the banner renders from;
+			//   password configured and the session carries the login mark →
+			//     auto-admin;
+			//   password configured and no mark → stay anonymous, which lands
+			//     the request on HasAuth and from there on /login.
+			if !s.adminStore.IsConfigured(c.Request.Context()) {
+				ctx := context.WithValue(c.Request.Context(), IsOpenInstanceContext{}, true)
+				c.Request = c.Request.WithContext(ctx)
+				s.registerAdminUser(c)
+				c.Next()
+				return
+			}
+			if adminSessionActive(c) {
+				s.registerAdminUser(c)
+			}
 			c.Next()
 		})
 		return
@@ -518,6 +544,75 @@ func (s *Auth) registerAdminUser(c *gin.Context) {
 	c.Request = c.Request.WithContext(ctx)
 }
 
+// IsOpenInstanceContext marks a request served by an instance that has no
+// administrator password at all.
+type IsOpenInstanceContext struct{}
+
+// IsOpenInstance reports whether this instance is running without a password.
+// Templates use it to render the "set a password" banner.
+func IsOpenInstance(c *gin.Context) bool {
+	v := c.Request.Context().Value(IsOpenInstanceContext{})
+	open, ok := v.(bool)
+	return ok && open
+}
+
+// AdminSessionKey is the session entry that records a successful password
+// login. It lives in the session store already configured in
+// handlers/session, so it inherits that cookie's HttpOnly/Secure settings.
+const AdminSessionKey = "admin-authenticated"
+
+func adminSessionActive(c *gin.Context) bool {
+	v := sessions.Default(c).Get(AdminSessionKey)
+	active, ok := v.(bool)
+	return ok && active
+}
+
+// AdminPasswordActive reports whether the password branch governs this
+// request. It is false wherever SuperTokens is configured, which is what
+// keeps production untouched.
+//
+// This is the single place that decision gets made. handlers/auth's GET
+// /login and POST /login both call it (via the func value RegisterHandler
+// hands them) instead of re-deriving "is the password form active" from
+// AdminStore().IsConfigured() themselves — IsConfigured alone is not enough:
+// it fails closed (returns true) on a repository error, which is correct for
+// self-hosted but would otherwise show the password form on webtor.io during
+// a transient Postgres blip if hasSupetokens weren't checked too.
+func (s *Auth) AdminPasswordActive(c *gin.Context) bool {
+	if s.hasSupetokens {
+		return false
+	}
+	if c == nil {
+		return s.adminStore != nil
+	}
+	return s.adminStore.IsConfigured(c.Request.Context())
+}
+
+// AdminStore exposes the password store to the login and profile handlers.
+func (s *Auth) AdminStore() *adminauth.Store {
+	return s.adminStore
+}
+
+// SelfHosted reports whether this deployment has no SuperTokens configured.
+// The profile page's password section uses this — not AdminPasswordActive —
+// to decide whether to show itself: AdminPasswordActive also requires a
+// password to already be configured, which is exactly the state this section
+// exists to get the instance out of (setting the very first password).
+func (s *Auth) SelfHosted() bool {
+	return !s.hasSupetokens
+}
+
+// NewForAdminPasswordTest builds a minimal Auth exposing only the two fields
+// AdminPasswordActive reads. It exists so handlers/auth's tests can exercise
+// the real gating decision — not a hand-rolled stand-in for it — without
+// going through New(), which needs a live *cli.Context, *cs.PG and
+// http.Client that a fast handler-logic test has no business standing up.
+// Every other field stays zero; nothing but AdminPasswordActive should be
+// called on the result.
+func NewForAdminPasswordTest(hasSupertokens bool, store *adminauth.Store) *Auth {
+	return &Auth{hasSupetokens: hasSupertokens, adminStore: store}
+}
+
 func IsAdmin(c *gin.Context) bool {
 	v := c.Request.Context().Value(IsAdminContext{})
 	isAdmin, ok := v.(bool)
@@ -532,11 +627,70 @@ func IsAdmin(c *gin.Context) bool {
 // without aborting hands control straight to the next handler — the 401
 // status set here would then be overwritten by whatever that handler wrote,
 // and every route behind this middleware would run with an empty user.
+//
+// A browser navigating to a protected page gets a redirect to the login form;
+// everything else keeps the bare 401, because an XHR or an SSE stream cannot
+// do anything useful with an HTML page.
 func HasAuth(c *gin.Context) {
 	u := GetUserFromContext(c)
 	if !u.HasAuth() {
+		if isNavigation(c.Request) {
+			target := "/login"
+			if p := c.Request.URL.Path; isSafeReturnPath(p) {
+				target += "?return-url=" + url.QueryEscape(p)
+			}
+			c.Redirect(http.StatusFound, target)
+			c.Abort()
+			return
+		}
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	c.Next()
+}
+
+// isNavigation reports whether the request is a browser navigating to a page,
+// as opposed to a script fetching data. Sec-Fetch-Mode is authoritative where
+// the browser sends it; the Accept check covers the rest.
+func isNavigation(r *http.Request) bool {
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		return false
+	}
+	if mode := r.Header.Get("Sec-Fetch-Mode"); mode != "" {
+		return mode == "navigate"
+	}
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+// isSafeReturnPath reports whether p is safe to hand back to /login as
+// return-url. The login template renders that value straight into an href
+// with no escaping (templates/partials/auth/form.html), so p must be a
+// site-relative path that resolves the same way in every browser as it does
+// in Go — never something a browser's URL parser rewrites into a
+// scheme-relative or off-site reference.
+//
+// Two escape hatches beyond a literal "//" prefix matter here:
+//   - a leading backslash: WHATWG URL parsing normalizes a leading "\" to
+//     "/" for special schemes when a browser resolves an href, so
+//     "/\evil.com" resolves exactly like "//evil.com" — off-site — even
+//     though Go's net/url keeps the backslash verbatim in r.URL.Path and
+//     never treats it as a host separator itself.
+//   - ASCII control characters (tab, CR, LF, ...): browsers strip these
+//     while parsing a URL, so "/\t/evil.com" collapses to "//evil.com" by
+//     the time it's dereferenced, even though it looks like an ordinary
+//     same-origin path here. Go will decode a percent-encoded control byte
+//     (e.g. "%09") straight into r.URL.Path, so this is reachable.
+func isSafeReturnPath(p string) bool {
+	if p == "" || p[0] != '/' {
+		return false
+	}
+	if len(p) > 1 && (p[1] == '/' || p[1] == '\\') {
+		return false
+	}
+	for i := 0; i < len(p); i++ {
+		if p[i] < 0x20 || p[i] == 0x7f {
+			return false
+		}
+	}
+	return true
 }
