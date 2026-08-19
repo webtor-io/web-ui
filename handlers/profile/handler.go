@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -493,6 +494,18 @@ func (s *Handler) setPassword(c *gin.Context) {
 			c.Redirect(http.StatusFound, "/profile?err=auth.password.tooShort")
 			return
 		}
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	// Setting the first password flips adminStore.IsConfigured() to true for
+	// every request from now on, including this visitor's very next one. If
+	// this session isn't also marked admin-authenticated here (the same mark
+	// handlers/auth/handler.go's passwordLogin sets), the person who just set
+	// the password immediately looks unauthenticated to auth.AdminPasswordActive
+	// and gets bounced to the login form on the redirect below.
+	session := sessions.Default(c)
+	session.Set(auth.AdminSessionKey, true)
+	if err := session.Save(); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
