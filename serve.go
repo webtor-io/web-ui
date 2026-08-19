@@ -316,6 +316,23 @@ func serve(c *cli.Context) error {
 		wau.RegisterHandler(r, tm, a)
 	}
 
+	// Setting the whole-interface auth gate (self-hosted; off by default).
+	//
+	// Placement is deliberate and load-bearing: gin applies Use() only to
+	// routes registered after it, and everything a signed-out visitor still
+	// needs is registered above — the static assets (sta.RegisterHandler) and
+	// the login form itself (wau.RegisterHandler). Move this call earlier and
+	// the login page arrives without its stylesheet and without a way to log
+	// in.
+	//
+	// The exempt prefixes are the surfaces registered below that carry their
+	// own authentication: the JSON API checks its key, the Stremio addon its
+	// token, S3 its signature. Everything else added later is closed by
+	// default, which is the direction we want a mistake to fall.
+	if c.Bool(common.OnlyAuthorized) {
+		r.Use(auth.OnlyAuthorized(libapi.MountPath, "/stremio", s3svc.MountPath))
+	}
+
 	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).
 	// Consumed by both AI recommendations and AI enrichment.
 	anthropicCl := ac.New(c)

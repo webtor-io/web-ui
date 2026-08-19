@@ -57,6 +57,7 @@ var (
 	SMTPSecureFlag    = "smtp-secure"
 	SMTPFromFlag      = "smtp-from"
 	UseDirectLinks    = "use-direct-links"
+	OnlyAuthorized    = "only-authorized"
 	SessionSecretFlag = "secret"
 	DisableWebDAVFlag = "disable-webdav"
 	DisableS3Flag     = "disable-s3"
@@ -122,6 +123,17 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   UseDirectLinks,
 			Usage:  "use direct links",
 			EnvVar: "USE_DIRECT_LINKS",
+		},
+		cli.BoolFlag{
+			// Off by default so webtor.io, which serves anonymous visitors,
+			// is unaffected. Self-hosted turns it on: there a resource page is
+			// reachable by anyone holding the hash, so an instance with an
+			// administrator password would still serve its content to
+			// strangers. Surfaces with their own authentication — the JSON
+			// API, the Stremio addon, S3 — are exempt; see serve.go.
+			Name:   OnlyAuthorized,
+			Usage:  "require an authenticated user for every page of the web interface",
+			EnvVar: "ONLY_AUTHORIZED",
 		},
 		cli.StringFlag{
 			Name:   SessionSecretFlag,
