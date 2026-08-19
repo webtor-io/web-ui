@@ -38,6 +38,7 @@
         {{- template "head_extra" . }}
     </head>
     <body class="flex flex-col min-h-screen font-sans antialiased">
+        {{ template "open_instance_banner" $ }}
         <script>
             // Anti-FOUC hide; layout.js unhides once it runs. The load/timeout
             // fallbacks guarantee the page never stays blank if layout.js

@@ -47,6 +47,11 @@ type Context struct {
 	UserSettings *models.UserSettings
 	Lang         string
 	Path         string
+	// OpenInstance is true on a self-hosted instance running without an
+	// administrator password: anyone who can reach the port is admin. The
+	// banner rendered from this is the only thing standing between the
+	// instance and a stranger, so it is deliberately hard to ignore.
+	OpenInstance bool
 	ginCtx       *gin.Context
 }
 
@@ -104,6 +109,7 @@ func NewContext(c *gin.Context) *Context {
 		UserSettings: settings,
 		Lang:         lang,
 		Path:         path,
+		OpenInstance: auth.IsOpenInstance(c),
 		ginCtx:       c,
 	}
 }

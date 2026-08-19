@@ -1,0 +1,18 @@
+{{ define "open_instance_banner" }}
+{{ if $.OpenInstance }}
+<div id="open-instance-banner" class="bg-error/15 border-b border-error/40 px-4 py-3">
+    <div class="max-w-5xl mx-auto flex items-center gap-3 text-sm">
+        <svg class="size-5 shrink-0 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+        <span class="flex-1">{{ t $.Lang "banner.openInstance" }}</span>
+        <a href="{{ langPath $.Lang "/profile" }}#password" class="btn btn-sm btn-error shrink-0">{{ t $.Lang "banner.openInstanceAction" }}</a>
+        <button type="button" class="btn btn-ghost btn-sm shrink-0"
+                onclick="sessionStorage.setItem('open-instance-banner-hidden','1');document.getElementById('open-instance-banner').remove()">
+            {{ t $.Lang "banner.hideForNow" }}
+        </button>
+    </div>
+</div>
+<script>(function(){try{if(sessionStorage.getItem('open-instance-banner-hidden')==='1'){var b=document.getElementById('open-instance-banner');if(b)b.remove();}}catch(e){}})();</script>
+{{ end }}
+{{ end }}
