@@ -430,7 +430,7 @@ func serve(c *cli.Context) error {
 	release_subscription.RegisterHandler(r, tm, pg, releaseSubSvc)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)

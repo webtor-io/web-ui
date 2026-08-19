@@ -593,6 +593,15 @@ func (s *Auth) AdminStore() *adminauth.Store {
 	return s.adminStore
 }
 
+// SelfHosted reports whether this deployment has no SuperTokens configured.
+// The profile page's password section uses this — not AdminPasswordActive —
+// to decide whether to show itself: AdminPasswordActive also requires a
+// password to already be configured, which is exactly the state this section
+// exists to get the instance out of (setting the very first password).
+func (s *Auth) SelfHosted() bool {
+	return !s.hasSupetokens
+}
+
 // NewForAdminPasswordTest builds a minimal Auth exposing only the two fields
 // AdminPasswordActive reads. It exists so handlers/auth's tests can exercise
 // the real gating decision — not a hand-rolled stand-in for it — without

@@ -16,6 +16,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
+	"github.com/webtor-io/web-ui/services/adminauth"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
@@ -83,6 +84,14 @@ type Data struct {
 	DisableS3             bool
 	DisableAPI            bool
 	DisableEmbed          bool
+	// SelfHosted gates the administrator-password section: it must only ever
+	// render on a deployment with no SuperTokens, never on webtor.io.
+	SelfHosted bool
+	// PasswordSet and PasswordManagedEnv drive the password section's copy
+	// and form: whether a "current password" field is needed at all, and
+	// whether the form should be refused because ADMIN_PASSWORD governs it.
+	PasswordSet        bool
+	PasswordManagedEnv bool
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
 	HasPayments bool
@@ -106,9 +115,11 @@ type Handler struct {
 	s3Endpoint    string
 	apiEndpoint   string
 	domain        string
+	adminStore    *adminauth.Store
+	selfHosted    bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service) {
 	h := &Handler{
 		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:            at,
@@ -127,6 +138,8 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		s3Endpoint:    s3.PublicEndpoint(c),
 		apiEndpoint:   libapi.PublicEndpoint(c),
 		domain:        c.String(common.DomainFlag),
+		adminStore:    a.AdminStore(),
+		selfHosted:    a.SelfHosted(),
 	}
 	r.GET("/profile", h.get)
 	gr := r.Group("/profile")
@@ -134,6 +147,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 	gr.POST("/delete", h.delete)
 	gr.GET("/export", h.export)
 	gr.POST("/settings", h.updateSettings)
+	gr.POST("/password", h.setPassword)
 }
 
 // getAvailableBackendTypes returns the list of available streaming backend types
@@ -442,7 +456,47 @@ func (s *Handler) get(c *gin.Context) {
 		DisableS3:             s.disableS3,
 		DisableAPI:            s.disableAPI,
 		DisableEmbed:          s.disableEmbed,
+		SelfHosted:            s.selfHosted,
+		PasswordSet:           s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()),
+		PasswordManagedEnv:    s.adminStore != nil && s.adminStore.ManagedByEnv(),
 	}))
+}
+
+// setPassword sets or changes the single administrator password. Changing an
+// existing password requires the current one: otherwise a stolen session
+// converts into a permanent takeover.
+//
+// The !s.selfHosted check is defense in depth, not the only thing standing
+// between this route and webtor.io: adminauth's Postgres repo already scopes
+// every read/write to the literal "email = 'admin'" row that only the
+// self-hosted auto-admin flow ever creates, so on production Set would fail
+// closed (0 rows affected) even without this check. But that protection
+// lives one file away and depends on no real account ever having that email;
+// checking selfHosted here means the route refuses outright instead of
+// relying on that coincidence.
+func (s *Handler) setPassword(c *gin.Context) {
+	if s.adminStore == nil || !s.selfHosted {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	ctx := c.Request.Context()
+	if s.adminStore.ManagedByEnv() {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	if s.adminStore.IsConfigured(ctx) && !s.adminStore.Verify(ctx, c.PostForm("current")) {
+		c.Redirect(http.StatusFound, "/profile?err=auth.password.wrongCurrent")
+		return
+	}
+	if err := s.adminStore.Set(ctx, c.PostForm("new")); err != nil {
+		if errors.Is(err, adminauth.ErrTooShort) {
+			c.Redirect(http.StatusFound, "/profile?err=auth.password.tooShort")
+			return
+		}
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Redirect(http.StatusFound, "/profile")
 }
 
 // updateSettings persists the toggles from the per-user settings
