@@ -56,6 +56,17 @@ func cacheKey(r *Request) string {
 // that poll for a tier change (e.g. right after a payment) — polling through
 // Refresh would Drop hot cache entries and race the per-request middleware.
 func (s *Claims) Fetch(r *Request) (*Data, error) {
+	// No provider configured — the self-hosted case, where nothing sells
+	// tiers. Answer with the same synthetic free-tier, no-ads claims the
+	// auto-admin path already hands out, rather than dereferencing a nil
+	// client. The ordinary request path never reaches here on such an
+	// instance (IsAdmin short-circuits in MakeUserClaimsFromContext), but
+	// embed's domain lookup asks for a named owner's claims directly and has
+	// no such shortcut: without this guard, registering a domain for
+	// embedding panics the request.
+	if s.cl == nil {
+		return s.makeAdminClaims(), nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cl, err := s.cl.Get()

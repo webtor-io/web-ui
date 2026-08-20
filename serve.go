@@ -316,6 +316,23 @@ func serve(c *cli.Context) error {
 		wau.RegisterHandler(r, tm, a)
 	}
 
+	// Setting the whole-interface auth gate (self-hosted; off by default).
+	//
+	// Placement is deliberate and load-bearing: gin applies Use() only to
+	// routes registered after it, and everything a signed-out visitor still
+	// needs is registered above — the static assets (sta.RegisterHandler) and
+	// the login form itself (wau.RegisterHandler). Move this call earlier and
+	// the login page arrives without its stylesheet and without a way to log
+	// in.
+	//
+	// The exempt prefixes are the surfaces registered below that carry their
+	// own authentication: the JSON API checks its key, the Stremio addon its
+	// token, S3 its signature. Everything else added later is closed by
+	// default, which is the direction we want a mistake to fall.
+	if c.Bool(common.OnlyAuthorized) {
+		r.Use(auth.OnlyAuthorized(onlyAuthorizedExempt()...))
+	}
+
 	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).
 	// Consumed by both AI recommendations and AI enrichment.
 	anthropicCl := ac.New(c)
@@ -565,4 +582,24 @@ func serve(c *cli.Context) error {
 		log.WithError(err).Error("got server error")
 	}
 	return err
+}
+
+// onlyAuthorizedExempt lists the paths that stay reachable without a session
+// when ONLY_AUTHORIZED puts the rest of the interface behind a login. Each one
+// authenticates by its own means, so gating it here would break the mechanism
+// without adding any protection:
+//
+//   - /api/v1 checks an API key issued on the profile page;
+//   - /stremio carries the addon token in its own URL;
+//   - /s3 verifies a request signature;
+//   - /embed is decided by the embed domain list on the profile page. A
+//     third-party iframe has no session with this instance, so a redirect to
+//     the login form would only render a broken player; with
+//     EMBED_ONLY_AUTHORIZED on, a domain that is not on the list gets the
+//     embed/unauthorized template instead, which a human can read.
+//
+// Kept as a named function rather than inline so the policy is greppable and
+// can be asserted in a test.
+func onlyAuthorizedExempt() []string {
+	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed"}
 }
