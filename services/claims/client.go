@@ -67,6 +67,13 @@ func (s *Client) Get() (proto.ClaimsProviderClient, error) {
 }
 
 func (s *Client) Close() {
+	// NewClient returns nil when no provider is configured, and callers keep
+	// that nil in a `defer ...Close()`. Tolerating it here means no caller has
+	// to remember the guard -- subscription.go did not, and the job segfaulted
+	// on teardown after finishing its work.
+	if s == nil {
+		return
+	}
 	if s.conn != nil {
 		_ = s.conn.Close()
 	}
