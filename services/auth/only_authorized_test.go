@@ -135,3 +135,33 @@ func TestExemptPrefixesMatchOnPathBoundaries(t *testing.T) {
 		}
 	}
 }
+
+// Embedding is exempt on purpose, and the reason is worth keeping next to the
+// test. A third-party <iframe> has no session with this instance, so gating it
+// here would answer with a redirect to a login form the visitor cannot use --
+// inside a frame that is simply a broken player. Access is decided instead by
+// the embed domain list on the profile page: with EMBED_ONLY_AUTHORIZED on, a
+// domain that is not on the list gets the embed/unauthorized template, which
+// is a message a human can read.
+func TestEmbedIsExemptSoTheDomainListCanDecide(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(OnlyAuthorized("/embed"))
+
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		reached := false
+		r.Handle(method, "/embed", func(c *gin.Context) {
+			reached = true
+			c.String(http.StatusOK, "player")
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(method, "/embed", nil))
+		if !reached {
+			t.Errorf("%s /embed was gated; the domain list must be what decides", method)
+		}
+		if w.Code != http.StatusOK {
+			t.Errorf("%s /embed: got %d, want 200", method, w.Code)
+		}
+	}
+}
