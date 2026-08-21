@@ -18,6 +18,26 @@ import (
 // stay decoupled from web.Context's internal layout.
 const userSettingsContextKey = "web.user_settings"
 
+const vaultEnabledContextKey = "web.vault_enabled"
+
+// SetVaultEnabled records whether the vault service is configured. The navbar
+// link and the /vault routes must agree: the routes are registered only when
+// the vault API client exists, so an ungated link is a 404.
+func SetVaultEnabled(c *gin.Context, enabled bool) {
+	c.Set(vaultEnabledContextKey, enabled)
+}
+
+// vaultEnabled defaults to false when nothing set it, so a caller that forgets
+// hides the link rather than rendering a broken one.
+func vaultEnabled(c *gin.Context) bool {
+	v, ok := c.Get(vaultEnabledContextKey)
+	if !ok {
+		return false
+	}
+	b, _ := v.(bool)
+	return b
+}
+
 // The onboarding checklist travels on Context because the navbar counter needs
 // it on every page, and the navbar renders from Context rather than from any
 // handler's data struct.
@@ -52,7 +72,9 @@ type Context struct {
 	// banner rendered from this is the only thing standing between the
 	// instance and a stranger, so it is deliberately hard to ignore.
 	OpenInstance bool
-	ginCtx       *gin.Context
+	// Vault reports whether the vault service is configured.
+	Vault  bool
+	ginCtx *gin.Context
 }
 
 func (c *Context) WithData(obj any) *Context {
@@ -110,6 +132,7 @@ func NewContext(c *gin.Context) *Context {
 		Lang:         lang,
 		Path:         path,
 		OpenInstance: auth.IsOpenInstance(c),
+		Vault:        vaultEnabled(c),
 		ginCtx:       c,
 	}
 }

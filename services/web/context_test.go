@@ -36,3 +36,19 @@ func TestNewContextCarriesOpenInstance(t *testing.T) {
 		}
 	}
 }
+
+// TestContextCarriesVaultAvailability pins Context.Vault's zero value to
+// false: the navbar link and the /vault routes must agree (routes are
+// registered only when the vault API client exists), so a field that
+// defaulted to true would put the 404 back for any caller that forgets to
+// set it.
+func TestContextCarriesVaultAvailability(t *testing.T) {
+	c := Context{Vault: true}
+	if !c.Vault {
+		t.Fatal("Context.Vault should round-trip true")
+	}
+	var zero Context
+	if zero.Vault {
+		t.Fatal("Context.Vault must default to false, so a caller that forgets to set it hides the link rather than showing a broken one")
+	}
+}

@@ -370,6 +370,16 @@ func serve(c *cli.Context) error {
 	onboardingSvc := onboarding.New(pg, vaultApi != nil)
 	r.Use(w.OnboardingMiddleware(onboardingSvc))
 
+	// Mounted here for the same reason the onboarding middleware above is:
+	// gin's r.Use only applies to routes registered after it, and the navbar
+	// renders on every page. vaultApi != nil is the existing source of truth
+	// for whether vault is configured -- do not introduce a second one.
+	vaultConfigured := vaultApi != nil
+	r.Use(func(c *gin.Context) {
+		w.SetVaultEnabled(c, vaultConfigured)
+		c.Next()
+	})
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
