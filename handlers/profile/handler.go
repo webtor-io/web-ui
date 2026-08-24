@@ -88,9 +88,14 @@ type Data struct {
 	DisableS3             bool
 	DisableAPI            bool
 	DisableEmbed          bool
-	// SelfHosted gates the administrator-password section: it must only ever
-	// render on a deployment with no SuperTokens, never on webtor.io.
-	SelfHosted bool
+	// IdentityEditable gates the administrator-password section: it must
+	// only ever render when no external identity provider owns this
+	// account's identity (auth.IdentityManagedExternally is false), never
+	// when SuperTokens does. AdminPasswordActive is not used here because it
+	// also requires a password to already be configured, which is exactly
+	// the state this section exists to get the instance out of (setting the
+	// very first password).
+	IdentityEditable bool
 	// PasswordSet and PasswordManagedEnv drive the password section's copy
 	// and form: whether a "current password" field is needed at all, and
 	// whether the form should be refused because ADMIN_PASSWORD governs it.
@@ -138,13 +143,16 @@ type Handler struct {
 	apiEndpoint   string
 	domain        string
 	adminStore    *adminauth.Store
-	selfHosted    bool
 	// identityEditable is auth.IdentityManagedExternally negated: true when
 	// this deployment's own user row is the operator's identity (nothing
-	// external -- SuperTokens -- owns it), which is the capability the
-	// email section depends on. Kept separate from selfHosted: that field
-	// names a deployment shape and answers the password section's
-	// question, not this one.
+	// external -- SuperTokens -- owns it). Two sections depend on that same
+	// capability: the email section (nothing external claims this account,
+	// so editing its notification address is ours to allow -- combined with
+	// MailConfigured in ShowEmailSection), and the password section, which
+	// gates on this alone rather than on AdminPasswordActive -- the latter
+	// also requires a password to already exist, exactly the state the
+	// section exists to get the instance out of (setting the very first
+	// password).
 	identityEditable bool
 }
 
@@ -169,7 +177,6 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		apiEndpoint:      libapi.PublicEndpoint(c),
 		domain:           c.String(common.DomainFlag),
 		adminStore:       a.AdminStore(),
-		selfHosted:       a.SelfHosted(),
 		identityEditable: !a.IdentityManagedExternally(),
 	}
 	r.GET("/profile", h.get)
@@ -509,7 +516,7 @@ func (s *Handler) get(c *gin.Context) {
 		DisableS3:             s.disableS3,
 		DisableAPI:            s.disableAPI,
 		DisableEmbed:          s.disableEmbed,
-		SelfHosted:            s.selfHosted,
+		IdentityEditable:      s.identityEditable,
 		PasswordSet:           s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()),
 		PasswordManagedEnv:    s.adminStore != nil && s.adminStore.ManagedByEnv(),
 		ShowEmailSection:      showEmailSection,
@@ -522,16 +529,16 @@ func (s *Handler) get(c *gin.Context) {
 // existing password requires the current one: otherwise a stolen session
 // converts into a permanent takeover.
 //
-// The !s.selfHosted check is defense in depth, not the only thing standing
-// between this route and webtor.io: adminauth's Postgres repo already scopes
-// every read/write to the literal "email = 'admin'" row that only the
-// self-hosted auto-admin flow ever creates, so on production Set would fail
-// closed (0 rows affected) even without this check. But that protection
-// lives one file away and depends on no real account ever having that email;
-// checking selfHosted here means the route refuses outright instead of
-// relying on that coincidence.
+// The !s.identityEditable check is defense in depth, not the only thing
+// standing between this route and webtor.io: adminauth's Postgres repo
+// already scopes every read/write to the literal "email = 'admin'" row that
+// only the local auto-admin flow ever creates, so on production Set would
+// fail closed (0 rows affected) even without this check. But that
+// protection lives one file away and depends on no real account ever having
+// that email; checking identityEditable here means the route refuses
+// outright instead of relying on that coincidence.
 func (s *Handler) setPassword(c *gin.Context) {
-	if s.adminStore == nil || !s.selfHosted {
+	if s.adminStore == nil || !s.identityEditable {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}

@@ -46,7 +46,7 @@ func postPassword(r *gin.Engine, current, next string) *httptest.ResponseRecorde
 func TestSetPasswordOnAnOpenInstance(t *testing.T) {
 	repo := &memRepo{}
 	store := adminauth.NewStore("", repo)
-	h := &Handler{adminStore: store, selfHosted: true}
+	h := &Handler{adminStore: store, identityEditable: true}
 	r := newPasswordRouter(h)
 
 	if w := postPassword(r, "", "a brand new password"); w.Code != http.StatusFound {
@@ -66,7 +66,7 @@ func TestChangePasswordRequiresTheCurrentOne(t *testing.T) {
 	}
 	repo := &memRepo{hash: existing}
 	store := adminauth.NewStore("", repo)
-	h := &Handler{adminStore: store, selfHosted: true}
+	h := &Handler{adminStore: store, identityEditable: true}
 	r := newPasswordRouter(h)
 
 	// A wrong current password still redirects (the profile POST handlers all
@@ -88,7 +88,7 @@ func TestChangePasswordRequiresTheCurrentOne(t *testing.T) {
 
 func TestPasswordChangeRefusedWhenEnvManaged(t *testing.T) {
 	store := adminauth.NewStore("env password", &memRepo{})
-	h := &Handler{adminStore: store, selfHosted: true}
+	h := &Handler{adminStore: store, identityEditable: true}
 	r := newPasswordRouter(h)
 
 	w := postPassword(r, "env password", "a brand new password")
@@ -99,22 +99,53 @@ func TestPasswordChangeRefusedWhenEnvManaged(t *testing.T) {
 
 // This is the route's other guard, independent of the current-password
 // check: even a well-formed request must not be able to touch the admin
-// password on a SuperTokens (production) deployment. adminauth's Postgres
-// repo also fails closed here on its own (it only ever touches a row that
-// the self-hosted auto-admin flow creates), but that is a second layer, not
-// a substitute for this one.
-func TestPasswordChangeRefusedWhenNotSelfHosted(t *testing.T) {
+// password when an external identity provider (SuperTokens, production)
+// owns identity. adminauth's Postgres repo also fails closed here on its
+// own (it only ever touches a row that the local auto-admin flow creates),
+// but that is a second layer, not a substitute for this one.
+func TestPasswordChangeRefusedWhenIdentityManagedExternally(t *testing.T) {
 	repo := &memRepo{}
 	store := adminauth.NewStore("", repo)
-	h := &Handler{adminStore: store, selfHosted: false}
+	h := &Handler{adminStore: store, identityEditable: false}
 	r := newPasswordRouter(h)
 
 	w := postPassword(r, "", "a brand new password")
 	if w.Code == http.StatusFound {
-		t.Error("the password changed on a non-self-hosted deployment")
+		t.Error("the password changed while identity is managed externally")
 	}
 	if store.Verify(context.Background(), "a brand new password") {
-		t.Error("the new password took effect on a non-self-hosted deployment")
+		t.Error("the new password took effect while identity is managed externally")
+	}
+}
+
+// TestIdentityEditableWiringMatchesAuthCapability pins the formula
+// RegisterHandler uses to derive identityEditable --
+// !a.IdentityManagedExternally() -- against the real predicate, not a
+// hand-set field, for both of its states. identityEditable gates whether the
+// administrator-password route exists at all, so a sign flip on that one
+// line would compile clean and pass every test that only checks one state;
+// this one checks both.
+func TestIdentityEditableWiringMatchesAuthCapability(t *testing.T) {
+	for _, tt := range []struct {
+		name           string
+		hasSupertokens bool
+		wantAllowed    bool
+	}{
+		{"no external identity provider: password may be set", false, true},
+		{"external identity provider: password must be refused", true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			a := svcauth.NewForAdminPasswordTest(tt.hasSupertokens, nil)
+			store := adminauth.NewStore("", &memRepo{})
+			h := &Handler{adminStore: store, identityEditable: !a.IdentityManagedExternally()}
+			r := newPasswordRouter(h)
+
+			w := postPassword(r, "", "a brand new password")
+			allowed := w.Code == http.StatusFound && store.Verify(context.Background(), "a brand new password")
+			if allowed != tt.wantAllowed {
+				t.Errorf("got allowed=%v, want %v (status %d)", allowed, tt.wantAllowed, w.Code)
+			}
+		})
 	}
 }
 
@@ -145,7 +176,7 @@ func sessionCookieFrom(t *testing.T, w *httptest.ResponseRecorder) string {
 func TestSettingTheFirstPasswordKeepsTheAdministratorSignedIn(t *testing.T) {
 	repo := &memRepo{}
 	store := adminauth.NewStore("", repo)
-	h := &Handler{adminStore: store, selfHosted: true}
+	h := &Handler{adminStore: store, identityEditable: true}
 	r := newPasswordRouter(h)
 	r.GET("/test/admin-marked", func(c *gin.Context) {
 		marked, _ := sessions.Default(c).Get(svcauth.AdminSessionKey).(bool)

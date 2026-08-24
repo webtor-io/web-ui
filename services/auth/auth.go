@@ -601,25 +601,18 @@ func (s *Auth) AdminStore() *adminauth.Store {
 	return s.adminStore
 }
 
-// SelfHosted reports whether this deployment has no SuperTokens configured.
-// The profile page's password section uses this — not AdminPasswordActive —
-// to decide whether to show itself: AdminPasswordActive also requires a
-// password to already be configured, which is exactly the state this section
-// exists to get the instance out of (setting the very first password).
-func (s *Auth) SelfHosted() bool {
-	return !s.hasSupetokens
-}
-
 // IdentityManagedExternally reports whether an external identity provider
-// owns this user's identity. When SuperTokens is configured, a user's email
-// is what claims.go keys the tier lookup on and what models.GetOrCreateUser
-// matches Patreon accounts by — letting a user edit it here would silently
-// detach both. It is true under exactly the same condition SelfHosted is
-// false, but the two methods answer different questions and must be kept
-// separate: SelfHosted names a deployment shape, this names the capability
-// (or rather its absence) a feature actually depends on. Callers deciding
-// whether an address is theirs to change belong on this method, not on
-// SelfHosted.
+// owns this user's identity. The profile page's password section uses this
+// — not AdminPasswordActive — to decide whether to show itself:
+// AdminPasswordActive also requires a password to already be configured,
+// which is exactly the state this section exists to get the instance out of
+// (setting the very first password). When SuperTokens is configured, a
+// user's email is also what claims.go keys the tier lookup on and what
+// models.GetOrCreateUser matches Patreon accounts by — letting a user edit
+// it here would silently detach both, which is why the email section
+// depends on this same capability. Callers deciding whether an address is
+// theirs to change, or whether a local administrator password may exist at
+// all, both belong on this method.
 func (s *Auth) IdentityManagedExternally() bool {
 	return s.hasSupetokens
 }
