@@ -6,7 +6,10 @@
      Google's "offered in" bar. Both actions go through the ?lang= switcher
      branch, which sets the cookie server-side — works without JS; any
      cookie value stops the offer from reappearing. */}}
-<div id="lang-suggest-banner" class="bg-w-cyan/10 border-b border-w-cyan/30 px-4 py-2.5">
+{{/* mt-[72px]: the navbar is fixed top-0 h-[72px] with a translucent blur,
+     so an in-flow block at y=0 sits BEHIND it. The margin drops the strip
+     to sit flush under the header — the "Google offered in" placement. */}}
+<div id="lang-suggest-banner" class="mt-[72px] bg-w-cyan/10 border-b border-w-cyan/30 px-4 py-2.5">
     <div class="max-w-5xl mx-auto flex flex-wrap items-center gap-3 text-sm">
         <svg class="size-5 shrink-0 text-w-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5 0 4.5-4 4.5-9S14.5 3 12 3 7.5 7 7.5 12s2 9 4.5 9Zm-8.5-9h17" />
