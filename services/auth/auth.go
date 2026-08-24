@@ -436,6 +436,10 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
+		// Database outage is transient and recoverable, unlike an identity
+		// provider that yields no email. Degrading a brief blip to "no user"
+		// is better than turning it into a broken response. The nil user is
+		// safe because makeUserFromContext checks for it explicitly.
 		return
 	}
 	userID := sess.GetUserID()
