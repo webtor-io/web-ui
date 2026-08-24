@@ -819,8 +819,11 @@ func TestPollOneSkipsUndeliverableAddress(t *testing.T) {
 	if store.checkedState != sub.State {
 		t.Errorf("state: got %q, want unchanged %q", store.checkedState, sub.State)
 	}
-	if store.checkedNext.IsZero() || !store.checkedNext.After(time.Now().Add(23*time.Hour)) {
-		t.Errorf("next check: got %v, want ~24h out (the far-out reschedule for nothing to mail)", store.checkedNext)
+	// The interval is jittered ±10%, so the scheduled retry sits in [21.6h, 26.4h].
+	// 12h threshold leaves wide margin and cannot be reached by the unguarded branch
+	// (hot/paid intervals 3h-6h ±10% = at most ~6.6h).
+	if store.checkedNext.IsZero() || !store.checkedNext.After(time.Now().Add(12*time.Hour)) {
+		t.Errorf("next check: got %v, want pushed far out (>12h) because there was nothing to mail; the retry interval is 24h ±10%% jitter", store.checkedNext)
 	}
 }
 
