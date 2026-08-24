@@ -22,6 +22,7 @@ forward-ports:
 PROTO_CONFLICT_LDFLAGS := -X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore
 
 test:
+	@docker info >/dev/null 2>&1 || echo "WARNING: docker is not available -- Postgres-backed tests will be SKIPPED, not run. The prune-partition test will not protect you."
 	go test -ldflags '$(PROTO_CONFLICT_LDFLAGS)' ./...
 
 vet:
