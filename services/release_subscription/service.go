@@ -322,12 +322,13 @@ func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled 
 // remote round-trip, and the user is waiting on a toast that says what
 // already happened in the database — the letter is not part of that answer.
 func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	if s.mail == nil || !notification.Deliverable(u.Email) {
+	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
+	if s.mail == nil || !notification.Deliverable(addr) {
 		return
 	}
 	view := s.view(ctx, sub)
 	s.run(func() {
-		if err := s.mail.SendSubscriptionOn(u.Email, u.ID, view); err != nil {
+		if err := s.mail.SendSubscriptionOn(addr, u.ID, view); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).
@@ -337,12 +338,13 @@ func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseS
 }
 
 func (s *Service) mailOff(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	if s.mail == nil || !notification.Deliverable(u.Email) {
+	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
+	if s.mail == nil || !notification.Deliverable(addr) {
 		return
 	}
 	view := s.view(ctx, sub)
 	s.run(func() {
-		if err := s.mail.SendSubscriptionOff(u.Email, u.ID, view, false); err != nil {
+		if err := s.mail.SendSubscriptionOff(addr, u.ID, view, false); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).

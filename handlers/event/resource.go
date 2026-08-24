@@ -59,8 +59,9 @@ func (h *Handler) resourceVaulted(msg []byte) error {
 		if err != nil {
 			return err
 		}
-		if notification.Deliverable(u.Email) {
-			if err := h.ns.SendVaulted(u.Email, u.UserID, r); err != nil {
+		addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
+		if notification.Deliverable(addr) {
+			if err := h.ns.SendVaulted(addr, u.UserID, r); err != nil {
 				return err
 			}
 		}

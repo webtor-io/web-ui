@@ -18,6 +18,9 @@
             <p class="text-sm text-error">{{ t $.Lang .Data.ErrKey }}</p>
         </div>
         {{ end }}
+        {{ if .Data.NotificationEmail }}
+        <p class="text-sm text-w-sub mb-4">{{ tp $.Lang "profile.email.currentHint" "Email" .Data.NotificationEmail }}</p>
+        {{ end }}
         {{ if .Data.PendingEmail }}
         <p class="text-sm text-w-sub mb-4">{{ tp $.Lang "profile.email.pendingHint" "Email" .Data.PendingEmail }}</p>
         {{ end }}

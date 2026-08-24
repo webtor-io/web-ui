@@ -1,4 +1,5 @@
 ALTER TABLE public."user"
+    ADD COLUMN notification_email       text,
     ADD COLUMN pending_email            text,
     ADD COLUMN pending_email_token      text,
     ADD COLUMN pending_email_expires_at timestamptz;

@@ -107,6 +107,12 @@ type Data struct {
 	// (notification.Service.MailConfigured()). Without SMTP there is
 	// nothing an address could achieve, and no way to verify one.
 	ShowEmailSection bool
+	// NotificationEmail is the confirmed address mail actually goes to, or
+	// "" if none has ever been verified. This is models.User.NotificationEmail,
+	// never Email -- in self-hosted Email is the literal sentinel "admin",
+	// not an address, and showing it here would be exactly the confusion
+	// this section exists to remove.
+	NotificationEmail string
 	// PendingEmail is the address currently awaiting confirmation, or "" if
 	// none is pending.
 	PendingEmail string
@@ -462,12 +468,21 @@ func (s *Handler) get(c *gin.Context) {
 
 	// The email section's two capability gates: our own row must be the
 	// identity (not an external provider's) and mail must be sendable.
-	// Only then is a pending address even worth reading.
+	// Only then is a pending or confirmed address even worth reading.
 	showEmailSection := s.identityEditable && s.notification != nil && s.notification.MailConfigured()
+	notificationEmail := ""
 	pendingEmail := ""
 	if showEmailSection {
-		if full, ferr := models.GetUserByID(c.Request.Context(), db, u.ID); ferr == nil && full != nil && full.PendingEmail != nil {
-			pendingEmail = *full.PendingEmail
+		if full, ferr := models.GetUserByID(c.Request.Context(), db, u.ID); ferr == nil && full != nil {
+			// full.Email is deliberately never read here: in self-hosted it
+			// is the literal sentinel "admin", not an address, and showing
+			// it would be exactly the confusion this section removes.
+			if full.NotificationEmail != nil {
+				notificationEmail = *full.NotificationEmail
+			}
+			if full.PendingEmail != nil {
+				pendingEmail = *full.PendingEmail
+			}
 		}
 	}
 
@@ -498,6 +513,7 @@ func (s *Handler) get(c *gin.Context) {
 		PasswordSet:           s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()),
 		PasswordManagedEnv:    s.adminStore != nil && s.adminStore.ManagedByEnv(),
 		ShowEmailSection:      showEmailSection,
+		NotificationEmail:     notificationEmail,
 		PendingEmail:          pendingEmail,
 	}))
 }

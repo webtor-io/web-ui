@@ -54,14 +54,14 @@ func (s *pgReaperStore) GetGhostResources(ctx context.Context) ([]vaultModels.Re
 }
 
 type reaper struct {
-	store                  reaperStore
-	vault                  reaperVault
-	notification           reaperNotification
-	expirePeriod           time.Duration
-	abandonedExpirePeriod  time.Duration
-	transferTimeoutPeriod  time.Duration
-	pg                     *cs.PG
-	cpCl                   *claims.Client
+	store                 reaperStore
+	vault                 reaperVault
+	notification          reaperNotification
+	expirePeriod          time.Duration
+	abandonedExpirePeriod time.Duration
+	transferTimeoutPeriod time.Duration
+	pg                    *cs.PG
+	cpCl                  *claims.Client
 }
 
 func makeVaultCMD() cli.Command {
@@ -162,14 +162,14 @@ func initializeReaper(c *cli.Context) (*reaper, error) {
 	notificationService := notification.New(c, db, newI18n())
 
 	r := &reaper{
-		store:                  &pgReaperStore{db: db},
-		vault:                  vaultService,
-		notification:           notificationService,
-		expirePeriod:           c.Duration(vault.VaultResourceExpirePeriodFlag),
-		abandonedExpirePeriod:  c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
-		transferTimeoutPeriod:  c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
-		pg:                     pg,
-		cpCl:                   cpCl,
+		store:                 &pgReaperStore{db: db},
+		vault:                 vaultService,
+		notification:          notificationService,
+		expirePeriod:          c.Duration(vault.VaultResourceExpirePeriodFlag),
+		abandonedExpirePeriod: c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
+		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+		pg:                    pg,
+		cpCl:                  cpCl,
 	}
 
 	return r, nil
@@ -284,11 +284,15 @@ func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.P
 		Info("removed pledge")
 
 	// Send notification to user if user data is available
-	if pledge.User == nil || !notification.Deliverable(pledge.User.Email) {
+	if pledge.User == nil {
+		return
+	}
+	addr := notification.RecipientEmail(pledge.User.Email, pledge.User.NotificationEmail)
+	if !notification.Deliverable(addr) {
 		return
 	}
 
-	r.sendNotification(pledge.User.Email, pledge.UserID, resource, isTransferTimeout)
+	r.sendNotification(addr, pledge.UserID, resource, isTransferTimeout)
 }
 
 func (r *reaper) sendNotification(email string, userID uuid.UUID, resource vaultModels.Resource, isTransferTimeout bool) {

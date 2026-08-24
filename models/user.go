@@ -13,7 +13,16 @@ import (
 type User struct {
 	tableName struct{}  `pg:"user"`
 	UserID    uuid.UUID `pg:"user_id,pk"`
-	Email     string
+	// Email is identity, in both deployments -- never a contact preference.
+	// On webtor.io it is what services/claims keys the tier lookup on and
+	// what GetOrCreateUser matches Patreon accounts by. In self-hosted it is
+	// the literal string "admin", and services/adminauth plus
+	// services/auth.registerAdminUser look up that row by
+	// `email = 'admin'` on every single request (there is no session-
+	// carried user id in that path). Changing Email out from under either
+	// mechanism breaks it silently -- see NotificationEmail for where a
+	// user-supplied address actually belongs.
+	Email string
 	// Password holds the argon2id hash of the self-hosted administrator's
 	// password (services/adminauth). It is empty for every other user and on
 	// every SuperTokens-backed deployment.
@@ -22,6 +31,13 @@ type User struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	Tier          string
+	// NotificationEmail (migration 71) is the confirmed address mail
+	// actually goes to, kept deliberately separate from Email/identity --
+	// see the comment on Email for why the two must never merge into one
+	// column. Nil until a pending address is verified (VerifyPendingEmail).
+	// services/notification.RecipientEmail is what picks between this and
+	// Email for an outgoing send; read that instead of this field directly.
+	NotificationEmail *string `pg:"notification_email"`
 	// PendingEmail, PendingEmailToken and PendingEmailExpiresAt (migration
 	// 71) carry an address awaiting verification -- see SetPendingEmail and
 	// VerifyPendingEmail. All three are nil outside that window: entering a
@@ -55,11 +71,23 @@ func SetPendingEmail(ctx context.Context, db *pg.DB, userID uuid.UUID, email, to
 }
 
 // VerifyPendingEmail promotes the pending address owned by token to that
-// row's email, provided the token has not expired, and clears all three
-// pending columns. Returns (false, nil) for a token that matches no row or
-// whose row has expired -- the caller cannot and must not distinguish the
-// two: telling an unauthenticated GET which one is true would leak whether a
-// guessed token was ever valid.
+// row's notification_email, provided the token has not expired, and clears
+// all three pending columns. Returns (false, nil) for a token that matches
+// no row or whose row has expired -- the caller cannot and must not
+// distinguish the two: telling an unauthenticated GET which one is true
+// would leak whether a guessed token was ever valid.
+//
+// This writes notification_email, never email, and that is not a detail to
+// "clean up" later: email is identity on both deployments (see the doc
+// comment on User.Email). Concretely, in self-hosted, the admin row's email
+// is the literal string "admin", which services/adminauth and
+// services/auth.registerAdminUser look up on every request; overwriting it
+// here would make that lookup miss on the very next request, which falls
+// through to creating a second, empty-password "admin" row and silently
+// orphans the operator's account (this happened -- see
+// TestGetOrCreateUserAdminLookupSurvivesEmailVerification's negative
+// control). On webtor.io the same column feeds the tier lookup and the
+// Patreon match. Two separate columns is the fix, not a workaround.
 //
 // Matching is by token alone, deliberately not combined with a caller-
 // supplied user id: the partial unique index on pending_email_token
@@ -78,7 +106,7 @@ func VerifyPendingEmail(ctx context.Context, db *pg.DB, token string) (bool, err
 	}
 	res, err := db.Model((*User)(nil)).
 		Context(ctx).
-		Set("email = pending_email").
+		Set("notification_email = pending_email").
 		Set("pending_email = NULL").
 		Set("pending_email_token = NULL").
 		Set("pending_email_expires_at = NULL").

@@ -137,11 +137,15 @@ func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePerio
 	userEmails := make(map[string]string)
 
 	for _, p := range pledges {
-		if p.User == nil || !notification.Deliverable(p.User.Email) {
+		if p.User == nil {
+			continue
+		}
+		addr := notification.RecipientEmail(p.User.Email, p.User.NotificationEmail)
+		if !notification.Deliverable(addr) {
 			continue
 		}
 		userID := p.UserID.String()
-		userEmails[userID] = p.User.Email
+		userEmails[userID] = addr
 	}
 
 	for userID, email := range userEmails {

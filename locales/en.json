@@ -243,6 +243,7 @@
     "profile.email.hint": "Set an address to receive notifications by email as well as in the feed above. It must be verified before anything is sent to it.",
     "profile.email.placeholder": "you@example.com",
     "profile.email.submit": "Send verification link",
+    "profile.email.currentHint": "Notifications are currently sent to {{.Email}}.",
     "profile.email.pendingHint": "Verification sent to {{.Email}} — check your inbox and click the link to confirm it.",
     "profile.email.invalid": "That doesn't look like a deliverable email address.",
     "profile.email.sent": "Verification link sent — check your inbox to confirm the address.",

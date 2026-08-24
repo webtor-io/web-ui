@@ -177,14 +177,17 @@ func (p *Poller) Run(ctx context.Context) (int, error) {
 // as delivered only after a letter actually goes out, so a failed send
 // leaves them pending for the next run rather than losing them.
 func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if sub.User == nil || !notification.Deliverable(sub.User.Email) {
+	if sub.User == nil || !notification.Deliverable(notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)) {
 		// Nothing to mail. Push the row far out rather than leaving it due,
 		// or it comes back every run.
 		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt())
 	}
 
 	u := &auth.User{
-		ID:            sub.UserID,
+		ID: sub.UserID,
+		// Identity, not a mail recipient -- p.tiers.IsFree (nextCheckAt)
+		// and p.search.Search key off this exact field, so it stays the
+		// account's real Email even when a notification address is set.
 		Email:         sub.User.Email,
 		PatreonUserID: sub.User.PatreonUserID,
 	}
@@ -443,7 +446,8 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 		hashes = append(hashes, h.InfoHash)
 	}
 
-	if err := p.mail.SendSubscriptionUpdate(sub.User.Email, sub.User.UserID, p.view(ctx, sub), releases); err != nil {
+	addr := notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)
+	if err := p.mail.SendSubscriptionUpdate(addr, sub.User.UserID, p.view(ctx, sub), releases); err != nil {
 		return false, err
 	}
 	if err := p.store.MarkHitsNotified(ctx, sub.ID, hashes); err != nil {
@@ -455,7 +459,8 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 // announceCompletion tells the user their season is done. The state itself
 // is written by the MarkChecked that follows — one UPDATE, not two.
 func (p *Poller) announceCompletion(ctx context.Context, sub *models.ReleaseSubscription) {
-	if err := p.mail.SendSubscriptionOff(sub.User.Email, sub.User.UserID, p.view(ctx, sub), true); err != nil {
+	addr := notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)
+	if err := p.mail.SendSubscriptionOff(addr, sub.User.UserID, p.view(ctx, sub), true); err != nil {
 		log.WithError(err).
 			WithField("subscription_id", sub.ID).
 			Error("failed to send subscription completion notice")

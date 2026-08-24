@@ -321,6 +321,13 @@ type User struct {
 	// should still treat a zero value as "don't know" rather than "very old",
 	// since it only occurs when there is no user row at all.
 	CreatedAt time.Time
+	// NotificationEmail mirrors models.User.NotificationEmail -- the
+	// confirmed address a self-hosted operator verified, kept separate from
+	// Email (identity) for the reasons on that field's doc comment. Nil on
+	// every webtor.io account. Callers picking a mail recipient should go
+	// through notification.RecipientEmail(u.Email, u.NotificationEmail)
+	// rather than reading either field directly.
+	NotificationEmail *string
 }
 
 func (s *User) HasAuth() bool {
@@ -337,6 +344,7 @@ func makeUserFromContext(c *gin.Context) *User {
 		u.PatreonUserID = su.PatreonUserID
 		u.Tier = su.Tier
 		u.CreatedAt = su.CreatedAt
+		u.NotificationEmail = su.NotificationEmail
 	}
 	inc := c.Request.Context().Value(IsNewContext{})
 	isNew, ok := inc.(bool)
