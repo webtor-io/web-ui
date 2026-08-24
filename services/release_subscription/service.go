@@ -56,8 +56,8 @@ var (
 // it. An interface so the service does not depend on SMTP being configured —
 // a nil mailer simply sends nothing.
 type Mailer interface {
-	SendSubscriptionOn(to string, sub notification.SubscriptionView) error
-	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
+	SendSubscriptionOn(to string, userID uuid.UUID, sub notification.SubscriptionView) error
+	SendSubscriptionOff(to string, userID uuid.UUID, sub notification.SubscriptionView, completed bool) error
 }
 
 // airingCheck is the "is this series still producing episodes" capability —
@@ -327,7 +327,7 @@ func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseS
 	}
 	view := s.view(ctx, sub)
 	s.run(func() {
-		if err := s.mail.SendSubscriptionOn(u.Email, view); err != nil {
+		if err := s.mail.SendSubscriptionOn(u.Email, u.ID, view); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).
@@ -342,7 +342,7 @@ func (s *Service) mailOff(ctx context.Context, u *auth.User, sub *models.Release
 	}
 	view := s.view(ctx, sub)
 	s.run(func() {
-		if err := s.mail.SendSubscriptionOff(u.Email, view, false); err != nil {
+		if err := s.mail.SendSubscriptionOff(u.Email, u.ID, view, false); err != nil {
 			log.WithError(err).
 				WithField("feature", "release_subscription").
 				WithField("subscription_id", sub.ID).

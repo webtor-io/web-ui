@@ -10,6 +10,12 @@ type mailer interface {
 	Send(to, subject, body string) error
 }
 
+// ErrNotConfigured means no SMTP server is configured, so nothing was even
+// attempted. It is not a delivery failure and callers must not treat it as
+// one -- in particular, a notification recorded as mailed on the strength of
+// this would suppress the real send once SMTP arrives.
+var ErrNotConfigured = errors.New("smtp is not configured")
+
 type smtpMailer struct {
 	host   string
 	port   int
@@ -29,7 +35,7 @@ func (m *smtpMailer) fromAddr() string {
 func (m *smtpMailer) Send(to, subject, body string) error {
 	if m.host == "" {
 		log.Warn("SMTP host not configured, skipping email sending")
-		return nil
+		return ErrNotConfigured
 	}
 
 	msg := gomail.NewMessage()

@@ -47,8 +47,8 @@ type streamSearch interface {
 }
 
 type pollMailer interface {
-	SendSubscriptionUpdate(to string, sub notification.SubscriptionView, releases []notification.ReleaseView) error
-	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
+	SendSubscriptionUpdate(to string, userID uuid.UUID, sub notification.SubscriptionView, releases []notification.ReleaseView) error
+	SendSubscriptionOff(to string, userID uuid.UUID, sub notification.SubscriptionView, completed bool) error
 }
 
 // tierResolver answers "is this account on the free plan", which decides
@@ -443,7 +443,7 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 		hashes = append(hashes, h.InfoHash)
 	}
 
-	if err := p.mail.SendSubscriptionUpdate(sub.User.Email, p.view(ctx, sub), releases); err != nil {
+	if err := p.mail.SendSubscriptionUpdate(sub.User.Email, sub.User.UserID, p.view(ctx, sub), releases); err != nil {
 		return false, err
 	}
 	if err := p.store.MarkHitsNotified(ctx, sub.ID, hashes); err != nil {
@@ -455,7 +455,7 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 // announceCompletion tells the user their season is done. The state itself
 // is written by the MarkChecked that follows — one UPDATE, not two.
 func (p *Poller) announceCompletion(ctx context.Context, sub *models.ReleaseSubscription) {
-	if err := p.mail.SendSubscriptionOff(sub.User.Email, p.view(ctx, sub), true); err != nil {
+	if err := p.mail.SendSubscriptionOff(sub.User.Email, sub.User.UserID, p.view(ctx, sub), true); err != nil {
 		log.WithError(err).
 			WithField("subscription_id", sub.ID).
 			Error("failed to send subscription completion notice")

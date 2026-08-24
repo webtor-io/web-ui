@@ -96,7 +96,7 @@ type fakeMailer struct {
 	failWith error
 }
 
-func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ notification.SubscriptionView, releases []notification.ReleaseView) error {
+func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ uuid.UUID, _ notification.SubscriptionView, releases []notification.ReleaseView) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
@@ -104,7 +104,7 @@ func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ notification.Subscriptio
 	return nil
 }
 
-func (m *fakeMailer) SendSubscriptionOff(_ string, _ notification.SubscriptionView, completed bool) error {
+func (m *fakeMailer) SendSubscriptionOff(_ string, _ uuid.UUID, _ notification.SubscriptionView, completed bool) error {
 	m.offs = append(m.offs, completed)
 	return nil
 }

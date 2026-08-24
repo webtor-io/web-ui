@@ -12,7 +12,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/hako/durafmt"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	uuid "github.com/satori/go.uuid"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -76,6 +76,7 @@ func New(c *cli.Context, db *pg.DB, i18nSvc *i18n.Service) *Service {
 
 type SendOptions struct {
 	To       string
+	UserID   uuid.UUID
 	Key      string
 	Title    string
 	Template string
@@ -88,51 +89,56 @@ type SendOptions struct {
 func (s *Service) Send(opts SendOptions) error {
 	ctx := context.Background()
 
-	// 1. Check for duplicates in the last 24 hours
-	last, err := s.store.GetLastByKeyAndTo(ctx, opts.Key, opts.To)
+	// Dedupe on what was actually mailed. A row with mailed_at NULL is a
+	// feed entry whose letter never left -- either there is no SMTP server
+	// or the send failed -- and must not suppress a later attempt.
+	last, err := s.store.GetLastMailedByKeyAndUser(ctx, opts.Key, opts.UserID)
 	if err != nil {
 		return errors.Wrap(err, "failed to check for duplicate notification")
 	}
-	if last != nil && time.Since(last.CreatedAt) < 24*time.Hour {
-		log.WithFields(log.Fields{
-			"key": opts.Key,
-			"to":  opts.To,
-		}).Info("duplicate notification, skipping")
-		return nil
-	}
+	mailedRecently := last != nil && time.Since(*last.MailedAt) < 24*time.Hour
 
-	// 2. Render template
 	body, err := s.render(opts.Template, opts.Lang, opts.Data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render notification template")
 	}
 
-	// 3. Send, then journal. The order is what makes the duplicate check
-	// above trustworthy: a journal row exists only for a letter that
-	// actually left, so a dedupe hit genuinely means "already sent".
-	// Journaled-before-send, a failed SMTP attempt would leave a row
-	// behind, and the retry — same key, inside the 24h window — would be
-	// swallowed as a duplicate of a letter no one ever received. The
-	// price of this order is the opposite, smaller failure: a sent letter
-	// whose journal write fails may be sent again on the next run.
-	err = s.mail.Send(opts.To, opts.Title, body)
-	if err != nil {
-		return errors.Wrap(err, "failed to send email")
-	}
-
+	// The entry is written before anything is sent, because the entry IS the
+	// notification -- the letter is one way of carrying it, and a user with
+	// no deliverable address must still be told. This inverts the previous
+	// ordering, which existed so that a journal row implied a letter had
+	// left. That property is preserved by mailed_at instead: it is stamped
+	// only after an SMTP server accepts the message, so a failed send still
+	// leaves nothing that looks like a delivery.
 	n := &models.Notification{
 		Key:      opts.Key,
 		Title:    opts.Title,
 		Template: opts.Template,
 		Body:     body,
-		To:       &opts.To,
+		UserID:   &opts.UserID,
 	}
-	err = s.store.Create(ctx, n)
-	if err != nil {
+	if Deliverable(opts.To) {
+		to := opts.To
+		n.To = &to
+	}
+	if err := s.store.Create(ctx, n); err != nil {
 		return errors.Wrap(err, "failed to save notification to db")
 	}
 
-	return nil
+	if n.To == nil || mailedRecently {
+		return nil
+	}
+
+	if err := s.mail.Send(*n.To, opts.Title, body); err != nil {
+		if errors.Is(err, ErrNotConfigured) {
+			// Expected on an instance with no mail server. The feed entry
+			// above is the delivery; say so once at debug volume rather than
+			// reporting a failure that is not one.
+			return nil
+		}
+		return errors.Wrap(err, "failed to send email")
+	}
+	return s.store.MarkMailed(ctx, n.NotificationID)
 }
 
 func (s *Service) render(templateName string, lang string, data any) (string, error) {
@@ -204,9 +210,10 @@ func (s *Service) resourceData(r *vaultModels.Resource) map[string]any {
 	}
 }
 
-func (s *Service) SendVaulted(to string, r *vaultModels.Resource) error {
+func (s *Service) SendVaulted(to string, userID uuid.UUID, r *vaultModels.Resource) error {
 	opts := SendOptions{
 		To:       to,
+		UserID:   userID,
 		Key:      fmt.Sprintf("vaulted-%s", r.ResourceID),
 		Title:    fmt.Sprintf("Your resource %s has been vaulted!", r.Name),
 		Template: "vaulted.html",
@@ -220,7 +227,7 @@ type expiringResource struct {
 	URL  string
 }
 
-func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Resource) error {
+func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources []vaultModels.Resource) error {
 	expResources := make([]expiringResource, len(resources))
 	for i, r := range resources {
 		expResources[i] = expiringResource{
@@ -231,6 +238,7 @@ func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Reso
 
 	opts := SendOptions{
 		To:       to,
+		UserID:   userID,
 		Key:      fmt.Sprintf("expiring-%d", days),
 		Title:    fmt.Sprintf("Your resources will disappear in %d days!", days),
 		Template: "expiring.html",
@@ -243,12 +251,13 @@ func (s *Service) SendExpiring(to string, days int, resources []vaultModels.Reso
 	return s.Send(opts)
 }
 
-func (s *Service) SendTransferTimeout(to string, r *vaultModels.Resource) error {
+func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error {
 	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
 	data := s.resourceData(r)
 	data["Timeout"] = timeoutStr
 	opts := SendOptions{
 		To:       to,
+		UserID:   userID,
 		Key:      fmt.Sprintf("transfer-timeout-%s", r.ResourceID),
 		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
 		Template: "transfer-timeout.html",
@@ -257,9 +266,10 @@ func (s *Service) SendTransferTimeout(to string, r *vaultModels.Resource) error 
 	return s.Send(opts)
 }
 
-func (s *Service) SendExpired(to string, r *vaultModels.Resource) error {
+func (s *Service) SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error {
 	opts := SendOptions{
 		To:       to,
+		UserID:   userID,
 		Key:      fmt.Sprintf("expired-%s", r.ResourceID),
 		Title:    fmt.Sprintf("Your resource %s has expired", r.Name),
 		Template: "expired.html",

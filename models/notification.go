@@ -33,12 +33,17 @@ func CreateNotification(ctx context.Context, db pg.DBI, n *Notification) error {
 	return nil
 }
 
-// GetLastNotificationByKeyAndTo returns the last notification by key and recipient
-func GetLastNotificationByKeyAndTo(ctx context.Context, db pg.DBI, key string, to string) (*Notification, error) {
+// GetLastMailedNotificationByKeyAndUser returns the newest notification for
+// this key and user that was actually mailed (mailed_at IS NOT NULL). That
+// qualifier is what makes a hit trustworthy as "already sent": a row left
+// behind by a send that never happened -- no SMTP configured, or a failed
+// dial -- has mailed_at NULL and is invisible here, so it cannot suppress a
+// later attempt to mail the same key.
+func GetLastMailedNotificationByKeyAndUser(ctx context.Context, db pg.DBI, key string, userID uuid.UUID) (*Notification, error) {
 	n := &Notification{}
 	err := db.Model(n).
 		Context(ctx).
-		Where("key = ? AND \"to\" = ?", key, to).
+		Where("key = ? AND user_id = ? AND mailed_at IS NOT NULL", key, userID).
 		Order("created_at DESC").
 		Limit(1).
 		Select()
@@ -46,7 +51,25 @@ func GetLastNotificationByKeyAndTo(ctx context.Context, db pg.DBI, key string, t
 		if errors.Is(err, pg.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, errors.Wrap(err, "failed to get last notification")
+		return nil, errors.Wrap(err, "failed to get last mailed notification")
 	}
 	return n, nil
+}
+
+// MarkNotificationMailed stamps mailed_at on a notification row once an SMTP
+// server has actually accepted the message. It is the only place that
+// column is set, which is what lets the dedupe query above tell a real send
+// apart from a feed entry whose letter never left.
+func MarkNotificationMailed(ctx context.Context, db pg.DBI, id uuid.UUID) error {
+	n := &Notification{NotificationID: id}
+	_, err := db.Model(n).
+		Context(ctx).
+		Set("mailed_at = now()").
+		Set("updated_at = now()").
+		WherePK().
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to mark notification mailed")
+	}
+	return nil
 }

@@ -9,9 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 )
+
+// testUserID stands in for whatever account a test's notification belongs
+// to. Its value carries no meaning -- tests that care about a specific user
+// build their own.
+var testUserID = uuid.NewV4()
 
 // --- Mock implementations ---
 
@@ -20,15 +28,34 @@ type mockStore struct {
 	lastErr          error
 	createErr        error
 	created          *models.Notification
+	markMailedErr    error
+	markMailedID     uuid.UUID
+	markMailedCalled bool
 }
 
-func (m *mockStore) GetLastByKeyAndTo(_ context.Context, _, _ string) (*models.Notification, error) {
+func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
 	return m.lastNotification, m.lastErr
 }
 
 func (m *mockStore) Create(_ context.Context, n *models.Notification) error {
 	m.created = n
 	return m.createErr
+}
+
+func (m *mockStore) MarkMailed(_ context.Context, id uuid.UUID) error {
+	m.markMailedCalled = true
+	m.markMailedID = id
+	if m.markMailedErr != nil {
+		return m.markMailedErr
+	}
+	// Mirror the real column write, so a test asserting on the created
+	// row's MailedAt (rather than just the call flag) is checking
+	// something a regression could actually break.
+	if m.created != nil {
+		now := time.Now()
+		m.created.MailedAt = &now
+	}
+	return nil
 }
 
 type mockMailer struct {
@@ -137,6 +164,7 @@ func TestSend_Success(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test Title",
 		Template: "test.html",
@@ -158,6 +186,9 @@ func TestSend_Success(t *testing.T) {
 	if store.created.To == nil || *store.created.To != "user@example.com" {
 		t.Errorf("expected to 'user@example.com', got %v", store.created.To)
 	}
+	if store.created.UserID == nil || *store.created.UserID != testUserID {
+		t.Errorf("expected user id %v, got %v", testUserID, store.created.UserID)
+	}
 	if store.created.Template != "test.html" {
 		t.Errorf("expected template 'test.html', got %q", store.created.Template)
 	}
@@ -177,15 +208,19 @@ func TestSend_Success(t *testing.T) {
 	if mail.calls[0].body != "<p>Hello World!</p>" {
 		t.Errorf("expected body '<p>Hello World!</p>', got %q", mail.calls[0].body)
 	}
+	if !store.markMailedCalled {
+		t.Error("expected mailed_at to be stamped after a successful send")
+	}
 }
 
 func TestSend_DuplicateWithin24Hours(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
+	mailedAt := time.Now().Add(-1 * time.Hour)
 	store := &mockStore{
 		lastNotification: &models.Notification{
-			CreatedAt: time.Now().Add(-1 * time.Hour),
+			MailedAt: &mailedAt,
 		},
 	}
 	mail := &mockMailer{}
@@ -193,6 +228,7 @@ func TestSend_DuplicateWithin24Hours(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
@@ -200,11 +236,16 @@ func TestSend_DuplicateWithin24Hours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if store.created != nil {
-		t.Error("expected no notification to be created for duplicate")
+	// The feed entry is written regardless of the dedupe outcome -- it IS
+	// the notification. Only the letter is suppressed.
+	if store.created == nil {
+		t.Error("expected a feed entry to be created even for a recent duplicate")
 	}
 	if len(mail.calls) != 0 {
-		t.Error("expected no email to be sent for duplicate")
+		t.Error("expected no email to be sent for a duplicate mailed within 24h")
+	}
+	if store.markMailedCalled {
+		t.Error("expected mailed_at not to be stamped when the send is suppressed")
 	}
 }
 
@@ -212,9 +253,10 @@ func TestSend_DuplicateOlderThan24Hours(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
+	mailedAt := time.Now().Add(-25 * time.Hour)
 	store := &mockStore{
 		lastNotification: &models.Notification{
-			CreatedAt: time.Now().Add(-25 * time.Hour),
+			MailedAt: &mailedAt,
 		},
 	}
 	mail := &mockMailer{}
@@ -222,6 +264,7 @@ func TestSend_DuplicateOlderThan24Hours(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
@@ -235,6 +278,9 @@ func TestSend_DuplicateOlderThan24Hours(t *testing.T) {
 	if len(mail.calls) != 1 {
 		t.Error("expected email to be sent for old duplicate")
 	}
+	if !store.markMailedCalled {
+		t.Error("expected mailed_at to be stamped after the send")
+	}
 }
 
 func TestSend_NoPreviousNotification(t *testing.T) {
@@ -247,6 +293,7 @@ func TestSend_NoPreviousNotification(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
@@ -267,8 +314,9 @@ func TestSend_StoreGetLastError(t *testing.T) {
 	svc := newTestService(store, nil, "")
 
 	err := svc.Send(SendOptions{
-		To:  "user@example.com",
-		Key: "test-key",
+		To:     "user@example.com",
+		UserID: testUserID,
+		Key:    "test-key",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -285,6 +333,7 @@ func TestSend_RenderError(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "nonexistent.html",
@@ -307,6 +356,7 @@ func TestSend_StoreCreateError(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
@@ -317,11 +367,12 @@ func TestSend_StoreCreateError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to save notification to db") {
 		t.Errorf("unexpected error message: %v", err)
 	}
-	// The letter goes out before the journal write: a failed write costs at
-	// worst a duplicate send on the retry, where the reverse order cost the
-	// letter itself (see TestSend_MailError).
-	if len(mail.calls) != 1 {
-		t.Errorf("emails sent: got %d, want 1 — the send precedes the journal write", len(mail.calls))
+	// The entry is written before anything is sent, so a failed write means
+	// nothing was mailed either — there is no letter for a row that was
+	// never recorded as existing (see TestSend_MailError for the reverse:
+	// the entry surviving a failed send).
+	if len(mail.calls) != 0 {
+		t.Errorf("emails sent: got %d, want 0 — the journal write precedes the send", len(mail.calls))
 	}
 }
 
@@ -335,6 +386,7 @@ func TestSend_MailError(t *testing.T) {
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
@@ -345,17 +397,20 @@ func TestSend_MailError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to send email") {
 		t.Errorf("unexpected error message: %v", err)
 	}
-	// No journal row for a letter that never left. A row here would make
-	// the retry — same key, inside the 24h window — dedupe against a send
-	// that failed, and the letter would be lost for good: the poller marks
-	// its hits delivered on Send's nil return.
-	if store.created != nil {
-		t.Error("a failed send must not be journaled — the retry would dedupe against it and the letter would never go out")
+	// The feed entry exists even though the letter failed — it is written
+	// before the send is attempted, because the entry IS the notification.
+	// Only mailed_at stays unset, which is what keeps the retry honest.
+	if store.created == nil {
+		t.Error("expected the feed entry to exist even though the send failed")
+	}
+	if store.markMailedCalled {
+		t.Error("mailed_at must not be stamped when the send failed")
 	}
 }
 
-// TestSend_RetryAfterMailFailure pins the recovery path end to end: a send
-// that failed leaves no trace, so the identical retry actually mails.
+// TestSend_RetryAfterMailFailure pins the recovery path end to end: a failed
+// send still records the feed entry with mailed_at unset, so the identical
+// retry is not muted by the dedupe check and actually mails.
 func TestSend_RetryAfterMailFailure(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
@@ -366,12 +421,16 @@ func TestSend_RetryAfterMailFailure(t *testing.T) {
 
 	opts := SendOptions{
 		To:       "user@example.com",
+		UserID:   testUserID,
 		Key:      "test-key",
 		Title:    "Test",
 		Template: "test.html",
 	}
 	if err := svc.Send(opts); err == nil {
 		t.Fatal("expected the first send to fail")
+	}
+	if store.markMailedCalled {
+		t.Fatal("first send failed; mailed_at must not be stamped")
 	}
 
 	mail.sendErr = nil
@@ -381,8 +440,8 @@ func TestSend_RetryAfterMailFailure(t *testing.T) {
 	if len(mail.calls) != 2 {
 		t.Errorf("send attempts: got %d, want 2 — the retry must not be muted by the dedupe", len(mail.calls))
 	}
-	if store.created == nil {
-		t.Error("the successful retry must be journaled")
+	if !store.markMailedCalled {
+		t.Error("the successful retry must stamp mailed_at")
 	}
 }
 
@@ -391,8 +450,8 @@ func TestSend_RetryAfterMailFailure(t *testing.T) {
 func TestSmtpMailer_EmptyHost(t *testing.T) {
 	m := &smtpMailer{host: ""}
 	err := m.Send("user@example.com", "Test", "body")
-	if err != nil {
-		t.Fatalf("expected no error when SMTP host is empty, got %v", err)
+	if !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("expected ErrNotConfigured when SMTP host is empty, got %v", err)
 	}
 }
 
@@ -410,7 +469,7 @@ func TestSendVaulted(t *testing.T) {
 		ResourceID: "abc123",
 		Name:       "My Torrent",
 	}
-	err := svc.SendVaulted("user@example.com", r)
+	err := svc.SendVaulted("user@example.com", testUserID, r)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -448,7 +507,7 @@ func TestSendExpiring(t *testing.T) {
 		{ResourceID: "res1", Name: "Torrent 1"},
 		{ResourceID: "res2", Name: "Torrent 2"},
 	}
-	err := svc.SendExpiring("user@example.com", 7, resources)
+	err := svc.SendExpiring("user@example.com", testUserID, 7, resources)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -477,7 +536,7 @@ func TestSendExpiring_EmptyResources(t *testing.T) {
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
-	err := svc.SendExpiring("user@example.com", 3, []vaultModels.Resource{})
+	err := svc.SendExpiring("user@example.com", testUserID, 3, []vaultModels.Resource{})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -504,7 +563,7 @@ func TestSendTransferTimeout(t *testing.T) {
 		ResourceID: "xyz789",
 		Name:       "Big Torrent",
 	}
-	err := svc.SendTransferTimeout("user@example.com", r)
+	err := svc.SendTransferTimeout("user@example.com", testUserID, r)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -544,7 +603,7 @@ func TestSendExpired(t *testing.T) {
 		ResourceID: "exp456",
 		Name:       "Old Torrent",
 	}
-	err := svc.SendExpired("user@example.com", r)
+	err := svc.SendExpired("user@example.com", testUserID, r)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -562,5 +621,112 @@ func TestSendExpired(t *testing.T) {
 	expectedBody := "Old Torrent expired url=https://webtor.io/exp456 (https://webtor.io)"
 	if store.created.Body != expectedBody {
 		t.Errorf("expected body %q, got %q", expectedBody, store.created.Body)
+	}
+}
+
+// --- Tests for the two properties that make the journal trustworthy ---
+
+// TestSendRecordsEntryWithoutMailWhenSMTPMissing pins the self-hosted case:
+// no SMTP server configured, so Send must still record the feed entry, and
+// must not claim a delivery that never happened.
+func TestSendRecordsEntryWithoutMailWhenSMTPMissing(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	store := &mockStore{}
+	// The real smtpMailer, unconfigured -- exercises the actual path that
+	// makes an SMTP-less self-hosted instance return ErrNotConfigured,
+	// not a stand-in that merely asserts the constant's name.
+	mail := &smtpMailer{host: ""}
+	svc := newTestService(store, mail, tmplDir)
+
+	err := svc.Send(SendOptions{
+		To:       "user@example.com",
+		UserID:   testUserID,
+		Key:      "test-key",
+		Title:    "Test",
+		Template: "test.html",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if store.created == nil {
+		t.Fatal("expected exactly one row to be created")
+	}
+	if store.created.MailedAt != nil {
+		t.Errorf("expected MailedAt to be nil, got %v", store.created.MailedAt)
+	}
+	if store.markMailedCalled {
+		t.Error("mailed_at must not be stamped when SMTP is not configured")
+	}
+}
+
+// journalStore is a store fake with real dedupe filtering, mirroring the
+// production SQL predicate (key, user_id, mailed_at IS NOT NULL) instead of
+// a hand-set return value -- so a regression in that filter is something a
+// test built on it can actually catch, the way TestSendDoesNotSuppress...
+// below does.
+type journalStore struct {
+	rows []*models.Notification
+}
+
+func (j *journalStore) GetLastMailedByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
+	for i := len(j.rows) - 1; i >= 0; i-- {
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID && r.MailedAt != nil {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (j *journalStore) Create(_ context.Context, n *models.Notification) error {
+	j.rows = append(j.rows, n)
+	return nil
+}
+
+func (j *journalStore) MarkMailed(_ context.Context, id uuid.UUID) error {
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.NotificationID == id {
+			r.MailedAt = &now
+		}
+	}
+	return nil
+}
+
+// TestSendDoesNotSuppressRetryAfterFailedSend pins the other half: a row
+// that exists for this key and user but was never mailed must not count as
+// a duplicate.
+func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	store := &journalStore{
+		rows: []*models.Notification{
+			{
+				NotificationID: uuid.NewV4(),
+				Key:            "test-key",
+				UserID:         &testUserID,
+				// MailedAt is nil: an earlier attempt for this key never
+				// actually left -- no SMTP configured, or a failed dial.
+			},
+		},
+	}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	err := svc.Send(SendOptions{
+		To:       "user@example.com",
+		UserID:   testUserID,
+		Key:      "test-key",
+		Title:    "Test",
+		Template: "test.html",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(mail.calls) != 1 {
+		t.Errorf("expected the mail to be attempted despite the unmailed row for the same key, got %d calls", len(mail.calls))
 	}
 }

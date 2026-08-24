@@ -7,6 +7,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	_ "github.com/go-pg/pg/v10/orm"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -165,7 +166,12 @@ func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePerio
 		}
 
 		if len(expiring) > 0 {
-			err = ns.SendExpiring(email, days, expiring)
+			uid, perr := uuid.FromString(userID)
+			if perr != nil {
+				log.WithError(perr).WithField("user_id", userID).Error("invalid user id for notification")
+				continue
+			}
+			err = ns.SendExpiring(email, uid, days, expiring)
 			if err != nil {
 				log.WithError(err).WithField("email", email).Error("failed to send expiring notification")
 			}

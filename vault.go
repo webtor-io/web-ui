@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -25,8 +26,8 @@ type reaperVault interface {
 }
 
 type reaperNotification interface {
-	SendTransferTimeout(to string, r *vaultModels.Resource) error
-	SendExpired(to string, r *vaultModels.Resource) error
+	SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error
+	SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error
 }
 
 type reaperStore interface {
@@ -287,17 +288,17 @@ func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.P
 		return
 	}
 
-	r.sendNotification(pledge.User.Email, resource, isTransferTimeout)
+	r.sendNotification(pledge.User.Email, pledge.UserID, resource, isTransferTimeout)
 }
 
-func (r *reaper) sendNotification(email string, resource vaultModels.Resource, isTransferTimeout bool) {
+func (r *reaper) sendNotification(email string, userID uuid.UUID, resource vaultModels.Resource, isTransferTimeout bool) {
 	var err error
 	var action string
 	if isTransferTimeout {
-		err = r.notification.SendTransferTimeout(email, &resource)
+		err = r.notification.SendTransferTimeout(email, userID, &resource)
 		action = "transfer timeout"
 	} else {
-		err = r.notification.SendExpired(email, &resource)
+		err = r.notification.SendExpired(email, userID, &resource)
 		action = "expiration"
 	}
 

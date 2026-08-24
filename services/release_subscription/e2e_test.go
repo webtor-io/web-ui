@@ -378,26 +378,45 @@ func (m *sentMail) last() mailMessage {
 }
 
 // memJournal is the notification table: what the 24-hour duplicate check
-// reads.
+// reads. GetLastMailedByKeyAndUser only ever considers rows with MailedAt
+// set, the same restriction the real SQL query applies — a row nobody ever
+// mailed must not look like a duplicate.
 type memJournal struct {
 	mu   sync.Mutex
 	rows []*models.Notification
 }
 
-func (j *memJournal) GetLastByKeyAndTo(_ context.Context, key, to string) (*models.Notification, error) {
+func (j *memJournal) GetLastMailedByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	for i := len(j.rows) - 1; i >= 0; i-- {
-		if j.rows[i].Key == key && j.rows[i].To != nil && *j.rows[i].To == to {
-			return j.rows[i], nil
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID && r.MailedAt != nil {
+			return r, nil
 		}
 	}
 	return nil, nil
 }
 
+func (j *memJournal) MarkMailed(_ context.Context, id uuid.UUID) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.NotificationID == id {
+			r.MailedAt = &now
+			return nil
+		}
+	}
+	return nil
+}
+
 func (j *memJournal) Create(_ context.Context, n *models.Notification) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	if n.NotificationID == (uuid.UUID{}) {
+		n.NotificationID = uuid.NewV4()
+	}
 	n.CreatedAt = time.Now()
 	j.rows = append(j.rows, n)
 	return nil

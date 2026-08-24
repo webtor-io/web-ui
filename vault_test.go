@@ -85,7 +85,7 @@ type mockReaperNotification struct {
 	calls                  []notificationCall
 }
 
-func (m *mockReaperNotification) SendTransferTimeout(to string, r *vaultModels.Resource) error {
+func (m *mockReaperNotification) SendTransferTimeout(to string, _ uuid.UUID, r *vaultModels.Resource) error {
 	m.calls = append(m.calls, notificationCall{
 		email:      to,
 		resourceID: r.ResourceID,
@@ -94,7 +94,7 @@ func (m *mockReaperNotification) SendTransferTimeout(to string, r *vaultModels.R
 	return m.sendTransferTimeoutErr
 }
 
-func (m *mockReaperNotification) SendExpired(to string, r *vaultModels.Resource) error {
+func (m *mockReaperNotification) SendExpired(to string, _ uuid.UUID, r *vaultModels.Resource) error {
 	m.calls = append(m.calls, notificationCall{
 		email:      to,
 		resourceID: r.ResourceID,
@@ -519,7 +519,7 @@ func TestSendNotification_Expired(t *testing.T) {
 	n := &mockReaperNotification{}
 	r := newTestReaper(nil, nil, n)
 
-	r.sendNotification("user@example.com", resource, false)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, false)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(n.calls))
@@ -541,7 +541,7 @@ func TestSendNotification_TransferTimeout(t *testing.T) {
 	n := &mockReaperNotification{}
 	r := newTestReaper(nil, nil, n)
 
-	r.sendNotification("user@example.com", resource, true)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, true)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(n.calls))
@@ -559,7 +559,7 @@ func TestSendNotification_ExpiredError(t *testing.T) {
 	r := newTestReaper(nil, nil, n)
 
 	// Should not panic, just log the error
-	r.sendNotification("user@example.com", resource, false)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, false)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification attempt, got %d", len(n.calls))
@@ -573,7 +573,7 @@ func TestSendNotification_TransferTimeoutError(t *testing.T) {
 	r := newTestReaper(nil, nil, n)
 
 	// Should not panic, just log the error
-	r.sendNotification("user@example.com", resource, true)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, true)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification attempt, got %d", len(n.calls))

@@ -114,12 +114,12 @@ type subMail struct {
 	off []notification.SubscriptionView
 }
 
-func (m *subMail) SendSubscriptionOn(_ string, sub notification.SubscriptionView) error {
+func (m *subMail) SendSubscriptionOn(_ string, _ uuid.UUID, sub notification.SubscriptionView) error {
 	m.on = append(m.on, sub)
 	return nil
 }
 
-func (m *subMail) SendSubscriptionOff(_ string, sub notification.SubscriptionView, _ bool) error {
+func (m *subMail) SendSubscriptionOff(_ string, _ uuid.UUID, sub notification.SubscriptionView, _ bool) error {
 	m.off = append(m.off, sub)
 	return nil
 }
