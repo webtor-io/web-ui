@@ -73,3 +73,81 @@ func MarkNotificationMailed(ctx context.Context, db pg.DBI, id uuid.UUID) error 
 	}
 	return nil
 }
+
+// CountUnreadNotifications counts a user's notifications that have not been
+// read yet. Backs the navbar badge, so it counts feed entries regardless of
+// whether they were ever mailed -- a notification with no deliverable
+// address is still unread.
+func CountUnreadNotifications(ctx context.Context, db pg.DBI, userID uuid.UUID) (int, error) {
+	count, err := db.Model((*Notification)(nil)).
+		Context(ctx).
+		Where("user_id = ? AND read_at IS NULL", userID).
+		Count()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to count unread notifications")
+	}
+	return count, nil
+}
+
+// ListNotificationsByUser returns a user's notifications, newest first,
+// capped at limit. Backs the notifications page.
+func ListNotificationsByUser(ctx context.Context, db pg.DBI, userID uuid.UUID, limit int) ([]Notification, error) {
+	var ns []Notification
+	err := db.Model(&ns).
+		Context(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list notifications")
+	}
+	return ns, nil
+}
+
+// MarkAllNotificationsRead stamps read_at on every currently-unread
+// notification belonging to a user. Only touches rows that are still
+// unread, so it does not disturb the read_at already recorded on entries
+// read individually.
+func MarkAllNotificationsRead(ctx context.Context, db pg.DBI, userID uuid.UUID) error {
+	_, err := db.Model((*Notification)(nil)).
+		Context(ctx).
+		Set("read_at = now()").
+		Set("updated_at = now()").
+		Where("user_id = ? AND read_at IS NULL", userID).
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to mark all notifications read")
+	}
+	return nil
+}
+
+// PruneNotificationsKeepingNewest deletes all but the newest `keep` entries
+// for every user. The ranking is computed per user_id via a window
+// function and only rows past the cutoff for their own partition are
+// deleted -- a global "keep the newest N rows" query (e.g. a plain
+// `ORDER BY created_at OFFSET keep`) would let one busy account's recent
+// notifications evict a quiet account's older, still-under-the-cap ones.
+// Rows with no user_id (pre-migration entries with no owner to bound a feed
+// for) are left untouched.
+func PruneNotificationsKeepingNewest(ctx context.Context, db pg.DBI, keep int) error {
+	_, err := db.ExecContext(ctx, `
+		DELETE FROM notification
+		WHERE notification_id IN (
+			SELECT notification_id FROM (
+				SELECT notification_id,
+					ROW_NUMBER() OVER (
+						PARTITION BY user_id
+						ORDER BY created_at DESC, notification_id DESC
+					) AS rank
+				FROM notification
+				WHERE user_id IS NOT NULL
+			) ranked
+			WHERE ranked.rank > ?
+		)
+	`, keep)
+	if err != nil {
+		return errors.Wrap(err, "failed to prune notifications")
+	}
+	return nil
+}

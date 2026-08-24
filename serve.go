@@ -380,6 +380,24 @@ func serve(c *cli.Context) error {
 		c.Next()
 	})
 
+	// Setting Notification. Built here (earlier than the rest of the
+	// notification wiring below) so the unread-count middleware right after
+	// it can close over a real Service before any route is registered — pg
+	// and i18nSvc are both already available this early.
+	ns := notification.New(c, pg.Get(), i18nSvc)
+
+	// Counted per request so the badge is never stale. Anonymous users and
+	// store errors both fall through to zero rather than blocking the page:
+	// a missing badge is a smaller failure than a page that will not render.
+	r.Use(func(c *gin.Context) {
+		if u := auth.GetUserFromContext(c); u != nil && u.HasAuth() {
+			if n, err := ns.CountUnread(c.Request.Context(), u.ID); err == nil {
+				w.SetUnreadNotifications(c, n)
+			}
+		}
+		c.Next()
+	})
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
@@ -418,9 +436,6 @@ func serve(c *cli.Context) error {
 	// Setting Vault (vaultApi is built earlier — the onboarding middleware
 	// needs to know whether Vault is configured before any route is mounted)
 	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
-
-	// Setting Notification
-	ns := notification.New(c, pg.Get(), i18nSvc)
 
 	// Setting VaultHandler
 	if v != nil {

@@ -80,6 +80,43 @@ func TestNewContextCarriesVaultAvailability(t *testing.T) {
 	}
 }
 
+// TestNewContextCarriesUnreadNotifications pins the wiring between
+// SetUnreadNotifications and Context.UnreadNotifications, the same way
+// TestNewContextCarriesVaultAvailability pins Vault above: the navbar bell
+// renders its badge exclusively from this field, and the middleware in
+// serve.go that calls SetUnreadNotifications -- mounted beside the vault
+// one, for the same r.Use-ordering reason -- is the only place that knows
+// both who the request's user is and what notificationStore.CountUnread
+// says. This proves NewContext actually reads the value back out: a silent
+// drop of the `UnreadNotifications: unreadNotifications(c)` line in the
+// constructor would leave the badge permanently at zero with no test
+// failing anywhere else.
+func TestNewContextCarriesUnreadNotifications(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  bool
+		val  int
+		want int
+	}{
+		{"set to three", true, 3, 3},
+		{"set to zero", true, 0, 0},
+		// Unset must mean zero: a caller who forgets renders no badge
+		// rather than a wrong one.
+		{"never set", false, 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("GET", "/", nil)
+			if tc.set {
+				SetUnreadNotifications(c, tc.val)
+			}
+			if got := NewContext(c).UnreadNotifications; got != tc.want {
+				t.Fatalf("UnreadNotifications = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestVaultEnabledIgnoresWrongType exercises the defensive type assertion in
 // vaultEnabled: nothing else in this codebase stores a non-bool under
 // vaultEnabledContextKey today, but the failed-assertion branch (`b, _ :=

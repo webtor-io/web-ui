@@ -150,6 +150,23 @@ func (s *Service) Send(opts SendOptions) error {
 	return s.store.MarkMailed(ctx, n.NotificationID)
 }
 
+// CountUnread returns how many of a user's notifications have not been
+// read yet. Thin pass-through to the store so callers outside this package
+// (the per-request middleware in serve.go) never reach past Service into
+// the unexported notificationStore.
+func (s *Service) CountUnread(ctx context.Context, userID uuid.UUID) (int, error) {
+	return s.store.CountUnread(ctx, userID)
+}
+
+// PruneKeepingNewest caps the notification feed by deleting everything
+// past the newest `keep` entries for every user. Called from the
+// "notification send" cron subcommand, after the sending work for that run
+// -- pruning first could delete rows the run still needed to reference
+// (e.g. for the mailed-recently dedupe check).
+func (s *Service) PruneKeepingNewest(ctx context.Context, keep int) error {
+	return s.store.PruneKeepingNewest(ctx, keep)
+}
+
 func (s *Service) render(templateName string, lang string, data any) (string, error) {
 	path := filepath.Join(s.templateDir, templateName)
 	if _, err := os.Stat(path); os.IsNotExist(err) {

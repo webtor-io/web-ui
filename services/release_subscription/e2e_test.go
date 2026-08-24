@@ -422,6 +422,51 @@ func (j *memJournal) Create(_ context.Context, n *models.Notification) error {
 	return nil
 }
 
+// CountUnread, ListByUser, MarkAllRead and PruneKeepingNewest are not
+// exercised by this suite -- it drives Send/SendExpiring end to end, not
+// the feed-reading path -- but memJournal still has to satisfy
+// notification.notificationStore (aliased notification.Store) to be usable
+// with notification.NewWith.
+func (j *memJournal) CountUnread(_ context.Context, userID uuid.UUID) (int, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	count := 0
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (j *memJournal) ListByUser(_ context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	var out []models.Notification
+	for i := len(j.rows) - 1; i >= 0 && len(out) < limit; i-- {
+		if r := j.rows[i]; r.UserID != nil && *r.UserID == userID {
+			out = append(out, *r)
+		}
+	}
+	return out, nil
+}
+
+func (j *memJournal) MarkAllRead(_ context.Context, userID uuid.UUID) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			r.ReadAt = &now
+		}
+	}
+	return nil
+}
+
+func (j *memJournal) PruneKeepingNewest(_ context.Context, _ int) error {
+	return nil
+}
+
 // --- the scenario ---
 
 func stream(hash, title, source string) stremio.StreamItem {

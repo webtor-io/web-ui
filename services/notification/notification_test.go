@@ -31,6 +31,19 @@ type mockStore struct {
 	markMailedErr    error
 	markMailedID     uuid.UUID
 	markMailedCalled bool
+
+	countUnread    int
+	countUnreadErr error
+
+	listByUser    []models.Notification
+	listByUserErr error
+
+	markAllReadErr    error
+	markAllReadCalled bool
+
+	pruneKeepingNewestErr    error
+	pruneKeepingNewestCalled bool
+	pruneKeepingNewestKeep   int
 }
 
 func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
@@ -56,6 +69,25 @@ func (m *mockStore) MarkMailed(_ context.Context, id uuid.UUID) error {
 		m.created.MailedAt = &now
 	}
 	return nil
+}
+
+func (m *mockStore) CountUnread(_ context.Context, _ uuid.UUID) (int, error) {
+	return m.countUnread, m.countUnreadErr
+}
+
+func (m *mockStore) ListByUser(_ context.Context, _ uuid.UUID, _ int) ([]models.Notification, error) {
+	return m.listByUser, m.listByUserErr
+}
+
+func (m *mockStore) MarkAllRead(_ context.Context, _ uuid.UUID) error {
+	m.markAllReadCalled = true
+	return m.markAllReadErr
+}
+
+func (m *mockStore) PruneKeepingNewest(_ context.Context, keep int) error {
+	m.pruneKeepingNewestCalled = true
+	m.pruneKeepingNewestKeep = keep
+	return m.pruneKeepingNewestErr
 }
 
 type mockMailer struct {
@@ -692,6 +724,44 @@ func (j *journalStore) MarkMailed(_ context.Context, id uuid.UUID) error {
 			r.MailedAt = &now
 		}
 	}
+	return nil
+}
+
+// CountUnread, ListByUser, MarkAllRead and PruneKeepingNewest are not
+// exercised by any journalStore-based test today -- those methods back
+// the feed-reading path, while journalStore exists for Send's dedupe
+// filter -- but the type still has to satisfy notificationStore.
+func (j *journalStore) CountUnread(_ context.Context, userID uuid.UUID) (int, error) {
+	count := 0
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (j *journalStore) ListByUser(_ context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
+	var out []models.Notification
+	for i := len(j.rows) - 1; i >= 0 && len(out) < limit; i-- {
+		if r := j.rows[i]; r.UserID != nil && *r.UserID == userID {
+			out = append(out, *r)
+		}
+	}
+	return out, nil
+}
+
+func (j *journalStore) MarkAllRead(_ context.Context, userID uuid.UUID) error {
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			r.ReadAt = &now
+		}
+	}
+	return nil
+}
+
+func (j *journalStore) PruneKeepingNewest(_ context.Context, _ int) error {
 	return nil
 }
 

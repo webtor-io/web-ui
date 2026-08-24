@@ -80,6 +80,14 @@ func sendExpiringNotifications(c *cli.Context) error {
 		}
 	}
 
+	// Pruning runs after the sending work above, not before: pruning first
+	// could delete rows this run still needed (e.g. for the mailed-recently
+	// dedupe check inside Send).
+	const notificationFeedCap = 100
+	if err := ns.PruneKeepingNewest(ctx, notificationFeedCap); err != nil {
+		log.WithError(err).Error("failed to prune notifications")
+	}
+
 	return nil
 }
 
