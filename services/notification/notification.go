@@ -96,7 +96,16 @@ func (s *Service) Send(opts SendOptions) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to check for duplicate notification")
 	}
-	mailedRecently := last != nil && time.Since(*last.MailedAt) < 24*time.Hour
+	// last.MailedAt != nil looks redundant -- the query above is documented
+	// to only return rows with mailed_at IS NOT NULL -- but that predicate
+	// lives in a different file behind the notificationStore interface,
+	// where nothing in this package enforces it. Send runs inside a bare
+	// `go f()` in release_subscription (no recover()), so a store
+	// implementation, a cache layer, or a hand-run fix that ever hands back
+	// a row with MailedAt nil turns a bad dedupe hit into a nil-pointer
+	// panic that takes the whole process down, not one failed send. Do not
+	// delete this check.
+	mailedRecently := last != nil && last.MailedAt != nil && time.Since(*last.MailedAt) < 24*time.Hour
 
 	body, err := s.render(opts.Template, opts.Lang, opts.Data)
 	if err != nil {

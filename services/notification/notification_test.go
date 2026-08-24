@@ -730,3 +730,42 @@ func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
 		t.Errorf("expected the mail to be attempted despite the unmailed row for the same key, got %d calls", len(mail.calls))
 	}
 }
+
+// TestSendSurvivesStoreReturningUnmailedRow is the Go-side counterpart to
+// TestSendDoesNotSuppressRetryAfterFailedSend: that test proves the SQL
+// predicate matters, this one proves Send does not crash if a store
+// implementation -- one this package does not control, reached only
+// through the notificationStore interface -- ever violates the contract
+// and hands back a row with MailedAt nil. Send runs inside a bare `go f()`
+// in release_subscription with no recover(), so a nil-pointer panic here
+// would take down the whole process, not just this send.
+func TestSendSurvivesStoreReturningUnmailedRow(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	// mockStore returns exactly what is set here, unlike journalStore --
+	// this is deliberately a store that violates its own contract.
+	store := &mockStore{
+		lastNotification: &models.Notification{
+			Key:      "test-key",
+			UserID:   &testUserID,
+			MailedAt: nil,
+		},
+	}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	err := svc.Send(SendOptions{
+		To:       "user@example.com",
+		UserID:   testUserID,
+		Key:      "test-key",
+		Title:    "Test",
+		Template: "test.html",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(mail.calls) != 1 {
+		t.Errorf("expected the mail to be attempted -- a nil MailedAt means never mailed, not a recent duplicate, got %d calls", len(mail.calls))
+	}
+}
