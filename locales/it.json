@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Interrompere queste email?",
     "subscription.unsubscribe.confirmText": "Non riceverai più email sulle nuove uscite di {{.Title}}.",
     "subscription.unsubscribe.confirmTextPlain": "Non riceverai più email sulle nuove uscite per questo abbonamento.",
-    "subscription.unsubscribe.confirmButton": "Annulla iscrizione"
+    "subscription.unsubscribe.confirmButton": "Annulla iscrizione",
+    "langSuggest.text": "Webtor è disponibile in italiano.",
+    "langSuggest.switch": "Passa all'italiano",
+    "langSuggest.stay": "Rimani in inglese"
 }

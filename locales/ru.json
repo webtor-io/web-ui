@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Отключить эти письма?",
     "subscription.unsubscribe.confirmText": "Писем о новых раздачах «{{.Title}}» больше не будет.",
     "subscription.unsubscribe.confirmTextPlain": "Писем о новых раздачах по этой подписке больше не будет.",
-    "subscription.unsubscribe.confirmButton": "Отписаться"
+    "subscription.unsubscribe.confirmButton": "Отписаться",
+    "langSuggest.text": "Webtor доступен на русском языке.",
+    "langSuggest.switch": "Перейти на русский",
+    "langSuggest.stay": "Остаться на английском"
 }

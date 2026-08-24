@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Wyłączyć te e-maile?",
     "subscription.unsubscribe.confirmText": "Nie będziesz już dostawać e-maili o nowych wydaniach {{.Title}}.",
     "subscription.unsubscribe.confirmTextPlain": "Nie będziesz już dostawać e-maili o nowych wydaniach dla tej subskrypcji.",
-    "subscription.unsubscribe.confirmButton": "Wypisz się"
+    "subscription.unsubscribe.confirmButton": "Wypisz się",
+    "langSuggest.text": "Webtor jest dostępny po polsku.",
+    "langSuggest.switch": "Przełącz na polski",
+    "langSuggest.stay": "Zostań przy angielskim"
 }

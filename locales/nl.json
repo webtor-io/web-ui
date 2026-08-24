@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Deze e-mails stoppen?",
     "subscription.unsubscribe.confirmText": "Je krijgt geen e-mails meer over nieuwe releases van {{.Title}}.",
     "subscription.unsubscribe.confirmTextPlain": "Je krijgt geen e-mails meer over nieuwe releases voor dit abonnement.",
-    "subscription.unsubscribe.confirmButton": "Afmelden"
+    "subscription.unsubscribe.confirmButton": "Afmelden",
+    "langSuggest.text": "Webtor is ook beschikbaar in het Nederlands.",
+    "langSuggest.switch": "Overschakelen naar Nederlands",
+    "langSuggest.stay": "In het Engels blijven"
 }

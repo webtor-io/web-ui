@@ -67,6 +67,11 @@ type Context struct {
 	UserSettings *models.UserSettings
 	Lang         string
 	Path         string
+	// SuggestLang is the language to offer the visitor a switch to via the
+	// homepage banner (bare / no longer auto-redirects by Accept-Language —
+	// see i18n.HTTPMiddleware). Non-empty only on the bare homepage for
+	// cookieless visitors whose browser prefers a supported non-EN language.
+	SuggestLang string
 	// OpenInstance is true on a self-hosted instance running without an
 	// administrator password: anyone who can reach the port is admin. The
 	// banner rendered from this is the only thing standing between the
@@ -117,6 +122,10 @@ func NewContext(c *gin.Context) *Context {
 	tu := claims.GetTierUpdateFromContext(c)
 	lang := i18n.GetLang(c)
 	path := c.Request.URL.Path
+	suggest := ""
+	if path == "/" && lang == i18n.DefaultLang {
+		suggest = i18n.SuggestLang(c)
+	}
 	us, _ := c.Get(userSettingsContextKey)
 	settings, _ := us.(*models.UserSettings)
 
@@ -131,6 +140,7 @@ func NewContext(c *gin.Context) *Context {
 		UserSettings: settings,
 		Lang:         lang,
 		Path:         path,
+		SuggestLang:  suggest,
 		OpenInstance: auth.IsOpenInstance(c),
 		Vault:        vaultEnabled(c),
 		ginCtx:       c,

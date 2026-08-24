@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Zastavit tyto e-maily?",
     "subscription.unsubscribe.confirmText": "Další e-maily o nových vydáních {{.Title}} už nepřijdou.",
     "subscription.unsubscribe.confirmTextPlain": "Další e-maily o nových vydáních k tomuto odběru už nepřijdou.",
-    "subscription.unsubscribe.confirmButton": "Odhlásit odběr"
+    "subscription.unsubscribe.confirmButton": "Odhlásit odběr",
+    "langSuggest.text": "Webtor je k dispozici i v češtině.",
+    "langSuggest.switch": "Přepnout do češtiny",
+    "langSuggest.stay": "Zůstat v angličtině"
 }

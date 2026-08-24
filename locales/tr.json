@@ -1724,5 +1724,8 @@
     "subscription.unsubscribe.confirmTitle": "Bu e-postalar durdurulsun mu?",
     "subscription.unsubscribe.confirmText": "{{.Title}} için yeni sürüm e-postaları artık gelmeyecek.",
     "subscription.unsubscribe.confirmTextPlain": "Bu abonelik için yeni sürüm e-postaları artık gelmeyecek.",
-    "subscription.unsubscribe.confirmButton": "Abonelikten çık"
+    "subscription.unsubscribe.confirmButton": "Abonelikten çık",
+    "langSuggest.text": "Webtor Türkçe olarak da mevcut.",
+    "langSuggest.switch": "Türkçeye geç",
+    "langSuggest.stay": "İngilizce devam et"
 }

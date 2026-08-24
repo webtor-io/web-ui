@@ -64,6 +64,21 @@ func BrowserLang(c *gin.Context) string {
 	return ""
 }
 
+// SuggestLang returns the language the current visitor should be OFFERED a
+// switch to, or "" when no offer is due. An offer is due only when the
+// visitor has no stored preference (no lang cookie — a cookie of any value
+// means they either chose a language or dismissed the offer) and their
+// Accept-Language prefers a supported non-English language. This is the
+// banner-side companion of the bare-/ redirect exemption in HTTPMiddleware:
+// the homepage no longer auto-redirects (it must answer 200 for crawlers),
+// so first-time non-English visitors get an explicit offer instead.
+func SuggestLang(c *gin.Context) string {
+	if _, err := c.Cookie(langCookie); err == nil {
+		return ""
+	}
+	return BrowserLang(c)
+}
+
 // T translates a message key using the language from gin.Context.
 // Convenient shorthand for handlers: i18n.T(c, "toast.added")
 func T(c *gin.Context, key string) string {
