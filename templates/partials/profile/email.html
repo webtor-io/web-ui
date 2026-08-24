@@ -1,0 +1,31 @@
+{{ define "profile/email" }}
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+        <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            {{ t $.Lang "profile.email.title" }}
+        </h2>
+        <p class="text-sm text-w-sub leading-relaxed mb-4">{{ t $.Lang "profile.email.hint" }}</p>
+        {{ if eq .Data.ErrKey "profile.email.verified" }}
+        <div class="bg-success/10 border border-success/30 rounded-2xl p-4 mb-4">
+            <p class="text-sm text-success">{{ t $.Lang "profile.email.verified" }}</p>
+        </div>
+        {{ else if eq .Data.ErrKey "profile.email.sent" }}
+        <div class="bg-success/10 border border-success/30 rounded-2xl p-4 mb-4">
+            <p class="text-sm text-success">{{ t $.Lang "profile.email.sent" }}</p>
+        </div>
+        {{ else if or (eq .Data.ErrKey "profile.email.invalid") (eq .Data.ErrKey "profile.email.expired") }}
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 mb-4">
+            <p class="text-sm text-error">{{ t $.Lang .Data.ErrKey }}</p>
+        </div>
+        {{ end }}
+        {{ if .Data.PendingEmail }}
+        <p class="text-sm text-w-sub mb-4">{{ tp $.Lang "profile.email.pendingHint" "Email" .Data.PendingEmail }}</p>
+        {{ end }}
+        <form method="post" action="{{ langPath $.Lang "/profile/email" }}" class="flex flex-col gap-3 max-w-sm">
+            <input type="hidden" name="_csrf" value="{{ $.CSRF }}" />
+            <input type="email" name="email" autocomplete="email" required
+                   class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none" placeholder="{{ t $.Lang "profile.email.placeholder" }}" />
+            <button type="submit" class="btn btn-soft self-start" data-umami-event="profile-email-set">{{ t $.Lang "profile.email.submit" }}</button>
+        </form>
+    </div>
+{{ end }}

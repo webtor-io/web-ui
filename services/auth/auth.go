@@ -602,6 +602,20 @@ func (s *Auth) SelfHosted() bool {
 	return !s.hasSupetokens
 }
 
+// IdentityManagedExternally reports whether an external identity provider
+// owns this user's identity. When SuperTokens is configured, a user's email
+// is what claims.go keys the tier lookup on and what models.GetOrCreateUser
+// matches Patreon accounts by — letting a user edit it here would silently
+// detach both. It is true under exactly the same condition SelfHosted is
+// false, but the two methods answer different questions and must be kept
+// separate: SelfHosted names a deployment shape, this names the capability
+// (or rather its absence) a feature actually depends on. Callers deciding
+// whether an address is theirs to change belong on this method, not on
+// SelfHosted.
+func (s *Auth) IdentityManagedExternally() bool {
+	return s.hasSupetokens
+}
+
 // NewForAdminPasswordTest builds a minimal Auth exposing only the two fields
 // AdminPasswordActive reads. It exists so handlers/auth's tests can exercise
 // the real gating decision — not a hand-rolled stand-in for it — without

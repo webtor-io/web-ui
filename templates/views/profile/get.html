@@ -94,6 +94,15 @@
     </div>
     {{ end }}
 
+    {{/* Independent of the password section's gate above: this one needs
+         both no external identity provider AND SMTP configured (see
+         Data.ShowEmailSection), not just SelfHosted. */}}
+    {{ if .Data.ShowEmailSection }}
+    <div id="email">
+        {{ template "profile/email" $ }}
+    </div>
+    {{ end }}
+
     <!-- Preferences -->
     <div class="flex items-center gap-3 mt-10 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.preferences" }}</h2>

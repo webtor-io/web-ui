@@ -363,6 +363,13 @@ func (m *sentMail) Send(to, subject, body string) error {
 	return nil
 }
 
+// Configured always reports true: this stand-in never returns
+// notification.ErrNotConfigured from Send, so as far as a caller can tell
+// SMTP is up.
+func (m *sentMail) Configured() bool {
+	return true
+}
+
 func (m *sentMail) all() []mailMessage {
 	m.mu.Lock()
 	defer m.mu.Unlock()

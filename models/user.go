@@ -11,9 +11,9 @@ import (
 )
 
 type User struct {
-	tableName     struct{}  `pg:"user"`
-	UserID        uuid.UUID `pg:"user_id,pk"`
-	Email         string
+	tableName struct{}  `pg:"user"`
+	UserID    uuid.UUID `pg:"user_id,pk"`
+	Email     string
 	// Password holds the argon2id hash of the self-hosted administrator's
 	// password (services/adminauth). It is empty for every other user and on
 	// every SuperTokens-backed deployment.
@@ -22,6 +22,73 @@ type User struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	Tier          string
+	// PendingEmail, PendingEmailToken and PendingEmailExpiresAt (migration
+	// 71) carry an address awaiting verification -- see SetPendingEmail and
+	// VerifyPendingEmail. All three are nil outside that window: entering a
+	// new address overwrites any previous pending one rather than
+	// accumulating, and a successful or expired verification clears all
+	// three.
+	PendingEmail          *string    `pg:"pending_email"`
+	PendingEmailToken     *string    `pg:"pending_email_token"`
+	PendingEmailExpiresAt *time.Time `pg:"pending_email_expires_at"`
+}
+
+// SetPendingEmail stores an address awaiting verification for userID, together
+// with the single-use token that confirms it and the token's expiry.
+// Deliverability is the caller's job (notification.Deliverable) -- this
+// function stores whatever it is given, which is why the handler must check
+// first. A second call before the first is confirmed replaces the pending
+// state outright (old token included), so a stale link a user forgot about
+// simply stops working rather than staying live alongside a newer one.
+func SetPendingEmail(ctx context.Context, db *pg.DB, userID uuid.UUID, email, token string, expiresAt time.Time) error {
+	_, err := db.Model((*User)(nil)).
+		Context(ctx).
+		Set("pending_email = ?", email).
+		Set("pending_email_token = ?", token).
+		Set("pending_email_expires_at = ?", expiresAt).
+		Where("user_id = ?", userID).
+		Update()
+	if err != nil {
+		return errors.Wrap(err, "failed to store pending email")
+	}
+	return nil
+}
+
+// VerifyPendingEmail promotes the pending address owned by token to that
+// row's email, provided the token has not expired, and clears all three
+// pending columns. Returns (false, nil) for a token that matches no row or
+// whose row has expired -- the caller cannot and must not distinguish the
+// two: telling an unauthenticated GET which one is true would leak whether a
+// guessed token was ever valid.
+//
+// Matching is by token alone, deliberately not combined with a caller-
+// supplied user id: the partial unique index on pending_email_token
+// (migration 71, WHERE pending_email_token IS NOT NULL) guarantees at most
+// one row can hold a given token at a time, so `WHERE pending_email_token =
+// token` already can only ever touch the row that owns it. That is what
+// makes this safe to call with nothing but the token -- a token belonging to
+// user A can only ever promote user A's row, never user B's pending address,
+// regardless of who is asking or what user B's own pending state looks
+// like. Do not loosen the WHERE clause (e.g. to just the expiry check) to
+// "simplify" this: without the token equality, the UPDATE matches every row
+// with an unexpired pending address, promoting all of them at once.
+func VerifyPendingEmail(ctx context.Context, db *pg.DB, token string) (bool, error) {
+	if token == "" {
+		return false, nil
+	}
+	res, err := db.Model((*User)(nil)).
+		Context(ctx).
+		Set("email = pending_email").
+		Set("pending_email = NULL").
+		Set("pending_email_token = NULL").
+		Set("pending_email_expires_at = NULL").
+		Where("pending_email_token = ?", token).
+		Where("pending_email_expires_at > now()").
+		Update()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to verify pending email")
+	}
+	return res.RowsAffected() > 0, nil
 }
 
 // GetOrCreateUser finds or creates a user.

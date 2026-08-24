@@ -8,6 +8,13 @@ import (
 
 type mailer interface {
 	Send(to, subject, body string) error
+	// Configured reports whether this mailer can actually reach an SMTP
+	// server. It is the capability a caller outside this package needs
+	// before offering anything that depends on mail actually going out
+	// (e.g. an address that can only be confirmed by emailing it a link) --
+	// asking the mailer directly keeps that answer tied to the one place
+	// that knows how SMTP was set up, instead of a caller re-reading flags.
+	Configured() bool
 }
 
 // ErrNotConfigured means no SMTP server is configured, so nothing was even
@@ -23,6 +30,10 @@ type smtpMailer struct {
 	pass   string
 	from   string
 	secure bool
+}
+
+func (m *smtpMailer) Configured() bool {
+	return m.host != ""
 }
 
 func (m *smtpMailer) fromAddr() string {

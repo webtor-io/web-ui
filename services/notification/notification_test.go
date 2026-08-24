@@ -91,8 +91,9 @@ func (m *mockStore) PruneKeepingNewest(_ context.Context, keep int) error {
 }
 
 type mockMailer struct {
-	sendErr error
-	calls   []mailCall
+	sendErr    error
+	calls      []mailCall
+	configured bool
 }
 
 type mailCall struct {
@@ -104,6 +105,10 @@ type mailCall struct {
 func (m *mockMailer) Send(to, subject, body string) error {
 	m.calls = append(m.calls, mailCall{to: to, subject: subject, body: body})
 	return m.sendErr
+}
+
+func (m *mockMailer) Configured() bool {
+	return m.configured
 }
 
 // --- Test helpers ---

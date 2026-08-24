@@ -2,6 +2,8 @@ package profile
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,6 +26,7 @@ import (
 	"github.com/webtor-io/web-ui/services/data_export"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
+	"github.com/webtor-io/web-ui/services/notification"
 	pay "github.com/webtor-io/web-ui/services/payments"
 	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	"github.com/webtor-io/web-ui/services/s3"
@@ -96,6 +99,17 @@ type Data struct {
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
 	HasPayments bool
+	// ShowEmailSection gates the notification-email section. It renders only
+	// when both capabilities hold: this account's identity is not owned by
+	// an external identity provider (auth.IdentityManagedExternally is
+	// false -- our own row is the operator's identity, so editing its
+	// address is ours to allow), and mail can actually be sent
+	// (notification.Service.MailConfigured()). Without SMTP there is
+	// nothing an address could achieve, and no way to verify one.
+	ShowEmailSection bool
+	// PendingEmail is the address currently awaiting confirmation, or "" if
+	// none is pending.
+	PendingEmail string
 }
 
 type Handler struct {
@@ -108,6 +122,7 @@ type Handler struct {
 	userSettings  *usettings.Service
 	payments      *pay.Client
 	releaseSubs   *rss.Service
+	notification  *notification.Service
 	disableWebDAV bool
 	disableS3     bool
 	disableAPI    bool
@@ -118,37 +133,48 @@ type Handler struct {
 	domain        string
 	adminStore    *adminauth.Store
 	selfHosted    bool
+	// identityEditable is auth.IdentityManagedExternally negated: true when
+	// this deployment's own user row is the operator's identity (nothing
+	// external -- SuperTokens -- owns it), which is the capability the
+	// email section depends on. Kept separate from selfHosted: that field
+	// names a deployment shape and answers the password section's
+	// question, not this one.
+	identityEditable bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service) {
 	h := &Handler{
-		tb:            tm.MustRegisterViews("profile/*").WithLayout("main"),
-		at:            at,
-		ual:           ual,
-		pg:            pg,
-		claims:        cl,
-		vault:         v,
-		userSettings:  us,
-		payments:      payments,
-		releaseSubs:   releaseSubs,
-		disableWebDAV: c.Bool(common.DisableWebDAVFlag),
-		disableS3:     c.Bool(common.DisableS3Flag),
-		disableAPI:    c.Bool(common.DisableAPIFlag),
-		disableEmbed:  c.Bool(common.DisableEmbedFlag),
-		s3Secret:      s3.SigningSecret(c),
-		s3Endpoint:    s3.PublicEndpoint(c),
-		apiEndpoint:   libapi.PublicEndpoint(c),
-		domain:        c.String(common.DomainFlag),
-		adminStore:    a.AdminStore(),
-		selfHosted:    a.SelfHosted(),
+		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
+		at:               at,
+		ual:              ual,
+		pg:               pg,
+		claims:           cl,
+		vault:            v,
+		userSettings:     us,
+		payments:         payments,
+		releaseSubs:      releaseSubs,
+		notification:     ns,
+		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
+		disableS3:        c.Bool(common.DisableS3Flag),
+		disableAPI:       c.Bool(common.DisableAPIFlag),
+		disableEmbed:     c.Bool(common.DisableEmbedFlag),
+		s3Secret:         s3.SigningSecret(c),
+		s3Endpoint:       s3.PublicEndpoint(c),
+		apiEndpoint:      libapi.PublicEndpoint(c),
+		domain:           c.String(common.DomainFlag),
+		adminStore:       a.AdminStore(),
+		selfHosted:       a.SelfHosted(),
+		identityEditable: !a.IdentityManagedExternally(),
 	}
 	r.GET("/profile", h.get)
+	r.GET("/profile/email/verify/:token", h.verifyEmail)
 	gr := r.Group("/profile")
 	gr.Use(auth.HasAuth)
 	gr.POST("/delete", h.delete)
 	gr.GET("/export", h.export)
 	gr.POST("/settings", h.updateSettings)
 	gr.POST("/password", h.setPassword)
+	gr.POST("/email", h.setEmail)
 }
 
 // getAvailableBackendTypes returns the list of available streaming backend types
@@ -434,6 +460,17 @@ func (s *Handler) get(c *gin.Context) {
 		hasPayments = perr == nil && len(items) > 0
 	}
 
+	// The email section's two capability gates: our own row must be the
+	// identity (not an external provider's) and mail must be sendable.
+	// Only then is a pending address even worth reading.
+	showEmailSection := s.identityEditable && s.notification != nil && s.notification.MailConfigured()
+	pendingEmail := ""
+	if showEmailSection {
+		if full, ferr := models.GetUserByID(c.Request.Context(), db, u.ID); ferr == nil && full != nil && full.PendingEmail != nil {
+			pendingEmail = *full.PendingEmail
+		}
+	}
+
 	s.tb.Build("profile/get").HTML(http.StatusOK, web.NewContext(c).WithData(&Data{
 		StremioAddonURL:       stremioURL,
 		WebDAVURL:             webdavURL,
@@ -460,6 +497,8 @@ func (s *Handler) get(c *gin.Context) {
 		SelfHosted:            s.selfHosted,
 		PasswordSet:           s.adminStore != nil && s.adminStore.IsConfigured(c.Request.Context()),
 		PasswordManagedEnv:    s.adminStore != nil && s.adminStore.ManagedByEnv(),
+		ShowEmailSection:      showEmailSection,
+		PendingEmail:          pendingEmail,
 	}))
 }
 
@@ -510,6 +549,87 @@ func (s *Handler) setPassword(c *gin.Context) {
 		return
 	}
 	c.Redirect(http.StatusFound, "/profile")
+}
+
+// pendingEmailTokenBytes is 256 bits of randomness, hex-encoded to a
+// 64-character token -- long enough that guessing one is not a viable
+// attack, short enough to sit comfortably in a URL.
+const pendingEmailTokenBytes = 32
+
+// pendingEmailTTL is how long a verification link stays live. Matches the
+// migration 71 doc comment and this task's brief.
+const pendingEmailTTL = 24 * time.Hour
+
+func newEmailVerificationToken() (string, error) {
+	b := make([]byte, pendingEmailTokenBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", errors.Wrap(err, "failed to generate verification token")
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// setEmail accepts a notification address for this account, stores it as
+// pending, and mails exactly one message containing the verification link.
+// Nothing else is ever sent to a pending address -- SendEmailVerification is
+// the only Send* call in this codebase that reads PendingEmail rather than
+// the account's confirmed Email.
+//
+// The route only exists behind ShowEmailSection's two gates (see Data), but
+// this handler re-checks notification.Deliverable itself rather than
+// trusting the page that rendered the form: a POST does not prove the GET
+// that served the form saw the same gate state.
+func (s *Handler) setEmail(c *gin.Context) {
+	email := strings.TrimSpace(c.PostForm("email"))
+	if !notification.Deliverable(email) {
+		c.Redirect(http.StatusFound, "/profile?err=profile.email.invalid")
+		return
+	}
+	u := auth.GetUserFromContext(c)
+	db := s.pg.Get()
+	if db == nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	token, err := newEmailVerificationToken()
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	expiresAt := time.Now().Add(pendingEmailTTL)
+	if err := models.SetPendingEmail(c.Request.Context(), db, u.ID, email, token, expiresAt); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
+	if s.notification != nil {
+		link := fmt.Sprintf("%s/profile/email/verify/%s", s.domain, token)
+		if err := s.notification.SendEmailVerification(email, u.ID, token, link); err != nil {
+			_ = c.Error(errors.Wrap(err, "failed to send verification email"))
+		}
+	}
+	c.Redirect(http.StatusFound, "/profile?err=profile.email.sent")
+}
+
+// verifyEmail promotes a pending address whose token matches and has not
+// expired. Unauthenticated on purpose -- see models.VerifyPendingEmail's
+// doc comment for why matching by token alone is both sufficient and safe:
+// the link is meant to be clickable from whatever mail client opened it,
+// which may not carry this instance's session.
+func (s *Handler) verifyEmail(c *gin.Context) {
+	db := s.pg.Get()
+	if db == nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	ok, err := models.VerifyPendingEmail(c.Request.Context(), db, c.Param("token"))
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to verify pending email"))
+		return
+	}
+	if !ok {
+		c.Redirect(http.StatusFound, "/profile?err=profile.email.expired")
+		return
+	}
+	c.Redirect(http.StatusFound, "/profile?err=profile.email.verified")
 }
 
 // updateSettings persists the toggles from the per-user settings

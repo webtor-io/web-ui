@@ -150,6 +150,16 @@ func (s *Service) Send(opts SendOptions) error {
 	return s.store.MarkMailed(ctx, n.NotificationID)
 }
 
+// MailConfigured reports whether this Service can actually send mail. It is
+// the capability check a caller outside this package needs before offering
+// a feature that only makes sense with a working SMTP server -- e.g. an
+// address that can only be confirmed by emailing it a verification link.
+// Without this there is nothing such a feature could do, so gating on it is
+// what makes "verify before use" possible at all.
+func (s *Service) MailConfigured() bool {
+	return s.mail != nil && s.mail.Configured()
+}
+
 // CountUnread returns how many of a user's notifications have not been
 // read yet. Thin pass-through to the store so callers outside this package
 // (the per-request middleware in serve.go) never reach past Service into
@@ -302,6 +312,28 @@ func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModel
 		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
 		Template: "transfer-timeout.html",
 		Data:     data,
+	}
+	return s.Send(opts)
+}
+
+// SendEmailVerification mails the single-use link that confirms a pending
+// notification address (handlers/profile.setEmail). The dedupe key is keyed
+// on the token, not just the destination address: a re-submission of the
+// same address gets a fresh token (models.SetPendingEmail overwrites the
+// old one), and it must produce a fresh email too, or Service.Send's
+// 24-hour duplicate window would silently swallow the resend while the
+// stale, already-mailed link's token no longer matches anything in the
+// database.
+func (s *Service) SendEmailVerification(to string, userID uuid.UUID, token, link string) error {
+	opts := SendOptions{
+		To:       to,
+		UserID:   userID,
+		Key:      fmt.Sprintf("email-verify-%s", token),
+		Title:    "Confirm your notification email",
+		Template: "verify-email.html",
+		Data: map[string]any{
+			"Link": link,
+		},
 	}
 	return s.Send(opts)
 }
