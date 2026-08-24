@@ -287,10 +287,15 @@ func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.P
 	if pledge.User == nil {
 		return
 	}
+	// No notification.Deliverable guard on addr, on purpose. Both sends
+	// below go through notification.Service.Send, which writes the feed
+	// entry unconditionally and decides about mail on its own -- it fills
+	// the To column only for a deliverable address and never opens an SMTP
+	// connection without one. Returning early here would skip the feed
+	// entry too, so the self-hosted admin (whose address is the sentinel
+	// "admin") would lose a resource and never be told. Do not "restore"
+	// the check.
 	addr := notification.RecipientEmail(pledge.User.Email, pledge.User.NotificationEmail)
-	if !notification.Deliverable(addr) {
-		return
-	}
 
 	r.sendNotification(addr, pledge.UserID, resource, isTransferTimeout)
 }

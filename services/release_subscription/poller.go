@@ -177,9 +177,20 @@ func (p *Poller) Run(ctx context.Context) (int, error) {
 // as delivered only after a letter actually goes out, so a failed send
 // leaves them pending for the next run rather than losing them.
 func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if sub.User == nil || !notification.Deliverable(notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)) {
-		// Nothing to mail. Push the row far out rather than leaving it due,
-		// or it comes back every run.
+	if sub.User == nil {
+		// No account joined onto the row, so there is nobody to attribute a
+		// finding to -- neither a letter nor a feed entry has a recipient.
+		// Push the row far out rather than leaving it due, or it comes back
+		// every run.
+		//
+		// An undeliverable address is deliberately NOT part of this guard.
+		// Both sends a poll can make go through notification.Service.Send,
+		// which writes the feed entry unconditionally and decides about mail
+		// on its own -- it fills the To column only for a deliverable
+		// address and never opens an SMTP connection without one. Bailing
+		// out here would skip the search as well, so the self-hosted admin
+		// (whose address is the sentinel "admin") would never learn that a
+		// release turned up. Do not "restore" a Deliverable check here.
 		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt())
 	}
 

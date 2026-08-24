@@ -91,6 +91,33 @@ func sendExpiringNotifications(c *cli.Context) error {
 	return nil
 }
 
+// expiringRecipients reduces a pledge list to one destination address per
+// user -- the set of accounts the expiry run has something to tell.
+//
+// A pledge whose User did not join is dropped, because there is no account
+// to attribute a notification to. An undeliverable address is NOT dropped:
+// SendExpiring goes through notification.Service.Send, which writes the
+// feed entry unconditionally and decides about mail on its own (it fills
+// the To column only for a deliverable address and never opens an SMTP
+// connection without one). Filtering here would remove the user from this
+// map and so skip the feed entry as well, leaving the self-hosted admin --
+// whose address is the sentinel "admin" -- with no warning at all that
+// their resources are about to disappear. Do not "restore" a Deliverable
+// check here.
+//
+// Split out of sendExpiringNotificationsByDays so that rule can be tested
+// without a database.
+func expiringRecipients(pledges []vault.Pledge) map[string]string {
+	userEmails := make(map[string]string)
+	for _, p := range pledges {
+		if p.User == nil {
+			continue
+		}
+		userEmails[p.UserID.String()] = notification.RecipientEmail(p.User.Email, p.User.NotificationEmail)
+	}
+	return userEmails
+}
+
 func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePeriod time.Duration, ns *notification.Service, days int) error {
 	log.WithField("days", days).Info("processing expiring notifications")
 
@@ -134,19 +161,7 @@ func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePerio
 		return errors.Wrap(err, "failed to get pledges for notification")
 	}
 
-	userEmails := make(map[string]string)
-
-	for _, p := range pledges {
-		if p.User == nil {
-			continue
-		}
-		addr := notification.RecipientEmail(p.User.Email, p.User.NotificationEmail)
-		if !notification.Deliverable(addr) {
-			continue
-		}
-		userID := p.UserID.String()
-		userEmails[userID] = addr
-	}
+	userEmails := expiringRecipients(pledges)
 
 	for userID, email := range userEmails {
 		var userPledges []vault.Pledge
