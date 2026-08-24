@@ -114,40 +114,59 @@ func TestAPIPathsBypassLanguageRouting(t *testing.T) {
 	}
 }
 
-// The bare homepage must never Accept-Language-redirect: locale-adaptive
-// crawls that get 302 /{lang}/ never see /, the language cluster stops
-// consolidating, and localized homepages surface in the US SERP with
-// near-zero CTR (8.6K impressions → 15 clicks, week of 2026-08-10). / is the
-// x-default entry point and has to answer 200 for every first-time visitor.
-// A stored cookie preference still redirects — cookies are personal state
-// crawlers do not carry.
-func TestBareHomepageServesDefaultDespiteAcceptLanguage(t *testing.T) {
+// Accept-Language must never redirect, on any bare path: locale-adaptive
+// crawls that get 302 /{lang}/ never see the canonical English pages, the
+// hreflang cluster stops consolidating, and localized pages surface in
+// foreign SERPs with near-zero CTR (8.8K US impressions → 17 clicks/week,
+// home and tool pages alike). Bare URLs answer 200 for every first-time
+// visitor; the language offer is the banner's job. A stored cookie
+// preference still redirects everywhere — cookies are personal state
+// crawlers do not carry. And no cookie may be written for non-English
+// browsers: the banner must keep appearing until the visitor chooses.
+func TestAcceptLanguageNeverRedirects(t *testing.T) {
 	h := langEngine(t, nil)
 
+	for _, path := range []string{"/", "/some-page"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Host = "example.com"
+		req.Header.Set("Accept-Language", "es-ES,es;q=0.9")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK || w.Body.String() != path {
+			t.Errorf("%s with es Accept-Language: got %d → %q, want 200 serving %s",
+				path, w.Code, w.Header().Get("Location"), path)
+		}
+		for _, c := range w.Result().Cookies() {
+			if c.Name == langCookie {
+				t.Errorf("%s with es Accept-Language: lang cookie %q written, want none (kills the banner)", path, c.Value)
+			}
+		}
+	}
+
+	// English-preferring browsers get the default cookie so Accept-Language
+	// isn't re-parsed on every request.
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Host = "example.com"
-	req.Header.Set("Accept-Language", "es-ES,es;q=0.9")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9,ru;q=0.8")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
-	if w.Code != http.StatusOK || w.Body.String() != "/" {
-		t.Errorf("/ with es Accept-Language: got %d → %q, want 200 serving /",
-			w.Code, w.Header().Get("Location"))
+	got := ""
+	for _, c := range w.Result().Cookies() {
+		if c.Name == langCookie {
+			got = c.Value
+		}
+	}
+	if w.Code != http.StatusOK || got != DefaultLang {
+		t.Errorf("/ with en-first Accept-Language: got %d cookie %q, want 200 with cookie %q", w.Code, got, DefaultLang)
 	}
 
-	// Nested bare paths keep the first-visit detection redirect.
-	req = httptest.NewRequest(http.MethodGet, "/some-page", nil)
-	req.Host = "example.com"
-	req.Header.Set("Accept-Language", "es-ES,es;q=0.9")
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, req)
-	if w.Code != http.StatusFound || w.Header().Get("Location") != "/es/some-page" {
-		t.Errorf("/some-page with es Accept-Language: got %d → %q, want 302 → /es/some-page",
-			w.Code, w.Header().Get("Location"))
-	}
-
-	// An explicit cookie preference still wins on the homepage.
+	// An explicit cookie preference still wins, on the homepage and nested.
 	if w := langGet(h, "example.com", "/", "es"); w.Code != http.StatusFound ||
 		w.Header().Get("Location") != "/es/" {
 		t.Errorf("/ with es cookie: got %d → %q, want 302 → /es/", w.Code, w.Header().Get("Location"))
+	}
+	if w := langGet(h, "example.com", "/some-page", "es"); w.Code != http.StatusFound ||
+		w.Header().Get("Location") != "/es/some-page" {
+		t.Errorf("/some-page with es cookie: got %d → %q, want 302 → /es/some-page", w.Code, w.Header().Get("Location"))
 	}
 }

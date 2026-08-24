@@ -68,8 +68,8 @@ type Context struct {
 	Lang         string
 	Path         string
 	// SuggestLang is the language to offer the visitor a switch to via the
-	// homepage banner (bare / no longer auto-redirects by Accept-Language —
-	// see i18n.HTTPMiddleware). Non-empty only on the bare homepage for
+	// layout banner (Accept-Language no longer auto-redirects anywhere —
+	// see i18n.HTTPMiddleware). Non-empty only on bare English pages for
 	// cookieless visitors whose browser prefers a supported non-EN language.
 	SuggestLang string
 	// OpenInstance is true on a self-hosted instance running without an
@@ -123,7 +123,7 @@ func NewContext(c *gin.Context) *Context {
 	lang := i18n.GetLang(c)
 	path := c.Request.URL.Path
 	suggest := ""
-	if path == "/" && lang == i18n.DefaultLang {
+	if lang == i18n.DefaultLang {
 		suggest = i18n.SuggestLang(c)
 	}
 	us, _ := c.Get(userSettingsContextKey)

@@ -18,9 +18,10 @@ const (
 //     301-redirect (no-store) to the canonical URL for X (with ?lang stripped)
 //  2. /en/* → 301 redirect to /* (English is default, no prefix; cookie→en)
 //  3. /{lang}/* → strip prefix, set X-Lang header, set lang cookie
-//  4. No prefix + no cookie → detect Accept-Language → 302 redirect
-//     (bare / is exempt: it is the x-default crawl entry point and always
-//     answers 200 — see the homepage guard below)
+//  4. No prefix + no cookie → serve English and, for browsers preferring a
+//     supported non-English language, let the layout offer a switch via the
+//     language-suggest banner. Accept-Language NEVER redirects: bare URLs
+//     are the canonical English pages and the x-default crawl surface
 //  5. No prefix + cookie has non-default language → 302 redirect to
 //     /{cookie}/path so external entry points (OAuth callbacks, bookmarks,
 //     shared links) honour the user's language preference
@@ -177,36 +178,21 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 			// No language prefix.
 			cookie, err := r.Cookie(langCookie)
 			if err != nil {
-				// The bare homepage is exempt from first-visit detection: / is
-				// the x-default entry point, and locale-adaptive crawls that
-				// get 302 /{lang}/ never see it — the language cluster stops
-				// consolidating and localized homepages surface in foreign
-				// SERPs with near-zero CTR (measured: 8.6K US impressions →
-				// 15 clicks/week). No cookie is set either, so a later
-				// prefixed or nested-path visit still records the preference.
-				if path == "/" {
-					next.ServeHTTP(w, r)
-					return
-				}
-				// No cookie → first visit. Detect browser language.
-				if bl := detectBrowserLang(r); bl != "" && isSafe {
-					http.SetCookie(w, &http.Cookie{
-						Name:     langCookie,
-						Value:    bl,
-						Path:     "/",
-						MaxAge:   365 * 24 * 3600,
-						SameSite: http.SameSiteLaxMode,
-					})
-					target := "/" + bl + path
-					if r.URL.RawQuery != "" {
-						target += "?" + r.URL.RawQuery
-					}
-					http.Redirect(w, r, target, http.StatusFound)
-					return
-				}
-				// Browser prefers English (or non-safe method) → set cookie so
-				// we don't re-check on every request.
-				if isSafe {
+				// No cookie → first visit. Accept-Language never causes a
+				// redirect: bare URLs are the canonical English pages and the
+				// x-default crawl surface, and the old auto-302 by browser
+				// language hid them from locale-adaptive crawls — hreflang
+				// clusters stopped consolidating and localized pages surfaced
+				// in foreign SERPs with near-zero CTR (8.8K US impressions →
+				// 17 clicks/week across home and tool pages). It also made
+				// the language depend on the entry point once the homepage
+				// alone stopped redirecting. First-time non-English visitors
+				// get the language-suggest banner instead (web.Context →
+				// lang_suggest_banner.html); NO cookie is written for them,
+				// so the offer follows them across bare pages until they
+				// choose. Browsers preferring English get the cookie so
+				// Accept-Language isn't re-parsed on every request.
+				if isSafe && detectBrowserLang(r) == "" {
 					http.SetCookie(w, &http.Cookie{
 						Name:     langCookie,
 						Value:    DefaultLang,

@@ -15,8 +15,8 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5 0 4.5-4 4.5-9S14.5 3 12 3 7.5 7 7.5 12s2 9 4.5 9Zm-8.5-9h17" />
         </svg>
         <span class="flex-1 min-w-[12rem]">{{ t $.SuggestLang "langSuggest.text" }}</span>
-        <a href="/?lang={{ $.SuggestLang }}" rel="nofollow" class="btn btn-soft-cyan btn-sm shrink-0" data-umami-event="lang-suggest-switch" data-umami-event-lang="{{ $.SuggestLang }}">{{ t $.SuggestLang "langSuggest.switch" }}</a>
-        <a href="/?lang=en" rel="nofollow" class="btn btn-ghost btn-sm shrink-0" data-umami-event="lang-suggest-stay">{{ t $.SuggestLang "langSuggest.stay" }}</a>
+        <a href="{{ $.Path }}?lang={{ $.SuggestLang }}" rel="nofollow" class="btn btn-soft-cyan btn-sm shrink-0" data-umami-event="lang-suggest-switch" data-umami-event-lang="{{ $.SuggestLang }}">{{ t $.SuggestLang "langSuggest.switch" }}</a>
+        <a href="{{ $.Path }}?lang=en" rel="nofollow" class="btn btn-ghost btn-sm shrink-0" data-umami-event="lang-suggest-stay">{{ t $.SuggestLang "langSuggest.stay" }}</a>
     </div>
 </div>
 {{ end }}
