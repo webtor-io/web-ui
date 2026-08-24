@@ -19,6 +19,8 @@ const (
 //  2. /en/* → 301 redirect to /* (English is default, no prefix; cookie→en)
 //  3. /{lang}/* → strip prefix, set X-Lang header, set lang cookie
 //  4. No prefix + no cookie → detect Accept-Language → 302 redirect
+//     (bare / is exempt: it is the x-default crawl entry point and always
+//     answers 200 — see the homepage guard below)
 //  5. No prefix + cookie has non-default language → 302 redirect to
 //     /{cookie}/path so external entry points (OAuth callbacks, bookmarks,
 //     shared links) honour the user's language preference
@@ -175,6 +177,17 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 			// No language prefix.
 			cookie, err := r.Cookie(langCookie)
 			if err != nil {
+				// The bare homepage is exempt from first-visit detection: / is
+				// the x-default entry point, and locale-adaptive crawls that
+				// get 302 /{lang}/ never see it — the language cluster stops
+				// consolidating and localized homepages surface in foreign
+				// SERPs with near-zero CTR (measured: 8.6K US impressions →
+				// 15 clicks/week). No cookie is set either, so a later
+				// prefixed or nested-path visit still records the preference.
+				if path == "/" {
+					next.ServeHTTP(w, r)
+					return
+				}
 				// No cookie → first visit. Detect browser language.
 				if bl := detectBrowserLang(r); bl != "" && isSafe {
 					http.SetCookie(w, &http.Cookie{

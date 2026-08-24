@@ -288,6 +288,7 @@
         "about.faq.ads.q|about.faq.ads.a"
         "about.faq.zip.q|about.faq.zip.a"
         "about.faq.speed.q|about.faq.speed.a1"
+        "about.faq.streamVsDownload.q|about.faq.streamVsDownload.a"
         "tool.torrentToDdl.about.faq.q1.question|tool.torrentToDdl.about.faq.q1.answer"
         "tool.torrentToDdl.about.faq.q2.question|tool.torrentToDdl.about.faq.q2.answer"
         "tool.torrentToDdl.about.faq.q3.question|tool.torrentToDdl.about.faq.q3.answer"
@@ -314,6 +315,7 @@
         "about.faq.ads.q|about.faq.ads.a"
         "about.faq.zip.q|about.faq.zip.a"
         "about.faq.speed.q|about.faq.speed.a1"
+        "about.faq.streamVsDownload.q|about.faq.streamVsDownload.a"
     }}
     {{ end }}
     <div class="max-w-[1100px] mx-auto">
@@ -457,6 +459,12 @@
                     <p class="text-[0.92rem] text-w-sub leading-relaxed mb-2">{{ t $.Lang "about.faq.speed.a1" }}</p>
                     <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.speed.a2" }}</p>
                 </div>
+            </div>
+
+            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
+                <input type="checkbox">
+                <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.streamVsDownload.q" }}</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.streamVsDownload.a" }} <a class="link text-w-cyan" href="https://blog.webtor.io/{{ blogLang $.Lang }}/post/torrent-streaming-vs-downloading/" target="_blank" rel="noopener">{{ t $.Lang "about.faq.streamVsDownload.link" }}</a></p></div>
             </div>
 
             {{ if eq $instruction "torrent_to_ddl" }}

@@ -113,3 +113,41 @@ func TestAPIPathsBypassLanguageRouting(t *testing.T) {
 		}
 	}
 }
+
+// The bare homepage must never Accept-Language-redirect: locale-adaptive
+// crawls that get 302 /{lang}/ never see /, the language cluster stops
+// consolidating, and localized homepages surface in the US SERP with
+// near-zero CTR (8.6K impressions → 15 clicks, week of 2026-08-10). / is the
+// x-default entry point and has to answer 200 for every first-time visitor.
+// A stored cookie preference still redirects — cookies are personal state
+// crawlers do not carry.
+func TestBareHomepageServesDefaultDespiteAcceptLanguage(t *testing.T) {
+	h := langEngine(t, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "example.com"
+	req.Header.Set("Accept-Language", "es-ES,es;q=0.9")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || w.Body.String() != "/" {
+		t.Errorf("/ with es Accept-Language: got %d → %q, want 200 serving /",
+			w.Code, w.Header().Get("Location"))
+	}
+
+	// Nested bare paths keep the first-visit detection redirect.
+	req = httptest.NewRequest(http.MethodGet, "/some-page", nil)
+	req.Host = "example.com"
+	req.Header.Set("Accept-Language", "es-ES,es;q=0.9")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusFound || w.Header().Get("Location") != "/es/some-page" {
+		t.Errorf("/some-page with es Accept-Language: got %d → %q, want 302 → /es/some-page",
+			w.Code, w.Header().Get("Location"))
+	}
+
+	// An explicit cookie preference still wins on the homepage.
+	if w := langGet(h, "example.com", "/", "es"); w.Code != http.StatusFound ||
+		w.Header().Get("Location") != "/es/" {
+		t.Errorf("/ with es cookie: got %d → %q, want 302 → /es/", w.Code, w.Header().Get("Location"))
+	}
+}
