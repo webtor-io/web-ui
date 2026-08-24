@@ -25,6 +25,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/legal"
 	"github.com/webtor-io/web-ui/handlers/library"
 	wm "github.com/webtor-io/web-ui/handlers/migration"
+	"github.com/webtor-io/web-ui/handlers/notifications"
 	p "github.com/webtor-io/web-ui/handlers/profile"
 	"github.com/webtor-io/web-ui/handlers/release_subscription"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
@@ -470,6 +471,10 @@ func serve(c *cli.Context) error {
 	// lists them, the Discover app and the resource banner create them.
 	releaseSubSvc := rss.New(pg, en, ns, c.String(common.DomainFlag), c.String(common.SessionSecretFlag))
 	release_subscription.RegisterHandler(r, tm, pg, releaseSubSvc)
+
+	// Setting NotificationHandler (the in-app feed behind the navbar bell —
+	// ns is the same Service the unread-count middleware above reads from).
+	notifications.RegisterHandler(r, tm, ns)
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)

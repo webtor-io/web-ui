@@ -8,6 +8,8 @@
     "nav.vault": "Vault",
     "@nav.vault": "Top-nav button label linking to the user's Vault page. Vault is a brand/feature name — keep it untranslated everywhere.",
     "nav.profile": "Profile",
+    "nav.notifications": "Notifications",
+    "@nav.notifications": "aria-label on the top-nav bell icon that links to the notifications page. Not shown as visible text next to the icon.",
     "nav.login": "Login",
     "nav.donate": "Donate",
     "banner.openInstance": "This instance is open: anyone who knows the address has full access. Set an administrator password.",
@@ -1799,5 +1801,15 @@
     "subscription.unsubscribe.confirmTitle": "Stop these emails?",
     "subscription.unsubscribe.confirmText": "You will no longer get emails about new releases of {{.Title}}.",
     "subscription.unsubscribe.confirmTextPlain": "You will no longer get emails about new releases for this subscription.",
-    "subscription.unsubscribe.confirmButton": "Unsubscribe"
+    "subscription.unsubscribe.confirmButton": "Unsubscribe",
+    "notifications.badge": "Notifications",
+    "@notifications.badge": "Small badge above the Notifications page heading, same slot/shape as vault.dashboard.badge.",
+    "notifications.title": "Notifications",
+    "notifications.subtitle": "Updates about your saved content and account, kept here even when this instance cannot send email.",
+    "@notifications.subtitle": "Subtitle on the Notifications page. Calls out that this feed is what self-hosted instances without SMTP have instead of email.",
+    "notifications.markAllRead": "Mark all as read",
+    "notifications.unread": "Unread",
+    "@notifications.unread": "sr-only label attached to the unread dot next to a notification's title, for screen readers -- the dot itself carries no text.",
+    "notifications.emptyTitle": "No notifications yet",
+    "notifications.emptyHint": "You'll see updates about your saved content and account here."
 }

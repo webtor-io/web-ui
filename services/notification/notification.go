@@ -158,6 +158,20 @@ func (s *Service) CountUnread(ctx context.Context, userID uuid.UUID) (int, error
 	return s.store.CountUnread(ctx, userID)
 }
 
+// ListByUser returns a user's most recent notifications, newest first. Thin
+// pass-through to the store, same reasoning as CountUnread: it keeps the
+// notifications page (and anything else outside this package) off the
+// unexported notificationStore.
+func (s *Service) ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
+	return s.store.ListByUser(ctx, userID, limit)
+}
+
+// MarkAllRead marks every one of a user's notifications as read. Thin
+// pass-through, same reasoning as ListByUser.
+func (s *Service) MarkAllRead(ctx context.Context, userID uuid.UUID) error {
+	return s.store.MarkAllRead(ctx, userID)
+}
+
 // PruneKeepingNewest caps the notification feed by deleting everything
 // past the newest `keep` entries for every user. Called from the
 // "notification send" cron subcommand, after the sending work for that run
