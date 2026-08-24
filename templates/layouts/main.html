@@ -39,7 +39,7 @@
     </head>
     <body class="flex flex-col min-h-screen font-sans antialiased">
         {{ template "open_instance_banner" $ }}
-        {{ template "lang_suggest_banner" $ }}
+        <div id="lang-suggest">{{ template "lang_suggest_banner" $ }}</div>
         <script>
             // Anti-FOUC hide; layout.js unhides once it runs. The load/timeout
             // fallbacks guarantee the page never stays blank if layout.js
@@ -57,7 +57,7 @@
             <nav data-async-layout="{{`{{ template "nav" . }}`}}">{{ template "nav" . }}</nav>
         </header>
         <div id="wrapper" class="flex flex-col w-full items-center flex-1">
-            <main id="main" class="w-full" data-async-scroll-top data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}" data-async-update-footer="{{`{{ template "footer" . }}`}}" data-async-update-lang="{{`{{ $.Lang }}`}}">
+            <main id="main" class="w-full" data-async-scroll-top data-async-layout="{{`{{ template "main" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-description="{{`{{ block "description" . }}{{ end }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}" data-async-update-footer="{{`{{ template "footer" . }}`}}" data-async-update-lang="{{`{{ $.Lang }}`}}" data-async-update-langsuggest="{{`{{ template "lang_suggest_banner" . }}`}}">
             {{ template "main" . }}
             </main>
         </div>

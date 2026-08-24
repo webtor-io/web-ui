@@ -133,6 +133,13 @@ bindAsync({
             const footer = document.getElementById('footer');
             if (footer) loadAsyncView(footer, val);
         }
+        if (key === 'langsuggest') {
+            // Re-render the language-suggest banner so its path-preserving
+            // switch links follow async navigation (the banner lives outside
+            // #main and would otherwise keep the entry page's URL).
+            const ls = document.getElementById('lang-suggest');
+            if (ls) loadAsyncView(ls, val);
+        }
         if (key === 'lang') {
             if (val && document.documentElement.lang !== val) {
                 // Language changed via async nav. Sync <html lang> so the
