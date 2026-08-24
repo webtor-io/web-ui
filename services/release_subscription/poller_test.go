@@ -788,6 +788,42 @@ func TestFailedPollIsStillRescheduled(t *testing.T) {
 	}
 }
 
+// TestPollOneSkipsUndeliverableAddress guards the site that costs the most
+// if the guard ever regresses to Email == "": pollOne's early return here
+// doesn't just skip a letter, it skips the source search entirely and
+// reschedules the subscription a day out, forever. The self-hosted admin
+// account carries the literal "admin" sentinel (services/adminauth/pg_repo.go),
+// not an empty string, so the guard must recognise it as undeliverable
+// rather than merely absent — otherwise this subscription would run a real
+// search every poll for an account that can never be mailed.
+func TestPollOneSkipsUndeliverableAddress(t *testing.T) {
+	sub := seasonSub()
+	sub.User = &models.User{Email: "admin"}
+
+	store := &fakeStore{
+		due:      []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{episode(1, 7*24*time.Hour)},
+	}
+	search := &fakeSearch{byContentID: map[string][]stremio.StreamItem{
+		"tt1190634:3:1": {{InfoHash: "aa", Title: "The.Boys.S03E01"}},
+	}}
+	p := NewPoller(store, search, &fakeMailer{}, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	if len(search.asked) != 0 {
+		t.Errorf("source search: got %d queries, want 0 — an undeliverable address must never reach the search", len(search.asked))
+	}
+	if store.checkedState != sub.State {
+		t.Errorf("state: got %q, want unchanged %q", store.checkedState, sub.State)
+	}
+	if store.checkedNext.IsZero() || !store.checkedNext.After(time.Now().Add(23*time.Hour)) {
+		t.Errorf("next check: got %v, want ~24h out (the far-out reschedule for nothing to mail)", store.checkedNext)
+	}
+}
+
 // The row in hand was read before the letter went out, so its
 // LastNotifiedAt is stale by exactly the event that matters. Reading it
 // literally backs off a subscription on the run where it finally delivered.

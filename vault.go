@@ -283,7 +283,7 @@ func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.P
 		Info("removed pledge")
 
 	// Send notification to user if user data is available
-	if pledge.User == nil || pledge.User.Email == "" {
+	if pledge.User == nil || !notification.Deliverable(pledge.User.Email) {
 		return
 	}
 

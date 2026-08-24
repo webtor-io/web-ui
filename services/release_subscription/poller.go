@@ -177,7 +177,7 @@ func (p *Poller) Run(ctx context.Context) (int, error) {
 // as delivered only after a letter actually goes out, so a failed send
 // leaves them pending for the next run rather than losing them.
 func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if sub.User == nil || sub.User.Email == "" {
+	if sub.User == nil || !notification.Deliverable(sub.User.Email) {
 		// Nothing to mail. Push the row far out rather than leaving it due,
 		// or it comes back every run.
 		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt())

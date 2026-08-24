@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/notification"
 )
 
 type resourceVaultedMsg struct {
@@ -58,7 +59,7 @@ func (h *Handler) resourceVaulted(msg []byte) error {
 		if err != nil {
 			return err
 		}
-		if u.Email != "" {
+		if notification.Deliverable(u.Email) {
 			if err := h.ns.SendVaulted(u.Email, r); err != nil {
 				return err
 			}

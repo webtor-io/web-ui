@@ -322,7 +322,7 @@ func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled 
 // remote round-trip, and the user is waiting on a toast that says what
 // already happened in the database — the letter is not part of that answer.
 func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	if s.mail == nil || u.Email == "" {
+	if s.mail == nil || !notification.Deliverable(u.Email) {
 		return
 	}
 	view := s.view(ctx, sub)
@@ -337,7 +337,7 @@ func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseS
 }
 
 func (s *Service) mailOff(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	if s.mail == nil || u.Email == "" {
+	if s.mail == nil || !notification.Deliverable(u.Email) {
 		return
 	}
 	view := s.view(ctx, sub)
