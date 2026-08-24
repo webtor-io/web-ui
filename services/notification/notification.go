@@ -125,7 +125,7 @@ func (s *Service) Send(opts SendOptions) error {
 		Title:    opts.Title,
 		Template: opts.Template,
 		Body:     body,
-		To:       opts.To,
+		To:       &opts.To,
 	}
 	err = s.store.Create(ctx, n)
 	if err != nil {
