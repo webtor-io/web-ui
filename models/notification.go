@@ -10,15 +10,18 @@ import (
 )
 
 type Notification struct {
-	tableName      struct{}  `pg:"notification"`
-	NotificationID uuid.UUID `pg:"notification_id,pk,type:uuid,default:uuid_generate_v4()"`
-	Key            string    `pg:"key,notnull"`
-	Title          string    `pg:"title,notnull"`
-	Template       string    `pg:"template,notnull"`
-	Body           string    `pg:"body,notnull"`
-	To             string    `pg:"to,notnull"`
-	CreatedAt      time.Time `pg:"created_at,notnull,default:now()"`
-	UpdatedAt      time.Time `pg:"updated_at,notnull,default:now()"`
+	tableName      struct{}   `pg:"notification"`
+	NotificationID uuid.UUID  `pg:"notification_id,pk,type:uuid,default:uuid_generate_v4()"`
+	Key            string     `pg:"key,notnull"`
+	Title          string     `pg:"title,notnull"`
+	Template       string     `pg:"template,notnull"`
+	Body           string     `pg:"body,notnull"`
+	To             *string    `pg:"to"`
+	UserID         *uuid.UUID `pg:"user_id,type:uuid"`
+	ReadAt         *time.Time `pg:"read_at"`
+	MailedAt       *time.Time `pg:"mailed_at"`
+	CreatedAt      time.Time  `pg:"created_at,notnull,default:now()"`
+	UpdatedAt      time.Time  `pg:"updated_at,notnull,default:now()"`
 }
 
 // CreateNotification creates a new notification record
