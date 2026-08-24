@@ -155,8 +155,8 @@ func TestSend_Success(t *testing.T) {
 	if store.created.Title != "Test Title" {
 		t.Errorf("expected title 'Test Title', got %q", store.created.Title)
 	}
-	if store.created.To == nil || *store.created.To != "user@example.com" {
-		t.Errorf("expected to 'user@example.com', got %v", store.created.To)
+	if store.created.To != "user@example.com" {
+		t.Errorf("expected to 'user@example.com', got %q", store.created.To)
 	}
 	if store.created.Template != "test.html" {
 		t.Errorf("expected template 'test.html', got %q", store.created.Template)
@@ -424,8 +424,8 @@ func TestSendVaulted(t *testing.T) {
 	if store.created.Title != "Your resource My Torrent has been vaulted!" {
 		t.Errorf("unexpected title: %q", store.created.Title)
 	}
-	if store.created.To == nil || *store.created.To != "user@example.com" {
-		t.Errorf("expected to 'user@example.com', got %v", store.created.To)
+	if store.created.To != "user@example.com" {
+		t.Errorf("expected to 'user@example.com', got %q", store.created.To)
 	}
 
 	expectedBody := "<p>My Torrent at https://webtor.io/abc123 (https://webtor.io)</p>"

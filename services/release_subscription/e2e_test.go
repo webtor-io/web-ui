@@ -388,7 +388,7 @@ func (j *memJournal) GetLastByKeyAndTo(_ context.Context, key, to string) (*mode
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	for i := len(j.rows) - 1; i >= 0; i-- {
-		if j.rows[i].Key == key && j.rows[i].To != nil && *j.rows[i].To == to {
+		if j.rows[i].Key == key && j.rows[i].To == to {
 			return j.rows[i], nil
 		}
 	}
