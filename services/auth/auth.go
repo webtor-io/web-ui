@@ -338,7 +338,12 @@ func makeUserFromContext(c *gin.Context) *User {
 	u := &User{}
 	uc := c.Request.Context().Value(UserContext{})
 	su, ok := uc.(*models.User)
-	if ok {
+	// A type assertion on an interface holding a typed nil (*models.User)(nil)
+	// still succeeds -- ok is true even though su is nil -- so nilness must
+	// be checked explicitly here rather than folded into `if ok`, or any
+	// future path that puts a nil *models.User into the context turns into a
+	// dereference below.
+	if ok && su != nil {
 		u.ID = su.UserID
 		u.Email = su.Email
 		u.PatreonUserID = su.PatreonUserID
@@ -453,6 +458,18 @@ func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer)
 			patreonUserID = &tpUserInfo.ThirdParty.UserID
 		}
 		return models.GetOrCreateUser(ctx, db, tpUserInfo.Email, patreonUserID)
+	}
+	// Every branch above either returned or carried its own error. Getting
+	// here with err == nil means supertokens resolved the session but never
+	// yielded an email (unreachable today: Google always returns one, and
+	// the Patreon override in Init rejects a sign-in without one) -- return
+	// an explicit error instead of falling through with u still nil. A bare
+	// return here would hand myVerifySession a nil error alongside a nil
+	// *models.User, which it would then store in the request context as a
+	// typed nil that satisfies makeUserFromContext's type assertion and gets
+	// dereferenced.
+	if err == nil {
+		err = fmt.Errorf("createUser: no email resolved for supertokens user %s", userID)
 	}
 	return
 }
