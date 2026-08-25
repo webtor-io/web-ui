@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/webtor-io/web-ui/models"
@@ -28,6 +27,7 @@ type mockStore struct {
 	lastErr          error
 	createErr        error
 	created          *models.Notification
+	createCalls      int
 	markMailedErr    error
 	markMailedID     uuid.UUID
 	markMailedCalled bool
@@ -52,6 +52,7 @@ func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uui
 
 func (m *mockStore) Create(_ context.Context, n *models.Notification) error {
 	m.created = n
+	m.createCalls++
 	return m.createErr
 }
 
@@ -91,9 +92,8 @@ func (m *mockStore) PruneKeepingNewest(_ context.Context, keep int) error {
 }
 
 type mockMailer struct {
-	sendErr    error
-	calls      []mailCall
-	configured bool
+	sendErr error
+	calls   []mailCall
 }
 
 type mailCall struct {
@@ -105,10 +105,6 @@ type mailCall struct {
 func (m *mockMailer) Send(to, subject, body string) error {
 	m.calls = append(m.calls, mailCall{to: to, subject: subject, body: body})
 	return m.sendErr
-}
-
-func (m *mockMailer) Configured() bool {
-	return m.configured
 }
 
 // --- Test helpers ---
@@ -482,16 +478,6 @@ func TestSend_RetryAfterMailFailure(t *testing.T) {
 	}
 }
 
-// --- Tests for smtpMailer ---
-
-func TestSmtpMailer_EmptyHost(t *testing.T) {
-	m := &smtpMailer{host: ""}
-	err := m.Send("user@example.com", "Test", "body")
-	if !errors.Is(err, ErrNotConfigured) {
-		t.Fatalf("expected ErrNotConfigured when SMTP host is empty, got %v", err)
-	}
-}
-
 // --- Tests for SendVaulted ---
 
 func TestSendVaulted(t *testing.T) {
@@ -663,19 +649,22 @@ func TestSendExpired(t *testing.T) {
 
 // --- Tests for the two properties that make the journal trustworthy ---
 
-// TestSendRecordsEntryWithoutMailWhenSMTPMissing pins the self-hosted case:
-// no SMTP server configured, so Send must still record the feed entry, and
-// must not claim a delivery that never happened.
+// TestSendRecordsEntryWithoutMailWhenSMTPMissing pins the instance with no
+// mail transport at all: Send must still record the feed entry, and must not
+// claim a delivery that never happened.
 func TestSendRecordsEntryWithoutMailWhenSMTPMissing(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
 	store := &mockStore{}
-	// The real smtpMailer, unconfigured -- exercises the actual path that
-	// makes an SMTP-less self-hosted instance return ErrNotConfigured,
-	// not a stand-in that merely asserts the constant's name.
-	mail := &smtpMailer{host: ""}
-	svc := newTestService(store, mail, tmplDir)
+	// No mailer: this is exactly what New produces when SMTP_HOST is empty.
+	// There is no unconfigured-mailer stand-in to substitute any more --
+	// absence is the state under test.
+	svc := newTestService(store, nil, tmplDir)
+
+	if svc.MailConfigured() {
+		t.Error("a Service with no mailer must not report mail as available")
+	}
 
 	err := svc.Send(SendOptions{
 		To:       "user@example.com",
@@ -687,14 +676,85 @@ func TestSendRecordsEntryWithoutMailWhenSMTPMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if store.created == nil {
-		t.Fatal("expected exactly one row to be created")
+	if store.createCalls != 1 {
+		t.Fatalf("expected exactly one row to be created, got %d", store.createCalls)
 	}
 	if store.created.MailedAt != nil {
 		t.Errorf("expected MailedAt to be nil, got %v", store.created.MailedAt)
 	}
 	if store.markMailedCalled {
-		t.Error("mailed_at must not be stamped when SMTP is not configured")
+		t.Error("mailed_at must not be stamped when there is no mail transport")
+	}
+}
+
+// TestTypedNilMailerIsNoMailer is the guard against the interface trap: a
+// typed nil pointer stored in an interface compares != nil, so a Service
+// assembled with one would report mail as available and then panic on the
+// first Send. This has already cost this codebase two bugs elsewhere (a
+// typed-nil *models.User in the auth request context, a nil-receiver panic
+// in claims.Client.Close) -- it must not become a third here.
+func TestTypedNilMailerIsNoMailer(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+
+	// Sanity: the trap is real. If this ever stops holding, the guards below
+	// are testing nothing.
+	var typedNil mailer = (*smtpMailer)(nil)
+	if typedNil == nil {
+		t.Fatal("a typed nil in an interface compared equal to nil; this test's premise is gone")
+	}
+
+	// Both construction paths. They share one guard today (Service.hasMail),
+	// and that is the point of testing both: a later refactor that moves the
+	// check into NewWith would leave the in-package path unguarded, and this
+	// second case is what would go red.
+	for _, tc := range []struct {
+		name  string
+		build func(store notificationStore) *Service
+	}{
+		{
+			name: "NewWith",
+			build: func(store notificationStore) *Service {
+				return NewWith(store, (*smtpMailer)(nil), nil, "https://webtor.io", tmplDir)
+			},
+		},
+		{
+			name: "assembled in package",
+			build: func(store notificationStore) *Service {
+				return newTestService(store, (*smtpMailer)(nil), tmplDir)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := &mockStore{}
+			svc := tc.build(store)
+
+			if svc.MailConfigured() {
+				t.Error("a typed-nil mailer must not answer that mail is available")
+			}
+
+			// Would panic dereferencing the nil *smtpMailer if Send called through.
+			err := svc.Send(SendOptions{
+				To:       "user@example.com",
+				UserID:   testUserID,
+				Key:      "test-key",
+				Title:    "Test",
+				Template: "test.html",
+			})
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if store.createCalls != 1 {
+				t.Fatalf("expected exactly one row to be created, got %d", store.createCalls)
+			}
+			if store.created.MailedAt != nil {
+				t.Errorf("expected MailedAt to be nil, got %v", store.created.MailedAt)
+			}
+			if store.markMailedCalled {
+				t.Error("mailed_at must not be stamped when there is no mail transport")
+			}
+		})
 	}
 }
 

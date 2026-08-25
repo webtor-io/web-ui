@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -30,22 +31,36 @@ type Service struct {
 	transferTimeoutPeriod time.Duration
 }
 
-// New builds the mailer. The i18n service is what lets a template say
+// New builds the Service from CLI flags. The i18n service is what lets a template say
 // {{ t "email.something" }} instead of carrying English text: notifications
 // are rendered in a cron job, where the URL prefix and the lang cookie that
 // pick a language everywhere else do not exist. It may be nil, in which case
 // templates fall back to their message keys — callers that have a bundle
 // should always pass it.
 // Store is the notification journal — what makes the 24-hour duplicate
-// check possible. Mailer is the transport. Both are exported so a caller
-// can assemble a Service from parts it already has (see NewWith), which is
-// how the subscription end-to-end test drives real templates and real
-// translations without SMTP or a database.
+// check possible. Mailer is the transport, and is optional: an instance with
+// no SMTP server simply has none. Both are exported so a caller can assemble
+// a Service from parts it already has (see NewWith), which is how the
+// subscription end-to-end test drives real templates and real translations
+// without SMTP or a database.
 type Store = notificationStore
 
 type Mailer = mailer
 
 // NewWith assembles a Service from explicit parts.
+//
+// Contract for mail: pass a working transport, or nil when this instance has
+// none -- absence of a mailer is how "this instance cannot send mail" is
+// spelled, and it is what MailConfigured answers.
+//
+// Say "no mail" with a plain nil. A typed nil pointer ((*smtpMailer)(nil), or
+// a nil fake) is not the same thing: an interface holding one compares
+// non-nil, so a naive check would read it as "mail is available" and then
+// panic on the first call -- the same mistake that has already cost this
+// codebase two bugs (a typed-nil *models.User in the auth request context, a
+// nil-receiver panic in claims.Client.Close). The Service does not trust the
+// bare comparison (see hasMail), so a typed nil is survivable rather than
+// fatal, but it is still not the way to say it.
 func NewWith(store Store, mail Mailer, i18nSvc *i18n.Service, domain, templateDir string) *Service {
 	return &Service{
 		store:       store,
@@ -57,20 +72,48 @@ func NewWith(store Store, mail Mailer, i18nSvc *i18n.Service, domain, templateDi
 }
 
 func New(c *cli.Context, db *pg.DB, i18nSvc *i18n.Service) *Service {
-	return &Service{
-		i18n:  i18nSvc,
-		store: &pgNotificationStore{db: db},
-		mail: &smtpMailer{
-			host:   c.String(common.SMTPHostFlag),
+	s := &Service{
+		i18n:                  i18nSvc,
+		store:                 &pgNotificationStore{db: db},
+		domain:                c.String(common.DomainFlag),
+		templateDir:           "templates/notification",
+		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+	}
+	// The mailer is built only where there is an SMTP server to build it
+	// around. With no host there is no transport, and the Service says that
+	// by not having one -- rather than by carrying a mailer that answers
+	// every call with a refusal.
+	if host := c.String(common.SMTPHostFlag); host != "" {
+		s.mail = &smtpMailer{
+			host:   host,
 			port:   c.Int(common.SMTPPortFlag),
 			user:   c.String(common.SMTPUserFlag),
 			pass:   c.String(common.SMTPPassFlag),
 			from:   c.String(common.SMTPFromFlag),
 			secure: c.Bool(common.SMTPSecureFlag),
-		},
-		domain:                c.String(common.DomainFlag),
-		templateDir:           "templates/notification",
-		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+		}
+	}
+	return s
+}
+
+// hasMail reports whether this Service can put a letter on the wire. It is
+// the single presence check -- Send and MailConfigured both go through it, so
+// there is one place to get right rather than two comparisons to keep in step.
+//
+// It is deliberately not a bare `s.mail != nil`: an interface holding a typed
+// nil pointer compares non-nil and would pass that check, then panic when
+// called. Normalising in NewWith instead was considered and dropped: it would
+// leave this predicate looking safe while only one of the two construction
+// paths was, and neither guard could then be shown to matter on its own.
+func (s *Service) hasMail() bool {
+	if s.mail == nil {
+		return false
+	}
+	switch v := reflect.ValueOf(s.mail); v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer:
+		return !v.IsNil()
+	default:
+		return true
 	}
 }
 
@@ -138,26 +181,31 @@ func (s *Service) Send(opts SendOptions) error {
 		return nil
 	}
 
+	// No transport, nothing to attempt. On an instance that was never given
+	// an SMTP server the feed entry written above IS the delivery, so this is
+	// a success, not a failure to report. mailed_at stays NULL, which is what
+	// keeps the letter owed once a server appears.
+	if !s.hasMail() {
+		return nil
+	}
+
 	if err := s.mail.Send(*n.To, opts.Title, body); err != nil {
-		if errors.Is(err, ErrNotConfigured) {
-			// Expected on an instance with no mail server. The feed entry
-			// above is the delivery; say so once at debug volume rather than
-			// reporting a failure that is not one.
-			return nil
-		}
 		return errors.Wrap(err, "failed to send email")
 	}
 	return s.store.MarkMailed(ctx, n.NotificationID)
 }
 
-// MailConfigured reports whether this Service can actually send mail. It is
-// the capability check a caller outside this package needs before offering
-// a feature that only makes sense with a working SMTP server -- e.g. an
-// address that can only be confirmed by emailing it a verification link.
-// Without this there is nothing such a feature could do, so gating on it is
-// what makes "verify before use" possible at all.
+// MailConfigured reports whether this Service can actually send mail. The
+// answer is not a flag anyone read: the Service either was given a mail
+// transport or was not, and having one is the whole of the capability.
+//
+// It is the check a caller outside this package needs before offering a
+// feature that only makes sense with a working SMTP server -- e.g. an address
+// that can only be confirmed by emailing it a verification link. Without a
+// transport there is nothing such a feature could do, so gating on it is what
+// makes "verify before use" possible at all.
 func (s *Service) MailConfigured() bool {
-	return s.mail != nil && s.mail.Configured()
+	return s.hasMail()
 }
 
 // CountUnread returns how many of a user's notifications have not been

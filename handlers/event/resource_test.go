@@ -112,8 +112,6 @@ func (m *recordingMailer) Send(to, _, _ string) error {
 	return nil
 }
 
-func (m *recordingMailer) Configured() bool { return true }
-
 func newTestNotificationService(j *memJournal, m *recordingMailer) *notification.Service {
 	return notification.NewWith(j, m, nil, "https://webtor.io", "../../templates/notification")
 }

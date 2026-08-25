@@ -6,22 +6,16 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// mailer is the transport a Service mails through. It has one method on
+// purpose: a mailer that exists can send, and one that does not exist is
+// how "this instance has no SMTP server" is spelled. There used to be a
+// Configured() bool here, which meant a mailer could sit in the Service
+// answering every call with "I cannot do this" -- the capability is now
+// carried by the value's presence instead, so there is no second source of
+// truth to keep in step.
 type mailer interface {
 	Send(to, subject, body string) error
-	// Configured reports whether this mailer can actually reach an SMTP
-	// server. It is the capability a caller outside this package needs
-	// before offering anything that depends on mail actually going out
-	// (e.g. an address that can only be confirmed by emailing it a link) --
-	// asking the mailer directly keeps that answer tied to the one place
-	// that knows how SMTP was set up, instead of a caller re-reading flags.
-	Configured() bool
 }
-
-// ErrNotConfigured means no SMTP server is configured, so nothing was even
-// attempted. It is not a delivery failure and callers must not treat it as
-// one -- in particular, a notification recorded as mailed on the strength of
-// this would suppress the real send once SMTP arrives.
-var ErrNotConfigured = errors.New("smtp is not configured")
 
 type smtpMailer struct {
 	host   string
@@ -32,10 +26,6 @@ type smtpMailer struct {
 	secure bool
 }
 
-func (m *smtpMailer) Configured() bool {
-	return m.host != ""
-}
-
 func (m *smtpMailer) fromAddr() string {
 	if m.from != "" {
 		return m.from
@@ -43,12 +33,10 @@ func (m *smtpMailer) fromAddr() string {
 	return m.user
 }
 
+// Send dials the configured SMTP server. There is no empty-host guard here
+// because there is no way to get an smtpMailer without a host: New only
+// builds one when the flag is set (see notification.go).
 func (m *smtpMailer) Send(to, subject, body string) error {
-	if m.host == "" {
-		log.Warn("SMTP host not configured, skipping email sending")
-		return ErrNotConfigured
-	}
-
 	msg := gomail.NewMessage()
 	msg.SetAddressHeader("From", m.fromAddr(), "Webtor")
 	msg.SetHeader("To", to)

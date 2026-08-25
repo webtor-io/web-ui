@@ -117,8 +117,6 @@ func (m *recordingMailer) Send(to, _, _ string) error {
 	return nil
 }
 
-func (m *recordingMailer) Configured() bool { return true }
-
 // --- tests for expiringRecipients ---
 
 func expiringPledge(userID uuid.UUID, user *models.User) vaultModels.Pledge {
