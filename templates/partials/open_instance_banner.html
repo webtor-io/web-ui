@@ -1,6 +1,15 @@
 {{ define "open_instance_banner" }}
 {{ if $.OpenInstance }}
-<div id="open-instance-banner" class="bg-error/15 border-b border-error/40 px-4 py-3">
+{{/* relative z-10 mt-[72px] -mb-[72px]: the same seating the language strip
+     needs, and for the same reason. The navbar is fixed top-0 h-[72px], so an
+     in-flow block at y=0 renders UNDERNEATH it -- this banner was invisible
+     from the day it was added while still taking 57px of flow, which read as
+     an unexplained gap above every page. mt seats it flush under the header;
+     -mb cancels the navbar's share of the >=96px top padding every view
+     already carries, so content shifts by the banner's own height and not by
+     that height plus the navbar again. Two of these stack correctly: each
+     pulls back exactly what it pushed. */}}
+<div id="open-instance-banner" class="relative z-10 mt-[72px] -mb-[72px] bg-error/15 border-b border-error/40 px-4 py-3">
     <div class="max-w-5xl mx-auto flex items-center gap-3 text-sm">
         <svg class="size-5 shrink-0 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />

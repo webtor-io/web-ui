@@ -50,6 +50,18 @@ async function asyncFetch(url, targetSelector, fetchParams, params, options) {
         }
     }
     const res = await fetchFunc(url, fetchParams);
+    // 401 means the session is gone, or never existed. HasAuth answers async
+    // requests with a status rather than a redirect on purpose: following a
+    // redirect inside fetch would splice the login page into whatever element
+    // this navigation targeted. Nothing here can render that, and swapping in
+    // the empty 401 body blanks the page instead -- which is what clicking the
+    // logo on the login form used to do. Hand the URL back to the browser so
+    // the server can answer a real navigation with its normal redirect to
+    // /login, return-url and all.
+    if (res.status === 401) {
+        window.location.assign(url);
+        return res;
+    }
     const text = await res.text();
     const fragments = parseFragments(text);
     loadAsyncView(target, fragments.main ?? text, options);
