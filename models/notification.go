@@ -56,6 +56,39 @@ func GetLastMailedNotificationByKeyAndUser(ctx context.Context, db pg.DBI, key s
 	return n, nil
 }
 
+// GetLastNotificationByKeyAndUser returns the newest notification for this
+// key and user whatever became of its letter -- mailed, failed, or never
+// attempted at all. The absent mailed_at filter is the whole difference
+// from GetLastMailedNotificationByKeyAndUser above, and it is deliberate:
+// this query backs the feed guard, and the feed entry IS the notification,
+// so a row existing at all already answers "has this user been told about
+// this key". A redelivered event must find that row and reuse it rather
+// than add a second copy of the same message to the feed.
+//
+// The two queries are kept apart rather than merged because they answer
+// different questions and one row cannot answer both -- see Service.Send
+// for the arrangement where the newest row is unmailed while an older row
+// inside the same window was mailed.
+//
+// Covered by notification_key_user_created_idx (key, user_id, created_at
+// DESC), the same index the mailed variant uses.
+func GetLastNotificationByKeyAndUser(ctx context.Context, db pg.DBI, key string, userID uuid.UUID) (*Notification, error) {
+	n := &Notification{}
+	err := db.Model(n).
+		Context(ctx).
+		Where("key = ? AND user_id = ?", key, userID).
+		Order("created_at DESC").
+		Limit(1).
+		Select()
+	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "failed to get last notification")
+	}
+	return n, nil
+}
+
 // MarkNotificationMailed stamps mailed_at on a notification row once an SMTP
 // server has actually accepted the message. It is the only place that
 // column is set, which is what lets the dedupe query above tell a real send

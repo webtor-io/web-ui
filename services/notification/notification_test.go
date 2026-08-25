@@ -23,8 +23,16 @@ var testUserID = uuid.NewV4()
 // --- Mock implementations ---
 
 type mockStore struct {
-	lastNotification *models.Notification
-	lastErr          error
+	// lastMailed answers GetLastMailedByKeyAndUser, last answers
+	// GetLastByKeyAndUser. Two fields rather than one filtered row because
+	// mockStore returns exactly what a test sets, contract or no contract --
+	// TestSendSurvivesStoreReturningUnmailedRow depends on being able to
+	// hand back a row the real SQL could never produce.
+	lastMailed *models.Notification
+	last       *models.Notification
+	lastErr    error
+	lastAnyErr error
+
 	createErr        error
 	created          *models.Notification
 	createCalls      int
@@ -47,7 +55,11 @@ type mockStore struct {
 }
 
 func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
-	return m.lastNotification, m.lastErr
+	return m.lastMailed, m.lastErr
+}
+
+func (m *mockStore) GetLastByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
+	return m.last, m.lastAnyErr
 }
 
 func (m *mockStore) Create(_ context.Context, n *models.Notification) error {
@@ -268,12 +280,19 @@ func TestSend_DuplicateWithin24Hours(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
+	// One row, seen by both guards: a row that was mailed an hour ago is
+	// also a row that was created inside the window, so a store cannot
+	// report it to one guard and hide it from the other.
 	mailedAt := time.Now().Add(-1 * time.Hour)
-	store := &mockStore{
-		lastNotification: &models.Notification{
-			MailedAt: &mailedAt,
-		},
+	existing := &models.Notification{
+		NotificationID: uuid.NewV4(),
+		Key:            "test-key",
+		UserID:         &testUserID,
+		Body:           "body",
+		CreatedAt:      mailedAt,
+		MailedAt:       &mailedAt,
 	}
+	store := &mockStore{lastMailed: existing, last: existing}
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
@@ -287,10 +306,10 @@ func TestSend_DuplicateWithin24Hours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	// The feed entry is written regardless of the dedupe outcome -- it IS
-	// the notification. Only the letter is suppressed.
-	if store.created == nil {
-		t.Error("expected a feed entry to be created even for a recent duplicate")
+	// No second feed entry: the existing one IS this notification, and a
+	// repeat inside the window is the same notification arriving again.
+	if store.createCalls != 0 {
+		t.Errorf("feed rows created: got %d, want 0 -- the entry inside the window is this notification", store.createCalls)
 	}
 	if len(mail.calls) != 0 {
 		t.Error("expected no email to be sent for a duplicate mailed within 24h")
@@ -305,11 +324,15 @@ func TestSend_DuplicateOlderThan24Hours(t *testing.T) {
 		"test.html": "body",
 	})
 	mailedAt := time.Now().Add(-25 * time.Hour)
-	store := &mockStore{
-		lastNotification: &models.Notification{
-			MailedAt: &mailedAt,
-		},
+	existing := &models.Notification{
+		NotificationID: uuid.NewV4(),
+		Key:            "test-key",
+		UserID:         &testUserID,
+		Body:           "body",
+		CreatedAt:      mailedAt,
+		MailedAt:       &mailedAt,
 	}
+	store := &mockStore{lastMailed: existing, last: existing}
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
@@ -338,7 +361,7 @@ func TestSend_NoPreviousNotification(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
-	store := &mockStore{lastNotification: nil}
+	store := &mockStore{}
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
@@ -795,7 +818,31 @@ func (j *journalStore) GetLastMailedByKeyAndUser(_ context.Context, key string, 
 	return nil, nil
 }
 
+// GetLastByKeyAndUser is the feed guard's read: newest row for this key and
+// user, mailed or not. The missing MailedAt condition is the whole
+// difference from the method above.
+func (j *journalStore) GetLastByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
+	for i := len(j.rows) - 1; i >= 0; i-- {
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+// Create fills in what the real table's column defaults fill in. Both
+// matter: without notification_id MarkMailed cannot find the row it is
+// meant to stamp, and without created_at every row looks infinitely old to
+// the feed guard, which would let a second entry through in exactly the
+// tests written to catch one.
 func (j *journalStore) Create(_ context.Context, n *models.Notification) error {
+	if n.NotificationID == (uuid.UUID{}) {
+		n.NotificationID = uuid.NewV4()
+	}
+	if n.CreatedAt.IsZero() {
+		n.CreatedAt = time.Now()
+	}
 	j.rows = append(j.rows, n)
 	return nil
 }
@@ -848,24 +895,115 @@ func (j *journalStore) PruneKeepingNewest(_ context.Context, _ int) error {
 	return nil
 }
 
-// TestSendDoesNotSuppressRetryAfterFailedSend pins the other half: a row
-// that exists for this key and user but was never mailed must not count as
-// a duplicate.
-func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
+// TestSendCreatesOneFeedEntryPerKeyAndUserInsideTheWindow is property one:
+// the same (key, user) sent twice inside the window leaves exactly one feed
+// row.
+//
+// This is the JetStream redelivery case reduced to its essentials.
+// handlers/event.resourceVaulted notifies users in a loop and returns on the
+// first failing lookup, after the earlier users have already been notified;
+// handler.subscribe Naks the message, JetStream redelivers it, and every one
+// of those earlier users used to collect another identical entry -- once per
+// redelivery, forever. The dedupe used to be the journal row itself, and was
+// lost when the row started being written unconditionally.
+func TestSendCreatesOneFeedEntryPerKeyAndUserInsideTheWindow(t *testing.T) {
 	tmplDir := setupTemplateDir(t, map[string]string{
 		"test.html": "body",
 	})
+	store := &journalStore{}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	opts := SendOptions{
+		To:       "user@example.com",
+		UserID:   testUserID,
+		Key:      "vaulted-abc123",
+		Title:    "Test",
+		Template: "test.html",
+	}
+	if err := svc.Send(opts); err != nil {
+		t.Fatalf("first send: %v", err)
+	}
+	if err := svc.Send(opts); err != nil {
+		t.Fatalf("redelivery: %v", err)
+	}
+
+	if len(store.rows) != 1 {
+		t.Errorf("feed rows: got %d, want 1 -- a redelivered event must not add a second entry", len(store.rows))
+	}
+	// The letter is deduped too, by mailed_at, which is the guard that
+	// already worked. Asserted here so a fix that suppressed the row by
+	// suppressing the whole send would still have to explain itself.
+	if len(mail.calls) != 1 {
+		t.Errorf("letters: got %d, want 1", len(mail.calls))
+	}
+}
+
+// TestSendCreatesASecondFeedEntryOutsideTheWindow is the negative control on
+// the guard above: repeats are bounded by a window, not blocked forever.
+//
+// It is the difference between this design and the unique index on
+// (key, user_id) an earlier draft proposed. expiring-7 is a digest key: the
+// same user legitimately earns it again next month, and an index would have
+// allowed one seven-day warning per account ever.
+func TestSendCreatesASecondFeedEntryOutsideTheWindow(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	stale := time.Now().Add(-dedupeWindow - time.Hour)
 	store := &journalStore{
 		rows: []*models.Notification{
 			{
 				NotificationID: uuid.NewV4(),
-				Key:            "test-key",
+				Key:            "expiring-7",
 				UserID:         &testUserID,
-				// MailedAt is nil: an earlier attempt for this key never
-				// actually left -- no SMTP configured, or a failed dial.
+				Body:           "body",
+				CreatedAt:      stale,
+				MailedAt:       &stale,
 			},
 		},
 	}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	err := svc.Send(SendOptions{
+		To:       "user@example.com",
+		UserID:   testUserID,
+		Key:      "expiring-7",
+		Title:    "Test",
+		Template: "test.html",
+	})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if len(store.rows) != 2 {
+		t.Errorf("feed rows: got %d, want 2 -- a repeat past the window is a new notification, not a duplicate", len(store.rows))
+	}
+	if len(mail.calls) != 1 {
+		t.Errorf("letters: got %d, want 1", len(mail.calls))
+	}
+}
+
+// TestSendDoesNotSuppressRetryAfterFailedSend is property two, and the
+// interaction that makes the fix above more than a one-liner: a row inside
+// the window whose letter never left suppresses the duplicate entry and
+// still owes the letter. The retry has to mail that existing row and stamp
+// its mailed_at -- deduping the feed by refusing to work on the row it
+// found would fix duplicates by breaking retries.
+func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	existing := &models.Notification{
+		NotificationID: uuid.NewV4(),
+		Key:            "test-key",
+		UserID:         &testUserID,
+		Body:           "body",
+		CreatedAt:      time.Now().Add(-time.Hour),
+		// MailedAt is nil: an earlier attempt for this key never
+		// actually left -- no SMTP configured, or a failed dial.
+	}
+	store := &journalStore{rows: []*models.Notification{existing}}
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
@@ -881,6 +1019,15 @@ func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
 	}
 	if len(mail.calls) != 1 {
 		t.Errorf("expected the mail to be attempted despite the unmailed row for the same key, got %d calls", len(mail.calls))
+	}
+	// Both halves, together: the letter went out AND no second entry was
+	// added. Either assertion alone is satisfiable by a broken fix -- the
+	// mail one by dropping the feed guard, the row one by returning early.
+	if len(store.rows) != 1 {
+		t.Errorf("feed rows: got %d, want 1 -- the retry mails the existing entry, it does not add one", len(store.rows))
+	}
+	if existing.MailedAt == nil {
+		t.Error("mailed_at was not stamped on the existing row -- the letter it owed is still owed, so the next send will mail again")
 	}
 }
 
@@ -899,7 +1046,7 @@ func TestSendSurvivesStoreReturningUnmailedRow(t *testing.T) {
 	// mockStore returns exactly what is set here, unlike journalStore --
 	// this is deliberately a store that violates its own contract.
 	store := &mockStore{
-		lastNotification: &models.Notification{
+		lastMailed: &models.Notification{
 			Key:      "test-key",
 			UserID:   &testUserID,
 			MailedAt: nil,

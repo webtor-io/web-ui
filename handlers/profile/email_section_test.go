@@ -45,6 +45,9 @@ type nullJournal struct{}
 func (nullJournal) GetLastMailedByKeyAndUser(context.Context, string, uuid.UUID) (*models.Notification, error) {
 	return nil, nil
 }
+func (nullJournal) GetLastByKeyAndUser(context.Context, string, uuid.UUID) (*models.Notification, error) {
+	return nil, nil
+}
 func (nullJournal) Create(context.Context, *models.Notification) error  { return nil }
 func (nullJournal) MarkMailed(context.Context, uuid.UUID) error         { return nil }
 func (nullJournal) CountUnread(context.Context, uuid.UUID) (int, error) { return 0, nil }

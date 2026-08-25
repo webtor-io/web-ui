@@ -139,26 +139,63 @@ type SendOptions struct {
 	Lang string
 }
 
+// dedupeWindow is how long one (key, user) pair counts as already handled --
+// for the feed entry and for the letter alike. One constant rather than two
+// literals, because the two guards below are only coherent while they use
+// the same number: a feed window shorter than the mail window would create
+// second rows that can never be mailed.
+//
+// The window, not a unique index, is what bounds repeats. Keys are of two
+// shapes: vaulted-<id>, expired-<id> and transfer-timeout-<id> name one
+// resource and are never legitimately repeated, but expiring-7/-3/-1 are
+// digests that recur -- the same user genuinely earns expiring-7 again next
+// month. A unique index on (key, user_id) would permit one seven-day
+// warning per user ever.
+const dedupeWindow = 24 * time.Hour
+
 func (s *Service) Send(opts SendOptions) error {
 	ctx := context.Background()
 
-	// Dedupe on what was actually mailed. A row with mailed_at NULL is a
-	// feed entry whose letter never left -- either there is no SMTP server
-	// or the send failed -- and must not suppress a later attempt.
-	last, err := s.store.GetLastMailedByKeyAndUser(ctx, opts.Key, opts.UserID)
+	// Two guards, two questions, two queries -- deliberately not one.
+	//
+	// The mail guard asks "has a letter for this key and user actually gone
+	// out inside the window", and must ignore rows with mailed_at NULL: such
+	// a row is a feed entry whose letter never left -- no SMTP server, or a
+	// failed send -- and the letter is still owed.
+	//
+	// The feed guard asks "does an entry for this key and user already exist
+	// inside the window", and must count those very same rows: the entry IS
+	// the notification, so an event redelivered by JetStream has to find the
+	// existing row and reuse it rather than publish the same message to the
+	// feed twice. Before this guard existed the row was created
+	// unconditionally, and every redelivery added a duplicate.
+	//
+	// Deriving both answers from a single row would get one of them wrong:
+	// the newest row can be unmailed while an older row inside the window
+	// was mailed (a row whose retry succeeded late, followed by a fresh row
+	// once its created_at aged past the window), and reading mailed_at off
+	// the newest row would then put two letters on the wire inside one
+	// window.
+	lastMailed, err := s.store.GetLastMailedByKeyAndUser(ctx, opts.Key, opts.UserID)
 	if err != nil {
 		return errors.Wrap(err, "failed to check for duplicate notification")
 	}
-	// last.MailedAt != nil looks redundant -- the query above is documented
-	// to only return rows with mailed_at IS NOT NULL -- but that predicate
-	// lives in a different file behind the notificationStore interface,
-	// where nothing in this package enforces it. Send runs inside a bare
-	// `go f()` in release_subscription (no recover()), so a store
+	// lastMailed.MailedAt != nil looks redundant -- the query above is
+	// documented to only return rows with mailed_at IS NOT NULL -- but that
+	// predicate lives in a different file behind the notificationStore
+	// interface, where nothing in this package enforces it. Send runs inside
+	// a bare `go f()` in release_subscription (no recover()), so a store
 	// implementation, a cache layer, or a hand-run fix that ever hands back
 	// a row with MailedAt nil turns a bad dedupe hit into a nil-pointer
 	// panic that takes the whole process down, not one failed send. Do not
 	// delete this check.
-	mailedRecently := last != nil && last.MailedAt != nil && time.Since(*last.MailedAt) < 24*time.Hour
+	mailedRecently := lastMailed != nil && lastMailed.MailedAt != nil && time.Since(*lastMailed.MailedAt) < dedupeWindow
+
+	last, err := s.store.GetLastByKeyAndUser(ctx, opts.Key, opts.UserID)
+	if err != nil {
+		return errors.Wrap(err, "failed to check for a recent feed entry")
+	}
+	entryExists := last != nil && time.Since(last.CreatedAt) < dedupeWindow
 
 	body, err := s.render(opts.Template, opts.Lang, opts.Data)
 	if err != nil {
@@ -172,22 +209,36 @@ func (s *Service) Send(opts SendOptions) error {
 	// left. That property is preserved by mailed_at instead: it is stamped
 	// only after an SMTP server accepts the message, so a failed send still
 	// leaves nothing that looks like a delivery.
-	n := &models.Notification{
-		Key:      opts.Key,
-		Title:    opts.Title,
-		Template: opts.Template,
-		Body:     body,
-		UserID:   &opts.UserID,
-	}
-	if Deliverable(opts.To) {
-		to := opts.To
-		n.To = &to
-	}
-	if err := s.store.Create(ctx, n); err != nil {
-		return errors.Wrap(err, "failed to save notification to db")
+	//
+	// Written only when the window holds no entry for this key and user. An
+	// entry it already holds is not skipped over -- it becomes the row this
+	// send works on, so the mail path below can still put its letter on the
+	// wire and stamp mailed_at on it. Suppressing the duplicate row must not
+	// cost the owed letter; those are the two properties this function has
+	// to hold at once.
+	n := last
+	if !entryExists {
+		n = &models.Notification{
+			Key:      opts.Key,
+			Title:    opts.Title,
+			Template: opts.Template,
+			Body:     body,
+			UserID:   &opts.UserID,
+		}
+		if Deliverable(opts.To) {
+			to := opts.To
+			n.To = &to
+		}
+		if err := s.store.Create(ctx, n); err != nil {
+			return errors.Wrap(err, "failed to save notification to db")
+		}
 	}
 
-	if n.To == nil || mailedRecently {
+	// Deliverability is read off this call's options rather than off n.To,
+	// which matters exactly when n is a reused row: the address recorded on
+	// it belongs to the earlier attempt, and an account that has since
+	// confirmed one is owed the letter its existing entry never got.
+	if !Deliverable(opts.To) || mailedRecently {
 		return nil
 	}
 
@@ -202,12 +253,18 @@ func (s *Service) Send(opts SendOptions) error {
 	// The feed got the fragment; the wire gets it wrapped in a document.
 	// Wrapping happens here rather than in render so the stored body stays
 	// the thing the feed can show.
-	letter, err := s.wrapEmail(body, opts.Lang)
+	//
+	// The fragment wrapped is n's, not the one just rendered, so that the
+	// letter and the feed entry are two presentations of one notification
+	// and cannot say different things. They only differ when n is a reused
+	// row, in which case the entry the reader can already see is the
+	// authority on what this notification says.
+	letter, err := s.wrapEmail(n.Body, opts.Lang)
 	if err != nil {
 		return errors.Wrap(err, "failed to render email layout")
 	}
 
-	if err := s.mail.Send(*n.To, opts.Title, letter); err != nil {
+	if err := s.mail.Send(opts.To, n.Title, letter); err != nil {
 		return errors.Wrap(err, "failed to send email")
 	}
 	return s.store.MarkMailed(ctx, n.NotificationID)

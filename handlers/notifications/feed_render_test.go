@@ -29,6 +29,9 @@ type captureStore struct {
 func (s *captureStore) GetLastMailedByKeyAndUser(context.Context, string, uuid.UUID) (*models.Notification, error) {
 	return nil, nil
 }
+func (s *captureStore) GetLastByKeyAndUser(context.Context, string, uuid.UUID) (*models.Notification, error) {
+	return nil, nil
+}
 func (s *captureStore) Create(_ context.Context, n *models.Notification) error {
 	s.created = n
 	return nil

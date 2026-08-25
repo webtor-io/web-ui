@@ -36,6 +36,23 @@ func (j *memJournal) GetLastMailedByKeyAndUser(_ context.Context, key string, us
 	return nil, nil
 }
 
+// GetLastByKeyAndUser is the feed guard's read: the newest row for this key
+// and user whether or not it was ever mailed. No MailedAt condition here --
+// that is the whole difference from the method above, and dropping it is
+// what lets a redelivered event find its existing entry instead of adding a
+// second one.
+func (j *memJournal) GetLastByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	for i := len(j.rows) - 1; i >= 0; i-- {
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
 func (j *memJournal) Create(_ context.Context, n *models.Notification) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
