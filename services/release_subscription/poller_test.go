@@ -96,7 +96,7 @@ type fakeMailer struct {
 	failWith error
 }
 
-func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ notification.SubscriptionView, releases []notification.ReleaseView) error {
+func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ uuid.UUID, _ notification.SubscriptionView, releases []notification.ReleaseView) error {
 	if m.failWith != nil {
 		return m.failWith
 	}
@@ -104,7 +104,7 @@ func (m *fakeMailer) SendSubscriptionUpdate(_ string, _ notification.Subscriptio
 	return nil
 }
 
-func (m *fakeMailer) SendSubscriptionOff(_ string, _ notification.SubscriptionView, completed bool) error {
+func (m *fakeMailer) SendSubscriptionOff(_ string, _ uuid.UUID, _ notification.SubscriptionView, completed bool) error {
 	m.offs = append(m.offs, completed)
 	return nil
 }
@@ -785,6 +785,81 @@ func TestFailedPollIsStillRescheduled(t *testing.T) {
 				t.Errorf("next check: %v, want a future time so the row leaves the head of the queue", store.checkedNext)
 			}
 		})
+	}
+}
+
+// TestPollOneReachesTheFeedForAnUndeliverableAddress guards the site that
+// costs the most if a deliverability guard is ever put back into pollOne:
+// an early return there does not merely skip a letter, it skips the source
+// search entirely and reschedules the subscription a day out, forever. The
+// self-hosted admin account carries the literal "admin" sentinel
+// (services/adminauth/pg_repo.go), so that account — the only one a default
+// self-hosted instance has — would never hear about a release again.
+//
+// The mailer here is the real notification.Service over a real journal,
+// not fakeMailer, because the property under test is that a feed row lands.
+// Only Service.Send decides that, and a fake that merely records a call
+// would pass even if Send had been written to bail out on an undeliverable
+// address.
+func TestPollOneReachesTheFeedForAnUndeliverableAddress(t *testing.T) {
+	journal := &memJournal{}
+	mail := &sentMail{}
+	ns := notification.NewWith(journal, mail, nil, "https://webtor.io", "../../templates/notification")
+
+	sub := seasonSub()
+	sub.User = &models.User{UserID: sub.UserID, Email: "admin"}
+
+	name := "The.Boys.S03E01.1080p"
+	store := &fakeStore{
+		due:      []models.ReleaseSubscription{*sub},
+		episodes: []models.EpisodeMetadata{episode(1, 7*24*time.Hour)},
+		pending: []models.ReleaseSubscriptionHit{
+			{SubscriptionID: sub.ID, InfoHash: "aa", Name: &name},
+		},
+	}
+	search := &fakeSearch{byContentID: map[string][]stremio.StreamItem{
+		"tt1190634:3:1": {{InfoHash: "aa", Title: "The.Boys.S03E01"}},
+	}}
+	p := NewPoller(store, search, ns, fakeTier{}, fakeAiring{airing: true}, testConfig())
+
+	if _, err := p.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	if len(search.asked) == 0 {
+		t.Errorf("source search: got 0 queries — an address that cannot be mailed must not stop the poll")
+	}
+
+	rows, err := ns.ListByUser(context.Background(), sub.UserID, 10)
+	if err != nil {
+		t.Fatalf("list notifications: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("feed rows for the account: got %d, want 1 — the entry IS the notification when there is no mailbox", len(rows))
+	}
+	if !strings.HasPrefix(rows[0].Key, "sub-upd-") {
+		t.Errorf("feed row key: got %q, want the subscription-update key", rows[0].Key)
+	}
+	if rows[0].To != nil {
+		t.Errorf("feed row carries To=%q; an undeliverable address must not be recorded as a destination", *rows[0].To)
+	}
+	if !strings.Contains(rows[0].Body, name) {
+		t.Errorf("feed row body does not name the release:\n%s", rows[0].Body)
+	}
+	if len(mail.all()) != 0 {
+		t.Errorf("letters sent: got %d, want 0 — there is no address to send to", len(mail.all()))
+	}
+
+	// The hits are spent, and the row goes back into the normal rotation
+	// rather than the far-out retry slot the old early return used.
+	if len(store.notifiedHashes) != 1 || !store.markedNotified {
+		t.Errorf("hits marked: %v, notified stamp: %v — both must follow a delivered feed entry", store.notifiedHashes, store.markedNotified)
+	}
+	if store.checkedState != sub.State {
+		t.Errorf("state: got %q, want unchanged %q", store.checkedState, sub.State)
+	}
+	if store.checkedNext.IsZero() {
+		t.Errorf("next check was never written — the row would stay permanently due")
 	}
 }
 

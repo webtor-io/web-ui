@@ -22,6 +22,7 @@ forward-ports:
 PROTO_CONFLICT_LDFLAGS := -X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore
 
 test:
+	@docker info >/dev/null 2>&1 || echo "WARNING: docker is not available -- Postgres-backed tests will FAIL (they t.Fatal on the docker dial, they do not skip). A cached green result from an earlier run with docker up can hide that: re-run with -count=1 after docker state changes."
 	go test -ldflags '$(PROTO_CONFLICT_LDFLAGS)' ./...
 
 vet:

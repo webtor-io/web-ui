@@ -12,9 +12,10 @@ import (
 
 // TestPasswordPartialRenders parses and executes the profile administrator-
 // password section standalone, for the same reason as the subscriptions and
-// torznab partial tests: get.html includes it lazily behind the SelfHosted
-// gate, so nothing exercises it at startup, and a template error only
-// surfaces the first time a self-hosted instance actually renders /profile.
+// torznab partial tests: get.html includes it lazily behind the
+// Data.IdentityEditable gate, so nothing exercises it at startup, and a
+// template error only surfaces the first time an instance with no external
+// identity provider actually renders /profile.
 //
 // It also pins the context shape this partial actually receives: get.html
 // includes it with `{{ template "profile/password" $ }}` (bare context, like

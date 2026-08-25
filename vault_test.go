@@ -9,6 +9,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/notification"
 )
 
 // --- Mock implementations ---
@@ -85,7 +86,7 @@ type mockReaperNotification struct {
 	calls                  []notificationCall
 }
 
-func (m *mockReaperNotification) SendTransferTimeout(to string, r *vaultModels.Resource) error {
+func (m *mockReaperNotification) SendTransferTimeout(to string, _ uuid.UUID, r *vaultModels.Resource) error {
 	m.calls = append(m.calls, notificationCall{
 		email:      to,
 		resourceID: r.ResourceID,
@@ -94,7 +95,7 @@ func (m *mockReaperNotification) SendTransferTimeout(to string, r *vaultModels.R
 	return m.sendTransferTimeoutErr
 }
 
-func (m *mockReaperNotification) SendExpired(to string, r *vaultModels.Resource) error {
+func (m *mockReaperNotification) SendExpired(to string, _ uuid.UUID, r *vaultModels.Resource) error {
 	m.calls = append(m.calls, notificationCall{
 		email:      to,
 		resourceID: r.ResourceID,
@@ -484,7 +485,44 @@ func TestRemovePledgeAndNotify_NilUser(t *testing.T) {
 	}
 }
 
-func TestRemovePledgeAndNotify_EmptyEmail(t *testing.T) {
+// An address nothing can be mailed to is still notified. The reaper is
+// destroying something the user spent points on, and Service.Send writes a
+// feed entry for exactly this case -- when there is no mailbox, that entry
+// IS the notification. An early return here would take the entry with it,
+// which is why removePledgeAndNotify carries no deliverability check.
+func TestRemovePledgeAndNotify_UndeliverableAddressStillNotified(t *testing.T) {
+	expired := timePtr(time.Now().Add(-8 * 24 * time.Hour))
+	resource := makeResource("res1", expired)
+	userID := uuid.NewV4()
+	pledge := makePledge(uuid.NewV4(), "res1", userID, 1.0, &models.User{
+		UserID: userID,
+		Email:  "admin", // the self-hosted admin sentinel
+	})
+
+	v := &mockReaperVault{}
+	n := &mockReaperNotification{}
+	r := newTestReaper(nil, v, n)
+
+	r.removePledgeAndNotify(context.Background(), pledge, resource, false)
+
+	// Pledge should be removed
+	if len(v.removePledgeCalls) != 1 {
+		t.Fatalf("expected 1 pledge removed, got %d", len(v.removePledgeCalls))
+	}
+
+	if len(n.calls) != 1 {
+		t.Fatalf("expected 1 notification for the undeliverable address, got %d", len(n.calls))
+	}
+	if n.calls[0].email != "admin" {
+		t.Errorf("notification address: got %q, want the account's own %q", n.calls[0].email, "admin")
+	}
+}
+
+// The same for an account with no address at all. public."user" declares
+// email NOT NULL, so this is a shape fixtures produce rather than one
+// production does -- but the rule is identical, and the old guard treated
+// the two cases together, so both are pinned.
+func TestRemovePledgeAndNotify_EmptyEmailStillNotified(t *testing.T) {
 	expired := timePtr(time.Now().Add(-8 * 24 * time.Hour))
 	resource := makeResource("res1", expired)
 	userID := uuid.NewV4()
@@ -499,14 +537,54 @@ func TestRemovePledgeAndNotify_EmptyEmail(t *testing.T) {
 
 	r.removePledgeAndNotify(context.Background(), pledge, resource, false)
 
-	// Pledge should be removed
 	if len(v.removePledgeCalls) != 1 {
 		t.Fatalf("expected 1 pledge removed, got %d", len(v.removePledgeCalls))
 	}
+	if len(n.calls) != 1 {
+		t.Fatalf("expected 1 notification for the addressless account, got %d", len(n.calls))
+	}
+}
 
-	// No notification for empty email
-	if len(n.calls) != 0 {
-		t.Errorf("expected no notifications for empty email, got %d", len(n.calls))
+// The same claim as TestRemovePledgeAndNotify_UndeliverableAddressStillNotified,
+// made against the real notification.Service over a real journal instead of
+// a recording mock. The mock proves only that sendNotification was reached;
+// what has to hold is that a row lands in the user's feed, and that is
+// Service.Send's decision, not the reaper's.
+func TestRemovePledgeAndNotify_UndeliverableAddressReachesTheFeed(t *testing.T) {
+	expired := timePtr(time.Now().Add(-8 * 24 * time.Hour))
+	resource := makeResource("res1", expired)
+	userID := uuid.NewV4()
+	pledge := makePledge(uuid.NewV4(), "res1", userID, 1.0, &models.User{
+		UserID: userID,
+		Email:  "admin",
+	})
+
+	mail := &recordingMailer{}
+	ns := notification.NewWith(&memJournal{}, mail, nil, "https://webtor.io", "templates/notification")
+
+	v := &mockReaperVault{}
+	r := newTestReaper(nil, v, ns)
+
+	r.removePledgeAndNotify(context.Background(), pledge, resource, false)
+
+	rows, err := ns.ListByUser(context.Background(), userID, 10)
+	if err != nil {
+		t.Fatalf("list notifications: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("feed rows: got %d, want 1 — the entry IS the notification when there is no mailbox", len(rows))
+	}
+	if rows[0].Key != "expired-res1" {
+		t.Errorf("feed row key: got %q, want %q", rows[0].Key, "expired-res1")
+	}
+	if rows[0].UserID == nil || *rows[0].UserID != userID {
+		t.Errorf("feed row is not attributed to the user: %v", rows[0].UserID)
+	}
+	if rows[0].To != nil {
+		t.Errorf("feed row carries To=%q; an undeliverable address must not be recorded as a destination", *rows[0].To)
+	}
+	if len(mail.sent) != 0 {
+		t.Errorf("letters sent: got %d, want 0 — there is no address to send to", len(mail.sent))
 	}
 }
 
@@ -519,7 +597,7 @@ func TestSendNotification_Expired(t *testing.T) {
 	n := &mockReaperNotification{}
 	r := newTestReaper(nil, nil, n)
 
-	r.sendNotification("user@example.com", resource, false)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, false)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(n.calls))
@@ -541,7 +619,7 @@ func TestSendNotification_TransferTimeout(t *testing.T) {
 	n := &mockReaperNotification{}
 	r := newTestReaper(nil, nil, n)
 
-	r.sendNotification("user@example.com", resource, true)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, true)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(n.calls))
@@ -559,7 +637,7 @@ func TestSendNotification_ExpiredError(t *testing.T) {
 	r := newTestReaper(nil, nil, n)
 
 	// Should not panic, just log the error
-	r.sendNotification("user@example.com", resource, false)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, false)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification attempt, got %d", len(n.calls))
@@ -573,7 +651,7 @@ func TestSendNotification_TransferTimeoutError(t *testing.T) {
 	r := newTestReaper(nil, nil, n)
 
 	// Should not panic, just log the error
-	r.sendNotification("user@example.com", resource, true)
+	r.sendNotification("user@example.com", uuid.NewV4(), resource, true)
 
 	if len(n.calls) != 1 {
 		t.Fatalf("expected 1 notification attempt, got %d", len(n.calls))
@@ -696,7 +774,11 @@ func TestRun_PartialPledgeRemovalFailure(t *testing.T) {
 	}
 }
 
-func TestProcessResource_PledgeWithUserNoEmail_And_PledgeWithEmail(t *testing.T) {
+// Two pledgers, one mailable and one not: both are notified. The
+// unmailable one gets a feed entry rather than a letter, which is the point
+// -- an instance whose only account is the self-hosted admin would
+// otherwise lose every resource in silence.
+func TestProcessResource_PledgeWithUndeliverableAddress_And_PledgeWithEmail(t *testing.T) {
 	expired := timePtr(time.Now().Add(-8 * 24 * time.Hour))
 	resource := makeResource("res1", expired)
 	user1ID := uuid.NewV4()
@@ -707,7 +789,7 @@ func TestProcessResource_PledgeWithUserNoEmail_And_PledgeWithEmail(t *testing.T)
 			"res1": {
 				makePledge(uuid.NewV4(), "res1", user1ID, 0.5, &models.User{
 					UserID: user1ID,
-					Email:  "", // empty email
+					Email:  "admin", // nothing can be mailed here
 				}),
 				makePledge(uuid.NewV4(), "res1", user2ID, 0.5, &models.User{
 					UserID: user2ID,
@@ -727,12 +809,15 @@ func TestProcessResource_PledgeWithUserNoEmail_And_PledgeWithEmail(t *testing.T)
 		t.Fatalf("expected 2 pledges removed, got %d", len(v.removePledgeCalls))
 	}
 
-	// Only 1 notification (user2 has email)
-	if len(n.calls) != 1 {
-		t.Fatalf("expected 1 notification, got %d", len(n.calls))
+	if len(n.calls) != 2 {
+		t.Fatalf("expected 2 notifications, got %d — both pledgers are owed one", len(n.calls))
 	}
-	if n.calls[0].email != "user2@example.com" {
-		t.Errorf("expected notification for user2, got %q", n.calls[0].email)
+	got := map[string]bool{}
+	for _, c := range n.calls {
+		got[c.email] = true
+	}
+	if !got["admin"] || !got["user2@example.com"] {
+		t.Errorf("notified addresses: %v, want both admin and user2@example.com", got)
 	}
 }
 

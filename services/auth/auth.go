@@ -321,6 +321,13 @@ type User struct {
 	// should still treat a zero value as "don't know" rather than "very old",
 	// since it only occurs when there is no user row at all.
 	CreatedAt time.Time
+	// NotificationEmail mirrors models.User.NotificationEmail -- the
+	// confirmed address a self-hosted operator verified, kept separate from
+	// Email (identity) for the reasons on that field's doc comment. Nil on
+	// every webtor.io account. Callers picking a mail recipient should go
+	// through notification.RecipientEmail(u.Email, u.NotificationEmail)
+	// rather than reading either field directly.
+	NotificationEmail *string
 }
 
 func (s *User) HasAuth() bool {
@@ -331,12 +338,18 @@ func makeUserFromContext(c *gin.Context) *User {
 	u := &User{}
 	uc := c.Request.Context().Value(UserContext{})
 	su, ok := uc.(*models.User)
-	if ok {
+	// A type assertion on an interface holding a typed nil (*models.User)(nil)
+	// still succeeds -- ok is true even though su is nil -- so nilness must
+	// be checked explicitly here rather than folded into `if ok`, or any
+	// future path that puts a nil *models.User into the context turns into a
+	// dereference below.
+	if ok && su != nil {
 		u.ID = su.UserID
 		u.Email = su.Email
 		u.PatreonUserID = su.PatreonUserID
 		u.Tier = su.Tier
 		u.CreatedAt = su.CreatedAt
+		u.NotificationEmail = su.NotificationEmail
 	}
 	inc := c.Request.Context().Value(IsNewContext{})
 	isNew, ok := inc.(bool)
@@ -423,6 +436,10 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
+		// Database outage is transient and recoverable, unlike an identity
+		// provider that yields no email. Degrading a brief blip to "no user"
+		// is better than turning it into a broken response. The nil user is
+		// safe because makeUserFromContext checks for it explicitly.
 		return
 	}
 	userID := sess.GetUserID()
@@ -445,6 +462,18 @@ func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer)
 			patreonUserID = &tpUserInfo.ThirdParty.UserID
 		}
 		return models.GetOrCreateUser(ctx, db, tpUserInfo.Email, patreonUserID)
+	}
+	// Every branch above either returned or carried its own error. Getting
+	// here with err == nil means supertokens resolved the session but never
+	// yielded an email (unreachable today: Google always returns one, and
+	// the Patreon override in Init rejects a sign-in without one) -- return
+	// an explicit error instead of falling through with u still nil. A bare
+	// return here would hand myVerifySession a nil error alongside a nil
+	// *models.User, which it would then store in the request context as a
+	// typed nil that satisfies makeUserFromContext's type assertion and gets
+	// dereferenced.
+	if err == nil {
+		err = fmt.Errorf("createUser: no email resolved for supertokens user %s", userID)
 	}
 	return
 }
@@ -593,13 +622,20 @@ func (s *Auth) AdminStore() *adminauth.Store {
 	return s.adminStore
 }
 
-// SelfHosted reports whether this deployment has no SuperTokens configured.
-// The profile page's password section uses this — not AdminPasswordActive —
-// to decide whether to show itself: AdminPasswordActive also requires a
-// password to already be configured, which is exactly the state this section
-// exists to get the instance out of (setting the very first password).
-func (s *Auth) SelfHosted() bool {
-	return !s.hasSupetokens
+// IdentityManagedExternally reports whether an external identity provider
+// owns this user's identity. The profile page's password section uses this
+// — not AdminPasswordActive — to decide whether to show itself:
+// AdminPasswordActive also requires a password to already be configured,
+// which is exactly the state this section exists to get the instance out of
+// (setting the very first password). When SuperTokens is configured, a
+// user's email is also what claims.go keys the tier lookup on and what
+// models.GetOrCreateUser matches Patreon accounts by — letting a user edit
+// it here would silently detach both, which is why the email section
+// depends on this same capability. Callers deciding whether an address is
+// theirs to change, or whether a local administrator password may exist at
+// all, both belong on this method.
+func (s *Auth) IdentityManagedExternally() bool {
+	return s.hasSupetokens
 }
 
 // NewForAdminPasswordTest builds a minimal Auth exposing only the two fields

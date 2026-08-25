@@ -6,6 +6,13 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// mailer is the transport a Service mails through. It has one method on
+// purpose: a mailer that exists can send, and one that does not exist is
+// how "this instance has no SMTP server" is spelled. There used to be a
+// Configured() bool here, which meant a mailer could sit in the Service
+// answering every call with "I cannot do this" -- the capability is now
+// carried by the value's presence instead, so there is no second source of
+// truth to keep in step.
 type mailer interface {
 	Send(to, subject, body string) error
 }
@@ -26,12 +33,10 @@ func (m *smtpMailer) fromAddr() string {
 	return m.user
 }
 
+// Send dials the configured SMTP server. There is no empty-host guard here
+// because there is no way to get an smtpMailer without a host: New only
+// builds one when the flag is set (see notification.go).
 func (m *smtpMailer) Send(to, subject, body string) error {
-	if m.host == "" {
-		log.Warn("SMTP host not configured, skipping email sending")
-		return nil
-	}
-
 	msg := gomail.NewMessage()
 	msg.SetAddressHeader("From", m.fromAddr(), "Webtor")
 	msg.SetHeader("To", to)

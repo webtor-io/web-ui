@@ -81,9 +81,10 @@
     </div>
     {{ end }}
 
-    {{/* Only a self-hosted instance (no SuperTokens) has an administrator
-         password to set at all — on webtor.io this section must not render. */}}
-    {{ if .Data.SelfHosted }}
+    {{/* Only when no external identity provider owns this account's identity
+         does an administrator password exist to set at all — on webtor.io
+         (SuperTokens-managed identity) this section must not render. */}}
+    {{ if .Data.IdentityEditable }}
     <!-- Administration -->
     <div class="flex items-center gap-3 mt-10 mb-4">
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.administration" }}</h2>
@@ -91,6 +92,15 @@
     </div>
     <div id="password">
         {{ template "profile/password" $ }}
+    </div>
+    {{ end }}
+
+    {{/* Independent of the password section's gate above: this one needs
+         both no external identity provider AND SMTP configured (see
+         Data.ShowEmailSection), not just Data.IdentityEditable. */}}
+    {{ if .Data.ShowEmailSection }}
+    <div id="email">
+        {{ template "profile/email" $ }}
     </div>
     {{ end }}
 

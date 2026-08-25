@@ -20,6 +20,30 @@ const userSettingsContextKey = "web.user_settings"
 
 const vaultEnabledContextKey = "web.vault_enabled"
 
+const unreadNotificationsContextKey = "web.unread_notifications"
+
+// SetUnreadNotifications records the signed-in user's unread notification
+// count for this request. Called once per request by the middleware in
+// serve.go (mounted beside the vault one, for the same r.Use-ordering
+// reason), which is the only place that knows both who the user is and
+// what notificationStore.CountUnread says.
+func SetUnreadNotifications(c *gin.Context, n int) {
+	c.Set(unreadNotificationsContextKey, n)
+}
+
+// unreadNotifications defaults to 0 when nothing set it: a caller who
+// forgets to wire the middleware renders no badge rather than a wrong one,
+// and an anonymous request -- which the middleware skips outright -- has no
+// notifications to count anyway.
+func unreadNotifications(c *gin.Context) int {
+	v, ok := c.Get(unreadNotificationsContextKey)
+	if !ok {
+		return 0
+	}
+	n, _ := v.(int)
+	return n
+}
+
 // SetVaultEnabled records whether the vault service is configured. The navbar
 // link and the /vault routes must agree: the routes are registered only when
 // the vault API client exists, so an ungated link is a 404.
@@ -78,8 +102,12 @@ type Context struct {
 	// instance and a stranger, so it is deliberately hard to ignore.
 	OpenInstance bool
 	// Vault reports whether the vault service is configured.
-	Vault  bool
-	ginCtx *gin.Context
+	Vault bool
+	// UnreadNotifications is the signed-in user's unread notification
+	// count, populated by the middleware in serve.go. Zero for anonymous
+	// requests and for any request that middleware did not run on.
+	UnreadNotifications int
+	ginCtx              *gin.Context
 }
 
 func (c *Context) WithData(obj any) *Context {
@@ -130,20 +158,21 @@ func NewContext(c *gin.Context) *Context {
 	settings, _ := us.(*models.UserSettings)
 
 	return &Context{
-		CSRF:         sess.CSRF,
-		User:         user,
-		Claims:       cl,
-		ApiClaims:    aCl,
-		SessionID:    sess.ID,
-		Geo:          geoData,
-		TierUpdated:  tu,
-		UserSettings: settings,
-		Lang:         lang,
-		Path:         path,
-		SuggestLang:  suggest,
-		OpenInstance: auth.IsOpenInstance(c),
-		Vault:        vaultEnabled(c),
-		ginCtx:       c,
+		CSRF:                sess.CSRF,
+		User:                user,
+		Claims:              cl,
+		ApiClaims:           aCl,
+		SessionID:           sess.ID,
+		Geo:                 geoData,
+		TierUpdated:         tu,
+		UserSettings:        settings,
+		Lang:                lang,
+		Path:                path,
+		SuggestLang:         suggest,
+		OpenInstance:        auth.IsOpenInstance(c),
+		Vault:               vaultEnabled(c),
+		UnreadNotifications: unreadNotifications(c),
+		ginCtx:              c,
 	}
 }
 

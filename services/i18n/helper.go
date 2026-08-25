@@ -11,22 +11,51 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// resolve turns a (message, error) pair from go-i18n into the string to show.
+//
+// The subtlety it exists for: go-i18n v2 (v2.6.1, i18n/localizer.go
+// getMessageTemplate) reports *MessageNotFoundErr whenever the requested
+// language has no entry for the key — including the case where it went on to
+// find the key in the bundle's default language and rendered that template
+// successfully. LocalizeWithTag says so itself: "It may return a best effort
+// localized message even if an error happens."
+//
+// So `err != nil` does not mean "nothing to show". Treating it that way is
+// what turned a locale missing a key into a page full of raw identifiers
+// (notifications.title, nav.notifications) when the English copy was sitting
+// right there. Prefer whatever non-empty string came back; fall back to the
+// key only when the key is genuinely absent from every locale, in which case
+// go-i18n returns an empty message alongside the error.
+func resolve(msg string, err error, key string, lang string) string {
+	if msg != "" {
+		if err != nil {
+			log.WithError(err).WithField("key", key).WithField("lang", lang).
+				Debug("i18n key missing in locale, fell back to default language")
+		}
+		return msg
+	}
+	if err != nil {
+		log.WithError(err).WithField("key", key).WithField("lang", lang).
+			Debug("i18n key missing")
+	}
+	return key
+}
+
 // TranslateWithLocalizer translates a key using the given Localizer.
-// Returns the key itself if translation is missing.
+// Falls back to the default language when the requested locale lacks the key,
+// and returns the key itself only when no locale has it at all.
 func TranslateWithLocalizer(loc *i18n.Localizer, key string) string {
 	if loc == nil {
 		return key
 	}
 	msg, err := loc.Localize(&i18n.LocalizeConfig{MessageID: key})
-	if err != nil {
-		return key
-	}
-	return msg
+	return resolve(msg, err, key, "")
 }
 
 // TranslateWithLocalizerData translates a parameterized key using the given
 // Localizer and template data. Use for messages like `{{.Bytes}}` / `{{.Peers}}`.
-// Returns the key itself if translation is missing.
+// Falls back to the default language when the requested locale lacks the key,
+// and returns the key itself only when no locale has it at all.
 func TranslateWithLocalizerData(loc *i18n.Localizer, key string, data map[string]any) string {
 	if loc == nil {
 		return key
@@ -35,10 +64,7 @@ func TranslateWithLocalizerData(loc *i18n.Localizer, key string, data map[string
 		MessageID:    key,
 		TemplateData: data,
 	})
-	if err != nil {
-		return key
-	}
-	return msg
+	return resolve(msg, err, key, "")
 }
 
 // Helper exposes i18n translation functions as template helpers.
@@ -52,15 +78,13 @@ func NewHelper(svc *Service) *Helper {
 }
 
 // T translates a message by key for the given language.
+// A locale missing the key degrades to the default-language (English) text,
+// not to the raw key — see resolve.
 // Template usage: {{ t $.Lang "nav.discover" }}
 func (h *Helper) T(lang string, key string) string {
 	loc := h.svc.Localizer(lang)
 	msg, err := loc.Localize(&i18n.LocalizeConfig{MessageID: key})
-	if err != nil {
-		log.WithError(err).WithField("key", key).WithField("lang", lang).Debug("i18n key missing")
-		return key
-	}
-	return msg
+	return resolve(msg, err, key, lang)
 }
 
 // THTML translates a message and returns template.HTML (unescaped).
@@ -82,11 +106,7 @@ func (h *Helper) Tp(lang string, key string, args ...any) string {
 		MessageID:    key,
 		TemplateData: data,
 	})
-	if err != nil {
-		log.WithError(err).WithField("key", key).WithField("lang", lang).Debug("i18n key missing")
-		return key
-	}
-	return msg
+	return resolve(msg, err, key, lang)
 }
 
 // TpHTML translates a message with template data and returns template.HTML (unescaped).

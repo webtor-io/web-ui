@@ -63,9 +63,10 @@ func (s *Service) subscriptionData(sub SubscriptionView) subscriptionMailData {
 // repeat of the same (key, to) within 24 hours, so a key like "sub-on" would
 // leave a user who subscribes to two things in one evening with one
 // confirmation and one silence.
-func (s *Service) SendSubscriptionOn(to string, sub SubscriptionView) error {
+func (s *Service) SendSubscriptionOn(to string, userID uuid.UUID, sub SubscriptionView) error {
 	return s.Send(SendOptions{
 		To:       to,
+		UserID:   userID,
 		Lang:     sub.Lang,
 		Key:      fmt.Sprintf("sub-on-%s", sub.ID),
 		Title:    s.T(sub.Lang, "email.subscription.on.subject", "Title", sub.Title),
@@ -77,11 +78,12 @@ func (s *Service) SendSubscriptionOn(to string, sub SubscriptionView) error {
 // SendSubscriptionOff confirms that a subscription has ended. completed
 // distinguishes the two ways that happens: the season finished airing, or
 // the user removed it.
-func (s *Service) SendSubscriptionOff(to string, sub SubscriptionView, completed bool) error {
+func (s *Service) SendSubscriptionOff(to string, userID uuid.UUID, sub SubscriptionView, completed bool) error {
 	data := s.subscriptionData(sub)
 	data.Completed = completed
 	return s.Send(SendOptions{
 		To:       to,
+		UserID:   userID,
 		Lang:     sub.Lang,
 		Key:      fmt.Sprintf("sub-off-%s", sub.ID),
 		Title:    s.T(sub.Lang, "email.subscription.off.subject", "Title", sub.Title),
@@ -93,15 +95,16 @@ func (s *Service) SendSubscriptionOff(to string, sub SubscriptionView, completed
 // SendSubscriptionUpdate reports releases the subscription had not seen
 // before. Everything found since the last letter goes out in one message —
 // four new rips are four lines here, not four emails.
-func (s *Service) SendSubscriptionUpdate(to string, sub SubscriptionView, releases []ReleaseView) error {
+func (s *Service) SendSubscriptionUpdate(to string, userID uuid.UUID, sub SubscriptionView, releases []ReleaseView) error {
 	if len(releases) == 0 {
 		return nil
 	}
 	data := s.subscriptionData(sub)
 	data.Releases = releases
 	return s.Send(SendOptions{
-		To:   to,
-		Lang: sub.Lang,
+		To:     to,
+		UserID: userID,
+		Lang:   sub.Lang,
 		// Unlike the on/off letters this one recurs, so the key has to
 		// change between sends or the 24-hour dedupe would swallow the
 		// second batch — and its hashes, already recorded as seen, would

@@ -378,18 +378,51 @@ func (m *sentMail) last() mailMessage {
 }
 
 // memJournal is the notification table: what the 24-hour duplicate check
-// reads.
+// reads. GetLastMailedByKeyAndUser only ever considers rows with MailedAt
+// set, the same restriction the real SQL query applies — a row nobody ever
+// mailed must not look like a duplicate.
 type memJournal struct {
 	mu   sync.Mutex
 	rows []*models.Notification
 }
 
-func (j *memJournal) GetLastByKeyAndTo(_ context.Context, key, to string) (*models.Notification, error) {
+func (j *memJournal) GetLastMailedByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	for i := len(j.rows) - 1; i >= 0; i-- {
-		if j.rows[i].Key == key && j.rows[i].To == to {
-			return j.rows[i], nil
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID && r.MailedAt != nil {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (j *memJournal) MarkMailed(_ context.Context, id uuid.UUID, to string) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.NotificationID == id {
+			r.MailedAt = &now
+			return nil
+		}
+	}
+	return nil
+}
+
+// GetLastByKeyAndUser is the feed guard's read: the newest row for this key
+// and user whether or not it was ever mailed. No MailedAt condition here --
+// that is the whole difference from the method above, and dropping it is
+// what lets a redelivered event find its existing entry instead of adding a
+// second one.
+func (j *memJournal) GetLastByKeyAndUser(_ context.Context, key string, userID uuid.UUID) (*models.Notification, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	for i := len(j.rows) - 1; i >= 0; i-- {
+		r := j.rows[i]
+		if r.Key == key && r.UserID != nil && *r.UserID == userID {
+			return r, nil
 		}
 	}
 	return nil, nil
@@ -398,8 +431,56 @@ func (j *memJournal) GetLastByKeyAndTo(_ context.Context, key, to string) (*mode
 func (j *memJournal) Create(_ context.Context, n *models.Notification) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	if n.NotificationID == (uuid.UUID{}) {
+		n.NotificationID = uuid.NewV4()
+	}
 	n.CreatedAt = time.Now()
 	j.rows = append(j.rows, n)
+	return nil
+}
+
+// CountUnread, ListByUser, MarkAllRead and PruneKeepingNewest are not
+// exercised by this suite -- it drives Send/SendExpiring end to end, not
+// the feed-reading path -- but memJournal still has to satisfy
+// notification.notificationStore (aliased notification.Store) to be usable
+// with notification.NewWith.
+func (j *memJournal) CountUnread(_ context.Context, userID uuid.UUID) (int, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	count := 0
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (j *memJournal) ListByUser(_ context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	var out []models.Notification
+	for i := len(j.rows) - 1; i >= 0 && len(out) < limit; i-- {
+		if r := j.rows[i]; r.UserID != nil && *r.UserID == userID {
+			out = append(out, *r)
+		}
+	}
+	return out, nil
+}
+
+func (j *memJournal) MarkAllRead(_ context.Context, userID uuid.UUID) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	now := time.Now()
+	for _, r := range j.rows {
+		if r.UserID != nil && *r.UserID == userID && r.ReadAt == nil {
+			r.ReadAt = &now
+		}
+	}
+	return nil
+}
+
+func (j *memJournal) PruneKeepingNewest(_ context.Context, _ int) error {
 	return nil
 }
 

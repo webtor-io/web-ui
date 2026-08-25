@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -25,8 +26,8 @@ type reaperVault interface {
 }
 
 type reaperNotification interface {
-	SendTransferTimeout(to string, r *vaultModels.Resource) error
-	SendExpired(to string, r *vaultModels.Resource) error
+	SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error
+	SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error
 }
 
 type reaperStore interface {
@@ -53,14 +54,14 @@ func (s *pgReaperStore) GetGhostResources(ctx context.Context) ([]vaultModels.Re
 }
 
 type reaper struct {
-	store                  reaperStore
-	vault                  reaperVault
-	notification           reaperNotification
-	expirePeriod           time.Duration
-	abandonedExpirePeriod  time.Duration
-	transferTimeoutPeriod  time.Duration
-	pg                     *cs.PG
-	cpCl                   *claims.Client
+	store                 reaperStore
+	vault                 reaperVault
+	notification          reaperNotification
+	expirePeriod          time.Duration
+	abandonedExpirePeriod time.Duration
+	transferTimeoutPeriod time.Duration
+	pg                    *cs.PG
+	cpCl                  *claims.Client
 }
 
 func makeVaultCMD() cli.Command {
@@ -161,14 +162,14 @@ func initializeReaper(c *cli.Context) (*reaper, error) {
 	notificationService := notification.New(c, db, newI18n())
 
 	r := &reaper{
-		store:                  &pgReaperStore{db: db},
-		vault:                  vaultService,
-		notification:           notificationService,
-		expirePeriod:           c.Duration(vault.VaultResourceExpirePeriodFlag),
-		abandonedExpirePeriod:  c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
-		transferTimeoutPeriod:  c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
-		pg:                     pg,
-		cpCl:                   cpCl,
+		store:                 &pgReaperStore{db: db},
+		vault:                 vaultService,
+		notification:          notificationService,
+		expirePeriod:          c.Duration(vault.VaultResourceExpirePeriodFlag),
+		abandonedExpirePeriod: c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
+		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
+		pg:                    pg,
+		cpCl:                  cpCl,
 	}
 
 	return r, nil
@@ -283,21 +284,30 @@ func (r *reaper) removePledgeAndNotify(ctx context.Context, pledge vaultModels.P
 		Info("removed pledge")
 
 	// Send notification to user if user data is available
-	if pledge.User == nil || pledge.User.Email == "" {
+	if pledge.User == nil {
 		return
 	}
+	// No notification.Deliverable guard on addr, on purpose. Both sends
+	// below go through notification.Service.Send, which writes the feed
+	// entry unconditionally and decides about mail on its own -- it fills
+	// the To column only for a deliverable address and never opens an SMTP
+	// connection without one. Returning early here would skip the feed
+	// entry too, so the self-hosted admin (whose address is the sentinel
+	// "admin") would lose a resource and never be told. Do not "restore"
+	// the check.
+	addr := notification.RecipientEmail(pledge.User.Email, pledge.User.NotificationEmail)
 
-	r.sendNotification(pledge.User.Email, resource, isTransferTimeout)
+	r.sendNotification(addr, pledge.UserID, resource, isTransferTimeout)
 }
 
-func (r *reaper) sendNotification(email string, resource vaultModels.Resource, isTransferTimeout bool) {
+func (r *reaper) sendNotification(email string, userID uuid.UUID, resource vaultModels.Resource, isTransferTimeout bool) {
 	var err error
 	var action string
 	if isTransferTimeout {
-		err = r.notification.SendTransferTimeout(email, &resource)
+		err = r.notification.SendTransferTimeout(email, userID, &resource)
 		action = "transfer timeout"
 	} else {
-		err = r.notification.SendExpired(email, &resource)
+		err = r.notification.SendExpired(email, userID, &resource)
 		action = "expiration"
 	}
 

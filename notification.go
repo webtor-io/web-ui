@@ -7,6 +7,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	_ "github.com/go-pg/pg/v10/orm"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -79,7 +80,42 @@ func sendExpiringNotifications(c *cli.Context) error {
 		}
 	}
 
+	// Pruning runs after the sending work above, not before: pruning first
+	// could delete rows this run still needed (e.g. for the mailed-recently
+	// dedupe check inside Send).
+	const notificationFeedCap = 100
+	if err := ns.PruneKeepingNewest(ctx, notificationFeedCap); err != nil {
+		log.WithError(err).Error("failed to prune notifications")
+	}
+
 	return nil
+}
+
+// expiringRecipients reduces a pledge list to one destination address per
+// user -- the set of accounts the expiry run has something to tell.
+//
+// A pledge whose User did not join is dropped, because there is no account
+// to attribute a notification to. An undeliverable address is NOT dropped:
+// SendExpiring goes through notification.Service.Send, which writes the
+// feed entry unconditionally and decides about mail on its own (it fills
+// the To column only for a deliverable address and never opens an SMTP
+// connection without one). Filtering here would remove the user from this
+// map and so skip the feed entry as well, leaving the self-hosted admin --
+// whose address is the sentinel "admin" -- with no warning at all that
+// their resources are about to disappear. Do not "restore" a Deliverable
+// check here.
+//
+// Split out of sendExpiringNotificationsByDays so that rule can be tested
+// without a database.
+func expiringRecipients(pledges []vault.Pledge) map[string]string {
+	userEmails := make(map[string]string)
+	for _, p := range pledges {
+		if p.User == nil {
+			continue
+		}
+		userEmails[p.UserID.String()] = notification.RecipientEmail(p.User.Email, p.User.NotificationEmail)
+	}
+	return userEmails
 }
 
 func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePeriod time.Duration, ns *notification.Service, days int) error {
@@ -125,15 +161,7 @@ func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePerio
 		return errors.Wrap(err, "failed to get pledges for notification")
 	}
 
-	userEmails := make(map[string]string)
-
-	for _, p := range pledges {
-		if p.User == nil || p.User.Email == "" {
-			continue
-		}
-		userID := p.UserID.String()
-		userEmails[userID] = p.User.Email
-	}
+	userEmails := expiringRecipients(pledges)
 
 	for userID, email := range userEmails {
 		var userPledges []vault.Pledge
@@ -165,7 +193,12 @@ func sendExpiringNotificationsByDays(ctx context.Context, db *pg.DB, expirePerio
 		}
 
 		if len(expiring) > 0 {
-			err = ns.SendExpiring(email, days, expiring)
+			uid, perr := uuid.FromString(userID)
+			if perr != nil {
+				log.WithError(perr).WithField("user_id", userID).Error("invalid user id for notification")
+				continue
+			}
+			err = ns.SendExpiring(email, uid, days, expiring)
 			if err != nil {
 				log.WithError(err).WithField("email", email).Error("failed to send expiring notification")
 			}

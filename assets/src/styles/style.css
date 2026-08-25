@@ -965,3 +965,26 @@ input:-webkit-autofill:focus {
 }
 
 /* trigger tailwind rescan */
+
+/* The in-app notification feed prints a stored message fragment as markup
+   (see handlers/notifications.Item). The fragment is authored for email, so
+   it carries bare <p>, <a> and <ul> that Tailwind's preflight strips of all
+   styling -- links in particular would otherwise be indistinguishable from
+   the text around them. This gives those elements back just enough to read
+   as a message in a list row, without a full prose stylesheet. */
+.notification-body {
+  p {
+    @apply my-1;
+    &:first-child { @apply mt-0; }
+    &:last-child { @apply mb-0; }
+  }
+  a {
+    @apply link link-hover text-w-pinkL break-all;
+  }
+  ul {
+    @apply list-disc pl-5 my-1;
+  }
+  strong {
+    @apply font-semibold text-base-content;
+  }
+}

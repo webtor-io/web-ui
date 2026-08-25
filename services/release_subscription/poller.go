@@ -47,8 +47,8 @@ type streamSearch interface {
 }
 
 type pollMailer interface {
-	SendSubscriptionUpdate(to string, sub notification.SubscriptionView, releases []notification.ReleaseView) error
-	SendSubscriptionOff(to string, sub notification.SubscriptionView, completed bool) error
+	SendSubscriptionUpdate(to string, userID uuid.UUID, sub notification.SubscriptionView, releases []notification.ReleaseView) error
+	SendSubscriptionOff(to string, userID uuid.UUID, sub notification.SubscriptionView, completed bool) error
 }
 
 // tierResolver answers "is this account on the free plan", which decides
@@ -177,14 +177,28 @@ func (p *Poller) Run(ctx context.Context) (int, error) {
 // as delivered only after a letter actually goes out, so a failed send
 // leaves them pending for the next run rather than losing them.
 func (p *Poller) pollOne(ctx context.Context, sub *models.ReleaseSubscription) error {
-	if sub.User == nil || sub.User.Email == "" {
-		// Nothing to mail. Push the row far out rather than leaving it due,
-		// or it comes back every run.
+	if sub.User == nil {
+		// No account joined onto the row, so there is nobody to attribute a
+		// finding to -- neither a letter nor a feed entry has a recipient.
+		// Push the row far out rather than leaving it due, or it comes back
+		// every run.
+		//
+		// An undeliverable address is deliberately NOT part of this guard.
+		// Both sends a poll can make go through notification.Service.Send,
+		// which writes the feed entry unconditionally and decides about mail
+		// on its own -- it fills the To column only for a deliverable
+		// address and never opens an SMTP connection without one. Bailing
+		// out here would skip the search as well, so the self-hosted admin
+		// (whose address is the sentinel "admin") would never learn that a
+		// release turned up. Do not "restore" a Deliverable check here.
 		return p.store.MarkChecked(ctx, sub.ID, sub.State, p.retryAt())
 	}
 
 	u := &auth.User{
-		ID:            sub.UserID,
+		ID: sub.UserID,
+		// Identity, not a mail recipient -- p.tiers.IsFree (nextCheckAt)
+		// and p.search.Search key off this exact field, so it stays the
+		// account's real Email even when a notification address is set.
 		Email:         sub.User.Email,
 		PatreonUserID: sub.User.PatreonUserID,
 	}
@@ -443,7 +457,8 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 		hashes = append(hashes, h.InfoHash)
 	}
 
-	if err := p.mail.SendSubscriptionUpdate(sub.User.Email, p.view(ctx, sub), releases); err != nil {
+	addr := notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)
+	if err := p.mail.SendSubscriptionUpdate(addr, sub.User.UserID, p.view(ctx, sub), releases); err != nil {
 		return false, err
 	}
 	if err := p.store.MarkHitsNotified(ctx, sub.ID, hashes); err != nil {
@@ -455,7 +470,8 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 // announceCompletion tells the user their season is done. The state itself
 // is written by the MarkChecked that follows — one UPDATE, not two.
 func (p *Poller) announceCompletion(ctx context.Context, sub *models.ReleaseSubscription) {
-	if err := p.mail.SendSubscriptionOff(sub.User.Email, p.view(ctx, sub), true); err != nil {
+	addr := notification.RecipientEmail(sub.User.Email, sub.User.NotificationEmail)
+	if err := p.mail.SendSubscriptionOff(addr, sub.User.UserID, p.view(ctx, sub), true); err != nil {
 		log.WithError(err).
 			WithField("subscription_id", sub.ID).
 			Error("failed to send subscription completion notice")

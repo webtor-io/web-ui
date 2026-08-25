@@ -25,6 +25,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/legal"
 	"github.com/webtor-io/web-ui/handlers/library"
 	wm "github.com/webtor-io/web-ui/handlers/migration"
+	"github.com/webtor-io/web-ui/handlers/notifications"
 	p "github.com/webtor-io/web-ui/handlers/profile"
 	"github.com/webtor-io/web-ui/handlers/release_subscription"
 	wr "github.com/webtor-io/web-ui/handlers/resource"
@@ -380,6 +381,24 @@ func serve(c *cli.Context) error {
 		c.Next()
 	})
 
+	// Setting Notification. Built here (earlier than the rest of the
+	// notification wiring below) so the unread-count middleware right after
+	// it can close over a real Service before any route is registered — pg
+	// and i18nSvc are both already available this early.
+	ns := notification.New(c, pg.Get(), i18nSvc)
+
+	// Counted per request so the badge is never stale. Anonymous users and
+	// store errors both fall through to zero rather than blocking the page:
+	// a missing badge is a smaller failure than a page that will not render.
+	r.Use(func(c *gin.Context) {
+		if u := auth.GetUserFromContext(c); u != nil && u.HasAuth() {
+			if n, err := ns.CountUnread(c.Request.Context(), u.ID); err == nil {
+				w.SetUnreadNotifications(c, n)
+			}
+		}
+		c.Next()
+	})
+
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
@@ -419,9 +438,6 @@ func serve(c *cli.Context) error {
 	// needs to know whether Vault is configured before any route is mounted)
 	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
 
-	// Setting Notification
-	ns := notification.New(c, pg.Get(), i18nSvc)
-
 	// Setting VaultHandler
 	if v != nil {
 		vh.RegisterHandler(r, v, tm, pg)
@@ -456,8 +472,12 @@ func serve(c *cli.Context) error {
 	releaseSubSvc := rss.New(pg, en, ns, c.String(common.DomainFlag), c.String(common.SessionSecretFlag))
 	release_subscription.RegisterHandler(r, tm, pg, releaseSubSvc)
 
+	// Setting NotificationHandler (the in-app feed behind the navbar bell —
+	// ns is the same Service the unread-count middleware above reads from).
+	notifications.RegisterHandler(r, tm, ns)
+
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)

@@ -1,0 +1,62 @@
+{{ define "title" }}{{ t $.Lang "notifications.title" }}{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+  <div class="max-w-[700px] mx-auto">
+    <div class="hidden sm:inline-flex badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/>
+      </svg>
+      {{ t $.Lang "notifications.badge" }}
+    </div>
+
+    <div class="flex items-start justify-between gap-4 mb-4">
+      <div>
+        <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-2">{{ t $.Lang "notifications.title" }}</h1>
+        <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed">{{ t $.Lang "notifications.subtitle" }}</p>
+      </div>
+      {{ if .Data.Notifications }}
+      <form action="{{ langPath $.Lang "/notifications/read" }}" method="post" class="shrink-0 mt-1">
+        <input type="hidden" name="_csrf" value="{{ $.CSRF }}"/>
+        <button type="submit" class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">
+          {{ t $.Lang "notifications.markAllRead" }}
+        </button>
+      </form>
+      {{ end }}
+    </div>
+
+    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6">
+      {{ if .Data.Notifications }}
+        <ul class="flex flex-col gap-3">
+          {{ range .Data.Notifications }}
+          <li class="rounded-xl p-4 border {{ if not .ReadAt }}bg-w-pink/5 border-w-pink/30{{ else }}bg-base-200/50 border-w-line/50{{ end }}">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-2 min-w-0">
+                {{ if not .ReadAt }}
+                <span class="inline-block size-2 rounded-full bg-w-pink shrink-0" aria-hidden="true"></span>
+                {{ end }}
+                <span class="font-semibold text-base-content truncate">{{ .Title }}</span>
+                {{ if not .ReadAt }}<span class="sr-only">{{ t $.Lang "notifications.unread" }}</span>{{ end }}
+              </div>
+              <span class="text-xs text-w-muted whitespace-nowrap shrink-0">{{ timeAgoLang $.Lang .CreatedAt }}</span>
+            </div>
+            {{/* .Body is a message fragment and is already markup (see
+                 handlers/notifications.Item), which is why this is a <div>
+                 and not a <p>: a <p> nested in a <p> is invalid, and the
+                 browser would close the outer one at the first inner tag. */}}
+            <div class="notification-body text-sm text-w-sub mt-1 leading-relaxed">{{ .Body }}</div>
+          </li>
+          {{ end }}
+        </ul>
+      {{ else }}
+        <div class="bg-base-200/50 rounded-xl p-10 text-center">
+          <svg class="w-16 h-16 mx-auto text-w-muted/40 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/>
+          </svg>
+          <p class="text-base font-semibold text-w-text mb-2">{{ t $.Lang "notifications.emptyTitle" }}</p>
+          <p class="text-sm text-w-muted max-w-sm mx-auto leading-relaxed">{{ t $.Lang "notifications.emptyHint" }}</p>
+        </div>
+      {{ end }}
+    </div>
+  </div>
+</section>
+{{ end }}
