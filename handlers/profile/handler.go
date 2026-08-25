@@ -476,7 +476,7 @@ func (s *Handler) get(c *gin.Context) {
 	// The email section's two capability gates: our own row must be the
 	// identity (not an external provider's) and mail must be sendable.
 	// Only then is a pending or confirmed address even worth reading.
-	showEmailSection := s.identityEditable && s.notification != nil && s.notification.MailConfigured()
+	showEmailSection := s.emailSectionAvailable()
 	notificationEmail := ""
 	pendingEmail := ""
 	if showEmailSection {
@@ -591,17 +591,44 @@ func newEmailVerificationToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// emailSectionAvailable is the notification-email capability: this account's
+// identity is not owned by an external identity provider (so editing its
+// address is ours to allow), and mail can actually be sent (so an address
+// can be verified before anything is sent to it, and there is a point in
+// having one at all).
+//
+// It is one method rather than two copies of the same conjunction because
+// both the render decision (get) and the write decision (setEmail) must
+// answer it identically. They did not: get gated, setEmail did not, and a
+// route that is never rendered on production was still reachable by any
+// authenticated user.
+func (s *Handler) emailSectionAvailable() bool {
+	return s.identityEditable && s.notification != nil && s.notification.MailConfigured()
+}
+
 // setEmail accepts a notification address for this account, stores it as
 // pending, and mails exactly one message containing the verification link.
 // Nothing else is ever sent to a pending address -- SendEmailVerification is
 // the only Send* call in this codebase that reads PendingEmail rather than
 // the account's confirmed Email.
 //
-// The route only exists behind ShowEmailSection's two gates (see Data), but
-// this handler re-checks notification.Deliverable itself rather than
-// trusting the page that rendered the form: a POST does not prove the GET
-// that served the form saw the same gate state.
+// The capability gate is enforced here, not merely in get. A POST does not
+// prove the GET that served the form saw the same gate state -- and on a
+// deployment where the form is never rendered at all (external identity
+// provider, or no SMTP) the route would otherwise still accept: any
+// authenticated user could name an arbitrary address and have this instance
+// mail a verification link to it, once per POST, since each POST mints a
+// fresh token and so is never a duplicate; and could point their own
+// notification_email away from the address the identity provider owns.
+// Same shape as setPassword's !identityEditable check, for the same reason.
+//
+// Deliverable is checked on top of that, because a gate that says mail can
+// be sent says nothing about whether this particular string is an address.
 func (s *Handler) setEmail(c *gin.Context) {
+	if !s.emailSectionAvailable() {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
 	email := strings.TrimSpace(c.PostForm("email"))
 	if !notification.Deliverable(email) {
 		c.Redirect(http.StatusFound, "/profile?err=profile.email.invalid")
@@ -625,7 +652,7 @@ func (s *Handler) setEmail(c *gin.Context) {
 	}
 	if s.notification != nil {
 		link := fmt.Sprintf("%s/profile/email/verify/%s", s.domain, token)
-		if err := s.notification.SendEmailVerification(email, u.ID, token, link); err != nil {
+		if err := s.notification.SendEmailVerification(email, link); err != nil {
 			_ = c.Error(errors.Wrap(err, "failed to send verification email"))
 		}
 	}

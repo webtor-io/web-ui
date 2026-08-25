@@ -904,3 +904,73 @@ func TestSendSurvivesStoreReturningUnmailedRow(t *testing.T) {
 		t.Errorf("expected the mail to be attempted -- a nil MailedAt means never mailed, not a recent duplicate, got %d calls", len(mail.calls))
 	}
 }
+
+// --- Tests for SendEmailVerification ---
+
+// verifyTemplate is the real one, reduced to the part that matters: the
+// token-bearing link, which templates/notification/verify-email.html renders
+// as <a href="{{ .Link }}">{{ .Link }}</a>.
+const verifyTemplate = `<p><a href="{{ .Link }}">{{ .Link }}</a></p>`
+
+const verifyLink = "https://webtor.io/profile/email/verify/deadbeefdeadbeef"
+
+// TestSendEmailVerificationDoesNotEnterTheFeed is the whole point of
+// verification. The feed is readable by the account that submitted the
+// address (templates/views/notifications/get.html renders .Body verbatim),
+// so a journal row carrying the verification link would let the submitter
+// read the token out of their own feed and confirm a mailbox they have no
+// access to -- which is the one thing verifying an address is for.
+//
+// The letter still goes out: this is transactional mail, not feed content,
+// and suppressing the row must not suppress the message.
+func TestSendEmailVerificationDoesNotEnterTheFeed(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"verify-email.html": verifyTemplate,
+	})
+	store := &mockStore{}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+		t.Fatalf("send verification: %v", err)
+	}
+
+	if store.createCalls != 0 {
+		t.Errorf("feed rows created: got %d, want 0 -- the verification link must never be published to the submitter's feed", store.createCalls)
+	}
+	if store.created != nil && strings.Contains(store.created.Body, verifyLink) {
+		t.Errorf("the feed row carries the verification link, which voids verification:\n%s", store.created.Body)
+	}
+
+	if len(mail.calls) != 1 {
+		t.Fatalf("letters sent: got %d, want 1 -- keeping it out of the feed must not stop it being mailed", len(mail.calls))
+	}
+	if mail.calls[0].to != "user@example.com" {
+		t.Errorf("recipient: got %q, want the pending address", mail.calls[0].to)
+	}
+	if !strings.Contains(mail.calls[0].body, verifyLink) {
+		t.Errorf("the letter does not carry the verification link:\n%s", mail.calls[0].body)
+	}
+}
+
+// TestSendEmailVerificationWithoutMailTransportIsNoOp pins the other half of
+// the mechanism: with no transport the call is a success that does nothing.
+// Not an error, because the address field is only offered where mail works
+// (handlers/profile.emailSectionAvailable), so there is nothing to report --
+// and still no feed row, since the row is what would leak the token. Both
+// assertions are needed: the no-error half alone passed before this fix too.
+func TestSendEmailVerificationWithoutMailTransportIsNoOp(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"verify-email.html": verifyTemplate,
+	})
+	store := &mockStore{}
+	// No mailer: exactly what New produces when SMTP_HOST is empty.
+	svc := newTestService(store, nil, tmplDir)
+
+	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+		t.Fatalf("send verification without a transport must be a no-op, got error: %v", err)
+	}
+	if store.createCalls != 0 {
+		t.Errorf("feed rows created: got %d, want 0 -- an unsendable verification link must not be published to the feed either", store.createCalls)
+	}
+}

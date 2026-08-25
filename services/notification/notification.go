@@ -374,26 +374,57 @@ func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModel
 	return s.Send(opts)
 }
 
-// SendEmailVerification mails the single-use link that confirms a pending
-// notification address (handlers/profile.setEmail). The dedupe key is keyed
-// on the token, not just the destination address: a re-submission of the
-// same address gets a fresh token (models.SetPendingEmail overwrites the
-// old one), and it must produce a fresh email too, or Service.Send's
-// 24-hour duplicate window would silently swallow the resend while the
-// stale, already-mailed link's token no longer matches anything in the
-// database.
-func (s *Service) SendEmailVerification(to string, userID uuid.UUID, token, link string) error {
-	opts := SendOptions{
-		To:       to,
-		UserID:   userID,
-		Key:      fmt.Sprintf("email-verify-%s", token),
-		Title:    "Confirm your notification email",
-		Template: "verify-email.html",
-		Data: map[string]any{
-			"Link": link,
-		},
+// mailOnly renders a template and puts it on the wire without writing
+// anything to the notification journal. It is the exception to Send, not a
+// variant of it, and exists for one class of message: transactional mail
+// whose entire content is a secret addressed to whoever holds the mailbox.
+//
+// Send's guarantee -- the row is written first and unconditionally, because
+// the row IS the notification -- is exactly wrong for such a message. The
+// feed is readable by the account that submitted the address, so publishing
+// a verification link there hands the token to the submitter, who can then
+// confirm a mailbox they have no access to. That is the one thing
+// verification exists to prevent, so the row must not exist at all rather
+// than exist with its body redacted.
+//
+// Everything else keeps going through Send. Do not add a "skip the feed"
+// switch to SendOptions: the property that every ordinary notification
+// reaches the feed is only as strong as the number of ways there are to
+// opt out of it.
+//
+// With no transport this is a no-op and not an error: an address is only
+// ever offered where mail works (handlers/profile.emailSectionAvailable),
+// so a mailless instance has nothing to send and nothing to report. An
+// address that is not deliverable is the same kind of nothing -- and unlike
+// Send there is no feed entry left behind to make the difference visible.
+func (s *Service) mailOnly(to, subject, templateName string, data any) error {
+	if !Deliverable(to) || !s.hasMail() {
+		return nil
 	}
-	return s.Send(opts)
+	body, err := s.render(templateName, "", data)
+	if err != nil {
+		return errors.Wrap(err, "failed to render notification template")
+	}
+	if err := s.mail.Send(to, subject, body); err != nil {
+		return errors.Wrap(err, "failed to send email")
+	}
+	return nil
+}
+
+// SendEmailVerification mails the single-use link that confirms a pending
+// notification address (handlers/profile.setEmail).
+//
+// It goes through mailOnly rather than Send because the link is the token:
+// a feed entry carrying it would let the account that submitted the address
+// read the link out of its own feed and confirm a mailbox it never had
+// access to. There is nothing to dedupe for the same reason -- the 24-hour
+// window is a property of the journal, and each submission mints a fresh
+// token (models.SetPendingEmail overwrites the old one) that must produce a
+// fresh letter regardless.
+func (s *Service) SendEmailVerification(to, link string) error {
+	return s.mailOnly(to, "Confirm your notification email", "verify-email.html", map[string]any{
+		"Link": link,
+	})
 }
 
 func (s *Service) SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error {
