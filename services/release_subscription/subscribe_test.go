@@ -660,3 +660,87 @@ func TestSetPreferences(t *testing.T) {
 		t.Errorf("language: got %v, want nil for \"any\"", *st.savedLang)
 	}
 }
+
+// TestSubscribeAndUnsubscribeReachTheFeedForAnUndeliverableAddress guards
+// the two remaining sites of the guard ba9362c removed from four others.
+// mailOn/mailOff route through notification.Service.Send, which writes the
+// feed row unconditionally and decides about SMTP itself -- so a
+// deliverability check around the call skipped the feed entry too, and the
+// account heard nothing at all about a subscription it just started or
+// ended. That account is the common case, not an edge one: a self-hosted
+// admin carries the literal "admin" sentinel
+// (services/adminauth/pg_repo.go), and on a default install it is the only
+// account there is.
+//
+// It also removes an inconsistency the guard created: poller.
+// announceCompletion reaches the same SendSubscriptionOff unguarded, so
+// before this fix the identical notification appeared or vanished depending
+// on which path produced it.
+//
+// The mailer here is the real notification.Service over a real journal, not
+// subMail: the property under test is that a feed row lands, and only
+// Service.Send decides that. A fake that merely records the call would pass
+// even if Send had been written to bail out on an undeliverable address.
+func TestSubscribeAndUnsubscribeReachTheFeedForAnUndeliverableAddress(t *testing.T) {
+	ctx := context.Background()
+	journal := &memJournal{}
+	mail := &sentMail{}
+	ns := notification.NewWith(journal, mail, nil, "https://webtor.io", "../../templates/notification")
+
+	admin := &auth.User{ID: uuid.NewV4(), Email: "admin"}
+	st := &subStore{createOK: true}
+	s := &Service{store: st, airing: subAiring{airing: true}, mail: ns, domain: "https://webtor.io", secret: "secret", sync: true}
+
+	sub, created, err := s.Subscribe(ctx, admin, movieReq(), -1)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if !created {
+		t.Fatalf("subscribe reported no new row; nothing would be announced either way")
+	}
+
+	rows, err := ns.ListByUser(ctx, admin.ID, 10)
+	if err != nil {
+		t.Fatalf("list notifications: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("feed rows after subscribing: got %d, want 1 -- the entry IS the notification when there is no mailbox", len(rows))
+	}
+	if want := "sub-on-" + sub.ID.String(); rows[0].Key != want {
+		t.Errorf("feed row key: got %q, want %q", rows[0].Key, want)
+	}
+	if rows[0].To != nil {
+		t.Errorf("feed row carries To=%q; an undeliverable address must not be recorded as a destination", *rows[0].To)
+	}
+
+	// The row now exists as far as the store is concerned, so Unsubscribe
+	// can read it back and then remove it.
+	st.found = sub
+	st.removedByContent = true
+
+	removed, err := s.Unsubscribe(ctx, admin, movieReq())
+	if err != nil {
+		t.Fatalf("unsubscribe: %v", err)
+	}
+	if !removed {
+		t.Fatalf("unsubscribe removed nothing; there would be no notice either way")
+	}
+
+	rows, err = ns.ListByUser(ctx, admin.ID, 10)
+	if err != nil {
+		t.Fatalf("list notifications: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("feed rows after unsubscribing: got %d, want 2 -- the removal notice must reach the feed too", len(rows))
+	}
+	if want := "sub-off-" + sub.ID.String(); rows[0].Key != want {
+		t.Errorf("newest feed row key: got %q, want %q", rows[0].Key, want)
+	}
+	if rows[0].To != nil {
+		t.Errorf("feed row carries To=%q; an undeliverable address must not be recorded as a destination", *rows[0].To)
+	}
+
+	if len(mail.all()) != 0 {
+		t.Errorf("letters sent: %d, want 0 -- there is no address to send to", len(mail.all()))
+	}
+}

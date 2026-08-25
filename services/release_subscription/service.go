@@ -321,11 +321,30 @@ func (s *Service) SetEnabled(ctx context.Context, userID, id uuid.UUID, enabled 
 // mailOn and mailOff send off the request goroutine. An SMTP dial is a
 // remote round-trip, and the user is waiting on a toast that says what
 // already happened in the database — the letter is not part of that answer.
+// The names are historical: both now hand the notification to
+// notification.Service, which writes a feed entry whether or not a letter
+// follows it.
+//
+// The `s.mail == nil` check that remains is not the other half of the guard
+// that used to stand beside it, and the two must not be collapsed back
+// together. A nil mailer is a missing collaborator: there is no
+// notification service wired in at all, so there is nothing to write a feed
+// entry with either, and skipping is all that is left to do. An
+// undeliverable address is the opposite — the service is right there, and
+// SendSubscriptionOn/Off go through notification.Service.Send, which writes
+// the feed row unconditionally and decides about SMTP on its own (it fills
+// To only for a deliverable address and never touches the transport
+// otherwise). Guarding on the address would drop the feed entry, which is
+// the entire notification for the users who have no mailbox: a self-hosted
+// admin account carries the literal "admin" sentinel, and on a default
+// install it is the only account there is. The same guard was removed from
+// four other sites in ba9362c; poller.announceCompletion already reaches
+// SendSubscriptionOff without one. Do not "restore" it here.
 func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
-	if s.mail == nil || !notification.Deliverable(addr) {
+	if s.mail == nil {
 		return
 	}
+	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
 	view := s.view(ctx, sub)
 	s.run(func() {
 		if err := s.mail.SendSubscriptionOn(addr, u.ID, view); err != nil {
@@ -337,11 +356,13 @@ func (s *Service) mailOn(ctx context.Context, u *auth.User, sub *models.ReleaseS
 	})
 }
 
+// mailOff carries the same reasoning as mailOn above, including why only
+// the nil-mailer half of the old guard survives.
 func (s *Service) mailOff(ctx context.Context, u *auth.User, sub *models.ReleaseSubscription) {
-	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
-	if s.mail == nil || !notification.Deliverable(addr) {
+	if s.mail == nil {
 		return
 	}
+	addr := notification.RecipientEmail(u.Email, u.NotificationEmail)
 	view := s.view(ctx, sub)
 	s.run(func() {
 		if err := s.mail.SendSubscriptionOff(addr, u.ID, view, false); err != nil {
