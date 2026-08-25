@@ -14,6 +14,7 @@ import (
 	"github.com/hako/durafmt"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -92,6 +93,15 @@ func New(c *cli.Context, db *pg.DB, i18nSvc *i18n.Service) *Service {
 			from:   c.String(common.SMTPFromFlag),
 			secure: c.Bool(common.SMTPSecureFlag),
 		}
+	} else {
+		// Said once, at startup, because an absent capability gets explained
+		// rather than silently hidden: notifications still reach the user
+		// through the in-app feed, and nothing is queued waiting for a mail
+		// server that is never going to appear. This replaces a warning that
+		// used to fire on every send from a mailer that existed only to
+		// refuse -- once per process is the right volume for a fact about
+		// configuration.
+		log.Info("SMTP_HOST is not set: no mail transport, notifications are delivered to the in-app feed only")
 	}
 	return s
 }
