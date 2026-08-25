@@ -1,13 +1,7 @@
-<!DOCTYPE html>
-<html>
-<body>
-    <p>{{ tp "email.subscription.on.heading" "Title" .Title }}{{ if .IsSeason }} — {{ tp "email.subscription.season" "Season" .Season }}{{ end }}</p>
-    <p>{{ t "email.subscription.on.text" }}</p>
-    <p>
-        <a href="{{ .ManageURL }}">{{ t "email.subscription.manage" }}</a>
-        &nbsp;·&nbsp;
-        <a href="{{ .UnsubscribeURL }}">{{ t "email.subscription.unsubscribe" }}</a>
-    </p>
-    <p>{{ t "email.regards" }}<br>Webtor</p>
-</body>
-</html>
+<p>{{ tp "email.subscription.on.heading" "Title" .Title }}{{ if .IsSeason }} — {{ tp "email.subscription.season" "Season" .Season }}{{ end }}</p>
+<p>{{ t "email.subscription.on.text" }}</p>
+<p>
+    <a href="{{ .ManageURL }}">{{ t "email.subscription.manage" }}</a>
+    &nbsp;·&nbsp;
+    <a href="{{ .UnsubscribeURL }}">{{ t "email.subscription.unsubscribe" }}</a>
+</p>

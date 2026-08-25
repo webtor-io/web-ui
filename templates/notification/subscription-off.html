@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html>
-<body>
-    <p>{{ tp "email.subscription.off.heading" "Title" .Title }}{{ if .IsSeason }} — {{ tp "email.subscription.season" "Season" .Season }}{{ end }}</p>
-    {{/* A season that has finished airing ends on its own; every other
-         ending was the user's doing. Saying which one it was is the whole
-         point of this letter. */}}
-    <p>{{ if .Completed }}{{ t "email.subscription.off.completed" }}{{ else }}{{ t "email.subscription.off.text" }}{{ end }}</p>
-    <p>
-        <a href="{{ .ManageURL }}">{{ t "email.subscription.manage" }}</a>
-    </p>
-    <p>{{ t "email.regards" }}<br>Webtor</p>
-</body>
-</html>
+<p>{{ tp "email.subscription.off.heading" "Title" .Title }}{{ if .IsSeason }} — {{ tp "email.subscription.season" "Season" .Season }}{{ end }}</p>
+{{/* A season that has finished airing ends on its own; every other
+     ending was the user's doing. Saying which one it was is the whole
+     point of this letter. */}}
+<p>{{ if .Completed }}{{ t "email.subscription.off.completed" }}{{ else }}{{ t "email.subscription.off.text" }}{{ end }}</p>
+<p>
+    <a href="{{ .ManageURL }}">{{ t "email.subscription.manage" }}</a>
+</p>

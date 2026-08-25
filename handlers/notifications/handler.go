@@ -8,6 +8,7 @@ package notifications
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/models"
@@ -28,9 +29,39 @@ type Handler struct {
 	tb *template.BuilderWithLayout[*web.Context]
 }
 
+// Item is one row of the feed.
+//
+// It exists rather than handing models.Notification straight to the view,
+// and the reason is Body's type. The stored body is a message fragment
+// produced by html/template (services/notification.render), so the view has
+// to print it as markup -- printed as a plain string it comes out as visible
+// tags, which is exactly what this feed used to show. template.HTML is how a
+// Go template is told "this is already markup", and naming it here keeps
+// that decision in one place, next to the reason it is safe: the fragment's
+// interpolated data -- torrent and resource names, which users control --
+// was escaped when the fragment was rendered. Nothing that did not come out
+// of that renderer may be assigned to this field.
+type Item struct {
+	Title     string
+	Body      template.HTML
+	ReadAt    *time.Time
+	CreatedAt time.Time
+}
+
 // Data is what the list view renders.
 type Data struct {
-	Notifications []models.Notification
+	Notifications []Item
+}
+
+// NewItem builds a feed row from a stored notification. Exported so the
+// render test drives the same conversion the handler does.
+func NewItem(n models.Notification) Item {
+	return Item{
+		Title:     n.Title,
+		Body:      template.HTML(n.Body),
+		ReadAt:    n.ReadAt,
+		CreatedAt: n.CreatedAt,
+	}
 }
 
 func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *notification.Service) {
@@ -52,8 +83,13 @@ func (h *Handler) list(c *gin.Context) {
 		return
 	}
 
+	items := make([]Item, len(list))
+	for i, n := range list {
+		items[i] = NewItem(n)
+	}
+
 	ctx := web.NewContext(c)
-	h.tb.Build("notifications/get").HTML(http.StatusOK, ctx.WithData(&Data{Notifications: list}))
+	h.tb.Build("notifications/get").HTML(http.StatusOK, ctx.WithData(&Data{Notifications: items}))
 }
 
 // markRead clears the unread count and sends the user back where they came

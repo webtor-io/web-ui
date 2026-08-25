@@ -199,7 +199,15 @@ func (s *Service) Send(opts SendOptions) error {
 		return nil
 	}
 
-	if err := s.mail.Send(*n.To, opts.Title, body); err != nil {
+	// The feed got the fragment; the wire gets it wrapped in a document.
+	// Wrapping happens here rather than in render so the stored body stays
+	// the thing the feed can show.
+	letter, err := s.wrapEmail(body, opts.Lang)
+	if err != nil {
+		return errors.Wrap(err, "failed to render email layout")
+	}
+
+	if err := s.mail.Send(*n.To, opts.Title, letter); err != nil {
 		return errors.Wrap(err, "failed to send email")
 	}
 	return s.store.MarkMailed(ctx, n.NotificationID)
@@ -249,6 +257,28 @@ func (s *Service) PruneKeepingNewest(ctx context.Context, keep int) error {
 	return s.store.PruneKeepingNewest(ctx, keep)
 }
 
+// emailLayout is the one document wrapper every letter goes out in. It lives
+// next to the message templates because it is written and edited by whoever
+// writes them, but it is not one of them: render never resolves a caller's
+// template name to it, only wrapEmail names it.
+const emailLayout = "layout.html"
+
+// render executes a message template and returns the fragment it produced.
+//
+// A fragment is the message and nothing else -- no DOCTYPE, no <html>, no
+// sign-off. Every one of these templates used to be a whole document, which
+// is what put "<!DOCTYPE html> <html> <body>" on screen in the in-app feed:
+// the feed shows the stored body, and a document has no place inside a list
+// row. The wrapper is now wrapEmail's job, so there is exactly one body and
+// two presentations of it, rather than two bodies that drift apart.
+//
+// The return value is the output of html/template, which is what makes it
+// safe for the feed to show as markup: every {{ . }} in the template was
+// escaped as it was written, so a torrent name carrying "<script>" is in
+// there as "&lt;script&gt;". Anything that changes this function to skip
+// that escaping (text/template, or interpolating data into the template
+// source) breaks the feed's safety, not just this package's -- see
+// TestRenderedBodyEscapesHostileNames.
 func (s *Service) render(templateName string, lang string, data any) (string, error) {
 	path := filepath.Join(s.templateDir, templateName)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -263,6 +293,34 @@ func (s *Service) render(templateName string, lang string, data any) (string, er
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, data); err != nil {
 		return "", errors.Wrap(err, "failed to execute template")
+	}
+
+	return buf.String(), nil
+}
+
+// wrapEmail puts a rendered fragment inside the shared email document, which
+// is what a mail client needs and a feed row does not: DOCTYPE, <html>,
+// <body> and the sign-off.
+//
+// fragment is passed as template.HTML, i.e. deliberately not escaped again.
+// That is only correct because fragment came out of render, which is
+// html/template -- the attacker-controlled parts of it (torrent and resource
+// names) were escaped when the fragment was built. Do not call this with a
+// string from anywhere else.
+func (s *Service) wrapEmail(fragment string, lang string) (string, error) {
+	path := filepath.Join(s.templateDir, emailLayout)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return "", fmt.Errorf("email layout not found: %s", path)
+	}
+
+	t, err := template.New(emailLayout).Funcs(s.funcs(lang)).ParseFiles(path)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse email layout")
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, map[string]any{"Content": template.HTML(fragment)}); err != nil {
+		return "", errors.Wrap(err, "failed to execute email layout")
 	}
 
 	return buf.String(), nil
@@ -405,7 +463,13 @@ func (s *Service) mailOnly(to, subject, templateName string, data any) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to render notification template")
 	}
-	if err := s.mail.Send(to, subject, body); err != nil {
+	// Never reaches the feed, but it is still a letter, so it still needs to
+	// be a document -- the layout is what makes it one.
+	letter, err := s.wrapEmail(body, "")
+	if err != nil {
+		return errors.Wrap(err, "failed to render email layout")
+	}
+	if err := s.mail.Send(to, subject, letter); err != nil {
 		return errors.Wrap(err, "failed to send email")
 	}
 	return nil

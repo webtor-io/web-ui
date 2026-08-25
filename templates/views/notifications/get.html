@@ -39,7 +39,11 @@
               </div>
               <span class="text-xs text-w-muted whitespace-nowrap shrink-0">{{ timeAgoLang $.Lang .CreatedAt }}</span>
             </div>
-            <p class="text-sm text-w-sub mt-1 leading-relaxed">{{ .Body }}</p>
+            {{/* .Body is a message fragment and is already markup (see
+                 handlers/notifications.Item), which is why this is a <div>
+                 and not a <p>: a <p> nested in a <p> is invalid, and the
+                 browser would close the outer one at the first inner tag. */}}
+            <div class="notification-body text-sm text-w-sub mt-1 leading-relaxed">{{ .Body }}</div>
           </li>
           {{ end }}
         </ul>

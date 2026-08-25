@@ -26,6 +26,12 @@ import (
 
 type FuncMap = template.FuncMap
 
+// HTML is html/template's HTML, re-exported for the same reason FuncMap is:
+// a handler that has to hand a view a value already known to be markup
+// should not have to import html/template alongside this package and alias
+// one of the two to dodge the name clash.
+type HTML = template.HTML
+
 type View struct {
 	Name         string
 	Path         string

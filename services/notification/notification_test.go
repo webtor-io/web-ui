@@ -112,6 +112,18 @@ func (m *mockMailer) Send(to, subject, body string) error {
 func setupTemplateDir(t *testing.T, templates map[string]string) string {
 	t.Helper()
 	tmplDir := t.TempDir()
+	// The real email layout, copied rather than retyped: every mail send
+	// goes through it, so a stand-in here would let these tests pass against
+	// a wrapper production does not use.
+	if _, ok := templates[emailLayout]; !ok {
+		layout, err := os.ReadFile(filepath.Join("../../templates/notification", emailLayout))
+		if err != nil {
+			t.Fatalf("read the real email layout: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(tmplDir, emailLayout), layout, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for name, content := range templates {
 		if err := os.WriteFile(filepath.Join(tmplDir, name), []byte(content), 0644); err != nil {
 			t.Fatal(err)
@@ -238,8 +250,14 @@ func TestSend_Success(t *testing.T) {
 	if mail.calls[0].subject != "Test Title" {
 		t.Errorf("expected subject 'Test Title', got %q", mail.calls[0].subject)
 	}
-	if mail.calls[0].body != "<p>Hello World!</p>" {
-		t.Errorf("expected body '<p>Hello World!</p>', got %q", mail.calls[0].body)
+	// The letter carries the same fragment the feed row got, wrapped in the
+	// email layout -- which is the whole difference between the two
+	// destinations, and the reason the feed no longer shows a DOCTYPE.
+	if !strings.Contains(mail.calls[0].body, "<p>Hello World!</p>") {
+		t.Errorf("the letter does not carry the message:\n%s", mail.calls[0].body)
+	}
+	if !strings.Contains(mail.calls[0].body, "<!DOCTYPE html>") {
+		t.Errorf("the letter is not a document -- a mail client needs the layout:\n%s", mail.calls[0].body)
 	}
 	if !store.markMailedCalled {
 		t.Error("expected mailed_at to be stamped after a successful send")
