@@ -398,7 +398,7 @@ func (j *memJournal) GetLastMailedByKeyAndUser(_ context.Context, key string, us
 	return nil, nil
 }
 
-func (j *memJournal) MarkMailed(_ context.Context, id uuid.UUID) error {
+func (j *memJournal) MarkMailed(_ context.Context, id uuid.UUID, to string) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	now := time.Now()

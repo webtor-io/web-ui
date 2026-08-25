@@ -267,7 +267,7 @@ func (s *Service) Send(opts SendOptions) error {
 	if err := s.mail.Send(opts.To, n.Title, letter); err != nil {
 		return errors.Wrap(err, "failed to send email")
 	}
-	return s.store.MarkMailed(ctx, n.NotificationID)
+	return s.store.MarkMailed(ctx, n.NotificationID, opts.To)
 }
 
 // MailConfigured reports whether this Service can actually send mail. The

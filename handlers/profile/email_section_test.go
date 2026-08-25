@@ -49,7 +49,7 @@ func (nullJournal) GetLastByKeyAndUser(context.Context, string, uuid.UUID) (*mod
 	return nil, nil
 }
 func (nullJournal) Create(context.Context, *models.Notification) error  { return nil }
-func (nullJournal) MarkMailed(context.Context, uuid.UUID) error         { return nil }
+func (nullJournal) MarkMailed(context.Context, uuid.UUID, string) error { return nil }
 func (nullJournal) CountUnread(context.Context, uuid.UUID) (int, error) { return 0, nil }
 func (nullJournal) MarkAllRead(context.Context, uuid.UUID) error        { return nil }
 func (nullJournal) PruneKeepingNewest(context.Context, int) error       { return nil }

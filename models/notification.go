@@ -93,11 +93,19 @@ func GetLastNotificationByKeyAndUser(ctx context.Context, db pg.DBI, key string,
 // server has actually accepted the message. It is the only place that
 // column is set, which is what lets the dedupe query above tell a real send
 // apart from a feed entry whose letter never left.
-func MarkNotificationMailed(ctx context.Context, db pg.DBI, id uuid.UUID) error {
+// MarkNotificationMailed stamps the delivery and records who it went to.
+//
+// The address is written here, not only at Create, because a row reused by
+// a redelivered event carries the earlier attempt's `to` -- which is NULL
+// when that attempt had nowhere to send. Stamping mailed_at without it would
+// leave a row saying a letter went out to nobody: the same shape of quiet
+// untruth this table was fixed to stop telling.
+func MarkNotificationMailed(ctx context.Context, db pg.DBI, id uuid.UUID, to string) error {
 	n := &Notification{NotificationID: id}
 	_, err := db.Model(n).
 		Context(ctx).
 		Set("mailed_at = now()").
+		Set("\"to\" = ?", to).
 		Set("updated_at = now()").
 		WherePK().
 		Update()

@@ -36,7 +36,7 @@ func (s *captureStore) Create(_ context.Context, n *models.Notification) error {
 	s.created = n
 	return nil
 }
-func (s *captureStore) MarkMailed(context.Context, uuid.UUID) error { return nil }
+func (s *captureStore) MarkMailed(context.Context, uuid.UUID, string) error { return nil }
 func (s *captureStore) CountUnread(context.Context, uuid.UUID) (int, error) {
 	return 0, nil
 }

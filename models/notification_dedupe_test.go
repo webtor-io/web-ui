@@ -112,3 +112,41 @@ func TestGetLastNotificationByKeyAndUserIsScopedAndOrdered(t *testing.T) {
 		t.Fatalf("got row %s for a key this user never received, want none", none.NotificationID)
 	}
 }
+
+// TestMarkNotificationMailedRecordsTheRecipient exercises the UPDATE against a
+// real Postgres, because the column is named "to" -- a reserved word. A
+// mis-quoted identifier is a syntax error at runtime, not at compile time, and
+// the failure would be quiet in the worst way: MarkMailed returns an error,
+// mailed_at is never stamped, and every later run inside the window decides the
+// letter is still owed and sends it again.
+func TestMarkNotificationMailedRecordsTheRecipient(t *testing.T) {
+	db := startTestPostgres(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, db, "mark-mailed@example.com")
+	const key = "vaulted-mark-mailed"
+
+	// The row an earlier attempt left behind: no address, never mailed.
+	id := insertDedupeNotification(t, db, user, key, time.Now().Add(-time.Hour), nil)
+
+	if err := MarkNotificationMailed(ctx, db, id, "confirmed@example.com"); err != nil {
+		t.Fatalf("MarkNotificationMailed: %v", err)
+	}
+
+	got, err := GetLastNotificationByKeyAndUser(ctx, db, key, user)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if got == nil {
+		t.Fatal("row disappeared")
+	}
+	if got.MailedAt == nil {
+		t.Error("mailed_at was not stamped")
+	}
+	if got.To == nil {
+		t.Fatal("row is stamped as mailed but records no recipient")
+	}
+	if *got.To != "confirmed@example.com" {
+		t.Errorf("recipient recorded as %q, want confirmed@example.com", *got.To)
+	}
+}

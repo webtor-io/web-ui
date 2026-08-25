@@ -68,7 +68,7 @@ func (m *mockStore) Create(_ context.Context, n *models.Notification) error {
 	return m.createErr
 }
 
-func (m *mockStore) MarkMailed(_ context.Context, id uuid.UUID) error {
+func (m *mockStore) MarkMailed(_ context.Context, id uuid.UUID, to string) error {
 	m.markMailedCalled = true
 	m.markMailedID = id
 	if m.markMailedErr != nil {
@@ -847,11 +847,17 @@ func (j *journalStore) Create(_ context.Context, n *models.Notification) error {
 	return nil
 }
 
-func (j *journalStore) MarkMailed(_ context.Context, id uuid.UUID) error {
+func (j *journalStore) MarkMailed(_ context.Context, id uuid.UUID, to string) error {
 	now := time.Now()
 	for _, r := range j.rows {
 		if r.NotificationID == id {
 			r.MailedAt = &now
+			// Mirrors the real store: the address is recorded with the
+			// stamp, not only at Create. A reused row carries the earlier
+			// attempt's `to`, which is NULL when that attempt had nowhere
+			// to send.
+			addr := to
+			r.To = &addr
 		}
 	}
 	return nil
@@ -1028,6 +1034,52 @@ func TestSendDoesNotSuppressRetryAfterFailedSend(t *testing.T) {
 	}
 	if existing.MailedAt == nil {
 		t.Error("mailed_at was not stamped on the existing row -- the letter it owed is still owed, so the next send will mail again")
+	}
+}
+
+// TestSendRecordsTheRecipientWhenStampingAReusedRow closes the gap that
+// stamping alone leaves. A row reused by a redelivered event carries the
+// earlier attempt's `to` -- NULL when that attempt had nowhere to send, which
+// is the ordinary case on an instance with no deliverable address. Stamping
+// mailed_at without also writing the address would leave a row asserting that
+// a letter went out, with no record of where: the same shape of quiet untruth
+// this table was changed to stop telling.
+func TestSendRecordsTheRecipientWhenStampingAReusedRow(t *testing.T) {
+	tmplDir := setupTemplateDir(t, map[string]string{
+		"test.html": "body",
+	})
+	existing := &models.Notification{
+		NotificationID: uuid.NewV4(),
+		Key:            "test-key",
+		UserID:         &testUserID,
+		Body:           "body",
+		CreatedAt:      time.Now().Add(-time.Hour),
+		// To is nil and MailedAt is nil: the earlier attempt had no
+		// deliverable address, so it wrote a feed entry and stopped.
+	}
+	store := &journalStore{rows: []*models.Notification{existing}}
+	mail := &mockMailer{}
+	svc := newTestService(store, mail, tmplDir)
+
+	// The account has since confirmed an address, so this attempt can mail.
+	err := svc.Send(SendOptions{
+		To:       "confirmed@example.com",
+		UserID:   testUserID,
+		Key:      "test-key",
+		Title:    "Test",
+		Template: "test.html",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if existing.MailedAt == nil {
+		t.Fatal("mailed_at was not stamped, so this test cannot say anything about the address")
+	}
+	if existing.To == nil {
+		t.Fatal("row is stamped as mailed but records no recipient -- the journal says a letter went out to nobody")
+	}
+	if *existing.To != "confirmed@example.com" {
+		t.Errorf("recipient recorded as %q, want the address this send actually used", *existing.To)
 	}
 }
 

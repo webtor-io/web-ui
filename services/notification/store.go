@@ -19,7 +19,7 @@ type notificationStore interface {
 	// accident of naming.
 	GetLastByKeyAndUser(ctx context.Context, key string, userID uuid.UUID) (*models.Notification, error)
 	Create(ctx context.Context, n *models.Notification) error
-	MarkMailed(ctx context.Context, id uuid.UUID) error
+	MarkMailed(ctx context.Context, id uuid.UUID, to string) error
 	CountUnread(ctx context.Context, userID uuid.UUID) (int, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error)
 	MarkAllRead(ctx context.Context, userID uuid.UUID) error
@@ -45,8 +45,8 @@ func (s *pgNotificationStore) Create(ctx context.Context, n *models.Notification
 	return models.CreateNotification(ctx, s.db, n)
 }
 
-func (s *pgNotificationStore) MarkMailed(ctx context.Context, id uuid.UUID) error {
-	return models.MarkNotificationMailed(ctx, s.db, id)
+func (s *pgNotificationStore) MarkMailed(ctx context.Context, id uuid.UUID, to string) error {
+	return models.MarkNotificationMailed(ctx, s.db, id, to)
 }
 
 func (s *pgNotificationStore) CountUnread(ctx context.Context, userID uuid.UUID) (int, error) {
