@@ -683,11 +683,21 @@ func (s *Handler) verifyEmail(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to verify pending email"))
 		return
 	}
-	if !ok {
-		c.Redirect(http.StatusFound, "/profile?err=profile.email.expired")
-		return
-	}
-	c.Redirect(http.StatusFound, "/profile?err=profile.email.verified")
+	// Rendered here, not redirected to /profile: the click arrives from a mail
+	// client in whatever browser it opens, which need not carry a session --
+	// and on an instance with ONLY_AUTHORIZED on, /profile would answer that
+	// with a login form and swallow the result. Both outcomes also used to
+	// travel as ?err=..., putting a success in the profile's error slot.
+	s.tb.Build("profile/email_verified").HTML(http.StatusOK,
+		web.NewContext(c).WithData(&emailVerifiedData{OK: ok}))
+}
+
+// emailVerifiedData drives profile/email_verified.html. One field, because
+// there are exactly two outcomes and neither carries the address: the page is
+// reachable by anyone holding the link, so it says whether the link worked
+// and nothing about whose account it belongs to.
+type emailVerifiedData struct {
+	OK bool
 }
 
 // updateSettings persists the toggles from the per-user settings

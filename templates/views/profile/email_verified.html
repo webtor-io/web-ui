@@ -1,0 +1,38 @@
+{{ define "title" }}{{ t $.Lang "profile.email.resultTitle" }}{{ end }}
+{{ define "main" }}
+{{/* A page of its own, not a redirect back to /profile, for two reasons.
+
+     The link is clicked out of a mail client, in whatever browser that opens
+     -- often one with no session here. On an instance with ONLY_AUTHORIZED on,
+     redirecting to /profile answers the click with a login form and the
+     confirmation is simply lost; this route is exempt from that gate so the
+     outcome is always readable.
+
+     And the outcome deserves saying. It used to arrive as
+     ?err=profile.email.verified, i.e. the one result the user was hoping for
+     rendered in the profile's error slot. */}}
+<section class="min-h-screen pt-[120px] pb-20 px-3 sm:px-6">
+  <div class="max-w-md mx-auto text-center">
+
+    <div class="w-14 h-14 rounded-2xl {{ if .Data.OK }}bg-w-cyan/10{{ else }}bg-error/10{{ end }} flex items-center justify-center mx-auto mb-5">
+      {{ if .Data.OK }}
+      <svg class="w-7 h-7 text-w-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 6 9 17l-5-5"/>
+      </svg>
+      {{ else }}
+      <svg class="w-7 h-7 text-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>
+      </svg>
+      {{ end }}
+    </div>
+
+    <h1 class="text-[clamp(1.8rem,4vw,2.4rem)] font-extrabold tracking-tight leading-tight mb-2">{{ t $.Lang "profile.email.resultTitle" }}</h1>
+    <p class="text-w-sub text-sm mb-8">
+      {{ if .Data.OK }}{{ t $.Lang "profile.email.verified" }}{{ else }}{{ t $.Lang "profile.email.expired" }}{{ end }}
+    </p>
+
+    <a data-async-target="main" href="{{ langPath $.Lang "/profile" }}" class="btn btn-soft">{{ t $.Lang "profile.email.backToProfile" }}</a>
+
+  </div>
+</section>
+{{ end }}

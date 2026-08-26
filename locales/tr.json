@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Henüz bildirim yok",
     "notifications.emptyHint": "Kaydettiğin içerikler ve hesabınla ilgili güncellemeleri burada göreceksin.",
     "toast.passwordSet": "Yönetici parolası ayarlandı",
-    "toast.verificationSent": "Doğrulama bağlantısı gönderildi"
+    "toast.verificationSent": "Doğrulama bağlantısı gönderildi",
+    "profile.email.resultTitle": "E-posta doğrulama",
+    "profile.email.backToProfile": "Profile dön"
 }

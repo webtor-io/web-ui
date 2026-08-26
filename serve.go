@@ -628,16 +628,23 @@ func serve(c *cli.Context) error {
 // without adding any protection:
 //
 //   - /api/v1 checks an API key issued on the profile page;
+//
 //   - /stremio carries the addon token in its own URL;
+//
 //   - /s3 verifies a request signature;
+//
 //   - /embed is decided by the embed domain list on the profile page. A
 //     third-party iframe has no session with this instance, so a redirect to
 //     the login form would only render a broken player; with
 //     EMBED_ONLY_AUTHORIZED on, a domain that is not on the list gets the
 //     embed/unauthorized template instead, which a human can read.
 //
-// Kept as a named function rather than inline so the policy is greppable and
-// can be asserted in a test.
+//   - /profile/email/verify carries its own single-use token in the URL, the
+//     same shape /stremio uses. The link is clicked out of a mail client, in
+//     whatever browser that opens — often one with no session here — so
+//     gating it answers the confirmation with a login form and loses it.
+//     Deliberately narrower than /profile: only this subtree opens.
+//
 //   - /donate is the one entry that authenticates nothing. Asking someone to
 //     sign in before they may give money is backwards, and on an instance
 //     whose whole interface is gated the page would otherwise be unreachable
@@ -647,5 +654,5 @@ func serve(c *cli.Context) error {
 // Kept as a named function rather than inline so the policy is greppable and
 // can be asserted in a test.
 func onlyAuthorizedExempt() []string {
-	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate"}
+	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate", "/profile/email/verify"}
 }

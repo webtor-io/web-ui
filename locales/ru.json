@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Уведомлений пока нет",
     "notifications.emptyHint": "Здесь будут новости о ваших сохранённых раздачах и об аккаунте.",
     "toast.passwordSet": "Пароль администратора задан",
-    "toast.verificationSent": "Ссылка для подтверждения отправлена"
+    "toast.verificationSent": "Ссылка для подтверждения отправлена",
+    "profile.email.resultTitle": "Подтверждение почты",
+    "profile.email.backToProfile": "Вернуться в профиль"
 }

@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Noch keine Benachrichtigungen",
     "notifications.emptyHint": "Neuigkeiten zu deinen gespeicherten Inhalten und deinem Konto erscheinen hier.",
     "toast.passwordSet": "Administratorpasswort gesetzt",
-    "toast.verificationSent": "Bestätigungslink gesendet"
+    "toast.verificationSent": "Bestätigungslink gesendet",
+    "profile.email.resultTitle": "E-Mail-Bestätigung",
+    "profile.email.backToProfile": "Zurück zum Profil"
 }

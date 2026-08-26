@@ -1826,5 +1826,7 @@
     "notifications.emptyTitle": "No notifications yet",
     "notifications.emptyHint": "You'll see updates about your saved content and account here.",
     "toast.passwordSet": "Administrator password set",
-    "toast.verificationSent": "Verification link sent"
+    "toast.verificationSent": "Verification link sent",
+    "profile.email.resultTitle": "Email verification",
+    "profile.email.backToProfile": "Back to profile"
 }

@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Nog geen meldingen",
     "notifications.emptyHint": "Hier zie je nieuws over je opgeslagen content en je account.",
     "toast.passwordSet": "Beheerderswachtwoord ingesteld",
-    "toast.verificationSent": "Verificatielink verzonden"
+    "toast.verificationSent": "Verificatielink verzonden",
+    "profile.email.resultTitle": "E-mailverificatie",
+    "profile.email.backToProfile": "Terug naar profiel"
 }

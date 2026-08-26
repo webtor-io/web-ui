@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Ancora nessuna notifica",
     "notifications.emptyHint": "Qui vedrai le novità sui tuoi contenuti salvati e sul tuo account.",
     "toast.passwordSet": "Password amministratore impostata",
-    "toast.verificationSent": "Link di verifica inviato"
+    "toast.verificationSent": "Link di verifica inviato",
+    "profile.email.resultTitle": "Verifica dell'email",
+    "profile.email.backToProfile": "Torna al profilo"
 }

@@ -1747,5 +1747,7 @@
     "notifications.emptyTitle": "Zatím žádná oznámení",
     "notifications.emptyHint": "Novinky o tvém uloženém obsahu a účtu se objeví tady.",
     "toast.passwordSet": "Heslo správce nastaveno",
-    "toast.verificationSent": "Ověřovací odkaz odeslán"
+    "toast.verificationSent": "Ověřovací odkaz odeslán",
+    "profile.email.resultTitle": "Ověření e-mailu",
+    "profile.email.backToProfile": "Zpět do profilu"
 }
