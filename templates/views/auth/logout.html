@@ -16,6 +16,20 @@
       <p class="text-w-sub text-sm">{{ t $.Lang "auth.logout.subtitle" }}</p>
     </div>
 
+    {{/* The client half is SuperTokens' and only SuperTokens'. The handler
+         has already deleted the admin session server-side by the time this
+         renders, so a password-only instance is signed out before the page
+         arrives and has nothing left to ask a script to do.
+
+         Loading it anyway was a real defect, not dead weight: lib/supertokens
+         initialises against `apiDomain: window._domain`, i.e. the configured
+         DOMAIN. On an instance with no SuperTokens that request has no
+         endpoint to reach -- and when DOMAIN does not match the address the
+         page was actually served from, it does not even reach the right
+         host, surfacing as "Failed to fetch" and a POST to /auth/session/
+         refresh against some other port. Gate on the capability, and the
+         whole class disappears. */}}
+    {{ if useSuperTokens }}
     <form class="progress-alert progress-alert-block hidden closeable">
       <div class="log-target"></div>
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
@@ -23,8 +37,19 @@
         <a data-async-target="main" class="close closeable-close" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>
       </div>
     </form>
+    {{ else }}
+    <div class="alert bg-w-line/30 border border-w-line justify-center mb-4">
+      <span class="text-sm">{{ t $.Lang "auth.progress.logoutSuccessful" }}</span>
+    </div>
+    <div class="flex justify-center gap-4 text-sm">
+      <a data-async-target="main" href="{{ langPath $.Lang "/login" }}">{{ t $.Lang "auth.logout.loginAgain" }}</a>
+      <a data-async-target="main" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>
+    </div>
+    {{ end }}
 
   </div>
 </section>
+{{ if useSuperTokens }}
 {{ "auth/logout.js" | asset }}
+{{ end }}
 {{ end }}
