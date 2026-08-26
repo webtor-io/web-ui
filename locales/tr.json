@@ -1745,5 +1745,7 @@
     "notifications.markAllRead": "Tümünü okundu işaretle",
     "notifications.unread": "Okunmadı",
     "notifications.emptyTitle": "Henüz bildirim yok",
-    "notifications.emptyHint": "Kaydettiğin içerikler ve hesabınla ilgili güncellemeleri burada göreceksin."
+    "notifications.emptyHint": "Kaydettiğin içerikler ve hesabınla ilgili güncellemeleri burada göreceksin.",
+    "toast.passwordSet": "Yönetici parolası ayarlandı",
+    "toast.verificationSent": "Doğrulama bağlantısı gönderildi"
 }

@@ -1745,5 +1745,7 @@
     "notifications.markAllRead": "Označit vše jako přečtené",
     "notifications.unread": "Nepřečteno",
     "notifications.emptyTitle": "Zatím žádná oznámení",
-    "notifications.emptyHint": "Novinky o tvém uloženém obsahu a účtu se objeví tady."
+    "notifications.emptyHint": "Novinky o tvém uloženém obsahu a účtu se objeví tady.",
+    "toast.passwordSet": "Heslo správce nastaveno",
+    "toast.verificationSent": "Ověřovací odkaz odeslán"
 }

@@ -1745,5 +1745,7 @@
     "notifications.markAllRead": "Marcar todo como leído",
     "notifications.unread": "Sin leer",
     "notifications.emptyTitle": "Aún no hay notificaciones",
-    "notifications.emptyHint": "Aquí verás las novedades sobre tu contenido guardado y tu cuenta."
+    "notifications.emptyHint": "Aquí verás las novedades sobre tu contenido guardado y tu cuenta.",
+    "toast.passwordSet": "Contraseña de administrador establecida",
+    "toast.verificationSent": "Enlace de verificación enviado"
 }

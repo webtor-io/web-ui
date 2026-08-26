@@ -1745,5 +1745,7 @@
     "notifications.markAllRead": "Отметить все как прочитанные",
     "notifications.unread": "Не прочитано",
     "notifications.emptyTitle": "Уведомлений пока нет",
-    "notifications.emptyHint": "Здесь будут новости о ваших сохранённых раздачах и об аккаунте."
+    "notifications.emptyHint": "Здесь будут новости о ваших сохранённых раздачах и об аккаунте.",
+    "toast.passwordSet": "Пароль администратора задан",
+    "toast.verificationSent": "Ссылка для подтверждения отправлена"
 }

@@ -1745,5 +1745,7 @@
     "notifications.markAllRead": "Alles als gelezen markeren",
     "notifications.unread": "Ongelezen",
     "notifications.emptyTitle": "Nog geen meldingen",
-    "notifications.emptyHint": "Hier zie je nieuws over je opgeslagen content en je account."
+    "notifications.emptyHint": "Hier zie je nieuws over je opgeslagen content en je account.",
+    "toast.passwordSet": "Beheerderswachtwoord ingesteld",
+    "toast.verificationSent": "Verificatielink verzonden"
 }

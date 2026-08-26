@@ -1824,5 +1824,7 @@
     "notifications.unread": "Unread",
     "@notifications.unread": "sr-only label attached to the unread dot next to a notification's title, for screen readers -- the dot itself carries no text.",
     "notifications.emptyTitle": "No notifications yet",
-    "notifications.emptyHint": "You'll see updates about your saved content and account here."
+    "notifications.emptyHint": "You'll see updates about your saved content and account here.",
+    "toast.passwordSet": "Administrator password set",
+    "toast.verificationSent": "Verification link sent"
 }

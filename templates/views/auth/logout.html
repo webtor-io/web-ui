@@ -38,13 +38,17 @@
       </div>
     </form>
     {{ else }}
-    <div class="alert bg-w-line/30 border border-w-line justify-center mb-4">
-      <span class="text-sm">{{ t $.Lang "auth.progress.logoutSuccessful" }}</span>
-    </div>
-    <div class="flex justify-center gap-4 text-sm">
-      <a data-async-target="main" href="{{ langPath $.Lang "/login" }}">{{ t $.Lang "auth.logout.loginAgain" }}</a>
-      <a data-async-target="main" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>
-    </div>
+    {{/* The same block the progress log would have produced, in the state it
+         would have ended in -- same classes, same links, just without the
+         `hidden` the script exists to remove. Rendering a different-looking
+         panel here was a needless second design for one page. */}}
+    <form class="progress-alert progress-alert-block closeable">
+      <div class="log-target">{{ t $.Lang "auth.progress.logoutSuccessful" }}</div>
+      <div class="pt-3 flex justify-end alert-close-wrapper">
+        <a data-async-target="main" class="close" href="{{ langPath $.Lang "/login" }}">{{ t $.Lang "auth.logout.loginAgain" }}</a>
+        <a data-async-target="main" class="close closeable-close" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>
+      </div>
+    </form>
     {{ end }}
 
   </div>

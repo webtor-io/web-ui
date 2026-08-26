@@ -24,7 +24,7 @@
         {{ if .Data.PendingEmail }}
         <p class="text-sm text-w-sub mb-4">{{ tp $.Lang "profile.email.pendingHint" "Email" .Data.PendingEmail }}</p>
         {{ end }}
-        <form method="post" action="{{ langPath $.Lang "/profile/email" }}" class="flex flex-col gap-3 max-w-sm">
+        <form method="post" enctype="multipart/form-data" data-async-push-state="false" data-async-target="#email" action="{{ langPath $.Lang "/profile/email" }}" class="flex flex-col gap-3 max-w-sm">
             <input type="hidden" name="_csrf" value="{{ $.CSRF }}" />
             <input type="email" name="email" autocomplete="email" required
                    class="input w-full bg-base-300 border-w-line focus:border-w-pink focus:outline-none" placeholder="{{ t $.Lang "profile.email.placeholder" }}" />

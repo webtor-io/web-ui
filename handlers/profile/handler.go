@@ -571,7 +571,12 @@ func (s *Handler) setPassword(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	c.Redirect(http.StatusFound, "/profile")
+	// Same answer every other form on this page gives: the async layer reads
+	// status/message off the redirect it lands on and raises the toast. A
+	// bare redirect to /profile left the page reloading whole and saying
+	// nothing, which is how a form that worked still looked like one that
+	// had not.
+	web.RedirectWithSuccessAndMessage(c, "toast.passwordSet")
 }
 
 // pendingEmailTokenBytes is 256 bits of randomness, hex-encoded to a
@@ -656,7 +661,10 @@ func (s *Handler) setEmail(c *gin.Context) {
 			_ = c.Error(errors.Wrap(err, "failed to send verification email"))
 		}
 	}
-	c.Redirect(http.StatusFound, "/profile?err=profile.email.sent")
+	// A sent verification is a success, not an error. It went out as
+	// ?err=profile.email.sent, which rendered it in the section's error slot
+	// -- red styling for the one outcome the user was hoping for.
+	web.RedirectWithSuccessAndMessage(c, "toast.verificationSent")
 }
 
 // verifyEmail promotes a pending address whose token matches and has not
