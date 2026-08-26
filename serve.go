@@ -520,20 +520,25 @@ func serve(c *cli.Context) error {
 
 	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper, torznabCl, torznabTitles)
 
-	// Setting Discover
-	discover.RegisterHandler(r, tm, pg, en, sb)
-
 	// Setting AI Recommendations (Discover)
 	//
 	// rec.New returns nil when the feature flag is off or
 	// ANTHROPIC_API_KEY is empty. In that case we skip handler
-	// registration entirely — the routes simply don't exist and gin
-	// returns its default 404, which the Discover frontend reads as
-	// "feature disabled" and hides the section.
+	// registration entirely — the routes simply don't exist.
+	//
+	// Built before Discover because the page has to be told: its chips
+	// arrive over an EventSource, which cannot see an HTTP status, so an
+	// unregistered route reaches the browser as a closed connection and is
+	// indistinguishable from a network blip. Left to infer, the section drew
+	// itself and then reported a failure on an instance that simply has no
+	// API key.
 	recSvc := rec.New(c, anthropicCl, pg, redis, en, en)
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}
+
+	// Setting Discover
+	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil)
 
 	// Setting Discover Watchlist
 	discover_watchlist.RegisterHandler(r, pg, en)

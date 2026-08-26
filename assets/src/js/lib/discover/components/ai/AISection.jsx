@@ -152,6 +152,18 @@ export function AISection({
     // unmount, and cancellation is handled by the separate unmount effect
     // above via abortRef.
     useEffect(() => {
+        // The server says whether this feature exists at all (window._aiEnabled,
+        // from indexData.AIEnabled). Asking it here rather than inferring from
+        // the response is not a shortcut: chips arrive over an EventSource, and
+        // an EventSource cannot read an HTTP status. An unregistered route
+        // reaches onError as status 0 / connection_lost -- exactly what a
+        // dropped network gives -- so the 404 branch below could never fire for
+        // the case it was written for, and the section rendered itself and then
+        // announced a failure on an instance that simply has no API key.
+        if (window._aiEnabled === false) {
+            dispatch({ type: 'AI_DISABLED' });
+            return;
+        }
         dispatch({ type: 'AI_LOAD_CHIPS_START' });
         let cancelled = false;
         let count = 0;

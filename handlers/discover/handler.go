@@ -49,6 +49,14 @@ type indexerView struct {
 type indexData struct {
 	Addons   []addonView
 	Indexers []indexerView
+	// AIEnabled says whether the recommendations service exists at all
+	// (ANTHROPIC_API_KEY set and the feature on). The section cannot work
+	// this out for itself: its chips arrive over an EventSource, and an
+	// EventSource cannot see an HTTP status -- an unregistered route reaches
+	// it as a closed connection, indistinguishable from a network blip, so
+	// the section drew itself and then reported a failure. Answering here,
+	// from configuration, is the same shape every other capability uses.
+	AIEnabled bool
 	// Prefs are the account's stream settings. The page needs them to say
 	// "nothing here matches what you asked for" — Discover shows every
 	// stream and lets the chips do the filtering, so without them it cannot
@@ -78,14 +86,18 @@ type Handler struct {
 	// sb builds the Torznab half of the stream pipeline — see torznab.go
 	// for why that half cannot run in the browser.
 	sb *stremio.Builder
+	// aiEnabled mirrors whether serve.go registered the recommendations
+	// routes at all; see indexData.AIEnabled for why the page has to be told.
+	aiEnabled bool
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder, aiEnabled bool) {
 	h := &Handler{
-		tb: tm.MustRegisterViews("discover/*").WithLayout("main"),
-		pg: pg,
-		en: en,
-		sb: sb,
+		tb:        tm.MustRegisterViews("discover/*").WithLayout("main"),
+		pg:        pg,
+		en:        en,
+		sb:        sb,
+		aiEnabled: aiEnabled,
 	}
 	r.GET("/discover", h.index)
 	r.POST("/discover/localize", auth.HasAuth, h.localize)
@@ -141,9 +153,10 @@ func (h *Handler) index(c *gin.Context) {
 	}
 
 	h.tb.Build("discover/index").HTML(http.StatusOK, web.NewContext(c).WithData(&indexData{
-		Addons:   views,
-		Indexers: indexerViews(c.Request.Context(), db, u),
-		Prefs:    streamPrefs(c.Request.Context(), db, u),
+		Addons:    views,
+		Indexers:  indexerViews(c.Request.Context(), db, u),
+		Prefs:     streamPrefs(c.Request.Context(), db, u),
+		AIEnabled: h.aiEnabled,
 	}))
 }
 
