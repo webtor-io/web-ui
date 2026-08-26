@@ -23,7 +23,20 @@ func (s *KinopoiskUnofficial) GetName() string {
 	return "Kinopoisk Unofficial"
 }
 
+// NewKinopoiskUnofficial returns nil when there is no API to talk to, the
+// same as every other mapper here -- common.go appends a mapper only when the
+// constructor hands one back, so this is what keeps an unconfigured provider
+// out of the chain.
+//
+// Without it the mapper was appended regardless, and Map dereferenced the nil
+// client on the first title search: an instance with no KINOPOISK key -- every
+// self-hosted one -- panicked inside the enrichment job, so content metadata
+// never arrived. The panic was caught by the job runner and logged, which is
+// why it looked like enrichment merely failing.
 func NewKinopoiskUnofficial(pg *cs.PG, api *ku.Api) *KinopoiskUnofficial {
+	if api == nil {
+		return nil
+	}
 	return &KinopoiskUnofficial{
 		pg:  pg,
 		api: api,
