@@ -15,7 +15,11 @@
         <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed">{{ t $.Lang "notifications.subtitle" }}</p>
       </div>
       {{ if .Data.Notifications }}
-      <form action="{{ langPath $.Lang "/notifications/read" }}" method="post" class="shrink-0 mt-1">
+      {{/* Targets main rather than a fragment of this page: marking read
+           changes the navbar's unread badge too, and the layout already wires
+           main to refresh the nav with it. No history entry -- the URL does
+           not change, the page's own state does. */}}
+      <form action="{{ langPath $.Lang "/notifications/read" }}" method="post" enctype="multipart/form-data" data-async-push-state="false" data-async-target="main" class="shrink-0 mt-1">
         <input type="hidden" name="_csrf" value="{{ $.CSRF }}"/>
         <button type="submit" class="btn btn-ghost btn-sm border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">
           {{ t $.Lang "notifications.markAllRead" }}
