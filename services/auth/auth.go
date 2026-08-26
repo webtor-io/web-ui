@@ -649,6 +649,25 @@ func NewForAdminPasswordTest(hasSupertokens bool, store *adminauth.Store) *Auth 
 	return &Auth{hasSupetokens: hasSupertokens, adminStore: store}
 }
 
+// ForgetAdmin drops the admin identity from this request's context.
+//
+// The auth middleware resolves the user before any handler runs, so a
+// handler that ends the session -- logout -- has already been handed a page
+// context saying "signed in as admin". Rendering from it produced a sign-out
+// page whose navbar still showed the account that had just been signed out,
+// correcting itself only on the next navigation.
+//
+// Clearing IsAdminContext is enough: GetUserFromContext consults it first,
+// and with no access-token query and no SuperTokens session the remaining
+// paths yield an anonymous user. The UserContext value is deliberately left
+// alone rather than overwritten with a nil *models.User -- an interface
+// holding a typed nil is not nil, and that trap has been paid for twice in
+// this package already.
+func ForgetAdmin(c *gin.Context) {
+	ctx := context.WithValue(c.Request.Context(), IsAdminContext{}, false)
+	c.Request = c.Request.WithContext(ctx)
+}
+
 func IsAdmin(c *gin.Context) bool {
 	v := c.Request.Context().Value(IsAdminContext{})
 	isAdmin, ok := v.(bool)

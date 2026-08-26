@@ -326,10 +326,13 @@ func serve(c *cli.Context) error {
 	// the login page arrives without its stylesheet and without a way to log
 	// in.
 	//
-	// The exempt prefixes are the surfaces registered below that carry their
-	// own authentication: the JSON API checks its key, the Stremio addon its
-	// token, S3 its signature. Everything else added later is closed by
-	// default, which is the direction we want a mistake to fall.
+	// The exempt prefixes are of two kinds, and the difference matters when
+	// judging a new one. Most carry their own authentication: the JSON API
+	// checks its key, the Stremio addon its token, S3 its signature. /donate
+	// carries none -- it is exempt because it is meant to be public, which is
+	// a deliberate policy rather than an oversight. Everything else added
+	// later is closed by default, which is the direction we want a mistake
+	// to fall.
 	if c.Bool(common.OnlyAuthorized) {
 		r.Use(auth.OnlyAuthorized(onlyAuthorizedExempt()...))
 	}
@@ -630,6 +633,14 @@ func serve(c *cli.Context) error {
 //
 // Kept as a named function rather than inline so the policy is greppable and
 // can be asserted in a test.
+//   - /donate is the one entry that authenticates nothing. Asking someone to
+//     sign in before they may give money is backwards, and on an instance
+//     whose whole interface is gated the page would otherwise be unreachable
+//     for exactly the visitors most likely to want it. It exposes no user
+//     data: the handler renders payment options and takes a checkout.
+//
+// Kept as a named function rather than inline so the policy is greppable and
+// can be asserted in a test.
 func onlyAuthorizedExempt() []string {
-	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed"}
+	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate"}
 }

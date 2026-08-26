@@ -301,6 +301,11 @@ func (s *Handler) logout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Delete(auth.AdminSessionKey)
 	_ = session.Save()
+	// Before building the context, not after: NewContext reads the user the
+	// middleware resolved on the way in, which is still the admin whose
+	// session was deleted two lines up. Without this the sign-out page renders
+	// its own navbar as signed in.
+	auth.ForgetAdmin(c)
 	s.tb.Build("auth/logout").HTML(http.StatusOK, web.NewContext(c).WithData(LogoutData{}))
 }
 
