@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/webtor-io/web-ui/handlers/about"
@@ -56,6 +57,7 @@ import (
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	"github.com/webtor-io/web-ui/services/memwatch"
 	"github.com/webtor-io/web-ui/services/notification"
 	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
@@ -137,6 +139,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = usv.RegisterFlags(c.Flags)
 	c.Flags = thumb.RegisterFlags(c.Flags)
 	c.Flags = donate.RegisterFlags(c.Flags)
+	c.Flags = memwatch.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -609,6 +612,15 @@ func serve(c *cli.Context) error {
 	err = tm.Init()
 	if err != nil {
 		return err
+	}
+
+	// Setting Memwatch — in-process heap-spike profiler (plain goroutine,
+	// deliberately not a cs.Servable: diagnostics must never take the
+	// process down)
+	if mw := memwatch.New(c); mw != nil {
+		mwCtx, mwCancel := context.WithCancel(context.Background())
+		defer mwCancel()
+		go mw.Serve(mwCtx)
 	}
 
 	// Setting Serve
