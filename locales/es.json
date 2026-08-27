@@ -1723,7 +1723,7 @@
     "email.transfer_timeout.subject": "No hemos podido transferir tu recurso {{.Name}}",
     "email.transfer_timeout.heading": "No hemos podido transferir tu recurso {{.Name}} al Vault en {{.Timeout}}.",
     "email.transfer_timeout.no_seeders": "No había seeders disponibles de los que descargar los datos.",
-    "email.transfer_timeout.points_returned": "Todos tus Vault Points han sido devueltos.",
+    "email.transfer_timeout.points_returned": "Se te han devuelto todos tus Vault Points.",
     "email.transfer_timeout.try_again": "Prueba a buscar otro torrent o inténtalo de nuevo más tarde.",
     "email.expired.subject": "Tu recurso {{.Name}} ha caducado",
     "email.expired.heading": "Tu recurso {{.Name}} ha caducado.",
