@@ -537,7 +537,7 @@ git commit -m "feat(i18n): localize the vault letter bodies"
 
 - [ ] **Step 1: Write the failing check**
 
-A shell check, not a Go test (there is no locale-parity test in this repo and this plan does not introduce one):
+A shell check, not a Go test (correction found at final review: services/i18n/locales_parity_test.go DOES enforce key parity across locales and covers the new keys too; this shell check remains as the task-scoped RED/GREEN gate):
 
 ```bash
 cd /Users/vintikzzzz/Projects/webtor/web-ui && python3 - <<'EOF'
