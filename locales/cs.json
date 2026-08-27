@@ -1731,7 +1731,7 @@
     "email.resource.link": "Odkaz na zdroj:",
     "email.verify.subject": "Potvrď e-mail pro oznámení",
     "email.verify.text": "Potvrď tuto adresu, ať ti chodí oznámení z Webtoru.",
-    "email.verify.expires": "Odkaz platí 24 hodin. Pokud jsi o to nežádal, tento e-mail můžeš ignorovat.",
+    "email.verify.expires": "Odkaz platí 24 hodin. Pokud to nebyla tvoje žádost, tento e-mail můžeš ignorovat.",
     "subscription.unsubscribed.title": "Odběr zrušen",
     "subscription.unsubscribed.text": "Další e-maily o {{.Title}} už nepřijdou.",
     "subscription.unsubscribed.textPlain": "Tento odběr už neexistuje. Další e-maily k němu nepřijdou.",
