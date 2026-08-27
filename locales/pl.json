@@ -1745,5 +1745,10 @@
     "notifications.markAllRead": "Oznacz wszystkie jako przeczytane",
     "notifications.unread": "Nieprzeczytane",
     "notifications.emptyTitle": "Na razie brak powiadomień",
-    "notifications.emptyHint": "Tutaj pojawią się nowości o Twoich zapisanych treściach i koncie."
+    "notifications.emptyHint": "Tutaj pojawią się nowości o Twoich zapisanych treściach i koncie.",
+    "toast.passwordSet": "Hasło administratora ustawione",
+    "toast.verificationSent": "Link weryfikacyjny wysłany",
+    "profile.email.resultTitle": "Weryfikacja e-maila",
+    "profile.email.backToProfile": "Powrót do profilu",
+    "profile.email.tooOften": "Zbyt często prosiłeś o link weryfikacyjny. Spróbuj ponownie za kilka minut."
 }

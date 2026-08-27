@@ -283,18 +283,34 @@ func (h *Handler) pickPeriod(ctx context.Context, tierID int, annual bool) (int,
 // on checkout.
 func (h *Handler) index(c *gin.Context) {
 	tpl := h.tb.Build("donate/index")
-	if h.np == nil {
-		tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(nil, h.patreonOn)))
+
+	var prices []np.Price
+	var pricesErr error
+	if h.np != nil {
+		prices, pricesErr = h.np.Prices(c.Request.Context())
+	}
+	data := buildCards(prices, h.patreonOn)
+
+	// The tier grid is built entirely from the payment provider's prices, so
+	// with no provider -- unconfigured, or down -- there is nothing to choose
+	// between and the page becomes an apology with one button under it. Send
+	// the visitor to that button instead.
+	//
+	// Via our own /donate/patreon, not the storefront URL: it keeps the URL
+	// and its umami event in one place. That route bounces back here when
+	// Patreon is off, which is exactly why this redirect is conditional --
+	// unconditional, the two would volley.
+	if len(data.Cards) == 0 && h.patreonOn {
+		c.Redirect(http.StatusFound, i18n.LangPath(i18n.GetLang(c), "/donate/patreon"))
 		return
 	}
-	prices, err := h.np.Prices(c.Request.Context())
-	if err != nil {
+
+	ctx := web.NewContext(c).WithData(data)
+	if pricesErr != nil {
 		// Plans unavailable must not take the Patreon option down with it.
-		tpl.HTML(http.StatusOK,
-			web.NewContext(c).WithData(buildCards(nil, h.patreonOn)).WithErr(errors.Wrap(err, "failed to get plans")))
-		return
+		ctx = ctx.WithErr(errors.Wrap(pricesErr, "failed to get plans"))
 	}
-	tpl.HTML(http.StatusOK, web.NewContext(c).WithData(buildCards(prices, h.patreonOn)))
+	tpl.HTML(http.StatusOK, ctx)
 }
 
 func (h *Handler) cryptoCheckout(c *gin.Context) {

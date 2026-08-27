@@ -1745,5 +1745,10 @@
     "notifications.markAllRead": "Označit vše jako přečtené",
     "notifications.unread": "Nepřečteno",
     "notifications.emptyTitle": "Zatím žádná oznámení",
-    "notifications.emptyHint": "Novinky o tvém uloženém obsahu a účtu se objeví tady."
+    "notifications.emptyHint": "Novinky o tvém uloženém obsahu a účtu se objeví tady.",
+    "toast.passwordSet": "Heslo správce nastaveno",
+    "toast.verificationSent": "Ověřovací odkaz odeslán",
+    "profile.email.resultTitle": "Ověření e-mailu",
+    "profile.email.backToProfile": "Zpět do profilu",
+    "profile.email.tooOften": "Ověřovací odkaz jste si vyžádali příliš mnohokrát. Zkuste to za pár minut."
 }

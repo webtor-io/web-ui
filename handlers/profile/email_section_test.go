@@ -12,6 +12,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/libapi"
 	"github.com/webtor-io/web-ui/services/notification"
 )
 
@@ -81,17 +82,21 @@ func notificationServiceWithoutMail() *notification.Service {
 	return notification.NewWith(nullJournal{}, nil, nil, "https://webtor.io", "../../templates/notification")
 }
 
-// TestSetEmailRefusedWithoutTheCapability is the security gate: the POST
-// route must enforce the same two capabilities that decide whether the form
-// is rendered at all (Handler.emailSectionAvailable), rather than assume an
-// unrendered form means an unreachable endpoint.
+// TestSetEmailRefusedWithoutTheCapability is the security gate: the POST route
+// must enforce the same capability that decides whether the form is rendered
+// at all (Handler.emailSectionAvailable), rather than assume an unrendered
+// form means an unreachable endpoint. It did not, and any authenticated user
+// could post an arbitrary address and have this instance mail a verification
+// link to it, once per request -- each POST mints a fresh token, so the
+// notification dedupe never applies.
 //
-// Without that gate, on production -- where the section never renders,
-// because an external identity provider owns identity -- any authenticated
-// user could post an arbitrary address and have this instance mail a
-// verification link to it, once per request (each POST mints a fresh token,
-// so the notification dedupe never applies), and could point their own
-// notification_email away from the address the identity provider owns.
+// The capability is mail being sendable, and only that. An earlier version
+// also required that no external identity provider owned the account, which
+// kept the section off webtor.io entirely; that condition guarded against
+// editing the identity address, and nothing here does -- a confirmed address
+// lands in notification_email, a separate column. identityEditable is still
+// set in the cases below, deliberately including the external-provider one,
+// to pin that it no longer decides this.
 //
 // The address posted is well-formed on purpose: it passes
 // notification.Deliverable, so the only thing that can refuse the request is
@@ -106,19 +111,19 @@ func TestSetEmailRefusedWithoutTheCapability(t *testing.T) {
 		noService        bool
 	}{
 		{
-			// Production: an external identity provider owns the identity,
-			// so this account's address is not ours to change even though
-			// mail works.
-			name:             "identity owned by an external provider",
-			identityEditable: false,
-			withMail:         true,
-		},
-		{
-			// Default self-hosted: nothing external owns identity, but with
-			// no transport there is no way to verify an address, so there is
-			// nothing an address could achieve.
+			// Default self-hosted: with no transport there is no way to verify
+			// an address, so there is nothing an address could achieve.
 			name:             "no mail transport",
 			identityEditable: true,
+			withMail:         false,
+		},
+		{
+			// Same, with an external identity provider in the picture: still
+			// refused, and still for the mail reason. Kept as its own case so
+			// a future change that reintroduces the identity condition cannot
+			// hide behind this one passing.
+			name:             "no mail transport, identity owned externally",
+			identityEditable: false,
 			withMail:         false,
 		},
 		{
@@ -181,5 +186,60 @@ func TestSetEmailRejectsUndeliverableAddress(t *testing.T) {
 	}
 	if len(mail.sent) != 0 {
 		t.Errorf("letters sent: %v, want none", mail.sent)
+	}
+}
+
+// The point of enabling this on production: mail being sendable is the whole
+// capability, and an external identity provider owning the account no longer
+// suppresses the section. A confirmed address lands in notification_email, so
+// the identity address the provider owns is untouched -- which is exactly why
+// the old condition was the wrong one.
+func TestEmailSectionAvailableWhereIdentityIsExternal(t *testing.T) {
+	h := &Handler{
+		identityEditable: false, // SuperTokens owns identity: production
+		notification:     notificationServiceWithMail(&countingMailer{}),
+	}
+	if !h.emailSectionAvailable() {
+		t.Error("the section is unavailable where an external provider owns identity; " +
+			"that condition guarded the identity address, and this section does not touch it")
+	}
+}
+
+// Without a bound, POST /profile/email is a spam relay wearing this instance's
+// sender domain: every submission mints a fresh token, so the notification
+// journal's 24-hour window cannot suppress a repeat, and the verification mail
+// bypasses that journal anyway to keep the token out of the in-app feed.
+//
+// The assertion is about the mailer, not just the status: what matters is that
+// a refused request sends nothing.
+func TestSetEmailIsRateLimited(t *testing.T) {
+	const burst = 3
+	mail := &countingMailer{}
+	h := &Handler{
+		identityEditable: true,
+		notification:     notificationServiceWithMail(mail),
+		// Sustained rate low enough that nothing refills during the test, so
+		// the only thing that can allow a request is an unspent burst token.
+		emailLimiter: libapi.NewRateLimiterWith(0.001, burst),
+	}
+	r := newEmailRouter(h)
+
+	// The burst is spent by requests that get past the limiter and then panic
+	// on the nil *cs.PG -- 500 here means "allowed through", which is what the
+	// count is measuring.
+	for i := 0; i < burst; i++ {
+		if code := postEmail(r, "reader@example.com").Code; code != http.StatusInternalServerError {
+			t.Fatalf("take %d of %d: got %d, want 500 (i.e. allowed past the limiter)", i+1, burst, code)
+		}
+	}
+	sentBefore := len(mail.sent)
+
+	w := postEmail(r, "reader@example.com")
+	if w.Code == http.StatusInternalServerError {
+		t.Error("the request after the burst reached the handler body; the limiter did not refuse it")
+	}
+	if len(mail.sent) != sentBefore {
+		t.Errorf("a refused request still sent mail (%d -> %d); the limit does not bound what leaves the instance",
+			sentBefore, len(mail.sent))
 	}
 }

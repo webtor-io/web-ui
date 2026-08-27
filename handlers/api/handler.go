@@ -24,6 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	j "github.com/webtor-io/web-ui/jobs"
@@ -66,7 +67,7 @@ type Handler struct {
 	keyOrigins map[string]bool
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessToken, sapi *restapi.Api, jobs *j.Jobs, v *vault.Vault, us *usettings.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessToken, sapi *restapi.Api, jobs *j.Jobs, v *vault.Vault, us *usettings.Service, rdb redis.UniversalClient) {
 	if c.Bool(co.DisableAPIFlag) {
 		return
 	}
@@ -77,12 +78,12 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 		jobs:         jobs,
 		vault:        v,
 		userSettings: us,
-		limiter:      libapi.NewRateLimiter(c),
+		limiter:      libapi.NewRateLimiter(c).WithRedis(rdb, "rl:api"),
 		domain:       strings.TrimSuffix(c.String(co.DomainFlag), "/"),
 		// A person confirms within minutes; three codes per minute per
 		// address with a small burst covers every legitimate retry.
-		deviceCodeLimiter: libapi.NewRateLimiterWith(0.05, 3),
-		devicePollLimiter: libapi.NewRateLimiterWith(libapi.DevicePollRPS, 1),
+		deviceCodeLimiter: libapi.NewRateLimiterWith(0.05, 3).WithRedis(rdb, "rl:device-code"),
+		devicePollLimiter: libapi.NewRateLimiterWith(libapi.DevicePollRPS, 1).WithRedis(rdb, "rl:device-poll"),
 		keyOrigins:        libapi.AllowedKeyOrigins(libapi.Hosts(c)),
 	}
 

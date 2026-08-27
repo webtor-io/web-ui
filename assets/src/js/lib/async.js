@@ -51,6 +51,22 @@ async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     }
     const res = await fetchFunc(url, fetchParams);
     const text = await res.text();
+    // An EMPTY 401 means the session is gone, or never existed: HasAuth aborts
+    // with a bare status rather than a redirect on purpose, because following
+    // a redirect inside fetch would splice the login page into whatever
+    // element this navigation targeted. Nothing here can render an empty body
+    // either -- swapping it in blanks the page, which is what clicking the
+    // logo on the login form used to do. Hand the URL back to the browser and
+    // let the server answer a real navigation with its redirect to /login.
+    //
+    // A 401 WITH a body is a different answer and must not be hijacked: the
+    // admin login form replies 401 and renders itself again carrying "wrong
+    // password". Reloading there would throw that message away and show a
+    // blank form, so the emptiness -- not the status -- is what decides.
+    if (res.status === 401 && text.trim() === '') {
+        window.location.assign(url);
+        return res;
+    }
     const fragments = parseFragments(text);
     loadAsyncView(target, fragments.main ?? text, options);
     for (const f of updateFields) {

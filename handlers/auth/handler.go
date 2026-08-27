@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/webtor-io/web-ui/services/template"
 )
@@ -102,6 +103,10 @@ type Handler struct {
 	// *auth.Auth (its fields are unexported outside services/auth).
 	passwordFormActive func(*gin.Context) bool
 	loginLimiter       *libapi.RateLimiter
+	// identityManagedExternally is the capability the SuperTokens-only
+	// surfaces hang on: whether an external identity provider owns identity
+	// here at all.
+	identityManagedExternally bool
 }
 
 // PasswordLoginData drives templates/views/auth/password.html. Err carries an
@@ -110,17 +115,44 @@ type PasswordLoginData struct {
 	Err string
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, rdb redis.UniversalClient) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("auth/*").WithLayout("main"),
 		// Five attempts at once, then one per five seconds. Enough that a
 		// mistyped password is never noticed, little enough that guessing is
 		// pointless.
-		loginLimiter:       libapi.NewRateLimiterWith(0.2, 5),
+		loginLimiter:       libapi.NewRateLimiterWith(0.2, 5).WithRedis(rdb, "rl:login"),
 		adminStore:         a.AdminStore(),
 		passwordFormActive: a.AdminPasswordActive,
+
+		identityManagedExternally: a.IdentityManagedExternally(),
 	}
 
+	// /login and /logout exist in both worlds: the first serves the local
+	// password form, the second deletes the local admin session. Everything
+	// else below belongs to the external identity provider and has no
+	// meaning without one -- the views behind them load the SuperTokens
+	// client, which then talks to an endpoint that is not there.
+	//
+	// Registering them anyway was not merely untidy. Each answered 200 and
+	// shipped that client to the browser, so a request to /refresh,
+	// /auth/verify or /auth/callback/google on an instance with no
+	// SuperTokens ended in a failed fetch against the configured DOMAIN --
+	// a different host entirely when the instance is served from another
+	// address. Gate on the capability and the surface simply is not there.
+	r.GET("/login", h.login)
+	r.POST("/login", h.passwordLogin)
+	r.GET("/logout", h.logout)
+
+	if !a.IdentityManagedExternally() {
+		return
+	}
+
+	// Session expiry is a SuperTokens notion: Expired is set only from its
+	// TryRefreshTokenError, and the view this renders exists to hand the
+	// refresh back to its client. Both are meaningless -- and unreachable --
+	// without the provider, so the middleware is registered with the routes
+	// it belongs to rather than always.
 	r.Use(func(c *gin.Context) {
 		u := auth.GetUserFromContext(c)
 		if u != nil && u.Expired {
@@ -130,10 +162,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.
 		}
 	})
 
-	r.GET("/login", h.login)
-	r.POST("/login", h.passwordLogin)
 	r.GET("/refresh", h.refresh)
-	r.GET("/logout", h.logout)
 	r.GET("/auth/verify", h.verify)
 	r.GET("/auth/callback/google", h.callback)
 	r.GET("/auth/callback/patreon", h.callback)
@@ -165,6 +194,14 @@ func (s *Handler) loginView(c *gin.Context) (view string, data any) {
 	if s.passwordFormActive != nil && s.passwordFormActive(c) {
 		return "auth/password", PasswordLoginData{}
 	}
+	// Neither a local password nor an external provider: there is nothing to
+	// sign in to, and auth/login below would ship the SuperTokens client to
+	// a browser with no server to answer it. An empty view name tells the
+	// caller to send the visitor home instead -- which is where an open
+	// instance already lets them go.
+	if !s.identityManagedExternally {
+		return "", nil
+	}
 	instruction := "default"
 	if c.Query("from") != "" {
 		instruction = c.Query("from")
@@ -182,6 +219,14 @@ func (s *Handler) login(c *gin.Context) {
 		_ = session.Save()
 	}
 	view, data := s.loginView(c)
+	// No view means no way to sign in exists on this instance -- no local
+	// password, no external provider. Send the visitor to the page they were
+	// heading for instead of rendering a form that cannot authenticate
+	// anyone; an instance in this state lets them in anyway.
+	if view == "" {
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
 	if s.tb == nil {
 		c.Status(http.StatusOK)
 		return
@@ -257,6 +302,11 @@ func (s *Handler) logout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Delete(auth.AdminSessionKey)
 	_ = session.Save()
+	// Before building the context, not after: NewContext reads the user the
+	// middleware resolved on the way in, which is still the admin whose
+	// session was deleted two lines up. Without this the sign-out page renders
+	// its own navbar as signed in.
+	auth.ForgetAdmin(c)
 	s.tb.Build("auth/logout").HTML(http.StatusOK, web.NewContext(c).WithData(LogoutData{}))
 }
 

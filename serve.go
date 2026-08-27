@@ -314,7 +314,7 @@ func serve(c *cli.Context) error {
 
 	// Setting AuthHandlers
 	if a != nil {
-		wau.RegisterHandler(r, tm, a)
+		wau.RegisterHandler(r, tm, a, redis.Get())
 	}
 
 	// Setting the whole-interface auth gate (self-hosted; off by default).
@@ -326,10 +326,13 @@ func serve(c *cli.Context) error {
 	// the login page arrives without its stylesheet and without a way to log
 	// in.
 	//
-	// The exempt prefixes are the surfaces registered below that carry their
-	// own authentication: the JSON API checks its key, the Stremio addon its
-	// token, S3 its signature. Everything else added later is closed by
-	// default, which is the direction we want a mistake to fall.
+	// The exempt prefixes are of two kinds, and the difference matters when
+	// judging a new one. Most carry their own authentication: the JSON API
+	// checks its key, the Stremio addon its token, S3 its signature. /donate
+	// carries none -- it is exempt because it is meant to be public, which is
+	// a deliberate policy rather than an oversight. Everything else added
+	// later is closed by default, which is the direction we want a mistake
+	// to fall.
 	if c.Bool(common.OnlyAuthorized) {
 		r.Use(auth.OnlyAuthorized(onlyAuthorizedExempt()...))
 	}
@@ -477,11 +480,11 @@ func serve(c *cli.Context) error {
 	notifications.RegisterHandler(r, tm, ns)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get())
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)
-	wdev.RegisterHandler(r, tm, pg)
+	wdev.RegisterHandler(r, tm, pg, redis.Get())
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
@@ -517,20 +520,25 @@ func serve(c *cli.Context) error {
 
 	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper, torznabCl, torznabTitles)
 
-	// Setting Discover
-	discover.RegisterHandler(r, tm, pg, en, sb)
-
 	// Setting AI Recommendations (Discover)
 	//
 	// rec.New returns nil when the feature flag is off or
 	// ANTHROPIC_API_KEY is empty. In that case we skip handler
-	// registration entirely — the routes simply don't exist and gin
-	// returns its default 404, which the Discover frontend reads as
-	// "feature disabled" and hides the section.
+	// registration entirely — the routes simply don't exist.
+	//
+	// Built before Discover because the page has to be told: its chips
+	// arrive over an EventSource, which cannot see an HTTP status, so an
+	// unregistered route reaches the browser as a closed connection and is
+	// indistinguishable from a network blip. Left to infer, the section drew
+	// itself and then reported a failure on an instance that simply has no
+	// API key.
 	recSvc := rec.New(c, anthropicCl, pg, redis, en, en)
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}
+
+	// Setting Discover
+	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil)
 
 	// Setting Discover Watchlist
 	discover_watchlist.RegisterHandler(r, pg, en)
@@ -580,7 +588,7 @@ func serve(c *cli.Context) error {
 	s3.RegisterHandler(c, r, pg, ats, sapi, jobs)
 
 	// Setting JSON API (same library tree again, plus vault and profile)
-	japi.RegisterHandler(c, r, pg, ats, sapi, jobs, v, userSettingsSvc)
+	japi.RegisterHandler(c, r, pg, ats, sapi, jobs, v, userSettingsSvc, redis.Get())
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)
@@ -620,16 +628,31 @@ func serve(c *cli.Context) error {
 // without adding any protection:
 //
 //   - /api/v1 checks an API key issued on the profile page;
+//
 //   - /stremio carries the addon token in its own URL;
+//
 //   - /s3 verifies a request signature;
+//
 //   - /embed is decided by the embed domain list on the profile page. A
 //     third-party iframe has no session with this instance, so a redirect to
 //     the login form would only render a broken player; with
 //     EMBED_ONLY_AUTHORIZED on, a domain that is not on the list gets the
 //     embed/unauthorized template instead, which a human can read.
 //
+//   - /profile/email/verify carries its own single-use token in the URL, the
+//     same shape /stremio uses. The link is clicked out of a mail client, in
+//     whatever browser that opens — often one with no session here — so
+//     gating it answers the confirmation with a login form and loses it.
+//     Deliberately narrower than /profile: only this subtree opens.
+//
+//   - /donate is the one entry that authenticates nothing. Asking someone to
+//     sign in before they may give money is backwards, and on an instance
+//     whose whole interface is gated the page would otherwise be unreachable
+//     for exactly the visitors most likely to want it. It exposes no user
+//     data: the handler renders payment options and takes a checkout.
+//
 // Kept as a named function rather than inline so the policy is greppable and
 // can be asserted in a test.
 func onlyAuthorizedExempt() []string {
-	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed"}
+	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate", "/profile/email/verify"}
 }

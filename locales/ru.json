@@ -1745,5 +1745,10 @@
     "notifications.markAllRead": "Отметить все как прочитанные",
     "notifications.unread": "Не прочитано",
     "notifications.emptyTitle": "Уведомлений пока нет",
-    "notifications.emptyHint": "Здесь будут новости о ваших сохранённых раздачах и об аккаунте."
+    "notifications.emptyHint": "Здесь будут новости о ваших сохранённых раздачах и об аккаунте.",
+    "toast.passwordSet": "Пароль администратора задан",
+    "toast.verificationSent": "Ссылка для подтверждения отправлена",
+    "profile.email.resultTitle": "Подтверждение почты",
+    "profile.email.backToProfile": "Вернуться в профиль",
+    "profile.email.tooOften": "Вы слишком часто запрашивали ссылку для подтверждения. Попробуйте через несколько минут."
 }

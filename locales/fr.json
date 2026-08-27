@@ -1745,5 +1745,10 @@
     "notifications.markAllRead": "Tout marquer comme lu",
     "notifications.unread": "Non lu",
     "notifications.emptyTitle": "Aucune notification pour l'instant",
-    "notifications.emptyHint": "Les nouvelles concernant vos contenus enregistrés et votre compte apparaîtront ici."
+    "notifications.emptyHint": "Les nouvelles concernant vos contenus enregistrés et votre compte apparaîtront ici.",
+    "toast.passwordSet": "Mot de passe administrateur défini",
+    "toast.verificationSent": "Lien de vérification envoyé",
+    "profile.email.resultTitle": "Vérification de l'e-mail",
+    "profile.email.backToProfile": "Retour au profil",
+    "profile.email.tooOften": "Vous avez demandé le lien de vérification trop souvent. Réessayez dans quelques minutes."
 }

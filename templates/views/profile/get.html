@@ -90,7 +90,7 @@
         <h2 class="text-xs font-semibold tracking-widest uppercase text-w-muted">{{ t $.Lang "profile.administration" }}</h2>
         <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
-    <div id="password">
+    <div id="password" data-async-layout="{{`{{ template "profile/password" $ }}`}}">
         {{ template "profile/password" $ }}
     </div>
     {{ end }}
@@ -99,7 +99,7 @@
          both no external identity provider AND SMTP configured (see
          Data.ShowEmailSection), not just Data.IdentityEditable. */}}
     {{ if .Data.ShowEmailSection }}
-    <div id="email">
+    <div id="email" data-async-layout="{{`{{ template "profile/email" $ }}`}}">
         {{ template "profile/email" $ }}
     </div>
     {{ end }}

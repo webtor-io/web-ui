@@ -16,6 +16,18 @@
       <p class="text-w-sub text-sm">{{ t $.Lang "auth.logout.subtitle" }}</p>
     </div>
 
+    {{/* The panel is the same in both worlds; only who fills it differs.
+         With a provider, logout.js runs the sign-out through it and reports
+         what it answered. Without one the handler has already deleted the
+         session by the time this renders, so logout_local.js just shows the
+         finished state -- same progress log, same i18n keys, no call to a
+         service that is not there.
+
+         Loading the SuperTokens half unconditionally was a real defect:
+         lib/supertokens initialises against `apiDomain: window._domain`, the
+         configured DOMAIN, so on an instance without it the sign-out ended in
+         a failed fetch -- against another host entirely when DOMAIN does not
+         match where the page was served from. */}}
     <form class="progress-alert progress-alert-block hidden closeable">
       <div class="log-target"></div>
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
@@ -26,5 +38,9 @@
 
   </div>
 </section>
+{{ if useSuperTokens }}
 {{ "auth/logout.js" | asset }}
+{{ else }}
+{{ "auth/logout_local.js" | asset }}
+{{ end }}
 {{ end }}

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	uuid "github.com/satori/go.uuid"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -104,19 +105,21 @@ type Data struct {
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
 	HasPayments bool
-	// ShowEmailSection gates the notification-email section. It renders only
-	// when both capabilities hold: this account's identity is not owned by
-	// an external identity provider (auth.IdentityManagedExternally is
-	// false -- our own row is the operator's identity, so editing its
-	// address is ours to allow), and mail can actually be sent
-	// (notification.Service.MailConfigured()). Without SMTP there is
-	// nothing an address could achieve, and no way to verify one.
+	// ShowEmailSection gates the notification-email section. One capability:
+	// mail can actually be sent (notification.Service.MailConfigured()).
+	// Without SMTP there is nothing an address could achieve and no way to
+	// verify one. It used to also require that no external identity provider
+	// owned this account -- see emailSectionAvailable for why that was the
+	// wrong question.
 	ShowEmailSection bool
-	// NotificationEmail is the confirmed address mail actually goes to, or
-	// "" if none has ever been verified. This is models.User.NotificationEmail,
-	// never Email -- in self-hosted Email is the literal sentinel "admin",
-	// not an address, and showing it here would be exactly the confusion
-	// this section exists to remove.
+	// NotificationEmail is where mail actually goes: the confirmed address if
+	// one was ever verified, otherwise the account's own Email -- the same
+	// choice notification.RecipientEmail makes when sending, so this page
+	// cannot name a destination the sender would not use.
+	//
+	// "" when neither is deliverable, which is the self-hosted case before an
+	// address is set: Email there is the literal sentinel "admin", and showing
+	// that would be exactly the confusion this section exists to remove.
 	NotificationEmail string
 	// PendingEmail is the address currently awaiting confirmation, or "" if
 	// none is pending.
@@ -145,18 +148,28 @@ type Handler struct {
 	adminStore    *adminauth.Store
 	// identityEditable is auth.IdentityManagedExternally negated: true when
 	// this deployment's own user row is the operator's identity (nothing
-	// external -- SuperTokens -- owns it). Two sections depend on that same
-	// capability: the email section (nothing external claims this account,
-	// so editing its notification address is ours to allow -- combined with
-	// MailConfigured in ShowEmailSection), and the password section, which
-	// gates on this alone rather than on AdminPasswordActive -- the latter
-	// also requires a password to already exist, exactly the state the
-	// section exists to get the instance out of (setting the very first
-	// password).
+	// external -- SuperTokens -- owns it). The password section gates on this
+	// alone rather than on AdminPasswordActive -- the latter also requires a
+	// password to already exist, exactly the state the section exists to get
+	// the instance out of (setting the very first password).
+	//
+	// The email section deliberately does NOT depend on it; see
+	// emailSectionAvailable for why that condition was the wrong question.
 	identityEditable bool
+	// emailLimiter bounds how often one account may ask for a verification
+	// mail. Without it POST /profile/email is a spam relay wearing this
+	// instance's sender domain: every submission mints a fresh token, so the
+	// notification journal's 24-hour window cannot suppress a repeat -- and
+	// the verification mail bypasses that journal entirely anyway, to keep the
+	// token out of the in-app feed. Nothing else stood between an
+	// authenticated user and unbounded mail to an address of their choosing.
+	//
+	// Keyed on the account, not the client IP: the abuse is per-account, and
+	// an attacker changes IP far more cheaply than they create accounts.
+	emailLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient) {
 	h := &Handler{
 		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:               at,
@@ -178,6 +191,11 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		domain:           c.String(common.DomainFlag),
 		adminStore:       a.AdminStore(),
 		identityEditable: !a.IdentityManagedExternally(),
+		// Three in a row, then one per five minutes. Three covers a typo
+		// corrected twice; a loop stops being useful immediately. Setting an
+		// address is a once-in-an-account-lifetime action, so a limit this
+		// tight costs a real user nothing.
+		emailLimiter: libapi.NewRateLimiterWith(1.0/300.0, 3).WithRedis(rdb, "rl:email-verify"),
 	}
 	r.GET("/profile", h.get)
 	r.GET("/profile/email/verify/:token", h.verifyEmail)
@@ -481,11 +499,21 @@ func (s *Handler) get(c *gin.Context) {
 	pendingEmail := ""
 	if showEmailSection {
 		if full, ferr := models.GetUserByID(c.Request.Context(), db, u.ID); ferr == nil && full != nil {
-			// full.Email is deliberately never read here: in self-hosted it
-			// is the literal sentinel "admin", not an address, and showing
-			// it would be exactly the confusion this section removes.
-			if full.NotificationEmail != nil {
-				notificationEmail = *full.NotificationEmail
+			// The address mail actually goes to, which is what the reader
+			// wants to know -- the same choice RecipientEmail makes when
+			// sending, so the page cannot claim a destination the sender
+			// would not use.
+			//
+			// Deliverable is what keeps the identity address out of it where
+			// it is not one: in self-hosted Email is the literal sentinel
+			// "admin", and showing that would be exactly the confusion this
+			// section exists to remove. On webtor.io it is a real address, and
+			// showing it is the point -- an account with nothing set still has
+			// somewhere its mail goes, and saying so is how a reader learns
+			// they are overriding rather than filling in a blank.
+			effective := notification.RecipientEmail(full.Email, full.NotificationEmail)
+			if notification.Deliverable(effective) {
+				notificationEmail = effective
 			}
 			if full.PendingEmail != nil {
 				pendingEmail = *full.PendingEmail
@@ -547,13 +575,19 @@ func (s *Handler) setPassword(c *gin.Context) {
 		c.AbortWithStatus(http.StatusForbidden)
 		return
 	}
+	// Both refusals go through RedirectWithError, like the rest of this file:
+	// it answers X-Return-Url rather than a hardcoded /profile (so the language
+	// prefix and the page the visitor was on survive), sets status=error beside
+	// the key, and answers JSON to a caller that asked for it. Hand-built
+	// "?err=" redirects did none of that.
 	if s.adminStore.IsConfigured(ctx) && !s.adminStore.Verify(ctx, c.PostForm("current")) {
-		c.Redirect(http.StatusFound, "/profile?err=auth.password.wrongCurrent")
+		web.RedirectWithError(c, web.NewUserError("auth.password.wrongCurrent",
+			errors.New("current password did not match")))
 		return
 	}
 	if err := s.adminStore.Set(ctx, c.PostForm("new")); err != nil {
 		if errors.Is(err, adminauth.ErrTooShort) {
-			c.Redirect(http.StatusFound, "/profile?err=auth.password.tooShort")
+			web.RedirectWithError(c, web.NewUserError("auth.password.tooShort", err))
 			return
 		}
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -571,7 +605,12 @@ func (s *Handler) setPassword(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	c.Redirect(http.StatusFound, "/profile")
+	// Same answer every other form on this page gives: the async layer reads
+	// status/message off the redirect it lands on and raises the toast. A
+	// bare redirect to /profile left the page reloading whole and saying
+	// nothing, which is how a form that worked still looked like one that
+	// had not.
+	web.RedirectWithSuccessAndMessage(c, "toast.passwordSet")
 }
 
 // pendingEmailTokenBytes is 256 bits of randomness, hex-encoded to a
@@ -591,19 +630,25 @@ func newEmailVerificationToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// emailSectionAvailable is the notification-email capability: this account's
-// identity is not owned by an external identity provider (so editing its
-// address is ours to allow), and mail can actually be sent (so an address
-// can be verified before anything is sent to it, and there is a point in
-// having one at all).
+// emailSectionAvailable is the notification-email capability: mail can
+// actually be sent, so an address can be verified before anything is sent to
+// it and there is a point in having one at all.
 //
-// It is one method rather than two copies of the same conjunction because
-// both the render decision (get) and the write decision (setEmail) must
-// answer it identically. They did not: get gated, setEmail did not, and a
-// route that is never rendered on production was still reachable by any
-// authenticated user.
+// It used to also require identityEditable -- no external identity provider --
+// which kept the section off webtor.io entirely. That condition was answering
+// the wrong question. It guarded against editing the identity address, and
+// nothing here does: a confirmed address lands in notification_email, a column
+// that exists precisely so identity stays untouched. Tier lookup and Patreon
+// matching read Email and are unaffected; RecipientEmail falls back to Email
+// whenever no notification address is set, which is every account until its
+// owner sets one.
+//
+// It is one method rather than two copies of the same condition because both
+// the render decision (get) and the write decision (setEmail) must answer it
+// identically. They did not: get gated, setEmail did not, and a route that was
+// never rendered was still reachable by any authenticated user.
 func (s *Handler) emailSectionAvailable() bool {
-	return s.identityEditable && s.notification != nil && s.notification.MailConfigured()
+	return s.notification != nil && s.notification.MailConfigured()
 }
 
 // setEmail accepts a notification address for this account, stores it as
@@ -631,10 +676,24 @@ func (s *Handler) setEmail(c *gin.Context) {
 	}
 	email := strings.TrimSpace(c.PostForm("email"))
 	if !notification.Deliverable(email) {
-		c.Redirect(http.StatusFound, "/profile?err=profile.email.invalid")
+		web.RedirectWithError(c, web.NewUserError("profile.email.invalid",
+			errors.New("submitted address is not deliverable")))
 		return
 	}
 	u := auth.GetUserFromContext(c)
+	// After the address is parsed, before anything is sent: a malformed
+	// address costs no mail and should not consume the budget for correcting
+	// it. Keyed on the account for the reason on emailLimiter.
+	if s.emailLimiter != nil {
+		// No Retry-After header: this answers with a redirect, and the header
+		// only means anything on a 429 or 503. The reader gets the wait as a
+		// message instead; the exact seconds go to the log.
+		if retryAfter, ok := s.emailLimiter.Take(u.ID.String()); !ok {
+			web.RedirectWithError(c, web.NewUserError("profile.email.tooOften",
+				errors.Errorf("verification rate limit, retry after %s", retryAfter)))
+			return
+		}
+	}
 	db := s.pg.Get()
 	if db == nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -656,7 +715,10 @@ func (s *Handler) setEmail(c *gin.Context) {
 			_ = c.Error(errors.Wrap(err, "failed to send verification email"))
 		}
 	}
-	c.Redirect(http.StatusFound, "/profile?err=profile.email.sent")
+	// A sent verification is a success, not an error. It went out as
+	// ?err=profile.email.sent, which rendered it in the section's error slot
+	// -- red styling for the one outcome the user was hoping for.
+	web.RedirectWithSuccessAndMessage(c, "toast.verificationSent")
 }
 
 // verifyEmail promotes a pending address whose token matches and has not
@@ -675,11 +737,21 @@ func (s *Handler) verifyEmail(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to verify pending email"))
 		return
 	}
-	if !ok {
-		c.Redirect(http.StatusFound, "/profile?err=profile.email.expired")
-		return
-	}
-	c.Redirect(http.StatusFound, "/profile?err=profile.email.verified")
+	// Rendered here, not redirected to /profile: the click arrives from a mail
+	// client in whatever browser it opens, which need not carry a session --
+	// and on an instance with ONLY_AUTHORIZED on, /profile would answer that
+	// with a login form and swallow the result. Both outcomes also used to
+	// travel as ?err=..., putting a success in the profile's error slot.
+	s.tb.Build("profile/email_verified").HTML(http.StatusOK,
+		web.NewContext(c).WithData(&emailVerifiedData{OK: ok}))
+}
+
+// emailVerifiedData drives profile/email_verified.html. One field, because
+// there are exactly two outcomes and neither carries the address: the page is
+// reachable by anyone holding the link, so it says whether the link worked
+// and nothing about whose account it belongs to.
+type emailVerifiedData struct {
+	OK bool
 }
 
 // updateSettings persists the toggles from the per-user settings

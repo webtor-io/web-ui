@@ -243,7 +243,10 @@ func TestPasswordFormGateIsRespected(t *testing.T) {
 	supertokensAuth := svcauth.NewForAdminPasswordTest(true, store)
 	r := newLoginRouterWithGate(t, store, supertokensAuth.AdminPasswordActive)
 
-	handler := &Handler{adminStore: store, passwordFormActive: supertokensAuth.AdminPasswordActive}
+	// identityManagedExternally mirrors NewForAdminPasswordTest(true, ...)
+	// above: this is the SuperTokens-configured world, and loginView reads
+	// the field rather than re-deriving it.
+	handler := &Handler{adminStore: store, passwordFormActive: supertokensAuth.AdminPasswordActive, identityManagedExternally: true}
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet, "/login", nil)
 	if view, _ := handler.loginView(c); view != "auth/login" {
@@ -256,5 +259,27 @@ func TestPasswordFormGateIsRespected(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(w.Header().Values("Set-Cookie"), " "), "session=") {
 		t.Error("POST /login with SuperTokens configured set a session cookie — it must not authenticate")
+	}
+}
+
+// TestLoginViewOffersNothingWhenNothingCanAuthenticate covers the third
+// state, which used to fall through to the SuperTokens view: no local
+// password and no external provider. That view loads the SuperTokens client,
+// which then talks to an endpoint no such instance has -- so an open
+// instance answered /login with a form that could not work and a failed
+// fetch to whatever DOMAIN names. An empty view name is loginView's way of
+// saying "send them home"; the handler redirects on it.
+func TestLoginViewOffersNothingWhenNothingCanAuthenticate(t *testing.T) {
+	// No password in the store, and no SuperTokens: an open instance.
+	store := adminauth.NewStore("", &memRepo{})
+	openAuth := svcauth.NewForAdminPasswordTest(false, store)
+
+	handler := &Handler{adminStore: store, passwordFormActive: openAuth.AdminPasswordActive}
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, "/login", nil)
+
+	view, _ := handler.loginView(c)
+	if view != "" {
+		t.Errorf("loginView: got %q, want \"\" -- with neither a password nor a provider there is nothing to sign in to, and %q ships the SuperTokens client to a browser with no server for it", view, view)
 	}
 }
