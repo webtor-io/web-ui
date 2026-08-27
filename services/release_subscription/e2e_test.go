@@ -484,6 +484,14 @@ func (j *memJournal) PruneKeepingNewest(_ context.Context, _ int) error {
 	return nil
 }
 
+// AccountLang is not exercised by this suite -- it drives subscription
+// letters, which resolve language through the poller's own store, not
+// through the notification journal -- but memJournal still has to satisfy
+// notification.notificationStore to be usable with notification.NewWith.
+func (j *memJournal) AccountLang(_ context.Context, _ uuid.UUID) string {
+	return ""
+}
+
 // --- the scenario ---
 
 func stream(hash, title, source string) stremio.StreamItem {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // testUserID stands in for whatever account a test's notification belongs
@@ -52,6 +53,10 @@ type mockStore struct {
 	pruneKeepingNewestErr    error
 	pruneKeepingNewestCalled bool
 	pruneKeepingNewestKeep   int
+
+	// accountLang answers AccountLang -- the language "stored" on the
+	// account a test pretends to have.
+	accountLang string
 }
 
 func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
@@ -101,6 +106,10 @@ func (m *mockStore) PruneKeepingNewest(_ context.Context, keep int) error {
 	m.pruneKeepingNewestCalled = true
 	m.pruneKeepingNewestKeep = keep
 	return m.pruneKeepingNewestErr
+}
+
+func (m *mockStore) AccountLang(_ context.Context, _ uuid.UUID) string {
+	return m.accountLang
 }
 
 type mockMailer struct {
@@ -544,7 +553,7 @@ func TestSendVaulted(t *testing.T) {
 	if store.created.Key != "vaulted-abc123" {
 		t.Errorf("expected key 'vaulted-abc123', got %q", store.created.Key)
 	}
-	if store.created.Title != "Your resource My Torrent has been vaulted!" {
+	if store.created.Title != "email.vaulted.subject" {
 		t.Errorf("unexpected title: %q", store.created.Title)
 	}
 	if store.created.To == nil || *store.created.To != "user@example.com" {
@@ -582,7 +591,7 @@ func TestSendExpiring(t *testing.T) {
 	if store.created.Key != "expiring-7" {
 		t.Errorf("expected key 'expiring-7', got %q", store.created.Key)
 	}
-	if store.created.Title != "Your resources will disappear in 7 days!" {
+	if store.created.Title != "email.expiring.subject" {
 		t.Errorf("unexpected title: %q", store.created.Title)
 	}
 
@@ -638,7 +647,7 @@ func TestSendTransferTimeout(t *testing.T) {
 	if store.created.Key != "transfer-timeout-xyz789" {
 		t.Errorf("expected key 'transfer-timeout-xyz789', got %q", store.created.Key)
 	}
-	if store.created.Title != "We were unable to transfer your resource Big Torrent" {
+	if store.created.Title != "email.transfer_timeout.subject" {
 		t.Errorf("unexpected title: %q", store.created.Title)
 	}
 	if !strings.Contains(store.created.Body, "Big Torrent") {
@@ -678,7 +687,7 @@ func TestSendExpired(t *testing.T) {
 	if store.created.Key != "expired-exp456" {
 		t.Errorf("expected key 'expired-exp456', got %q", store.created.Key)
 	}
-	if store.created.Title != "Your resource Old Torrent has expired" {
+	if store.created.Title != "email.expired.subject" {
 		t.Errorf("unexpected title: %q", store.created.Title)
 	}
 
@@ -899,6 +908,13 @@ func (j *journalStore) MarkAllRead(_ context.Context, userID uuid.UUID) error {
 
 func (j *journalStore) PruneKeepingNewest(_ context.Context, _ int) error {
 	return nil
+}
+
+// AccountLang is not exercised by any journalStore-based test today -- the
+// dedupe filter this fake exists for has nothing to do with language -- but
+// the type still has to satisfy notificationStore.
+func (j *journalStore) AccountLang(_ context.Context, _ uuid.UUID) string {
+	return ""
 }
 
 // TestSendCreatesOneFeedEntryPerKeyAndUserInsideTheWindow is property one:
@@ -1148,7 +1164,7 @@ func TestSendEmailVerificationDoesNotEnterTheFeed(t *testing.T) {
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
-	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
 		t.Fatalf("send verification: %v", err)
 	}
 
@@ -1184,10 +1200,83 @@ func TestSendEmailVerificationWithoutMailTransportIsNoOp(t *testing.T) {
 	// No mailer: exactly what New produces when SMTP_HOST is empty.
 	svc := newTestService(store, nil, tmplDir)
 
-	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
 		t.Fatalf("send verification without a transport must be a no-op, got error: %v", err)
 	}
 	if store.createCalls != 0 {
 		t.Errorf("feed rows created: got %d, want 0 -- an unsendable verification link must not be published to the feed either", store.createCalls)
+	}
+}
+
+// TestSendEmailVerificationLocalized pins the reported bug: an account
+// browsing in Russian got the verification letter in English. Real
+// templates, real locale bundle -- only the transport is a fake.
+func TestSendEmailVerificationLocalized(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	i18nSvc := i18n.New(locales.FS())
+
+	mail := &mockMailer{}
+	svc := NewWith(&mockStore{}, mail, i18nSvc, "https://webtor.io", "../../templates/notification")
+
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, "ru"); err != nil {
+		t.Fatalf("send verification: %v", err)
+	}
+	if len(mail.calls) != 1 {
+		t.Fatalf("letters sent: got %d, want 1", len(mail.calls))
+	}
+	if mail.calls[0].subject != "Подтвердите почту для уведомлений" {
+		t.Errorf("subject not localized: %q", mail.calls[0].subject)
+	}
+	if !strings.Contains(mail.calls[0].body, "Подтвердите этот адрес") {
+		t.Errorf("body not localized:\n%s", mail.calls[0].body)
+	}
+	if !strings.Contains(mail.calls[0].body, verifyLink) {
+		t.Errorf("the letter lost the verification link:\n%s", mail.calls[0].body)
+	}
+
+	// Negative control built in: an account with no observed language gets
+	// the default (English) letter, not the key and not Russian.
+	mail.calls = nil
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
+		t.Fatalf("send verification (default lang): %v", err)
+	}
+	if mail.calls[0].subject != "Confirm your notification email" {
+		t.Errorf("default-language subject: %q", mail.calls[0].subject)
+	}
+}
+
+// TestSendVaultedUsesAccountLanguage pins the resolver wiring end to end:
+// the language stored on the account (user_settings.lang, here via the
+// mock's accountLang) must reach both the letter's subject and the feed
+// row's title. Real locale bundle, real templates.
+func TestSendVaultedUsesAccountLanguage(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	i18nSvc := i18n.New(locales.FS())
+
+	store := &mockStore{accountLang: "ru"}
+	mail := &mockMailer{}
+	svc := NewWith(store, mail, i18nSvc, "https://webtor.io", "../../templates/notification")
+
+	r := &vaultModels.Resource{ResourceID: "abc123", Name: "My Torrent"}
+	if err := svc.SendVaulted("user@example.com", testUserID, r); err != nil {
+		t.Fatalf("send vaulted: %v", err)
+	}
+	if len(mail.calls) != 1 {
+		t.Fatalf("letters sent: got %d, want 1", len(mail.calls))
+	}
+	wantSubject := "Ваш ресурс My Torrent сохранён в Vault!"
+	if mail.calls[0].subject != wantSubject {
+		t.Errorf("subject: got %q, want %q", mail.calls[0].subject, wantSubject)
+	}
+	if store.created == nil || store.created.Title != wantSubject {
+		t.Errorf("feed title not localized: %+v", store.created)
 	}
 }

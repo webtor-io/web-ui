@@ -57,6 +57,7 @@ func (nullJournal) PruneKeepingNewest(context.Context, int) error       { return
 func (nullJournal) ListByUser(context.Context, uuid.UUID, int) ([]models.Notification, error) {
 	return nil, nil
 }
+func (nullJournal) AccountLang(context.Context, uuid.UUID) string { return "" }
 
 // countingMailer stands in for a configured SMTP server: its presence is
 // what makes notification.Service.MailConfigured() true, and its call count

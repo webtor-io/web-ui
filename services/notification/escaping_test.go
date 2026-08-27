@@ -1,12 +1,14 @@
 package notification
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	uuid "github.com/satori/go.uuid"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // The in-app feed prints a stored notification body as markup rather than as
@@ -68,9 +70,19 @@ func TestRenderedBodyEscapesHostileNames(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tmplDir := "../../templates/notification"
+			locales, err := os.OpenRoot("../../locales")
+			if err != nil {
+				t.Fatalf("locales: %v", err)
+			}
+			defer locales.Close()
 			store := &mockStore{}
 			mail := &mockMailer{}
-			svc := newTestService(store, mail, tmplDir)
+			// The real bundle, not nil: since the templates were localized,
+			// a hostile name reaches the body through a translated sentence
+			// (go-i18n's text/template interpolates it, html/template
+			// escapes it on output). A nil bundle would drop the name
+			// entirely -- trivially safe, and testing nothing.
+			svc := NewWith(store, mail, i18n.New(locales.FS()), "https://webtor.io", tmplDir)
 
 			if err := svc.SendVaulted("user@example.com", uuid.NewV4(), hostileResource(tt.resource)); err != nil {
 				t.Fatalf("send: %v", err)

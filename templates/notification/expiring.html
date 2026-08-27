@@ -1,4 +1,4 @@
-<p>Your resources will disappear in {{ .Days }} days:</p>
+<p>{{ tp "email.expiring.heading" "Days" .Days }}</p>
 <ul>
     {{ range .Resources }}
     <li><a href="{{ .URL }}">{{ .Name }}</a></li>

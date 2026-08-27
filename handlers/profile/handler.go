@@ -711,7 +711,7 @@ func (s *Handler) setEmail(c *gin.Context) {
 	}
 	if s.notification != nil {
 		link := fmt.Sprintf("%s/profile/email/verify/%s", s.domain, token)
-		if err := s.notification.SendEmailVerification(email, link); err != nil {
+		if err := s.notification.SendEmailVerification(email, link, i18n.GetLang(c)); err != nil {
 			_ = c.Error(errors.Wrap(err, "failed to send verification email"))
 		}
 	}

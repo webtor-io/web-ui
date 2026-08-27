@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
 )
 
@@ -27,6 +28,13 @@ type notificationStore interface {
 	// user. Rows are kept per user rather than globally: a global cap would
 	// let one busy account evict a quiet one's only notification.
 	PruneKeepingNewest(ctx context.Context, keep int) error
+	// AccountLang returns the language the account browses in
+	// (user_settings.lang), or "" when it has never been observed. It is
+	// what lets a letter assembled far from any HTTP request -- a NATS
+	// event handler, a cron run -- speak the reader's language. "" falls
+	// back to the default language, never to an error: a lookup failure
+	// must not stop a send.
+	AccountLang(ctx context.Context, userID uuid.UUID) string
 }
 
 type pgNotificationStore struct {
@@ -63,4 +71,16 @@ func (s *pgNotificationStore) MarkAllRead(ctx context.Context, userID uuid.UUID)
 
 func (s *pgNotificationStore) PruneKeepingNewest(ctx context.Context, keep int) error {
 	return models.PruneNotificationsKeepingNewest(ctx, s.db, keep)
+}
+
+// AccountLang mirrors release_subscription's pgStore.AccountLang (the same
+// question asked by subscription letters); errors are swallowed because the
+// caller always has a fallback -- the default language.
+func (s *pgNotificationStore) AccountLang(ctx context.Context, userID uuid.UUID) string {
+	us, err := models.GetUserSettings(ctx, s.db, userID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", userID).Warn("failed to read account language for notification")
+		return ""
+	}
+	return us.GetLang()
 }

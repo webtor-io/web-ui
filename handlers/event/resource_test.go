@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/notification"
 )
 
@@ -114,6 +116,11 @@ func (j *memJournal) MarkAllRead(_ context.Context, userID uuid.UUID) error {
 
 func (j *memJournal) PruneKeepingNewest(_ context.Context, _ int) error { return nil }
 
+// AccountLang is not exercised by this package's tests -- they assert on
+// the event-handling wiring, not on letter language -- but the type still
+// has to satisfy notificationStore.
+func (j *memJournal) AccountLang(_ context.Context, _ uuid.UUID) string { return "" }
+
 // recordingMailer is the SMTP transport, minus the SMTP. Configured reports
 // true so that a message the service declines to send is the service's own
 // decision about the address, not a missing mail server.
@@ -129,8 +136,19 @@ func (m *recordingMailer) Send(to, _, _ string) error {
 	return nil
 }
 
-func newTestNotificationService(j *memJournal, m *recordingMailer) *notification.Service {
-	return notification.NewWith(j, m, nil, "https://webtor.io", "../../templates/notification")
+func newTestNotificationService(t *testing.T, j *memJournal, m *recordingMailer) *notification.Service {
+	t.Helper()
+	// The real bundle, not nil: production always passes one (main's
+	// newI18n). Since the vault templates were localized, the resource name
+	// reaches the feed body only through a translated ("tp") sentence -- a
+	// nil bundle would return the bare message key and drop the name
+	// entirely, making the "names the resource" assertion below untestable.
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	t.Cleanup(func() { locales.Close() })
+	return notification.NewWith(j, m, i18n.New(locales.FS()), "https://webtor.io", "../../templates/notification")
 }
 
 // --- tests ---
@@ -147,7 +165,7 @@ func newTestNotificationService(j *memJournal, m *recordingMailer) *notification
 func TestNotifyVaultedReachesTheFeedForUndeliverableAddress(t *testing.T) {
 	journal := &memJournal{}
 	mail := &recordingMailer{}
-	ns := newTestNotificationService(journal, mail)
+	ns := newTestNotificationService(t, journal, mail)
 
 	adminID := uuid.NewV4()
 	r := &vaultModels.Resource{ResourceID: "res1", Name: "Big Buck Bunny"}
@@ -187,7 +205,7 @@ func TestNotifyVaultedReachesTheFeedForUndeliverableAddress(t *testing.T) {
 func TestNotifyVaultedMailsADeliverableAddress(t *testing.T) {
 	journal := &memJournal{}
 	mail := &recordingMailer{}
-	ns := newTestNotificationService(journal, mail)
+	ns := newTestNotificationService(t, journal, mail)
 
 	userID := uuid.NewV4()
 	r := &vaultModels.Resource{ResourceID: "res1", Name: "Big Buck Bunny"}
@@ -215,7 +233,7 @@ func TestNotifyVaultedMailsADeliverableAddress(t *testing.T) {
 func TestNotifyVaultedNotifiesEveryPledger(t *testing.T) {
 	journal := &memJournal{}
 	mail := &recordingMailer{}
-	ns := newTestNotificationService(journal, mail)
+	ns := newTestNotificationService(t, journal, mail)
 
 	adminID := uuid.NewV4()
 	viewerID := uuid.NewV4()
@@ -249,7 +267,7 @@ func TestNotifyVaultedNotifiesEveryPledger(t *testing.T) {
 func TestNotifyVaultedPrefersNotificationAddress(t *testing.T) {
 	journal := &memJournal{}
 	mail := &recordingMailer{}
-	ns := newTestNotificationService(journal, mail)
+	ns := newTestNotificationService(t, journal, mail)
 
 	adminID := uuid.NewV4()
 	notify := "ops@example.com"

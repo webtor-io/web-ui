@@ -434,11 +434,13 @@ func (s *Service) resourceData(r *vaultModels.Resource) map[string]any {
 }
 
 func (s *Service) SendVaulted(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("vaulted-%s", r.ResourceID),
-		Title:    fmt.Sprintf("Your resource %s has been vaulted!", r.Name),
+		Title:    s.T(lang, "email.vaulted.subject", "Name", r.Name),
 		Template: "vaulted.html",
 		Data:     s.resourceData(r),
 	}
@@ -459,11 +461,13 @@ func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources 
 		}
 	}
 
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("expiring-%d", days),
-		Title:    fmt.Sprintf("Your resources will disappear in %d days!", days),
+		Title:    s.T(lang, "email.expiring.subject", "Days", days),
 		Template: "expiring.html",
 		Data: map[string]any{
 			"Days":      days,
@@ -475,14 +479,18 @@ func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources 
 }
 
 func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	// durafmt speaks English only; {{.Timeout}} stays "2 days" in every
+	// language. Accepted for now -- the letter around it is localized.
 	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
+	lang := s.store.AccountLang(context.Background(), userID)
 	data := s.resourceData(r)
 	data["Timeout"] = timeoutStr
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("transfer-timeout-%s", r.ResourceID),
-		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
+		Title:    s.T(lang, "email.transfer_timeout.subject", "Name", r.Name),
 		Template: "transfer-timeout.html",
 		Data:     data,
 	}
@@ -512,17 +520,17 @@ func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModel
 // so a mailless instance has nothing to send and nothing to report. An
 // address that is not deliverable is the same kind of nothing -- and unlike
 // Send there is no feed entry left behind to make the difference visible.
-func (s *Service) mailOnly(to, subject, templateName string, data any) error {
+func (s *Service) mailOnly(to, subject, templateName, lang string, data any) error {
 	if !Deliverable(to) || !s.hasMail() {
 		return nil
 	}
-	body, err := s.render(templateName, "", data)
+	body, err := s.render(templateName, lang, data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render notification template")
 	}
 	// Never reaches the feed, but it is still a letter, so it still needs to
 	// be a document -- the layout is what makes it one.
-	letter, err := s.wrapEmail(body, "")
+	letter, err := s.wrapEmail(body, lang)
 	if err != nil {
 		return errors.Wrap(err, "failed to render email layout")
 	}
@@ -542,18 +550,24 @@ func (s *Service) mailOnly(to, subject, templateName string, data any) error {
 // window is a property of the journal, and each submission mints a fresh
 // token (models.SetPendingEmail overwrites the old one) that must produce a
 // fresh letter regardless.
-func (s *Service) SendEmailVerification(to, link string) error {
-	return s.mailOnly(to, "Confirm your notification email", "verify-email.html", map[string]any{
+//
+// lang is the language the request was browsing in, not an account
+// preference looked up from storage -- this letter is sent from a live
+// handler, so the caller already has it and no lookup is needed.
+func (s *Service) SendEmailVerification(to, link, lang string) error {
+	return s.mailOnly(to, s.T(lang, "email.verify.subject"), "verify-email.html", lang, map[string]any{
 		"Link": link,
 	})
 }
 
 func (s *Service) SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("expired-%s", r.ResourceID),
-		Title:    fmt.Sprintf("Your resource %s has expired", r.Name),
+		Title:    s.T(lang, "email.expired.subject", "Name", r.Name),
 		Template: "expired.html",
 		Data:     s.resourceData(r),
 	}
