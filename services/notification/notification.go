@@ -512,17 +512,17 @@ func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModel
 // so a mailless instance has nothing to send and nothing to report. An
 // address that is not deliverable is the same kind of nothing -- and unlike
 // Send there is no feed entry left behind to make the difference visible.
-func (s *Service) mailOnly(to, subject, templateName string, data any) error {
+func (s *Service) mailOnly(to, subject, templateName, lang string, data any) error {
 	if !Deliverable(to) || !s.hasMail() {
 		return nil
 	}
-	body, err := s.render(templateName, "", data)
+	body, err := s.render(templateName, lang, data)
 	if err != nil {
 		return errors.Wrap(err, "failed to render notification template")
 	}
 	// Never reaches the feed, but it is still a letter, so it still needs to
 	// be a document -- the layout is what makes it one.
-	letter, err := s.wrapEmail(body, "")
+	letter, err := s.wrapEmail(body, lang)
 	if err != nil {
 		return errors.Wrap(err, "failed to render email layout")
 	}
@@ -542,8 +542,12 @@ func (s *Service) mailOnly(to, subject, templateName string, data any) error {
 // window is a property of the journal, and each submission mints a fresh
 // token (models.SetPendingEmail overwrites the old one) that must produce a
 // fresh letter regardless.
-func (s *Service) SendEmailVerification(to, link string) error {
-	return s.mailOnly(to, "Confirm your notification email", "verify-email.html", map[string]any{
+//
+// lang is the language the request was browsing in, not an account
+// preference looked up from storage -- this letter is sent from a live
+// handler, so the caller already has it and no lookup is needed.
+func (s *Service) SendEmailVerification(to, link, lang string) error {
+	return s.mailOnly(to, s.T(lang, "email.verify.subject"), "verify-email.html", lang, map[string]any{
 		"Link": link,
 	})
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 // testUserID stands in for whatever account a test's notification belongs
@@ -1148,7 +1149,7 @@ func TestSendEmailVerificationDoesNotEnterTheFeed(t *testing.T) {
 	mail := &mockMailer{}
 	svc := newTestService(store, mail, tmplDir)
 
-	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
 		t.Fatalf("send verification: %v", err)
 	}
 
@@ -1184,10 +1185,51 @@ func TestSendEmailVerificationWithoutMailTransportIsNoOp(t *testing.T) {
 	// No mailer: exactly what New produces when SMTP_HOST is empty.
 	svc := newTestService(store, nil, tmplDir)
 
-	if err := svc.SendEmailVerification("user@example.com", verifyLink); err != nil {
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
 		t.Fatalf("send verification without a transport must be a no-op, got error: %v", err)
 	}
 	if store.createCalls != 0 {
 		t.Errorf("feed rows created: got %d, want 0 -- an unsendable verification link must not be published to the feed either", store.createCalls)
+	}
+}
+
+// TestSendEmailVerificationLocalized pins the reported bug: an account
+// browsing in Russian got the verification letter in English. Real
+// templates, real locale bundle -- only the transport is a fake.
+func TestSendEmailVerificationLocalized(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	i18nSvc := i18n.New(locales.FS())
+
+	mail := &mockMailer{}
+	svc := NewWith(&mockStore{}, mail, i18nSvc, "https://webtor.io", "../../templates/notification")
+
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, "ru"); err != nil {
+		t.Fatalf("send verification: %v", err)
+	}
+	if len(mail.calls) != 1 {
+		t.Fatalf("letters sent: got %d, want 1", len(mail.calls))
+	}
+	if mail.calls[0].subject != "Подтвердите почту для уведомлений" {
+		t.Errorf("subject not localized: %q", mail.calls[0].subject)
+	}
+	if !strings.Contains(mail.calls[0].body, "Подтвердите этот адрес") {
+		t.Errorf("body not localized:\n%s", mail.calls[0].body)
+	}
+	if !strings.Contains(mail.calls[0].body, verifyLink) {
+		t.Errorf("the letter lost the verification link:\n%s", mail.calls[0].body)
+	}
+
+	// Negative control built in: an account with no observed language gets
+	// the default (English) letter, not the key and not Russian.
+	mail.calls = nil
+	if err := svc.SendEmailVerification("user@example.com", verifyLink, ""); err != nil {
+		t.Fatalf("send verification (default lang): %v", err)
+	}
+	if mail.calls[0].subject != "Confirm your notification email" {
+		t.Errorf("default-language subject: %q", mail.calls[0].subject)
 	}
 }
