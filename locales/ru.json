@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Пароль администратора задан",
     "toast.verificationSent": "Ссылка для подтверждения отправлена",
     "profile.email.resultTitle": "Подтверждение почты",
-    "profile.email.backToProfile": "Вернуться в профиль"
+    "profile.email.backToProfile": "Вернуться в профиль",
+    "profile.email.tooOften": "Вы слишком часто запрашивали ссылку для подтверждения. Попробуйте через несколько минут."
 }

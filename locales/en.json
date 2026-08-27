@@ -1828,5 +1828,6 @@
     "toast.passwordSet": "Administrator password set",
     "toast.verificationSent": "Verification link sent",
     "profile.email.resultTitle": "Email verification",
-    "profile.email.backToProfile": "Back to profile"
+    "profile.email.backToProfile": "Back to profile",
+    "profile.email.tooOften": "You have asked for a verification link too many times. Try again in a few minutes."
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/webtor-io/web-ui/services/template"
 )
@@ -114,13 +115,13 @@ type PasswordLoginData struct {
 	Err string
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, rdb redis.UniversalClient) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("auth/*").WithLayout("main"),
 		// Five attempts at once, then one per five seconds. Enough that a
 		// mistyped password is never noticed, little enough that guessing is
 		// pointless.
-		loginLimiter:       libapi.NewRateLimiterWith(0.2, 5),
+		loginLimiter:       libapi.NewRateLimiterWith(0.2, 5).WithRedis(rdb, "rl:login"),
 		adminStore:         a.AdminStore(),
 		passwordFormActive: a.AdminPasswordActive,
 

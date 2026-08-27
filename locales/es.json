@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Contraseña de administrador establecida",
     "toast.verificationSent": "Enlace de verificación enviado",
     "profile.email.resultTitle": "Verificación de correo",
-    "profile.email.backToProfile": "Volver al perfil"
+    "profile.email.backToProfile": "Volver al perfil",
+    "profile.email.tooOften": "Has solicitado el enlace de verificación demasiadas veces. Inténtalo de nuevo en unos minutos."
 }

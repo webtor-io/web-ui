@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Yönetici parolası ayarlandı",
     "toast.verificationSent": "Doğrulama bağlantısı gönderildi",
     "profile.email.resultTitle": "E-posta doğrulama",
-    "profile.email.backToProfile": "Profile dön"
+    "profile.email.backToProfile": "Profile dön",
+    "profile.email.tooOften": "Doğrulama bağlantısını çok fazla kez istediniz. Birkaç dakika sonra tekrar deneyin."
 }

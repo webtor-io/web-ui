@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Password amministratore impostata",
     "toast.verificationSent": "Link di verifica inviato",
     "profile.email.resultTitle": "Verifica dell'email",
-    "profile.email.backToProfile": "Torna al profilo"
+    "profile.email.backToProfile": "Torna al profilo",
+    "profile.email.tooOften": "Hai richiesto il link di verifica troppe volte. Riprova tra qualche minuto."
 }

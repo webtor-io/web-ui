@@ -314,7 +314,7 @@ func serve(c *cli.Context) error {
 
 	// Setting AuthHandlers
 	if a != nil {
-		wau.RegisterHandler(r, tm, a)
+		wau.RegisterHandler(r, tm, a, redis.Get())
 	}
 
 	// Setting the whole-interface auth gate (self-hosted; off by default).
@@ -480,11 +480,11 @@ func serve(c *cli.Context) error {
 	notifications.RegisterHandler(r, tm, ns)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get())
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)
-	wdev.RegisterHandler(r, tm, pg)
+	wdev.RegisterHandler(r, tm, pg, redis.Get())
 
 	// Setting EmbedDomainHandler
 	err = embed_domain.RegisterHandler(c, r, pg)
@@ -588,7 +588,7 @@ func serve(c *cli.Context) error {
 	s3.RegisterHandler(c, r, pg, ats, sapi, jobs)
 
 	// Setting JSON API (same library tree again, plus vault and profile)
-	japi.RegisterHandler(c, r, pg, ats, sapi, jobs, v, userSettingsSvc)
+	japi.RegisterHandler(c, r, pg, ats, sapi, jobs, v, userSettingsSvc, redis.Get())
 
 	// Setting Tests
 	tests.RegisterHandler(r, tm)

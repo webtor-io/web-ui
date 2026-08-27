@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Mot de passe administrateur défini",
     "toast.verificationSent": "Lien de vérification envoyé",
     "profile.email.resultTitle": "Vérification de l'e-mail",
-    "profile.email.backToProfile": "Retour au profil"
+    "profile.email.backToProfile": "Retour au profil",
+    "profile.email.tooOften": "Vous avez demandé le lien de vérification trop souvent. Réessayez dans quelques minutes."
 }

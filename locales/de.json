@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Administratorpasswort gesetzt",
     "toast.verificationSent": "Bestätigungslink gesendet",
     "profile.email.resultTitle": "E-Mail-Bestätigung",
-    "profile.email.backToProfile": "Zurück zum Profil"
+    "profile.email.backToProfile": "Zurück zum Profil",
+    "profile.email.tooOften": "Sie haben zu oft einen Bestätigungslink angefordert. Versuchen Sie es in ein paar Minuten erneut."
 }

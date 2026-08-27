@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Beheerderswachtwoord ingesteld",
     "toast.verificationSent": "Verificatielink verzonden",
     "profile.email.resultTitle": "E-mailverificatie",
-    "profile.email.backToProfile": "Terug naar profiel"
+    "profile.email.backToProfile": "Terug naar profiel",
+    "profile.email.tooOften": "Je hebt te vaak een verificatielink aangevraagd. Probeer het over een paar minuten opnieuw."
 }

@@ -1749,5 +1749,6 @@
     "toast.passwordSet": "Heslo správce nastaveno",
     "toast.verificationSent": "Ověřovací odkaz odeslán",
     "profile.email.resultTitle": "Ověření e-mailu",
-    "profile.email.backToProfile": "Zpět do profilu"
+    "profile.email.backToProfile": "Zpět do profilu",
+    "profile.email.tooOften": "Ověřovací odkaz jste si vyžádali příliš mnohokrát. Zkuste to za pár minut."
 }

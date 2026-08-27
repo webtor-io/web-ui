@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -38,11 +39,11 @@ type Data struct {
 	DeviceName string
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, rdb redis.UniversalClient) {
 	h := &Handler{
 		tb:      tm.MustRegisterViews("device/*").WithLayout("main"),
 		pg:      pg,
-		limiter: libapi.NewRateLimiterWith(0.1, 5),
+		limiter: libapi.NewRateLimiterWith(0.1, 5).WithRedis(rdb, "rl:device"),
 	}
 	r.GET(libapi.DevicePath, h.get)
 	gr := r.Group(libapi.DevicePath)
