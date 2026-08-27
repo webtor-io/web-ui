@@ -119,6 +119,11 @@ func (j *memJournal) MarkAllRead(_ context.Context, userID uuid.UUID) error {
 
 func (j *memJournal) PruneKeepingNewest(_ context.Context, _ int) error { return nil }
 
+// AccountLang is not exercised by this package's tests -- they assert on
+// the send/dedupe wiring, not on letter language -- but the type still has
+// to satisfy notificationStore.
+func (j *memJournal) AccountLang(_ context.Context, _ uuid.UUID) string { return "" }
+
 // recordingMailer is the SMTP transport, minus the SMTP. Configured reports
 // true so that a message the service declines to send is the service's own
 // decision about the address, not a missing mail server.

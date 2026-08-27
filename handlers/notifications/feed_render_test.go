@@ -45,6 +45,7 @@ func (s *captureStore) ListByUser(context.Context, uuid.UUID, int) ([]models.Not
 }
 func (s *captureStore) MarkAllRead(context.Context, uuid.UUID) error  { return nil }
 func (s *captureStore) PruneKeepingNewest(context.Context, int) error { return nil }
+func (s *captureStore) AccountLang(context.Context, uuid.UUID) string { return "" }
 
 // storedBodyFor sends a "vaulted" notification for a resource with the given
 // name and returns the body that landed in the journal -- byte for byte what

@@ -434,11 +434,13 @@ func (s *Service) resourceData(r *vaultModels.Resource) map[string]any {
 }
 
 func (s *Service) SendVaulted(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("vaulted-%s", r.ResourceID),
-		Title:    fmt.Sprintf("Your resource %s has been vaulted!", r.Name),
+		Title:    s.T(lang, "email.vaulted.subject", "Name", r.Name),
 		Template: "vaulted.html",
 		Data:     s.resourceData(r),
 	}
@@ -459,11 +461,13 @@ func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources 
 		}
 	}
 
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("expiring-%d", days),
-		Title:    fmt.Sprintf("Your resources will disappear in %d days!", days),
+		Title:    s.T(lang, "email.expiring.subject", "Days", days),
 		Template: "expiring.html",
 		Data: map[string]any{
 			"Days":      days,
@@ -476,13 +480,15 @@ func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources 
 
 func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error {
 	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
+	lang := s.store.AccountLang(context.Background(), userID)
 	data := s.resourceData(r)
 	data["Timeout"] = timeoutStr
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("transfer-timeout-%s", r.ResourceID),
-		Title:    fmt.Sprintf("We were unable to transfer your resource %s", r.Name),
+		Title:    s.T(lang, "email.transfer_timeout.subject", "Name", r.Name),
 		Template: "transfer-timeout.html",
 		Data:     data,
 	}
@@ -553,11 +559,13 @@ func (s *Service) SendEmailVerification(to, link, lang string) error {
 }
 
 func (s *Service) SendExpired(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	lang := s.store.AccountLang(context.Background(), userID)
 	opts := SendOptions{
 		To:       to,
 		UserID:   userID,
+		Lang:     lang,
 		Key:      fmt.Sprintf("expired-%s", r.ResourceID),
-		Title:    fmt.Sprintf("Your resource %s has expired", r.Name),
+		Title:    s.T(lang, "email.expired.subject", "Name", r.Name),
 		Template: "expired.html",
 		Data:     s.resourceData(r),
 	}
