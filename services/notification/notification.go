@@ -479,6 +479,8 @@ func (s *Service) SendExpiring(to string, userID uuid.UUID, days int, resources 
 }
 
 func (s *Service) SendTransferTimeout(to string, userID uuid.UUID, r *vaultModels.Resource) error {
+	// durafmt speaks English only; {{.Timeout}} stays "2 days" in every
+	// language. Accepted for now -- the letter around it is localized.
 	timeoutStr := durafmt.Parse(s.transferTimeoutPeriod).LimitFirstN(2).String()
 	lang := s.store.AccountLang(context.Background(), userID)
 	data := s.resourceData(r)
