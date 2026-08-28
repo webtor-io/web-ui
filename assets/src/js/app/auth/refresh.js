@@ -8,7 +8,12 @@ av(async function() {
     } catch (err) {
         console.error(err);
     }
-    window.location.replace(nextLocation(refreshed, window.location));
+    const next = nextLocation(refreshed, window.location);
+    if (next === null) {
+        window.location.reload();
+    } else {
+        window.location.replace(next);
+    }
 });
 
 export {}

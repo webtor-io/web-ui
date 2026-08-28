@@ -3,10 +3,19 @@ import assert from 'node:assert/strict';
 import {nextLocation} from './nextLocation.js';
 
 // A successful refresh means the server can now resolve the session, so the
-// interstitial reloads the page the visitor was on.
-test('successful refresh reloads the current url', () => {
+// interstitial must re-request the page the visitor was on. That has to be a
+// reload (null), not a location.replace(href): when href carries a fragment
+// (e.g. /profile#subscriptions from a subscription email), navigating to the
+// current URL is a same-document fragment navigation per the HTML spec — no
+// server request, and the visitor stays on the blank interstitial forever.
+test('successful refresh signals an in-place reload', () => {
     const loc = {href: 'http://localhost:8083/ru/notifications', pathname: '/ru/notifications', search: ''};
-    assert.equal(nextLocation(true, loc), 'http://localhost:8083/ru/notifications');
+    assert.equal(nextLocation(true, loc), null);
+});
+
+test('successful refresh signals a reload when the url has a fragment', () => {
+    const loc = {href: 'http://localhost:8083/profile#subscriptions', pathname: '/profile', search: ''};
+    assert.equal(nextLocation(true, loc), null);
 });
 
 // attemptRefreshingSession() resolves false — without throwing and without a
