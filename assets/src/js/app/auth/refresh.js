@@ -1,13 +1,14 @@
 import av from '../../lib/av';
+import {nextLocation} from '../../lib/auth/nextLocation.js';
 av(async function() {
     const {refresh} = (await import('../../lib/supertokens'));
+    let refreshed = false;
     try {
-        await refresh(window._CSRF);
-        window.location.replace(window.location.href);
+        refreshed = await refresh(window._CSRF);
     } catch (err) {
         console.error(err);
-        window.location = '/login';
     }
+    window.location.replace(nextLocation(refreshed, window.location));
 });
 
 export {}
