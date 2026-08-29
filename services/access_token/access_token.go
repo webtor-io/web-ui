@@ -66,6 +66,36 @@ func (s *AccessToken) GetTokenByName(c *gin.Context, name string) (*models.Acces
 
 type TokenScope struct{}
 
+// tokenAuthPrefixes are the mount points that authenticate by access token
+// and verify the token's scope before acting.
+//
+// Deliberately a short, explicit list rather than anything derived: it is the
+// contract that says which surfaces a bearer credential may speak to. Adding
+// an entry means committing that everything under it checks scope.
+//
+// /api-credentials and /s3-credentials are NOT here and must not be — they
+// hand out the credentials themselves, and they authenticate by session. Note
+// they escape the list only because of the boundary check below; a bare
+// strings.HasPrefix against "/api" would have swallowed /api-credentials.
+var tokenAuthPrefixes = []string{
+	"/api",
+	"/s3",
+	"/stremio",
+	"/webdav",
+}
+
+// tokenAuthPath reports whether a path is under a mount that accepts token
+// authentication. Matching is on path segment boundaries, so "/api" matches
+// "/api/v1/library" but not "/api-credentials/key".
+func tokenAuthPath(p string) bool {
+	for _, prefix := range tokenAuthPrefixes {
+		if p == prefix || strings.HasPrefix(p, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *AccessToken) RegisterHandler(r *gin.Engine) {
 	prefix := fmt.Sprintf("/%s/", common2.AccessTokenParamName)
 	r.Match(common.AnyMethods, prefix+"*rest", func(c *gin.Context) {
@@ -91,9 +121,30 @@ func (s *AccessToken) RegisterHandler(r *gin.Engine) {
 			c.Next()
 			return
 		}
+		// A token establishes identity only on the surfaces that go on to
+		// verify its scope. This middleware is global, so without the check
+		// a token minted for one purpose authenticated every route in the
+		// app: a stremio:read token — a value that travels in a URL handed
+		// to a third-party client — reached /profile/export, which returns
+		// every other token of that account in cleartext, and
+		// /profile/delete. The S3 access key id is the same value, and by
+		// S3's own model an access key id is not a secret.
+		//
+		// Scope is checked per-surface (at.HasScope in handlers/webdav and
+		// handlers/stremio, the equivalent in handlers/s3 and handlers/api);
+		// what this gate adds is that everything NOT in that list gets no
+		// identity from a token at all. New routes are therefore closed by
+		// default, which is the direction a mistake should fall.
+		if !tokenAuthPath(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
 		at, err := s.getToken(c.Request.Context(), c.Query(common2.AccessTokenParamName))
 		if err != nil {
-			_ = c.AbortWithError(http.StatusInternalServerError, err)
+			// A malformed token is a bad request from this caller, not a
+			// server fault: getToken fails on any non-UUID, so returning 500
+			// here meant `/?token=x` answered 500 on every URL in the app.
+			_ = c.AbortWithError(http.StatusUnauthorized, err)
 			return
 		}
 		if at != nil {

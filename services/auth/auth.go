@@ -363,7 +363,11 @@ func GetUserFromContext(c *gin.Context) *User {
 	if IsAdmin(c) {
 		return makeUserFromContext(c)
 	}
-	if c.Query(sv.AccessTokenParamName) != "" {
+	// A token-derived identity is whatever services/access_token actually
+	// put in the request context, not the mere presence of a query
+	// parameter. Trusting the parameter meant any route treated a token as
+	// proof of identity even where nothing had resolved or scope-checked it.
+	if su, ok := c.Request.Context().Value(UserContext{}).(*models.User); ok && su != nil {
 		return makeUserFromContext(c)
 	}
 	if sessionContainer := session.GetSessionFromRequestContext(c.Request.Context()); sessionContainer != nil {
@@ -489,6 +493,21 @@ func (s *Auth) verifySession(options *sessmodels.VerifySessionOptions) gin.Handl
 	}
 }
 
+// corsOrigins lists the hosts allowed to make credentialed cross-origin
+// requests. Only this site qualifies: the SuperTokens APIDomain and
+// WebsiteDomain are the same host, so there is no second origin that needs to
+// send cookies here.
+//
+// An unset domain yields an empty list, which denies every cross-origin
+// credentialed request. That is the direction a misconfiguration should fall.
+func (s *Auth) corsOrigins() []string {
+	d := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(s.domain, "https://"), "http://"), "/")
+	if d == "" {
+		return nil
+	}
+	return []string{d}
+}
+
 // RegisterHandler wires SuperTokens session handling and its CORS policy.
 //
 // corsExemptPrefixes are path prefixes the SuperTokens CORS middleware must
@@ -521,9 +540,30 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 		return
 	}
 	// CORS
+	//
+	// AllowOriginFunc used to return true unconditionally. Combined with
+	// AllowCredentials that is the reflected-origin misconfiguration:
+	// gin-contrib/cors leaves allowAllOrigins false whenever an origin func
+	// is set, so it echoes the caller's Origin into
+	// Access-Control-Allow-Origin and always emits
+	// Access-Control-Allow-Credentials: true. Since the gin session cookie
+	// is deliberately SameSite=None (see handlers/session, the embed flow
+	// needs it), that cookie rides a cross-site fetch — so any website could
+	// read the body of a page served under it, window._CSRF included.
+	//
+	// The site is its own only legitimate credentialed origin: APIDomain and
+	// WebsiteDomain are the same host here, and nothing cross-origin needs
+	// to send credentials. Everything genuinely public (the poster routes,
+	// the /s alias, /api/v1) declares its own wildcard CORS *without*
+	// credentials, which is the safe combination and is unaffected by this.
+	allowedOrigins := map[string]bool{}
+	for _, h := range s.corsOrigins() {
+		allowedOrigins["https://"+h] = true
+		allowedOrigins["http://"+h] = true
+	}
 	corsHandler := cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
-			return true
+			return allowedOrigins[origin]
 		},
 		AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
 		AllowHeaders:     append([]string{"content-type"}, supertokens.GetAllCORSHeaders()...),
