@@ -25,13 +25,13 @@ require (
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
 	github.com/webtor-io/common-services v0.0.0-20260323152956-4a4e97f013f7
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
-	github.com/webtor-io/lazymap v0.0.0-20251112155450-24fcf0ad4b5d
+	github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4
 	github.com/webtor-io/rest-api v1.0.1-0.20260702182913-e2204030bcdf
 	github.com/yargevad/filepathx v1.0.0
-	golang.org/x/image v0.32.0
-	golang.org/x/sync v0.19.0
-	golang.org/x/text v0.33.0
-	google.golang.org/grpc v1.77.0
+	golang.org/x/image v0.45.0
+	golang.org/x/sync v0.22.0
+	golang.org/x/text v0.41.0
+	google.golang.org/grpc v1.82.1
 )
 
 require (
@@ -55,8 +55,8 @@ require (
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/quic-go/qpack v0.5.1 // indirect
-	github.com/quic-go/quic-go v0.56.0 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
+	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/snowdreamtech/redistore v0.0.0-20231007100540-6364ca2c97b4 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -66,7 +66,7 @@ require (
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.31.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
@@ -156,16 +156,16 @@ require (
 	github.com/webtor-io/magnet2torrent v0.0.0-20220312143110-bc1a7e4bcbba // indirect
 	github.com/webtor-io/torrent-store v1.0.1-0.20260614135143-50f5d91eee6b // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.47.0
+	golang.org/x/crypto v0.54.0
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/time v0.14.0
-	golang.org/x/tools v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	golang.org/x/tools v0.48.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/h2non/gock.v1 v1.1.2 // indirect
