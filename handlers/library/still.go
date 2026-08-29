@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/poster_resolver"
 )
 
 type StillArgs struct {
@@ -41,7 +42,12 @@ func (s *Handler) bindStillArgs(c *gin.Context) (*StillArgs, error) {
 	}
 	width, err := strconv.Atoi(fileParts[0])
 	if err != nil {
-		return nil, errors.Errorf("wrong width %v", width)
+		return nil, errors.Errorf("wrong width %v", fileParts[0])
+	}
+	// See bindPosterArgs: unbounded, this width is a multi-gigabyte
+	// allocation in imaging.Resize on an unauthenticated route.
+	if err := poster_resolver.ValidateWidth(width); err != nil {
+		return nil, err
 	}
 	f := PosterFormat(fileParts[1])
 	if f != PosterFormatJPEG {

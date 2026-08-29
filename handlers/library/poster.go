@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/poster_resolver"
 )
 
 type PosterFormat string
@@ -60,7 +61,14 @@ func (s *Handler) bindPosterArgs(c *gin.Context) (*PosterArgs, error) {
 	}
 	width, err := strconv.Atoi(fileParts[0])
 	if err != nil {
-		return nil, errors.Errorf("wrong width %v", width)
+		return nil, errors.Errorf("wrong width %v", fileParts[0])
+	}
+	// The width goes straight into imaging.Resize below, which allocates
+	// width × height × 4 bytes. Unbounded, one anonymous GET for a
+	// five-figure width is a multi-gigabyte allocation. Same clamp the
+	// newer poster_resolver route has always had.
+	if err := poster_resolver.ValidateWidth(width); err != nil {
+		return nil, err
 	}
 	f := PosterFormat(fileParts[1])
 	if f != PosterFormatJPEG {

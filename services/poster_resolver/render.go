@@ -82,13 +82,34 @@ func (m Mode) CacheTag() string {
 	return tag
 }
 
+// MinWidth and MaxWidth bound every caller-supplied resize width.
+//
+// The bound is load-bearing, not cosmetic: the width reaches
+// imaging.Resize(src, w, 0, Lanczos), which allocates w × h × 4 bytes with
+// h derived from the source aspect ratio. On an ordinary 500x750 poster a
+// width of 20000 asks for a single 2.4 GB allocation — one unauthenticated
+// request against a 5Gi pod. Anything that turns a caller-supplied width
+// into a resize MUST clamp through ValidateWidth.
+const (
+	MinWidth = 32
+	MaxWidth = 1600
+)
+
+// ValidateWidth rejects a resize width outside MinWidth..MaxWidth.
+func ValidateWidth(w int) error {
+	if w < MinWidth || w > MaxWidth {
+		return errors.Errorf("bad poster width %d (want %d..%d)", w, MinWidth, MaxWidth)
+	}
+	return nil
+}
+
 // ParseFileMode unpacks the `file` route parameter into a Mode. Accepts
 //
 //	og.jpg            → OG canvas
 //	<width>.jpg       → resize to <width>
 //
-// width is bounded (32..1600) so a hostile caller can't burn Lanczos
-// CPU asking for 99999.jpg.
+// width is bounded (see ValidateWidth) so a hostile caller can't burn
+// Lanczos CPU — or the pod's whole memory budget — asking for 99999.jpg.
 func ParseFileMode(file string) (Mode, error) {
 	parts := strings.SplitN(file, ".", 2)
 	if len(parts) != 2 || parts[1] != "jpg" {
@@ -98,8 +119,11 @@ func ParseFileMode(file string) (Mode, error) {
 		return Mode{OG: true}, nil
 	}
 	w, err := strconv.Atoi(parts[0])
-	if err != nil || w < 32 || w > 1600 {
+	if err != nil {
 		return Mode{}, errors.Errorf("bad poster width %q", parts[0])
+	}
+	if err := ValidateWidth(w); err != nil {
+		return Mode{}, err
 	}
 	return Mode{Width: w}, nil
 }
