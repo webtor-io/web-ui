@@ -418,7 +418,18 @@ func (s *Job) close() {
 	_ = s.log(LogItem{
 		Level: Close,
 	})
+	// Snapshot under the lock, then close outside it — the same shape
+	// pushToObservers uses, and for the same reason: ObserveLog writes this
+	// map under s.mux from every SSE reader, so iterating it unlocked is a
+	// concurrent map iteration/write, which the runtime turns into an
+	// unrecoverable throw rather than a catchable panic.
+	s.mux.Lock()
+	observers := make([]*Observer, 0, len(s.observers))
 	for _, o := range s.observers {
+		observers = append(observers, o)
+	}
+	s.mux.Unlock()
+	for _, o := range observers {
 		o.Close()
 	}
 }
@@ -507,7 +518,18 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 
 func (s *Jobs) Log(ctx context.Context, id string) (c chan LogItem, ok bool, err error) {
 	c = make(chan LogItem, 10)
+	// s.jobs is written under s.mux by Enqueue and by the cleanup that
+	// deletes finished jobs. Reading it unlocked races those writes, and a
+	// concurrent map read/write is a runtime throw, not a panic — the
+	// recover() further up this package cannot catch it and the whole
+	// process dies. This endpoint is unauthenticated and load-job ids are
+	// sha1(infohash + "/" + lang), so the race is reachable on demand.
+	//
+	// The lock covers only the lookup: Enqueue below takes s.mux itself, so
+	// holding it across that call would deadlock.
+	s.mux.Lock()
 	j, ok := s.jobs[id]
+	s.mux.Unlock()
 	if !ok {
 		log.Infof("unable to find local job with id=%v", id)
 		var state *State
@@ -576,6 +598,20 @@ func NewQueues(storage Storage) *Queues {
 		jobs:    map[string]*Jobs{},
 		storage: storage,
 	}
+}
+
+// Get returns an existing queue without creating one.
+//
+// Anything that takes a queue name from a request must use this rather than
+// GetOrCreate: this map has no capacity, no TTL and no eviction, so a
+// caller-supplied name inserts an entry that is retained for the lifetime of
+// the process. Producers — the handlers and jobs that own a fixed set of
+// queue names — keep using GetOrCreate.
+func (s Queues) Get(name string) (*Jobs, bool) {
+	queueMux.Lock()
+	defer queueMux.Unlock()
+	j, ok := s.jobs[name]
+	return j, ok
 }
 
 func (s Queues) GetOrCreate(name string) *Jobs {

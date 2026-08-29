@@ -25,7 +25,16 @@ func RegisterHandler(r *gin.Engine, q *job.Queues) {
 func (s *Handler) log(c *gin.Context) {
 	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
-	l, ok, err := s.q.GetOrCreate(c.Param("queue_id")).Log(ctx, c.Param("job_id"))
+	// Get, not GetOrCreate: queue_id arrives from the URL on an
+	// unauthenticated route, and GetOrCreate would mint a permanent,
+	// never-evicted entry per distinct name. An unknown queue is a 404, the
+	// same answer an unknown job already gets.
+	q, ok := s.q.Get(c.Param("queue_id"))
+	if !ok {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	l, ok, err := q.Log(ctx, c.Param("job_id"))
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get job log"))
 		return
