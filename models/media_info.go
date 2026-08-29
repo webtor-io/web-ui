@@ -137,6 +137,22 @@ func TryInsertOrLockMediaInfo(ctx context.Context, db *pg.DB, resourceID string,
 	return &existing, tx.Commit()
 }
 
+// MediaInfoExists reports whether we still hold a media_info row for the
+// resource. It answers one question — "is this resource still known to us" —
+// and the caller that needs it is the poster resolver: PurgeResourceByID
+// (the ban path) deletes media_info and lets the FK cascade take movie,
+// series, episode and resource_metadata with it, but a thumbnail row has no
+// FK and survives. Without this check the resolver falls through to that
+// surviving thumbnail and keeps serving a frame extracted from the banned
+// video — and, because the cascade also removed the resource_metadata row
+// the blur decision reads, serves it unblurred.
+func MediaInfoExists(ctx context.Context, db *pg.DB, resourceID string) (bool, error) {
+	return db.Model((*MediaInfo)(nil)).
+		Context(ctx).
+		Where("resource_id = ?", resourceID).
+		Exists()
+}
+
 func UpdateMediaInfo(ctx context.Context, db *pg.DB, info *MediaInfo) error {
 	_, err := db.Model(info).
 		Context(ctx).

@@ -73,6 +73,18 @@ func PurgeResourceByID(ctx context.Context, db *pg.DB, infohash string) error {
 		// PK is (parsed_title, parsed_year, content_type)) records the
 		// first torrent that triggered the memoized Claude lookup —
 		// best-effort cleanup of the diagnostic trace.
+		// thumbnail has no FK on media_info, so unlike movie/series/episode/
+		// resource_metadata it does NOT go by cascade above — it has to be
+		// deleted explicitly. It matters more than the other rows here: the
+		// thumbnail is a frame extracted out of the video itself, and it is
+		// served by the public, unauthenticated /lib/poster/ route. The S3
+		// blob and the derived render cache outlive this DELETE (their keys
+		// carry no resource_id), which is why poster_resolver.Resolve also
+		// refuses to consult a thumbnail once media_info is gone — the
+		// serving path is the guard, this is the cleanup.
+		//
+		// release_subscription_hit keeps producing magnet rows in
+		// subscription mail for a banned release until its row goes too.
 		for _, q := range []string{
 			`DELETE FROM library WHERE resource_id = ?`,
 			`DELETE FROM watch_history WHERE resource_id = ?`,
@@ -80,6 +92,8 @@ func PurgeResourceByID(ctx context.Context, db *pg.DB, infohash string) error {
 			`DELETE FROM torrent_resource WHERE resource_id = ?`,
 			`DELETE FROM user_subtitle WHERE resource_id = ?`,
 			`DELETE FROM ai_enrich.query WHERE resource_id = ?`,
+			`DELETE FROM thumbnail WHERE resource_id = ?`,
+			`DELETE FROM release_subscription_hit WHERE infohash = ?`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, infohash); err != nil {
 				return errors.Wrapf(err, "failed to execute cleanup query: %s", q)

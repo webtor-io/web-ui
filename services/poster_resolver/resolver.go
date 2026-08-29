@@ -75,6 +75,27 @@ func Resolve(ctx context.Context, db *pg.DB, thumb *thumbnail.Service, cl *http.
 		}
 	}
 	if thumb != nil && thumb.Enabled() {
+		// The movie and series lookups above are FK-children of media_info,
+		// so PurgeResourceByID (the ban path) removes them by cascade and
+		// they simply miss for a purged resource. The thumbnail table has no
+		// FK, so its row outlives the purge — and the thumbnail is a frame
+		// extracted from the video itself, not external cover art. Serving
+		// it after a ban would also serve it UNBLURRED, because the same
+		// cascade removed the resource_metadata row that miss() reads to
+		// decide on the blur.
+		//
+		// So ask whether the resource is still known to us before consulting
+		// the thumbnail at all. Returning nil here happens before the S3
+		// render cache is keyed in miss(), which matters: that cache is keyed
+		// on image content with no resource_id in it, and nothing keyed on a
+		// resource could ever evict it.
+		known, err := models.MediaInfoExists(ctx, db, resourceID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check whether resource is still known")
+		}
+		if !known {
+			return nil, nil
+		}
 		t, err := thumb.Get(ctx, resourceID)
 		if err != nil {
 			return nil, err
