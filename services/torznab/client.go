@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -15,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	jackett "github.com/webtor-io/go-jackett"
+	"github.com/webtor-io/web-ui/services/egress"
 )
 
 // maxBodyBytes caps what we read from an indexer on the download path. The
@@ -121,22 +121,7 @@ func newHTTPClient(allowPrivate bool, timeout time.Duration, forDownload bool, p
 		Timeout:   10 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}
-	if !allowPrivate {
-		d.Control = func(network, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return err
-			}
-			ip := net.ParseIP(host)
-			if ip == nil {
-				return errors.Errorf("cannot resolve %s", address)
-			}
-			if isPrivateIP(ip) {
-				return errors.Errorf("refusing to connect to private address %s", ip)
-			}
-			return nil
-		}
-	}
+	d.Control = egress.DialControl(allowPrivate)
 	tr := &http.Transport{
 		DialContext:           d.DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -162,43 +147,12 @@ func newHTTPClient(allowPrivate bool, timeout time.Duration, forDownload bool, p
 	return cl
 }
 
-// blockedRanges are the ranges Go's own predicates miss: carrier-grade NAT
-// (which is also where Alibaba's metadata service lives), benchmarking,
-// IETF protocol assignments, reserved space, and the two IPv6 transition
-// mechanisms that embed an arbitrary IPv4 address — 6to4 and NAT64 — through
-// which 2002:7f00:1:: reaches 127.0.0.1.
-var blockedRanges = []*net.IPNet{
-	mustCIDR("100.64.0.0/10"),
-	mustCIDR("192.0.0.0/24"),
-	mustCIDR("198.18.0.0/15"),
-	mustCIDR("240.0.0.0/4"),
-	mustCIDR("2002::/16"),
-	mustCIDR("64:ff9b::/96"),
-}
-
-func mustCIDR(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
-	if err != nil {
-		panic(err)
-	}
-	return n
-}
-
-// isPrivateIP reports whether an address must not be reachable from a shared
-// deployment. The base rule is "global unicast only", which excludes
-// loopback, link-local (and with it the 169.254.169.254 metadata endpoint),
-// multicast and the unspecified address in one go; IsPrivate covers
-// RFC1918/RFC4193, and blockedRanges the rest.
+// isPrivateIP delegates to the shared egress rule. Kept as a name in this
+// package because client_test.go's address table is the coverage for that
+// rule — the table stayed here when the implementation moved out, so the
+// shared predicate is still exercised by it.
 func isPrivateIP(ip net.IP) bool {
-	if !ip.IsGlobalUnicast() || ip.IsPrivate() {
-		return true
-	}
-	for _, n := range blockedRanges {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	return egress.IsPrivateIP(ip)
 }
 
 // jackettClient builds a per-endpoint go-jackett client. It is cheap

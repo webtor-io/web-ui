@@ -5,13 +5,16 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/egress"
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
@@ -64,19 +67,64 @@ func (s *EmbedScript) t(key string) string {
 	return i18n.TranslateWithLocalizer(s.i18n.Localizer(s.c.Lang), key)
 }
 
+// maxEmbedTorrentBytes bounds the .torrent fetched below. Same figure the
+// JSON API uses for an uploaded torrent (handlers/api/resource.go).
+const maxEmbedTorrentBytes = 8 << 20
+
+// embedTorrentClient fetches settings.TorrentURL.
+//
+// It is deliberately not the process-wide http.DefaultClient: this URL comes
+// from the embed POST body, which is anonymous, so the fetch is an attacker's
+// choice of destination. The dialer refuses private and link-local addresses
+// (cluster services, the metadata endpoint), redirects are not followed so a
+// public host cannot bounce the request inward, and there is a timeout —
+// DefaultClient has none, and a server that answers one byte per minute would
+// otherwise hold the goroutine forever.
+var embedTorrentClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Control:   egress.DialControl(false),
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	},
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
+
 func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, error) {
 	la := &LoadArgs{}
 	if settings.TorrentURL != "" {
-		resp, err := s.cl.Get(settings.TorrentURL)
+		u, err := url.Parse(settings.TorrentURL)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse torrent url")
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return nil, errors.Errorf("torrent url must be http or https, got %q", u.Scheme)
+		}
+		resp, err := embedTorrentClient.Get(settings.TorrentURL)
 		if err != nil {
 			return nil, err
 		}
 		defer func(Body io.ReadCloser) {
 			_ = Body.Close()
 		}(resp.Body)
-		body, err := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.Errorf("torrent url returned HTTP %d", resp.StatusCode)
+		}
+		// Bounded: an unbounded ReadAll here let one anonymous request point
+		// the pod at an endless response and grow a single slice until the
+		// memory limit tripped.
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxEmbedTorrentBytes+1))
 		if err != nil {
 			return nil, err
+		}
+		if len(body) > maxEmbedTorrentBytes {
+			return nil, errors.Errorf("torrent is larger than %d bytes", maxEmbedTorrentBytes)
 		}
 		la.File = body
 	} else if settings.Magnet != "" {
@@ -238,7 +286,17 @@ func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, a
 		geoHash = c.Geo.Country
 	}
 	hourKey := time.Now().UTC().Format("2006010215")
-	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang)))
+	// The visitor's session identity is part of the key for the same reason
+	// it is in the action key: without it every visitor of a given embed
+	// shared one rendered player for the whole hour, and that HTML carries a
+	// signed token minted from the first visitor's claims. This key was the
+	// coarser of the two — it had no visitor component at all, and an hour
+	// bucket rather than ten minutes.
+	sessionKey := ""
+	if c.ApiClaims != nil {
+		sessionKey = c.ApiClaims.SessionID
+	}
+	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang+"/"+sessionKey)))
 	r = NewEmbedScript(tb, cl, c, api, i18nSvc, enricher, settings, file, dsd, warmup)
 	return
 }
