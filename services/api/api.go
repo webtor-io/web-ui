@@ -913,13 +913,28 @@ func GetClaimsFromContext(c *gin.Context) *Claims {
 	return cl
 }
 
+// GenerateSessionID derives the session identity that goes into the signed
+// claims sent upstream.
+//
+// The anonymous branch hashes the session cookie rather than returning it.
+// It used to return the cookie verbatim, so the value travelled inside a JWT
+// that is embedded in the player URL — and any job log carrying that URL
+// therefore carried a replayable session cookie, along with the IP and
+// User-Agent alongside it in the same claims. Hashing keeps the identity
+// stable and unique per visitor, which is all any consumer needs, while
+// making the value useless to whoever reads it.
 func GenerateSessionID(c *gin.Context) string {
-	sess, _ := c.Cookie("session")
 	u := auth.GetUserFromContext(c)
 	if u.Email != "" {
-		sess = GenerateSessionIDFromUser(u)
+		return GenerateSessionIDFromUser(u)
 	}
-	return sess
+	sess, _ := c.Cookie("session")
+	if sess == "" {
+		return ""
+	}
+	h := sha1.New()
+	h.Write([]byte(sess))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func GenerateSessionIDFromUser(u *auth.User) string {

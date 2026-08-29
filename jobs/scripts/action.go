@@ -1139,8 +1139,26 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	// subtitles for this file so an upload or delete invalidates the cache
 	// immediately — otherwise the new <track> element would only appear
 	// after the 10-minute cache bucket rolled over.
+	// userKey separates one caller's rendered output from another's.
+	//
+	// It used to be filled in only for signed-in users, which left it empty
+	// for everyone else — so two anonymous visitors opening the same file in
+	// the same ten-minute bucket collapsed onto one job, and the second was
+	// served the first one's rendered player. That HTML embeds a signed
+	// ?token= whose claims carry the first visitor's session identity, IP and
+	// User-Agent, and the job-log endpoint that replays it is unauthenticated
+	// with Access-Control-Allow-Origin: *.
+	//
+	// ApiClaims.SessionID is the right value for both cases: the user hash
+	// when signed in, a hash of the session cookie when not (see
+	// api.GenerateSessionID). Dedup across *repeat visits by the same
+	// visitor* — which is what the cache is for — is preserved; dedup across
+	// different visitors, which was never safe, is not.
 	userKey := ""
 	userSubsKey := ""
+	if c != nil && c.ApiClaims != nil {
+		userKey = c.ApiClaims.SessionID
+	}
 	if c != nil && c.User != nil && c.User.HasAuth() {
 		userKey = c.User.ID.String()
 		if userSubtitles.Enabled() {
