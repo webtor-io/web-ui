@@ -55,8 +55,20 @@ func storedBodyFor(t *testing.T, resourceName string) string {
 	store := &captureStore{}
 	// No mailer: this test is about the feed, and mail is a separate
 	// destination for the same body.
-	svc := notification.NewWith(store, nil, nil, "https://webtor.io", "../../templates/notification")
-	err := svc.SendVaulted("user@example.com", uuid.NewV4(), &vaultModels.Resource{
+	//
+	// The real bundle, not nil, for the same reason handlers/event's test
+	// carries one: vaulted.html reaches the resource name only through a
+	// translated ("tp") sentence, and on a nil bundle tp returns the bare
+	// message key and drops its arguments. The name would then never enter
+	// the body, and the escaping assertions below would be testing an empty
+	// string rather than a hostile one.
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	t.Cleanup(func() { locales.Close() })
+	svc := notification.NewWith(store, nil, i18n.New(locales.FS()), "https://webtor.io", "../../templates/notification")
+	err = svc.SendVaulted("user@example.com", uuid.NewV4(), &vaultModels.Resource{
 		ResourceID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Name:       resourceName,
 	})
