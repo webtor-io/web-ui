@@ -82,6 +82,24 @@ export RAPIDAPI_KEY={YOUR_RAPIDAPI_KEY}
 export RAPIDAPI_HOST={YOUR_RAPIDAPI_HOST}
 ```
 
+### SESSION_SECRET (required)
+
+The application refuses to start without it:
+
+```shell
+export SESSION_SECRET=$(openssl rand -hex 32)
+```
+
+There is deliberately no default. This one value is the HMAC key for session
+cookies, CSRF tokens, Stremio playback links, one-click unsubscribe links,
+and — unless `S3_SIGNING_SECRET` is set separately — the derivation of every
+user's S3 secret access key. A shared or guessable value therefore makes all
+of those forgeable by anyone who knows it, which is why a working default was
+removed rather than kept for convenience.
+
+Keep it stable: changing it invalidates every existing session and every
+issued S3 credential at once.
+
 ## Usage
 
 ```shell

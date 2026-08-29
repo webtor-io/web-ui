@@ -136,9 +136,19 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			EnvVar: "ONLY_AUTHORIZED",
 		},
 		cli.StringFlag{
-			Name:   SessionSecretFlag,
-			Usage:  "session secret",
-			Value:  "secret123",
+			Name: SessionSecretFlag,
+			// No default. This one value is the HMAC key for the session
+			// cookie store, the CSRF token, the Stremio playback JWT, the
+			// unsubscribe JWT and — through the documented fallback in
+			// services/s3 — the derivation of every user's S3 secret access
+			// key. A working default meant an instance that never set it
+			// came up healthy, silently, on a key published in this
+			// repository: sessions forgeable for any user, and every user's
+			// S3 secret computable from their (non-secret) access key id.
+			//
+			// Absent is now refused at startup rather than substituted. See
+			// requireSessionSecret in serve.go.
+			Usage:  "session secret (required; no default — see README)",
 			EnvVar: "SESSION_SECRET",
 		},
 		cli.BoolFlag{

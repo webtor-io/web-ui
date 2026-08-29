@@ -223,7 +223,17 @@ func (s *Handler) getStremioAddonURL(c *gin.Context) (string, error) {
 	}
 	url := fmt.Sprintf("/%s/%s/stremio/", common.AccessTokenParamName, at.Token)
 
-	al, err := s.ual.Get(c.Request.Context(), url, false)
+	// proxy=true, as docs/stremio.md has always required and as the WebDAV
+	// sibling below already does. With proxy=false the alias answered every
+	// request with a 301 whose Location contained the raw access token, which
+	// the Stremio client then stored and replayed on each call — putting an
+	// account credential into a third-party app's config, its logs and every
+	// hop in between. Proxying keeps the token server-side.
+	//
+	// Note for existing users: CreateOrGetURLAlias matches on the URL, so
+	// rows minted before this keep proxy=false until the token is
+	// regenerated. Flipping them is a separate data fix.
+	al, err := s.ual.Get(c.Request.Context(), url, true)
 	if err != nil {
 		return "", err
 	}

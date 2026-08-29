@@ -35,6 +35,13 @@ that points at `/token/<token>/stremio/`. The alias **must be created with
 resources are served in place — a `proxy=false` alias `301`-redirects every
 resource request, which some clients handle poorly.
 
+> This was `false` in the code until the 2026-08 security pass, and the cost
+> was not only client compatibility: the `301` carried the raw access token in
+> its `Location`, so the Stremio client stored an account credential and
+> replayed it on every request. Because `CreateOrGetURLAlias` matches on the
+> URL, aliases minted before the fix keep `proxy=false` until the user
+> regenerates the token — flipping the existing rows is a separate data fix.
+
 ## Stream pipeline
 
 `Builder.BuildStreamsService` composes layers (inner → outer):

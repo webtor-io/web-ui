@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/webtor-io/web-ui/handlers/about"
 	wa "github.com/webtor-io/web-ui/handlers/action"
@@ -221,6 +224,10 @@ func serve(c *cli.Context) error {
 	// before the session middleware, whose CSRF exemption is keyed on the /api
 	// prefix this rewrite produces.
 	libapi.RegisterHostMiddleware(r, apiHosts, libapi.HostPrefix)
+
+	if err := requireSessionSecret(c); err != nil {
+		return err
+	}
 
 	// Setting URL Alias
 	ual := ua.New(pg, r)
@@ -667,4 +674,33 @@ func serve(c *cli.Context) error {
 // can be asserted in a test.
 func onlyAuthorizedExempt() []string {
 	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate", "/profile/email/verify"}
+}
+
+// requireSessionSecret refuses to start without SESSION_SECRET.
+//
+// The flag used to carry a working default, so an operator who never set it
+// got a healthy-looking instance keyed on a value published in this
+// repository. That one value signs five independent things — the session
+// cookie store, the CSRF token, the Stremio playback JWT, the unsubscribe
+// JWT, and (via the S3_SIGNING_SECRET fallback) the derivation of every
+// user's S3 secret access key — so the failure was total and silent.
+//
+// A missing signing key is a missing dependency, not a defaultable knob:
+// explain it at startup rather than paper over it. Production sets it
+// already, so this changes nothing there; it is self-hosted deployments that
+// were running on the default.
+func requireSessionSecret(c *cli.Context) error {
+	if strings.TrimSpace(c.String(common.SessionSecretFlag)) != "" {
+		return nil
+	}
+	return errors.Errorf(
+		"SESSION_SECRET is not set.\n\n" +
+			"It signs session cookies, CSRF tokens, Stremio playback links, " +
+			"unsubscribe links, and (unless S3_SIGNING_SECRET is set separately) " +
+			"every user's S3 secret key. There is deliberately no default: a " +
+			"shared one would make all of those forgeable by anyone.\n\n" +
+			"Generate one and pass it as SESSION_SECRET, for example:\n" +
+			"    SESSION_SECRET=$(openssl rand -hex 32)\n\n" +
+			"Note that changing it later invalidates every existing session " +
+			"and every issued S3 credential.")
 }
