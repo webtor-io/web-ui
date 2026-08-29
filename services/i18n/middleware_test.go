@@ -170,3 +170,50 @@ func TestAcceptLanguageNeverRedirects(t *testing.T) {
 		t.Errorf("/some-page with es cookie: got %d → %q, want 302 → /es/some-page", w.Code, w.Header().Get("Location"))
 	}
 }
+
+// TestLanguageRedirectsStayOnSite is the negative control for
+// safeRedirectPath.
+//
+// Both redirect targets in this middleware are built by slicing the request
+// path, so "/en//evil.com" produces "//evil.com". http.Redirect only rewrites
+// a target as relative when it parses with an empty scheme AND an empty host,
+// and url.Parse("//evil.com") reports Host="evil.com" — so without the guard
+// the Location header ships verbatim and the browser resolves it
+// protocol-relative to another origin.
+//
+// This runs before gin, so no route guard downstream can catch it.
+//
+// Negative control: drop the safeRedirectPath calls and every case below with
+// a want of "/evil.com" starts answering "//evil.com".
+func TestLanguageRedirectsStayOnSite(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		path   string
+		cookie string
+		want   string
+	}{
+		{name: "en prefix with protocol-relative rest", path: "/en//evil.com", want: "/evil.com"},
+		{name: "en prefix with protocol-relative subpath", path: "/en//evil.com/x", want: "/evil.com/x"},
+		{name: "en prefix with backslash rest", path: "/en/\\evil.com", want: "/evil.com"},
+		{name: "triple slash collapses", path: "/en///evil.com", want: "/evil.com"},
+		{name: "lang query with protocol-relative path", path: "//evil.com/?lang=en", want: "/evil.com/"},
+		{name: "ordinary en-prefixed page is untouched", path: "/en/some-page", want: "/some-page"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := langEngine(t, nil)
+			w := langGet(h, "example.com", tt.path, tt.cookie)
+			loc := w.Header().Get("Location")
+			if loc == "" {
+				t.Fatalf("%s: no redirect happened, so this case asserts nothing", tt.path)
+			}
+			if loc != tt.want {
+				t.Errorf("%s: Location = %q, want %q", tt.path, loc, tt.want)
+			}
+			// Belt and braces: whatever the exact path, it must not be
+			// readable as another origin.
+			if len(loc) > 1 && (loc[1] == '/' || loc[1] == '\\') {
+				t.Errorf("%s: Location %q leaves the site", tt.path, loc)
+			}
+		})
+	}
+}

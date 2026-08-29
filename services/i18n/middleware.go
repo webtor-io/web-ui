@@ -12,6 +12,38 @@ const (
 	langCookie = "lang"
 )
 
+// safeRedirectPath keeps a redirect target on this site.
+//
+// The targets here are built by slicing the request path, so a request for
+// "/en//evil.com" yields "//evil.com". That is not a relative path:
+// http.Redirect only applies its relative-path fix-up when the target parses
+// with an empty scheme AND an empty host, and url.Parse("//evil.com") gives
+// Host="evil.com" — so the Location header goes out verbatim and the browser
+// resolves it protocol-relative to https://evil.com. A leading backslash is
+// treated the same way by browsers.
+//
+// This middleware runs at the net/http level, ahead of gin, so nothing
+// downstream — not RedirectNonCanonical, not auth, not any route guard —
+// ever sees these redirects. The check has to live here.
+//
+// Collapsing leading slashes rather than rejecting keeps a genuine
+// double-slash path working as the single-slash one, which is what every
+// caller here wants.
+// Strip every leading slash and backslash, then put exactly one slash back.
+// Shifting the string instead would be wrong for "/\evil.com": that leaves
+// "\evil.com", which has no leading slash, and http.Redirect then resolves it
+// against the request's directory — landing back on the attacker's string.
+func safeRedirectPath(target string) string {
+	if target == "" || target[0] != '/' {
+		return "/"
+	}
+	i := 0
+	for i < len(target) && (target[i] == '/' || target[i] == '\\') {
+		i++
+	}
+	return "/" + target[i:]
+}
+
 // HTTPMiddleware wraps an http.Handler to handle language routing:
 //
 //  1. ?lang=X query (from the language switcher) → set cookie=X and
@@ -108,6 +140,7 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 							target = "/" + reqLang + basePath
 						}
 					}
+					target = safeRedirectPath(target)
 					if encoded := q.Encode(); encoded != "" {
 						target += "?" + encoded
 					}
@@ -139,10 +172,7 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 							MaxAge:   365 * 24 * 3600,
 							SameSite: http.SameSiteLaxMode,
 						})
-						target := rest
-						if target == "" {
-							target = "/"
-						}
+						target := safeRedirectPath(rest)
 						if r.URL.RawQuery != "" {
 							target += "?" + r.URL.RawQuery
 						}
@@ -207,7 +237,11 @@ func HTTPMiddleware(skipHosts []string) func(http.Handler) http.Handler {
 				// shared link) — honour their preference by redirecting to the
 				// prefixed URL. Explicit English switches come through the
 				// ?lang=en branch above and clear the cookie before reaching here.
-				target := "/" + cookie.Value + path
+				// The language prefix normally keeps this on-site on its own;
+				// the guard is here so all three redirect sites in this file
+				// answer to the same rule rather than to a case analysis of
+				// what the cookie can hold.
+				target := safeRedirectPath("/" + cookie.Value + path)
 				if r.URL.RawQuery != "" {
 					target += "?" + r.URL.RawQuery
 				}
