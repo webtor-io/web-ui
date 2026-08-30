@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -822,17 +823,34 @@ func (s *Api) makeSubtitleURL(u string, esub ExtSubtitle) string {
 	path = strings.Join(pathParts, "/") + esub.Src
 	src.Path = path
 	res := src.String()
-	if esub.Format == "srt" {
+	if _, ok := vttConvertibleExts[esub.Format]; ok {
 		res = s.convertToVTT(res)
 	}
 	return res
+}
+
+// vttConvertibleExts are the text-subtitle formats srt2vtt can turn into
+// WebVTT (routed through the proxy's ~vtt transform). ASS/SSA styling is
+// dropped in conversion — the cues come back as plain text.
+var vttConvertibleExts = map[string]struct{}{
+	"srt": {},
+	"ass": {},
+	"ssa": {},
+}
+
+// needsVTTConversion reports whether a URL path ends in a subtitle
+// extension the ~vtt transform understands.
+func needsVTTConversion(path string) bool {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	_, ok := vttConvertibleExts[ext]
+	return ok
 }
 
 func (*Api) convertToVTT(u string) string {
 	parsed, _ := url.Parse(u)
 	pathParts := strings.Split(parsed.Path, "/")
 	name := pathParts[len(pathParts)-1]
-	newName := strings.TrimSuffix(name, ".srt") + ".vtt"
+	newName := strings.TrimSuffix(name, filepath.Ext(name)) + ".vtt"
 	// parsed.EscapedPath() returns the %-encoded path verbatim when
 	// RawPath is a valid encoding of Path, so we don't lose percent
 	// sequences already present in u (e.g. %3D%3D from base64 padding).
@@ -845,13 +863,8 @@ func (*Api) convertToVTT(u string) string {
 
 func (s *Api) AttachExternalSubtitle(ei ra.ExportItem, u string) string {
 	res := s.AttachExternalFile(ei, u)
-	format := "vtt"
-
 	src, _ := url.Parse(u)
-	if strings.HasSuffix(src.Path, ".srt") {
-		format = "srt"
-	}
-	if format == "srt" {
+	if needsVTTConversion(src.Path) {
 		res = s.convertToVTT(res)
 	}
 	return res

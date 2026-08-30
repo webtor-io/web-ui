@@ -39,6 +39,7 @@ var allowedFormats = map[string]struct{}{
 	"srt": {},
 	"vtt": {},
 	"ass": {},
+	"ssa": {},
 }
 
 // Sentinel errors surfaced to handlers for translation into user-friendly
@@ -384,7 +385,7 @@ func ContentTypeFor(format string) string {
 		return "text/vtt; charset=utf-8"
 	case "srt":
 		return "application/x-subrip; charset=utf-8"
-	case "ass":
+	case "ass", "ssa":
 		return "text/x-ass; charset=utf-8"
 	}
 	return "application/octet-stream"

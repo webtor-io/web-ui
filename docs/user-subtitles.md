@@ -15,9 +15,10 @@ the main site (not embed), authenticated users only.
    the hash, and inserts a binding row.
 5. The next player render picks up the new track. The track appears under
    its original filename via the `UserSubtitle` provider and is wrapped
-   through `torrent-http-proxy`'s `/ext/` → `~vtt/` chain so SRT/ASS
+   through `torrent-http-proxy`'s `/ext/` → `~vtt/` chain so SRT/ASS/SSA
    content is converted to VTT on the fly (same path used for
-   OpenSubtitles).
+   OpenSubtitles). ASS/SSA styling, positioning and karaoke tags are
+   dropped in conversion — cues come back as plain text.
 
 ## Storage
 
@@ -40,7 +41,7 @@ only after confirming no remaining rows reference the hash.
 - `10` subtitles per `(user_id, resource_id, path)`. Exceeded uploads
   return `error.user_subtitle.limit_reached`.
 - `5 MB` max file size.
-- Formats: `srt`, `vtt`, `ass`. Detection uses the file extension first
+- Formats: `srt`, `vtt`, `ass`, `ssa`. Detection uses the file extension first
   with a `WEBVTT` magic-bytes sniff fallback.
 
 ## Schema
