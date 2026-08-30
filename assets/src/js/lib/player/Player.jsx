@@ -4,6 +4,7 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
+import { applyCueOffset } from './cue-offset';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
@@ -80,6 +81,30 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             })
             .catch(() => {}); // ignore — offset stays 0
     }, []);
+
+    // Element-backed subtitle tracks (user uploads, OpenSubtitles, external)
+    // carry cues in absolute movie time, while a transcoder session that
+    // starts mid-movie (resume, seek) exposes a timeline that begins at
+    // zero. Shift the cues by the session offset — and re-shift tracks that
+    // finish loading later ('load' doesn't bubble, so listen in capture;
+    // this also covers tracks added mid-session from the My Subtitles tab).
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !isSession) return;
+        const applyAll = () => {
+            for (const el of video.querySelectorAll('track')) {
+                if (el.track) applyCueOffset(el.track, seekOffset);
+            }
+        };
+        applyAll();
+        const onTrackLoad = (e) => {
+            if (e.target.tagName === 'TRACK' && e.target.track) {
+                applyCueOffset(e.target.track, seekOffset);
+            }
+        };
+        video.addEventListener('load', onTrackLoad, true);
+        return () => video.removeEventListener('load', onTrackLoad, true);
+    }, [seekOffset, isSession]);
 
     // Sync ref with state for use in closures that don't re-bind
     const setSessionSeekingWithRef = useCallback((val) => {

@@ -7,6 +7,7 @@
  * Seek is quantized to 30-second boundaries.
  */
 import { Hls } from './hls-manager';
+import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
 
 /**
  * Capture the current video frame onto a canvas positioned over the video.
@@ -56,6 +57,13 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             const savedAudioTrack = hls ? hls.audioTrack : -1;
             const savedSubtitleTrack = hls ? hls.subtitleTrack : -1;
             const savedSubtitleDisplay = hls ? hls.subtitleDisplay : false;
+            // hls.js flips element-backed <track>s (user uploads,
+            // OpenSubtitles, external) to 'disabled' and clears their cue
+            // lists while reprocessing the media element on loadSource() —
+            // snapshot mode and cues so the active selection survives.
+            const savedElementTrackState = captureTrackState(
+                [...videoEl.querySelectorAll('track')].map((el) => el.track),
+            );
 
             const separator = sessionSeekUrl.includes('?') ? '&' : '?';
             await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
@@ -94,6 +102,13 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 function onPlaying() {
                     videoEl.removeEventListener('playing', onPlaying);
                     if (freezeFrame) freezeFrame.remove();
+                    restoreTrackState(savedElementTrackState);
+                    // The Player's seekOffset effect fired while the cue
+                    // lists were still empty, so re-shift the restored cues
+                    // onto the new session timeline here.
+                    for (const { track } of savedElementTrackState) {
+                        applyCueOffset(track, seekOffset);
+                    }
                     setIsSeeking(false);
                     resolve();
                 }

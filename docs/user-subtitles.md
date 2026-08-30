@@ -116,3 +116,31 @@ injects the env var. The production bucket is set in
   the `UserSubtitle` provider in the list that produces `<track>` tags
 - UI partial: `templates/partials/action/user_subtitles.html`
 - Client JS (drag-and-drop): `assets/src/js/app/action/stream.js`
+- Session-timeline cue shift: `assets/src/js/lib/player/cue-offset.js`
+  (see below)
+
+## Transcoder sessions and the cue timeline
+
+Side-loaded `<track>`s (user uploads, OpenSubtitles, external) carry cue
+times in **absolute movie time**, but a transcoder session that starts
+mid-movie (resume from watch history, any seek) exposes a media timeline
+that begins at zero — `usePlayerState` displays `seekOffset + rawTime`.
+Without compensation those cues can never become active, which is exactly
+"the subtitle is listed but never shows" (support case, Aug 2026).
+
+Two client-side mechanisms fix this (`cue-offset.js`):
+
+1. `applyCueOffset(track, offset)` — stashes each cue's authored times on
+   first touch and re-computes `startTime/endTime = authored − offset`
+   from them on every call, so repeated seeks never accumulate drift.
+   Wired in `Player.jsx` as an effect on `seekOffset` plus a capturing
+   `load` listener on the `<video>` (covers lazily-loaded tracks and
+   tracks added mid-session from the My Subtitles tab).
+2. `captureTrackState` / `restoreTrackState` around a session seek
+   (`session-seek.js`) — hls.js flips element-backed tracks to
+   `disabled` **and clears their cue lists** on `loadSource()`, so the
+   seeker snapshots mode + cue objects before the reload, re-adds them on
+   `playing`, then re-applies the new offset.
+
+HLS-manifest tracks (MediaProbe, created by hls.js itself) are already
+session-relative and must never be passed to `applyCueOffset`.
