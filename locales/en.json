@@ -96,6 +96,7 @@
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Embed the torrent streaming player on your own site with our open-source JavaScript SDK.",
     "about.faq.badge": "FAQ",
+    "about.faq.guideLink": "Read the step-by-step guide",
     "about.faq.title": "Common questions",
     "about.faq.subtitle": "Quick answers to the things people ask most.",
     "about.faq.free.q": "Is Webtor.io free to use?",

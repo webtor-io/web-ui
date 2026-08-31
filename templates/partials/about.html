@@ -381,13 +381,19 @@
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.openTorrent.q" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrent.a" }}</p></div>
+                <div class="collapse-content">
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrent.a" }}</p>
+                    <a href="{{ langPath $.Lang "/open-torrent-file" }}" data-async-target="main" class="inline-block mt-2 text-[0.92rem] text-w-cyan hover:underline">{{ t $.Lang "about.faq.guideLink" }} →</a>
+                </div>
             </div>
 
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.openTorrentApp.q" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrentApp.a" }}</p></div>
+                <div class="collapse-content">
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrentApp.a" }}</p>
+                    <a href="{{ langPath $.Lang "/open-torrents-on-pc" }}" data-async-target="main" class="inline-block mt-2 text-[0.92rem] text-w-cyan hover:underline">{{ t $.Lang "about.faq.guideLink" }} →</a>
+                </div>
             </div>
 
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
@@ -405,7 +411,10 @@
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.downloadTorrented.q" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.downloadTorrented.a" }}</p></div>
+                <div class="collapse-content">
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.downloadTorrented.a" }}</p>
+                    <a href="{{ langPath $.Lang "/how-to-download-torrent-files" }}" data-async-target="main" class="inline-block mt-2 text-[0.92rem] text-w-cyan hover:underline">{{ t $.Lang "about.faq.guideLink" }} →</a>
+                </div>
             </div>
 
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
