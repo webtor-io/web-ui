@@ -51,7 +51,7 @@ func (s *Service) subscriptionData(sub SubscriptionView) subscriptionMailData {
 		Title:          sub.Title,
 		Season:         sub.Season,
 		IsSeason:       sub.Season > 0,
-		ManageURL:      s.domain + "/profile#subscriptions",
+		ManageURL:      withUTM(s.domain+"/profile#subscriptions", "release-sub"),
 		UnsubscribeURL: sub.UnsubscribeURL,
 		Domain:         s.domain,
 	}
@@ -100,7 +100,11 @@ func (s *Service) SendSubscriptionUpdate(to string, userID uuid.UUID, sub Subscr
 		return nil
 	}
 	data := s.subscriptionData(sub)
-	data.Releases = releases
+	data.Releases = make([]ReleaseView, len(releases))
+	for i, r := range releases {
+		r.URL = withUTM(r.URL, "release-sub")
+		data.Releases[i] = r
+	}
 	return s.Send(SendOptions{
 		To:     to,
 		UserID: userID,

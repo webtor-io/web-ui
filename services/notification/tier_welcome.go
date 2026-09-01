@@ -66,9 +66,9 @@ func (s *Service) SendTierWelcome(to string, userID uuid.UUID, w TierWelcome) er
 		Data: map[string]any{
 			"Tier":        title,
 			"ShowStremio": w.ShowStremio,
-			"StremioURL":  s.domain + "/stremio/configure",
+			"StremioURL":  withUTM(s.domain+"/stremio/configure", "tier-welcome"),
 			"ShowVault":   w.ShowVault,
-			"VaultURL":    s.domain + "/vault",
+			"VaultURL":    withUTM(s.domain+"/vault", "tier-welcome"),
 			"Provider":    w.Billing.Provider,
 			"ManageURL":   w.Billing.ManageURL,
 			"TrialDays":   w.Billing.TrialDays,

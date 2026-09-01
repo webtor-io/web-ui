@@ -184,7 +184,15 @@ Eligibility проверяется **на сервере** при POST (`IsAirin
 
 ### Аналитика
 
-Umami, kebab-case как везде: `release-sub-created` (property `source`), `release-sub-removed`, `release-sub-limit-hit`, `release-sub-email-click`.
+Umami, kebab-case как везде: `release-sub-created` (property `source`), `release-sub-removed`, `release-sub-limit-hit`.
+
+Клики по письму — **не событие, а utm**: ссылки на раздачи и «Управлять» в
+`subscription-update.html` уходят с `utm_source=webtor&utm_medium=email&utm_campaign=release-sub`
+(`services/notification/utm.go`), Umami сам пишет их в `website_event.utm_*`.
+CTR письма = сессии с `utm_campaign='release-sub'` / письма с `mailed_at`
+по ключам `sub-upd-%` в `notification`. Задекларированный ранее
+`release-sub-email-click` не делался — утм даёт то же без редирект-хопа.
+Unsubscribe-ссылка подписана и utm не получает.
 
 Префикс `release-sub-`, а не `subscription-`, намеренно: событие `subscription-started` уже занято — оно про **платную** подписку (см. `assets/src/js/app/nav.js`), и в дашборде два семейства с одним префиксом читались бы как одно.
 
