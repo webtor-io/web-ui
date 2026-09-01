@@ -1,4 +1,4 @@
-import { useCallback } from 'preact/hooks';
+import { useCallback, useEffect } from 'preact/hooks';
 import { t, tf } from '../i18n';
 import { subscriptionKey } from '../subscriptionsClient';
 
@@ -15,6 +15,20 @@ export function SubscribeButton({ target, subscriptionKeys, onToggle, size = 'sm
         e?.stopPropagation?.();
         if (onToggle && target) onToggle(target);
     }, [onToggle, target]);
+
+    // The offer was shown: the denominator for release-sub-created, per
+    // surface (target.source). Once per mount — reopening the modal is a new
+    // look at the offer, a re-render of the same open modal is not.
+    const videoId = target && target.videoId;
+    useEffect(() => {
+        if (!videoId || !window.umami) return;
+        window.umami.track('release-sub-seen', {
+            kind: target.kind,
+            id: videoId,
+            season: target.season,
+            source: target.source || 'other',
+        });
+    }, [target && target.kind, videoId, target && target.season, target && target.source]);
 
     if (!target || !target.videoId) return null;
 

@@ -184,7 +184,12 @@ Eligibility проверяется **на сервере** при POST (`IsAirin
 
 ### Аналитика
 
-Umami, kebab-case как везде: `release-sub-created` (property `source`), `release-sub-removed`, `release-sub-limit-hit`.
+Umami, kebab-case как везде: `release-sub-seen` (показ оффера, property
+`source`; в Discover — из `SubscribeButton` при монтировании, на странице
+раздачи — через `data-umami-impression` на баннере + `lib/impression.js`,
+только пока баннер является оффером), `release-sub-created` (property
+`source`), `release-sub-removed`, `release-sub-limit-hit`. CTR точки входа =
+`release-sub-created` / `release-sub-seen` по одному `source`.
 
 Клики по письму — **не событие, а utm**: ссылки на раздачи и «Управлять» в
 `subscription-update.html` уходят с `utm_source=webtor&utm_medium=email&utm_campaign=release-sub`

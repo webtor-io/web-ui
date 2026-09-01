@@ -3,9 +3,12 @@
 {{/* The banner is its own async island: subscribing re-renders just this
      block, so the button flips to "unsubscribe" without reloading a page
      whose file list may be several hundred rows long. */}}
+{{/* data-umami-impression only while the banner is an offer: once
+     subscribed it shows state, and counting that as an impression would
+     inflate the denominator of release-sub-created. */}}
 <div id="release-subscribe-banner"
      class="mb-4 rounded-2xl border border-w-cyan/30 bg-w-cyan/5 p-4 sm:p-5"
-     data-async-layout="{{`{{ template "resource/release_subscribe_banner" $ }}`}}">
+     data-async-layout="{{`{{ template "resource/release_subscribe_banner" $ }}`}}"{{ if not $b.Subscribed }} data-umami-impression="release-sub-seen" data-umami-impression-source="resource_banner"{{ end }}>
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <div class="flex-1 min-w-0">
             {{/* Own block, not an inline sibling of the heading: as an
@@ -65,6 +68,7 @@
             {{ end }}
         </div>
     </div>
+    {{ "release_subscribe_banner.js" | asset }}
 </div>
 {{ end }}
 {{ end }}
