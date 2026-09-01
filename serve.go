@@ -487,7 +487,7 @@ func serve(c *cli.Context) error {
 
 	// Setting NotificationHandler (the in-app feed behind the navbar bell —
 	// ns is the same Service the unread-count middleware above reads from).
-	notifications.RegisterHandler(r, tm, ns)
+	notifications.RegisterHandler(r, tm, ns, donate.Billing(c))
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get())

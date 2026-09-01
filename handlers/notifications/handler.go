@@ -7,10 +7,14 @@
 package notifications
 
 import (
+	"fmt"
+	"html"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/webtor-io/web-ui/handlers/donate"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/i18n"
@@ -25,8 +29,9 @@ import (
 const feedLimit = 100
 
 type Handler struct {
-	ns *notification.Service
-	tb *template.BuilderWithLayout[*web.Context]
+	ns      *notification.Service
+	billing notification.Billing
+	tb      *template.BuilderWithLayout[*web.Context]
 }
 
 // Item is one row of the feed.
@@ -64,14 +69,62 @@ func NewItem(n models.Notification) Item {
 	}
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *notification.Service) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *notification.Service, billing notification.Billing) {
 	h := &Handler{
-		ns: ns,
-		tb: tm.MustRegisterViews("notifications/*").WithLayout("main"),
+		ns:      ns,
+		billing: billing,
+		tb:      tm.MustRegisterViews("notifications/*").WithLayout("main"),
 	}
 	gr := r.Group("/notifications")
 	gr.GET("", auth.HasAuth, h.list)
 	gr.POST("/read", auth.HasAuth, h.markRead)
+	// Dev-only: the letters this service sends fire on events a developer
+	// cannot replay at will (a tier turning paid happens once per account),
+	// so the only way to look at one before a customer does is to render it
+	// on demand. Not registered at all under GIN_MODE=release — same gate as
+	// the streaming-error debug modals and the onboarding preview.
+	if gin.Mode() != gin.ReleaseMode {
+		gr.GET("/preview/tier-welcome", h.previewTierWelcome)
+	}
+}
+
+// previewTierWelcome renders the tier welcome letter as HTML.
+//
+//	?tier=silver         tier id (bronze|silver|gold; default silver)
+//	?lang=ru             letter language (default: the request's language)
+//	?stremio=0 ?vault=0 ?discover=0  hide a "start here" block (default: all shown)
+//	?billing=0           render as a deployment with no billing provider
+//	?trial=0             drop the trial sentence
+func (h *Handler) previewTierWelcome(c *gin.Context) {
+	tier := c.DefaultQuery("tier", "silver")
+	lang := c.Query("lang")
+	if lang == "" {
+		lang = i18n.GetLang(c)
+	}
+	on := func(name string) bool { return c.DefaultQuery(name, "1") != "0" }
+	w := notification.TierWelcome{
+		Tier:         tier,
+		BenefitKeys:  donate.TierBenefitKeys(tier),
+		ShowStremio:  on("stremio"),
+		ShowVault:    on("vault"),
+		ShowDiscover: on("discover"),
+	}
+	if on("billing") {
+		w.Billing = h.billing
+		if !on("trial") {
+			w.Billing.TrialDays = 0
+		}
+	}
+	subject, letter, err := h.ns.PreviewTierWelcome(lang, w)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	// The subject is not part of the document; show it where a mail client
+	// would, above the body.
+	bar := fmt.Sprintf(`<p style="font:13px/1.4 monospace;color:#888;border-bottom:1px solid #ddd;padding-bottom:8px">Subject: %s</p>`, html.EscapeString(subject))
+	letter = strings.Replace(letter, "<body>", "<body>"+bar, 1)
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(letter))
 }
 
 func (h *Handler) list(c *gin.Context) {

@@ -403,6 +403,13 @@ func (s *Handler) get(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get stremio addon url"))
 		return
 	}
+	// Dev-only: render the Stremio block as an account that has not generated
+	// its addon URL yet. A developer's own account has one, so the pre-token
+	// state — the one every new user meets — is otherwise unreviewable
+	// without a second account. Same gate as the other debug switches.
+	if gin.Mode() != gin.ReleaseMode && c.Query("preview") == "stremio-fresh" {
+		stremioURL = ""
+	}
 	webdavURL, err := s.getWebDAVURL(c)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get webdav url"))
