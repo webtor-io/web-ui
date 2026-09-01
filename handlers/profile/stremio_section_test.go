@@ -81,6 +81,7 @@ func TestStremioBlockTokenLeadsWithDeepLink(t *testing.T) {
 		`value="https://webtor.io/s/abc/manifest.json"`,
 		`/stremio/url/regenerate`,
 		`stremio-copy-addon-url`,
+		`https://www.stremio.com/downloads`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("token block lacks %s:\n%s", want, out)

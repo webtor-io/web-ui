@@ -82,7 +82,7 @@ func TestReleaseSubscribeBannerRenders(t *testing.T) {
 			banner: &banner{SeriesTitle: "The Boys", SeriesVideoID: "tt1190634", Season: 3, Anonymous: true},
 			// The path is escaped by html/template in a query context — the
 			// login page decodes it back.
-			want:    []string{"/login?return-url=%2fabc123", "Notify me"},
+			want:    []string{"/login?return-url=%2Fabc123%3Frelease_sub%3D1", "Notify me"},
 			notWant: []string{"<form", "/subscription/add"},
 		},
 	} {

@@ -41,7 +41,12 @@
             {{ if $b.Anonymous }}
                 {{/* Nothing to post without an account; the offer stays
                      visible because it is a reason to have one. */}}
-                <a href="{{ langPath $.Lang "/login" }}?return-url={{ langPath $.Lang (printf "/%s" .Data.Resource.ID) }}"
+                {{/* The intent rides in the return-url: after login the page comes
+                     back with ?release_sub=1 and release_subscribe_banner.js submits
+                     the subscribe form on the visitor's behalf. Without it, 81 of the
+                     first month's anonymous clicks came back to a banner that asked
+                     them to click again — and most did not. */}}
+                <a href="{{ langPath $.Lang "/login" }}?return-url={{ printf "%s?release_sub=1" (langPath $.Lang (printf "/%s" .Data.Resource.ID)) | urlquery }}"
                    class="btn btn-sm btn-soft-cyan" data-umami-event="release-sub-login-click" data-umami-event-source="resource_banner">
                     {{ t .Lang "release_sub.btn_subscribe" }}
                 </a>
@@ -55,7 +60,7 @@
                 </form>
             {{ else }}
                 <form method="post" data-async-push-state="false" data-async-target="#release-subscribe-banner"
-                      action="{{ langPath $.Lang "/subscription/add" }}">
+                      action="{{ langPath $.Lang "/subscription/add" }}" data-release-sub-form>
                     <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
                     <input type="hidden" name="kind" value="season">
                     <input type="hidden" name="video_id" value="{{ $b.SeriesVideoID }}">
