@@ -1712,6 +1712,7 @@
     "onboarding.stremio.cta": "Set up Stremio",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Unlock with a plan",
+    "onboarding.trialCta": "Try free for 7 days",
     "@onboarding.title": "Heading of the activation checklist card on the home page, shown to accounts younger than two weeks. Means 'here is how to get started', NOT 'the beginning of a video'.",
     "@onboarding.account.title": "Checklist row, always ticked: the user has just registered. Past tense statement of fact, not an instruction.",
     "@onboarding.library.desc": "Quotes the actual button label from the torrent page — keep it identical to library.addToLibrary in this locale, in the local quotation marks.",

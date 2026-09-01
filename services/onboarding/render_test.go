@@ -91,7 +91,7 @@ func TestRenderAllLocalesAndStates(t *testing.T) {
 
 	for _, lang := range i18n.SupportedLangs {
 		for name, p := range states {
-			cl := build(p, true, paidUser, now)
+			cl := build(p, true, paidUser, trialOn, now)
 			if cl == nil {
 				t.Fatalf("state %q unexpectedly produced no checklist", name)
 			}
@@ -149,7 +149,7 @@ func TestRenderAppendsFragmentOutsideLangPath(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, paidUser, now)
+	cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, paidUser, trialOn, now)
 	out := render(t, tmpl, "ru", cl)
 
 	if !strings.Contains(out, `href="[ru]/profile#stremio"`) {
@@ -162,7 +162,7 @@ func TestRenderLinksEverySection(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, paidUser, now))
+	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, paidUser, trialOn, now))
 	for _, want := range []string{
 		`data-umami-event="onboarding-library"`,
 		`data-umami-event="onboarding-discover"`,
@@ -186,7 +186,7 @@ func TestRenderDoneStepKeepsDescriptionAndLink(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, paidUser, now))
+	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, paidUser, trialOn, now))
 	if !strings.Contains(out, `data-umami-event="onboarding-library"`) {
 		t.Error("a completed step must keep its link")
 	}
@@ -199,7 +199,7 @@ func TestRenderLockedStepsShowProBadgeAndQuietPlansLink(t *testing.T) {
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
 	for _, lang := range i18n.SupportedLangs {
-		cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, false, now)
+		cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, false, trialOn, now)
 		out := render(t, tmpl, lang, cl)
 
 		if strings.Contains(out, "onboarding.") {
@@ -251,7 +251,7 @@ func TestRenderStatusHasTextEquivalent(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, now))
+	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, trialOn, now))
 	// Five row statuses plus the progress counter's spoken form.
 	if got := strings.Count(out, `class="sr-only"`); got != 6 {
 		t.Errorf("expected 5 row statuses + 1 counter label, got %d", got)
@@ -277,7 +277,7 @@ func TestRenderToggleIsHiddenUntilScriptRuns(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, true, now))
+	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, true, trialOn, now))
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "data-checklist-toggle") && !strings.Contains(line, "hidden") {
 			t.Errorf("the toggle must render hidden: %s", strings.TrimSpace(line))
@@ -295,7 +295,7 @@ func TestRenderCarriesImpressionData(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, now))
+	out := render(t, tmpl, "en", build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, trialOn, now))
 	// Whitespace-tolerant: html/template pads numbers in attribute context.
 	for attr, want := range map[string]string{"done": "2", "total": "3", "locked": "2"} {
 		re := regexp.MustCompile(`data-onboarding-` + attr + `="\s*` + want + `\s*"`)

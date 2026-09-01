@@ -1650,6 +1650,7 @@
     "onboarding.stremio.cta": "Stremio instellen",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Ontgrendel met een abonnement",
+    "onboarding.trialCta": "Probeer 7 dagen gratis",
     "onboarding.progress": "{{.Done}} van {{.Total}} stappen klaar",
     "onboarding.toggle": "Stappen tonen of verbergen",
     "onboarding.status.done": "Klaar:",

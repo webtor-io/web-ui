@@ -1650,6 +1650,7 @@
     "onboarding.stremio.cta": "Nastavit Stremio",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Odemknout s tarifem",
+    "onboarding.trialCta": "Vyzkoušejte 7 dní zdarma",
     "onboarding.progress": "Hotovo {{.Done}} z {{.Total}} kroků",
     "onboarding.toggle": "Zobrazit nebo skrýt kroky",
     "onboarding.status.done": "Hotovo:",

@@ -56,6 +56,22 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 	)
 }
 
+// TrialAvailable answers "can this deployment offer a free trial": Patreon is
+// configured and at least one tier is fronted by a trial there. Callers
+// outside the donate page (the onboarding checklist) use it to decide whether
+// a locked feature can say "try it" instead of "buy it".
+func TrialAvailable(c *cli.Context) bool {
+	if !c.BoolT(patreonFlag) {
+		return false
+	}
+	for _, m := range tierMetas {
+		if m.trial {
+			return true
+		}
+	}
+	return false
+}
+
 type Handler struct {
 	tb        template.Builder[*web.Context]
 	np        *np.Client

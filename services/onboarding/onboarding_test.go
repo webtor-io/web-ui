@@ -13,6 +13,8 @@ const (
 	withVault = true
 	paidUser  = true
 	freeUser  = false
+	trialOn   = true
+	noTrial   = false
 )
 
 func progress(age time.Duration, library, watchlist, vault, stremio bool) (*models.OnboardingProgress, time.Time) {
@@ -28,28 +30,28 @@ func progress(age time.Duration, library, watchlist, vault, stremio bool) (*mode
 
 func TestHiddenWhenEverythingDone(t *testing.T) {
 	p, now := progress(time.Hour, true, true, true, true)
-	if c := build(p, withVault, paidUser, now); c != nil {
+	if c := build(p, withVault, paidUser, trialOn, now); c != nil {
 		t.Fatalf("expected no checklist for a fully activated user, got %+v", c)
 	}
 }
 
 func TestHiddenAfterActivationWindow(t *testing.T) {
 	p, now := progress(ActivationWindow, false, false, false, false)
-	if c := build(p, withVault, paidUser, now); c != nil {
+	if c := build(p, withVault, paidUser, trialOn, now); c != nil {
 		t.Fatal("expected no checklist once the account is older than the activation window")
 	}
 }
 
 func TestVisibleJustInsideActivationWindow(t *testing.T) {
 	p, now := progress(ActivationWindow-time.Minute, false, false, false, false)
-	if c := build(p, withVault, paidUser, now); c == nil {
+	if c := build(p, withVault, paidUser, trialOn, now); c == nil {
 		t.Fatal("expected a checklist a minute before the window closes")
 	}
 }
 
 func TestFreshAccountStartsWithAccountStepDone(t *testing.T) {
 	p, now := progress(time.Minute, false, false, false, false)
-	c := build(p, withVault, paidUser, now)
+	c := build(p, withVault, paidUser, trialOn, now)
 	if c == nil {
 		t.Fatal("expected a checklist for a brand new account")
 	}
@@ -73,7 +75,7 @@ func TestFreshAccountStartsWithAccountStepDone(t *testing.T) {
 // empty title, description or link — a blank row would look like a bug.
 func TestEveryStepIsFullyPopulated(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
-	for _, s := range build(p, withVault, paidUser, now).Steps {
+	for _, s := range build(p, withVault, paidUser, trialOn, now).Steps {
 		if s.TitleKey == "" || s.DescKey == "" {
 			t.Errorf("step %q is missing a translation key: %+v", s.Key, s)
 		}
@@ -100,7 +102,7 @@ func TestEveryStepIsFullyPopulated(t *testing.T) {
 func TestStepDestinationsAreDistinct(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
 	seen := map[string]StepKey{}
-	for _, s := range build(p, withVault, paidUser, now).Steps {
+	for _, s := range build(p, withVault, paidUser, trialOn, now).Steps {
 		if s.Path == "" {
 			continue
 		}
@@ -114,7 +116,7 @@ func TestStepDestinationsAreDistinct(t *testing.T) {
 
 func TestPartialProgressIsCounted(t *testing.T) {
 	p, now := progress(time.Hour, true, false, true, false)
-	c := build(p, withVault, paidUser, now)
+	c := build(p, withVault, paidUser, trialOn, now)
 	if c == nil {
 		t.Fatal("expected a checklist while two steps are outstanding")
 	}
@@ -131,7 +133,7 @@ func TestPartialProgressIsCounted(t *testing.T) {
 // rather than link to a 404.
 func TestVaultStepOmittedWhenVaultDisabled(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
-	c := build(p, false, paidUser, now)
+	c := build(p, false, paidUser, trialOn, now)
 	if c == nil {
 		t.Fatal("expected a checklist")
 	}
@@ -148,7 +150,7 @@ func TestVaultStepOmittedWhenVaultDisabled(t *testing.T) {
 // With vault disabled the remaining three steps still complete the checklist.
 func TestHiddenWhenAllRemainingStepsDoneWithoutVault(t *testing.T) {
 	p, now := progress(time.Hour, true, true, false, true)
-	if c := build(p, false, paidUser, now); c != nil {
+	if c := build(p, false, paidUser, trialOn, now); c != nil {
 		t.Fatal("expected no checklist when every rendered step is done")
 	}
 }
@@ -157,7 +159,7 @@ func TestHiddenWhenAllRemainingStepsDoneWithoutVault(t *testing.T) {
 // resolves the fragment, dropping the user at the top of the profile page.
 func TestFragmentStepsAreNotAsync(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
-	for _, s := range build(p, withVault, paidUser, now).Steps {
+	for _, s := range build(p, withVault, paidUser, trialOn, now).Steps {
 		if s.Fragment != "" && s.Async {
 			t.Errorf("step %q has a fragment and must not be async", s.Key)
 		}
@@ -169,7 +171,7 @@ func TestFragmentStepsAreNotAsync(t *testing.T) {
 // subscription buys.
 func TestFreeUserSeesLockedPaidSteps(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
-	c := build(p, withVault, freeUser, now)
+	c := build(p, withVault, freeUser, trialOn, now)
 	if c == nil {
 		t.Fatal("expected a checklist for a free account")
 	}
@@ -206,7 +208,7 @@ func TestFreeUserSeesLockedPaidSteps(t *testing.T) {
 
 func TestPaidUserHasNothingLocked(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
-	for _, s := range build(p, withVault, paidUser, now).Steps {
+	for _, s := range build(p, withVault, paidUser, trialOn, now).Steps {
 		if s.Locked {
 			t.Errorf("step %q must not be locked for a paying user", s.Key)
 		}
@@ -217,7 +219,7 @@ func TestPaidUserHasNothingLocked(t *testing.T) {
 // Greying out something already finished would read as a bug.
 func TestDoneStepIsNeverLocked(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, true)
-	for _, s := range build(p, withVault, freeUser, now).Steps {
+	for _, s := range build(p, withVault, freeUser, trialOn, now).Steps {
 		if s.Key == StepStremio {
 			if !s.Done {
 				t.Error("stremio should be done")
@@ -234,11 +236,11 @@ func TestDoneStepIsNeverLocked(t *testing.T) {
 // about steps they cannot complete.
 func TestFreeUserChecklistHidesWhenActionableStepsDone(t *testing.T) {
 	p, now := progress(time.Hour, true, true, false, false)
-	if c := build(p, withVault, freeUser, now); c != nil {
+	if c := build(p, withVault, freeUser, trialOn, now); c != nil {
 		t.Fatalf("expected no checklist once every actionable step is done, got %+v", c)
 	}
 	// The same state still shows for a paying user — they have real work left.
-	if c := build(p, withVault, paidUser, now); c == nil {
+	if c := build(p, withVault, paidUser, trialOn, now); c == nil {
 		t.Fatal("a paying user still has the vault and stremio steps outstanding")
 	}
 }
@@ -259,7 +261,7 @@ func TestStepPathsMatchNavbarLinks(t *testing.T) {
 
 	p, now := progress(time.Hour, false, false, false, false)
 	for _, paid := range []bool{true, false} {
-		for _, s := range build(p, withVault, paid, now).Steps {
+		for _, s := range build(p, withVault, paid, trialOn, now).Steps {
 			if s.Path == "" || exempt[s.Path] {
 				continue
 			}
@@ -278,12 +280,60 @@ func TestCounterExcludesLockedSteps(t *testing.T) {
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 	p := &models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}
 
-	free := build(p, withVault, freeUser, now)
+	free := build(p, withVault, freeUser, trialOn, now)
 	if free.Done != 2 || free.Total != 3 {
 		t.Errorf("free: want 2/3, got %d/%d", free.Done, free.Total)
 	}
-	paid := build(p, withVault, paidUser, now)
+	paid := build(p, withVault, paidUser, trialOn, now)
 	if paid.Done != 2 || paid.Total != 5 {
 		t.Errorf("paid: want 2/5, got %d/%d", paid.Done, paid.Total)
+	}
+}
+
+// Locked rows keep the PRO badge either way (the template keys off Locked);
+// what changes with trial availability is only the invitation on the button.
+func TestLockedStepsInviteToTrialWhenAvailable(t *testing.T) {
+	p, now := progress(time.Hour, false, false, false, false)
+	for _, s := range build(p, withVault, freeUser, trialOn, now).Steps {
+		if !s.Locked {
+			continue
+		}
+		if s.CTAKey != "onboarding.trialCta" {
+			t.Errorf("step %s: expected trial CTA, got %s", s.Key, s.CTAKey)
+		}
+		if s.Path != "/donate" {
+			t.Errorf("step %s: trial CTA must still lead to /donate, got %s", s.Key, s.Path)
+		}
+	}
+}
+
+func TestLockedStepsFallBackToProCtaWithoutTrial(t *testing.T) {
+	p, now := progress(time.Hour, false, false, false, false)
+	locked := 0
+	for _, s := range build(p, withVault, freeUser, noTrial, now).Steps {
+		if !s.Locked {
+			continue
+		}
+		locked++
+		if s.CTAKey != "onboarding.proCta" {
+			t.Errorf("step %s: expected plans CTA without a trial, got %s", s.Key, s.CTAKey)
+		}
+	}
+	if locked != 2 {
+		t.Errorf("expected 2 locked steps, got %d", locked)
+	}
+}
+
+// Trial availability is an upsell concern; for paying users it must change
+// nothing at all.
+func TestTrialAvailabilityDoesNotAffectPaidUsers(t *testing.T) {
+	p, now := progress(time.Hour, false, false, false, false)
+	for _, s := range build(p, withVault, paidUser, trialOn, now).Steps {
+		if s.Locked {
+			t.Errorf("step %s: paid user must not see locked steps", s.Key)
+		}
+		if s.CTAKey == "onboarding.trialCta" || s.CTAKey == "onboarding.proCta" {
+			t.Errorf("step %s: paid user must keep the step's own CTA, got %s", s.Key, s.CTAKey)
+		}
 	}
 }

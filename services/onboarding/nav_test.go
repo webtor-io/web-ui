@@ -117,7 +117,7 @@ func TestNavModalRendersOnDemand(t *testing.T) {
 func TestModalRendersRowsAndClosesOnNavigation(t *testing.T) {
 	tmpl := newRenderer(t)
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
-	cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, now)
+	cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour), HasLibrary: true}, true, false, trialOn, now)
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "onboarding_checklist/modal", &ctxData{Ctx: &ctx{Lang: "ru"}, Data: cl}); err != nil {

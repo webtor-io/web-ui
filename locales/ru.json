@@ -1650,6 +1650,7 @@
     "onboarding.stremio.cta": "Настроить Stremio",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Разблокировать",
+    "onboarding.trialCta": "Попробовать 7 дней бесплатно",
     "onboarding.progress": "Выполнено {{.Done}} из {{.Total}} шагов",
     "onboarding.toggle": "Показать или скрыть шаги",
     "onboarding.status.done": "Выполнено:",

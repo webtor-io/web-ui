@@ -64,10 +64,14 @@ const (
 type Service struct {
 	pg           *cs.PG
 	vaultEnabled bool
+	// trialAvailable: some tier is fronted by a free trial (see
+	// donate.TrialAvailable) — locked rows then invite the user to try the
+	// feature instead of asking them to buy it sight unseen.
+	trialAvailable bool
 }
 
-func New(pg *cs.PG, vaultEnabled bool) *Service {
-	return &Service{pg: pg, vaultEnabled: vaultEnabled}
+func New(pg *cs.PG, vaultEnabled, trialAvailable bool) *Service {
+	return &Service{pg: pg, vaultEnabled: vaultEnabled, trialAvailable: trialAvailable}
 }
 
 // Get returns the checklist for a signed-in user, or nil when it should not be
@@ -88,7 +92,7 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID, paid bool, now time
 	if p == nil {
 		return nil, nil
 	}
-	return build(p, s.vaultEnabled, paid, now), nil
+	return build(p, s.vaultEnabled, paid, s.trialAvailable, now), nil
 }
 
 // paidOnlySteps are the steps a free account cannot complete. Vault shows an
@@ -102,7 +106,7 @@ var paidOnlySteps = map[StepKey]bool{
 }
 
 // build is the whole decision, kept pure so it can be tested without a DB.
-func build(p *models.OnboardingProgress, vaultEnabled, paid bool, now time.Time) *Checklist {
+func build(p *models.OnboardingProgress, vaultEnabled, paid, trialAvailable bool, now time.Time) *Checklist {
 	if now.Sub(p.CreatedAt) >= ActivationWindow {
 		return nil
 	}
@@ -191,7 +195,15 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid bool, now time.Time)
 			steps[i].Path = "/donate"
 			steps[i].Fragment = ""
 			steps[i].Async = true
+			// The row keeps its PRO badge either way; only the invitation
+			// changes. When a trial is configured the CTA leads with it —
+			// "try it" outsells "buy it" for a feature the user has never
+			// touched, and the 2026-09 cohort measure showed trial-first
+			// payers retain at least as well as direct ones.
 			steps[i].CTAKey = "onboarding.proCta"
+			if trialAvailable {
+				steps[i].CTAKey = "onboarding.trialCta"
+			}
 			steps[i].UmamiEvent = "onboarding-pro-" + string(steps[i].Key)
 			continue
 		}

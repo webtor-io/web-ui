@@ -1650,6 +1650,7 @@
     "onboarding.stremio.cta": "Stremio einrichten",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Mit Tarif freischalten",
+    "onboarding.trialCta": "7 Tage gratis testen",
     "onboarding.progress": "{{.Done}} von {{.Total}} Schritten erledigt",
     "onboarding.toggle": "Schritte ein- oder ausblenden",
     "onboarding.status.done": "Erledigt:",

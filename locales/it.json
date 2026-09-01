@@ -1650,6 +1650,7 @@
     "onboarding.stremio.cta": "Configura Stremio",
     "onboarding.proBadge": "PRO",
     "onboarding.proCta": "Sblocca con un piano",
+    "onboarding.trialCta": "Prova 7 giorni gratis",
     "onboarding.progress": "{{.Done}} di {{.Total}} passaggi completati",
     "onboarding.toggle": "Mostra o nascondi i passaggi",
     "onboarding.status.done": "Completato:",

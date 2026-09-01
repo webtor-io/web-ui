@@ -381,7 +381,7 @@ func serve(c *cli.Context) error {
 	// feature tables and keeps no state of its own. Mounted globally, before
 	// any route is registered, because the navbar shows a progress counter on
 	// every page — and after auth/claims, which the resolver reads.
-	onboardingSvc := onboarding.New(pg, vaultApi != nil)
+	onboardingSvc := onboarding.New(pg, vaultApi != nil, donate.TrialAvailable(c))
 	r.Use(w.OnboardingMiddleware(onboardingSvc))
 
 	// Mounted here for the same reason the onboarding middleware above is:
