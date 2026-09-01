@@ -19,21 +19,24 @@ type Handler struct {
 	vault  *vault.Vault
 	claims *claims.Claims
 	ns     *notification.Service
-	subs   []*nats.Subscription
-	done   chan struct{}
+	// billing feeds the tier-welcome message; zero when no provider is on.
+	billing notification.Billing
+	subs    []*nats.Subscription
+	done    chan struct{}
 }
 
-func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service) *Handler {
+func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service, billing notification.Billing) *Handler {
 	if !c.Bool(useEventHandlerFlag) {
 		return nil
 	}
 	return &Handler{
-		nats:   nats,
-		pg:     pg,
-		vault:  v,
-		claims: cl,
-		ns:     ns,
-		done:   make(chan struct{}),
+		nats:    nats,
+		pg:      pg,
+		vault:   v,
+		claims:  cl,
+		ns:      ns,
+		billing: billing,
+		done:    make(chan struct{}),
 	}
 }
 

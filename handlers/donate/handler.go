@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
+	"github.com/webtor-io/web-ui/services/notification"
 	np "github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
@@ -31,6 +32,11 @@ const (
 	patreonCheckoutFmt = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=%s"
 	// Direct checkout of the Silver tier's 7-day free trial.
 	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
+	// patreonManageURL is where a member sees, changes and cancels the
+	// membership — the page support keeps sending people to.
+	patreonManageURL = "https://www.patreon.com/settings/memberships"
+	// patreonTrialDays is Patreon's free-trial length for the trial tier.
+	patreonTrialDays = 7
 
 	patreonFlag = "donate-patreon"
 	cryptoFlag  = "donate-crypto"
@@ -70,6 +76,21 @@ func TrialAvailable(c *cli.Context) bool {
 		}
 	}
 	return false
+}
+
+// Billing is what the rest of the app may say about payments: with Patreon
+// on, subscriptions are managed there and the trial tier's length applies;
+// with it off there is no provider to point anyone at and the zero value
+// keeps welcome mail silent on the subject.
+func Billing(c *cli.Context) notification.Billing {
+	if !c.BoolT(patreonFlag) {
+		return notification.Billing{}
+	}
+	b := notification.Billing{ManageURL: patreonManageURL}
+	if TrialAvailable(c) {
+		b.TrialDays = patreonTrialDays
+	}
+	return b
 }
 
 type Handler struct {

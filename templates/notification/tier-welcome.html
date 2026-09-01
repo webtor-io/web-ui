@@ -1,0 +1,6 @@
+<p>{{ tp "email.tierWelcome.heading" "Tier" .Tier }}</p>
+{{ if .ShowStremio }}<p>{{ t "email.tierWelcome.stremio" }} <a href="{{ .StremioURL }}">{{ .StremioURL }}</a></p>
+{{ end }}{{ if .ShowVault }}<p>{{ t "email.tierWelcome.vault" }} <a href="{{ .VaultURL }}">{{ .VaultURL }}</a></p>
+{{ end }}{{ if .ManageURL }}<p>{{ t "email.tierWelcome.billing" }} <a href="{{ .ManageURL }}">{{ .ManageURL }}</a></p>
+{{ if .TrialDays }}<p>{{ tp "email.tierWelcome.trial" "Days" .TrialDays }}</p>
+{{ end }}{{ end }}
