@@ -18,7 +18,7 @@ func TestBuildCards(t *testing.T) {
 		price(1, "bronze", 365, 18),
 		price(2, "silver", 30, 5),
 		price(2, "silver", 365, 45),
-	}, true)
+	}, true, true)
 	if len(d.Cards) != 3 {
 		t.Fatalf("expected 3 cards, got %d", len(d.Cards))
 	}
@@ -56,7 +56,7 @@ func TestBuildCards(t *testing.T) {
 func TestBuildCards_UnknownTierAndMonthlyOnly(t *testing.T) {
 	d := buildCards([]np.Price{
 		price(7, "platinum", 30, 30),
-	}, true)
+	}, true, true)
 	if len(d.Cards) != 1 {
 		t.Fatalf("expected 1 card, got %d", len(d.Cards))
 	}
@@ -75,8 +75,30 @@ func TestBuildCards_UnknownTierAndMonthlyOnly(t *testing.T) {
 	}
 }
 
+func TestBuildCards_CryptoDisabled(t *testing.T) {
+	unavailable := false
+	p := price(1, "bronze", 30, 2)
+	p.Available = &unavailable
+	d := buildCards([]np.Price{
+		p,
+		price(1, "bronze", 365, 18),
+	}, true, false)
+	if d.CryptoEnabled {
+		t.Error("expected CryptoEnabled=false")
+	}
+	if d.HasUnavailable {
+		t.Error("unavailable-plans footnote must be off without the crypto links it explains")
+	}
+	if len(d.Cards) != 1 || !d.Cards[0].HasAnnual {
+		t.Errorf("cards must stay without crypto: %+v", d.Cards)
+	}
+	if d.Cards[0].PatreonMonthURL == "" {
+		t.Errorf("patreon links must stay without crypto: %+v", d.Cards[0])
+	}
+}
+
 func TestBuildCards_Empty(t *testing.T) {
-	d := buildCards(nil, true)
+	d := buildCards(nil, true, true)
 	if len(d.Cards) != 0 || d.AnnualSavePct != 0 {
 		t.Errorf("expected empty, got %+v", d)
 	}

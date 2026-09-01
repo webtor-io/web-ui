@@ -68,8 +68,9 @@ managed on patreon.com and are not listed.
 
 | Env | Meaning |
 |---|---|
-| `USE_PAYMENTS` | Crypto switch (values: `payments.enable`). Off → /donate renders without tier cards |
+| `USE_PAYMENTS` | Payments-client switch (values: `payments.enable`). Off → /donate renders without tier cards, no payment history. Keep it **on** even when crypto checkout is closed: the client also serves the tier prices behind the card grid |
 | `USE_PATREON` | Patreon switch, default **on** (values: `donate.patreon`). Off → Patreon card, tier join buttons, trial plaque and gift block hidden; /donate/patreon bounces to /donate |
+| `USE_CRYPTO` | Crypto-checkout switch, default **on** (values: `donate.crypto`). Off → the "or pay with crypto" links, the greyed-out unavailable variant and the minimum-payment footnote are hidden and POST /donate/crypto bounces to /donate; the tier cards, `/profile/payments` history and `/donate/crypto/success` (pending payments still resolve via IPN) keep working. Set to off in prod since 2026-09 — the crypto provider discontinued service for the account |
 | `WEBHOOK_SERVICE_HOST` / `WEBHOOK_SERVICE_PORT` | Webhook service address, auto-injected by kubernetes (same namespace); set manually for local dev |
 
 Payment statuses shown on the success page: `finished` → done;

@@ -47,6 +47,7 @@
                             {{ if .PatreonMonthURL }}
                             <a href="{{ .PatreonMonthURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="1">{{ t $.Lang "donate.crypto.join" }}</a>
                             <a href="{{ .PatreonYearURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 hidden group-has-[:checked]:inline-flex" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="12">{{ t $.Lang "donate.crypto.join" }}</a>
+                            {{ if $.Data.CryptoEnabled }}
                             {{ if .HasMonthly }}{{ if not .MonthlyUnavailable }}
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="block w-full mb-4 text-center text-xs text-w-sub link link-hover hover:text-w-cyan transition-colors {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.orPayCrypto" }}</button>
                             {{ else }}
@@ -55,7 +56,8 @@
                             {{ if .HasAnnual }}
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="w-full mb-4 text-center text-xs text-w-sub link link-hover hover:text-w-cyan transition-colors hidden group-has-[:checked]:block" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.orPayCrypto" }}</button>
                             {{ end }}
-                            {{ else }}
+                            {{ end }}
+                            {{ else if $.Data.CryptoEnabled }}
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
                             {{ end }}
                             {{ if .TaglineKey }}<p class="text-sm italic text-w-sub mb-3">{{ t $.Lang .TaglineKey }}</p>{{ end }}

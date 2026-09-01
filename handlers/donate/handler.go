@@ -33,16 +33,25 @@ const (
 	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
 
 	patreonFlag = "donate-patreon"
+	cryptoFlag  = "donate-crypto"
 )
 
-// RegisterFlags adds the per-method payment toggles. Crypto has its own
-// switch (USE_PAYMENTS on the payments client).
+// RegisterFlags adds the per-method payment toggles. donate-crypto is
+// distinct from USE_PAYMENTS (the payments client): the client also serves
+// the tier prices behind the card grid and the payment history, so it stays
+// on when the crypto provider stops accepting new checkouts — this flag
+// hides only the checkout offer.
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.BoolTFlag{
 			Name:   patreonFlag,
 			Usage:  "offer Patreon on the donate page (set to false to hide)",
 			EnvVar: "USE_PATREON",
+		},
+		cli.BoolTFlag{
+			Name:   cryptoFlag,
+			Usage:  "offer crypto checkout on the donate page (set to false to hide)",
+			EnvVar: "USE_CRYPTO",
 		},
 	)
 }
@@ -52,6 +61,7 @@ type Handler struct {
 	np        *np.Client
 	jobs      *j.Jobs
 	patreonOn bool
+	cryptoOn  bool
 }
 
 // RegisterHandler always serves /donate as a page: with a nil gateway client
@@ -64,6 +74,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		jobs:      jobs,
 		tb:        tm.MustRegisterViews("donate/*").WithLayout("main"),
 		patreonOn: c.BoolT(patreonFlag),
+		cryptoOn:  c.BoolT(cryptoFlag),
 	}
 	r.GET("/donate", h.index)
 	r.GET("/donate/patreon", methodRedirect(h.patreonOn, patreonURL))
@@ -141,6 +152,10 @@ type donateData struct {
 	// tier-card Patreon buttons, the trial plaque and the gift block
 	// (USE_PATREON).
 	PatreonEnabled bool
+	// CryptoEnabled gates the "or pay with crypto" checkout links on the
+	// tier cards (USE_CRYPTO); the cards themselves stay — their prices
+	// come from our own DB, not the crypto provider.
+	CryptoEnabled bool
 	// HasUnavailable turns on the footnote about plans hidden because the
 	// payment provider's minimum payment exceeds their price.
 	HasUnavailable bool
@@ -160,7 +175,7 @@ func fmtUSD(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
 }
 
-func buildCards(prices []np.Price, patreonOn bool) *donateData {
+func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
 	byTier := map[int]*tierCard{}
 	monthlyRaw := map[int]float64{}
 	order := []int{}
@@ -236,9 +251,12 @@ func buildCards(prices []np.Price, patreonOn bool) *donateData {
 		cards[len(cards)/2].Recommended = true
 	}
 	return &donateData{
-		Cards:           cards,
-		PatreonEnabled:  patreonOn,
-		HasUnavailable:  hasUnavailable,
+		Cards:          cards,
+		PatreonEnabled: patreonOn,
+		CryptoEnabled:  cryptoOn,
+		// The footnote explains greyed-out crypto options; without the
+		// crypto links there is nothing to explain.
+		HasUnavailable:  hasUnavailable && cryptoOn,
 		AnnualSavePct:   savePct,
 		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
 		PatreonGiftURL:  patreonGiftURL,
@@ -289,7 +307,7 @@ func (h *Handler) index(c *gin.Context) {
 	if h.np != nil {
 		prices, pricesErr = h.np.Prices(c.Request.Context())
 	}
-	data := buildCards(prices, h.patreonOn)
+	data := buildCards(prices, h.patreonOn, h.cryptoOn)
 
 	// The tier grid is built entirely from the payment provider's prices, so
 	// with no provider -- unconfigured, or down -- there is nothing to choose
@@ -315,7 +333,7 @@ func (h *Handler) index(c *gin.Context) {
 
 func (h *Handler) cryptoCheckout(c *gin.Context) {
 	donatePath := i18n.LangPath(i18n.GetLang(c), "/donate")
-	if h.np == nil {
+	if h.np == nil || !h.cryptoOn {
 		c.Redirect(http.StatusFound, donatePath)
 		return
 	}
@@ -352,7 +370,7 @@ func (h *Handler) cryptoCheckout(c *gin.Context) {
 	if err != nil {
 		prices, _ := h.np.Prices(ctx)
 		h.tb.Build("donate/index").HTML(http.StatusInternalServerError,
-			web.NewContext(c).WithData(buildCards(prices, h.patreonOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
+			web.NewContext(c).WithData(buildCards(prices, h.patreonOn, h.cryptoOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
 		return
 	}
 	// Hosted checkout lives on the payment provider's domain.
