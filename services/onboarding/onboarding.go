@@ -95,6 +95,16 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID, paid bool, now time
 	return build(p, s.vaultEnabled, paid, s.trialAvailable, now), nil
 }
 
+// Preview renders the checklist exactly as a freshly registered account of the
+// given tier sees it: pristine progress, no database, no activation-window
+// concern. It exists for the dev-only `?onboarding=free|paid` override — the
+// real resolver is useless for review on a developer's own account, which is
+// both past the activation window and has every step done, so the card would
+// be nil long before the tier mattered.
+func (s *Service) Preview(paid bool, now time.Time) *Checklist {
+	return build(&models.OnboardingProgress{CreatedAt: now}, s.vaultEnabled, paid, s.trialAvailable, now)
+}
+
 // paidOnlySteps are the steps a free account cannot complete. Vault shows an
 // upsell instead of contents, and while a free user can install the Stremio
 // addon, webtor itself is not offered as a streaming backend —

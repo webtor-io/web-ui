@@ -337,3 +337,41 @@ func TestTrialAvailabilityDoesNotAffectPaidUsers(t *testing.T) {
 		}
 	}
 }
+
+// Preview is the dev-only `?onboarding=` review mode: a pristine account of the
+// requested tier, past no gates. Free must show the locked rows (that is what
+// the mode exists to review); paid must show every step actionable.
+func TestPreviewRendersFreshAccountOfRequestedTier(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	svc := &Service{vaultEnabled: true, trialAvailable: true}
+
+	free := svc.Preview(false, now)
+	if free == nil {
+		t.Fatal("free preview must render")
+	}
+	locked := 0
+	for _, s := range free.Steps {
+		if s.Locked {
+			locked++
+			if s.CTAKey != "onboarding.trialCta" {
+				t.Errorf("step %s: free preview with a trial must invite to it, got %s", s.Key, s.CTAKey)
+			}
+		}
+	}
+	if locked != 2 {
+		t.Errorf("free preview: expected 2 locked steps, got %d", locked)
+	}
+
+	paid := svc.Preview(true, now)
+	if paid == nil {
+		t.Fatal("paid preview must render")
+	}
+	for _, s := range paid.Steps {
+		if s.Locked {
+			t.Errorf("step %s: paid preview must not lock steps", s.Key)
+		}
+	}
+	if paid.Done != 1 {
+		t.Errorf("fresh account starts at 1 done (account), got %d", paid.Done)
+	}
+}

@@ -38,6 +38,20 @@ func OnboardingMiddleware(svc *onboarding.Service) gin.HandlerFunc {
 }
 
 func loadOnboarding(svc *onboarding.Service, c *gin.Context) *models.OnboardingChecklist {
+	// Dev-only review mode: render the checklist as a fresh account of the
+	// requested tier would see it. It sits above every real gate on purpose —
+	// a developer's own account is past the activation window with all steps
+	// done, so the genuine resolver can only ever answer nil for them. Gated
+	// on gin.Mode() exactly like the streaming-error debug modals; under
+	// GIN_MODE=release the query param is inert.
+	if gin.Mode() != gin.ReleaseMode {
+		switch c.Query("onboarding") {
+		case "free":
+			return svc.Preview(false, time.Now())
+		case "paid":
+			return svc.Preview(true, time.Now())
+		}
+	}
 	u := auth.GetUserFromContext(c)
 	if u == nil || !u.HasAuth() {
 		return nil
@@ -49,7 +63,7 @@ func loadOnboarding(svc *onboarding.Service, c *gin.Context) *models.OnboardingC
 	if age := u.CreatedAt; !age.IsZero() && time.Since(age) >= onboarding.ActivationWindow {
 		return nil
 	}
-	cl, err := svc.Get(c.Request.Context(), u.ID, onboarding.PaidTier(c, claims.GetFromContext(c)), time.Now())
+	cl, err := svc.Get(c.Request.Context(), u.ID, onboarding.PaidTier(claims.GetFromContext(c)), time.Now())
 	if err != nil {
 		// Debug, not Warn: this runs per page render for a slice of users, and
 		// a persistent failure would otherwise flood the logs and drown the
