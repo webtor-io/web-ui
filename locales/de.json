@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Das Limit von 10 Untertiteln für diese Datei ist erreicht.",
     "error.user_subtitle.empty_file": "Die Untertiteldatei ist leer.",
     "error.generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "error.resolution_not_supported": "Streaming ist für Videos über 1080p nicht verfügbar. Du kannst die Datei stattdessen herunterladen.",
     "error.subscriptionFailed": "Abo konnte nicht angelegt werden",
     "error.subscriptionLimit": "Abo-Limit erreicht. Lösche eines oder wechsle den Tarif.",
     "error.subscriptionNotEligible": "Hier gibt es nichts zu erwarten – diese Staffel ist bereits vollständig ausgestrahlt.",

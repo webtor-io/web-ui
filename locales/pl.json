@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Osiągnięto limit 10 napisów dla tego pliku.",
     "error.user_subtitle.empty_file": "Plik napisów jest pusty.",
     "error.generic": "Coś poszło nie tak. Spróbuj ponownie.",
+    "error.resolution_not_supported": "Streaming nie jest dostępny dla filmów w rozdzielczości powyżej 1080p. Możesz pobrać plik.",
     "error.subscriptionFailed": "Nie udało się utworzyć subskrypcji",
     "error.subscriptionLimit": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",
     "error.subscriptionNotEligible": "Nie ma tu na co czekać — ten sezon został już w całości wyemitowany.",

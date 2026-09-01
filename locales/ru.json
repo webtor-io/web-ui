@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Достигнут лимит в 10 субтитров для этого файла.",
     "error.user_subtitle.empty_file": "Файл субтитров пуст.",
     "error.generic": "Что-то пошло не так. Попробуйте ещё раз.",
+    "error.resolution_not_supported": "Онлайн-просмотр недоступен для видео с разрешением выше 1080p. Вы можете скачать файл.",
     "error.subscriptionFailed": "Не удалось оформить подписку",
     "error.subscriptionLimit": "Достигнут лимит подписок. Удалите одну или перейдите на платный тариф.",
     "error.subscriptionNotEligible": "Здесь нечего ждать — сезон уже вышел целиком.",

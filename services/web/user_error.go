@@ -61,6 +61,11 @@ func ClassifyError(err error) string {
 	case strings.Contains(msg, "failed to load resource"):
 		return "error.load_failed"
 
+	case strings.Contains(msg, "over 1080p is not supported"):
+		// content-transcoder rejects >1080p non-h264 sources (415 body is
+		// embedded into the session-creation error by the api client).
+		return "error.resolution_not_supported"
+
 	case strings.Contains(msg, "maximum") && strings.Contains(msg, "allowed"):
 		return "error.quota_exceeded"
 

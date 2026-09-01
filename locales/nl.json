@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Je hebt de limiet van 10 ondertitels voor dit bestand bereikt.",
     "error.user_subtitle.empty_file": "Het ondertitelbestand is leeg.",
     "error.generic": "Er is iets misgegaan. Probeer het opnieuw.",
+    "error.resolution_not_supported": "Streamen is niet beschikbaar voor video's boven 1080p. Je kunt het bestand downloaden.",
     "error.subscriptionFailed": "Het abonnement kon niet worden aangemaakt",
     "error.subscriptionLimit": "Abonnementslimiet bereikt. Verwijder er een of stap over op een ander plan.",
     "error.subscriptionNotEligible": "Hier valt niets te verwachten — dit seizoen is volledig uitgezonden.",

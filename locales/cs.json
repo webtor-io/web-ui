@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Dosáhli jste limitu 10 titulků pro tento soubor.",
     "error.user_subtitle.empty_file": "Soubor titulků je prázdný.",
     "error.generic": "Něco se pokazilo. Zkuste to prosím znovu.",
+    "error.resolution_not_supported": "Streamování není dostupné pro videa nad 1080p. Soubor si můžete stáhnout.",
     "error.subscriptionFailed": "Odběr se nepodařilo vytvořit",
     "error.subscriptionLimit": "Dosáhl jsi limitu odběrů. Jeden smaž nebo změň tarif.",
     "error.subscriptionNotEligible": "Není tu na co čekat — tato sezóna už byla celá odvysílána.",

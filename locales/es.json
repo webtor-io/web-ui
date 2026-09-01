@@ -1501,6 +1501,7 @@
     "error.user_subtitle.limit_reached": "Has alcanzado el límite de 10 subtítulos para este archivo.",
     "error.user_subtitle.empty_file": "El archivo de subtítulos está vacío.",
     "error.generic": "Algo salió mal. Inténtalo de nuevo.",
+    "error.resolution_not_supported": "La transmisión no está disponible para vídeos con resolución superior a 1080p. Puedes descargar el archivo.",
     "error.subscriptionFailed": "No se pudo crear la suscripción",
     "error.subscriptionLimit": "Has alcanzado el límite de suscripciones. Elimina una o mejora tu plan.",
     "error.subscriptionNotEligible": "Aquí no hay nada que esperar: esta temporada ya terminó de emitirse.",
