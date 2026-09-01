@@ -31,7 +31,7 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 		Tier:        "silver",
 		ShowStremio: true,
 		ShowVault:   true,
-		Billing:     Billing{ManageURL: "https://www.patreon.com/settings/memberships", TrialDays: 7},
+		Billing:     Billing{Provider: "Patreon", ManageURL: "https://www.patreon.com/settings/memberships", TrialDays: 7},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +46,7 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 		"https://webtor.io/stremio/configure",
 		"https://webtor.io/vault",
 		"https://www.patreon.com/settings/memberships",
+		"through Patreon",
 		"free trial",
 		"Silver",
 	} {
@@ -90,7 +91,7 @@ func TestSendTierWelcome_BillingWithoutTrial(t *testing.T) {
 
 	err := svc.SendTierWelcome("user@example.com", testUserID, TierWelcome{
 		Tier:    "bronze",
-		Billing: Billing{ManageURL: "https://provider.example/manage"},
+		Billing: Billing{Provider: "Acme", ManageURL: "https://provider.example/manage"},
 	})
 	if err != nil {
 		t.Fatal(err)

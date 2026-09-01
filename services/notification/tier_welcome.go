@@ -14,6 +14,9 @@ import (
 // simply says nothing about payments — a self-hosted instance handing out
 // tiers by its own means has no Patreon page to send anyone to.
 type Billing struct {
+	// Provider is the name the charge appears under on the user's
+	// statement — the one word support keeps having to supply.
+	Provider string
 	// ManageURL is the provider's subscription-management page.
 	ManageURL string
 	// TrialDays is the length of the provider's free trial, 0 when there is
@@ -66,6 +69,7 @@ func (s *Service) SendTierWelcome(to string, userID uuid.UUID, w TierWelcome) er
 			"StremioURL":  s.domain + "/stremio/configure",
 			"ShowVault":   w.ShowVault,
 			"VaultURL":    s.domain + "/vault",
+			"Provider":    w.Billing.Provider,
 			"ManageURL":   w.Billing.ManageURL,
 			"TrialDays":   w.Billing.TrialDays,
 			"Domain":      s.domain,

@@ -18,6 +18,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
+	"github.com/webtor-io/web-ui/handlers/donate"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/adminauth"
@@ -105,6 +106,10 @@ type Data struct {
 	// HasPayments toggles the "my payments" link: shown only when the user
 	// has at least one crypto payment (Patreon history lives on patreon.com).
 	HasPayments bool
+	// Billing feeds the "billed through <provider>, manage or cancel here"
+	// line on a paid tier card. 39% of 2026-08 support mail was "how do I
+	// cancel" from people who never connected the charge to the provider.
+	Billing notification.Billing
 	// ShowEmailSection gates the notification-email section. One capability:
 	// mail can actually be sent (notification.Service.MailConfigured()).
 	// Without SMTP there is nothing an address could achieve and no way to
@@ -127,16 +132,19 @@ type Data struct {
 }
 
 type Handler struct {
-	tb            template.Builder[*web.Context]
-	ual           *ua.UrlAlias
-	at            *at.AccessToken
-	pg            *cs.PG
-	claims        *claims.Claims
-	vault         *vault.Vault
-	userSettings  *usettings.Service
-	payments      *pay.Client
-	releaseSubs   *rss.Service
-	notification  *notification.Service
+	tb           template.Builder[*web.Context]
+	ual          *ua.UrlAlias
+	at           *at.AccessToken
+	pg           *cs.PG
+	claims       *claims.Claims
+	vault        *vault.Vault
+	userSettings *usettings.Service
+	payments     *pay.Client
+	releaseSubs  *rss.Service
+	notification *notification.Service
+	// billing: who takes the money and where it is managed; zero when no
+	// provider is configured, and the tier card then says nothing about it.
+	billing       notification.Billing
 	disableWebDAV bool
 	disableS3     bool
 	disableAPI    bool
@@ -181,6 +189,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		payments:         payments,
 		releaseSubs:      releaseSubs,
 		notification:     ns,
+		billing:          donate.Billing(c),
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
 		disableAPI:       c.Bool(common.DisableAPIFlag),
@@ -550,6 +559,7 @@ func (s *Handler) get(c *gin.Context) {
 		UserSettings:          userSettings,
 		ErrKey:                c.Query("err"),
 		HasPayments:           hasPayments,
+		Billing:               s.billing,
 		DisableWebDAV:         s.disableWebDAV,
 		DisableS3:             s.disableS3,
 		DisableAPI:            s.disableAPI,

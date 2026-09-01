@@ -86,7 +86,7 @@ func Billing(c *cli.Context) notification.Billing {
 	if !c.BoolT(patreonFlag) {
 		return notification.Billing{}
 	}
-	b := notification.Billing{ManageURL: patreonManageURL}
+	b := notification.Billing{Provider: "Patreon", ManageURL: patreonManageURL}
 	if TrialAvailable(c) {
 		b.TrialDays = patreonTrialDays
 	}
