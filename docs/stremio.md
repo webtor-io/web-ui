@@ -22,6 +22,22 @@ anchor rides in the Location header — the only way it survives a login
 round-trip — so anonymous-facing links (the tool-page CTA) point here instead
 of at `/profile#stremio`.
 
+## Install flow (profile block)
+
+`templates/partials/profile/stremio.html` + `assets/src/js/app/profile/stremio.js`.
+Fresh account: one primary action, **Install in Stremio** — the generate form
+mints the token and, with JS, the module opens the `stremio://` deep link as
+soon as the async island re-renders into the token state. The intent has to
+survive the round-trip (the fragment swap is a new subtree), so it rides in
+`sessionStorage` (`stremio-install-pending`), set on submit by
+`e.submitter`, consumed once on the next render. "Just give me the link" is
+the same form without the intent (other device, Stremio Web). Without JS the
+form posts, the page reloads into the token state and Install is the first
+button there. Umami: `stremio-install-addon` with `stage=fresh|token|auto`,
+`stremio-generate-addon-url` for link-only, `stremio-download-app`.
+`/instructions/stremio` leads with this path and keeps the manual one below.
+Review the fresh state on your own account: `/profile?preview=stremio-fresh`.
+
 Token management (both `POST`, auth-gated, rendered by `templates/partials/profile/stremio.html`):
 
 | Route | Purpose |

@@ -15,6 +15,10 @@
 
     <p class="hidden sm:block text-[1.05rem] text-w-sub leading-relaxed mb-10">{{ t $.Lang "instructions.stremio.intro" }}</p>
 
+    <div class="bg-w-cyan/5 border border-w-cyan/30 rounded-xl p-4 mb-6 text-[1.05rem] text-w-sub leading-relaxed">
+      {{ tpHTML $.Lang "instructions.stremio.quick" "ProfileURL" (langPath $.Lang "/profile") }}
+    </div>
+
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
         <li>{{ tpHTML $.Lang "instructions.stremio.step1" "ProfileURL" (langPath $.Lang "/profile") }}</li>
         <li>{{ tHTML $.Lang "instructions.stremio.step2" }}</li>
