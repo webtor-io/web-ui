@@ -94,7 +94,8 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *noti
 //	?lang=ru             letter language (default: the request's language)
 //	?stremio=0 ?vault=0 ?discover=0  hide a "start here" block (default: all shown)
 //	?billing=0           render as a deployment with no billing provider
-//	?trial=0             drop the trial sentence
+//	?trial=0             drop the trial sentence (with ?known=1: a paid, non-trial member)
+//	?known=1             as if the event carried is_free_trial + next_charge_date (in 7 days)
 func (h *Handler) previewTierWelcome(c *gin.Context) {
 	tier := c.DefaultQuery("tier", "silver")
 	lang := c.Query("lang")
@@ -114,6 +115,14 @@ func (h *Handler) previewTierWelcome(c *gin.Context) {
 		if !on("trial") {
 			w.Billing.TrialDays = 0
 		}
+	}
+	// ?known=1 pretends the event carried the membership facts: a trial (or
+	// not, with ?trial=0) charging in a week.
+	if c.Query("known") == "1" {
+		isTrial := on("trial")
+		w.IsFreeTrial = &isTrial
+		next := time.Now().AddDate(0, 0, 7)
+		w.NextCharge = &next
 	}
 	subject, letter, err := h.ns.PreviewTierWelcome(lang, w)
 	if err != nil {

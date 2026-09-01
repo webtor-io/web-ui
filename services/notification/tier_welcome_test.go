@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/webtor-io/web-ui/services/i18n"
 )
@@ -146,5 +147,33 @@ func TestPreviewTierWelcomeRendersWithoutSending(t *testing.T) {
 	}
 	if store.created != nil || store.createCalls != 0 {
 		t.Error("preview must not journal a notification")
+	}
+}
+
+// With the membership facts on the event, the letter states them: a trial
+// names the day it converts, a paid member the next charge — and the
+// conditional "if you started with a trial" sentence goes away.
+func TestSendTierWelcome_StatesKnownTrialAndChargeDate(t *testing.T) {
+	store := &mockStore{}
+	svc := newTierWelcomeService(t, store, &mockMailer{})
+	next := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC)
+	billing := Billing{Provider: "Patreon", ManageURL: "https://p/manage", TrialDays: 7}
+
+	yes := true
+	if err := svc.SendTierWelcome("u@example.com", testUserID, TierWelcome{Tier: "silver", Billing: billing, IsFreeTrial: &yes, NextCharge: &next}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(store.created.Body, "trial ends on 2026-09-09") || strings.Contains(store.created.Body, "If you started with a free trial") {
+		t.Errorf("known trial must name the date and drop the conditional:\n%s", store.created.Body)
+	}
+
+	store = &mockStore{}
+	svc = newTierWelcomeService(t, store, &mockMailer{})
+	no := false
+	if err := svc.SendTierWelcome("u@example.com", testUserID, TierWelcome{Tier: "silver", Billing: billing, IsFreeTrial: &no, NextCharge: &next}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(store.created.Body, "Next charge: 2026-09-09") || strings.Contains(store.created.Body, "trial") {
+		t.Errorf("known non-trial must name the next charge and say nothing about trials:\n%s", store.created.Body)
 	}
 }

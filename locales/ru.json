@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Раздача, сохранённая в Vault, играет даже после ухода последнего сида.",
     "email.tierWelcome.billing": "Оплата проходит через {{.Provider}} — именно это имя вы увидите в выписке. Управлять подпиской или отменить её можно в любой момент:",
     "email.tierWelcome.trial": "Если вы начали с бесплатного пробного периода, через {{.Days}} дней он станет платной подпиской, если не отменить раньше.",
+    "email.tierWelcome.trialEnds": "Бесплатный период заканчивается {{.Date}}; с этого дня подписка платная, если не отменить раньше.",
+    "email.tierWelcome.nextCharge": "Следующее списание: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Что входит в тариф",
     "email.tierWelcome.startTitle": "С чего начать",
     "email.tierWelcome.stremioTitle": "Смотрите на телевизоре",

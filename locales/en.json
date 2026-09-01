@@ -1788,6 +1788,8 @@
     "email.tierWelcome.vault": "A torrent saved to Vault keeps playing even after the last seeder is gone.",
     "email.tierWelcome.billing": "Payments go through {{.Provider}} — that is the name you will see on your statement. Manage or cancel your membership anytime:",
     "email.tierWelcome.trial": "If you started with a free trial, it turns into a paid membership after {{.Days}} days unless you cancel before then.",
+    "email.tierWelcome.trialEnds": "Your free trial ends on {{.Date}}; from then on the membership is paid unless you cancel before that day.",
+    "email.tierWelcome.nextCharge": "Next charge: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "What your plan includes",
     "email.tierWelcome.startTitle": "Start here",
     "email.tierWelcome.stremioTitle": "Watch on your TV",

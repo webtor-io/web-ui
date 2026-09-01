@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	log "github.com/sirupsen/logrus"
@@ -13,8 +14,16 @@ import (
 	"github.com/webtor-io/web-ui/services/notification"
 )
 
+// userUpdatedMsg is the webhook service's user.updated event. Email is the
+// contract every version has had; the rest arrived in 2026-09 so the welcome
+// letter can name the trial and the charge date instead of hedging. All
+// optional — an older publisher sends only the email.
 type userUpdatedMsg struct {
-	Email string `json:"email"`
+	Email          string `json:"email"`
+	Source         string `json:"source"`
+	Event          string `json:"event"`
+	IsFreeTrial    *bool  `json:"is_free_trial"`
+	NextChargeDate string `json:"next_charge_date"`
 }
 
 func (h *Handler) userUpdated(msg []byte) error {
@@ -56,7 +65,7 @@ func (h *Handler) userUpdated(msg []byte) error {
 	// dedupe key makes a second trigger safe should one ever be added.
 	// Failing to greet must not fail the tier sync: log and carry on.
 	if h.ns != nil && welcomeNeeded(prevTier, user.Tier) {
-		if err := h.sendTierWelcome(ctx, db, user); err != nil {
+		if err := h.sendTierWelcome(ctx, db, user, m); err != nil {
 			log.WithError(err).WithField("email", m.Email).Warn("failed to send tier welcome")
 		}
 	}
@@ -86,7 +95,7 @@ func welcomeNeeded(prev, next string) bool {
 	return free(prev) && !free(next)
 }
 
-func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.User) error {
+func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.User, m userUpdatedMsg) error {
 	w := notification.TierWelcome{
 		Tier:         user.Tier,
 		BenefitKeys:  donate.TierBenefitKeys(user.Tier),
@@ -94,6 +103,8 @@ func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.U
 		ShowVault:    h.vault != nil,
 		ShowDiscover: true,
 		Billing:      h.billing,
+		IsFreeTrial:  m.IsFreeTrial,
+		NextCharge:   parseChargeDate(m.NextChargeDate),
 	}
 	// Skip the lines about things the account has already done. The
 	// onboarding progress query answers exactly these questions; a nil
@@ -107,4 +118,19 @@ func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.U
 	}
 	to := notification.RecipientEmail(user.Email, user.NotificationEmail)
 	return h.ns.SendTierWelcome(to, user.UserID, w)
+}
+
+// parseChargeDate reads Patreon's next_charge_date. Patreon sends RFC 3339
+// with milliseconds ("2026-09-09T00:00:00.000+00:00"); anything unparseable
+// is treated as unknown rather than failing the welcome.
+func parseChargeDate(raw string) *time.Time {
+	if raw == "" {
+		return nil
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02"} {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return &t
+		}
+	}
+	return nil
 }

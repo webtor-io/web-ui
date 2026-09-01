@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Een torrent die in Vault is bewaard blijft afspelen, ook als de laatste seeder weg is.",
     "email.tierWelcome.billing": "Betalingen lopen via {{.Provider}} — die naam zie je op je afschrift. Beheer of annuleer je lidmaatschap wanneer je wilt:",
     "email.tierWelcome.trial": "Als je met een gratis proefperiode bent begonnen, wordt die na {{.Days}} dagen een betaald lidmaatschap, tenzij je eerder opzegt.",
+    "email.tierWelcome.trialEnds": "Je gratis proefperiode eindigt op {{.Date}}; vanaf dan is het lidmaatschap betaald, tenzij je eerder opzegt.",
+    "email.tierWelcome.nextCharge": "Volgende afschrijving: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Wat je abonnement bevat",
     "email.tierWelcome.startTitle": "Begin hier",
     "email.tierWelcome.stremioTitle": "Kijk op je tv",

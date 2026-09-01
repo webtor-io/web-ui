@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"strings"
+	"time"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -48,6 +49,12 @@ type TierWelcome struct {
 	// progress query says whether the account has any.
 	ShowDiscover bool
 	Billing      Billing
+	// IsFreeTrial and NextCharge come from the membership event when the
+	// publisher knows them (nil otherwise): with both, the letter names the
+	// day the trial converts or the next charge lands; without, it states
+	// the trial rule conditionally.
+	IsFreeTrial *bool
+	NextCharge  *time.Time
 }
 
 // SendTierWelcome tells a freshly paid account what its tier unlocks and, when
@@ -98,8 +105,24 @@ func (s *Service) tierWelcomeData(lang string, w TierWelcome) map[string]any {
 		"ManageURL":      w.Billing.ManageURL,
 		"CancelGuideURL": w.Billing.CancelGuideURL,
 		"TrialDays":      w.Billing.TrialDays,
+		// TrialKnown: the event said whether this is a trial. Then the
+		// letter states the fact (with the date when known) instead of the
+		// conditional "if you started with a trial" sentence.
+		"TrialKnown":     w.IsFreeTrial != nil,
+		"IsTrial":        w.IsFreeTrial != nil && *w.IsFreeTrial,
+		"NextChargeDate": chargeDate(w.NextCharge),
 		"Domain":         s.domain,
 	}
+}
+
+// chargeDate renders a charge date for the letter. ISO date on purpose: it is
+// the one format every locale reads the same way, and a wrong guess at a
+// locale's day/month order would be worse than plain.
+func chargeDate(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
 }
 
 // PreviewTierWelcome renders the letter exactly as it would go on the wire

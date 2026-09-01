@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Um torrent salvo no Vault continua tocando mesmo depois que o último seeder sai.",
     "email.tierWelcome.billing": "Os pagamentos passam pelo {{.Provider}} — é esse nome que aparecerá no seu extrato. Gerencie ou cancele sua assinatura quando quiser:",
     "email.tierWelcome.trial": "Se você começou com um teste gratuito, ele vira uma assinatura paga após {{.Days}} dias, a menos que você cancele antes.",
+    "email.tierWelcome.trialEnds": "Seu teste gratuito termina em {{.Date}}; a partir daí a assinatura é paga, a menos que você cancele antes.",
+    "email.tierWelcome.nextCharge": "Próxima cobrança: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "O que seu plano inclui",
     "email.tierWelcome.startTitle": "Comece por aqui",
     "email.tierWelcome.stremioTitle": "Assista na TV",

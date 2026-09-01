@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Vault'a kaydedilen torrent, son seeder gittikten sonra bile oynatılmaya devam eder.",
     "email.tierWelcome.billing": "Ödemeler {{.Provider}} üzerinden yapılır — ekstrenizde göreceğiniz isim budur. Üyeliğinizi istediğiniz zaman yönetin veya iptal edin:",
     "email.tierWelcome.trial": "Ücretsiz denemeyle başladıysanız, daha önce iptal etmezseniz {{.Days}} gün sonra ücretli üyeliğe dönüşür.",
+    "email.tierWelcome.trialEnds": "Ücretsiz deneme süreniz {{.Date}} tarihinde bitiyor; daha önce iptal etmezseniz o günden itibaren üyelik ücretlidir.",
+    "email.tierWelcome.nextCharge": "Sonraki ödeme: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Planınıza dahil olanlar",
     "email.tierWelcome.startTitle": "Buradan başlayın",
     "email.tierWelcome.stremioTitle": "TV'nizde izleyin",

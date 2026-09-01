@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Torrent uložený do Vaultu se přehrává i po odchodu posledního seedera.",
     "email.tierWelcome.billing": "Platby probíhají přes {{.Provider}} — právě tento název uvidíte na výpisu. Členství můžete kdykoli spravovat nebo zrušit:",
     "email.tierWelcome.trial": "Pokud jste začali bezplatnou zkušební verzí, po {{.Days}} dnech se změní na placené členství, pokud ji dříve nezrušíte.",
+    "email.tierWelcome.trialEnds": "Bezplatná zkušební doba končí {{.Date}}; od toho dne je členství placené, pokud ho dříve nezrušíte.",
+    "email.tierWelcome.nextCharge": "Další platba: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Co váš tarif obsahuje",
     "email.tierWelcome.startTitle": "Začněte zde",
     "email.tierWelcome.stremioTitle": "Sledujte na televizi",

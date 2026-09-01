@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Torrent zapisany w Vault gra dalej nawet po odejściu ostatniego seeda.",
     "email.tierWelcome.billing": "Płatności przechodzą przez {{.Provider}} — taką nazwę zobaczysz na wyciągu. Zarządzaj subskrypcją lub anuluj ją w dowolnym momencie:",
     "email.tierWelcome.trial": "Jeśli zacząłeś od bezpłatnego okresu próbnego, po {{.Days}} dniach zmieni się on w płatną subskrypcję, o ile nie anulujesz wcześniej.",
+    "email.tierWelcome.trialEnds": "Bezpłatny okres próbny kończy się {{.Date}}; od tego dnia subskrypcja jest płatna, o ile nie anulujesz wcześniej.",
+    "email.tierWelcome.nextCharge": "Następna płatność: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Co zawiera Twój plan",
     "email.tierWelcome.startTitle": "Zacznij tutaj",
     "email.tierWelcome.stremioTitle": "Oglądaj na telewizorze",

@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Ein im Vault gespeicherter Torrent läuft weiter, auch wenn der letzte Seeder weg ist.",
     "email.tierWelcome.billing": "Zahlungen laufen über {{.Provider}} – diesen Namen siehst du auf deinem Kontoauszug. Verwalte oder kündige deine Mitgliedschaft jederzeit:",
     "email.tierWelcome.trial": "Wenn du mit einer kostenlosen Testphase begonnen hast, wird sie nach {{.Days}} Tagen zu einer bezahlten Mitgliedschaft, sofern du nicht vorher kündigst.",
+    "email.tierWelcome.trialEnds": "Deine kostenlose Testphase endet am {{.Date}}; ab dann ist die Mitgliedschaft kostenpflichtig, sofern du nicht vorher kündigst.",
+    "email.tierWelcome.nextCharge": "Nächste Abbuchung: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Was dein Tarif enthält",
     "email.tierWelcome.startTitle": "So geht's los",
     "email.tierWelcome.stremioTitle": "Auf dem Fernseher schauen",

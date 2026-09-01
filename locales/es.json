@@ -1713,6 +1713,8 @@
     "email.tierWelcome.vault": "Un torrent guardado en Vault sigue reproduciéndose aunque desaparezca el último seeder.",
     "email.tierWelcome.billing": "Los pagos se realizan a través de {{.Provider}}: ese es el nombre que verás en tu extracto. Gestiona o cancela tu suscripción cuando quieras:",
     "email.tierWelcome.trial": "Si empezaste con una prueba gratuita, se convertirá en una suscripción de pago después de {{.Days}} días a menos que la canceles antes.",
+    "email.tierWelcome.trialEnds": "Tu prueba gratuita termina el {{.Date}}; a partir de entonces la suscripción es de pago a menos que la canceles antes.",
+    "email.tierWelcome.nextCharge": "Próximo cargo: {{.Date}}.",
     "email.tierWelcome.benefitsTitle": "Qué incluye tu plan",
     "email.tierWelcome.startTitle": "Empieza aquí",
     "email.tierWelcome.stremioTitle": "Mira en tu TV",
