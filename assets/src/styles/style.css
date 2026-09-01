@@ -984,7 +984,10 @@ input:-webkit-autofill:focus {
   ul {
     @apply list-disc pl-5 my-1;
   }
-  strong {
+  h3 {
+    @apply font-semibold text-base-content mt-3 mb-1;
+  }
+  strong, b {
     @apply font-semibold text-base-content;
   }
 }

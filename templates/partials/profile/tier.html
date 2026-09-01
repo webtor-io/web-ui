@@ -47,10 +47,15 @@
             {{ if and $.Data.Billing.ManageURL (ne (.Claims | tierName) "free") }}
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-5 pt-4 border-t border-w-line/40 text-xs text-w-sub">
                 <span class="flex-1 leading-relaxed">{{ tp $.Lang "profile.billing.text" "Provider" $.Data.Billing.Provider }}</span>
-                <a href="{{ $.Data.Billing.ManageURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-manage" class="btn btn-xs btn-soft gap-1.5 shrink-0">
-                    {{ tp $.Lang "profile.billing.manage" "Provider" $.Data.Billing.Provider }}
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
-                </a>
+                <span class="flex items-center gap-3 shrink-0">
+                    {{ if $.Data.Billing.CancelGuideURL }}
+                    <a href="{{ $.Data.Billing.CancelGuideURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-cancel-guide" class="link link-hover text-w-muted hover:text-w-sub">{{ t $.Lang "profile.billing.cancelGuide" }}</a>
+                    {{ end }}
+                    <a href="{{ $.Data.Billing.ManageURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-manage" class="btn btn-xs btn-soft gap-1.5">
+                        {{ tp $.Lang "profile.billing.manage" "Provider" $.Data.Billing.Provider }}
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
+                    </a>
+                </span>
             </div>
             {{ end }}
         </div>

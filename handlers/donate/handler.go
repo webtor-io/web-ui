@@ -35,6 +35,9 @@ const (
 	// patreonManageURL is where a member sees, changes and cancels the
 	// membership — the page support keeps sending people to.
 	patreonManageURL = "https://www.patreon.com/settings/memberships"
+	// patreonCancelGuideURL is Patreon's step-by-step "cancel a paid
+	// membership" article.
+	patreonCancelGuideURL = "https://support.patreon.com/hc/en-us/articles/360005502572-Canceling-a-paid-membership"
 	// patreonTrialDays is Patreon's free-trial length for the trial tier.
 	patreonTrialDays = 7
 
@@ -78,6 +81,21 @@ func TrialAvailable(c *cli.Context) bool {
 	return false
 }
 
+// TierBenefitKeys lists the i18n keys of a tier's marketing benefits — the
+// same lines the donate page prints on the tier's card — so a welcome message
+// can restate what was just bought without a second copy of the copy.
+func TierBenefitKeys(tier string) []string {
+	m, ok := tierMetas[tier]
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, m.benefits)
+	for i := 1; i <= m.benefits; i++ {
+		keys = append(keys, "donate.crypto.tier."+tier+".b"+strconv.Itoa(i))
+	}
+	return keys
+}
+
 // Billing is what the rest of the app may say about payments: with Patreon
 // on, subscriptions are managed there and the trial tier's length applies;
 // with it off there is no provider to point anyone at and the zero value
@@ -86,7 +104,7 @@ func Billing(c *cli.Context) notification.Billing {
 	if !c.BoolT(patreonFlag) {
 		return notification.Billing{}
 	}
-	b := notification.Billing{Provider: "Patreon", ManageURL: patreonManageURL}
+	b := notification.Billing{Provider: "Patreon", ManageURL: patreonManageURL, CancelGuideURL: patreonCancelGuideURL}
 	if TrialAvailable(c) {
 		b.TrialDays = patreonTrialDays
 	}

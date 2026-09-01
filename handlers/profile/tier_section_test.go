@@ -52,7 +52,12 @@ func renderTier(t *testing.T, tmpl *template.Template, lang, tier string, billin
 	return buf.String()
 }
 
-var patreonBilling = notification.Billing{Provider: "Patreon", ManageURL: "https://www.patreon.com/settings/memberships", TrialDays: 7}
+var patreonBilling = notification.Billing{
+	Provider:       "Patreon",
+	ManageURL:      "https://www.patreon.com/settings/memberships",
+	CancelGuideURL: "https://support.patreon.com/hc/en-us/articles/360005502572-Canceling-a-paid-membership",
+	TrialDays:      7,
+}
 
 func TestTierCardNamesTheBillingProviderOnPaidTiers(t *testing.T) {
 	tmpl := newTierRenderer(t)
@@ -60,6 +65,9 @@ func TestTierCardNamesTheBillingProviderOnPaidTiers(t *testing.T) {
 		out := renderTier(t, tmpl, lang, "silver", patreonBilling)
 		if !strings.Contains(out, patreonBilling.ManageURL) || !strings.Contains(out, `data-umami-event="profile-billing-manage"`) {
 			t.Errorf("lang=%s: paid card must link the provider's manage page", lang)
+		}
+		if !strings.Contains(out, patreonBilling.CancelGuideURL) || !strings.Contains(out, `data-umami-event="profile-billing-cancel-guide"`) {
+			t.Errorf("lang=%s: paid card must link the cancellation guide", lang)
 		}
 		if strings.Count(out, "Patreon") < 2 {
 			t.Errorf("lang=%s: both the sentence and the button must name the provider", lang)

@@ -1,6 +1,13 @@
 <p>{{ tp "email.tierWelcome.heading" "Tier" .Tier }}</p>
-{{ if .ShowStremio }}<p>{{ t "email.tierWelcome.stremio" }} <a href="{{ .StremioURL }}">{{ .StremioURL }}</a></p>
-{{ end }}{{ if .ShowVault }}<p>{{ t "email.tierWelcome.vault" }} <a href="{{ .VaultURL }}">{{ .VaultURL }}</a></p>
-{{ end }}{{ if .ManageURL }}<p>{{ tp "email.tierWelcome.billing" "Provider" .Provider }} <a href="{{ .ManageURL }}">{{ .ManageURL }}</a></p>
-{{ if .TrialDays }}<p>{{ tp "email.tierWelcome.trial" "Days" .TrialDays }}</p>
-{{ end }}{{ end }}
+{{ if .BenefitKeys }}<h3>{{ t "email.tierWelcome.benefitsTitle" }}</h3>
+<ul>
+{{ range .BenefitKeys }}    <li>{{ t . }}</li>
+{{ end }}</ul>
+{{ end }}<h3>{{ t "email.tierWelcome.startTitle" }}</h3>
+{{ if .ShowStremio }}<p><b>{{ t "email.tierWelcome.stremioTitle" }}</b><br>{{ t "email.tierWelcome.stremio" }}<br><a href="{{ .StremioURL }}">{{ t "email.tierWelcome.stremioCta" }}</a></p>
+{{ end }}{{ if .ShowVault }}<p><b>{{ t "email.tierWelcome.vaultTitle" }}</b><br>{{ t "email.tierWelcome.vault" }}<br><a href="{{ .VaultURL }}">{{ t "email.tierWelcome.vaultCta" }}</a></p>
+{{ end }}{{ if .ShowDiscover }}<p><b>{{ t "email.tierWelcome.discoverTitle" }}</b><br>{{ t "email.tierWelcome.discover" }}<br><a href="{{ .DiscoverURL }}">{{ t "email.tierWelcome.discoverCta" }}</a></p>
+{{ end }}<p><b>{{ t "email.tierWelcome.subsTitle" }}</b><br>{{ t "email.tierWelcome.subs" }}<br><a href="{{ .DiscoverURL }}">{{ t "email.tierWelcome.subsCta" }}</a></p>
+{{ if .ManageURL }}<h3>{{ t "email.tierWelcome.billingTitle" }}</h3>
+<p>{{ tp "email.tierWelcome.billing" "Provider" .Provider }}{{ if .TrialDays }} {{ tp "email.tierWelcome.trial" "Days" .TrialDays }}{{ end }}<br><a href="{{ .ManageURL }}">{{ tp "email.tierWelcome.manageCta" "Provider" .Provider }}</a>{{ if .CancelGuideURL }} · <a href="{{ .CancelGuideURL }}">{{ t "email.tierWelcome.cancelGuideCta" }}</a>{{ end }}</p>
+{{ end }}<p>{{ t "email.tierWelcome.help" }} <a href="{{ .SupportURL }}">{{ t "email.tierWelcome.helpCta" }}</a></p>

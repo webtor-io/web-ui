@@ -19,6 +19,10 @@ type Billing struct {
 	Provider string
 	// ManageURL is the provider's subscription-management page.
 	ManageURL string
+	// CancelGuideURL is the provider's own step-by-step cancellation help
+	// page — three support requests in August came back "I can't" after
+	// being given ManageURL alone.
+	CancelGuideURL string
 	// TrialDays is the length of the provider's free trial, 0 when there is
 	// none. Until the tier-change event carries whether THIS subscription
 	// began as a trial, the message states the rule conditionally.
@@ -29,6 +33,9 @@ type Billing struct {
 // turned paid; it decides which "what you unlocked" lines are worth saying.
 type TierWelcome struct {
 	Tier string
+	// BenefitKeys are the tier's benefit lines as i18n keys (the donate
+	// page's card copy); empty for tiers the shop has no copy for.
+	BenefitKeys []string
 	// ShowStremio: the account has not connected the Stremio addon yet.
 	// Connecting it is the single strongest retention action we have
 	// measured, so it goes first — and is omitted once done, because
@@ -36,7 +43,11 @@ type TierWelcome struct {
 	ShowStremio bool
 	// ShowVault: Vault is enabled here and the account has nothing in it.
 	ShowVault bool
-	Billing   Billing
+	// ShowDiscover: the account has no watchlist yet. Release subscriptions
+	// are always mentioned — they are made from Discover and nothing in the
+	// progress query says whether the account has any.
+	ShowDiscover bool
+	Billing      Billing
 }
 
 // SendTierWelcome tells a freshly paid account what its tier unlocks and, when
@@ -55,27 +66,57 @@ type TierWelcome struct {
 // message.
 func (s *Service) SendTierWelcome(to string, userID uuid.UUID, w TierWelcome) error {
 	lang := s.store.AccountLang(context.Background(), userID)
-	title := s.tierTitle(lang, w.Tier)
-	opts := SendOptions{
+	return s.Send(SendOptions{
 		To:       to,
 		UserID:   userID,
 		Lang:     lang,
 		Key:      "tier-welcome-" + w.Tier,
-		Title:    s.T(lang, "email.tierWelcome.subject", "Tier", title),
-		Template: "tier-welcome.html",
-		Data: map[string]any{
-			"Tier":        title,
-			"ShowStremio": w.ShowStremio,
-			"StremioURL":  withUTM(s.domain+"/stremio/configure", "tier-welcome"),
-			"ShowVault":   w.ShowVault,
-			"VaultURL":    withUTM(s.domain+"/vault", "tier-welcome"),
-			"Provider":    w.Billing.Provider,
-			"ManageURL":   w.Billing.ManageURL,
-			"TrialDays":   w.Billing.TrialDays,
-			"Domain":      s.domain,
-		},
+		Title:    s.tierWelcomeSubject(lang, w),
+		Template: tierWelcomeTemplate,
+		Data:     s.tierWelcomeData(lang, w),
+	})
+}
+
+const tierWelcomeTemplate = "tier-welcome.html"
+
+func (s *Service) tierWelcomeSubject(lang string, w TierWelcome) string {
+	return s.T(lang, "email.tierWelcome.subject", "Tier", s.tierTitle(lang, w.Tier))
+}
+
+func (s *Service) tierWelcomeData(lang string, w TierWelcome) map[string]any {
+	return map[string]any{
+		"Tier":           s.tierTitle(lang, w.Tier),
+		"BenefitKeys":    w.BenefitKeys,
+		"SupportURL":     withUTM(s.domain+"/support", "tier-welcome"),
+		"ShowStremio":    w.ShowStremio,
+		"StremioURL":     withUTM(s.domain+"/stremio/configure", "tier-welcome"),
+		"ShowVault":      w.ShowVault,
+		"VaultURL":       withUTM(s.domain+"/vault", "tier-welcome"),
+		"ShowDiscover":   w.ShowDiscover,
+		"DiscoverURL":    withUTM(s.domain+"/discover", "tier-welcome"),
+		"Provider":       w.Billing.Provider,
+		"ManageURL":      w.Billing.ManageURL,
+		"CancelGuideURL": w.Billing.CancelGuideURL,
+		"TrialDays":      w.Billing.TrialDays,
+		"Domain":         s.domain,
 	}
-	return s.Send(opts)
+}
+
+// PreviewTierWelcome renders the letter exactly as it would go on the wire
+// (fragment wrapped in the mail layout) without sending or journaling it.
+// For the dev-only preview route: a welcome fires once per account's life
+// as a payer, so there is no other way to look at it before it reaches a
+// real customer. Returns subject and HTML.
+func (s *Service) PreviewTierWelcome(lang string, w TierWelcome) (string, string, error) {
+	body, err := s.render(tierWelcomeTemplate, lang, s.tierWelcomeData(lang, w))
+	if err != nil {
+		return "", "", err
+	}
+	letter, err := s.wrapEmail(body, lang)
+	if err != nil {
+		return "", "", err
+	}
+	return s.tierWelcomeSubject(lang, w), letter, nil
 }
 
 // tierTitle is the tier's marketing name in the user's language, falling back

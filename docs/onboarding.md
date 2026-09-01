@@ -159,9 +159,14 @@ free/пусто → платный тир зовёт `notification.Service.SendT
 (`services/notification/tier_welcome.go`): запись в in-app фид + письмо,
 шаблон `templates/notification/tier-welcome.html`, ключи `email.tierWelcome.*`.
 
-Содержание — активация и деньги в одном письме:
-- «Смотрите на ТВ» со ссылкой на `/stremio/configure` — только если аддон ещё
-  не подключён (`OnboardingProgress.HasStremio`); Vault — если включён и пуст;
+Содержание — полноценное welcome, не служебная строка:
+- «Что входит в тариф» — бенефиты карточки с /donate (`donate.TierBenefitKeys`,
+  те же ключи `donate.crypto.tier.<tier>.bN`, один источник копирайта);
+- «С чего начать»: «Смотрите на ТВ» → `/stremio/configure` — только если аддон
+  ещё не подключён (`OnboardingProgress.HasStremio`); Vault — если включён и пуст;
+  Discover — если watchlist пуст; подписки на выходящие сезоны — всегда (что
+  у аккаунта уже есть подписки, прогресс не знает); ссылки с текстовыми
+  лейблами, не сырые URL; в конце — ссылка на `/support`;
 - «Оплата идёт через Patreon, так будет в выписке» + ссылка на управление
   подпиской и фраза про триал (`{{.Days}}` дней) — только когда провайдер
   настроен: `donate.Billing(c)` отдаёт нулевое значение без `USE_PATREON`, и
@@ -180,6 +185,12 @@ paid↔paid переходы приветствием не считаются (`
 
 Ссылки письма несут `utm_campaign=tier-welcome` (см. `withUTM`) — CTR
 считается по сессиям с этой кампанией против писем с ключом `tier-welcome-%`.
+
+Посмотреть письмо до того, как его увидит клиент: dev-роут
+`GET /notifications/preview/tier-welcome?tier=silver&lang=ru` (параметры
+`stremio|vault|billing|trial=0` выключают блоки; вне release не регистрируется).
+Блок Stremio в профиле в состоянии «ссылка ещё не сгенерирована» —
+`/profile?preview=stremio-fresh`.
 
 Пока событие не несёт `is_free_trial`/дату списания (webhook публикует только
 `{email}`), фраза про триал условная. Следующий шаг — расширить payload

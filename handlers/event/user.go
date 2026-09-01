@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	log "github.com/sirupsen/logrus"
+	"github.com/webtor-io/web-ui/handlers/donate"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
@@ -87,10 +88,12 @@ func welcomeNeeded(prev, next string) bool {
 
 func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.User) error {
 	w := notification.TierWelcome{
-		Tier:        user.Tier,
-		ShowStremio: true,
-		ShowVault:   h.vault != nil,
-		Billing:     h.billing,
+		Tier:         user.Tier,
+		BenefitKeys:  donate.TierBenefitKeys(user.Tier),
+		ShowStremio:  true,
+		ShowVault:    h.vault != nil,
+		ShowDiscover: true,
+		Billing:      h.billing,
 	}
 	// Skip the lines about things the account has already done. The
 	// onboarding progress query answers exactly these questions; a nil
@@ -100,6 +103,7 @@ func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.U
 	} else if p != nil {
 		w.ShowStremio = !p.HasStremio
 		w.ShowVault = h.vault != nil && !p.HasVault
+		w.ShowDiscover = !p.HasWatchlist
 	}
 	to := notification.RecipientEmail(user.Email, user.NotificationEmail)
 	return h.ns.SendTierWelcome(to, user.UserID, w)
