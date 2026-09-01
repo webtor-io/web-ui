@@ -166,8 +166,14 @@ func (s *Handler) configure(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/login?"+v.Encode())
 		return
 	}
-	// For now, redirect authenticated users to their profile where the personalized addon URL and install link are shown
-	c.Redirect(http.StatusFound, "/profile")
+	// Redirect authenticated users straight to the Stremio section of their
+	// profile, where the personalized addon URL and install link are shown.
+	// The fragment rides in the Location header on purpose: it is the only
+	// way an anchor survives a login round-trip, since browsers never send
+	// fragments to the server and return-url can therefore not carry one.
+	// Links that want to land on #stremio for possibly-anonymous visitors
+	// should point here, not at /profile#stremio.
+	c.Redirect(http.StatusFound, "/profile#stremio")
 }
 
 // episodeClaims reads the season/episode a playback token was minted for.

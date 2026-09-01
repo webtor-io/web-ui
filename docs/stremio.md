@@ -16,6 +16,12 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 | `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it |
 | `GET /stream/:type/*id` | Streams for a movie/episode (the pipeline below) |
 
+`GET /configure` (Stremio's standard config entry): anonymous → login with
+`return-url=/stremio/configure`; authenticated → `302 /profile#stremio`. The
+anchor rides in the Location header — the only way it survives a login
+round-trip — so anonymous-facing links (the tool-page CTA) point here instead
+of at `/profile#stremio`.
+
 Token management (both `POST`, auth-gated, rendered by `templates/partials/profile/stremio.html`):
 
 | Route | Purpose |

@@ -1,10 +1,15 @@
 {{ define "stremio_cta" }}
-{{/* Used only on the /stremio-addons-online tool page, where the visitor is
-     already looking for Stremio addons. Every other tool page keeps
-     discover_cta — see docs/onboarding_empty_states.md. */}}
+{{/* Used only on the /webtor-stremio-addon tool page (handlers/common/tools.go,
+     CTA: "stremio"), where the visitor is already looking for the addon. Every
+     other tool page keeps discover_cta — see docs/onboarding_empty_states.md.
+
+     The button goes through /stremio/configure rather than /profile#stremio:
+     tool-page visitors are mostly anonymous, and a fragment never survives the
+     login round-trip (browsers do not send it to the server). The configure
+     endpoint handles the login detour and lands everyone on #stremio. */}}
 <div class="max-w-[1100px] mx-auto">
     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-8 p-6 sm:p-8 rounded-2xl border border-w-cyan/25 bg-gradient-to-r from-w-cyan/10 via-base-300 to-w-purple/10">
-        <a href="{{ langPath .Ctx.Lang "/profile" }}#stremio" data-umami-event="stremio-cta-click" data-umami-event-page="{{ if .Data }}{{ .Data.Url }}{{ else }}home{{ end }}" class="btn btn-lg btn-pink gap-2 px-8 shrink-0">
+        <a href="{{ langPath .Ctx.Lang "/stremio/configure" }}" data-umami-event="stremio-cta-click" data-umami-event-page="{{ if .Data }}{{ .Data.Url }}{{ else }}home{{ end }}" class="btn btn-lg btn-pink gap-2 px-8 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
                 <rect x="2" y="3" width="20" height="14" rx="2"/><path stroke-linecap="round" d="M8 21h8"/><path stroke-linecap="round" d="M12 17v4"/>
             </svg>
