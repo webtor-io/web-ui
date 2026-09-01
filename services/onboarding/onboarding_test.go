@@ -63,7 +63,8 @@ func TestFreshAccountStartsWithAccountStepDone(t *testing.T) {
 	if !c.Steps[0].Done {
 		t.Error("the account step must always count as done")
 	}
-	want := []StepKey{StepAccount, StepLibrary, StepDiscover, StepVault, StepStremio}
+	// Paid order: Stremio is promoted to second place (see build).
+	want := []StepKey{StepAccount, StepStremio, StepLibrary, StepDiscover, StepVault}
 	for i, k := range want {
 		if c.Steps[i].Key != k {
 			t.Errorf("step %d: want %q, got %q", i, k, c.Steps[i].Key)
@@ -124,7 +125,8 @@ func TestPartialProgressIsCounted(t *testing.T) {
 	if c.Done != 3 {
 		t.Fatalf("expected 3 done, got %d", c.Done)
 	}
-	if !c.Steps[1].Done || c.Steps[2].Done || !c.Steps[3].Done || c.Steps[4].Done {
+	// Paid order: account, stremio, library, discover, vault.
+	if c.Steps[1].Done || !c.Steps[2].Done || c.Steps[3].Done || !c.Steps[4].Done {
 		t.Error("done flags do not match the progress passed in")
 	}
 }
@@ -373,5 +375,24 @@ func TestPreviewRendersFreshAccountOfRequestedTier(t *testing.T) {
 	}
 	if paid.Done != 1 {
 		t.Errorf("fresh account starts at 1 done (account), got %d", paid.Done)
+	}
+}
+
+// Paying users see the Stremio row right after the account row; for free users
+// it is locked and stays last so the card does not open with a padlock.
+func TestStremioStepPositionDependsOnTier(t *testing.T) {
+	p, now := progress(time.Hour, false, false, false, false)
+
+	paid := build(p, withVault, paidUser, trialOn, now).Steps
+	if paid[0].Key != StepAccount || paid[1].Key != StepStremio {
+		t.Errorf("paid: expected account, stremio first; got %s, %s", paid[0].Key, paid[1].Key)
+	}
+
+	free := build(p, withVault, freeUser, trialOn, now).Steps
+	if last := free[len(free)-1]; last.Key != StepStremio || !last.Locked {
+		t.Errorf("free: expected a locked stremio row last, got %s (locked=%v)", last.Key, last.Locked)
+	}
+	if free[1].Key != StepLibrary {
+		t.Errorf("free: expected library second, got %s", free[1].Key)
 	}
 }

@@ -173,7 +173,7 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid, trialAvailable bool
 		})
 	}
 
-	steps = append(steps, Step{
+	stremio := Step{
 		Key:      StepStremio,
 		Done:     p.HasStremio,
 		TitleKey: "onboarding.stremio.title",
@@ -183,7 +183,19 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid, trialAvailable bool
 		Fragment: "#stremio",
 		// Fragment-bearing, so no async navigation.
 		UmamiEvent: "onboarding-stremio",
-	})
+	}
+	if paid {
+		// Right after the account row for paying users: connecting the
+		// addon is the strongest retention action we have measured (×9),
+		// and paid cohorts were converting to it WORSE than free ones
+		// (6.6% vs 8.9%, 2026-08) with the row parked last. For free users
+		// the row is locked and stays at the end — a card that opens with
+		// a padlock reads as an advert.
+		rest := append([]Step{stremio}, steps[1:]...)
+		steps = append(steps[:1], rest...)
+	} else {
+		steps = append(steps, stremio)
+	}
 
 	// A step already done is never locked — the user demonstrably had access,
 	// and greying out something they have finished would read as a bug.
