@@ -305,6 +305,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// (`#action=stream&debug=slow_download|slow_download_bt|no_peers`);
 	// the handler gates on gin.Mode != release so this never fires in
 	// prod even if a client posts the field.
+	if strings.HasPrefix(s.debug, "error:") {
+		// Renders any user-facing error key in the job log for review, e.g.
+		// debug=error:error.transcode_failed — the classified failures are
+		// otherwise reachable only by finding a torrent that triggers them.
+		return web.NewUserError(strings.TrimPrefix(s.debug, "error:"), errors.New("debug error preview"))
+	}
 	switch s.debug {
 	case "slow_download":
 		// Cap-modal variant (IsRateLimited=true) — under grace=ON this

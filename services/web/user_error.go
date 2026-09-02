@@ -84,6 +84,43 @@ func ClassifyError(err error) string {
 	case strings.Contains(msg, "failed to validate"):
 		return "error.validation_failed"
 
+	// --- streaming chain, in the order the request travels ---
+
+	case strings.Contains(msg, "failed to retrieve resource"),
+		strings.Contains(msg, "failed to retrieve stream url"),
+		strings.Contains(msg, "failed to retrieve download link"),
+		strings.Contains(msg, "stats returned status"),
+		strings.Contains(msg, "warmup returned status"):
+		// rest-api / torrent-http-proxy / seeder did not answer or answered
+		// with an unexpected status. Ours to fix, retry-able; the wording
+		// must not blame the torrent.
+		return "error.upstream_unavailable"
+
+	case strings.Contains(msg, "failed to get probe data"):
+		// content-prober could not read the media: not a video, or a
+		// damaged container. Downloading still works.
+		return "error.probe_failed"
+
+	case strings.Contains(msg, "transcoder session creation failed status=415"):
+		// The transcoder refused the source on purpose (codec, container);
+		// >1080p is matched above. The 415 body is in the message for logs.
+		return "error.transcode_failed"
+
+	case strings.Contains(msg, "transcoder session creation failed"):
+		// Any other status: the converter itself failed to start. Not the
+		// file's fault as far as we know — retry-able, download still works.
+		return "error.transcode_unavailable"
+
+	case strings.Contains(msg, "session buffer timeout exceeded"),
+		strings.Contains(msg, "failed to fetch session master playlist"),
+		strings.Contains(msg, "failed to fetch session video playlist"),
+		strings.Contains(msg, "failed to parse session video playlist"),
+		strings.Contains(msg, "no video variant found"),
+		strings.Contains(msg, "too many failed auto-restarts"):
+		// The session exists but produced no playable segments in time —
+		// the converter was starved by the torrent or died mid-way.
+		return "error.stream_stalled"
+
 	default:
 		return "error.generic"
 	}
@@ -101,7 +138,7 @@ func StatusForErrKey(key string) int {
 		return http.StatusNotFound
 	case "error.unauthorized":
 		return http.StatusUnauthorized
-	case "error.service_unavailable":
+	case "error.service_unavailable", "error.upstream_unavailable":
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError

@@ -12,7 +12,7 @@
                             </svg>
                             .torrent
                         </a>
-                        <button type="button" class="btn btn-sm btn-ghost border border-w-line rounded-l-none -ml-px relative hover:z-[1] text-w-sub hover:border-green-400 hover:text-green-400 px-2.5"
+                        <button type="button" class="btn btn-sm btn-ghost border border-w-line rounded-none -ml-px relative hover:z-[1] text-w-sub hover:border-green-400 hover:text-green-400 px-2.5"
                                 data-magnet-hash="{{ .Data.ID }}" data-magnet-name="{{ .Data.Name }}"
                                 data-copied-text="{{ t .Ctx.Lang "resource.magnetCopied" }}"
                                 onclick="copyMagnet(this)"
@@ -23,6 +23,15 @@
                                 <path d="m12 15 4 4"/>
                             </svg>
                         </button>
+                        {{/* Hands the support form the cause and infohash: two of
+                             twelve playback tickets in 2026-08 arrived with no way
+                             to tell which torrent they were about. */}}
+                        <a href="{{ langPath .Ctx.Lang "/support" }}?cause=2&infohash={{ .Data.ID }}&filename={{ .Data.Name | urlquery }}" class="btn btn-sm btn-ghost border border-w-line -ml-px relative hover:z-[1] text-w-sub hover:border-w-cyan hover:text-w-cyan px-2.5 rounded-l-none"
+                           title="{{ t .Ctx.Lang "resource.reportProblem" }}" aria-label="{{ t .Ctx.Lang "resource.reportProblem" }}" data-umami-event="report-problem">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+                            </svg>
+                        </a>
                     </div>
 {{ end }}
 {{ define "title" }}

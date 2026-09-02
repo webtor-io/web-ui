@@ -30,8 +30,8 @@
             {{ with .Form }}
                 <input type="text" name="subject" placeholder="{{ t $.Lang "support.subject" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-required value="{{ .Subject }}" />
                 <textarea name="description" class="textarea w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" placeholder="{{ t $.Lang "support.description" }}" rows="5" data-required>{{ .Description }}</textarea>
-                <input name="infohash" type="text" placeholder="{{ t $.Lang "support.infohash" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2" data-required value="{{ .Infohash }}" pattern=".*[0-9a-fA-F]{40}.*" />
-                <input name="filename" type="text" placeholder="{{ t $.Lang "support.filename" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2" value="{{ .Filename }}" />
+                <input name="infohash" type="text" placeholder="{{ t $.Lang "support.infohash" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2,3" data-required data-required-select="0,1,2" value="{{ .Infohash }}" pattern=".*[0-9a-fA-F]{40}.*" />
+                <input name="filename" type="text" placeholder="{{ t $.Lang "support.filename" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0,1,2,3" value="{{ .Filename }}" />
                 <input name="email" type="email" placeholder="{{ t $.Lang "support.email" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-required value="{{ .Email }}" />
                 <input name="work" type="text" placeholder="{{ t $.Lang "support.work" }}" class="input w-full mt-4 bg-base-300 border-w-line focus:border-w-cyan focus:outline-none hidden" data-select="0" value="{{ .Work }}" />
             {{ end }}

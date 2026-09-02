@@ -75,11 +75,25 @@ type Data struct {
 	CauseTypes map[int]string
 }
 
+// needsInfohash: complaints about content, malware or a site error are about
+// a specific torrent and cannot be acted on without knowing which. Questions
+// are not. Enforced server-side — the form's JS-only `required` used to be the
+// only guard, and tickets arrived with the field empty.
+func needsInfohash(cause Cause) bool {
+	return cause >= 0 && cause <= 2
+}
+
 func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
 	var err error
 	cause := -1
-	if c.PostForm("cause") != "" {
-		cause, err = strconv.Atoi(c.PostForm("cause"))
+	// GET prefills from the query so a "report a problem" link on a torrent
+	// page can hand over the cause and infohash; POST reads the form.
+	rawCause := c.PostForm("cause")
+	if rawCause == "" && c.Request.Method == http.MethodGet {
+		rawCause = c.Query("cause")
+	}
+	if rawCause != "" {
+		cause, err = strconv.Atoi(rawCause)
 		if err != nil {
 			return nil, err
 		}
@@ -94,6 +108,10 @@ func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
 		return nil, err
 	}
 	form.Cause = Cause(cause)
+	if c.Request.Method == http.MethodGet {
+		form.Infohash = c.Query("infohash")
+		form.Filename = c.Query("filename")
+	}
 	return &form, nil
 }
 
@@ -138,6 +156,10 @@ func (s *Handler) process(c *gin.Context) {
 		return
 	}
 	if c.Request.Method == "POST" {
+		if needsInfohash(form.Cause) && extractInfohash(form.Infohash) == "" {
+			tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(web.NewUserError("error.support_infohash_required", errors.New("infohash required for this cause"))))
+			return
+		}
 		if s.ts != nil {
 			token := c.PostForm("cf-turnstile-response")
 			if err := s.ts.Validate(token, c.ClientIP()); err != nil {

@@ -1,9 +1,17 @@
 import av from '../lib/av';
 
-function setRequired(input) {
-    if (input.getAttribute('data-required') !== null)  {
-        input.setAttribute('required', 'required');
+// data-required marks a field mandatory whenever shown; data-required-select
+// narrows that to the listed causes (the infohash is shown for questions too,
+// but only complaints cannot do without it — mirrored server-side in
+// handlers/support needsInfohash).
+function setRequired(input, cause) {
+    if (input.getAttribute('data-required') === null) return;
+    const only = input.getAttribute('data-required-select');
+    if (only && !only.split(',').includes(cause)) {
+        input.removeAttribute('required');
+        return;
     }
+    input.setAttribute('required', 'required');
 }
 
 function updateForm(select, inputs, actions) {
@@ -15,10 +23,10 @@ function updateForm(select, inputs, actions) {
             const ds = i.getAttribute('data-select');
             if (!ds) {
                 i.classList.remove('hidden');
-                setRequired(i);
+                setRequired(i, select.value);
             } else if (ds.split(',').includes(select.value)) {
                 i.classList.remove('hidden');
-                setRequired(i);
+                setRequired(i, select.value);
             } else {
                 i.classList.add('hidden');
                 i.removeAttribute('required');
