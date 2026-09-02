@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Advertentievrij",
     "profile.billing.text": "Gefactureerd via {{.Provider}} — die naam zie je op je afschrift.",
     "profile.billing.manage": "Beheren of opzeggen bij {{.Provider}}",
-    "profile.billing.cancelGuide": "Hoe opzeggen",
+    "profile.billing.cancelGuide": "Hoe opzeggen?",
     "profile.stremio.addonUrl": "Addon URL",
     "profile.stremio.generate": "Addon URL genereren",
     "profile.stremio.copyUrl": "URL kopiëren",

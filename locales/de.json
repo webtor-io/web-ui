@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Werbefrei",
     "profile.billing.text": "Abgerechnet über {{.Provider}} – diesen Namen siehst du auf deinem Kontoauszug.",
     "profile.billing.manage": "Bei {{.Provider}} verwalten oder kündigen",
-    "profile.billing.cancelGuide": "So kündigst du",
+    "profile.billing.cancelGuide": "Wie kündige ich?",
     "profile.stremio.addonUrl": "Addon-URL",
     "profile.stremio.generate": "Addon-URL generieren",
     "profile.stremio.copyUrl": "URL kopieren",

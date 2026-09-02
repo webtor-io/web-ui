@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Sem anúncios",
     "profile.billing.text": "Cobrado via {{.Provider}} — é esse nome que aparecerá no seu extrato.",
     "profile.billing.manage": "Gerenciar ou cancelar no {{.Provider}}",
-    "profile.billing.cancelGuide": "Como cancelar",
+    "profile.billing.cancelGuide": "Como cancelar?",
     "profile.stremio.addonUrl": "URL do addon",
     "profile.stremio.generate": "Gerar URL do addon",
     "profile.stremio.copyUrl": "Copiar URL",

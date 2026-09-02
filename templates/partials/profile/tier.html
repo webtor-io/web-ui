@@ -43,22 +43,22 @@
             {{/* Billing facts, only on a paid tier and only where a provider is
                  configured (Data.Billing is zero otherwise). The charge shows up
                  under the provider's name, not ours; saying so here, next to the
-                 tier it pays for, is what stops "how do I cancel" mail. */}}
+                 tier it pays for, is what stops "how do I cancel" mail. The
+                 footnote + button row mirrors the Vault card below (question-style
+                 link left, action right); on phones the button spans the card and
+                 the footnote sits under it. */}}
             {{ if and $.Data.Billing.ManageURL (ne (.Claims | tierName) "free") }}
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-5 pt-4 border-t border-w-line/40 text-xs text-w-sub">
-                <span class="flex-1 leading-relaxed">{{ tp $.Lang "profile.billing.text" "Provider" $.Data.Billing.Provider }}</span>
-                {{/* Mobile: a column with the button on top and the guide link under
-                     it; the row version only from sm — a fixed-width pair pushed the
-                     whole document wider than a 360px viewport. */}}
-                <span class="flex flex-col-reverse items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3 sm:shrink-0">
+            <div class="mt-5 pt-4 border-t border-w-line/40">
+                <p class="text-xs text-w-sub leading-relaxed mb-4">{{ tp $.Lang "profile.billing.text" "Provider" $.Data.Billing.Provider }}</p>
+                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     {{ if $.Data.Billing.CancelGuideURL }}
-                    <a href="{{ $.Data.Billing.CancelGuideURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-cancel-guide" class="link link-hover text-w-muted hover:text-w-sub">{{ t $.Lang "profile.billing.cancelGuide" }}</a>
-                    {{ end }}
-                    <a href="{{ $.Data.Billing.ManageURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-manage" class="btn btn-xs btn-soft gap-1.5">
+                    <a href="{{ $.Data.Billing.CancelGuideURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-cancel-guide" class="text-sm text-w-muted hover:text-w-sub link link-hover">{{ t $.Lang "profile.billing.cancelGuide" }}</a>
+                    {{ else }}<span></span>{{ end }}
+                    <a href="{{ $.Data.Billing.ManageURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-manage" class="btn btn-soft btn-sm gap-1.5 w-full sm:w-auto">
                         {{ tp $.Lang "profile.billing.manage" "Provider" $.Data.Billing.Provider }}
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
                     </a>
-                </span>
+                </div>
             </div>
             {{ end }}
         </div>

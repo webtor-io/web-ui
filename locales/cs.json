@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Bez reklam",
     "profile.billing.text": "Účtováno přes {{.Provider}} — právě tento název uvidíte na výpisu.",
     "profile.billing.manage": "Spravovat nebo zrušit na {{.Provider}}",
-    "profile.billing.cancelGuide": "Jak zrušit",
+    "profile.billing.cancelGuide": "Jak zrušit?",
     "profile.stremio.addonUrl": "URL addonu",
     "profile.stremio.generate": "Vygenerovat URL addonu",
     "profile.stremio.copyUrl": "Zkopírovat URL",

@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Без рекламы",
     "profile.billing.text": "Оплата проходит через {{.Provider}} — именно это имя вы увидите в выписке.",
     "profile.billing.manage": "Управлять или отменить на {{.Provider}}",
-    "profile.billing.cancelGuide": "Как отменить",
+    "profile.billing.cancelGuide": "Как отменить?",
     "profile.stremio.addonUrl": "URL аддона",
     "profile.stremio.generate": "Сгенерировать URL аддона",
     "profile.stremio.copyUrl": "Копировать URL",

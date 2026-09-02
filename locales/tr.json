@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Reklamsız",
     "profile.billing.text": "Ödemeler {{.Provider}} üzerinden alınır — ekstrenizde göreceğiniz isim budur.",
     "profile.billing.manage": "{{.Provider}} üzerinden yönetin veya iptal edin",
-    "profile.billing.cancelGuide": "Nasıl iptal edilir",
+    "profile.billing.cancelGuide": "Nasıl iptal edilir?",
     "profile.stremio.addonUrl": "Addon URL'si",
     "profile.stremio.generate": "Addon URL'si oluştur",
     "profile.stremio.copyUrl": "URL'yi kopyala",

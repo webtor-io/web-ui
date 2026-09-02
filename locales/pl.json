@@ -212,7 +212,7 @@
     "profile.tier.adFree": "Bez reklam",
     "profile.billing.text": "Rozliczane przez {{.Provider}} — taką nazwę zobaczysz na wyciągu.",
     "profile.billing.manage": "Zarządzaj lub anuluj w {{.Provider}}",
-    "profile.billing.cancelGuide": "Jak anulować",
+    "profile.billing.cancelGuide": "Jak anulować?",
     "profile.stremio.addonUrl": "URL addona",
     "profile.stremio.generate": "Wygeneruj URL addona",
     "profile.stremio.copyUrl": "Kopiuj URL",
