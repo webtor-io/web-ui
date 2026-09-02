@@ -35,3 +35,35 @@ func TestMeter(t *testing.T) {
 		t.Fatalf("zero interval: got %v", r)
 	}
 }
+
+// Events arrive in bursts: a 4 MiB piece landing 10 ms after the previous
+// sample must not read as 400 MB/s. The burst is folded into the next
+// measured interval instead.
+func TestMeter_BurstsAreNotSpikes(t *testing.T) {
+	m := New(0.4)
+	t0 := time.Unix(1000, 0)
+	m.Sample(0, t0)
+	m.Sample(1_000_000, t0.Add(time.Second)) // 1 MB/s
+	if r := m.Sample(5_000_000, t0.Add(1010*time.Millisecond)); r != 1_000_000 {
+		t.Fatalf("burst sample must not be measured: got %v", r)
+	}
+	// One second after the last measured sample: 4 MB over 1 s, smoothed.
+	if r := m.Sample(5_000_000, t0.Add(2*time.Second)); r != 0.4*4_000_000+0.6*1_000_000 {
+		t.Fatalf("folded burst: got %v", r)
+	}
+}
+
+// A counter jump beyond anything a swarm can deliver is a re-check or a pod
+// swap, not throughput: it re-primes and leaves the average alone.
+func TestMeter_ImpossibleJumpReprimes(t *testing.T) {
+	m := New(0.4)
+	t0 := time.Unix(1000, 0)
+	m.Sample(0, t0)
+	m.Sample(2_000_000, t0.Add(time.Second)) // 2 MB/s
+	if r := m.Sample(2_000_000+500_000_000, t0.Add(2*time.Second)); r != 2_000_000 {
+		t.Fatalf("500 MB/s jump must not enter the average: got %v", r)
+	}
+	if r := m.Sample(2_000_000+500_000_000+1_000_000, t0.Add(3*time.Second)); r != 0.4*1_000_000+0.6*2_000_000 {
+		t.Fatalf("measuring resumes from the jump: got %v", r)
+	}
+}
