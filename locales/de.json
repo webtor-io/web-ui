@@ -445,7 +445,6 @@
     "resource.status.vault_waiting": "Warte auf Seeder",
     "resource.status.vault_waitingHint": "Vault hat noch keine Quelle – kein Seeder ist online. Es prüft weiter und gibt deine Punkte zurück, falls keiner erscheint.",
     "resource.status.pieces": "{{.Done}} von {{.Total}} Teilen auf dem Server",
-    "resource.status.piecesFull": "Alle Teile auf dem Server",
     "resource.preview": "Vorschau",
     "vault.supporting": "Im Vault gespeichert",
     "vault.keepAvailable": "Im Vault speichern",

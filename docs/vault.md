@@ -425,10 +425,9 @@ cells, each the share of its pieces the seeder holds, pulsing where it is
 fetching. Data comes bucketed from the seeder's per-piece stats on the same
 status SSE (`handlers/resource/status.go` `bucketPieces`, ~350 bytes per
 update); no extra seeder wake-ups — the status SSE already opens the stats
-connection. Vaulted/cached content draws a full bar server-side without asking
-anyone. It is deliberately the whole torrent, not per file, and only on the
-resource page. It is drawn only while something moves (`caching`, `vaulting`,
-`vault_failed` with stored pieces) or when the content is complete; idle,
+connection. It is deliberately the whole torrent, not per file, and only on
+the resource page, and only while something moves (`caching`, `vaulting`,
+`vault_failed` with stored pieces). Complete content (cached, vaulted), idle,
 unknown and waiting states show a hairline divider in the same 6px slot, so
 the header never jumps when a transfer starts or the seeder's stats channel
 closes. Review: `?debug_status=caching&debug_pieces=stream` (also

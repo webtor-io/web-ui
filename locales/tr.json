@@ -446,7 +446,6 @@
     "resource.status.vault_waiting": "Seeder bekleniyor",
     "resource.status.vault_waitingHint": "Vault'un henüz indirebileceği bir kaynak yok — çevrimiçi seeder yok. Kontrol etmeye devam eder ve hiç seeder çıkmazsa puanlarınızı geri verir.",
     "resource.status.pieces": "Sunucuda {{.Total}} parçadan {{.Done}}",
-    "resource.status.piecesFull": "Tüm parçalar sunucuda",
     "vault.supporting": "Vault'a kaydedildi",
     "vault.keepAvailable": "Vault'a kaydet",
     "vault.error": "Maalesef, taahhüdün bir hata nedeniyle kaydedilemedi:",

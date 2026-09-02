@@ -446,7 +446,6 @@
     "resource.status.vault_waiting": "Czekamy na seedów",
     "resource.status.vault_waitingHint": "Vault nie ma jeszcze skąd pobierać — żaden seed nie jest online. Sprawdza dalej i zwróci Twoje punkty, jeśli żaden się nie pojawi.",
     "resource.status.pieces": "{{.Done}} z {{.Total}} części na serwerze",
-    "resource.status.piecesFull": "Wszystkie części na serwerze",
     "vault.supporting": "Zapisano w Vault",
     "vault.keepAvailable": "Zapisz w Vault",
     "vault.error": "Niestety, twojego zobowiązania nie udało się zapisać z powodu błędu:",

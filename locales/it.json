@@ -446,7 +446,6 @@
     "resource.status.vault_waiting": "In attesa di seeder",
     "resource.status.vault_waitingHint": "Il Vault non ha ancora da dove scaricare: nessun seeder online. Continua a controllare e restituisce i tuoi punti se non ne compare nessuno.",
     "resource.status.pieces": "{{.Done}} di {{.Total}} parti sul server",
-    "resource.status.piecesFull": "Tutte le parti sul server",
     "vault.supporting": "Salvato in Vault",
     "vault.keepAvailable": "Salva in Vault",
     "vault.error": "Purtroppo il tuo impegno non è stato salvato a causa di un errore:",

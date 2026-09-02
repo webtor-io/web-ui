@@ -364,16 +364,14 @@ func TestPieceMap_SmallTorrentAndDiffOnlyStream(t *testing.T) {
 	}
 }
 
-// Content that plays regardless of the swarm shows a full bar without a
-// seeder having been asked.
-func TestResolveStatus_FullBarForSafeContent(t *testing.T) {
-	vaulted := resolveStatus(&vaultModels.Resource{Funded: true, Vaulted: true}, nil, nil)
-	if vaulted.Pieces == "" {
-		t.Error("vaulted must carry a full bar")
+// Complete content draws no bar — the badge already says it; the bar exists
+// only while something moves.
+func TestResolveStatus_NoBarForCompleteContent(t *testing.T) {
+	if st := resolveStatus(&vaultModels.Resource{Funded: true, Vaulted: true}, nil, nil); st.Pieces != "" {
+		t.Error("vaulted must not draw a bar")
 	}
-	cached := resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10})
-	if cached.State != "cached" || cached.Pieces == "" {
-		t.Errorf("cached must carry a full bar: %+v", cached)
+	if st := resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10, Fill: []byte{255}, Active: []byte{0}}); st.State != "cached" || st.Pieces != "" {
+		t.Errorf("cached must not draw a bar: %+v", st)
 	}
 	if idle := resolveStatus(nil, nil, nil); idle.Pieces != "" {
 		t.Error("idle must not pretend to know the pieces")

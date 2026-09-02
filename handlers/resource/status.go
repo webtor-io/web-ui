@@ -39,8 +39,7 @@ type TorrentStatus struct {
 	// Pieces is the piece bar: PieceBuckets bytes, base64, one per bucket,
 	// 0..255 = share of the bucket's pieces the seeder holds. Active is a
 	// base64 bitset of buckets with pieces the seeder is fetching right now.
-	// Empty when nothing is known; a full bar for cached/vaulted content,
-	// which needs no seeder to be sure of.
+	// Empty when nothing is known and for complete content (see barStates).
 	Pieces      string `json:"pieces,omitempty"`
 	Active      string `json:"active,omitempty"`
 	PiecesDone  int    `json:"pieces_done,omitempty"`
@@ -83,26 +82,13 @@ func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 	return t
 }
 
-// fullBar marks content that plays regardless of the swarm — cached or
-// vaulted — as a completely filled piece bar, so the bar can be shown without
-// asking a seeder anything.
-func (t *TorrentStatus) fullBar() *TorrentStatus {
-	if t.Pieces == "" {
-		full := make([]byte, PieceBuckets)
-		for i := range full {
-			full[i] = 255
-		}
-		t.Pieces = base64.StdEncoding.EncodeToString(full)
-	}
-	return t
-}
-
 // barStates are the states in which the piece bar is drawn: something is
-// moving (caching, a Vault transfer, or one that failed mid-way with pieces
-// already stored) or the content is complete. An idle seeder that merely
-// knows its pieces draws nothing — an empty bar under an idle badge read as
-// "broken", and it vanished the moment the seeder's stats channel closed.
-var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true, "cached": true, "vaulted": true}
+// moving — caching, a Vault transfer, or one that failed mid-way with pieces
+// already stored. Complete content (cached, vaulted) draws nothing: a static
+// full bar told the user nothing the badge did not, and an idle seeder that
+// merely knows its pieces drew an empty bar that vanished when its stats
+// channel closed. Everything else shows the hairline divider.
+var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true}
 
 // withBarPolicy strips the piece bar from states that must not show one.
 func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
@@ -210,7 +196,7 @@ func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resou
 	cachingState := resolveCachingState(stats)
 
 	if vaultState.State == "vaulted" {
-		return vaultState.fullBar()
+		return vaultState
 	}
 	if vaultState.State == "vaulting" || vaultState.State == "vault_failed" {
 		vaultState.withSwarm(stats)
@@ -223,7 +209,7 @@ func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resou
 		return vaultState
 	}
 	if cachingState.State == "cached" {
-		return cachingState.fullBar()
+		return cachingState
 	}
 	if cachingState.State == "caching" {
 		return cachingState

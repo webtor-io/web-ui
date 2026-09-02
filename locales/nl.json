@@ -446,7 +446,6 @@
     "resource.status.vault_waiting": "Wachten op seeders",
     "resource.status.vault_waitingHint": "Vault heeft nog niets om van te downloaden — er is geen seeder online. Het blijft controleren en geeft je punten terug als er geen verschijnt.",
     "resource.status.pieces": "{{.Done}} van {{.Total}} stukken op de server",
-    "resource.status.piecesFull": "Alle stukken op de server",
     "vault.supporting": "Opgeslagen in Vault",
     "vault.keepAvailable": "Opslaan in Vault",
     "vault.error": "Helaas kon je toezegging niet worden opgeslagen door een fout:",
