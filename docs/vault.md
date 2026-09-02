@@ -401,3 +401,19 @@ Constructor `NewApi` returns `nil` if `VAULT_SERVICE_HOST` is empty.
 | 29 | alter_user_vp_total_nullable | Makes `user_vp.total` nullable |
 
 All include `update_updated_at` triggers. Down migrations drop tables or revert alterations.
+
+
+## Transfer status as the user sees it (2026-09)
+
+`handlers/resource/status.go` used to collapse queued / storing / failed into
+one "Vaulting N%" badge. Two states are now their own:
+
+| State | When | Badge |
+|---|---|---|
+| `vault_waiting` | funded, nothing stored yet, and the seeder sees zero seeders and zero peers | "Waiting for seeders" (purple, pulsing) with a tooltip saying Vault keeps checking and returns the points if none appear |
+| `vault_failed` | Vault API `status=3` | "Transfer failed, retrying" (warning) — the API's `Error` text rides as `Detail` into the tooltip; previously it was read nowhere |
+
+Everything else is unchanged: queued/processing render as `vaulting`, the
+7-day transfer timeout (`VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD`) still ends
+in the reaper's letter. Review with `?debug_status=vault_waiting` /
+`?debug_status=vault_failed` on any resource page (dev-only).

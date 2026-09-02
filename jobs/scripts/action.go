@@ -657,6 +657,10 @@ type FileDownload struct {
 	// carry no per-file checksums, so picky unpackers may warn. TAR (the
 	// default) has no such problem.
 	ZipWarning bool
+	// IsArchive: the link is an on-the-fly directory archive. Nothing on our
+	// side sees the download after this point, so the view says what the user
+	// can rely on: the archive is built as it streams and can be resumed.
+	IsArchive bool
 }
 
 type NoPeersData struct {
@@ -722,6 +726,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		HasAds:     hasAds,
 		TierName:   tierName,
 		ZipWarning: s.archiveFormat == "zip",
+		IsArchive:  s.archiveFormat != "",
 	}))
 	if err != nil {
 		return err

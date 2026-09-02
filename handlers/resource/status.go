@@ -32,6 +32,9 @@ type TorrentStatus struct {
 	// empty when nothing is known. Formatted server-side so the JS renderer
 	// never has to carry locale strings.
 	Swarm string `json:"swarm"`
+	// Detail is the Vault API's own error text for vault_failed — technical,
+	// shown as a tooltip, never as the label.
+	Detail string `json:"detail,omitempty"`
 }
 
 // TorrentStatsData holds the relevant fields from a torrent stats event.
@@ -61,8 +64,15 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 	if vaultState.State == "vaulted" {
 		return vaultState
 	}
-	if vaultState.State == "vaulting" {
-		return vaultState.withSwarm(stats)
+	if vaultState.State == "vaulting" || vaultState.State == "vault_failed" {
+		vaultState.withSwarm(stats)
+		// Funded, nothing stored, and the seeder sees nobody: the transfer is
+		// not slow, it is waiting for a swarm that is not there. Saying so is
+		// the difference between "stuck at 0%" and "no seeders yet".
+		if vaultState.State == "vaulting" && vaultState.Progress == 0 && stats != nil && stats.Seeders == 0 && stats.Peers == 0 {
+			vaultState.State = "vault_waiting"
+		}
+		return vaultState
 	}
 	if cachingState.State == "cached" {
 		return cachingState
@@ -95,8 +105,11 @@ func resolveVaultState(dbResource *vaultModels.Resource, apiResource *vault.Reso
 	case vault.StatusQueued:
 		return &TorrentStatus{State: "vaulting", Progress: 0}
 	default:
-		// Failed or unknown — still funded, system will retry
-		return &TorrentStatus{State: "vaulting", Progress: apiResource.GetProgress()}
+		// Failed (or unknown): still funded and the system retries, but the
+		// user deserves to know the last attempt did not go through — this
+		// used to render as "Vaulting N%" forever. The API's error text
+		// travels as Detail for the tooltip.
+		return &TorrentStatus{State: "vault_failed", Progress: apiResource.GetProgress(), Detail: apiResource.Error}
 	}
 }
 
@@ -198,7 +211,7 @@ func (s *Handler) status(c *gin.Context) {
 // Terminal states carry no swarm — a cached or vaulted torrent plays
 // regardless of who is around.
 func swarmLabel(loc *goi18n.Localizer, st *TorrentStatus) string {
-	if st.State == "cached" || st.State == "vaulted" || st.State == "unknown" {
+	if st.State == "cached" || st.State == "vaulted" || st.State == "unknown" || st.State == "vault_waiting" {
 		return ""
 	}
 	switch {
@@ -222,7 +235,7 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 	}
 	state := c.Query("debug_status")
 	switch state {
-	case "idle", "caching", "cached", "vaulting", "vaulted", "unknown":
+	case "idle", "caching", "cached", "vaulting", "vaulted", "unknown", "vault_failed", "vault_waiting":
 	default:
 		return nil
 	}

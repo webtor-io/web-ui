@@ -114,10 +114,33 @@ func TestResolveStatus_Vaulted_API(t *testing.T) {
 func TestResolveStatus_VaultFailed(t *testing.T) {
 	db := &vaultModels.Resource{Funded: true, Vaulted: false}
 	apiRes := &vault.Resource{Status: vault.StatusFailed}
+	apiRes.Error = "seeder pod unreachable"
 	status := resolveStatus(db, apiRes, nil)
-	// Funded resource with failed vault should still show vaulting (system will retry)
-	if status.State != "vaulting" {
-		t.Errorf("expected vaulting for failed vault (still funded), got %q", status.State)
+	// Funded, last transfer attempt failed: say so (the system retries), and
+	// carry the API's reason for the tooltip. This used to hide as "vaulting".
+	if status.State != "vault_failed" || status.Detail != "seeder pod unreachable" {
+		t.Errorf("expected vault_failed with detail, got %+v", status)
+	}
+}
+
+func TestResolveStatus_VaultWaitingForSeeders(t *testing.T) {
+	db := &vaultModels.Resource{Funded: true}
+	queued := &vault.Resource{Status: vault.StatusQueued}
+	// Nothing stored, seeder sees nobody → waiting for seeders.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 0, Peers: 0}); st.State != "vault_waiting" {
+		t.Errorf("queued + empty swarm must read vault_waiting, got %+v", st)
+	}
+	// Peers around → plain vaulting.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 2, Peers: 3}); st.State != "vaulting" || st.Seeders != 2 {
+		t.Errorf("queued + peers must stay vaulting with the swarm, got %+v", st)
+	}
+	// No stats at all → we do not know, so no claim.
+	if st := resolveStatus(db, queued, nil); st.State != "vaulting" {
+		t.Errorf("queued without stats must stay vaulting, got %+v", st)
+	}
+	// Progress already made → not waiting even if the swarm emptied.
+	if st := resolveStatus(db, &vault.Resource{Status: vault.StatusProcessing, StoredSize: 50, TotalSize: 100}, &TorrentStatsData{Total: 100}); st.State != "vaulting" {
+		t.Errorf("progress > 0 must stay vaulting, got %+v", st)
 	}
 }
 

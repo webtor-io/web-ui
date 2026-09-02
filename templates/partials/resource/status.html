@@ -31,6 +31,21 @@
     {{ t .Ctx.Lang "resource.status.vaulting" }} {{ printf "%.0f" .Data.Progress }}%
     {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
 </div>
+{{ else if eq .Data.State "vault_waiting" }}
+<div class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.vault_waitingHint" }}">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+    {{ t .Ctx.Lang "resource.status.vault_waiting" }}
+</div>
+{{ else if eq .Data.State "vault_failed" }}
+<div class="badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.vault_failedHint" }}{{ if .Data.Detail }} — {{ .Data.Detail }}{{ end }}">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+    </svg>
+    {{ t .Ctx.Lang "resource.status.vault_failed" }}{{ if gt .Data.Progress 0.0 }} {{ printf "%.0f" .Data.Progress }}%{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+</div>
 {{ else if eq .Data.State "unknown" }}
 <div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.unknownHint" }}">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">

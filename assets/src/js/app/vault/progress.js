@@ -6,6 +6,8 @@ const TINTS = {
     caching:  'rgba(0, 206, 201, 0.10)',
     cached:   'rgba(0, 206, 201, 0.06)',
     vaulting: 'rgba(108, 92, 231, 0.12)',
+    vault_waiting: 'rgba(108, 92, 231, 0.08)',
+    vault_failed: 'rgba(250, 204, 21, 0.10)',
     vaulted:  'rgba(34, 197, 94, 0.08)',
     idle:     'rgba(0, 206, 201, 0.06)',
 };
@@ -33,6 +35,14 @@ const BADGE_CONFIG = {
     vaulting: {
         // no leading icon: the row gradient + first-cell pulse already signal progress
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
+        icon: '',
+    },
+    vault_waiting: {
+        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
+        icon: '',
+    },
+    vault_failed: {
+        classes: 'badge badge-sm bg-warning/10 border-warning/30 text-warning',
         icon: '',
     },
     vaulted: {

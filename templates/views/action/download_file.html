@@ -25,6 +25,14 @@
         </a>
     </div>
     {{- end }}
+    {{- if .Data.IsArchive }}
+    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-cyan">
+            <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+        </svg>
+        <div class="text-xs text-w-muted leading-relaxed">{{ t $.Lang "action.download.archiveNote" }}</div>
+    </div>
+    {{- end }}
     {{- if .Data.ZipWarning }}
     <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-warning">
