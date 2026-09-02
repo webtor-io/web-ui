@@ -291,52 +291,76 @@ func TestSwarmLabel(t *testing.T) {
 	}
 }
 
-func TestBucketPieces(t *testing.T) {
-	var ev api.EventData
-	// 512 pieces → 256 cells of two pieces each. First cell complete, second
-	// half-complete, third has an active (fetching) piece, the rest empty.
-	for i := 0; i < 512; i++ {
-		p := struct {
-			Position int  `json:"position"`
-			Complete bool `json:"complete"`
-			Priority int  `json:"priority"`
-		}{Position: i}
-		switch {
-		case i < 2:
-			p.Complete = true
-		case i == 2:
-			p.Complete = true
-		case i == 4:
-			p.Priority = 1
-		}
-		ev.Pieces = append(ev.Pieces, p)
-	}
-	fill, active := bucketPieces(ev)
-	if len(fill) != PieceBuckets || len(active) != PieceBuckets/8 {
-		t.Fatalf("sizes: fill %d active %d", len(fill), len(active))
-	}
-	if fill[0] != 255 || fill[1] != 127 || fill[2] != 0 || fill[3] != 0 {
-		t.Errorf("fill: %v", fill[:4])
-	}
-	if active[0]&(1<<2) == 0 || active[0]&(1<<0) != 0 {
-		t.Errorf("active bits: %08b", active[0])
-	}
+type testPiece = struct {
+	Position int  `json:"position"`
+	Complete bool `json:"complete"`
+	Priority int  `json:"priority"`
+}
 
-	// Fewer pieces than buckets: one cell per piece.
-	small := api.EventData{}
+func evWith(ps ...testPiece) api.EventData {
+	var ev api.EventData
+	ev.Pieces = append(ev.Pieces, ps...)
+	return ev
+}
+
+func TestPieceMap_FullThenDiff(t *testing.T) {
+	// A stream opens with the full list: 512 pieces → 256 cells of two.
+	var full api.EventData
+	for i := 0; i < 512; i++ {
+		full.Pieces = append(full.Pieces, testPiece{Position: i, Complete: i < 3})
+	}
+	var m pieceMap
+	m.apply(full)
+	fill, active := m.buckets()
+	if len(fill) != PieceBuckets || fill[0] != 255 || fill[1] != 127 || fill[2] != 0 {
+		t.Fatalf("after full: %v", fill[:4])
+	}
+	if m.done() != 3 || len(m.complete) != 512 {
+		t.Errorf("counts after full: done %d total %d", m.done(), len(m.complete))
+	}
+	// Then only what changed: piece 3 completes, piece 4 starts fetching.
+	m.apply(evWith(testPiece{Position: 3, Complete: true}, testPiece{Position: 4, Priority: 1}))
+	fill, active = m.buckets()
+	if fill[1] != 255 {
+		t.Errorf("diff must patch the map, not replace it: cell 1 = %d", fill[1])
+	}
+	if fill[0] != 255 {
+		t.Errorf("untouched cells must keep their state: cell 0 = %d", fill[0])
+	}
+	if active[0]&(1<<2) == 0 {
+		t.Errorf("fetching piece 4 must light cell 2: %08b", active[0])
+	}
+	if m.done() != 4 {
+		t.Errorf("done after diff: %d", m.done())
+	}
+	// An event without pieces (peers changed only) leaves the map alone.
+	m.apply(api.EventData{Peers: 9})
+	if f, _ := m.buckets(); f[1] != 255 || len(f) != PieceBuckets {
+		t.Error("a pieceless event must not erase the map")
+	}
+}
+
+func TestPieceMap_SmallTorrentAndDiffOnlyStream(t *testing.T) {
+	var m pieceMap
+	var small api.EventData
 	for i := 0; i < 10; i++ {
-		small.Pieces = append(small.Pieces, struct {
-			Position int  `json:"position"`
-			Complete bool `json:"complete"`
-			Priority int  `json:"priority"`
-		}{Position: i, Complete: i%2 == 0})
+		small.Pieces = append(small.Pieces, testPiece{Position: i, Complete: i%2 == 0})
 	}
-	fill, _ = bucketPieces(small)
+	m.apply(small)
+	fill, _ := m.buckets()
 	if len(fill) != 10 || fill[0] != 255 || fill[1] != 0 {
-		t.Errorf("small torrent: %v", fill)
+		t.Errorf("small torrent, one cell per piece: %v", fill)
 	}
-	if f, _ := bucketPieces(api.EventData{}); f != nil {
-		t.Error("no pieces → no bar")
+	// A stream that (for whatever reason) never sent the full list still
+	// yields a picture sized by the highest position seen.
+	var d pieceMap
+	d.apply(evWith(testPiece{Position: 7, Complete: true}))
+	if len(d.complete) != 8 || d.done() != 1 {
+		t.Errorf("diff-only sizing: %d/%d", d.done(), len(d.complete))
+	}
+	var empty pieceMap
+	if f, _ := empty.buckets(); f != nil {
+		t.Error("nothing known → no bar")
 	}
 }
 

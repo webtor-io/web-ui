@@ -59,10 +59,13 @@ type TorrentStatsData struct {
 	Seeders   int
 	Leechers  int
 	Peers     int
-	// Fill/Active are the bucketed piece map (see bucketPieces); nil when the
-	// event carried no pieces.
-	Fill   []byte
-	Active []byte
+	// Fill/Active are the bucketed piece map (see pieceMap); nil until the
+	// stream has told us about any piece. PiecesDone/PiecesTotal count
+	// pieces, independent of what Total/Completed above measure.
+	Fill        []byte
+	Active      []byte
+	PiecesDone  int
+	PiecesTotal int
 }
 
 // withSwarm copies the swarm counters and the piece bar from a stats event
@@ -73,8 +76,8 @@ func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 		if len(stats.Fill) > 0 {
 			t.Pieces = base64.StdEncoding.EncodeToString(stats.Fill)
 			t.Active = base64.StdEncoding.EncodeToString(stats.Active)
-			t.PiecesDone = stats.Completed
-			t.PiecesTotal = int(stats.Total)
+			t.PiecesDone = stats.PiecesDone
+			t.PiecesTotal = stats.PiecesTotal
 		}
 	}
 	return t
@@ -109,13 +112,64 @@ func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
 	return t
 }
 
-// bucketPieces folds the seeder's per-piece list into PieceBuckets cells: the
-// fill is the share of complete pieces in the cell (0..255), the active bit
-// says the cell holds a piece with a raised priority that is not complete yet
-// — what a torrent client paints as "downloading". Torrents with fewer pieces
-// than buckets get one cell per piece.
-func bucketPieces(ev api.EventData) (fill, active []byte) {
-	n := len(ev.Pieces)
+// pieceMap is the seeder's piece state as this status stream knows it. The
+// seeder sends the full list only in the first event of a stream and then
+// just the pieces that changed (torrent-web-seeder Stat.StatStream → diff), so
+// bucketing each event on its own drew a bar from a handful of pieces and then
+// nothing — the map has to be kept and patched.
+type pieceMap struct {
+	complete []bool
+	active   []bool
+}
+
+// apply folds one stats event into the map. The first event sizes it (a
+// stream always opens with the full list); positions past the end grow it,
+// so a diff-only stream still builds a usable, if partial, picture.
+func (m *pieceMap) apply(ev api.EventData) {
+	if len(ev.Pieces) == 0 {
+		return
+	}
+	need := len(ev.Pieces)
+	for _, p := range ev.Pieces {
+		if p.Position+1 > need {
+			need = p.Position + 1
+		}
+	}
+	if need > len(m.complete) {
+		grow := make([]bool, need)
+		copy(grow, m.complete)
+		m.complete = grow
+		growA := make([]bool, need)
+		copy(growA, m.active)
+		m.active = growA
+	}
+	for _, p := range ev.Pieces {
+		if p.Position < 0 {
+			continue
+		}
+		m.complete[p.Position] = p.Complete
+		m.active[p.Position] = !p.Complete && p.Priority > 0
+	}
+}
+
+func (m *pieceMap) known() bool { return len(m.complete) > 0 }
+
+// done counts complete pieces.
+func (m *pieceMap) done() int {
+	n := 0
+	for _, c := range m.complete {
+		if c {
+			n++
+		}
+	}
+	return n
+}
+
+// buckets folds the map into PieceBuckets cells: fill is the share of complete
+// pieces in the cell (0..255); the active bit says the cell holds a piece being
+// fetched. Torrents with fewer pieces than buckets get one cell per piece.
+func (m *pieceMap) buckets() (fill, active []byte) {
+	n := len(m.complete)
 	if n == 0 {
 		return nil, nil
 	}
@@ -126,15 +180,12 @@ func bucketPieces(ev api.EventData) (fill, active []byte) {
 	complete := make([]int, cells)
 	total := make([]int, cells)
 	active = make([]byte, (cells+7)/8)
-	for _, p := range ev.Pieces {
-		if p.Position < 0 || p.Position >= n {
-			continue
-		}
-		c := p.Position * cells / n
+	for pos := 0; pos < n; pos++ {
+		c := pos * cells / n
 		total[c]++
-		if p.Complete {
+		if m.complete[pos] {
 			complete[c]++
-		} else if p.Priority > 0 {
+		} else if m.active[pos] {
 			active[c/8] |= 1 << uint(c%8)
 		}
 	}
@@ -410,6 +461,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	var statsCh <-chan api.EventData
 	var lastStats *TorrentStatsData
+	var pieces pieceMap
 	// statsUnavailable: the stats connection failed for a reason other than
 	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
 	// a dead torrent; "unknown" says what we actually know — nothing.
@@ -497,15 +549,18 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case ev, ok := <-statsCh:
 			if ok {
-				fill, active := bucketPieces(ev)
+				pieces.apply(ev)
+				fill, active := pieces.buckets()
 				lastStats = &TorrentStatsData{
-					Total:     ev.Total,
-					Completed: ev.Completed,
-					Seeders:   ev.Seeders,
-					Leechers:  ev.Leechers,
-					Peers:     ev.Peers,
-					Fill:      fill,
-					Active:    active,
+					Total:       ev.Total,
+					Completed:   ev.Completed,
+					Seeders:     ev.Seeders,
+					Leechers:    ev.Leechers,
+					Peers:       ev.Peers,
+					Fill:        fill,
+					Active:      active,
+					PiecesDone:  pieces.done(),
+					PiecesTotal: len(pieces.complete),
 				}
 				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Info("status: got stats event")
 			} else {
