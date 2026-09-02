@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"math"
 	"net/url"
 	"path/filepath"
 	"sort"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
+	"github.com/webtor-io/web-ui/services/ratemeter"
 )
 
 type StreamContent struct {
@@ -900,6 +902,12 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	// and leechers come from the seeder's stats events; Peers is the older
 	// combined count and the fallback when a seeder reports neither.
 	var seederCount, leecherCount atomic.Int32
+	// swarmRateBits: the swarm's useful throughput (float64 bits) from the
+	// seeder's Completed counter, smoothed by statsRate; preferred over the
+	// warm-up range's own byte counter because it covers the whole torrent —
+	// what the user means by "download speed".
+	var swarmRateBits atomic.Uint64
+	statsRate := ratemeter.New(0.4)
 	const earlyMinBytes = 1 * 1024 * 1024
 	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
 	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
@@ -932,6 +940,9 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		case bytes < earlyMinBytes:
 			left = slowPeersAfter - elapsed
 		}
+		if r := math.Float64frombits(swarmRateBits.Load()); r > 0 {
+			speed = r
+		}
 		j.StatusUpdate(s.swarmLine(int(seederCount.Load()), int(leecherCount.Load()), int(peerCount.Load()), bytes, speed, left))
 	}
 	// Probe missed: announce the step and start the UI peer-count goroutine.
@@ -953,6 +964,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			peerCount.Store(int32(probeEvent.Peers))
 			seederCount.Store(int32(probeEvent.Seeders))
 			leecherCount.Store(int32(probeEvent.Leechers))
+			statsRate.Sample(int64(probeEvent.Completed), time.Now())
 			updateSwarmLine()
 		}
 		if statsCh != nil {
@@ -967,6 +979,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 						peerCount.Store(int32(ev.Peers))
 						seederCount.Store(int32(ev.Seeders))
 						leecherCount.Store(int32(ev.Leechers))
+						swarmRateBits.Store(math.Float64bits(statsRate.Sample(int64(ev.Completed), time.Now())))
 						updateSwarmLine()
 					case <-warmupCtx.Done():
 						return

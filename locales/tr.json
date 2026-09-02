@@ -451,6 +451,7 @@
     },
     "resource.status.unknown": "Durum alınamıyor",
     "resource.status.unknownHint": "Torrent durumu şu anda alınamadı — bu, torrentin kendisi hakkında bir şey söylemez.",
+    "resource.status.rate": "{{.Speed}}/sn",
     "resource.status.vault_failed": "Aktarım başarısız, yeniden deneniyor",
     "resource.status.vault_failedHint": "Bu torrenti Vault'a kaydetme denemesi son kez başarısız oldu. Vault denemeye devam ediyor; hiçbir şey kaybolmadı.",
     "resource.status.vault_waiting": "Seeder bekleniyor",

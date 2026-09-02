@@ -450,6 +450,7 @@
     },
     "resource.status.unknown": "Estado no disponible",
     "resource.status.unknownHint": "No se pudo obtener el estado del torrent ahora mismo; esto no dice nada sobre el torrent en sí.",
+    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.vault_failed": "Transferencia fallida, reintentando",
     "resource.status.vault_failedHint": "El último intento de guardar este torrent en Vault no salió bien. Vault sigue intentándolo; no se ha perdido nada.",
     "resource.status.vault_waiting": "Esperando seeders",

@@ -14,8 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	csrf "github.com/utrack/gin-csrf"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/ratemeter"
 	vault "github.com/webtor-io/web-ui/services/vault"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -45,6 +47,12 @@ type TorrentStatus struct {
 	PiecesDone  int    `json:"pieces_done,omitempty"`
 	PiecesTotal int    `json:"pieces_total,omitempty"`
 	PiecesLabel string `json:"pieces_label,omitempty"`
+	// Rate is the swarm's useful download throughput in bytes per second,
+	// smoothed (services/ratemeter) from the seeder's Completed counter;
+	// RateLabel is it formatted ("2.3 MB/s"). Zero/empty when unknown or
+	// when nothing is moving.
+	Rate      float64 `json:"rate,omitempty"`
+	RateLabel string  `json:"rate_label,omitempty"`
 }
 
 // PieceBuckets is the piece bar's resolution: enough cells for any screen,
@@ -65,6 +73,7 @@ type TorrentStatsData struct {
 	Active      []byte
 	PiecesDone  int
 	PiecesTotal int
+	Rate        float64
 }
 
 // withSwarm copies the swarm counters and the piece bar from a stats event
@@ -78,6 +87,7 @@ func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 			t.PiecesDone = stats.PiecesDone
 			t.PiecesTotal = stats.PiecesTotal
 		}
+		t.Rate = stats.Rate
 	}
 	return t
 }
@@ -94,6 +104,7 @@ var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed
 func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
 	if !barStates[t.State] {
 		t.Pieces, t.Active, t.PiecesDone, t.PiecesTotal, t.PiecesLabel = "", "", 0, 0, ""
+		t.Rate = 0
 	}
 	return t
 }
@@ -337,6 +348,9 @@ func (s *Handler) status(c *gin.Context) {
 			if status.PiecesTotal > 0 {
 				status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
 			}
+			if status.Rate >= 1024 {
+				status.RateLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.rate", map[string]any{"Speed": helpers.Bytes(uint64(status.Rate))})
+			}
 			c.SSEvent("message", status)
 			return status.State != "vaulted"
 		}
@@ -380,7 +394,8 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 	}
 	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
 	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
-	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers")}
+	r, _ := strconv.ParseFloat(c.Query("rate"), 64)
+	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r}
 	if fill, active, total := debugPieces(c.Query("debug_pieces")); fill != nil {
 		st.Pieces = base64.StdEncoding.EncodeToString(fill)
 		st.Active = base64.StdEncoding.EncodeToString(active)
@@ -450,6 +465,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	var statsCh <-chan api.EventData
 	var lastStats *TorrentStatsData
 	var pieces pieceMap
+	rate := ratemeter.New(0.4)
 	// statsUnavailable: the stats connection failed for a reason other than
 	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
 	// a dead torrent; "unknown" says what we actually know — nothing.
@@ -539,7 +555,12 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			if ok {
 				pieces.apply(ev)
 				fill, active := pieces.buckets()
+				// Completed is verified bytes; its delta per second is the
+				// swarm's useful throughput — the download speed a torrent
+				// client would show.
+				rps := rate.Sample(int64(ev.Completed), time.Now())
 				lastStats = &TorrentStatsData{
+					Rate:        rps,
 					Total:       ev.Total,
 					Completed:   ev.Completed,
 					Seeders:     ev.Seeders,

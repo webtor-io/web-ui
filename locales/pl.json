@@ -457,6 +457,7 @@
     },
     "resource.status.unknown": "Status niedostępny",
     "resource.status.unknownHint": "Nie udało się pobrać statusu torrenta — nie mówi to nic o samym torrencie.",
+    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.vault_failed": "Transfer nie powiódł się, próbujemy ponownie",
     "resource.status.vault_failedHint": "Ostatnia próba zapisania tego torrenta w Vault nie przeszła. Vault próbuje dalej; nic nie przepadło.",
     "resource.status.vault_waiting": "Czekamy na seedów",

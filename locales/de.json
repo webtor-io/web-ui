@@ -450,6 +450,7 @@
     },
     "resource.status.unknown": "Status nicht verfügbar",
     "resource.status.unknownHint": "Der Torrent-Status konnte gerade nicht abgerufen werden – über den Torrent selbst sagt das nichts.",
+    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.vault_failed": "Übertragung fehlgeschlagen, neuer Versuch",
     "resource.status.vault_failedHint": "Der letzte Versuch, diesen Torrent im Vault zu speichern, ist nicht durchgegangen. Vault versucht es weiter; nichts ist verloren.",
     "resource.status.vault_waiting": "Warte auf Seeder",

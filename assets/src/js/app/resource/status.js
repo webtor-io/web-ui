@@ -99,6 +99,8 @@ function renderBadge(status) {
     let peers = '';
     if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
         label = `${label} ${Math.round(status.progress)}%`;
+        // Swarm throughput, server-formatted ("2.3 MB/s"); absent when nothing moves.
+        if (status.rate_label) label = `${label} · ${status.rate_label}`;
     }
     // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
     // server; empty for terminal states and when nothing is known.

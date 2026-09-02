@@ -457,6 +457,7 @@
     },
     "resource.status.unknown": "Stav nedostupný",
     "resource.status.unknownHint": "Stav torrentu se teď nepodařilo získat — o samotném torrentu to nic neříká.",
+    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.vault_failed": "Přenos selhal, zkoušíme znovu",
     "resource.status.vault_failedHint": "Poslední pokus uložit tento torrent do Vaultu neprošel. Vault to zkouší dál; nic se neztratilo.",
     "resource.status.vault_waiting": "Čekáme na seedery",
