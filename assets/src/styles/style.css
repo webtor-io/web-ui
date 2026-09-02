@@ -38,6 +38,18 @@ html {
   @apply bg-base-300/50 border border-w-line rounded-2xl p-4 sm:p-6 mb-6;
 }
 
+/* Status badge on the resource page: DaisyUI badges are one fixed-height
+   nowrap line, but "Caching 51% · 2.3 MB/s (4 seeders · 9 leechers)" does not
+   fit a phone — let it wrap to two lines and grow instead of overflowing. */
+#torrent-status .badge {
+  white-space: normal;
+  height: auto;
+  min-height: 1.25rem;
+  line-height: 1.3;
+  text-align: left;
+  @apply py-1;
+}
+
 /* Piece bar (resource page, under the status badge): a grid of cells, one per
    bucket of torrent pieces. Colour comes from the container's text colour so
    the bar follows the badge palette; --fill (0..1) on each cell is how much of

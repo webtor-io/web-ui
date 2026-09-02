@@ -432,3 +432,23 @@ unknown and waiting states show a hairline divider in the same 6px slot, so
 the header never jumps when a transfer starts or the seeder's stats channel
 closes. Review: `?debug_status=caching&debug_pieces=stream` (also
 `sparse`, `half`, `full`, `empty`).
+
+### Caching paused
+
+`caching` with no verified bytes for 5 s and no piece queued (`cachingPaused`,
+`handlers/resource/status.go`) renders amber with a pause glyph: "Caching
+paused N%". The seeder downloads on demand, so this reads as "nobody is
+streaming this right now", not as a fault — the tooltip says so. The 1 s
+status ticker flips it back the moment bytes move. Review:
+`?debug_status=caching&progress=40&paused=1`.
+
+### No seeders / stream reconnect
+
+`caching` with zero seeders and zero peers renders red: "No seeders · N%" —
+the swarm is empty, nothing can progress; it wins over "paused". A stats
+stream that closes mid-download (seeder pods are rotated on every deploy,
+closing every stream they held) is now reopened with backoff (2…32 s, five
+attempts, `shouldReconnect`) — but only while something was stored and not
+all of it, so an idle torrent never wakes a seeder pod. Meanwhile the last
+status stays on screen without speed or verdicts; after the retries the badge
+goes to "status unavailable". Review: `?debug_status=caching&progress=40&noseeders=1`.

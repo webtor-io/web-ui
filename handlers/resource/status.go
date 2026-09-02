@@ -53,6 +53,56 @@ type TorrentStatus struct {
 	// when nothing is moving.
 	Rate      float64 `json:"rate,omitempty"`
 	RateLabel string  `json:"rate_label,omitempty"`
+	// Paused: caching, but nothing is being fetched — no verified bytes
+	// arrived for pausedAfter and no piece is queued. The seeder downloads
+	// on demand, so this means "nobody is streaming this right now", not
+	// "stuck"; the badge turns amber with a pause glyph to say so.
+	Paused     bool   `json:"paused,omitempty"`
+	PausedHint string `json:"paused_hint,omitempty"`
+	// NoSeeders: caching, and the seeder sees nobody at all — the download
+	// cannot progress until a seeder shows up. Takes precedence over Paused
+	// in the badge: an empty swarm is the fact that matters.
+	NoSeeders     bool   `json:"no_seeders,omitempty"`
+	NoSeedersHint string `json:"no_seeders_hint,omitempty"`
+}
+
+// pausedAfter is how long caching may show no progress before it reads as
+// paused. Shorter and a piece boundary flickers the badge; longer and the
+// user stares at a blue "Caching" that is doing nothing.
+const pausedAfter = 5 * time.Second
+
+// cachingPaused decides the flag from what the loop knows: the state, when
+// verified bytes last grew, and whether any piece is queued for fetching.
+func cachingPaused(state string, sinceProgress time.Duration, activeBuckets bool) bool {
+	return state == "caching" && sinceProgress >= pausedAfter && !activeBuckets
+}
+
+// cachingNoSeeders: caching with an empty swarm. Seeders is the seeder's own
+// split; Peers is the combined count that older seeders report instead — both
+// must be zero before we call the swarm empty.
+func cachingNoSeeders(state string, seeders, peers int) bool {
+	return state == "caching" && seeders == 0 && peers == 0
+}
+
+// shouldReconnect decides whether a closed stats stream is worth reopening:
+// only while a download was actually in progress (something stored, not all
+// of it) and only a few times. Reopening for an idle torrent would start a
+// seeder pod nobody asked for — the reason the first attempt never retried.
+func shouldReconnect(stats *TorrentStatsData, attempts int) bool {
+	if stats == nil || attempts >= 5 {
+		return false
+	}
+	return stats.Completed > 0 && int64(stats.Completed) < stats.Total
+}
+
+// hasActive reports whether any bit of the active bucket bitset is set.
+func hasActive(active []byte) bool {
+	for _, b := range active {
+		if b != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // PieceBuckets is the piece bar's resolution: enough cells for any screen,
@@ -344,6 +394,14 @@ func (s *Handler) status(c *gin.Context) {
 			}
 			loc := i18n.GetLocalizer(c)
 			status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
+			if status.Paused {
+				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPaused")
+				status.PausedHint = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPausedHint")
+			}
+			if status.NoSeeders {
+				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.noSeeders")
+				status.NoSeedersHint = i18n.TranslateWithLocalizer(loc, "resource.status.noSeedersHint")
+			}
 			status.Swarm = swarmLabel(loc, status)
 			if status.PiecesTotal > 0 {
 				status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
@@ -395,7 +453,7 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
 	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
 	r, _ := strconv.ParseFloat(c.Query("rate"), 64)
-	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r}
+	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r, Paused: state == "caching" && c.Query("paused") == "1", NoSeeders: state == "caching" && c.Query("noseeders") == "1"}
 	if fill, active, total := debugPieces(c.Query("debug_pieces")); fill != nil {
 		st.Pieces = base64.StdEncoding.EncodeToString(fill)
 		st.Active = base64.StdEncoding.EncodeToString(active)
@@ -466,6 +524,15 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	var lastStats *TorrentStatsData
 	var pieces pieceMap
 	rate := ratemeter.New(0.4)
+	var lastCompleted int
+	lastProgressAt := time.Now()
+	// statsStale: the stream closed and a reconnect is pending. The last
+	// known status keeps being shown (a frozen 51% beats a false "idle"),
+	// without speed and without the paused/no-seeders verdicts — we do not
+	// know. Seeder pods are rotated on every deploy, which closes every
+	// stream they held; the download continues on the new pod.
+	var statsStale bool
+	reconnects := 0
 	// statsUnavailable: the stats connection failed for a reason other than
 	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
 	// a dead torrent; "unknown" says what we actually know — nothing.
@@ -491,11 +558,36 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	vaultTick := 0
 
+	scheduleReconnect := func() {
+		if !shouldReconnect(lastStats, reconnects) {
+			return
+		}
+		reconnects++
+		delay := time.Duration(1<<uint(reconnects)) * time.Second // 2, 4, 8, 16, 32 s
+		log.WithField("resourceID", resourceID).WithField("attempt", reconnects).WithField("in", delay).Info("status: stats stream closed mid-download, reconnecting")
+		time.AfterFunc(delay, func() {
+			ch, msg := s.tryConnectStats(ctx, claims, resourceID)
+			select {
+			case statsChResult <- statsResult{ch: ch, msg: msg}:
+			case <-ctx.Done():
+			}
+		})
+	}
+
 	sendStatus := func() bool {
 		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
 		if status.State == "idle" && statsUnavailable {
 			status.State = "unknown"
 			status.withBarPolicy()
+		}
+		if lastStats != nil && !statsStale {
+			status.NoSeeders = cachingNoSeeders(status.State, lastStats.Seeders, lastStats.Peers)
+			status.Paused = !status.NoSeeders && cachingPaused(status.State, time.Since(lastProgressAt), hasActive(lastStats.Active))
+		}
+		// A speed that reads as zero is zero: paused means nothing moves, and
+		// below half a kilobyte the smoothed tail is noise, not throughput.
+		if statsStale || status.Paused || status.NoSeeders || status.Rate < 512 {
+			status.Rate = 0
 		}
 		data, _ := json.Marshal(status)
 		jsonStr := string(data)
@@ -539,10 +631,22 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			statsCh = res.ch
 			log.WithField("resourceID", resourceID).WithField("connected", res.ch != nil).WithField("msg", res.msg).Info("status: stats connection result")
 			// If export says content is cached (no torrent_client_stat), mark as cached
+			if res.ch != nil {
+				statsStale = false
+			}
 			if res.msg == "cached" {
 				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
 			} else if res.ch == nil {
-				statsUnavailable = true
+				if statsStale && shouldReconnect(lastStats, reconnects) {
+					scheduleReconnect()
+				} else {
+					statsUnavailable = true
+					if statsStale {
+						// Retries exhausted: stop pretending to know.
+						lastStats = nil
+						statsStale = false
+					}
+				}
 			}
 			if !initialSent {
 				if !sendStatus() {
@@ -558,7 +662,12 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				// Completed is verified bytes; its delta per second is the
 				// swarm's useful throughput — the download speed a torrent
 				// client would show.
-				rps := rate.Sample(int64(ev.Completed), time.Now())
+				now := time.Now()
+				rps := rate.Sample(int64(ev.Completed), now)
+				if ev.Completed != lastCompleted {
+					lastCompleted = ev.Completed
+					lastProgressAt = now
+				}
 				lastStats = &TorrentStatsData{
 					Rate:        rps,
 					Total:       ev.Total,
@@ -573,10 +682,17 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				}
 				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Info("status: got stats event")
 			} else {
-				// Stats channel closed — seeder gone or connection dropped
+				// Stats channel closed — seeder gone or connection dropped.
+				// Keep the last status on screen while a reconnect is due;
+				// forget it only when there is nothing worth reconnecting for.
 				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")
-				lastStats = nil
 				statsCh = nil
+				if shouldReconnect(lastStats, reconnects) {
+					statsStale = true
+					scheduleReconnect()
+				} else {
+					lastStats = nil
+				}
 			}
 			if !sendStatus() {
 				return
@@ -602,6 +718,14 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				}
 			}
 			vaultTick++
+
+			// The seeder only sends events when something changed, so a
+			// swarm that stopped sends nothing — re-sample the meter with the
+			// unchanged counter so the speed decays instead of freezing at
+			// the last value it had when the bytes stopped.
+			if lastStats != nil && statsCh != nil {
+				lastStats.Rate = rate.Sample(int64(lastCompleted), time.Now())
+			}
 
 			if !sendStatus() {
 				return

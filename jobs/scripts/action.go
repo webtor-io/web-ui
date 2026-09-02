@@ -907,6 +907,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	// warm-up range's own byte counter because it covers the whole torrent —
 	// what the user means by "download speed".
 	var swarmRateBits atomic.Uint64
+	var lastStatsEventNs atomic.Int64
 	statsRate := ratemeter.New(0.4)
 	const earlyMinBytes = 1 * 1024 * 1024
 	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
@@ -940,8 +941,14 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		case bytes < earlyMinBytes:
 			left = slowPeersAfter - elapsed
 		}
+		// Swarm speed from the seeder's counter wins over the warm-up range's
+		// own; when the seeder has gone quiet (it only sends on change) for
+		// two seconds, nothing is moving and the speed shows zero.
 		if r := math.Float64frombits(swarmRateBits.Load()); r > 0 {
 			speed = r
+		}
+		if last := lastStatsEventNs.Load(); last != 0 && now.Sub(time.Unix(0, last)) > 2*time.Second {
+			speed = 0
 		}
 		j.StatusUpdate(s.swarmLine(int(seederCount.Load()), int(leecherCount.Load()), int(peerCount.Load()), bytes, speed, left))
 	}
@@ -965,6 +972,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			seederCount.Store(int32(probeEvent.Seeders))
 			leecherCount.Store(int32(probeEvent.Leechers))
 			statsRate.Sample(int64(probeEvent.Completed), time.Now())
+			lastStatsEventNs.Store(time.Now().UnixNano())
 			updateSwarmLine()
 		}
 		if statsCh != nil {
@@ -980,6 +988,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 						seederCount.Store(int32(ev.Seeders))
 						leecherCount.Store(int32(ev.Leechers))
 						swarmRateBits.Store(math.Float64bits(statsRate.Sample(int64(ev.Completed), time.Now())))
+						lastStatsEventNs.Store(time.Now().UnixNano())
 						updateSwarmLine()
 					case <-warmupCtx.Done():
 						return

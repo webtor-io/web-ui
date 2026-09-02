@@ -17,6 +17,14 @@ const BADGE_CONFIG = {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>',
     },
+    caching_noseeders: {
+        classes: 'badge badge-sm bg-error/10 border-error/30 text-error gap-1.5 px-3 py-2',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>',
+    },
+    caching_paused: {
+        classes: 'badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-2',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>',
+    },
     vault_waiting: {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
@@ -92,15 +100,21 @@ function renderLoading() {
 }
 
 function renderBadge(status) {
-    const config = BADGE_CONFIG[status.state];
+    // Paused caching is the same state with a different face: amber, a pause
+    // glyph, no throughput (there is none), and the server's "paused" label.
+    const noSeeders = status.state === 'caching' && status.no_seeders;
+    const paused = status.state === 'caching' && status.paused && !noSeeders;
+    const config = BADGE_CONFIG[noSeeders ? 'caching_noseeders' : paused ? 'caching_paused' : status.state];
     if (!config) return '';
 
     let label = status.label || '';
     let peers = '';
-    if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
+    if (noSeeders) {
+        label = `${label} · ${Math.round(status.progress)}%`;
+    } else if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
         label = `${label} ${Math.round(status.progress)}%`;
         // Swarm throughput, server-formatted ("2.3 MB/s"); absent when nothing moves.
-        if (status.rate_label) label = `${label} · ${status.rate_label}`;
+        if (status.rate_label && !paused) label = `${label} · ${status.rate_label}`;
     }
     // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
     // server; empty for terminal states and when nothing is known.
@@ -117,6 +131,12 @@ function renderBadge(status) {
     el.innerHTML = `${config.icon} ${label}${peers}`;
     if (status.state === 'vault_failed' && status.detail) {
         el.title = String(status.detail);
+    }
+    if (paused && status.paused_hint) {
+        el.title = String(status.paused_hint);
+    }
+    if (noSeeders && status.no_seeders_hint) {
+        el.title = String(status.no_seeders_hint);
     }
     return el.outerHTML;
 }
@@ -142,7 +162,7 @@ av(async function() {
     // the SSE endpoint; the server ignores them in release mode.
     const dbg = new URLSearchParams(window.location.search);
     let extra = '';
-    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces']) {
+    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders']) {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
     const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`);

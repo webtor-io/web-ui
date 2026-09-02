@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
@@ -398,5 +399,42 @@ func TestBarPolicy(t *testing.T) {
 	failed := resolveStatus(db, &vault.Resource{Status: vault.StatusFailed, StoredSize: 30, TotalSize: 100}, &TorrentStatsData{Total: 100, Completed: 30, Fill: []byte{255, 0}, Active: []byte{0}})
 	if failed.State != "vault_failed" || failed.Pieces == "" {
 		t.Errorf("a failed transfer with stored pieces keeps its bar: %+v", failed)
+	}
+}
+
+func TestCachingPaused(t *testing.T) {
+	if cachingPaused("caching", 4*time.Second, false) {
+		t.Error("too early to call it paused")
+	}
+	if !cachingPaused("caching", 6*time.Second, false) {
+		t.Error("no progress for pausedAfter and nothing queued → paused")
+	}
+	if cachingPaused("caching", 60*time.Second, true) {
+		t.Error("a queued piece means someone is fetching — not paused")
+	}
+	if cachingPaused("vaulting", 60*time.Second, false) || cachingPaused("idle", 60*time.Second, false) {
+		t.Error("only caching pauses")
+	}
+	if hasActive([]byte{0, 0}) || !hasActive([]byte{0, 4}) {
+		t.Error("hasActive bitset check")
+	}
+}
+
+func TestCachingNoSeedersAndReconnectPolicy(t *testing.T) {
+	if !cachingNoSeeders("caching", 0, 0) || cachingNoSeeders("caching", 0, 3) || cachingNoSeeders("caching", 2, 0) || cachingNoSeeders("idle", 0, 0) {
+		t.Error("no-seeders needs caching with zero seeders and zero peers")
+	}
+	inProgress := &TorrentStatsData{Total: 100, Completed: 40}
+	if !shouldReconnect(inProgress, 0) || !shouldReconnect(inProgress, 4) {
+		t.Error("a download in progress is worth reconnecting for")
+	}
+	if shouldReconnect(inProgress, 5) {
+		t.Error("retries are bounded")
+	}
+	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 0}, 0) {
+		t.Error("nothing stored yet: do not wake a seeder for it")
+	}
+	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 100}, 0) || shouldReconnect(nil, 0) {
+		t.Error("complete or unknown: nothing to reconnect for")
 	}
 }
