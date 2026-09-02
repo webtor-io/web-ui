@@ -999,7 +999,10 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		}
 	}
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		// One second, not five: the tick also redraws the status line (the
+		// countdown and the throughput), and a countdown that jumps by fives
+		// reads as stuck. The work per tick is a few atomic loads.
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
