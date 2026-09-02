@@ -1,5 +1,11 @@
 {{ define "main" }}
 {{ $isFree := eq .Data.TierName "free" }}
+{{/* Three different situations used to share one screen. Reason (see
+     NoPeersError) picks the words: a dead swarm asks for Vault/another
+     torrent; a slow swarm says the pace is the swarm's, not the plan's; a
+     hard timeout says nothing is known yet. All three can be retried. */}}
+{{ $slow := eq .Data.Reason "slow" }}
+{{ $timeout := eq .Data.Reason "timeout" }}
 <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
     <div class="flex items-start gap-3 flex-wrap">
         <div class="flex items-start gap-3 flex-1 min-w-[200px]">
@@ -7,10 +13,14 @@
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
-            <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang "action.noPeers.title" }}</h3>
+            <h3 class="font-semibold text-base text-base-content leading-snug">
+                {{- if $slow }}{{ t $.Lang "action.noPeers.slowTitle" }}
+                {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutTitle" }}
+                {{- else }}{{ t $.Lang "action.noPeers.title" }}{{ end -}}
+            </h3>
         </div>
-        {{- if $isFree }}
-        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" href="/donate" target="_blank">
+        {{- if and $isFree (not $slow) (not $timeout) }}
+        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-reason="{{ .Data.Reason }}" href="/donate" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
             </svg>
@@ -20,20 +30,49 @@
     </div>
 
     <p class="text-sm text-w-sub mt-3 leading-relaxed">
-        {{ if $isFree }}{{ t $.Lang "action.noPeers.vaultPitch" }}{{ else }}{{ t $.Lang "action.noPeers.vaultUse" }}{{ end }}
+        {{- if $slow }}{{ t $.Lang "action.noPeers.slowBody" }}
+        {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutBody" }}
+        {{- else if $isFree }}{{ t $.Lang "action.noPeers.vaultPitch" }}
+        {{- else }}{{ t $.Lang "action.noPeers.vaultUse" }}{{ end -}}
     </p>
 
+    {{- if or (gt .Data.Peers 0) (gt .Data.BytesRaw 0) }}
+    <p class="text-xs text-w-muted mt-3 tabular-nums">{{ tp $.Lang "action.noPeers.stats" "Bytes" .Data.Bytes "Peers" .Data.Peers "Sec" .Data.ElapsedSec }}</p>
+    {{- else if not $timeout }}
     <p class="text-xs text-w-muted mt-3">{{ t $.Lang "action.noPeers.altSearch" }}</p>
+    {{- end }}
 </div>
 
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
     <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
+    {{- if .Data.Endpoint }}
+    {{/* Same resubmit shape as slow_download.html, without force-slow: a
+         retry is a fresh warm-up, and the seeder pod is usually still warm. */}}
+    <form action="{{ langPath $.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data"
+          data-async-target="#log-{{ .Data.LogTargetID }}" data-async-push-state="false">
+        <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
+        <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
+        {{- if .Data.ArchiveFormat }}
+        <input type="hidden" name="archive-format" value="{{ .Data.ArchiveFormat }}" />
+        {{- end }}
+        {{- range .Data.SelectedPaths }}
+        <input type="hidden" name="paths" value="{{ . }}" />
+        {{- end }}
+        <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="no-peers-retry" data-umami-event-reason="{{ .Data.Reason }}" data-umami-event-tier="{{ .Data.TierName }}">{{ t $.Lang "action.noPeers.retry" }}</button>
+    </form>
+    {{- end }}
 </div>
 <script>
 (function () {
     if (!window.umami) return;
     window.umami.track('no-peers-shown', {
-        tier: '{{ .Data.TierName }}'
+        tier: '{{ .Data.TierName }}',
+        reason: '{{ .Data.Reason }}',
+        peers: {{ .Data.Peers }},
+        seeders: {{ .Data.Seeders }},
+        leechers: {{ .Data.Leechers }},
+        bytes: {{ .Data.BytesRaw }},
+        elapsed_s: {{ .Data.ElapsedSec }}
     });
 })();
 </script>

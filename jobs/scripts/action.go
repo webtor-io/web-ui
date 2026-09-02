@@ -125,7 +125,23 @@ func (e *SlowDownloadError) Error() string {
 	return "download speed too slow for streaming"
 }
 
-type NoPeersError struct{}
+// NoPeersError ends a warmup that produced nothing to play. Reason tells the
+// modal (and analytics) WHICH of three different situations it was, because
+// they call for different words and different next steps:
+//
+//	dead    — zero peers and zero bytes for NoPeersTimeoutSec: the swarm is gone
+//	slow    — peers exist but under 1 MiB arrived in SlowPeersTimeoutSec
+//	timeout — the hard warmup deadline passed before the measurement window
+//
+// The counters are the last values seen when the decision was made.
+type NoPeersError struct {
+	Reason   string
+	Peers    int
+	Seeders  int
+	Leechers int
+	Bytes    int64
+	Elapsed  time.Duration
+}
 
 func (e *NoPeersError) Error() string {
 	return "no peers / nothing downloaded during warmup"
@@ -322,8 +338,28 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			sdd.TierName = c.Claims.Context.Tier.Name
 		}
 		return &SlowDownloadError{Data: sdd}
+	case "swarm_demo":
+		// Plays the warm-up status line for review: eight seconds of a silent
+		// swarm with the countdown, eight seconds of a crawling download,
+		// then the slow verdict. No network involved.
+		j.InProgress(fmt.Sprintf("%v, %v", s.t("job.warmingUp"), s.tp("job.downloading", map[string]any{"Bytes": helpers.Bytes(2 * 1024 * 1024)})))
+		for i := 0; i < 16 && ctx.Err() == nil; i++ {
+			var line string
+			if i < 8 {
+				line = formatSwarmLine(s.tp, 0, 0, 0, 0, 0, time.Duration(60-i*5)*time.Second)
+			} else {
+				line = formatSwarmLine(s.tp, 2, 5, 7, int64(i-7)*40*1024, 40*1024, time.Duration(120-i*5)*time.Second)
+			}
+			j.StatusUpdate(line)
+			time.Sleep(time.Second)
+		}
+		return &NoPeersError{Reason: "slow", Peers: 7, Seeders: 2, Leechers: 5, Bytes: 320 * 1024, Elapsed: 120 * time.Second}
 	case "no_peers":
-		return &NoPeersError{}
+		return &NoPeersError{Reason: "dead", Elapsed: 60 * time.Second}
+	case "no_peers_slow":
+		return &NoPeersError{Reason: "slow", Peers: 3, Seeders: 1, Leechers: 2, Bytes: 340 * 1024, Elapsed: 120 * time.Second}
+	case "no_peers_timeout":
+		return &NoPeersError{Reason: "timeout", Peers: 7, Seeders: 2, Leechers: 5, Bytes: 6 * 1024 * 1024, Elapsed: 180 * time.Second}
 	}
 	// Free-tier grace: attach rules to the outgoing primary claims BEFORE
 	// the export call so rest-api carries them into every signed URL token
@@ -619,6 +655,23 @@ type FileDownload struct {
 
 type NoPeersData struct {
 	TierName string
+	// Reason and the counters come from NoPeersError (see there); Reason is
+	// "timeout" for a bare context deadline with no swarm facts at all.
+	Reason     string
+	Peers      int
+	Seeders    int
+	Leechers   int
+	Bytes      string
+	BytesRaw   int64
+	ElapsedSec int
+	// Form-resubmit context for "try again", same shape as SlowDownloadData.
+	Action        string
+	Endpoint      string
+	ResourceID    string
+	ItemID        string
+	LogTargetID   string
+	ArchiveFormat string
+	SelectedPaths []string
 }
 
 func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) (err error) {
@@ -797,44 +850,6 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		probeCancel()
 	}
 
-	// Probe missed: announce the step and start the UI peer-count goroutine.
-	if size > 0 {
-		downloading := s.tp("job.downloading", map[string]any{
-			"Bytes": helpers.Bytes(uint64(limitStart + limitEnd)),
-		})
-		j.InProgress(fmt.Sprintf("%v, %v", m, downloading))
-	} else {
-		j.InProgress(m)
-	}
-
-	if useStatus {
-		j.StatusUpdate(s.t("job.waitingForPeers"))
-		// If the probe already consumed event #1 (just with pieces incomplete),
-		// surface its peer count now so the UI isn't blank until event #2.
-		if probeHadEvent {
-			statsEverSeen.Store(true)
-			peerCount.Store(int32(probeEvent.Peers))
-			j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": probeEvent.Peers}))
-		}
-		if statsCh != nil {
-			go func() {
-				for {
-					select {
-					case ev, ok := <-statsCh:
-						if !ok {
-							return
-						}
-						statsEverSeen.Store(true)
-						peerCount.Store(int32(ev.Peers))
-						j.StatusUpdate(s.tp("job.peers", map[string]any{"Peers": ev.Peers}))
-					case <-warmupCtx.Done():
-						return
-					}
-				}
-			}()
-		}
-	}
-
 	// Warmup-SSE bookkeeping: the seeder's ?warmup endpoint bumps
 	// PiecePriorityHigh on every piece overlapping the requested range
 	// and streams a cumulative downloaded counter (bytes-within-range
@@ -870,6 +885,86 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 
 	warmupStart := time.Now()
 
+	// Swarm facts for the status line and for the no-peers verdict. Seeders
+	// and leechers come from the seeder's stats events; Peers is the older
+	// combined count and the fallback when a seeder reports neither.
+	var seederCount, leecherCount atomic.Int32
+	const earlyMinBytes = 1 * 1024 * 1024
+	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
+	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
+	var lastLineBytes atomic.Int64
+	var lastLineNs atomic.Int64
+	// updateSwarmLine rewrites the job's status line with what the swarm is
+	// doing right now — seeders, leechers, throughput, bytes so far and, while
+	// nothing has arrived yet, the seconds left before the no-peers verdict.
+	// Called from the stats goroutine on every event and from the watchdog
+	// every tick, so the countdown keeps moving on a silent swarm.
+	updateSwarmLine := func() {
+		if !useStatus {
+			return
+		}
+		now := time.Now()
+		bytes := totalDownloaded()
+		var speed float64
+		if prevNs := lastLineNs.Load(); prevNs != 0 {
+			if dt := now.Sub(time.Unix(0, prevNs)).Seconds(); dt > 0 {
+				speed = float64(bytes-lastLineBytes.Load()) / dt
+			}
+		}
+		lastLineNs.Store(now.UnixNano())
+		lastLineBytes.Store(bytes)
+		elapsed := now.Sub(warmupStart)
+		var left time.Duration
+		switch {
+		case bytes == 0:
+			left = noPeersAfter - elapsed
+		case bytes < earlyMinBytes:
+			left = slowPeersAfter - elapsed
+		}
+		j.StatusUpdate(s.swarmLine(int(seederCount.Load()), int(leecherCount.Load()), int(peerCount.Load()), bytes, speed, left))
+	}
+	// Probe missed: announce the step and start the UI peer-count goroutine.
+	if size > 0 {
+		downloading := s.tp("job.downloading", map[string]any{
+			"Bytes": helpers.Bytes(uint64(limitStart + limitEnd)),
+		})
+		j.InProgress(fmt.Sprintf("%v, %v", m, downloading))
+	} else {
+		j.InProgress(m)
+	}
+
+	if useStatus {
+		j.StatusUpdate(s.t("job.waitingForPeers"))
+		// If the probe already consumed event #1 (just with pieces incomplete),
+		// surface its peer count now so the UI isn't blank until event #2.
+		if probeHadEvent {
+			statsEverSeen.Store(true)
+			peerCount.Store(int32(probeEvent.Peers))
+			seederCount.Store(int32(probeEvent.Seeders))
+			leecherCount.Store(int32(probeEvent.Leechers))
+			updateSwarmLine()
+		}
+		if statsCh != nil {
+			go func() {
+				for {
+					select {
+					case ev, ok := <-statsCh:
+						if !ok {
+							return
+						}
+						statsEverSeen.Store(true)
+						peerCount.Store(int32(ev.Peers))
+						seederCount.Store(int32(ev.Seeders))
+						leecherCount.Store(int32(ev.Leechers))
+						updateSwarmLine()
+					case <-warmupCtx.Done():
+						return
+					}
+				}
+			}()
+		}
+	}
+
 	// Watchdog: surface no_peers CTA early instead of waiting the full warmup
 	// deadline. Two thresholds (both configurable via env):
 	//   - WARMUP_NO_PEERS_TIMEOUT_SEC + zero bytes + zero peers — torrent has
@@ -881,9 +976,17 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	//     but the rate is so low (<17 KB/s avg for 1 MB threshold) that probe
 	//     will hang on its own 1-min deadline anyway. Surface CTA now instead
 	//     of waiting.
-	const earlyMinBytes = 1 * 1024 * 1024
-	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
-	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
+	var noPeersReason atomic.Value // string: "dead" | "slow"
+	snapshot := func(reason string) *NoPeersError {
+		return &NoPeersError{
+			Reason:   reason,
+			Peers:    int(peerCount.Load()),
+			Seeders:  int(seederCount.Load()),
+			Leechers: int(leecherCount.Load()),
+			Bytes:    totalDownloaded(),
+			Elapsed:  time.Since(warmupStart),
+		}
+	}
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -895,14 +998,19 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 				bytes := totalDownloaded()
 				elapsed := time.Since(warmupStart)
 				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 && statsEverSeen.Load() {
+					noPeersReason.Store("dead")
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return
 				}
 				if elapsed > slowPeersAfter && bytes < earlyMinBytes {
+					noPeersReason.Store("slow")
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return
+				}
+				if statsEverSeen.Load() || bytes > 0 {
+					updateSwarmLine()
 				}
 			}
 		}
@@ -953,7 +1061,11 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	wg.Wait()
 
 	if noPeersFlag.Load() {
-		return 0, false, &NoPeersError{}
+		reason, _ := noPeersReason.Load().(string)
+		if reason == "" {
+			reason = "dead"
+		}
+		return 0, false, snapshot(reason)
 	}
 
 	// Vault/cache fast-path: the seeder short-circuits ?warmup with a
@@ -1000,7 +1112,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			log.WithField("elapsed", time.Since(warmupStart)).
 				WithField("bytes", final).
 				Warn("warmup hard timeout, insufficient data — surfacing no_peers")
-			return 0, false, &NoPeersError{}
+			return 0, false, snapshot("timeout")
 		}
 		log.WithField("elapsed", time.Since(warmupStart)).
 			WithField("bytes", final).
@@ -1111,17 +1223,38 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		j.Custom("action/errors/slow_download", strings.TrimSpace(str))
 		return nil
 	}
-	if _, ok := err.(*NoPeersError); ok || errors.Is(errors.Cause(err), context.DeadlineExceeded) {
+	npe, isNoPeers := err.(*NoPeersError)
+	if isNoPeers || errors.Is(errors.Cause(err), context.DeadlineExceeded) {
 		tpl := s.tb.Build("action/errors/no_peers").WithLayoutBody(`{{ template "main" . }}`)
 		tierName := "free"
 		if s.c.Claims != nil && s.c.Claims.Context != nil && s.c.Claims.Context.Tier != nil && s.c.Claims.Context.Tier.Name != "" {
 			tierName = s.c.Claims.Context.Tier.Name
 		}
-		str, terr := tpl.ToString(s.c.WithData(&NoPeersData{TierName: tierName}))
+		data := &NoPeersData{
+			TierName:      tierName,
+			Reason:        "timeout",
+			Action:        s.action,
+			Endpoint:      actionEndpoint(s.action),
+			ResourceID:    s.resourceId,
+			ItemID:        s.itemId,
+			LogTargetID:   s.itemId,
+			ArchiveFormat: s.archiveFormat,
+			SelectedPaths: s.selectedPaths,
+		}
+		if isNoPeers {
+			data.Reason = npe.Reason
+			data.Peers = npe.Peers
+			data.Seeders = npe.Seeders
+			data.Leechers = npe.Leechers
+			data.BytesRaw = npe.Bytes
+			data.Bytes = helpers.Bytes(uint64(npe.Bytes))
+			data.ElapsedSec = int(npe.Elapsed.Round(time.Second).Seconds())
+		}
+		str, terr := tpl.ToString(s.c.WithData(data))
 		if terr != nil {
 			return terr
 		}
-		log.WithError(err).Warn("no peers / warmup deadline — surfacing CTA")
+		log.WithError(err).WithField("reason", data.Reason).WithField("peers", data.Peers).WithField("bytes", data.BytesRaw).WithField("elapsed_s", data.ElapsedSec).Warn("no peers / warmup deadline — surfacing CTA")
 		j.Fail()
 		j.Custom("action/errors/no_peers", strings.TrimSpace(str))
 		return nil
@@ -1221,4 +1354,32 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			selectedPaths: selectedPaths,
 		},
 	}, id
+}
+
+// swarmLine is the job status line during warmup. Seeders/leechers when the
+// seeder reports them, the combined peer count otherwise; throughput and bytes
+// once anything has arrived; and while nothing has, the seconds left until the
+// no-peers verdict — so a silent swarm shows a countdown, not a frozen spinner.
+func (s *ActionScript) swarmLine(seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
+	return formatSwarmLine(s.tp, seeders, leechers, peers, bytes, speed, left)
+}
+
+func formatSwarmLine(tp func(string, map[string]any) string, seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
+	var who string
+	switch {
+	case seeders > 0 || leechers > 0:
+		who = tp("job.swarm", map[string]any{"Seeders": seeders, "Leechers": leechers})
+	default:
+		who = tp("job.peers", map[string]any{"Peers": peers})
+	}
+	if bytes <= 0 {
+		if left > 0 {
+			return tp("job.swarmWaiting", map[string]any{"Who": who, "Left": int(left.Round(time.Second).Seconds())})
+		}
+		return who
+	}
+	if speed < 0 {
+		speed = 0
+	}
+	return tp("job.swarmDownloading", map[string]any{"Who": who, "Speed": helpers.Bytes(uint64(speed)), "Bytes": helpers.Bytes(uint64(bytes))})
 }

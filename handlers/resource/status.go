@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,10 +22,16 @@ import (
 
 // TorrentStatus represents the current combined status of a torrent.
 type TorrentStatus struct {
-	State    string  `json:"state"`    // idle, caching, cached, vaulting, vaulted
+	State    string  `json:"state"`    // idle, caching, cached, vaulting, vaulted, unknown
 	Progress float64 `json:"progress"` // 0-100 for caching/vaulting
-	Seeders  int     `json:"seeders"`  // seed count for caching
+	Seeders  int     `json:"seeders"`  // seeders as the seeder reports them
+	Leechers int     `json:"leechers"` // leechers as the seeder reports them
+	Peers    int     `json:"peers"`    // combined peer count — the fallback when a seeder reports no split
 	Label    string  `json:"label"`    // translated state label
+	// Swarm is the translated "N seeders · M leechers" (or "N peers") suffix,
+	// empty when nothing is known. Formatted server-side so the JS renderer
+	// never has to carry locale strings.
+	Swarm string `json:"swarm"`
 }
 
 // TorrentStatsData holds the relevant fields from a torrent stats event.
@@ -31,6 +39,16 @@ type TorrentStatsData struct {
 	Total     int64
 	Completed int
 	Seeders   int
+	Leechers  int
+	Peers     int
+}
+
+// withSwarm copies the swarm counters from a stats event onto a status.
+func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
+	if stats != nil {
+		t.Seeders, t.Leechers, t.Peers = stats.Seeders, stats.Leechers, stats.Peers
+	}
+	return t
 }
 
 // resolveStatus is a pure function that determines the combined torrent status
@@ -44,10 +62,7 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 		return vaultState
 	}
 	if vaultState.State == "vaulting" {
-		if stats != nil {
-			vaultState.Seeders = stats.Seeders
-		}
-		return vaultState
+		return vaultState.withSwarm(stats)
 	}
 	if cachingState.State == "cached" {
 		return cachingState
@@ -95,13 +110,13 @@ func resolveCachingState(stats *TorrentStatsData) *TorrentStatus {
 	// If nothing has been downloaded yet, treat as idle — don't show "Caching 0%"
 	// which would be misleading (the seeder may have been started just by our stats probe)
 	if stats.Completed <= 0 {
-		return &TorrentStatus{State: "idle", Seeders: stats.Seeders}
+		return (&TorrentStatus{State: "idle"}).withSwarm(stats)
 	}
 	progress := float64(stats.Completed) / float64(stats.Total) * 100
 	if progress >= 100 {
-		return &TorrentStatus{State: "cached", Progress: 100, Seeders: stats.Seeders}
+		return (&TorrentStatus{State: "cached", Progress: 100}).withSwarm(stats)
 	}
-	return &TorrentStatus{State: "caching", Progress: progress, Seeders: stats.Seeders}
+	return (&TorrentStatus{State: "caching", Progress: progress}).withSwarm(stats)
 }
 
 // prepareInitialStatus computes the initial status for SSR (vault DB only, no SSE connection).
@@ -143,7 +158,18 @@ func (s *Handler) status(c *gin.Context) {
 	// Channel for status updates from background goroutine
 	statusCh := make(chan *TorrentStatus, 10)
 
-	go s.statusLoop(ctx, claims, resourceID, statusCh)
+	if dbg := debugStatus(c); dbg != nil {
+		go func() {
+			defer close(statusCh)
+			select {
+			case statusCh <- dbg:
+			case <-ctx.Done():
+			}
+			<-ctx.Done()
+		}()
+	} else {
+		go s.statusLoop(ctx, claims, resourceID, statusCh)
+	}
 
 	c.Stream(func(w io.Writer) bool {
 		ticker := time.NewTicker(5 * time.Second)
@@ -158,11 +184,51 @@ func (s *Handler) status(c *gin.Context) {
 			if !ok {
 				return false
 			}
-			status.Label = i18n.TranslateWithLocalizer(i18n.GetLocalizer(c), "resource.status."+status.State)
+			loc := i18n.GetLocalizer(c)
+			status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
+			status.Swarm = swarmLabel(loc, status)
 			c.SSEvent("message", status)
 			return status.State != "vaulted"
 		}
 	})
+}
+
+// swarmLabel is the badge suffix: seeders and leechers when the seeder splits
+// them, the combined peer count otherwise, nothing when nothing is known.
+// Terminal states carry no swarm — a cached or vaulted torrent plays
+// regardless of who is around.
+func swarmLabel(loc *goi18n.Localizer, st *TorrentStatus) string {
+	if st.State == "cached" || st.State == "vaulted" || st.State == "unknown" {
+		return ""
+	}
+	switch {
+	case st.Seeders > 0 || st.Leechers > 0:
+		return i18n.TranslateWithLocalizerData(loc, "resource.status.swarm", map[string]any{"Seeders": st.Seeders, "Leechers": st.Leechers})
+	case st.Peers > 0:
+		return i18n.TranslateWithLocalizerData(loc, "resource.status.peers", map[string]any{"Peers": st.Peers})
+	}
+	return ""
+}
+
+// debugStatus is the dev-only override for the status badge: with
+// ?debug_status=<state> (plus optional seeders, leechers, peers, progress) the
+// SSE stream emits exactly that status once instead of consulting the seeder
+// and Vault, so every badge variant can be reviewed on any resource page. The
+// JS client forwards these params from the page URL. Inert under
+// GIN_MODE=release, like the other debug switches.
+func debugStatus(c *gin.Context) *TorrentStatus {
+	if gin.Mode() == gin.ReleaseMode {
+		return nil
+	}
+	state := c.Query("debug_status")
+	switch state {
+	case "idle", "caching", "cached", "vaulting", "vaulted", "unknown":
+	default:
+		return nil
+	}
+	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
+	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
+	return &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers")}
 }
 
 // statusLoop runs in a background goroutine, computing status updates and sending them to the channel.
@@ -171,6 +237,10 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	var statsCh <-chan api.EventData
 	var lastStats *TorrentStatsData
+	// statsUnavailable: the stats connection failed for a reason other than
+	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
+	// a dead torrent; "unknown" says what we actually know — nothing.
+	var statsUnavailable bool
 	var lastJSON string
 	var lastDBResource *vaultModels.Resource
 	var lastAPIResource *vault.Resource
@@ -194,6 +264,9 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	sendStatus := func() bool {
 		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
+		if status.State == "idle" && statsUnavailable {
+			status.State = "unknown"
+		}
 		data, _ := json.Marshal(status)
 		jsonStr := string(data)
 		if jsonStr == lastJSON {
@@ -238,6 +311,8 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			// If export says content is cached (no torrent_client_stat), mark as cached
 			if res.msg == "cached" {
 				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
+			} else if res.ch == nil {
+				statsUnavailable = true
 			}
 			if !initialSent {
 				if !sendStatus() {
@@ -251,9 +326,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				lastStats = &TorrentStatsData{
 					Total:     ev.Total,
 					Completed: ev.Completed,
-					Seeders:   ev.Peers,
+					Seeders:   ev.Seeders,
+					Leechers:  ev.Leechers,
+					Peers:     ev.Peers,
 				}
-				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).Info("status: got stats event")
+				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Info("status: got stats event")
 			} else {
 				// Stats channel closed — seeder gone or connection dropped
 				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")

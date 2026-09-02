@@ -1,6 +1,7 @@
 package j
 
 import (
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/services/api"
@@ -94,6 +95,10 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 	loc := s.i18n.Localizer(c.Lang)
 	return func(err error) string {
 		key := web.ClassifyError(err)
+		// One structured line per error the user actually saw, so the
+		// distribution of keys (and how much lands in error.generic) can be
+		// read off Loki: {app="web-ui"} |= "user error shown".
+		log.WithError(err).WithField("err_key", key).WithField("surface", "job").Info("user error shown")
 		return i18n.TranslateWithLocalizer(loc, key)
 	}
 }

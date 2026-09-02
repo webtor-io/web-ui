@@ -44,6 +44,7 @@ func ErrorHandler(tb template.Builder[*Context]) gin.HandlerFunc {
 
 		errKey := ClassifyError(c.Errors.Last().Err)
 		status := StatusForErrKey(errKey)
+		log.WithError(c.Errors.Last().Err).WithField("err_key", errKey).WithField("surface", "page").WithField("path", c.Request.URL.Path).Info("user error shown")
 		if wantsJSON(c) {
 			c.JSON(status, gin.H{"error": errKey})
 			return

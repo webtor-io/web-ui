@@ -141,6 +141,34 @@ if !effectiveCache {
 }
 ```
 
+## What the user sees while waiting
+
+The job status line is `formatSwarmLine` (`jobs/scripts/action.go`): seeders
+and leechers when the seeder splits them (`job.swarm`), the combined peer
+count otherwise (`job.peers`); while nothing has arrived, the seconds left
+before the no-peers verdict (`job.swarmWaiting`); once bytes flow, throughput
+and bytes so far (`job.swarmDownloading`). It is rewritten on every stats
+event and on every 5 s watchdog tick, so a silent swarm shows a moving
+countdown rather than a frozen spinner.
+
+## Three no-peers reasons
+
+`NoPeersError` carries `Reason` and the counters at decision time:
+
+| Reason | Trigger | Modal |
+|---|---|---|
+| `dead` | `WARMUP_NO_PEERS_TIMEOUT_SEC` with 0 bytes and 0 peers (stats seen) | "no active seeders" + Vault / another torrent |
+| `slow` | `WARMUP_SLOW_PEERS_TIMEOUT_SEC` with &lt; 1 MiB | "peers are there, but crawling" — the swarm sets the pace, not the plan |
+| `timeout` | hard `WARMUP_TIMEOUT_MIN` before the measurement window, or a bare context deadline | "still not enough data" |
+
+All three render `action/errors/no_peers.html` with a "Try again" resubmit
+(same shape as slow_download's continue form, without `force-slow`) and report
+`no-peers-shown` with `reason`, `peers`, `seeders`, `leechers`, `bytes`,
+`elapsed_s` — the props that let the 35K/month impressions be split into
+classes before deciding what else to change. Review each variant with
+`#action=stream&debug=no_peers|no_peers_slow|no_peers_timeout`, and the status
+line with `debug=swarm_demo` (see CLAUDE.md, Debugging).
+
 ## Tuning
 
 | Env / flag | Default | Notes |

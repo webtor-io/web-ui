@@ -17,6 +17,10 @@ const BADGE_CONFIG = {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>',
     },
+    unknown: {
+        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" /></svg>',
+    },
     vaulted: {
         classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>',
@@ -36,9 +40,10 @@ function renderBadge(status) {
     if (status.state === 'caching' || status.state === 'vaulting') {
         label = `${label} ${Math.round(status.progress)}%`;
     }
-    // Show peers for non-terminal states
-    if (status.state !== 'cached' && status.state !== 'vaulted' && status.seeders > 0) {
-        peers = ` <span class="opacity-70">(${status.seeders} peers)</span>`;
+    // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
+    // server; empty for terminal states and when nothing is known.
+    if (status.swarm) {
+        peers = ` <span class="opacity-70">(${status.swarm})</span>`;
     }
 
     return `<div class="${config.classes}">${config.icon} ${label}${peers}</div>`;
@@ -60,7 +65,15 @@ av(async function() {
 
     const lang = document.documentElement.lang;
     const langPrefix = lang && lang !== 'en' ? `/${lang}` : '';
-    const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}`);
+    // Dev-only badge override (handlers/resource/status.go debugStatus): the
+    // page URL's debug_status/seeders/leechers/peers/progress ride along to
+    // the SSE endpoint; the server ignores them in release mode.
+    const dbg = new URLSearchParams(window.location.search);
+    let extra = '';
+    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress']) {
+        if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
+    }
+    const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`);
     container._statusSource = source;
 
     source.onmessage = (e) => {
