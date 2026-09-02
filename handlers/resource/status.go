@@ -94,6 +94,21 @@ func (t *TorrentStatus) fullBar() *TorrentStatus {
 	return t
 }
 
+// barStates are the states in which the piece bar is drawn: something is
+// moving (caching, a Vault transfer, or one that failed mid-way with pieces
+// already stored) or the content is complete. An idle seeder that merely
+// knows its pieces draws nothing — an empty bar under an idle badge read as
+// "broken", and it vanished the moment the seeder's stats channel closed.
+var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true, "cached": true, "vaulted": true}
+
+// withBarPolicy strips the piece bar from states that must not show one.
+func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
+	if !barStates[t.State] {
+		t.Pieces, t.Active, t.PiecesDone, t.PiecesTotal, t.PiecesLabel = "", "", 0, 0, ""
+	}
+	return t
+}
+
 // bucketPieces folds the seeder's per-piece list into PieceBuckets cells: the
 // fill is the share of complete pieces in the cell (0..255), the active bit
 // says the cell holds a piece with a raised priority that is not complete yet
@@ -136,6 +151,10 @@ func bucketPieces(ev api.EventData) (fill, active []byte) {
 // from vault DB state, vault API state, and torrent seeding stats.
 // Priority: vaulted > vaulting > cached > caching > idle.
 func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource, stats *TorrentStatsData) *TorrentStatus {
+	return resolveStatusRaw(dbResource, apiResource, stats).withBarPolicy()
+}
+
+func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resource, stats *TorrentStatsData) *TorrentStatus {
 	vaultState := resolveVaultState(dbResource, apiResource)
 	cachingState := resolveCachingState(stats)
 
@@ -333,7 +352,7 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 			}
 		}
 	}
-	return st
+	return st.withBarPolicy()
 }
 
 // debugPieces paints synthetic piece bars for the dev override:
@@ -420,6 +439,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
 		if status.State == "idle" && statsUnavailable {
 			status.State = "unknown"
+			status.withBarPolicy()
 		}
 		data, _ := json.Marshal(status)
 		jsonStr := string(data)

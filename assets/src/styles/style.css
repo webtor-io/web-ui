@@ -42,6 +42,19 @@ html {
    bucket of torrent pieces. Colour comes from the container's text colour so
    the bar follows the badge palette; --fill (0..1) on each cell is how much of
    the bucket the seeder holds; .is-active pulses for cells being fetched. */
+.piece-bar-slot {
+  height: 6px;
+  display: flex;
+  align-items: center;
+}
+.piece-bar-slot > .piece-bar {
+  width: 100%;
+}
+.piece-bar-divider {
+  width: 100%;
+  height: 1px;
+  @apply bg-w-line/50;
+}
 .piece-bar {
   display: grid;
   grid-auto-flow: column;

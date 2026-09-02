@@ -61,10 +61,14 @@ function decodeBytes(b64) {
     }
 }
 
+const BAR_DIVIDER = '<div class="piece-bar-divider" aria-hidden="true"></div>';
+
 function renderBar(status) {
-    if (!status.pieces) return '';
+    // No bar to draw (idle, unknown, waiting): keep the slot's height with a
+    // hairline so the header does not jump when a transfer starts or ends.
+    if (!status.pieces) return BAR_DIVIDER;
     const fill = decodeBytes(status.pieces);
-    if (!fill || !fill.length) return '';
+    if (!fill || !fill.length) return BAR_DIVIDER;
     const active = status.active ? decodeBytes(status.active) : null;
     const color = BAR_COLOR[status.state] || 'text-w-cyan';
     const title = status.pieces_label || '';

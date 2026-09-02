@@ -427,5 +427,9 @@ status SSE (`handlers/resource/status.go` `bucketPieces`, ~350 bytes per
 update); no extra seeder wake-ups — the status SSE already opens the stats
 connection. Vaulted/cached content draws a full bar server-side without asking
 anyone. It is deliberately the whole torrent, not per file, and only on the
-resource page. Review: `?debug_status=caching&debug_pieces=stream` (also
+resource page. It is drawn only while something moves (`caching`, `vaulting`,
+`vault_failed` with stored pieces) or when the content is complete; idle,
+unknown and waiting states show a hairline divider in the same 6px slot, so
+the header never jumps when a transfer starts or the seeder's stats channel
+closes. Review: `?debug_status=caching&debug_pieces=stream` (also
 `sparse`, `half`, `full`, `empty`).

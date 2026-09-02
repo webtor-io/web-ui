@@ -355,3 +355,26 @@ func TestResolveStatus_FullBarForSafeContent(t *testing.T) {
 		t.Error("idle must not pretend to know the pieces")
 	}
 }
+
+// The bar exists only while something moves or once the content is complete;
+// an idle seeder that knows its pieces draws nothing, and neither do the
+// states where nothing is known.
+func TestBarPolicy(t *testing.T) {
+	stats := &TorrentStatsData{Total: 100, Completed: 0, Seeders: 1, Fill: []byte{255, 0}, Active: []byte{0}}
+	if st := resolveStatus(nil, nil, stats); st.State != "idle" || st.Pieces != "" {
+		t.Errorf("idle with known pieces must not draw a bar: %+v", st)
+	}
+	stats.Completed = 10
+	if st := resolveStatus(nil, nil, stats); st.State != "caching" || st.Pieces == "" {
+		t.Errorf("caching must draw the bar: %+v", st)
+	}
+	db := &vaultModels.Resource{Funded: true}
+	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{0, 0}, Active: []byte{0}})
+	if waiting.State != "vault_waiting" || waiting.Pieces != "" {
+		t.Errorf("waiting for seeders must not draw a bar: %+v", waiting)
+	}
+	failed := resolveStatus(db, &vault.Resource{Status: vault.StatusFailed, StoredSize: 30, TotalSize: 100}, &TorrentStatsData{Total: 100, Completed: 30, Fill: []byte{255, 0}, Active: []byte{0}})
+	if failed.State != "vault_failed" || failed.Pieces == "" {
+		t.Errorf("a failed transfer with stored pieces keeps its bar: %+v", failed)
+	}
+}
