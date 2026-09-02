@@ -437,14 +437,14 @@ closes. Review: `?debug_status=caching&debug_pieces=stream` (also
 
 Partially cached content is not judged on sight. `judgeSwarm`
 (`handlers/resource/status.go`) watches the stream for `settleAfter` (5 s):
-progress or a queued piece at any moment → "Caching N% · speed"; until then,
-with no activity, the badge is a neutral "Checking activity… N%"; once the
-window has passed without activity, people around (seeders or peers) →
-"Caching paused N%" (amber, pause glyph — the seeder downloads on demand, so
-this means nobody is streaming it), nobody around → "No seeders · N%" (red,
-cross). A torrent can therefore open straight into paused or no-seeders after
-five seconds, and a piece boundary cannot flicker a live download into
-"paused". Review: `?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
+progress or a queued piece at any moment → "Caching N% · speed"; with no
+activity the badge stays a neutral "Checking activity… N%" until a verdict is
+earned: people around (seeders or peers) and 5 s quiet → "Caching paused N%"
+(amber, pause glyph — the seeder downloads on demand, so this means nobody is
+streaming it); nobody around for 30 s (`noSeedersAfter`) → "No seeders · N%"
+(red, cross). The long second window exists because a freshly started seeder
+pod sees an empty swarm for tens of seconds while it reaches trackers and the
+DHT. A piece boundary cannot flicker a live download into "paused". Review: `?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
 
 ### No seeders / stream reconnect
 
@@ -452,7 +452,9 @@ five seconds, and a piece boundary cannot flicker a live download into
 the swarm is empty, nothing can progress; it wins over "paused". A stats
 stream that closes mid-download (seeder pods are rotated on every deploy,
 closing every stream they held) is now reopened with backoff (2…32 s, five
-attempts, `shouldReconnect`) — but only while something was stored and not
-all of it, so an idle torrent never wakes a seeder pod. Meanwhile the last
+attempts, `shouldReconnect`) — but only while something was stored, not all
+of it, and bytes moved within the last minute: the seeder unloads idle
+torrents itself, and a stream that closes after a quiet spell is that, not an
+interruption — it falls back to idle instead of waking a pod for a badge. Meanwhile the last
 status stays on screen without speed or verdicts; after the retries the badge
 goes to "status unavailable". Review: `?debug_status=caching&progress=40&noseeders=1`.

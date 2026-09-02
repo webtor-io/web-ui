@@ -71,11 +71,16 @@ type TorrentStatus struct {
 	Checking bool `json:"checking,omitempty"`
 }
 
-// settleAfter is the observation window before any verdict on partially
-// cached content. A torrent can already be paused, or dead, the moment the
-// page opens; equally a piece boundary can make a live download look still
-// for a second. Five seconds of watching is what separates the three.
-const settleAfter = 5 * time.Second
+// settleAfter is the observation window before "paused": a piece boundary
+// can make a live download look still for a second; five seconds of no
+// progress with peers around is a pause. noSeedersAfter is the much longer
+// window before "no seeders": a seeder pod that has just started sees an
+// empty swarm for tens of seconds while it reaches trackers and the DHT, and
+// calling that "no seeders" at five seconds was simply wrong.
+const (
+	settleAfter    = 5 * time.Second
+	noSeedersAfter = 30 * time.Second
+)
 
 // swarmVerdict is the caching badge's face once the window has passed.
 type swarmVerdict int
@@ -90,31 +95,53 @@ const (
 // judgeSwarm is the whole decision, pure so it can be tested. observed is how
 // long we have watched this stream; activity is progress within settleAfter
 // or a piece queued for fetching; seeders/peers are the seeder's counts.
+//
+// With peers around and no activity: checking until settleAfter, paused
+// after. With nobody around and no activity: checking until noSeedersAfter,
+// no seeders after — the swarm gets time to appear before we say it is gone.
 func judgeSwarm(state string, observed time.Duration, activity bool, seeders, peers int) swarmVerdict {
-	if state != "caching" {
+	if state != "caching" || activity {
 		return verdictCaching
 	}
-	if activity {
-		return verdictCaching
+	if seeders == 0 && peers == 0 {
+		if observed < noSeedersAfter {
+			return verdictChecking
+		}
+		return verdictNoSeeders
 	}
 	if observed < settleAfter {
 		return verdictChecking
 	}
-	if seeders == 0 && peers == 0 {
-		return verdictNoSeeders
-	}
 	return verdictPaused
 }
 
+// recentActivity is how fresh the last progress must be for a closed stream
+// to count as "a download interrupted", not "a torrent the seeder unloaded".
+const recentActivity = 60 * time.Second
+
 // shouldReconnect decides whether a closed stats stream is worth reopening:
-// only while a download was actually in progress (something stored, not all
-// of it) and only a few times. Reopening for an idle torrent would start a
-// seeder pod nobody asked for — the reason the first attempt never retried.
-func shouldReconnect(stats *TorrentStatsData, attempts int) bool {
+// only while a download was actually in progress — something stored, not all
+// of it, and bytes moving within recentActivity — and only a few times. The
+// seeder unloads idle torrents on its own; a stream that closes after a quiet
+// spell is that, and reopening it would start a seeder pod nobody asked for
+// just to draw a badge. Such a torrent falls back to idle, as it always did.
+func shouldReconnect(stats *TorrentStatsData, attempts int, sinceProgress time.Duration) bool {
 	if stats == nil || attempts >= 5 {
 		return false
 	}
-	return stats.Completed > 0 && int64(stats.Completed) < stats.Total
+	if stats.Completed <= 0 || int64(stats.Completed) >= stats.Total {
+		return false
+	}
+	return sinceProgress >= 0 && sinceProgress < recentActivity
+}
+
+// sinceProgress is the age of the last observed progress, or -1 when none was
+// observed on this stream.
+func sinceProgress(lastProgressAt time.Time) time.Duration {
+	if lastProgressAt.IsZero() {
+		return -1
+	}
+	return time.Since(lastProgressAt)
 }
 
 // hasActive reports whether any bit of the active bucket bitset is set.
@@ -426,6 +453,8 @@ func (s *Handler) status(c *gin.Context) {
 			}
 			if status.Checking {
 				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.checking")
+				// No claims while checking: no swarm suffix either.
+				status.Swarm = ""
 			}
 			status.Swarm = swarmLabel(loc, status)
 			if status.PiecesTotal > 0 {
@@ -586,7 +615,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	vaultTick := 0
 
 	scheduleReconnect := func() {
-		if !shouldReconnect(lastStats, reconnects) {
+		if !shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
 			return
 		}
 		reconnects++
@@ -671,7 +700,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			if res.msg == "cached" {
 				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
 			} else if res.ch == nil {
-				if statsStale && shouldReconnect(lastStats, reconnects) {
+				if statsStale && shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
 					scheduleReconnect()
 				} else {
 					statsUnavailable = true
@@ -724,7 +753,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				// forget it only when there is nothing worth reconnecting for.
 				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")
 				statsCh = nil
-				if shouldReconnect(lastStats, reconnects) {
+				if shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
 					statsStale = true
 					scheduleReconnect()
 				} else {

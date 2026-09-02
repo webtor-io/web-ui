@@ -117,7 +117,8 @@ function renderBadge(status) {
     if (noSeeders) {
         label = `${label} · ${Math.round(status.progress)}%`;
     } else if (checking) {
-        label = `${label} ${Math.round(status.progress)}%`;
+        // Nothing but the label: no percent, no swarm — we are not claiming
+        // anything yet.
     } else if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
         label = `${label} ${Math.round(status.progress)}%`;
         // Swarm throughput, server-formatted ("2.3 MB/s"); absent when nothing moves.
@@ -125,9 +126,8 @@ function renderBadge(status) {
     }
     // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
     // server; empty for terminal states and when nothing is known.
-    if (status.swarm) {
-        // basis-full on phones: the swarm goes to its own line under the label.
-        peers = ` <span class="opacity-70 basis-full sm:basis-auto">(${status.swarm})</span>`;
+    if (status.swarm && !checking) {
+        peers = `<span class="opacity-70">(${status.swarm})</span>`;
     }
 
     // Built as a node, not a string: `detail` is the Vault API's error text
@@ -136,7 +136,8 @@ function renderBadge(status) {
     // constant markup; label and swarm are server-translated strings.
     const el = document.createElement('div');
     el.className = config.classes;
-    el.innerHTML = `${config.icon} ${label}${peers}`;
+    // Icon, then a text column (label / swarm) — see #torrent-status .badge-text.
+    el.innerHTML = `${config.icon}<span class="badge-text"><span>${label}</span>${peers}</span>`;
     if (status.state === 'vault_failed' && status.detail) {
         el.title = String(status.detail);
     }

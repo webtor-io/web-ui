@@ -419,7 +419,11 @@ func TestJudgeSwarm(t *testing.T) {
 		{"fresh stream but bytes moving", time.Second, true, 0, 0, verdictCaching},
 		{"settled, quiet, seeders around → paused", 6 * time.Second, false, 2, 4, verdictPaused},
 		{"settled, quiet, only peers → paused", 6 * time.Second, false, 0, 4, verdictPaused},
-		{"settled, quiet, nobody → no seeders", 6 * time.Second, false, 0, 0, verdictNoSeeders},
+		// A cold seeder pod sees nobody for tens of seconds while it reaches
+		// trackers and the DHT — still checking, not "no seeders".
+		{"6 s, quiet, nobody → still checking", 6 * time.Second, false, 0, 0, verdictChecking},
+		{"29 s, quiet, nobody → still checking", 29 * time.Second, false, 0, 0, verdictChecking},
+		{"31 s, quiet, nobody → no seeders", 31 * time.Second, false, 0, 0, verdictNoSeeders},
 		{"settled and moving → caching", 60 * time.Second, true, 1, 1, verdictCaching},
 	}
 	for _, c := range cases {
@@ -437,16 +441,25 @@ func TestJudgeSwarm(t *testing.T) {
 
 func TestReconnectPolicy(t *testing.T) {
 	inProgress := &TorrentStatsData{Total: 100, Completed: 40}
-	if !shouldReconnect(inProgress, 0) || !shouldReconnect(inProgress, 4) {
-		t.Error("a download in progress is worth reconnecting for")
+	fresh := 3 * time.Second
+	if !shouldReconnect(inProgress, 0, fresh) || !shouldReconnect(inProgress, 4, fresh) {
+		t.Error("a download interrupted mid-flight is worth reconnecting for")
 	}
-	if shouldReconnect(inProgress, 5) {
+	if shouldReconnect(inProgress, 5, fresh) {
 		t.Error("retries are bounded")
 	}
-	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 0}, 0) {
+	// The seeder unloads idle torrents itself: a stream that closes after a
+	// quiet spell, or with no progress ever seen, must not wake a pod.
+	if shouldReconnect(inProgress, 0, 2*time.Minute) || shouldReconnect(inProgress, 0, -1) {
+		t.Error("no recent activity: let it go idle instead of waking a seeder")
+	}
+	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 0}, 0, fresh) {
 		t.Error("nothing stored yet: do not wake a seeder for it")
 	}
-	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 100}, 0) || shouldReconnect(nil, 0) {
+	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 100}, 0, fresh) || shouldReconnect(nil, 0, fresh) {
 		t.Error("complete or unknown: nothing to reconnect for")
+	}
+	if sinceProgress(time.Time{}) != -1 {
+		t.Error("no progress observed reads as -1")
 	}
 }
