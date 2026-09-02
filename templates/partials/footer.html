@@ -8,7 +8,7 @@
             <nav class="flex flex-col gap-2">
                 <h6 class="footer-title text-w-muted">{{ t $.Lang "footer.tools" }}</h6>
                 {{ range tools }}{{ if not .Guide }}
-                    <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL whitespace-nowrap" href="{{ langPath $.Lang (printf "/%s" .Url) }}" data-async-target="main">{{ t $.Lang .Title }}</a>
+                    <a class="link link-hover text-sm text-w-sub hover:text-w-pinkL sm:whitespace-nowrap" href="{{ langPath $.Lang (printf "/%s" .Url) }}" data-async-target="main">{{ t $.Lang .Title }}</a>
                 {{ end }}{{ end }}
             </nav>
             <nav class="flex flex-col gap-2">

@@ -36,7 +36,7 @@
                     }
                 </script>
                 <div class="join w-full mb-3">
-                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.endpoint" }}</span>
+                    <span class="join-item hidden sm:flex sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.endpoint" }}</span>
                     <input readonly aria-label="{{ t $.Lang "profile.api.endpoint" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.API.Endpoint }}" />
                     <button type="button" onclick="copyApiValue(event, 'endpoint')" class="btn btn-soft join-item" data-umami-event="api-copy-endpoint">{{ t $.Lang "profile.api.copy" }}</button>
                 </div>
@@ -46,7 +46,7 @@
                      old key stops authenticating at once. */}}
                 <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/api-credentials/regenerate" }}" data-async-target="#api"
                       onsubmit="return confirm({{ t $.Lang "profile.api.regenerateWarning" | json }})" class="join w-full mb-4">
-                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.key" }}</span>
+                    <span class="join-item hidden sm:flex sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.api.key" }}</span>
                     <input id="api-key-input" type="password" readonly aria-label="{{ t $.Lang "profile.api.key" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.API.Key }}" />
                     <button type="button" onclick="toggleApiKey(event)" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.api.reveal" }}" aria-label="{{ t $.Lang "profile.api.reveal" }}">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

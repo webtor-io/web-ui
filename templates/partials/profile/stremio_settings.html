@@ -37,7 +37,7 @@
                             {{ t .Ctx.Lang "profile.settings.preferredLanguageDesc" }}
                         </p>
                     </div>
-                    <select name="preferred_language" class="select select-sm bg-base-300 border-w-line focus:border-w-pink focus:outline-none min-w-[12rem]">
+                    <select name="preferred_language" class="select select-sm bg-base-300 border-w-line focus:border-w-pink focus:outline-none min-w-0 w-full sm:w-auto sm:min-w-[12rem]">
                         <option value="" {{ if eq .Data.PreferredLanguage "" }}selected{{ end }}>{{ t .Ctx.Lang "profile.settings.preferredLanguageAny" }}</option>
                         {{ range stremioLanguages }}
                             <option value="{{ .Code }}" {{ if eq $.Data.PreferredLanguage .Code }}selected{{ end }}>{{ .Flag }} {{ .Name }}</option>

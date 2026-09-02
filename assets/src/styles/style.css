@@ -972,6 +972,16 @@ input:-webkit-autofill:focus {
    styling -- links in particular would otherwise be indistinguishable from
    the text around them. This gives those elements back just enough to read
    as a message in a list row, without a full prose stylesheet. */
+/* Inputs and selects inside a DaisyUI .join row: w-full on the field plus
+   flex-shrink:0 on the buttons made the row wider than its card on phones
+   (input min-content ≈ 20ch), and an unclipped card pushes the document past
+   the viewport — the mobile navbar got cut off. min-width:0 lets the field
+   shrink to whatever the buttons leave. */
+.join > .input,
+.join > .select {
+  min-width: 0;
+}
+
 .notification-body {
   p {
     @apply my-1;

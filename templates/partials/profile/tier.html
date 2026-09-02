@@ -47,7 +47,10 @@
             {{ if and $.Data.Billing.ManageURL (ne (.Claims | tierName) "free") }}
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-5 pt-4 border-t border-w-line/40 text-xs text-w-sub">
                 <span class="flex-1 leading-relaxed">{{ tp $.Lang "profile.billing.text" "Provider" $.Data.Billing.Provider }}</span>
-                <span class="flex items-center gap-3 shrink-0">
+                {{/* Mobile: a column with the button on top and the guide link under
+                     it; the row version only from sm — a fixed-width pair pushed the
+                     whole document wider than a 360px viewport. */}}
+                <span class="flex flex-col-reverse items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3 sm:shrink-0">
                     {{ if $.Data.Billing.CancelGuideURL }}
                     <a href="{{ $.Data.Billing.CancelGuideURL }}" target="_blank" rel="noopener" data-umami-event="profile-billing-cancel-guide" class="link link-hover text-w-muted hover:text-w-sub">{{ t $.Lang "profile.billing.cancelGuide" }}</a>
                     {{ end }}

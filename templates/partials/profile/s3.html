@@ -37,12 +37,12 @@
                     }
                 </script>
                 <div class="join w-full mb-3">
-                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.endpoint" }}</span>
+                    <span class="join-item hidden sm:flex sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.endpoint" }}</span>
                     <input readonly aria-label="{{ t $.Lang "profile.s3.endpoint" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.Endpoint }}" />
                     <button type="button" onclick="copyS3Value(event, 'endpoint')" class="btn btn-soft join-item" data-umami-event="s3-copy-endpoint">{{ t $.Lang "profile.s3.copy" }}</button>
                 </div>
                 <div class="join w-full mb-3">
-                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.accessKey" }}</span>
+                    <span class="join-item hidden sm:flex sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.accessKey" }}</span>
                     <input readonly aria-label="{{ t $.Lang "profile.s3.accessKey" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.AccessKey }}" />
                     <button type="button" onclick="copyS3Value(event, 'accessKey')" class="btn btn-soft join-item" data-umami-event="s3-copy-access-key">{{ t $.Lang "profile.s3.copy" }}</button>
                 </div>
@@ -52,7 +52,7 @@
                      stops authenticating, and the secret changes with the key. */}}
                 <form method="post" enctype="multipart/form-data" data-async-push-state="false" action="{{ langPath $.Lang "/s3-credentials/regenerate" }}" data-async-target="#s3"
                       onsubmit="return confirm({{ t $.Lang "profile.s3.regenerateWarning" | json }})" class="join w-full mb-4">
-                    <span class="join-item flex w-28 sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.secretKey" }}</span>
+                    <span class="join-item hidden sm:flex sm:w-36 shrink-0 items-center px-3 text-xs uppercase tracking-widest text-w-muted bg-base-300 border border-w-line border-r-0">{{ t $.Lang "profile.s3.secretKey" }}</span>
                     <input id="s3-secret-input" type="password" readonly aria-label="{{ t $.Lang "profile.s3.secretKey" }}" class="input bg-base-300 border-w-line w-full join-item" value="{{ .Data.S3.SecretKey }}" />
                     <button type="button" onclick="toggleS3Secret(event)" class="btn btn-soft join-item btn-square" title="{{ t $.Lang "profile.s3.reveal" }}" aria-label="{{ t $.Lang "profile.s3.reveal" }}">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
