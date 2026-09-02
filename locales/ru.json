@@ -436,15 +436,36 @@
     "resource.status.cached": "В кэше",
     "resource.status.vaulting": "Сохраняется",
     "resource.status.vaulted": "В Vault",
-    "resource.status.swarm": "{{.Seeders}} сидов · {{.Leechers}} личей",
-    "resource.status.peers": "{{.Peers}} пиров",
+    "resource.status.peers": {
+        "one": "{{.Count}} пир",
+        "few": "{{.Count}} пира",
+        "many": "{{.Count}} пиров",
+        "other": "{{.Count}} пира"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} сид",
+        "few": "{{.Count}} сида",
+        "many": "{{.Count}} сидов",
+        "other": "{{.Count}} сида"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} лич",
+        "few": "{{.Count}} лича",
+        "many": "{{.Count}} личей",
+        "other": "{{.Count}} лича"
+    },
     "resource.status.unknown": "Статус недоступен",
     "resource.status.unknownHint": "Не удалось получить статус торрента — о самой раздаче это ничего не говорит.",
     "resource.status.vault_failed": "Перенос не удался, повторяем",
     "resource.status.vault_failedHint": "Последняя попытка сохранить раздачу в Vault не прошла. Vault продолжает пробовать; ничего не потеряно.",
     "resource.status.vault_waiting": "Ждём сидов",
     "resource.status.vault_waitingHint": "Vault пока нечего скачивать — сидов онлайн нет. Он продолжает проверять и вернёт очки, если сиды не появятся.",
-    "resource.status.pieces": "{{.Done}} из {{.Total}} кусков на сервере",
+    "resource.status.pieces": {
+        "one": "{{.Done}} из {{.Total}} куска на сервере",
+        "few": "{{.Done}} из {{.Total}} кусков на сервере",
+        "many": "{{.Done}} из {{.Total}} кусков на сервере",
+        "other": "{{.Done}} из {{.Total}} кусков на сервере"
+    },
     "resource.preview": "Просмотр",
     "vault.supporting": "Сохранено в Vault",
     "vault.keepAvailable": "Сохранить в Vault",
@@ -518,7 +539,12 @@
     "action.noPeers.slowBody": "Скорость здесь задаёт раздача, а не тариф: немногие пиры онлайн отдают данные слишком медленно, чтобы начать воспроизведение.",
     "action.noPeers.timeoutTitle": "Данных для старта всё ещё недостаточно",
     "action.noPeers.timeoutBody": "Мы ждали всё время прогрева, но рой не отдал достаточно, чтобы начать. Через несколько минут может разогнаться — или у раздачи просто мало сидов.",
-    "action.noPeers.stats": "{{.Bytes}} получено от {{.Peers}} пиров за {{.Sec}} с",
+    "action.noPeers.stats": {
+        "one": "{{.Bytes}} получено от {{.Peers}} пира за {{.Sec}} с",
+        "few": "{{.Bytes}} получено от {{.Peers}} пиров за {{.Sec}} с",
+        "many": "{{.Bytes}} получено от {{.Peers}} пиров за {{.Sec}} с",
+        "other": "{{.Bytes}} получено от {{.Peers}} пиров за {{.Sec}} с"
+    },
     "action.noPeers.retry": "Попробовать ещё раз",
     "action.slow.title.rateLimited": "Не хватает скорости для плавного просмотра",
     "action.slow.title.bandwidth": "Скорость скачивания слишком низкая для стриминга",
@@ -588,8 +614,24 @@
     "job.warmingUp": "подготовка торрент-клиента",
     "job.downloading": "скачивание {{.Bytes}}",
     "job.waitingForPeers": "ожидание пиров",
-    "job.peers": "{{.Peers}} пиров",
-    "job.swarm": "{{.Seeders}} сидов · {{.Leechers}} личей",
+    "job.peers": {
+        "one": "{{.Count}} пир",
+        "few": "{{.Count}} пира",
+        "many": "{{.Count}} пиров",
+        "other": "{{.Count}} пира"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} сид",
+        "few": "{{.Count}} сида",
+        "many": "{{.Count}} сидов",
+        "other": "{{.Count}} сида"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} лич",
+        "few": "{{.Count}} лича",
+        "many": "{{.Count}} личей",
+        "other": "{{.Count}} лича"
+    },
     "job.swarmWaiting": "{{.Who}} · ждём данные, осталось {{.Left}} с",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/с · получено {{.Bytes}}",
     "toast.domainAdded": "Домен добавлен",

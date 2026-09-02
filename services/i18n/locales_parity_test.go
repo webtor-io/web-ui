@@ -24,7 +24,7 @@ func localeFiles(t *testing.T) map[string]map[string]string {
 		if err != nil {
 			t.Fatalf("read %s: %v", p, err)
 		}
-		var d map[string]string
+		var d map[string]any
 		if err := json.Unmarshal(b, &d); err != nil {
 			t.Fatalf("parse %s: %v", p, err)
 		}
@@ -33,7 +33,29 @@ func localeFiles(t *testing.T) map[string]map[string]string {
 			if strings.HasPrefix(k, "@") {
 				continue
 			}
-			msgs[k] = v
+			switch val := v.(type) {
+			case string:
+				msgs[k] = val
+			case map[string]any:
+				// A pluralised message: CLDR forms keyed one/few/many/other.
+				// Flattened to one string for the checks below; every form
+				// must be non-empty and "other" must exist, because go-i18n
+				// falls back to it for counts the language does not split.
+				if _, ok := val["other"]; !ok {
+					t.Errorf("%s: plural key %q has no \"other\" form", filepath.Base(p), k)
+				}
+				var parts []string
+				for form, fv := range val {
+					fs, _ := fv.(string)
+					if fs == "" {
+						t.Errorf("%s: plural key %q form %q is empty", filepath.Base(p), k, form)
+					}
+					parts = append(parts, form+"="+fs)
+				}
+				msgs[k] = strings.Join(parts, "|")
+			default:
+				t.Errorf("%s: key %q has unsupported value type %T", filepath.Base(p), k, v)
+			}
 		}
 		out[strings.TrimSuffix(filepath.Base(p), ".json")] = msgs
 	}

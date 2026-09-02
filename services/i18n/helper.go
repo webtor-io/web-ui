@@ -52,6 +52,24 @@ func TranslateWithLocalizer(loc *i18n.Localizer, key string) string {
 	return resolve(msg, err, key, "")
 }
 
+// TranslateWithLocalizerPlural translates a key whose message carries CLDR
+// plural forms ("one"/"few"/"many"/"other" objects in the locale file), picking
+// the form by count under the locale's own rules — "2 сида" and "5 сидов" are
+// different messages, and only the bundle knows which languages tell them
+// apart. count is also injected as Count for the template.
+func TranslateWithLocalizerPlural(loc *i18n.Localizer, key string, count int, data map[string]any) string {
+	if data == nil {
+		data = map[string]any{}
+	}
+	data["Count"] = count
+	msg, err := loc.Localize(&i18n.LocalizeConfig{
+		MessageID:    key,
+		PluralCount:  count,
+		TemplateData: data,
+	})
+	return resolve(msg, err, key, "")
+}
+
 // TranslateWithLocalizerData translates a parameterized key using the given
 // Localizer and template data. Use for messages like `{{.Bytes}}` / `{{.Peers}}`.
 // Falls back to the default language when the requested locale lacks the key,
@@ -107,6 +125,18 @@ func (h *Helper) Tp(lang string, key string, args ...any) string {
 		TemplateData: data,
 	})
 	return resolve(msg, err, key, lang)
+}
+
+// Tn translates a pluralised message: the count picks the CLDR form under the
+// language's rules and is available as {{.Count}}; further args are key/value
+// template data like Tp.
+// Template usage: {{ tn $.Lang "resource.status.seeders" .Seeders }}
+func (h *Helper) Tn(lang string, key string, count int, args ...any) string {
+	data := make(map[string]any, len(args)/2+1)
+	for i := 0; i+1 < len(args); i += 2 {
+		data[fmt.Sprintf("%v", args[i])] = args[i+1]
+	}
+	return TranslateWithLocalizerPlural(h.svc.Localizer(lang), key, count, data)
 }
 
 // TpHTML translates a message with template data and returns template.HTML (unescaped).

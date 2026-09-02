@@ -437,15 +437,28 @@
     "resource.status.cached": "In cache",
     "resource.status.vaulting": "Opslaan",
     "resource.status.vaulted": "In Vault",
-    "resource.status.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
-    "resource.status.peers": "{{.Peers}} peers",
+    "resource.status.peers": {
+        "one": "{{.Count}} peer",
+        "other": "{{.Count}} peers"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "resource.status.unknown": "Status niet beschikbaar",
     "resource.status.unknownHint": "De torrentstatus kon nu niet worden opgehaald — dat zegt niets over de torrent zelf.",
     "resource.status.vault_failed": "Overdracht mislukt, opnieuw proberen",
     "resource.status.vault_failedHint": "De laatste poging om deze torrent in Vault op te slaan is niet gelukt. Vault blijft het proberen; er is niets verloren.",
     "resource.status.vault_waiting": "Wachten op seeders",
     "resource.status.vault_waitingHint": "Vault heeft nog niets om van te downloaden — er is geen seeder online. Het blijft controleren en geeft je punten terug als er geen verschijnt.",
-    "resource.status.pieces": "{{.Done}} van {{.Total}} stukken op de server",
+    "resource.status.pieces": {
+        "one": "{{.Done}} van {{.Total}} stuk op de server",
+        "other": "{{.Done}} van {{.Total}} stukken op de server"
+    },
     "vault.supporting": "Opgeslagen in Vault",
     "vault.keepAvailable": "Opslaan in Vault",
     "vault.error": "Helaas kon je toezegging niet worden opgeslagen door een fout:",
@@ -518,7 +531,10 @@
     "action.noPeers.slowBody": "Hier bepaalt de zwerm het tempo, niet je abonnement: de paar peers online sturen te langzaam om het afspelen te starten.",
     "action.noPeers.timeoutTitle": "Nog steeds niet genoeg data om te starten",
     "action.noPeers.timeoutBody": "We hebben de volledige opwarmtijd gewacht en de zwerm leverde niet genoeg om te beginnen. Het kan over een paar minuten aantrekken — of deze torrent heeft simpelweg te weinig seeders.",
-    "action.noPeers.stats": "{{.Bytes}} ontvangen van {{.Peers}} peers in {{.Sec}} s",
+    "action.noPeers.stats": {
+        "one": "{{.Bytes}} ontvangen van {{.Peers}} peer in {{.Sec}} s",
+        "other": "{{.Bytes}} ontvangen van {{.Peers}} peers in {{.Sec}} s"
+    },
     "action.noPeers.retry": "Opnieuw proberen",
     "action.slow.title.rateLimited": "Onvoldoende snelheid voor soepel afspelen",
     "action.slow.title.bandwidth": "Downloadsnelheid te laag voor streamen",
@@ -588,8 +604,18 @@
     "job.warmingUp": "torrent-client opwarmen",
     "job.downloading": "{{.Bytes}} downloaden",
     "job.waitingForPeers": "wachten op peers",
-    "job.peers": "{{.Peers}} peers",
-    "job.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
+    "job.peers": {
+        "one": "{{.Count}} peer",
+        "other": "{{.Count}} peers"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "job.swarmWaiting": "{{.Who}} · wachten op data, nog {{.Left}} s",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} ontvangen",
     "toast.domainAdded": "Domein toegevoegd",

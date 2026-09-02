@@ -437,15 +437,36 @@
     "resource.status.cached": "W cache",
     "resource.status.vaulting": "Zapisywanie",
     "resource.status.vaulted": "W Vault",
-    "resource.status.swarm": "{{.Seeders}} seedów · {{.Leechers}} leecherów",
-    "resource.status.peers": "{{.Peers}} peerów",
+    "resource.status.peers": {
+        "one": "{{.Count}} peer",
+        "few": "{{.Count}} peery",
+        "many": "{{.Count}} peerów",
+        "other": "{{.Count}} peera"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seed",
+        "few": "{{.Count}} seedy",
+        "many": "{{.Count}} seedów",
+        "other": "{{.Count}} seeda"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "few": "{{.Count}} leechery",
+        "many": "{{.Count}} leecherów",
+        "other": "{{.Count}} leechera"
+    },
     "resource.status.unknown": "Status niedostępny",
     "resource.status.unknownHint": "Nie udało się pobrać statusu torrenta — nie mówi to nic o samym torrencie.",
     "resource.status.vault_failed": "Transfer nie powiódł się, próbujemy ponownie",
     "resource.status.vault_failedHint": "Ostatnia próba zapisania tego torrenta w Vault nie przeszła. Vault próbuje dalej; nic nie przepadło.",
     "resource.status.vault_waiting": "Czekamy na seedów",
     "resource.status.vault_waitingHint": "Vault nie ma jeszcze skąd pobierać — żaden seed nie jest online. Sprawdza dalej i zwróci Twoje punkty, jeśli żaden się nie pojawi.",
-    "resource.status.pieces": "{{.Done}} z {{.Total}} części na serwerze",
+    "resource.status.pieces": {
+        "one": "{{.Done}} z {{.Total}} części na serwerze",
+        "few": "{{.Done}} z {{.Total}} części na serwerze",
+        "many": "{{.Done}} z {{.Total}} części na serwerze",
+        "other": "{{.Done}} z {{.Total}} części na serwerze"
+    },
     "vault.supporting": "Zapisano w Vault",
     "vault.keepAvailable": "Zapisz w Vault",
     "vault.error": "Niestety, twojego zobowiązania nie udało się zapisać z powodu błędu:",
@@ -518,7 +539,12 @@
     "action.noPeers.slowBody": "Tempo narzuca tu rój, nie Twój plan: nieliczne peery online wysyłają dane zbyt wolno, by zacząć odtwarzanie.",
     "action.noPeers.timeoutTitle": "Nadal za mało danych, by zacząć",
     "action.noPeers.timeoutBody": "Odczekaliśmy cały czas rozgrzewki, a rój nie dostarczył dość, by zacząć. Może przyspieszyć za kilka minut — albo ten torrent ma po prostu mało seedów.",
-    "action.noPeers.stats": "Odebrano {{.Bytes}} od {{.Peers}} peerów w {{.Sec}} s",
+    "action.noPeers.stats": {
+        "one": "Odebrano {{.Bytes}} od {{.Peers}} peera w {{.Sec}} s",
+        "few": "Odebrano {{.Bytes}} od {{.Peers}} peerów w {{.Sec}} s",
+        "many": "Odebrano {{.Bytes}} od {{.Peers}} peerów w {{.Sec}} s",
+        "other": "Odebrano {{.Bytes}} od {{.Peers}} peera w {{.Sec}} s"
+    },
     "action.noPeers.retry": "Spróbuj ponownie",
     "action.slow.title.rateLimited": "Za mała prędkość dla płynnego odtwarzania",
     "action.slow.title.bandwidth": "Prędkość pobierania za niska do streamingu",
@@ -588,8 +614,24 @@
     "job.warmingUp": "rozgrzewanie klienta torrent",
     "job.downloading": "pobieranie {{.Bytes}}",
     "job.waitingForPeers": "oczekiwanie na peerów",
-    "job.peers": "{{.Peers}} peerów",
-    "job.swarm": "{{.Seeders}} seedów · {{.Leechers}} leecherów",
+    "job.peers": {
+        "one": "{{.Count}} peer",
+        "few": "{{.Count}} peery",
+        "many": "{{.Count}} peerów",
+        "other": "{{.Count}} peera"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seed",
+        "few": "{{.Count}} seedy",
+        "many": "{{.Count}} seedów",
+        "other": "{{.Count}} seeda"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "few": "{{.Count}} leechery",
+        "many": "{{.Count}} leecherów",
+        "other": "{{.Count}} leechera"
+    },
     "job.swarmWaiting": "{{.Who}} · czekamy na dane, pozostało {{.Left}} s",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · odebrano {{.Bytes}}",
     "toast.domainAdded": "Domena dodana",

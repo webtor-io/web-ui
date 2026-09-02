@@ -37,7 +37,7 @@
     </p>
 
     {{- if or (gt .Data.Peers 0) (gt .Data.BytesRaw 0) }}
-    <p class="text-xs text-w-muted mt-3 tabular-nums">{{ tp $.Lang "action.noPeers.stats" "Bytes" .Data.Bytes "Peers" .Data.Peers "Sec" .Data.ElapsedSec }}</p>
+    <p class="text-xs text-w-muted mt-3 tabular-nums">{{ tn $.Lang "action.noPeers.stats" .Data.Peers "Bytes" .Data.Bytes "Peers" .Data.Peers "Sec" .Data.ElapsedSec }}</p>
     {{- else if not $timeout }}
     <p class="text-xs text-w-muted mt-3">{{ t $.Lang "action.noPeers.altSearch" }}</p>
     {{- end }}

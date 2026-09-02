@@ -436,15 +436,28 @@
     "resource.status.cached": "Zwischengespeichert",
     "resource.status.vaulting": "Wird gespeichert",
     "resource.status.vaulted": "Im Vault",
-    "resource.status.swarm": "{{.Seeders}} Seeder · {{.Leechers}} Leecher",
-    "resource.status.peers": "{{.Peers}} Peers",
+    "resource.status.peers": {
+        "one": "{{.Count}} Peer",
+        "other": "{{.Count}} Peers"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} Seeder",
+        "other": "{{.Count}} Seeder"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} Leecher",
+        "other": "{{.Count}} Leecher"
+    },
     "resource.status.unknown": "Status nicht verfügbar",
     "resource.status.unknownHint": "Der Torrent-Status konnte gerade nicht abgerufen werden – über den Torrent selbst sagt das nichts.",
     "resource.status.vault_failed": "Übertragung fehlgeschlagen, neuer Versuch",
     "resource.status.vault_failedHint": "Der letzte Versuch, diesen Torrent im Vault zu speichern, ist nicht durchgegangen. Vault versucht es weiter; nichts ist verloren.",
     "resource.status.vault_waiting": "Warte auf Seeder",
     "resource.status.vault_waitingHint": "Vault hat noch keine Quelle – kein Seeder ist online. Es prüft weiter und gibt deine Punkte zurück, falls keiner erscheint.",
-    "resource.status.pieces": "{{.Done}} von {{.Total}} Teilen auf dem Server",
+    "resource.status.pieces": {
+        "one": "{{.Done}} von {{.Total}} Teil auf dem Server",
+        "other": "{{.Done}} von {{.Total}} Teilen auf dem Server"
+    },
     "resource.preview": "Vorschau",
     "vault.supporting": "Im Vault gespeichert",
     "vault.keepAvailable": "Im Vault speichern",
@@ -518,7 +531,10 @@
     "action.noPeers.slowBody": "Das Tempo bestimmt hier der Schwarm, nicht dein Tarif: die wenigen Peers online liefern zu langsam, um die Wiedergabe zu starten.",
     "action.noPeers.timeoutTitle": "Immer noch nicht genug Daten zum Starten",
     "action.noPeers.timeoutBody": "Wir haben die volle Aufwärmzeit gewartet, und der Schwarm hat nicht genug geliefert. In ein paar Minuten kann es anziehen – oder dieser Torrent hat einfach zu wenige Seeder.",
-    "action.noPeers.stats": "{{.Bytes}} von {{.Peers}} Peers in {{.Sec}} s empfangen",
+    "action.noPeers.stats": {
+        "one": "{{.Bytes}} von {{.Peers}} Peer in {{.Sec}} s empfangen",
+        "other": "{{.Bytes}} von {{.Peers}} Peers in {{.Sec}} s empfangen"
+    },
     "action.noPeers.retry": "Erneut versuchen",
     "action.slow.title.rateLimited": "Geschwindigkeit reicht für flüssige Wiedergabe nicht aus",
     "action.slow.title.bandwidth": "Download-Geschwindigkeit zu niedrig für Streaming",
@@ -588,8 +604,18 @@
     "job.warmingUp": "Torrent-Client wird vorbereitet",
     "job.downloading": "{{.Bytes}} wird heruntergeladen",
     "job.waitingForPeers": "Warte auf Peers",
-    "job.peers": "{{.Peers}} Peers",
-    "job.swarm": "{{.Seeders}} Seeder · {{.Leechers}} Leecher",
+    "job.peers": {
+        "one": "{{.Count}} Peer",
+        "other": "{{.Count}} Peers"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} Seeder",
+        "other": "{{.Count}} Seeder"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} Leecher",
+        "other": "{{.Count}} Leecher"
+    },
     "job.swarmWaiting": "{{.Who}} · warte auf Daten, noch {{.Left}} s",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} empfangen",
     "toast.domainAdded": "Domain hinzugefügt",

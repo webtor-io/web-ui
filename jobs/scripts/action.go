@@ -352,9 +352,9 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		for i := 0; i < 16 && ctx.Err() == nil; i++ {
 			var line string
 			if i < 8 {
-				line = formatSwarmLine(s.tp, 0, 0, 0, 0, 0, time.Duration(60-i*5)*time.Second)
+				line = formatSwarmLine(s.tp, s.tn, 0, 0, 0, 0, 0, time.Duration(60-i*5)*time.Second)
 			} else {
-				line = formatSwarmLine(s.tp, 2, 5, 7, int64(i-7)*40*1024, 40*1024, time.Duration(120-i*5)*time.Second)
+				line = formatSwarmLine(s.tp, s.tn, 2, 5, 7, int64(i-7)*40*1024, 40*1024, time.Duration(120-i*5)*time.Second)
 			}
 			j.StatusUpdate(line)
 			time.Sleep(time.Second)
@@ -1168,6 +1168,10 @@ func (s *ActionScript) tp(key string, data map[string]any) string {
 	return i18n.TranslateWithLocalizerData(s.i18n.Localizer(s.c.Lang), key, data)
 }
 
+func (s *ActionScript) tn(key string, count int, data map[string]any) string {
+	return i18n.TranslateWithLocalizerPlural(s.i18n.Localizer(s.c.Lang), key, count, data)
+}
+
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 	switch s.action {
 	case "download":
@@ -1375,17 +1379,22 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 // once anything has arrived; and while nothing has, the seconds left until the
 // no-peers verdict — so a silent swarm shows a countdown, not a frozen spinner.
 func (s *ActionScript) swarmLine(seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
-	return formatSwarmLine(s.tp, seeders, leechers, peers, bytes, speed, left)
+	return formatSwarmLine(s.tp, s.tn, seeders, leechers, peers, bytes, speed, left)
 }
 
-func formatSwarmLine(tp func(string, map[string]any) string, seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
-	var who string
-	switch {
-	case seeders > 0 || leechers > 0:
-		who = tp("job.swarm", map[string]any{"Seeders": seeders, "Leechers": leechers})
-	default:
-		who = tp("job.peers", map[string]any{"Peers": peers})
+type pluralFunc = func(key string, count int, data map[string]any) string
+
+// swarmWho is "N seeders · M leechers", each count declined on its own, or
+// "N peers" when the seeder reports no split.
+func swarmWho(tn pluralFunc, seeders, leechers, peers int, prefix string) string {
+	if seeders > 0 || leechers > 0 {
+		return tn(prefix+".seeders", seeders, nil) + " · " + tn(prefix+".leechers", leechers, nil)
 	}
+	return tn(prefix+".peers", peers, nil)
+}
+
+func formatSwarmLine(tp func(string, map[string]any) string, tn pluralFunc, seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
+	who := swarmWho(tn, seeders, leechers, peers, "job")
 	if bytes <= 0 {
 		if left > 0 {
 			return tp("job.swarmWaiting", map[string]any{"Who": who, "Left": int(left.Round(time.Second).Seconds())})

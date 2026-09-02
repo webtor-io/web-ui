@@ -437,15 +437,28 @@
     "resource.status.cached": "Önbelleğe alındı",
     "resource.status.vaulting": "Kaydediliyor",
     "resource.status.vaulted": "Vault'ta",
-    "resource.status.swarm": "{{.Seeders}} seeder · {{.Leechers}} leecher",
-    "resource.status.peers": "{{.Peers}} eş",
+    "resource.status.peers": {
+        "one": "{{.Count}} eş",
+        "other": "{{.Count}} eş"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeder"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leecher"
+    },
     "resource.status.unknown": "Durum alınamıyor",
     "resource.status.unknownHint": "Torrent durumu şu anda alınamadı — bu, torrentin kendisi hakkında bir şey söylemez.",
     "resource.status.vault_failed": "Aktarım başarısız, yeniden deneniyor",
     "resource.status.vault_failedHint": "Bu torrenti Vault'a kaydetme denemesi son kez başarısız oldu. Vault denemeye devam ediyor; hiçbir şey kaybolmadı.",
     "resource.status.vault_waiting": "Seeder bekleniyor",
     "resource.status.vault_waitingHint": "Vault'un henüz indirebileceği bir kaynak yok — çevrimiçi seeder yok. Kontrol etmeye devam eder ve hiç seeder çıkmazsa puanlarınızı geri verir.",
-    "resource.status.pieces": "Sunucuda {{.Total}} parçadan {{.Done}}",
+    "resource.status.pieces": {
+        "one": "Sunucuda {{.Total}} parçadan {{.Done}}",
+        "other": "Sunucuda {{.Total}} parçadan {{.Done}}"
+    },
     "vault.supporting": "Vault'a kaydedildi",
     "vault.keepAvailable": "Vault'a kaydet",
     "vault.error": "Maalesef, taahhüdün bir hata nedeniyle kaydedilemedi:",
@@ -518,7 +531,10 @@
     "action.noPeers.slowBody": "Burada hızı planınız değil sürü belirler: çevrimiçi birkaç eş, oynatmayı başlatmak için veriyi fazla yavaş gönderiyor.",
     "action.noPeers.timeoutTitle": "Başlamak için hâlâ yeterli veri yok",
     "action.noPeers.timeoutBody": "Tüm ısınma süresini bekledik ve sürü başlamaya yetecek kadar veri vermedi. Birkaç dakikada hızlanabilir — ya da bu torrentin seeder'ı az.",
-    "action.noPeers.stats": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı",
+    "action.noPeers.stats": {
+        "one": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı",
+        "other": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı"
+    },
     "action.noPeers.retry": "Tekrar dene",
     "action.slow.title.rateLimited": "Akıcı oynatma için hız yetersiz",
     "action.slow.title.bandwidth": "İndirme hızı yayın için çok düşük",
@@ -588,8 +604,18 @@
     "job.warmingUp": "torrent istemcisi ısıtılıyor",
     "job.downloading": "{{.Bytes}} indiriliyor",
     "job.waitingForPeers": "peer'ler bekleniyor",
-    "job.peers": "{{.Peers}} peer",
-    "job.swarm": "{{.Seeders}} seeder · {{.Leechers}} leecher",
+    "job.peers": {
+        "one": "{{.Count}} eş",
+        "other": "{{.Count}} eş"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeder"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leecher"
+    },
     "job.swarmWaiting": "{{.Who}} · veri bekleniyor, {{.Left}} s kaldı",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} alındı",
     "toast.domainAdded": "Alan adı eklendi",

@@ -23,9 +23,17 @@ func locales(t *testing.T) map[string]map[string]string {
 		if err != nil {
 			t.Fatalf("read %s: %v", p, err)
 		}
-		var d map[string]string
-		if err := json.Unmarshal(b, &d); err != nil {
+		// Plain strings only: pluralised keys are objects of CLDR forms and
+		// belong to the i18n parity test, not to the copy checks here.
+		var raw map[string]any
+		if err := json.Unmarshal(b, &raw); err != nil {
 			t.Fatalf("parse %s: %v", p, err)
+		}
+		d := make(map[string]string, len(raw))
+		for k, v := range raw {
+			if s, ok := v.(string); ok {
+				d[k] = s
+			}
 		}
 		out[strings.TrimSuffix(filepath.Base(p), ".json")] = d
 	}

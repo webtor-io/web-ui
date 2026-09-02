@@ -476,15 +476,28 @@
     "resource.status.vaulting": "Vaulting",
     "@resource.status.vaulting": "Torrent-state badge: the torrent is being transferred into Vault long-term storage (in-progress). Coined verb from the noun 'Vault' (brand). Keep Vault untranslated.",
     "resource.status.vaulted": "Vaulted",
-    "resource.status.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
-    "resource.status.peers": "{{.Peers}} peers",
+    "resource.status.peers": {
+        "one": "{{.Count}} peer",
+        "other": "{{.Count}} peers"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "resource.status.unknown": "Status unavailable",
     "resource.status.unknownHint": "Could not reach the torrent status right now — this says nothing about the torrent itself.",
     "resource.status.vault_failed": "Transfer failed, retrying",
     "resource.status.vault_failedHint": "The last attempt to store this torrent in Vault did not go through. Vault keeps retrying; nothing is lost.",
     "resource.status.vault_waiting": "Waiting for seeders",
     "resource.status.vault_waitingHint": "Vault has nothing to download from yet — no seeders are online. It keeps checking and returns your points if none appear.",
-    "resource.status.pieces": "{{.Done}} of {{.Total}} pieces on the server",
+    "resource.status.pieces": {
+        "one": "{{.Done}} of {{.Total}} piece on the server",
+        "other": "{{.Done}} of {{.Total}} pieces on the server"
+    },
     "@resource.status.vaulted": "Torrent-state badge: the torrent is stored in Vault and kept available indefinitely (as long as pledges back it). Adjective/state. Keep Vault untranslated.",
     "vault.supporting": "Saved to Vault",
     "vault.keepAvailable": "Save to Vault",
@@ -576,7 +589,10 @@
     "action.noPeers.slowBody": "The swarm sets the pace here, not your plan: the few peers online are sending data too slowly to start playback.",
     "action.noPeers.timeoutTitle": "Still not enough data to start",
     "action.noPeers.timeoutBody": "We waited the full warm-up time and the swarm did not deliver enough to begin. It may pick up in a few minutes — or this torrent is simply short on seeders.",
-    "action.noPeers.stats": "{{.Bytes}} received from {{.Peers}} peers in {{.Sec}} s",
+    "action.noPeers.stats": {
+        "one": "{{.Bytes}} received from {{.Peers}} peer in {{.Sec}} s",
+        "other": "{{.Bytes}} received from {{.Peers}} peers in {{.Sec}} s"
+    },
     "action.noPeers.retry": "Try again",
     "action.slow.title.rateLimited": "Not enough speed for smooth playback",
     "action.slow.title.bandwidth": "Download speed is too low for streaming",
@@ -646,8 +662,18 @@
     "job.warmingUp": "warming up torrent client",
     "job.downloading": "downloading {{.Bytes}}",
     "job.waitingForPeers": "waiting for peers",
-    "job.peers": "{{.Peers}} peers",
-    "job.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
+    "job.peers": {
+        "one": "{{.Count}} peer",
+        "other": "{{.Count}} peers"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "job.swarmWaiting": "{{.Who}} · waiting for data, {{.Left}} s left",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} received",
     "toast.domainAdded": "Domain added",

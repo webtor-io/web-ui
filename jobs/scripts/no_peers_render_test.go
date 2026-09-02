@@ -22,6 +22,7 @@ func TestNoPeersModalRenders(t *testing.T) {
 	tpl, err := template.New("no_peers.html").Funcs(template.FuncMap{
 		"t":        helper.T,
 		"tp":       helper.Tp,
+		"tn":       helper.Tn,
 		"langPath": func(lang, p string) string { return p },
 	}).ParseFiles("../../templates/views/action/errors/no_peers.html")
 	if err != nil {

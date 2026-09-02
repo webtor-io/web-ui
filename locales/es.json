@@ -436,15 +436,28 @@
     "resource.status.cached": "En caché",
     "resource.status.vaulting": "Guardando",
     "resource.status.vaulted": "En Vault",
-    "resource.status.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
-    "resource.status.peers": "{{.Peers}} pares",
+    "resource.status.peers": {
+        "one": "{{.Count}} par",
+        "other": "{{.Count}} pares"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "resource.status.unknown": "Estado no disponible",
     "resource.status.unknownHint": "No se pudo obtener el estado del torrent ahora mismo; esto no dice nada sobre el torrent en sí.",
     "resource.status.vault_failed": "Transferencia fallida, reintentando",
     "resource.status.vault_failedHint": "El último intento de guardar este torrent en Vault no salió bien. Vault sigue intentándolo; no se ha perdido nada.",
     "resource.status.vault_waiting": "Esperando seeders",
     "resource.status.vault_waitingHint": "Vault aún no tiene de dónde descargar: no hay seeders conectados. Sigue comprobando y devuelve tus puntos si no aparece ninguno.",
-    "resource.status.pieces": "{{.Done}} de {{.Total}} piezas en el servidor",
+    "resource.status.pieces": {
+        "one": "{{.Done}} de {{.Total}} pieza en el servidor",
+        "other": "{{.Done}} de {{.Total}} piezas en el servidor"
+    },
     "resource.preview": "Vista previa",
     "vault.supporting": "Guardado en Vault",
     "vault.keepAvailable": "Guardar en Vault",
@@ -518,7 +531,10 @@
     "action.noPeers.slowBody": "Aquí el ritmo lo marca el enjambre, no tu plan: los pocos pares conectados envían datos demasiado despacio para empezar la reproducción.",
     "action.noPeers.timeoutTitle": "Aún no hay datos suficientes para empezar",
     "action.noPeers.timeoutBody": "Esperamos todo el tiempo de calentamiento y el enjambre no entregó lo suficiente para empezar. Puede acelerarse en unos minutos, o este torrent simplemente tiene pocos seeders.",
-    "action.noPeers.stats": "{{.Bytes}} recibidos de {{.Peers}} pares en {{.Sec}} s",
+    "action.noPeers.stats": {
+        "one": "{{.Bytes}} recibidos de {{.Peers}} par en {{.Sec}} s",
+        "other": "{{.Bytes}} recibidos de {{.Peers}} pares en {{.Sec}} s"
+    },
     "action.noPeers.retry": "Intentar de nuevo",
     "action.slow.title.rateLimited": "Velocidad insuficiente para una reproducción fluida",
     "action.slow.title.bandwidth": "Velocidad de descarga demasiado baja para hacer streaming",
@@ -588,8 +604,18 @@
     "job.warmingUp": "preparando cliente torrent",
     "job.downloading": "descargando {{.Bytes}}",
     "job.waitingForPeers": "esperando pares",
-    "job.peers": "{{.Peers}} pares",
-    "job.swarm": "{{.Seeders}} seeders · {{.Leechers}} leechers",
+    "job.peers": {
+        "one": "{{.Count}} par",
+        "other": "{{.Count}} pares"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seeder",
+        "other": "{{.Count}} seeders"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "other": "{{.Count}} leechers"
+    },
     "job.swarmWaiting": "{{.Who}} · esperando datos, quedan {{.Left}} s",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} recibidos",
     "toast.domainAdded": "Dominio añadido",

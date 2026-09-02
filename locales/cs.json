@@ -437,15 +437,36 @@
     "resource.status.cached": "V keši",
     "resource.status.vaulting": "Ukládá se",
     "resource.status.vaulted": "Ve Vault",
-    "resource.status.swarm": "{{.Seeders}} seederů · {{.Leechers}} leecherů",
-    "resource.status.peers": "{{.Peers}} peerů",
+    "resource.status.peers": {
+        "one": "{{.Count}} peer",
+        "few": "{{.Count}} peeři",
+        "many": "{{.Count}} peerů",
+        "other": "{{.Count}} peerů"
+    },
+    "resource.status.seeders": {
+        "one": "{{.Count}} seeder",
+        "few": "{{.Count}} seedeři",
+        "many": "{{.Count}} seederů",
+        "other": "{{.Count}} seederů"
+    },
+    "resource.status.leechers": {
+        "one": "{{.Count}} leecher",
+        "few": "{{.Count}} leecheři",
+        "many": "{{.Count}} leecherů",
+        "other": "{{.Count}} leecherů"
+    },
     "resource.status.unknown": "Stav nedostupný",
     "resource.status.unknownHint": "Stav torrentu se teď nepodařilo získat — o samotném torrentu to nic neříká.",
     "resource.status.vault_failed": "Přenos selhal, zkoušíme znovu",
     "resource.status.vault_failedHint": "Poslední pokus uložit tento torrent do Vaultu neprošel. Vault to zkouší dál; nic se neztratilo.",
     "resource.status.vault_waiting": "Čekáme na seedery",
     "resource.status.vault_waitingHint": "Vault zatím nemá odkud stahovat — žádný seeder není online. Kontroluje dál a vrátí vaše body, pokud se žádný neobjeví.",
-    "resource.status.pieces": "{{.Done}} z {{.Total}} částí na serveru",
+    "resource.status.pieces": {
+        "one": "{{.Done}} z {{.Total}} části na serveru",
+        "few": "{{.Done}} z {{.Total}} částí na serveru",
+        "many": "{{.Done}} z {{.Total}} částí na serveru",
+        "other": "{{.Done}} z {{.Total}} částí na serveru"
+    },
     "vault.supporting": "Uloženo do Vault",
     "vault.keepAvailable": "Uložit do Vault",
     "vault.error": "Bohužel tvůj závazek nemohl být uložen kvůli chybě:",
@@ -518,7 +539,12 @@
     "action.noPeers.slowBody": "Tempo tu určuje roj, ne váš tarif: těch několik peerů online posílá data příliš pomalu, aby se přehrávání rozběhlo.",
     "action.noPeers.timeoutTitle": "Stále málo dat na start",
     "action.noPeers.timeoutBody": "Počkali jsme celou dobu zahřívání a roj nedodal dost na začátek. Za pár minut se může rozjet — nebo má tento torrent prostě málo seederů.",
-    "action.noPeers.stats": "Přijato {{.Bytes}} od {{.Peers}} peerů za {{.Sec}} s",
+    "action.noPeers.stats": {
+        "one": "Přijato {{.Bytes}} od {{.Peers}} peera za {{.Sec}} s",
+        "few": "Přijato {{.Bytes}} od {{.Peers}} peerů za {{.Sec}} s",
+        "many": "Přijato {{.Bytes}} od {{.Peers}} peerů za {{.Sec}} s",
+        "other": "Přijato {{.Bytes}} od {{.Peers}} peerů za {{.Sec}} s"
+    },
     "action.noPeers.retry": "Zkusit znovu",
     "action.slow.title.rateLimited": "Nedostatečná rychlost pro plynulé přehrávání",
     "action.slow.title.bandwidth": "Rychlost stahování je příliš nízká pro streamování",
@@ -588,8 +614,24 @@
     "job.warmingUp": "rozehřívám torrent klienta",
     "job.downloading": "stahuji {{.Bytes}}",
     "job.waitingForPeers": "čekám na peery",
-    "job.peers": "{{.Peers}} peerů",
-    "job.swarm": "{{.Seeders}} seederů · {{.Leechers}} leecherů",
+    "job.peers": {
+        "one": "{{.Count}} peer",
+        "few": "{{.Count}} peeři",
+        "many": "{{.Count}} peerů",
+        "other": "{{.Count}} peerů"
+    },
+    "job.seeders": {
+        "one": "{{.Count}} seeder",
+        "few": "{{.Count}} seedeři",
+        "many": "{{.Count}} seederů",
+        "other": "{{.Count}} seederů"
+    },
+    "job.leechers": {
+        "one": "{{.Count}} leecher",
+        "few": "{{.Count}} leecheři",
+        "many": "{{.Count}} leecherů",
+        "other": "{{.Count}} leecherů"
+    },
     "job.swarmWaiting": "{{.Who}} · čekáme na data, zbývá {{.Left}} s",
     "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · přijato {{.Bytes}}",
     "toast.domainAdded": "Doména přidána",

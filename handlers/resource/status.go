@@ -335,7 +335,7 @@ func (s *Handler) status(c *gin.Context) {
 			status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
 			status.Swarm = swarmLabel(loc, status)
 			if status.PiecesTotal > 0 {
-				status.PiecesLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.pieces", map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
+				status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
 			}
 			c.SSEvent("message", status)
 			return status.State != "vaulted"
@@ -353,9 +353,11 @@ func swarmLabel(loc *goi18n.Localizer, st *TorrentStatus) string {
 	}
 	switch {
 	case st.Seeders > 0 || st.Leechers > 0:
-		return i18n.TranslateWithLocalizerData(loc, "resource.status.swarm", map[string]any{"Seeders": st.Seeders, "Leechers": st.Leechers})
+		// Each count declined on its own: "2 сида · 5 личей".
+		return i18n.TranslateWithLocalizerPlural(loc, "resource.status.seeders", st.Seeders, nil) + " · " +
+			i18n.TranslateWithLocalizerPlural(loc, "resource.status.leechers", st.Leechers, nil)
 	case st.Peers > 0:
-		return i18n.TranslateWithLocalizerData(loc, "resource.status.peers", map[string]any{"Peers": st.Peers})
+		return i18n.TranslateWithLocalizerPlural(loc, "resource.status.peers", st.Peers, nil)
 	}
 	return ""
 }

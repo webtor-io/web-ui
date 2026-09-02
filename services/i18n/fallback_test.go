@@ -79,3 +79,25 @@ func TestMissingKeyFallsBackToEnglishNotTheKey(t *testing.T) {
 		t.Errorf("wholly unknown key in default lang: got %q, want the key back", got)
 	}
 }
+
+// Russian splits counts three ways; the plural helper must pick the form the
+// language's rules say, not the "other" form for everything.
+func TestPluralFormsFollowLanguageRules(t *testing.T) {
+	h := helperWith(t, map[string]string{
+		"en.json": `{"seeders": {"one": "{{.Count}} seeder", "other": "{{.Count}} seeders"}}`,
+		"ru.json": `{"seeders": {"one": "{{.Count}} сид", "few": "{{.Count}} сида", "many": "{{.Count}} сидов", "other": "{{.Count}} сида"}}`,
+	})
+	cases := []struct {
+		lang string
+		n    int
+		want string
+	}{
+		{"ru", 1, "1 сид"}, {"ru", 2, "2 сида"}, {"ru", 5, "5 сидов"}, {"ru", 21, "21 сид"}, {"ru", 12, "12 сидов"},
+		{"en", 1, "1 seeder"}, {"en", 2, "2 seeders"}, {"en", 0, "0 seeders"},
+	}
+	for _, c := range cases {
+		if got := h.Tn(c.lang, "seeders", c.n); got != c.want {
+			t.Errorf("%s %d: got %q, want %q", c.lang, c.n, got, c.want)
+		}
+	}
+}
