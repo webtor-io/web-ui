@@ -456,6 +456,7 @@
     "resource.status.cachingPausedHint": "Şu anda bunu kimse indirmiyor — biri izlemeye başlar başlamaz önbellekleme devam eder.",
     "resource.status.noSeeders": "Seeder yok",
     "resource.status.noSeedersHint": "Şu anda bu torrenti kimse paylaşmıyor; bir seeder çıkar çıkmaz önbellekleme devam eder.",
+    "resource.status.checking": "Etkinlik kontrol ediliyor…",
     "resource.status.vault_failed": "Aktarım başarısız, yeniden deneniyor",
     "resource.status.vault_failedHint": "Bu torrenti Vault'a kaydetme denemesi son kez başarısız oldu. Vault denemeye devam ediyor; hiçbir şey kaybolmadı.",
     "resource.status.vault_waiting": "Seeder bekleniyor",

@@ -456,6 +456,7 @@
     "resource.status.cachingPausedHint": "Niemand downloadt dit nu — het cachen gaat verder zodra iemand begint te kijken.",
     "resource.status.noSeeders": "Geen seeders",
     "resource.status.noSeedersHint": "Niemand deelt deze torrent nu; het cachen gaat verder zodra er een seeder is.",
+    "resource.status.checking": "Activiteit controleren…",
     "resource.status.vault_failed": "Overdracht mislukt, opnieuw proberen",
     "resource.status.vault_failedHint": "De laatste poging om deze torrent in Vault op te slaan is niet gelukt. Vault blijft het proberen; er is niets verloren.",
     "resource.status.vault_waiting": "Wachten op seeders",

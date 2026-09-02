@@ -462,6 +462,7 @@
     "resource.status.cachingPausedHint": "Teď to nikdo nestahuje — cache se rozjede, jakmile někdo začne sledovat.",
     "resource.status.noSeeders": "Žádní seedeři",
     "resource.status.noSeedersHint": "Tento torrent teď nikdo nesdílí; cache bude pokračovat, jakmile se objeví seeder.",
+    "resource.status.checking": "Kontrolujeme aktivitu…",
     "resource.status.vault_failed": "Přenos selhal, zkoušíme znovu",
     "resource.status.vault_failedHint": "Poslední pokus uložit tento torrent do Vaultu neprošel. Vault to zkouší dál; nic se neztratilo.",
     "resource.status.vault_waiting": "Čekáme na seedery",

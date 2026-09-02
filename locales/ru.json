@@ -461,6 +461,7 @@
     "resource.status.cachingPausedHint": "Сейчас это никто не скачивает — кэширование продолжится, как только кто-нибудь начнёт смотреть.",
     "resource.status.noSeeders": "Нет сидов",
     "resource.status.noSeedersHint": "Сейчас этот торрент никто не раздаёт; кэширование продолжится, как только появится сид.",
+    "resource.status.checking": "Проверяем активность…",
     "resource.status.vault_failed": "Перенос не удался, повторяем",
     "resource.status.vault_failedHint": "Последняя попытка сохранить раздачу в Vault не прошла. Vault продолжает пробовать; ничего не потеряно.",
     "resource.status.vault_waiting": "Ждём сидов",

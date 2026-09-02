@@ -402,28 +402,40 @@ func TestBarPolicy(t *testing.T) {
 	}
 }
 
-func TestCachingPaused(t *testing.T) {
-	if cachingPaused("caching", 4*time.Second, false) {
-		t.Error("too early to call it paused")
+// The verdict is earned, not assumed: nothing is said about partially cached
+// content for the first settleAfter unless activity proves it alive; after
+// that, people around means paused and nobody around means no seeders.
+func TestJudgeSwarm(t *testing.T) {
+	cases := []struct {
+		name     string
+		observed time.Duration
+		activity bool
+		seeders  int
+		peers    int
+		want     swarmVerdict
+	}{
+		{"fresh stream, quiet, seeders around", time.Second, false, 3, 5, verdictChecking},
+		{"fresh stream, quiet, empty swarm", time.Second, false, 0, 0, verdictChecking},
+		{"fresh stream but bytes moving", time.Second, true, 0, 0, verdictCaching},
+		{"settled, quiet, seeders around → paused", 6 * time.Second, false, 2, 4, verdictPaused},
+		{"settled, quiet, only peers → paused", 6 * time.Second, false, 0, 4, verdictPaused},
+		{"settled, quiet, nobody → no seeders", 6 * time.Second, false, 0, 0, verdictNoSeeders},
+		{"settled and moving → caching", 60 * time.Second, true, 1, 1, verdictCaching},
 	}
-	if !cachingPaused("caching", 6*time.Second, false) {
-		t.Error("no progress for pausedAfter and nothing queued → paused")
+	for _, c := range cases {
+		if got := judgeSwarm("caching", c.observed, c.activity, c.seeders, c.peers); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
 	}
-	if cachingPaused("caching", 60*time.Second, true) {
-		t.Error("a queued piece means someone is fetching — not paused")
-	}
-	if cachingPaused("vaulting", 60*time.Second, false) || cachingPaused("idle", 60*time.Second, false) {
-		t.Error("only caching pauses")
+	if judgeSwarm("vaulting", time.Minute, false, 0, 0) != verdictCaching || judgeSwarm("idle", time.Minute, false, 0, 0) != verdictCaching {
+		t.Error("only caching is judged")
 	}
 	if hasActive([]byte{0, 0}) || !hasActive([]byte{0, 4}) {
 		t.Error("hasActive bitset check")
 	}
 }
 
-func TestCachingNoSeedersAndReconnectPolicy(t *testing.T) {
-	if !cachingNoSeeders("caching", 0, 0) || cachingNoSeeders("caching", 0, 3) || cachingNoSeeders("caching", 2, 0) || cachingNoSeeders("idle", 0, 0) {
-		t.Error("no-seeders needs caching with zero seeders and zero peers")
-	}
+func TestReconnectPolicy(t *testing.T) {
 	inProgress := &TorrentStatsData{Total: 100, Completed: 40}
 	if !shouldReconnect(inProgress, 0) || !shouldReconnect(inProgress, 4) {
 		t.Error("a download in progress is worth reconnecting for")

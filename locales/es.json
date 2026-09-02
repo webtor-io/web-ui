@@ -455,6 +455,7 @@
     "resource.status.cachingPausedHint": "Nadie está descargando esto ahora mismo; la caché se reanuda en cuanto alguien empiece a ver.",
     "resource.status.noSeeders": "Sin seeders",
     "resource.status.noSeedersHint": "Nadie está compartiendo este torrent ahora; la caché continúa en cuanto aparezca un seeder.",
+    "resource.status.checking": "Comprobando actividad…",
     "resource.status.vault_failed": "Transferencia fallida, reintentando",
     "resource.status.vault_failedHint": "El último intento de guardar este torrent en Vault no salió bien. Vault sigue intentándolo; no se ha perdido nada.",
     "resource.status.vault_waiting": "Esperando seeders",

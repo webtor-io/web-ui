@@ -17,6 +17,10 @@ const BADGE_CONFIG = {
         classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>',
     },
+    caching_checking: {
+        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-sub gap-1.5 px-3 py-2',
+        icon: '<span class="loading loading-dots loading-xs"></span>',
+    },
     caching_noseeders: {
         classes: 'badge badge-sm bg-error/10 border-error/30 text-error gap-1.5 px-3 py-2',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
@@ -102,15 +106,18 @@ function renderLoading() {
 function renderBadge(status) {
     // Paused caching is the same state with a different face: amber, a pause
     // glyph, no throughput (there is none), and the server's "paused" label.
-    const noSeeders = status.state === 'caching' && status.no_seeders;
-    const paused = status.state === 'caching' && status.paused && !noSeeders;
-    const config = BADGE_CONFIG[noSeeders ? 'caching_noseeders' : paused ? 'caching_paused' : status.state];
+    const checking = status.state === 'caching' && status.checking;
+    const noSeeders = status.state === 'caching' && status.no_seeders && !checking;
+    const paused = status.state === 'caching' && status.paused && !noSeeders && !checking;
+    const config = BADGE_CONFIG[checking ? 'caching_checking' : noSeeders ? 'caching_noseeders' : paused ? 'caching_paused' : status.state];
     if (!config) return '';
 
     let label = status.label || '';
     let peers = '';
     if (noSeeders) {
         label = `${label} · ${Math.round(status.progress)}%`;
+    } else if (checking) {
+        label = `${label} ${Math.round(status.progress)}%`;
     } else if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
         label = `${label} ${Math.round(status.progress)}%`;
         // Swarm throughput, server-formatted ("2.3 MB/s"); absent when nothing moves.
@@ -162,7 +169,7 @@ av(async function() {
     // the SSE endpoint; the server ignores them in release mode.
     const dbg = new URLSearchParams(window.location.search);
     let extra = '';
-    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders']) {
+    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders', 'checking']) {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
     const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`);

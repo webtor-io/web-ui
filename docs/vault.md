@@ -433,14 +433,18 @@ the header never jumps when a transfer starts or the seeder's stats channel
 closes. Review: `?debug_status=caching&debug_pieces=stream` (also
 `sparse`, `half`, `full`, `empty`).
 
-### Caching paused
+### Caching: checking → caching / paused / no seeders
 
-`caching` with no verified bytes for 5 s and no piece queued (`cachingPaused`,
-`handlers/resource/status.go`) renders amber with a pause glyph: "Caching
-paused N%". The seeder downloads on demand, so this reads as "nobody is
-streaming this right now", not as a fault — the tooltip says so. The 1 s
-status ticker flips it back the moment bytes move. Review:
-`?debug_status=caching&progress=40&paused=1`.
+Partially cached content is not judged on sight. `judgeSwarm`
+(`handlers/resource/status.go`) watches the stream for `settleAfter` (5 s):
+progress or a queued piece at any moment → "Caching N% · speed"; until then,
+with no activity, the badge is a neutral "Checking activity… N%"; once the
+window has passed without activity, people around (seeders or peers) →
+"Caching paused N%" (amber, pause glyph — the seeder downloads on demand, so
+this means nobody is streaming it), nobody around → "No seeders · N%" (red,
+cross). A torrent can therefore open straight into paused or no-seeders after
+five seconds, and a piece boundary cannot flicker a live download into
+"paused". Review: `?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
 
 ### No seeders / stream reconnect
 

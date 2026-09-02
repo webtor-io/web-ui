@@ -462,6 +462,7 @@
     "resource.status.cachingPausedHint": "Nikt tego teraz nie pobiera — buforowanie ruszy, gdy ktoś zacznie oglądać.",
     "resource.status.noSeeders": "Brak seedów",
     "resource.status.noSeedersHint": "Nikt teraz nie udostępnia tego torrenta; buforowanie ruszy, gdy pojawi się seed.",
+    "resource.status.checking": "Sprawdzamy aktywność…",
     "resource.status.vault_failed": "Transfer nie powiódł się, próbujemy ponownie",
     "resource.status.vault_failedHint": "Ostatnia próba zapisania tego torrenta w Vault nie przeszła. Vault próbuje dalej; nic nie przepadło.",
     "resource.status.vault_waiting": "Czekamy na seedów",

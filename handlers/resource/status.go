@@ -64,24 +64,46 @@ type TorrentStatus struct {
 	// in the badge: an empty swarm is the fact that matters.
 	NoSeeders     bool   `json:"no_seeders,omitempty"`
 	NoSeedersHint string `json:"no_seeders_hint,omitempty"`
+	// Checking: caching with partial content, but we have watched the swarm
+	// for less than the settle window and seen no activity yet — too early to
+	// call it caching, paused or dead. The badge stays neutral until the
+	// verdict is earned.
+	Checking bool `json:"checking,omitempty"`
 }
 
-// pausedAfter is how long caching may show no progress before it reads as
-// paused. Shorter and a piece boundary flickers the badge; longer and the
-// user stares at a blue "Caching" that is doing nothing.
-const pausedAfter = 5 * time.Second
+// settleAfter is the observation window before any verdict on partially
+// cached content. A torrent can already be paused, or dead, the moment the
+// page opens; equally a piece boundary can make a live download look still
+// for a second. Five seconds of watching is what separates the three.
+const settleAfter = 5 * time.Second
 
-// cachingPaused decides the flag from what the loop knows: the state, when
-// verified bytes last grew, and whether any piece is queued for fetching.
-func cachingPaused(state string, sinceProgress time.Duration, activeBuckets bool) bool {
-	return state == "caching" && sinceProgress >= pausedAfter && !activeBuckets
-}
+// swarmVerdict is the caching badge's face once the window has passed.
+type swarmVerdict int
 
-// cachingNoSeeders: caching with an empty swarm. Seeders is the seeder's own
-// split; Peers is the combined count that older seeders report instead — both
-// must be zero before we call the swarm empty.
-func cachingNoSeeders(state string, seeders, peers int) bool {
-	return state == "caching" && seeders == 0 && peers == 0
+const (
+	verdictChecking  swarmVerdict = iota // window not over, no activity seen yet
+	verdictCaching                       // progress or queued pieces — alive
+	verdictPaused                        // no activity, but someone is around
+	verdictNoSeeders                     // no activity and an empty swarm
+)
+
+// judgeSwarm is the whole decision, pure so it can be tested. observed is how
+// long we have watched this stream; activity is progress within settleAfter
+// or a piece queued for fetching; seeders/peers are the seeder's counts.
+func judgeSwarm(state string, observed time.Duration, activity bool, seeders, peers int) swarmVerdict {
+	if state != "caching" {
+		return verdictCaching
+	}
+	if activity {
+		return verdictCaching
+	}
+	if observed < settleAfter {
+		return verdictChecking
+	}
+	if seeders == 0 && peers == 0 {
+		return verdictNoSeeders
+	}
+	return verdictPaused
 }
 
 // shouldReconnect decides whether a closed stats stream is worth reopening:
@@ -402,6 +424,9 @@ func (s *Handler) status(c *gin.Context) {
 				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.noSeeders")
 				status.NoSeedersHint = i18n.TranslateWithLocalizer(loc, "resource.status.noSeedersHint")
 			}
+			if status.Checking {
+				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.checking")
+			}
 			status.Swarm = swarmLabel(loc, status)
 			if status.PiecesTotal > 0 {
 				status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
@@ -453,7 +478,7 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
 	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
 	r, _ := strconv.ParseFloat(c.Query("rate"), 64)
-	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r, Paused: state == "caching" && c.Query("paused") == "1", NoSeeders: state == "caching" && c.Query("noseeders") == "1"}
+	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r, Paused: state == "caching" && c.Query("paused") == "1", NoSeeders: state == "caching" && c.Query("noseeders") == "1", Checking: state == "caching" && c.Query("checking") == "1"}
 	if fill, active, total := debugPieces(c.Query("debug_pieces")); fill != nil {
 		st.Pieces = base64.StdEncoding.EncodeToString(fill)
 		st.Active = base64.StdEncoding.EncodeToString(active)
@@ -525,7 +550,9 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	var pieces pieceMap
 	rate := ratemeter.New(0.4)
 	var lastCompleted int
-	lastProgressAt := time.Now()
+	// lastProgressAt is zero until Completed first grows on this stream;
+	// firstStatsAt starts the observation window.
+	var lastProgressAt, firstStatsAt time.Time
 	// statsStale: the stream closed and a reconnect is pending. The last
 	// known status keeps being shown (a frozen 51% beats a false "idle"),
 	// without speed and without the paused/no-seeders verdicts — we do not
@@ -580,13 +607,20 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			status.State = "unknown"
 			status.withBarPolicy()
 		}
-		if lastStats != nil && !statsStale {
-			status.NoSeeders = cachingNoSeeders(status.State, lastStats.Seeders, lastStats.Peers)
-			status.Paused = !status.NoSeeders && cachingPaused(status.State, time.Since(lastProgressAt), hasActive(lastStats.Active))
+		if lastStats != nil && !statsStale && !firstStatsAt.IsZero() {
+			activity := hasActive(lastStats.Active) || (!lastProgressAt.IsZero() && time.Since(lastProgressAt) < settleAfter)
+			switch judgeSwarm(status.State, time.Since(firstStatsAt), activity, lastStats.Seeders, lastStats.Peers) {
+			case verdictChecking:
+				status.Checking = true
+			case verdictPaused:
+				status.Paused = true
+			case verdictNoSeeders:
+				status.NoSeeders = true
+			}
 		}
 		// A speed that reads as zero is zero: paused means nothing moves, and
 		// below half a kilobyte the smoothed tail is noise, not throughput.
-		if statsStale || status.Paused || status.NoSeeders || status.Rate < 512 {
+		if statsStale || status.Paused || status.NoSeeders || status.Checking || status.Rate < 512 {
 			status.Rate = 0
 		}
 		data, _ := json.Marshal(status)
@@ -664,7 +698,10 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				// client would show.
 				now := time.Now()
 				rps := rate.Sample(int64(ev.Completed), now)
-				if ev.Completed != lastCompleted {
+				if firstStatsAt.IsZero() {
+					firstStatsAt = now
+					lastCompleted = ev.Completed
+				} else if ev.Completed != lastCompleted {
 					lastCompleted = ev.Completed
 					lastProgressAt = now
 				}
