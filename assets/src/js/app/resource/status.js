@@ -54,8 +54,17 @@ function renderBadge(status) {
         peers = ` <span class="opacity-70">(${status.swarm})</span>`;
     }
 
-    const title = status.state === 'vault_failed' && status.detail ? ` title="${String(status.detail).replace(/"/g, '&quot;')}"` : '';
-    return `<div class="${config.classes}"${title}>${config.icon} ${label}${peers}</div>`;
+    // Built as a node, not a string: `detail` is the Vault API's error text
+    // (arbitrary upstream content) and goes into the title attribute through
+    // the DOM property, which the serializer escapes properly. Icon is our
+    // constant markup; label and swarm are server-translated strings.
+    const el = document.createElement('div');
+    el.className = config.classes;
+    el.innerHTML = `${config.icon} ${label}${peers}`;
+    if (status.state === 'vault_failed' && status.detail) {
+        el.title = String(status.detail);
+    }
+    return el.outerHTML;
 }
 
 av(async function() {
