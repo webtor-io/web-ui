@@ -126,7 +126,8 @@ function renderBadge(status) {
     // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
     // server; empty for terminal states and when nothing is known.
     if (status.swarm) {
-        peers = ` <span class="opacity-70">(${status.swarm})</span>`;
+        // basis-full on phones: the swarm goes to its own line under the label.
+        peers = ` <span class="opacity-70 basis-full sm:basis-auto">(${status.swarm})</span>`;
     }
 
     // Built as a node, not a string: `detail` is the Vault API's error text

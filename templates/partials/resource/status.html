@@ -6,7 +6,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
     {{ t .Ctx.Lang "resource.status.idle" }}
-    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70 basis-full sm:basis-auto">({{ .Data.Swarm }})</span>{{ end }}
 </div>
 {{ else if and (eq .Data.State "caching") .Data.Checking }}
 <div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-sub gap-1.5 px-3 py-0.5">
@@ -26,7 +26,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
     </svg>
     {{ t .Ctx.Lang "resource.status.cachingPaused" }} {{ printf "%.0f" .Data.Progress }}%
-    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70 basis-full sm:basis-auto">({{ .Data.Swarm }})</span>{{ end }}
 </div>
 {{ else if eq .Data.State "caching" }}
 <div class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5 px-3 py-0.5">
@@ -34,7 +34,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
     </svg>
     {{ t .Ctx.Lang "resource.status.caching" }} {{ printf "%.0f" .Data.Progress }}%{{ if .Data.RateLabel }} · {{ .Data.RateLabel }}{{ end }}
-    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70 basis-full sm:basis-auto">({{ .Data.Swarm }})</span>{{ end }}
 </div>
 {{ else if eq .Data.State "cached" }}
 <div class="badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-0.5">
@@ -49,7 +49,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
     </svg>
     {{ t .Ctx.Lang "resource.status.vaulting" }} {{ printf "%.0f" .Data.Progress }}%{{ if .Data.RateLabel }} · {{ .Data.RateLabel }}{{ end }}
-    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70 basis-full sm:basis-auto">({{ .Data.Swarm }})</span>{{ end }}
 </div>
 {{ else if eq .Data.State "vault_waiting" }}
 <div class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.vault_waitingHint" }}">
@@ -64,7 +64,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
     </svg>
     {{ t .Ctx.Lang "resource.status.vault_failed" }}{{ if gt .Data.Progress 0.0 }} {{ printf "%.0f" .Data.Progress }}%{{ end }}
-    {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
+    {{ if .Data.Swarm }}<span class="opacity-70 basis-full sm:basis-auto">({{ .Data.Swarm }})</span>{{ end }}
 </div>
 {{ else if eq .Data.State "unknown" }}
 <div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.unknownHint" }}">

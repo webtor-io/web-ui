@@ -42,13 +42,15 @@ html {
    nowrap line, but "Caching 51% · 2.3 MB/s (4 seeders · 9 leechers)" does not
    fit a phone — let it wrap to two lines and grow instead of overflowing. */
 #torrent-status .badge {
-  white-space: normal;
+  flex-wrap: wrap;
   height: auto;
   min-height: 1.25rem;
   line-height: 1.3;
   text-align: left;
   @apply py-1;
 }
+/* On phones the swarm part "(4 seeders · 9 leechers)" takes the second line
+   (basis-full); from sm it sits back in the row (sm:basis-auto). */
 
 /* Piece bar (resource page, under the status badge): a grid of cells, one per
    bucket of torrent pieces. Colour comes from the container's text colour so
