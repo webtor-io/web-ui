@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
@@ -35,7 +36,21 @@ type TorrentStatus struct {
 	// Detail is the Vault API's own error text for vault_failed — technical,
 	// shown as a tooltip, never as the label.
 	Detail string `json:"detail,omitempty"`
+	// Pieces is the piece bar: PieceBuckets bytes, base64, one per bucket,
+	// 0..255 = share of the bucket's pieces the seeder holds. Active is a
+	// base64 bitset of buckets with pieces the seeder is fetching right now.
+	// Empty when nothing is known; a full bar for cached/vaulted content,
+	// which needs no seeder to be sure of.
+	Pieces      string `json:"pieces,omitempty"`
+	Active      string `json:"active,omitempty"`
+	PiecesDone  int    `json:"pieces_done,omitempty"`
+	PiecesTotal int    `json:"pieces_total,omitempty"`
+	PiecesLabel string `json:"pieces_label,omitempty"`
 }
+
+// PieceBuckets is the piece bar's resolution: enough cells for any screen,
+// ~350 bytes per update instead of a 10 000-piece array every second.
+const PieceBuckets = 256
 
 // TorrentStatsData holds the relevant fields from a torrent stats event.
 type TorrentStatsData struct {
@@ -44,14 +59,77 @@ type TorrentStatsData struct {
 	Seeders   int
 	Leechers  int
 	Peers     int
+	// Fill/Active are the bucketed piece map (see bucketPieces); nil when the
+	// event carried no pieces.
+	Fill   []byte
+	Active []byte
 }
 
-// withSwarm copies the swarm counters from a stats event onto a status.
+// withSwarm copies the swarm counters and the piece bar from a stats event
+// onto a status.
 func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 	if stats != nil {
 		t.Seeders, t.Leechers, t.Peers = stats.Seeders, stats.Leechers, stats.Peers
+		if len(stats.Fill) > 0 {
+			t.Pieces = base64.StdEncoding.EncodeToString(stats.Fill)
+			t.Active = base64.StdEncoding.EncodeToString(stats.Active)
+			t.PiecesDone = stats.Completed
+			t.PiecesTotal = int(stats.Total)
+		}
 	}
 	return t
+}
+
+// fullBar marks content that plays regardless of the swarm — cached or
+// vaulted — as a completely filled piece bar, so the bar can be shown without
+// asking a seeder anything.
+func (t *TorrentStatus) fullBar() *TorrentStatus {
+	if t.Pieces == "" {
+		full := make([]byte, PieceBuckets)
+		for i := range full {
+			full[i] = 255
+		}
+		t.Pieces = base64.StdEncoding.EncodeToString(full)
+	}
+	return t
+}
+
+// bucketPieces folds the seeder's per-piece list into PieceBuckets cells: the
+// fill is the share of complete pieces in the cell (0..255), the active bit
+// says the cell holds a piece with a raised priority that is not complete yet
+// — what a torrent client paints as "downloading". Torrents with fewer pieces
+// than buckets get one cell per piece.
+func bucketPieces(ev api.EventData) (fill, active []byte) {
+	n := len(ev.Pieces)
+	if n == 0 {
+		return nil, nil
+	}
+	cells := PieceBuckets
+	if n < cells {
+		cells = n
+	}
+	complete := make([]int, cells)
+	total := make([]int, cells)
+	active = make([]byte, (cells+7)/8)
+	for _, p := range ev.Pieces {
+		if p.Position < 0 || p.Position >= n {
+			continue
+		}
+		c := p.Position * cells / n
+		total[c]++
+		if p.Complete {
+			complete[c]++
+		} else if p.Priority > 0 {
+			active[c/8] |= 1 << uint(c%8)
+		}
+	}
+	fill = make([]byte, cells)
+	for c := range fill {
+		if total[c] > 0 {
+			fill[c] = byte(complete[c] * 255 / total[c])
+		}
+	}
+	return fill, active
 }
 
 // resolveStatus is a pure function that determines the combined torrent status
@@ -62,7 +140,7 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 	cachingState := resolveCachingState(stats)
 
 	if vaultState.State == "vaulted" {
-		return vaultState
+		return vaultState.fullBar()
 	}
 	if vaultState.State == "vaulting" || vaultState.State == "vault_failed" {
 		vaultState.withSwarm(stats)
@@ -75,7 +153,7 @@ func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource
 		return vaultState
 	}
 	if cachingState.State == "cached" {
-		return cachingState
+		return cachingState.fullBar()
 	}
 	if cachingState.State == "caching" {
 		return cachingState
@@ -200,6 +278,9 @@ func (s *Handler) status(c *gin.Context) {
 			loc := i18n.GetLocalizer(c)
 			status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
 			status.Swarm = swarmLabel(loc, status)
+			if status.PiecesTotal > 0 {
+				status.PiecesLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.pieces", map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
+			}
 			c.SSEvent("message", status)
 			return status.State != "vaulted"
 		}
@@ -241,7 +322,67 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 	}
 	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
 	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
-	return &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers")}
+	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers")}
+	if fill, active, total := debugPieces(c.Query("debug_pieces")); fill != nil {
+		st.Pieces = base64.StdEncoding.EncodeToString(fill)
+		st.Active = base64.StdEncoding.EncodeToString(active)
+		st.PiecesTotal = total
+		for _, f := range fill {
+			if f == 255 {
+				st.PiecesDone += total / len(fill)
+			}
+		}
+	}
+	return st
+}
+
+// debugPieces paints synthetic piece bars for the dev override:
+//
+//	stream — head and tail complete, a fetching window a third of the way in
+//	sparse — every fifth cell complete, the rest missing
+//	half   — first half complete, next cell fetching
+//	full   — everything complete
+//	empty  — nothing yet
+func debugPieces(pattern string) (fill, active []byte, total int) {
+	if pattern == "" {
+		return nil, nil, 0
+	}
+	fill = make([]byte, PieceBuckets)
+	active = make([]byte, PieceBuckets/8)
+	mark := func(i int) { active[i/8] |= 1 << uint(i%8) }
+	switch pattern {
+	case "stream":
+		for i := 0; i < 24; i++ {
+			fill[i] = 255
+		}
+		for i := PieceBuckets - 8; i < PieceBuckets; i++ {
+			fill[i] = 255
+		}
+		for i := 80; i < 96; i++ {
+			fill[i] = byte(255 - (i-80)*16)
+		}
+		for i := 96; i < 104; i++ {
+			mark(i)
+		}
+	case "sparse":
+		for i := 0; i < PieceBuckets; i += 5 {
+			fill[i] = 255
+		}
+	case "half":
+		for i := 0; i < PieceBuckets/2; i++ {
+			fill[i] = 255
+		}
+		mark(PieceBuckets / 2)
+		mark(PieceBuckets/2 + 1)
+	case "full":
+		for i := range fill {
+			fill[i] = 255
+		}
+	case "empty":
+	default:
+		return nil, nil, 0
+	}
+	return fill, active, PieceBuckets * 4
 }
 
 // statusLoop runs in a background goroutine, computing status updates and sending them to the channel.
@@ -336,12 +477,15 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case ev, ok := <-statsCh:
 			if ok {
+				fill, active := bucketPieces(ev)
 				lastStats = &TorrentStatsData{
 					Total:     ev.Total,
 					Completed: ev.Completed,
 					Seeders:   ev.Seeders,
 					Leechers:  ev.Leechers,
 					Peers:     ev.Peers,
+					Fill:      fill,
+					Active:    active,
 				}
 				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Info("status: got stats event")
 			} else {

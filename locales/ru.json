@@ -444,6 +444,8 @@
     "resource.status.vault_failedHint": "Последняя попытка сохранить раздачу в Vault не прошла. Vault продолжает пробовать; ничего не потеряно.",
     "resource.status.vault_waiting": "Ждём сидов",
     "resource.status.vault_waitingHint": "Vault пока нечего скачивать — сидов онлайн нет. Он продолжает проверять и вернёт очки, если сиды не появятся.",
+    "resource.status.pieces": "{{.Done}} из {{.Total}} кусков на сервере",
+    "resource.status.piecesFull": "Все куски на сервере",
     "resource.preview": "Просмотр",
     "vault.supporting": "Сохранено в Vault",
     "vault.keepAvailable": "Сохранить в Vault",

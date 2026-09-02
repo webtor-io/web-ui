@@ -484,6 +484,8 @@
     "resource.status.vault_failedHint": "The last attempt to store this torrent in Vault did not go through. Vault keeps retrying; nothing is lost.",
     "resource.status.vault_waiting": "Waiting for seeders",
     "resource.status.vault_waitingHint": "Vault has nothing to download from yet — no seeders are online. It keeps checking and returns your points if none appear.",
+    "resource.status.pieces": "{{.Done}} of {{.Total}} pieces on the server",
+    "resource.status.piecesFull": "All pieces on the server",
     "@resource.status.vaulted": "Torrent-state badge: the torrent is stored in Vault and kept available indefinitely (as long as pledges back it). Adjective/state. Keep Vault untranslated.",
     "vault.supporting": "Saved to Vault",
     "vault.keepAvailable": "Save to Vault",

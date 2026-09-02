@@ -38,6 +38,28 @@ html {
   @apply bg-base-300/50 border border-w-line rounded-2xl p-4 sm:p-6 mb-6;
 }
 
+/* Piece bar (resource page, under the status badge): a grid of cells, one per
+   bucket of torrent pieces. Colour comes from the container's text colour so
+   the bar follows the badge palette; --fill (0..1) on each cell is how much of
+   the bucket the seeder holds; .is-active pulses for cells being fetched. */
+.piece-bar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.piece-bar > span {
+  background: currentColor;
+  opacity: var(--fill, 0);
+}
+.piece-bar > span.is-active {
+  opacity: 0.45;
+  @apply animate-pulse;
+}
+
 .w-card-frame {
   background-color: #1a2235; /* w-card */
   border: 1px solid rgba(255, 255, 255, 0.07); /* w-line */

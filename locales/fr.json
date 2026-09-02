@@ -445,6 +445,8 @@
     "resource.status.vault_failedHint": "La dernière tentative d’enregistrer ce torrent dans Vault n’a pas abouti. Vault réessaie ; rien n’est perdu.",
     "resource.status.vault_waiting": "En attente de seeders",
     "resource.status.vault_waitingHint": "Vault n’a encore aucune source — aucun seeder en ligne. Il continue de vérifier et rend vos points si aucun n’apparaît.",
+    "resource.status.pieces": "{{.Done}} morceaux sur {{.Total}} sur le serveur",
+    "resource.status.piecesFull": "Tous les morceaux sur le serveur",
     "vault.supporting": "Enregistré dans Vault",
     "vault.keepAvailable": "Enregistrer dans Vault",
     "vault.error": "Malheureusement, votre engagement n'a pas pu être enregistré suite à une erreur :",

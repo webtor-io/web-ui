@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -287,5 +288,70 @@ func TestSwarmLabel(t *testing.T) {
 		if got := swarmLabel(loc, &c.st); got != c.want {
 			t.Errorf("%+v: got %q, want %q", c.st, got, c.want)
 		}
+	}
+}
+
+func TestBucketPieces(t *testing.T) {
+	var ev api.EventData
+	// 512 pieces → 256 cells of two pieces each. First cell complete, second
+	// half-complete, third has an active (fetching) piece, the rest empty.
+	for i := 0; i < 512; i++ {
+		p := struct {
+			Position int  `json:"position"`
+			Complete bool `json:"complete"`
+			Priority int  `json:"priority"`
+		}{Position: i}
+		switch {
+		case i < 2:
+			p.Complete = true
+		case i == 2:
+			p.Complete = true
+		case i == 4:
+			p.Priority = 1
+		}
+		ev.Pieces = append(ev.Pieces, p)
+	}
+	fill, active := bucketPieces(ev)
+	if len(fill) != PieceBuckets || len(active) != PieceBuckets/8 {
+		t.Fatalf("sizes: fill %d active %d", len(fill), len(active))
+	}
+	if fill[0] != 255 || fill[1] != 127 || fill[2] != 0 || fill[3] != 0 {
+		t.Errorf("fill: %v", fill[:4])
+	}
+	if active[0]&(1<<2) == 0 || active[0]&(1<<0) != 0 {
+		t.Errorf("active bits: %08b", active[0])
+	}
+
+	// Fewer pieces than buckets: one cell per piece.
+	small := api.EventData{}
+	for i := 0; i < 10; i++ {
+		small.Pieces = append(small.Pieces, struct {
+			Position int  `json:"position"`
+			Complete bool `json:"complete"`
+			Priority int  `json:"priority"`
+		}{Position: i, Complete: i%2 == 0})
+	}
+	fill, _ = bucketPieces(small)
+	if len(fill) != 10 || fill[0] != 255 || fill[1] != 0 {
+		t.Errorf("small torrent: %v", fill)
+	}
+	if f, _ := bucketPieces(api.EventData{}); f != nil {
+		t.Error("no pieces → no bar")
+	}
+}
+
+// Content that plays regardless of the swarm shows a full bar without a
+// seeder having been asked.
+func TestResolveStatus_FullBarForSafeContent(t *testing.T) {
+	vaulted := resolveStatus(&vaultModels.Resource{Funded: true, Vaulted: true}, nil, nil)
+	if vaulted.Pieces == "" {
+		t.Error("vaulted must carry a full bar")
+	}
+	cached := resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10})
+	if cached.State != "cached" || cached.Pieces == "" {
+		t.Errorf("cached must carry a full bar: %+v", cached)
+	}
+	if idle := resolveStatus(nil, nil, nil); idle.Pieces != "" {
+		t.Error("idle must not pretend to know the pieces")
 	}
 }

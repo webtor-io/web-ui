@@ -444,6 +444,8 @@
     "resource.status.vault_failedHint": "El último intento de guardar este torrent en Vault no salió bien. Vault sigue intentándolo; no se ha perdido nada.",
     "resource.status.vault_waiting": "Esperando seeders",
     "resource.status.vault_waitingHint": "Vault aún no tiene de dónde descargar: no hay seeders conectados. Sigue comprobando y devuelve tus puntos si no aparece ninguno.",
+    "resource.status.pieces": "{{.Done}} de {{.Total}} piezas en el servidor",
+    "resource.status.piecesFull": "Todas las piezas en el servidor",
     "resource.preview": "Vista previa",
     "vault.supporting": "Guardado en Vault",
     "vault.keepAvailable": "Guardar en Vault",

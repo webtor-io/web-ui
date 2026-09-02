@@ -417,3 +417,15 @@ Everything else is unchanged: queued/processing render as `vaulting`, the
 7-day transfer timeout (`VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD`) still ends
 in the reaper's letter. Review with `?debug_status=vault_waiting` /
 `?debug_status=vault_failed` on any resource page (dev-only).
+
+### Piece bar
+
+Under the badge the resource page paints the picture torrent clients do: 256
+cells, each the share of its pieces the seeder holds, pulsing where it is
+fetching. Data comes bucketed from the seeder's per-piece stats on the same
+status SSE (`handlers/resource/status.go` `bucketPieces`, ~350 bytes per
+update); no extra seeder wake-ups — the status SSE already opens the stats
+connection. Vaulted/cached content draws a full bar server-side without asking
+anyone. It is deliberately the whole torrent, not per file, and only on the
+resource page. Review: `?debug_status=caching&debug_pieces=stream` (also
+`sparse`, `half`, `full`, `empty`).

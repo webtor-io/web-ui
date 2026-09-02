@@ -35,6 +35,54 @@ const BADGE_CONFIG = {
     },
 };
 
+// Piece bar. Cells come base64-packed from the server (0..255 fill per cell,
+// plus a bitset of cells being fetched); the colour is the badge's, and the
+// whole thing is one grid of spans — cheap enough at 256 cells to rebuild on
+// every status message.
+const BAR_COLOR = {
+    cached: 'text-green-400',
+    vaulted: 'text-green-400',
+    vaulting: 'text-w-purpleL',
+    vault_waiting: 'text-w-purpleL',
+    vault_failed: 'text-w-purpleL',
+    caching: 'text-w-cyan',
+    idle: 'text-w-cyan',
+    unknown: 'text-w-cyan',
+};
+
+function decodeBytes(b64) {
+    try {
+        const bin = atob(b64);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+    } catch (e) {
+        return null;
+    }
+}
+
+function renderBar(status) {
+    if (!status.pieces) return '';
+    const fill = decodeBytes(status.pieces);
+    if (!fill || !fill.length) return '';
+    const active = status.active ? decodeBytes(status.active) : null;
+    const color = BAR_COLOR[status.state] || 'text-w-cyan';
+    const title = status.pieces_label || '';
+    let cells = '';
+    for (let i = 0; i < fill.length; i++) {
+        const isActive = active && (active[i >> 3] & (1 << (i & 7)));
+        cells += `<span style="--fill:${(fill[i] / 255).toFixed(2)}"${isActive ? ' class="is-active"' : ''}></span>`;
+    }
+    return `<div class="piece-bar ${color}" role="img" aria-label="${title}" title="${title}">${cells}</div>`;
+}
+
+function paintBars(resourceId, status) {
+    const html = renderBar(status);
+    document.querySelectorAll(`[data-piece-bar-for="${resourceId}"]`).forEach((host) => {
+        host.innerHTML = html;
+    });
+}
+
 function renderLoading() {
     return '<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2"><span class="loading loading-dots loading-xs"></span></div>';
 }
@@ -88,7 +136,7 @@ av(async function() {
     // the SSE endpoint; the server ignores them in release mode.
     const dbg = new URLSearchParams(window.location.search);
     let extra = '';
-    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress']) {
+    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces']) {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
     const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`);
@@ -98,6 +146,7 @@ av(async function() {
         try {
             const status = JSON.parse(e.data);
             badge.innerHTML = renderBadge(status);
+            paintBars(resourceId, status);
             if (status.state === 'vaulted') {
                 source.close();
                 container._statusSource = null;

@@ -63,3 +63,16 @@
 {{ end }}
 {{ end }}
 {{ end }}
+
+{{ define "resource/piece_bar" }}
+{{/* Piece bar under the status badge — the picture torrent clients paint:
+     which parts of the torrent the seeder holds (filled), is fetching (pulsing),
+     or lacks. Server-side only the full bar is drawn (cached/vaulted content
+     needs no seeder); everything else arrives over the same status SSE and is
+     painted by resource/status.js into every [data-piece-bar-for=<id>] host.
+     Colour follows the badge: green when the content is safe, purple while
+     Vault works, cyan while the seeder caches. */}}
+{{ if .Data }}{{ if or (eq .Data.State "vaulted") (eq .Data.State "cached") }}
+<div class="piece-bar {{ if eq .Data.State "vaulted" }}text-green-400{{ else }}text-w-cyan{{ end }}" role="img" aria-label="{{ t .Ctx.Lang "resource.status.piecesFull" }}" title="{{ t .Ctx.Lang "resource.status.piecesFull" }}"><span style="--fill:1"></span></div>
+{{ end }}{{ end }}
+{{ end }}
