@@ -30,6 +30,14 @@ html {
    Change here → both pages stay in sync.
    See docs/uikit.html section 7 "Video Card" for examples. */
 
+/* Settings/profile panel: the plain card every profile section sits in.
+   p-4 on phones, p-6 from sm — the same breathing room the resource page's
+   cards use, so a 360px viewport keeps 20px more for the content. One class
+   instead of the same 8-utility string repeated per partial. */
+.w-panel {
+  @apply bg-base-300/50 border border-w-line rounded-2xl p-4 sm:p-6 mb-6;
+}
+
 .w-card-frame {
   background-color: #1a2235; /* w-card */
   border: 1px solid rgba(255, 255, 255, 0.07); /* w-line */

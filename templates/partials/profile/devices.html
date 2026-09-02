@@ -1,6 +1,6 @@
 {{ define "profile/devices" }}
     {{ if .Data.Devices }}
-    <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
+    <div class="w-panel">
         <h2 class="text-[1.15rem] font-bold tracking-tight mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-w-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             {{ t $.Lang "profile.devices.title" }}
