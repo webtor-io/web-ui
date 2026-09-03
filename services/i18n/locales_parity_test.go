@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -112,6 +113,23 @@ func TestNoLocaleHasAnEmptyTranslation(t *testing.T) {
 		for k, v := range d {
 			if strings.TrimSpace(v) == "" {
 				t.Errorf("locales/%s.json: %s is empty", lang, k)
+			}
+		}
+	}
+}
+
+// breakableUnit matches a number (or a template placeholder) followed by a
+// plain space and an abbreviated unit. The rule (docs/i18n.md, "Numbers and
+// units"): that space is a no-break space, U+00A0, so "43 s" and "1.0 MB"
+// never split across lines on a phone. Whole words ("6 seeders") are not
+// units and may wrap.
+var breakableUnit = regexp.MustCompile(`(\}\}|[0-9]) (?:s|с|sn|sec|сек|дн\.|d\.|min|мин|h|ч|MB|GB|kB|KB|TB|МБ|ГБ|КБ|ТБ|Mbps|Mbit/s|Мбит/с|MB/s|Мб/с|Mo|Go|ko|Мбит)(?:$|[\s.,;:!?)\]<»"”])`)
+
+func TestUnitsFollowTheirNumberWithANoBreakSpace(t *testing.T) {
+	for lang, d := range localeFiles(t) {
+		for k, v := range d {
+			if m := breakableUnit.FindString(v); m != "" {
+				t.Errorf("locales/%s.json: %s has a breakable space before a unit (%q) — use U+00A0", lang, k, m)
 			}
 		}
 	}

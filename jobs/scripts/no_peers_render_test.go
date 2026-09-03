@@ -46,7 +46,7 @@ func TestNoPeersModalRenders(t *testing.T) {
 			d := base
 			d.Reason, d.Peers, d.Seeders, d.Leechers, d.Bytes, d.BytesRaw, d.ElapsedSec = "slow", 3, 1, 2, "340 KiB", 340*1024, 120
 			return d
-		}, []string{"crawling", "not your plan", "340 KiB", "from 3 peers", "in 120 s", "no-peers-retry", `reason: 'slow'`}, []string{"donate-no-peers", "another torrent"}},
+		}, []string{"crawling", "not your plan", "340 KiB", "from 3 peers", "in 120\u00a0s", "no-peers-retry", `reason: 'slow'`}, []string{"donate-no-peers", "another torrent"}},
 		{"timeout", func() NoPeersData { d := base; d.Reason = "timeout"; d.ElapsedSec = 180; return d },
 			[]string{"not enough data", "no-peers-retry", `reason: 'timeout'`}, []string{"donate-no-peers", "another torrent"}},
 	}
