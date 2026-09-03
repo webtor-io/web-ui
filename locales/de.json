@@ -522,7 +522,7 @@
     "action.download.copyUrl": "URL kopieren",
     "action.download.startDownload": "Download starten",
     "action.download.zipCrcWarning": "On-the-fly generierte ZIP-Archive enthalten keine CRC32-Prüfsummen pro Datei, daher zeigen manche Entpacker eine CRC-Warnung, obwohl die Dateien intakt sind. Wir empfehlen das Entpacken mit 7-Zip.",
-    "action.download.archiveNote": "Das Archiv wird während des Downloads erzeugt, daher gibt es auf unserer Seite keine Fortschrittsanzeige, und die Größe kann von der Summe der Dateien abweichen. Bricht der Download ab, setzen die wget/curl-Befehle unten dort fort.",
+    "action.download.archiveNote": "Das Archiv wird während des Downloads erzeugt, daher gibt es auf unserer Seite keine Fortschrittsanzeige, und die Größe kann von der Summe der Dateien abweichen. Bricht der Download ab, setzen die wget/curl-Befehle unten dort fort. Wenn dein Download-Manager die Verbindung nach ~30 s Stille trennt, erhöhe sein Timeout: bei einem langsamen Schwarm können die ersten Bytes einer Datei länger brauchen.",
     "action.download.downloadStarting": "Download startet...",
     "action.download.cancel": "abbrechen",
     "action.download.copied": "Kopiert!",

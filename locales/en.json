@@ -580,7 +580,7 @@
     "action.download.copyUrl": "copy url",
     "action.download.startDownload": "start download",
     "action.download.zipCrcWarning": "ZIP archives are generated on-the-fly and carry no per-file CRC32 checksums, so some unpackers may warn about CRC errors even though the files are intact. We recommend extracting with 7-Zip.",
-    "action.download.archiveNote": "The archive is built while it downloads, so there is no progress bar on our side and the size may differ from the sum of the files. If the download breaks, the wget/curl commands below resume where it stopped.",
+    "action.download.archiveNote": "The archive is built while it downloads, so there is no progress bar on our side and the size may differ from the sum of the files. If the download breaks, the wget/curl commands below resume where it stopped. If your download manager drops the connection after ~30 s of silence, raise its timeout: on a slow swarm the first bytes of a file can take longer than that.",
     "action.download.downloadStarting": "Download starting...",
     "action.download.cancel": "cancel",
     "action.download.copied": "Copied!",

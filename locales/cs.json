@@ -530,7 +530,7 @@
     "action.download.copyUrl": "kopírovat url",
     "action.download.startDownload": "spustit stahování",
     "action.download.zipCrcWarning": "ZIP archivy generované za běhu neobsahují kontrolní součty CRC32 jednotlivých souborů, takže některé nástroje mohou hlásit chyby CRC, i když jsou soubory v pořádku. Doporučujeme rozbalit pomocí 7-Zip.",
-    "action.download.archiveNote": "Archiv se sestavuje během stahování, takže na naší straně není ukazatel průběhu a velikost se může lišit od součtu souborů. Pokud se stahování přeruší, příkazy wget/curl níže naváží tam, kde skončilo.",
+    "action.download.archiveNote": "Archiv se sestavuje během stahování, takže na naší straně není ukazatel průběhu a velikost se může lišit od součtu souborů. Pokud se stahování přeruší, příkazy wget/curl níže naváží tam, kde skončilo. Pokud tvůj správce stahování ukončí spojení po ~30 s ticha, zvyš jeho časový limit: při pomalém roji mohou první bajty souboru dorazit později.",
     "action.download.downloadStarting": "Spouští se stahování...",
     "action.download.cancel": "zrušit",
     "action.download.copied": "Zkopírováno!",

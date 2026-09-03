@@ -522,7 +522,7 @@
     "action.download.copyUrl": "copia url",
     "action.download.startDownload": "avvia il download",
     "action.download.zipCrcWarning": "Gli archivi ZIP generati al volo non contengono checksum CRC32 per file, quindi alcuni estrattori possono segnalare errori CRC anche se i file sono integri. Consigliamo di estrarre con 7-Zip.",
-    "action.download.archiveNote": "L’archivio viene creato durante il download, quindi non c’è una barra di avanzamento dalla nostra parte e la dimensione può differire dalla somma dei file. Se il download si interrompe, i comandi wget/curl qui sotto riprendono da dove si è fermato.",
+    "action.download.archiveNote": "L’archivio viene creato durante il download, quindi non c’è una barra di avanzamento dalla nostra parte e la dimensione può differire dalla somma dei file. Se il download si interrompe, i comandi wget/curl qui sotto riprendono da dove si è fermato. Se il tuo download manager interrompe la connessione dopo ~30 s di silenzio, aumenta il suo timeout: con uno swarm lento i primi byte di un file possono arrivare più tardi.",
     "action.download.downloadStarting": "Avvio del download...",
     "action.download.cancel": "annulla",
     "action.download.copied": "Copiato!",

@@ -522,7 +522,7 @@
     "action.download.copyUrl": "copiar url",
     "action.download.startDownload": "iniciar descarga",
     "action.download.zipCrcWarning": "Los ZIP generados sobre la marcha no llevan checksums CRC32 por archivo, así que algunos descompresores pueden avisar de errores CRC aunque los archivos estén intactos. Recomendamos extraer con 7-Zip.",
-    "action.download.archiveNote": "El archivo se construye mientras se descarga, así que no hay barra de progreso por nuestra parte y el tamaño puede diferir de la suma de los archivos. Si la descarga se corta, los comandos wget/curl de abajo la reanudan donde se detuvo.",
+    "action.download.archiveNote": "El archivo se construye mientras se descarga, así que no hay barra de progreso por nuestra parte y el tamaño puede diferir de la suma de los archivos. Si la descarga se corta, los comandos wget/curl de abajo la reanudan donde se detuvo. Si tu gestor de descargas corta la conexión tras ~30 s de silencio, aumenta su tiempo de espera: con un enjambre lento los primeros bytes de un archivo pueden tardar más.",
     "action.download.downloadStarting": "Iniciando descarga...",
     "action.download.cancel": "cancelar",
     "action.download.copied": "¡Copiado!",

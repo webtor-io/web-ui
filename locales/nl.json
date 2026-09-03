@@ -522,7 +522,7 @@
     "action.download.copyUrl": "url kopiëren",
     "action.download.startDownload": "download starten",
     "action.download.zipCrcWarning": "On-the-fly gegenereerde ZIP-archieven bevatten geen CRC32-checksums per bestand, dus sommige uitpaktools kunnen CRC-fouten melden terwijl de bestanden intact zijn. We raden aan uit te pakken met 7-Zip.",
-    "action.download.archiveNote": "Het archief wordt tijdens het downloaden opgebouwd, dus er is aan onze kant geen voortgangsbalk en de grootte kan afwijken van de som van de bestanden. Breekt de download af, dan hervatten de wget/curl-opdrachten hieronder waar het stopte.",
+    "action.download.archiveNote": "Het archief wordt tijdens het downloaden opgebouwd, dus er is aan onze kant geen voortgangsbalk en de grootte kan afwijken van de som van de bestanden. Breekt de download af, dan hervatten de wget/curl-opdrachten hieronder waar het stopte. Als je downloadmanager de verbinding na ~30 s stilte verbreekt, verhoog dan de time-out: bij een trage swarm kunnen de eerste bytes van een bestand langer duren.",
     "action.download.downloadStarting": "Download wordt gestart...",
     "action.download.cancel": "annuleren",
     "action.download.copied": "Gekopieerd!",

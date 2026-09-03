@@ -530,7 +530,7 @@
     "action.download.copyUrl": "kopiuj url",
     "action.download.startDownload": "rozpocznij pobieranie",
     "action.download.zipCrcWarning": "Archiwa ZIP generowane w locie nie zawierają sum kontrolnych CRC32 dla plików, więc niektóre programy mogą ostrzegać o błędach CRC, mimo że pliki są całe. Zalecamy rozpakowanie przez 7-Zip.",
-    "action.download.archiveNote": "Archiwum jest budowane w trakcie pobierania, więc po naszej stronie nie ma paska postępu, a rozmiar może różnić się od sumy plików. Jeśli pobieranie się urwie, polecenia wget/curl poniżej wznowią je od miejsca przerwania.",
+    "action.download.archiveNote": "Archiwum jest budowane w trakcie pobierania, więc po naszej stronie nie ma paska postępu, a rozmiar może różnić się od sumy plików. Jeśli pobieranie się urwie, polecenia wget/curl poniżej wznowią je od miejsca przerwania. Jeśli menedżer pobierania zrywa połączenie po ~30 s ciszy, zwiększ jego limit czasu: przy wolnym roju pierwsze bajty pliku mogą nadejść później.",
     "action.download.downloadStarting": "Rozpoczynanie pobierania...",
     "action.download.cancel": "anuluj",
     "action.download.copied": "Skopiowano!",

@@ -522,7 +522,7 @@
     "action.download.copyUrl": "url'yi kopyala",
     "action.download.startDownload": "indirmeyi başlat",
     "action.download.zipCrcWarning": "Anlık oluşturulan ZIP arşivlerinde dosya başına CRC32 checksum bulunmaz; bu yüzden bazı açma araçları dosyalar sağlam olsa bile CRC hatası uyarısı verebilir. 7-Zip ile açmanızı öneririz.",
-    "action.download.archiveNote": "Arşiv indirme sırasında oluşturulur; bu yüzden bizim tarafta ilerleme çubuğu yok ve boyut dosyaların toplamından farklı olabilir. İndirme koparsa aşağıdaki wget/curl komutları kaldığı yerden devam eder.",
+    "action.download.archiveNote": "Arşiv indirme sırasında oluşturulur; bu yüzden bizim tarafta ilerleme çubuğu yok ve boyut dosyaların toplamından farklı olabilir. İndirme koparsa aşağıdaki wget/curl komutları kaldığı yerden devam eder. İndirme yöneticiniz ~30 sn sessizlikten sonra bağlantıyı kesiyorsa zaman aşımını artırın: yavaş bir sürüde bir dosyanın ilk baytları daha uzun sürebilir.",
     "action.download.downloadStarting": "İndirme başlıyor...",
     "action.download.cancel": "iptal",
     "action.download.copied": "Kopyalandı!",
