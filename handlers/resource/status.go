@@ -71,12 +71,15 @@ type TorrentStatus struct {
 	Checking bool `json:"checking,omitempty"`
 }
 
-// settleAfter is the observation window before "paused": a piece boundary
+// settleAfter is the observation window before any verdict: a piece boundary
 // can make a live download look still for a second; five seconds of no
-// progress with peers around is a pause. noSeedersAfter is the much longer
-// window before "no seeders": a seeder pod that has just started sees an
-// empty swarm for tens of seconds while it reaches trackers and the DHT, and
-// calling that "no seeders" at five seconds was simply wrong.
+// progress is a pause. noSeedersAfter is the much longer window before
+// "no seeders": a seeder pod that has just started sees an empty swarm for
+// tens of seconds while it reaches trackers and the DHT (16 s to the first
+// peer on a8386ee1, 2026-09-03), and calling that "no seeders" at five
+// seconds was simply wrong. Until then an idle torrent is what it looks like:
+// paused. The badge does not wait out the long window in "checking" — that
+// read as a stuck spinner.
 const (
 	settleAfter    = 5 * time.Second
 	noSeedersAfter = 30 * time.Second
@@ -88,29 +91,27 @@ type swarmVerdict int
 const (
 	verdictChecking  swarmVerdict = iota // window not over, no activity seen yet
 	verdictCaching                       // progress or queued pieces — alive
-	verdictPaused                        // no activity, but someone is around
-	verdictNoSeeders                     // no activity and an empty swarm
+	verdictPaused                        // no activity; nothing is moving
+	verdictNoSeeders                     // no activity and the swarm stayed empty
 )
 
 // judgeSwarm is the whole decision, pure so it can be tested. observed is how
 // long we have watched this stream; activity is progress within settleAfter
 // or a piece queued for fetching; seeders/peers are the seeder's counts.
 //
-// With peers around and no activity: checking until settleAfter, paused
-// after. With nobody around and no activity: checking until noSeedersAfter,
-// no seeders after — the swarm gets time to appear before we say it is gone.
+// Activity at any moment → caching. No activity: checking until settleAfter,
+// paused after — whoever is or is not around, nothing moves. Nobody around
+// for the whole of noSeedersAfter → no seeders: the swarm got its time to
+// appear before we say it is gone.
 func judgeSwarm(state string, observed time.Duration, activity bool, seeders, peers int) swarmVerdict {
 	if state != "caching" || activity {
 		return verdictCaching
 	}
-	if seeders == 0 && peers == 0 {
-		if observed < noSeedersAfter {
-			return verdictChecking
-		}
-		return verdictNoSeeders
-	}
 	if observed < settleAfter {
 		return verdictChecking
+	}
+	if seeders == 0 && peers == 0 && observed >= noSeedersAfter {
+		return verdictNoSeeders
 	}
 	return verdictPaused
 }
@@ -746,7 +747,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 					PiecesDone:  pieces.done(),
 					PiecesTotal: len(pieces.complete),
 				}
-				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Info("status: got stats event")
+				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Debug("status: got stats event")
 			} else {
 				// Stats channel closed — seeder gone or connection dropped.
 				// Keep the last status on screen while a reconnect is due;

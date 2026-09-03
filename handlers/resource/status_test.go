@@ -404,7 +404,8 @@ func TestBarPolicy(t *testing.T) {
 
 // The verdict is earned, not assumed: nothing is said about partially cached
 // content for the first settleAfter unless activity proves it alive; after
-// that, people around means paused and nobody around means no seeders.
+// that it is paused — nothing moves — and only a swarm that stayed empty for
+// the whole long window is called dead.
 func TestJudgeSwarm(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -420,10 +421,12 @@ func TestJudgeSwarm(t *testing.T) {
 		{"settled, quiet, seeders around → paused", 6 * time.Second, false, 2, 4, verdictPaused},
 		{"settled, quiet, only peers → paused", 6 * time.Second, false, 0, 4, verdictPaused},
 		// A cold seeder pod sees nobody for tens of seconds while it reaches
-		// trackers and the DHT — still checking, not "no seeders".
-		{"6 s, quiet, nobody → still checking", 6 * time.Second, false, 0, 0, verdictChecking},
-		{"29 s, quiet, nobody → still checking", 29 * time.Second, false, 0, 0, verdictChecking},
+		// trackers and the DHT — paused (nothing moves), not "no seeders",
+		// and not a spinner: checking ends at settleAfter whoever is around.
+		{"6 s, quiet, nobody → paused", 6 * time.Second, false, 0, 0, verdictPaused},
+		{"29 s, quiet, nobody → still paused", 29 * time.Second, false, 0, 0, verdictPaused},
 		{"31 s, quiet, nobody → no seeders", 31 * time.Second, false, 0, 0, verdictNoSeeders},
+		{"31 s, quiet, a peer showed up → paused", 31 * time.Second, false, 0, 1, verdictPaused},
 		{"settled and moving → caching", 60 * time.Second, true, 1, 1, verdictCaching},
 	}
 	for _, c := range cases {

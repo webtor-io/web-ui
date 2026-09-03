@@ -438,13 +438,17 @@ closes. Review: `?debug_status=caching&debug_pieces=stream` (also
 Partially cached content is not judged on sight. `judgeSwarm`
 (`handlers/resource/status.go`) watches the stream for `settleAfter` (5 s):
 progress or a queued piece at any moment → "Caching N% · speed"; with no
-activity the badge stays a neutral "Checking activity… N%" until a verdict is
-earned: people around (seeders or peers) and 5 s quiet → "Caching paused N%"
-(amber, pause glyph — the seeder downloads on demand, so this means nobody is
-streaming it); nobody around for 30 s (`noSeedersAfter`) → "No seeders · N%"
-(red, cross). The long second window exists because a freshly started seeder
-pod sees an empty swarm for tens of seconds while it reaches trackers and the
-DHT. A piece boundary cannot flicker a live download into "paused". Review: `?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
+activity the badge stays a neutral "Checking activity…" (no percent, no
+swarm) for those 5 s and then says "Caching paused N%" (amber, pause glyph —
+the seeder downloads on demand, so nothing moving means nobody is streaming
+it), whoever is or is not around. Only a swarm that stayed empty (no seeders,
+no peers) for the whole of `noSeedersAfter` (30 s) turns it red: "No seeders ·
+N%" (cross). The long window exists because a freshly started seeder pod sees
+an empty swarm for tens of seconds while it reaches trackers and the DHT —
+16 s to the first peer on a real torrent (2026-09-03) — and an earlier
+version kept the spinner for that whole window, which read as stuck. A piece
+boundary cannot flicker a live download into "paused". Review:
+`?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
 
 ### No seeders / stream reconnect
 
