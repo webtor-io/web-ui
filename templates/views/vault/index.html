@@ -81,7 +81,9 @@
               <col class="w-8">
               <col>
               <col class="w-24">
-              <col class="w-28">
+              {{/* Status: wide enough for the longest badge label on one line
+                   ("Caching paused", "Waiting for seeders"); badges never wrap. */}}
+              <col class="w-36 sm:w-44">
             </colgroup>
             <thead>
               <tr class="border-b border-w-line">
@@ -124,17 +126,17 @@
                   <td class="text-center">
                     {{ if not .Funded }}
                       <div class="flex flex-col items-center gap-0.5">
-                        <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
+                        <span class="badge badge-sm whitespace-nowrap bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
                         {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
                       </div>
                     {{ else if .ShowProgress }}
                       <span data-vault-progress-badge>
-                        <span class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
+                        <span class="badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
                           <span class="loading loading-dots loading-xs"></span>
                         </span>
                       </span>
                     {{ else }}
-                      <span class="badge badge-sm bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "vault.pledges.saved" }}</span>
+                      <span class="badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "vault.pledges.saved" }}</span>
                     {{ end }}
                   </td>
                 </tr>

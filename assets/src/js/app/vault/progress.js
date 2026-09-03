@@ -19,35 +19,38 @@ const MIN_VISIBLE_PCT = 2;
 // it flips to the right side of the gradient edge instead.
 const FLIP_PCT = 10;
 
+// whitespace-nowrap on every badge: the status column is narrow and a
+// two-word label ("Waiting for seeders", "Caching paused") must not fold
+// into two lines inside a fixed-height badge.
 const BADGE_CONFIG = {
     idle: {
-        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5',
+        classes: 'badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5',
         icon: '<span class="loading loading-dots loading-xs"></span>',
     },
     caching: {
-        classes: 'badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
+        classes: 'badge badge-sm whitespace-nowrap bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>',
     },
     cached: {
-        classes: 'badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
+        classes: 'badge badge-sm whitespace-nowrap bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
     },
     vaulting: {
         // no leading icon: the row gradient + first-cell pulse already signal progress
-        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
+        classes: 'badge badge-sm whitespace-nowrap bg-w-purple/10 border-w-purple/30 text-w-purpleL',
         icon: '',
     },
     vault_waiting: {
-        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL',
+        classes: 'badge badge-sm whitespace-nowrap bg-w-purple/10 border-w-purple/30 text-w-purpleL',
         icon: '',
     },
     vault_failed: {
-        classes: 'badge badge-sm bg-warning/10 border-warning/30 text-warning',
+        classes: 'badge badge-sm whitespace-nowrap bg-warning/10 border-warning/30 text-warning',
         icon: '',
     },
     vaulted: {
         // status column = torrent state only; frozen-ness lives on the VP cell
-        classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400',
+        classes: 'badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400',
         icon: '',
     },
 };
