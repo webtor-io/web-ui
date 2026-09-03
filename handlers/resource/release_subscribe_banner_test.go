@@ -12,12 +12,14 @@ import (
 )
 
 type fakeAiring struct {
-	airing bool
-	asked  string
+	airing      bool
+	asked       string
+	askedSeason int
 }
 
-func (f *fakeAiring) IsAiringSeries(_ context.Context, videoID string) bool {
+func (f *fakeAiring) IsAiringSeason(_ context.Context, videoID string, season int) bool {
 	f.asked = videoID
+	f.askedSeason = season
 	return f.airing
 }
 
@@ -65,8 +67,8 @@ func TestBannerOfferedForAnAiringSeason(t *testing.T) {
 	if b.Subscribed || b.Anonymous {
 		t.Errorf("state: subscribed=%v anonymous=%v, want the plain offer", b.Subscribed, b.Anonymous)
 	}
-	if airing.asked != "tt1190634" {
-		t.Errorf("airing check asked about %q", airing.asked)
+	if airing.asked != "tt1190634" || airing.askedSeason != 3 {
+		t.Errorf("airing check asked about %q season %d, want tt1190634 season 3 — the check is per season", airing.asked, airing.askedSeason)
 	}
 }
 

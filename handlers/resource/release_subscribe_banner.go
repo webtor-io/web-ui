@@ -30,10 +30,12 @@ type ReleaseSubscribeBanner struct {
 	Anonymous bool
 }
 
-// bannerAiring is the "is this series still producing episodes" capability,
+// bannerAiring is the "is this season still producing episodes" capability,
 // as an interface so the banner's rule can be tested without a TMDB cache.
+// Season-grained on purpose: a returning series has finished seasons behind
+// it, and the banner names the torrent's season.
 type bannerAiring interface {
-	IsAiringSeries(ctx context.Context, videoID string) bool
+	IsAiringSeason(ctx context.Context, videoID string, season int) bool
 }
 
 // bannerSubs answers "does this viewer already follow this season".
@@ -58,8 +60,8 @@ func (s pgBannerSubs) Find(ctx context.Context, userID uuid.UUID, videoID string
 // Three things have to hold: the torrent maps to a series we have metadata
 // for, the torrent is about one identifiable season, and that series is
 // still in production. The last one goes through the Enricher's
-// mapper-agnostic AiringChecker capability — this layer never reads TMDB's
-// `status` itself.
+// mapper-agnostic SeasonAiringChecker capability — this layer never reads
+// TMDB's `status` or episode stubs itself.
 //
 // Everything here comes from the local enrichment cache, so it costs the
 // page no external call.
@@ -73,7 +75,7 @@ func prepareReleaseSubscribeBanner(ctx context.Context, airing bannerAiring, sub
 		// subscription: the poller would not know what to ask for.
 		return nil
 	}
-	if !airing.IsAiringSeries(ctx, series.SeriesMetadata.VideoID) {
+	if !airing.IsAiringSeason(ctx, series.SeriesMetadata.VideoID, season) {
 		return nil
 	}
 

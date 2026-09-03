@@ -446,3 +446,18 @@ JS-тесты запускаются `npm test` — это `node --test` без 
 - **FAQ на главной** — `about.faq.releaseSubs.*`, добавлен в оба варианта `faqSchema` в `templates/partials/about.html`.
 - Кандидаты в weekly-мониторинг claudeclaw (`seo/serp-core.txt`, меняет только owner): `torrent rss feed|2840|en`, `sonarr alternative|2840|en`.
 - Не сделано сознательно: RU-лендинг (спрос ≈0 через KZ-прокси), таргет «tv show tracker» (SERP съеден одноимённым сериалом).
+
+### Сезонная проверка эфира (2026-09-03)
+
+Баннер на странице раздачи и правило `checkEligible` спрашивают **сезон**, а не
+сериал: `Enricher.IsAiringSeason(videoID, season)` через capability
+`SeasonAiringChecker`. TMDB отвечает из локального кэша `metadata`: сезон «ещё
+выходит», если `next_episode_to_air.season_number == season`, либо сериал в
+производстве (`status = Returning Series` / `in_production`) и сезон больше
+`last_episode_to_air.season_number` (анонсированный сезон). Причина: Silo S01
+показывал «сезон ещё выходит», потому что серийная проверка видела Returning
+Series из-за S03 в производстве. Серийная `IsAiringSeriesChecked` остаётся у
+поллера для закрытия подписок на завершённые сериалы — после финала сезона
+новые рипы ещё появляются, и закрывать подписку по сезону рано. Правило
+сезона — чистая функция `seasonAiring` в `services/enrich/tmdb.go` с табличным
+тестом. Ни баннер, ни сервис подписок полей TMDB не читают.

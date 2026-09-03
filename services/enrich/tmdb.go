@@ -637,9 +637,79 @@ func (s *TMDB) IsAiring(ctx context.Context, videoID string) (bool, error) {
 	return false, nil
 }
 
+// IsSeasonAiring answers for one season off the same cached metadata as
+// IsAiring: TMDB's `next_episode_to_air` / `last_episode_to_air` carry a
+// season_number. No external call; an uncached row reads as "not airing".
+func (s *TMDB) IsSeasonAiring(ctx context.Context, videoID string, season int) (bool, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return false, nil
+	}
+	info, err := tm.GetInfoByIMDBID(ctx, db, videoID)
+	if err != nil {
+		return false, err
+	}
+	if info == nil || info.Metadata == nil {
+		return false, nil
+	}
+	return seasonAiring(info.Metadata, season), nil
+}
+
+// seasonAiring is the whole rule, pure so it can be tested against metadata
+// shapes. A season is still producing episodes when TMDB's next episode to
+// air belongs to it, or when the series is still in production and the
+// season lies beyond the last episode that aired — an announced season
+// nothing has aired for yet. A season at or before the last aired one with
+// no next episode scheduled inside it is finished, whatever the series
+// status says.
+func seasonAiring(meta map[string]any, season int) bool {
+	if season <= 0 {
+		return false
+	}
+	if n, ok := episodeSeason(meta["next_episode_to_air"]); ok {
+		return n == season
+	}
+	seriesAiring := false
+	if v, ok := meta["status"].(string); ok && v == "Returning Series" {
+		seriesAiring = true
+	}
+	if v, ok := meta["in_production"].(bool); ok && v {
+		seriesAiring = true
+	}
+	if !seriesAiring {
+		return false
+	}
+	last, ok := episodeSeason(meta["last_episode_to_air"])
+	if !ok {
+		// Still producing, but nothing tells us which season: keep the
+		// series-level answer rather than hide every banner.
+		return true
+	}
+	return season > last
+}
+
+// episodeSeason reads season_number off a TMDB episode stub (JSON numbers
+// decode as float64; a nil or absent stub answers !ok).
+func episodeSeason(v any) (int, bool) {
+	ep, ok := v.(map[string]any)
+	if !ok || ep == nil {
+		return 0, false
+	}
+	switch n := ep["season_number"].(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	}
+	return 0, false
+}
+
 var _ MetadataMapper = (*TMDB)(nil)
 var _ DirectMapper = (*TMDB)(nil)
 var _ PopularProvider = (*TMDB)(nil)
 var _ LocalizableMapper = (*TMDB)(nil)
 var _ AiringChecker = (*TMDB)(nil)
+var _ SeasonAiringChecker = (*TMDB)(nil)
 var _ ReviewsProvider = (*TMDB)(nil)

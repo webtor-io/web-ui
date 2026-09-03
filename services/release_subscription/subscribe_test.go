@@ -126,7 +126,7 @@ func (m *subMail) SendSubscriptionOff(_ string, _ uuid.UUID, sub notification.Su
 
 type subAiring struct{ airing bool }
 
-func (f subAiring) IsAiringSeries(context.Context, string) bool { return f.airing }
+func (f subAiring) IsAiringSeason(context.Context, string, int) bool { return f.airing }
 
 // The poller's checked variant — the e2e scenario hands the same fake to
 // both halves of the feature.

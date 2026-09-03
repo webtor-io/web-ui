@@ -64,7 +64,7 @@ type Mailer interface {
 // the Enricher's AiringChecker facade, behind an interface so the
 // eligibility rule can be tested without a TMDB cache.
 type airingCheck interface {
-	IsAiringSeries(ctx context.Context, videoID string) bool
+	IsAiringSeason(ctx context.Context, videoID string, season int) bool
 }
 
 // metadataLookup fills the title/poster snapshot a profile row and an email
@@ -156,7 +156,11 @@ func (s *Service) Subscribe(ctx context.Context, u *auth.User, req Request, limi
 		return nil, false, ErrNoStreamSources
 	}
 
-	if err := s.checkEligible(ctx, kind, videoID); err != nil {
+	seasonNo := 0
+	if season != nil {
+		seasonNo = int(*season)
+	}
+	if err := s.checkEligible(ctx, kind, videoID, seasonNo); err != nil {
 		return nil, false, err
 	}
 
@@ -391,7 +395,7 @@ func (s *Service) view(ctx context.Context, sub *models.ReleaseSubscription) not
 // checkEligible is the one rule that decides whether a subscription makes
 // sense.
 //
-// For a season it is "is this series still producing episodes" — the same
+// For a season it is "is this season still producing episodes" — the same
 // AiringChecker capability the resource page has used since the fake-door.
 // A season of a finished series has no next episode, so a subscription to it
 // would poll forever and never fire.
@@ -399,7 +403,7 @@ func (s *Service) view(ctx context.Context, sub *models.ReleaseSubscription) not
 // A movie is always eligible: the entry point is a search that found
 // nothing, and no local signal tells us whether a release is coming. That
 // judgement belongs to the user.
-func (s *Service) checkEligible(ctx context.Context, kind, videoID string) error {
+func (s *Service) checkEligible(ctx context.Context, kind, videoID string, season int) error {
 	if kind != models.ReleaseSubscriptionKindSeason {
 		return nil
 	}
@@ -409,7 +413,7 @@ func (s *Service) checkEligible(ctx context.Context, kind, videoID string) error
 		// might poll a finished series indefinitely.
 		return ErrNotEligible
 	}
-	if !s.airing.IsAiringSeries(ctx, videoID) {
+	if !s.airing.IsAiringSeason(ctx, videoID, season) {
 		return ErrNotEligible
 	}
 	return nil

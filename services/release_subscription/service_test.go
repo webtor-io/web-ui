@@ -138,10 +138,10 @@ func TestLimit(t *testing.T) {
 // local could tell us whether a release is coming anyway.
 func TestCheckEligibleWithoutEnricher(t *testing.T) {
 	s := New(nil, nil, nil, "", "")
-	if err := s.checkEligible(t.Context(), models.ReleaseSubscriptionKindSeason, "tt1190634"); !errors.Is(err, ErrNotEligible) {
+	if err := s.checkEligible(t.Context(), models.ReleaseSubscriptionKindSeason, "tt1190634", 3); !errors.Is(err, ErrNotEligible) {
 		t.Errorf("season without enricher: got %v, want ErrNotEligible", err)
 	}
-	if err := s.checkEligible(t.Context(), models.ReleaseSubscriptionKindMovie, "tt0111161"); err != nil {
+	if err := s.checkEligible(t.Context(), models.ReleaseSubscriptionKindMovie, "tt0111161", 0); err != nil {
 		t.Errorf("movie without enricher: got %v, want nil", err)
 	}
 }

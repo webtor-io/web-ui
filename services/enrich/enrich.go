@@ -89,6 +89,16 @@ type AiringChecker interface {
 	IsAiring(ctx context.Context, videoID string) (bool, error)
 }
 
+// SeasonAiringChecker is the season-grained sibling of AiringChecker: "is
+// this particular season still producing episodes". A returning series has
+// finished seasons behind it, and a banner or a subscription that names one
+// of those has nothing to wait for — the series-level answer cannot tell
+// them apart (Silo S01 read as "still airing" because S03 is in production,
+// 2026-09-03). Today only TMDB implements it, off its cached metadata.
+type SeasonAiringChecker interface {
+	IsSeasonAiring(ctx context.Context, videoID string, season int) (bool, error)
+}
+
 func (s *Enricher) HasMappers() bool {
 	return len(s.mappers) > 0
 }
@@ -348,6 +358,62 @@ func (s *Enricher) IsAiringSeriesChecked(ctx context.Context, videoID string) (b
 			return false, errors.Wrap(lastErr, "airing check: every mapper failed")
 		}
 		return false, errors.New("airing check: no mapper supports it")
+	}
+	return false, nil
+}
+
+// IsAiringSeason is IsAiringSeries at season grain: does season `season` of
+// the series still have episodes to come. Same contract — first positive
+// mapper wins, mapper errors are logged and skipped, no answer reads as
+// false (hides the banner, the safe default).
+func (s *Enricher) IsAiringSeason(ctx context.Context, videoID string, season int) bool {
+	airing, _ := s.askSeason(ctx, videoID, season)
+	return airing
+}
+
+// IsAiringSeasonChecked is IsAiringSeason for callers whose "no" is
+// terminal: false comes with the guarantee that a mapper actually answered.
+func (s *Enricher) IsAiringSeasonChecked(ctx context.Context, videoID string, season int) (bool, error) {
+	if videoID == "" {
+		return false, errors.New("season airing check: empty video id")
+	}
+	if season <= 0 {
+		return false, errors.New("season airing check: no season")
+	}
+	return s.askSeason(ctx, videoID, season)
+}
+
+func (s *Enricher) askSeason(ctx context.Context, videoID string, season int) (bool, error) {
+	if videoID == "" || season <= 0 {
+		return false, errors.New("season airing check: nothing to ask about")
+	}
+	answered := false
+	var lastErr error
+	for _, m := range s.mappers {
+		sc, ok := m.(SeasonAiringChecker)
+		if !ok {
+			continue
+		}
+		airing, err := sc.IsSeasonAiring(ctx, videoID, season)
+		if err != nil {
+			log.WithError(err).
+				WithField("mapper", m.GetName()).
+				WithField("video_id", videoID).
+				WithField("season", season).
+				Debug("season airing check: mapper failed, trying next")
+			lastErr = err
+			continue
+		}
+		answered = true
+		if airing {
+			return true, nil
+		}
+	}
+	if !answered {
+		if lastErr != nil {
+			return false, errors.Wrap(lastErr, "season airing check: every mapper failed")
+		}
+		return false, errors.New("season airing check: no mapper supports it")
 	}
 	return false, nil
 }
