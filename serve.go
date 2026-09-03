@@ -254,9 +254,16 @@ func serve(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		// /api/v1 owns its own CORS (wildcard, bearer-auth, PATCH) — the
-		// SuperTokens policy must not answer its preflights.
-		a.RegisterHandler(r, libapi.MountPath)
+		// Surfaces that own their own wildcard, credential-less CORS — the
+		// SuperTokens policy must not answer for them: it 403s any origin
+		// but the site's own before their route group can run.
+		//   /api/v1  — JSON API (bearer-auth, PATCH);
+		//   /stremio — addon endpoints called by Stremio web/desktop, which
+		//              send Origin (incident 2026-09-03: 403 on every call);
+		//   /token/  — the access-token rewrite in front of the same
+		//              surfaces; the path is still /token/<id>/stremio/…
+		//              when this middleware runs.
+		a.RegisterHandler(r, libapi.MountPath, "/stremio/", "/token/")
 	}
 
 	// Setting S3 access key extraction — must run before the access token

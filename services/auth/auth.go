@@ -570,15 +570,7 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 		MaxAge:           1 * time.Minute,
 		AllowCredentials: true,
 	})
-	r.Use(func(c *gin.Context) {
-		for _, p := range corsExemptPrefixes {
-			if strings.HasPrefix(c.Request.URL.Path, p) {
-				c.Next()
-				return
-			}
-		}
-		corsHandler(c)
-	})
+	r.Use(corsWithExemptions(corsHandler, corsExemptPrefixes))
 
 	r.Use(func(c *gin.Context) {
 		supertokens.Middleware(http.HandlerFunc(
@@ -788,4 +780,26 @@ func isSafeReturnPath(p string) bool {
 		}
 	}
 	return true
+}
+
+// corsWithExemptions wraps the credentialed site-origin CORS handler so that
+// paths under corsExemptPrefixes never reach it. gin-contrib/cors answers a
+// disallowed Origin with 403 before any route runs, so a public surface that
+// declares its own wildcard CORS on its route group is unreachable from a
+// foreign origin unless its prefix is listed here — the group middleware
+// only runs once the request gets past this global one. Exemption means "no
+// CORS headers from this handler", not "allow": the surface's own policy is
+// what the browser then sees. Incident 2026-09-03: /stremio and the
+// /token/<id>/stremio rewrite were missing, so the Stremio web and desktop
+// clients (which send Origin) got 403 on every addon call.
+func corsWithExemptions(corsHandler gin.HandlerFunc, corsExemptPrefixes []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		for _, p := range corsExemptPrefixes {
+			if strings.HasPrefix(c.Request.URL.Path, p) {
+				c.Next()
+				return
+			}
+		}
+		corsHandler(c)
+	}
 }

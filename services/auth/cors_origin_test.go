@@ -116,3 +116,64 @@ func TestCorsOriginsNormalisesAConfiguredScheme(t *testing.T) {
 		}
 	}
 }
+
+// TestExemptPrefixesBypassSiteOriginCORS pins the Stremio incident of
+// 2026-09-03: the credentialed site-origin policy 403s any foreign Origin
+// before a route runs, so surfaces that declare their own wildcard CORS on
+// their route group (/stremio, and its /token/<id>/stremio rewrite) must be
+// exempted, or Stremio web/desktop — which send Origin — get 403 on every
+// addon call. Non-exempt paths keep the 403.
+//
+// Negative control: drop "/stremio/" or "/token/" from the exempt list in
+// serve.go (mirrored here) and the matching case must fail.
+func TestExemptPrefixesBypassSiteOriginCORS(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	a := &Auth{domain: "webtor.io"}
+	allowed := map[string]bool{}
+	for _, h := range a.corsOrigins() {
+		allowed["https://"+h] = true
+	}
+	site := cors.New(cors.Config{
+		AllowOriginFunc:  func(origin string) bool { return allowed[origin] },
+		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
+		AllowCredentials: true,
+	})
+	r := gin.New()
+	r.Use(corsWithExemptions(site, []string{"/api/v1", "/stremio/", "/token/"}))
+	// The addon group declares its own public policy, as handlers/stremio does.
+	sg := r.Group("/stremio")
+	sg.Use(cors.New(cors.Config{AllowOrigins: []string{"*"}, AllowMethods: []string{"GET", "HEAD", "POST"}}))
+	sg.GET("/manifest.json", func(c *gin.Context) { c.String(http.StatusOK, "{}") })
+	// The /token/<id>/… rewrite runs after the global CORS; mirror it.
+	r.GET("/token/:id/stremio/manifest.json", func(c *gin.Context) {
+		c.Request.URL.Path = "/stremio/manifest.json"
+		r.HandleContext(c)
+	})
+	r.GET("/profile", func(c *gin.Context) { c.String(http.StatusOK, "page") })
+
+	for _, tt := range []struct {
+		path     string
+		wantCode int
+		wantACAO string
+	}{
+		{"/stremio/manifest.json", http.StatusOK, "*"},
+		{"/token/f904d2e2-d8ad-47a0-84b2-9dd042cc5392/stremio/manifest.json", http.StatusOK, "*"},
+		{"/profile", http.StatusForbidden, ""},
+	} {
+		t.Run(tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			req.Header.Set("Origin", "https://web.stremio.com")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantCode {
+				t.Fatalf("GET %s with foreign Origin = %d, want %d", tt.path, w.Code, tt.wantCode)
+			}
+			if got := w.Header().Get("Access-Control-Allow-Origin"); got != tt.wantACAO {
+				t.Errorf("GET %s: Access-Control-Allow-Origin = %q, want %q", tt.path, got, tt.wantACAO)
+			}
+			if w.Header().Get("Access-Control-Allow-Credentials") == "true" {
+				t.Errorf("GET %s: credentials granted to a foreign origin", tt.path)
+			}
+		})
+	}
+}
