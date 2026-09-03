@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	h "github.com/dustin/go-humanize"
+	"github.com/webtor-io/web-ui/helpers"
 	"html/template"
 	"io"
 	"math/rand/v2"
@@ -27,7 +29,6 @@ import (
 	"github.com/hako/durafmt"
 	"github.com/urfave/cli"
 
-	h "github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -130,8 +131,15 @@ func (s *Helper) LongErr(err error) template.HTML {
 	return LongErr(err)
 }
 
+// BitsForHumans is the template-side size formatter; one arithmetic for the
+// whole UI (helpers.Bytes: base 1024, KB/MB/GB, no-break space). It used to be
+// go-humanize's base-1000 Bytes, so a directory's SSR size and the JS sum of
+// its files disagreed by 5–7% on the same bytes.
 func (s *Helper) BitsForHumans(b int64) string {
-	return h.Bytes(uint64(b))
+	if b < 0 {
+		b = 0
+	}
+	return helpers.Bytes(uint64(b))
 }
 
 func (s *Helper) Dev() bool {

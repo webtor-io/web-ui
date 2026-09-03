@@ -5,12 +5,14 @@ import (
 	"math"
 )
 
-// Bytes renders a size for people: "1.0 MB", "512 kB". The space before the
+// Bytes renders a size for people: "1.0 MB", "512 KB" — base 1024 with the
+// KB/MB/GB labels Chrome and Windows Explorer use (macOS Finder counts by
+// 1000; we follow the browser the page is shown in). The space before the
 // unit is a no-break space (U+00A0) so a narrow screen never splits the number
 // from its unit; every number-plus-unit in the UI follows the same rule
 // (docs/i18n.md, "Numbers and units").
 func Bytes(s uint64) string {
-	sizes := []string{"B", "kB", "MB", "GB", "TB", "PB", "EB"}
+	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB"}
 	return humanateBytes(s, 1024, sizes)
 }
 
