@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"math"
 	"net/url"
 	"path/filepath"
 	"sort"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
-	"github.com/webtor-io/web-ui/services/ratemeter"
 )
 
 type StreamContent struct {
@@ -348,15 +346,16 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		return &SlowDownloadError{Data: sdd}
 	case "swarm_demo":
 		// Plays the warm-up status line for review: eight seconds of a silent
-		// swarm with the countdown, eight seconds of a crawling download,
-		// then the slow verdict. No network involved.
-		j.InProgress(fmt.Sprintf("%v, %v", s.t("job.warmingUp"), s.tp("job.downloading", map[string]any{"Bytes": helpers.Bytes(2 * 1024 * 1024)})))
+		// swarm with the countdown, eight seconds of a crawling download with
+		// the percent, then the slow verdict. No network involved.
+		const demoTarget = 2 * 1024 * 1024
+		j.InProgress(fmt.Sprintf("%v, %v", s.t("job.warmingUp"), s.tp("job.downloading", map[string]any{"Bytes": helpers.Bytes(demoTarget)})))
 		for i := 0; i < 16 && ctx.Err() == nil; i++ {
 			var line string
 			if i < 8 {
-				line = formatSwarmLine(s.tp, s.tn, 0, 0, 0, 0, 0, time.Duration(60-i*5)*time.Second)
+				line = formatWarmupLine(s.tp, 0, demoTarget, time.Duration(60-i*5)*time.Second)
 			} else {
-				line = formatSwarmLine(s.tp, s.tn, 2, 5, 7, int64(i-7)*40*1024, 40*1024, time.Duration(120-i*5)*time.Second)
+				line = formatWarmupLine(s.tp, int64(i-7)*40*1024, demoTarget, 0)
 			}
 			j.StatusUpdate(line)
 			time.Sleep(time.Second)
@@ -898,59 +897,34 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 
 	warmupStart := time.Now()
 
-	// Swarm facts for the status line and for the no-peers verdict. Seeders
-	// and leechers come from the seeder's stats events; Peers is the older
-	// combined count and the fallback when a seeder reports neither.
+	// Swarm facts for the no-peers verdict. Seeders and leechers come from the
+	// seeder's stats events; Peers is the older combined count and the
+	// fallback when a seeder reports neither.
 	var seederCount, leecherCount atomic.Int32
-	// swarmRateBits: the swarm's useful throughput (float64 bits) from the
-	// seeder's Completed counter, smoothed by statsRate; preferred over the
-	// warm-up range's own byte counter because it covers the whole torrent —
-	// what the user means by "download speed".
-	var swarmRateBits atomic.Uint64
-	var lastStatsEventNs atomic.Int64
-	statsRate := ratemeter.New(0.4)
 	const earlyMinBytes = 1 * 1024 * 1024
 	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
 	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
-	var lastLineBytes atomic.Int64
-	var lastLineNs atomic.Int64
-	// updateSwarmLine rewrites the job's status line with what the swarm is
-	// doing right now — seeders, leechers, throughput, bytes so far and, while
-	// nothing has arrived yet, the seconds left before the no-peers verdict.
-	// Called from the stats goroutine on every event and from the watchdog
-	// every tick, so the countdown keeps moving on a silent swarm.
-	updateSwarmLine := func() {
+	warmupTarget := int64(limitStart + limitEnd)
+	// updateWarmupLine rewrites the job's status line: the seconds left before
+	// the no-peers verdict while nothing has arrived, the percent of the
+	// warm-up range once bytes flow — the same shape as buffering's "37%".
+	// Seeders, leechers and speed are not repeated here: the resource badge
+	// and the piece bar carry them, and the no-peers card gets the counts
+	// when they matter. Called from the stats goroutine on every event and
+	// from the watchdog every tick, so the countdown keeps moving on a silent
+	// swarm.
+	updateWarmupLine := func() {
 		if !useStatus {
 			return
 		}
-		now := time.Now()
 		bytes := totalDownloaded()
-		var speed float64
-		if prevNs := lastLineNs.Load(); prevNs != 0 {
-			if dt := now.Sub(time.Unix(0, prevNs)).Seconds(); dt > 0 {
-				speed = float64(bytes-lastLineBytes.Load()) / dt
-			}
-		}
-		lastLineNs.Store(now.UnixNano())
-		lastLineBytes.Store(bytes)
-		elapsed := now.Sub(warmupStart)
 		var left time.Duration
-		switch {
-		case bytes == 0:
-			left = noPeersAfter - elapsed
-		case bytes < earlyMinBytes:
-			left = slowPeersAfter - elapsed
+		if bytes == 0 {
+			left = noPeersAfter - time.Since(warmupStart)
 		}
-		// Swarm speed from the seeder's counter wins over the warm-up range's
-		// own; when the seeder has gone quiet (it only sends on change) for
-		// two seconds, nothing is moving and the speed shows zero.
-		if r := math.Float64frombits(swarmRateBits.Load()); r > 0 {
-			speed = r
+		if line := formatWarmupLine(s.tp, bytes, warmupTarget, left); line != "" {
+			j.StatusUpdate(line)
 		}
-		if last := lastStatsEventNs.Load(); last != 0 && now.Sub(time.Unix(0, last)) > 2*time.Second {
-			speed = 0
-		}
-		j.StatusUpdate(s.swarmLine(int(seederCount.Load()), int(leecherCount.Load()), int(peerCount.Load()), bytes, speed, left))
 	}
 	// Probe missed: announce the step and start the UI peer-count goroutine.
 	if size > 0 {
@@ -971,9 +945,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			peerCount.Store(int32(probeEvent.Peers))
 			seederCount.Store(int32(probeEvent.Seeders))
 			leecherCount.Store(int32(probeEvent.Leechers))
-			statsRate.Sample(int64(probeEvent.Completed), time.Now())
-			lastStatsEventNs.Store(time.Now().UnixNano())
-			updateSwarmLine()
+			updateWarmupLine()
 		}
 		if statsCh != nil {
 			go func() {
@@ -987,9 +959,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 						peerCount.Store(int32(ev.Peers))
 						seederCount.Store(int32(ev.Seeders))
 						leecherCount.Store(int32(ev.Leechers))
-						swarmRateBits.Store(math.Float64bits(statsRate.Sample(int64(ev.Completed), time.Now())))
-						lastStatsEventNs.Store(time.Now().UnixNano())
-						updateSwarmLine()
+						updateWarmupLine()
 					case <-warmupCtx.Done():
 						return
 					}
@@ -1022,7 +992,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	}
 	go func() {
 		// One second, not five: the tick also redraws the status line (the
-		// countdown and the throughput), and a countdown that jumps by fives
+		// countdown, then the percent), and a countdown that jumps by fives
 		// reads as stuck. The work per tick is a few atomic loads.
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -1046,7 +1016,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 					return
 				}
 				if statsEverSeen.Load() || bytes > 0 {
-					updateSwarmLine()
+					updateWarmupLine()
 				}
 			}
 		}
@@ -1188,10 +1158,6 @@ func (s *ActionScript) t(key string) string {
 
 func (s *ActionScript) tp(key string, data map[string]any) string {
 	return i18n.TranslateWithLocalizerData(s.i18n.Localizer(s.c.Lang), key, data)
-}
-
-func (s *ActionScript) tn(key string, count int, data map[string]any) string {
-	return i18n.TranslateWithLocalizerPlural(s.i18n.Localizer(s.c.Lang), key, count, data)
 }
 
 func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -1396,35 +1362,25 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	}, id
 }
 
-// swarmLine is the job status line during warmup. Seeders/leechers when the
-// seeder reports them, the combined peer count otherwise; throughput and bytes
-// once anything has arrived; and while nothing has, the seconds left until the
-// no-peers verdict — so a silent swarm shows a countdown, not a frozen spinner.
-func (s *ActionScript) swarmLine(seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
-	return formatSwarmLine(s.tp, s.tn, seeders, leechers, peers, bytes, speed, left)
-}
-
-type pluralFunc = func(key string, count int, data map[string]any) string
-
-// swarmWho is "N seeders · M leechers", each count declined on its own, or
-// "N peers" when the seeder reports no split.
-func swarmWho(tn pluralFunc, seeders, leechers, peers int, prefix string) string {
-	if seeders > 0 || leechers > 0 {
-		return tn(prefix+".seeders", seeders, nil) + " · " + tn(prefix+".leechers", leechers, nil)
-	}
-	return tn(prefix+".peers", peers, nil)
-}
-
-func formatSwarmLine(tp func(string, map[string]any) string, tn pluralFunc, seeders, leechers, peers int, bytes int64, speed float64, left time.Duration) string {
-	who := swarmWho(tn, seeders, leechers, peers, "job")
+// formatWarmupLine is the job status line during warm-up: "43 s" while
+// nothing has arrived (seconds left before the no-peers verdict, so a silent
+// swarm shows a countdown rather than a frozen spinner), "37%" of the warm-up
+// range once bytes flow — the same shape as buffering's line. Empty when
+// there is nothing honest to show (no target, or the countdown is over):
+// the previous line then stays.
+func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int64, left time.Duration) string {
 	if bytes <= 0 {
-		if left > 0 {
-			return tp("job.swarmWaiting", map[string]any{"Who": who, "Left": int(left.Round(time.Second).Seconds())})
+		if left <= 0 {
+			return ""
 		}
-		return who
+		return tp("job.warmupCountdown", map[string]any{"Seconds": int(left.Round(time.Second).Seconds())})
 	}
-	if speed < 0 {
-		speed = 0
+	if target <= 0 {
+		return ""
 	}
-	return tp("job.swarmDownloading", map[string]any{"Who": who, "Speed": helpers.Bytes(uint64(speed)), "Bytes": helpers.Bytes(uint64(bytes))})
+	pct := float64(bytes) / float64(target) * 100
+	if pct > 100 {
+		pct = 100
+	}
+	return fmt.Sprintf("%.0f%%", pct)
 }

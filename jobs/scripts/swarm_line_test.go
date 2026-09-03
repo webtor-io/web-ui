@@ -17,44 +17,27 @@ func tpStub(key string, data map[string]any) string {
 	return key + "{" + strings.Join(parts, ",") + "}"
 }
 
-func tnStub(key string, count int, data map[string]any) string {
-	return fmt.Sprintf("%s{Count=%d}", key, count)
-}
-
-func TestFormatSwarmLine_SilentSwarmCountsDown(t *testing.T) {
-	got := formatSwarmLine(tpStub, tnStub, 0, 0, 3, 0, 0, 42*time.Second)
-	if !strings.HasPrefix(got, "job.swarmWaiting{") || !strings.Contains(got, "Left=42") {
-		t.Errorf("silent swarm must show the countdown: %s", got)
+// The warm-up line is minimal on purpose: the badge and the piece bar carry
+// the swarm and the speed, so the line only says how long until a verdict
+// (silent swarm) or how much of the warm-up range has arrived.
+func TestFormatWarmupLine(t *testing.T) {
+	const mb = 1024 * 1024
+	cases := []struct {
+		name          string
+		bytes, target int64
+		left          time.Duration
+		want          string
+	}{
+		{"silent swarm counts down", 0, mb, 42 * time.Second, "job.warmupCountdown{Seconds=42}"},
+		{"countdown over, nothing arrived → keep previous line", 0, mb, -3 * time.Second, ""},
+		{"bytes flowing → percent of the warm-up range", 384 * 1024, mb, 0, "38%"},
+		{"bytes flowing ignores a stale countdown", 384 * 1024, mb, 30 * time.Second, "38%"},
+		{"never above 100%", 3 * mb, mb, 0, "100%"},
+		{"no target → nothing honest to say", 512 * 1024, 0, 0, ""},
 	}
-	if !strings.Contains(got, "job.peers{Count=3}") {
-		t.Errorf("without a seeder/leecher split the combined peer count is used: %s", got)
-	}
-}
-
-func TestFormatSwarmLine_PrefersSeederLeecherSplit(t *testing.T) {
-	got := formatSwarmLine(tpStub, tnStub, 2, 5, 7, 0, 0, 10*time.Second)
-	if !strings.Contains(got, "job.seeders{Count=2} · job.leechers{Count=5}") {
-		t.Errorf("seeders/leechers must win over the peer count: %s", got)
-	}
-}
-
-func TestFormatSwarmLine_DownloadingShowsSpeedAndBytes(t *testing.T) {
-	got := formatSwarmLine(tpStub, tnStub, 1, 1, 2, 3*1024*1024, 512*1024, 0)
-	// helpers.Bytes renders decimal units: "512 kB", "3.0 MB".
-	if !strings.HasPrefix(got, "job.swarmDownloading{") || !strings.Contains(got, "Speed=512 kB") {
-		t.Errorf("downloading line must carry speed: %s", got)
-	}
-	if !strings.Contains(got, "Bytes=3.0 MB") {
-		t.Errorf("downloading line must carry bytes: %s", got)
-	}
-	if strings.Contains(got, "Left=") {
-		t.Errorf("no countdown once data flows: %s", got)
-	}
-}
-
-func TestFormatSwarmLine_NoCountdownPastDeadline(t *testing.T) {
-	got := formatSwarmLine(tpStub, tnStub, 0, 0, 0, 0, 0, -3*time.Second)
-	if strings.Contains(got, "Left=") {
-		t.Errorf("a negative countdown must not render: %s", got)
+	for _, c := range cases {
+		if got := formatWarmupLine(tpStub, c.bytes, c.target, c.left); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
 	}
 }

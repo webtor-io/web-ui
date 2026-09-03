@@ -620,26 +620,7 @@
     "job.warmingUp": "rozgrzewanie klienta torrent",
     "job.downloading": "pobieranie {{.Bytes}}",
     "job.waitingForPeers": "oczekiwanie na peerów",
-    "job.peers": {
-        "one": "{{.Count}} peer",
-        "few": "{{.Count}} peery",
-        "many": "{{.Count}} peerów",
-        "other": "{{.Count}} peera"
-    },
-    "job.seeders": {
-        "one": "{{.Count}} seed",
-        "few": "{{.Count}} seedy",
-        "many": "{{.Count}} seedów",
-        "other": "{{.Count}} seeda"
-    },
-    "job.leechers": {
-        "one": "{{.Count}} leecher",
-        "few": "{{.Count}} leechery",
-        "many": "{{.Count}} leecherów",
-        "other": "{{.Count}} leechera"
-    },
-    "job.swarmWaiting": "{{.Who}} · czekamy na dane, pozostało {{.Left}} s",
-    "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · odebrano {{.Bytes}}",
+    "job.warmupCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Domena dodana",
     "toast.domainDeleted": "Domena usunięta",
     "toast.addedToLibrary": "Dodano do biblioteki",

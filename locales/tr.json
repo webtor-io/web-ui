@@ -610,20 +610,7 @@
     "job.warmingUp": "torrent istemcisi ısıtılıyor",
     "job.downloading": "{{.Bytes}} indiriliyor",
     "job.waitingForPeers": "peer'ler bekleniyor",
-    "job.peers": {
-        "one": "{{.Count}} eş",
-        "other": "{{.Count}} eş"
-    },
-    "job.seeders": {
-        "one": "{{.Count}} seeder",
-        "other": "{{.Count}} seeder"
-    },
-    "job.leechers": {
-        "one": "{{.Count}} leecher",
-        "other": "{{.Count}} leecher"
-    },
-    "job.swarmWaiting": "{{.Who}} · veri bekleniyor, {{.Left}} s kaldı",
-    "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} alındı",
+    "job.warmupCountdown": "{{.Seconds}} sn",
     "toast.domainAdded": "Alan adı eklendi",
     "toast.domainDeleted": "Alan adı silindi",
     "toast.addedToLibrary": "Kütüphaneye eklendi",

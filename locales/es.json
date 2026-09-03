@@ -610,20 +610,7 @@
     "job.warmingUp": "preparando cliente torrent",
     "job.downloading": "descargando {{.Bytes}}",
     "job.waitingForPeers": "esperando pares",
-    "job.peers": {
-        "one": "{{.Count}} par",
-        "other": "{{.Count}} pares"
-    },
-    "job.seeders": {
-        "one": "{{.Count}} seeder",
-        "other": "{{.Count}} seeders"
-    },
-    "job.leechers": {
-        "one": "{{.Count}} leecher",
-        "other": "{{.Count}} leechers"
-    },
-    "job.swarmWaiting": "{{.Who}} · esperando datos, quedan {{.Left}} s",
-    "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · {{.Bytes}} recibidos",
+    "job.warmupCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Dominio añadido",
     "toast.domainDeleted": "Dominio eliminado",
     "toast.addedToLibrary": "Añadido a la biblioteca",

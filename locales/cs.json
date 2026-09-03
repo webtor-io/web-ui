@@ -620,26 +620,7 @@
     "job.warmingUp": "rozehřívám torrent klienta",
     "job.downloading": "stahuji {{.Bytes}}",
     "job.waitingForPeers": "čekám na peery",
-    "job.peers": {
-        "one": "{{.Count}} peer",
-        "few": "{{.Count}} peeři",
-        "many": "{{.Count}} peerů",
-        "other": "{{.Count}} peerů"
-    },
-    "job.seeders": {
-        "one": "{{.Count}} seeder",
-        "few": "{{.Count}} seedeři",
-        "many": "{{.Count}} seederů",
-        "other": "{{.Count}} seederů"
-    },
-    "job.leechers": {
-        "one": "{{.Count}} leecher",
-        "few": "{{.Count}} leecheři",
-        "many": "{{.Count}} leecherů",
-        "other": "{{.Count}} leecherů"
-    },
-    "job.swarmWaiting": "{{.Who}} · čekáme na data, zbývá {{.Left}} s",
-    "job.swarmDownloading": "{{.Who}} · {{.Speed}}/s · přijato {{.Bytes}}",
+    "job.warmupCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Doména přidána",
     "toast.domainDeleted": "Doména smazána",
     "toast.addedToLibrary": "Přidáno do knihovny",

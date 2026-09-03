@@ -143,18 +143,19 @@ if !effectiveCache {
 
 ## What the user sees while waiting
 
-The job status line is `formatSwarmLine` (`jobs/scripts/action.go`): seeders
-and leechers when the seeder splits them (`job.swarm`), the combined peer
-count otherwise (`job.peers`); while nothing has arrived, the seconds left
-before the no-peers verdict (`job.swarmWaiting`); once bytes flow, throughput
-and bytes so far (`job.swarmDownloading`). The throughput is the swarm's: the
-seeder's `Completed` counter (verified bytes) sampled every event through
-`services/ratemeter` (EMA, α=0.4), not the warm-up range's own counter — the
-same figure the resource badge shows as "Caching 51% · 2.3 MB/s". It is rewritten on every stats
-event and on every 1 s watchdog tick, so a silent swarm shows a moving
-countdown rather than a frozen spinner. The seeder's own stats cadence is the
-other half of the latency (`torrent-web-seeder` StatStream ticker and Stat
-cache TTL, both 3 s before 2026-09; 1 s since).
+The job status line is `formatWarmupLine` (`jobs/scripts/action.go`) and it
+is deliberately minimal, the same shape as buffering's "37%": while nothing
+has arrived, the seconds left before the no-peers verdict
+(`job.warmupCountdown`, "43 s"), so a silent swarm shows a moving countdown
+rather than a frozen spinner; once bytes flow, the percent of the warm-up
+range received. Seeders, leechers and throughput are not repeated in the
+line — the resource badge and the piece bar carry them (docs/vault.md), and
+the no-peers card gets the counts when they matter. An earlier version spelt
+out "6 seeders · 0 leechers · waiting for data, 43 s left" and wrapped onto
+three lines on phones. The line is rewritten on every stats event and on
+every 1 s watchdog tick; the seeder's own stats cadence is the other half of
+the latency (`torrent-web-seeder` StatStream ticker and Stat cache TTL, both
+3 s before 2026-09; 1 s since).
 
 That cadence is for the browser, not for Loki: `services/job` logs
 `StatusUpdate` items at Debug (every other job item stays Info) and drops a

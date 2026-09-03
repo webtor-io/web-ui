@@ -620,26 +620,7 @@
     "job.warmingUp": "подготовка торрент-клиента",
     "job.downloading": "скачивание {{.Bytes}}",
     "job.waitingForPeers": "ожидание пиров",
-    "job.peers": {
-        "one": "{{.Count}} пир",
-        "few": "{{.Count}} пира",
-        "many": "{{.Count}} пиров",
-        "other": "{{.Count}} пира"
-    },
-    "job.seeders": {
-        "one": "{{.Count}} сид",
-        "few": "{{.Count}} сида",
-        "many": "{{.Count}} сидов",
-        "other": "{{.Count}} сида"
-    },
-    "job.leechers": {
-        "one": "{{.Count}} лич",
-        "few": "{{.Count}} лича",
-        "many": "{{.Count}} личей",
-        "other": "{{.Count}} лича"
-    },
-    "job.swarmWaiting": "{{.Who}} · ждём данные, осталось {{.Left}} с",
-    "job.swarmDownloading": "{{.Who}} · {{.Speed}}/с · получено {{.Bytes}}",
+    "job.warmupCountdown": "{{.Seconds}} с",
     "toast.domainAdded": "Домен добавлен",
     "toast.domainDeleted": "Домен удалён",
     "toast.addedToLibrary": "Добавлено в библиотеку",
