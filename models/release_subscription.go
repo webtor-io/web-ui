@@ -319,6 +319,25 @@ func ListDueReleaseSubscriptions(ctx context.Context, db *pg.DB, now time.Time, 
 	return subs, nil
 }
 
+// ListOpenSeasonReleaseSubscriptions returns every enabled, not yet completed
+// season subscription with its user — the set a one-off "is this season
+// really still airing" sweep walks (see Poller.SweepFinishedSeasons).
+func ListOpenSeasonReleaseSubscriptions(ctx context.Context, db *pg.DB) ([]ReleaseSubscription, error) {
+	var subs []ReleaseSubscription
+	err := db.Model(&subs).
+		Context(ctx).
+		Relation("User").
+		Where("release_subscription.enabled = ?", true).
+		Where("release_subscription.kind = ?", ReleaseSubscriptionKindSeason).
+		Where("release_subscription.state <> ?", ReleaseSubscriptionStateCompleted).
+		Order("release_subscription.created_at ASC").
+		Select()
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to list open season release subscriptions")
+	}
+	return subs, nil
+}
+
 // MarkReleaseSubscriptionChecked stamps a completed poll and schedules the
 // next one. State is written too because the baseline pass ends by promoting
 // the row to active.

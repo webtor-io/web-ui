@@ -31,6 +31,9 @@ import (
 
 type pollStore interface {
 	ListDue(ctx context.Context, now time.Time, limit int) ([]models.ReleaseSubscription, error)
+	// ListOpenSeasons is the sweep's input: every season subscription that
+	// has not completed, whatever its schedule says.
+	ListOpenSeasons(ctx context.Context) ([]models.ReleaseSubscription, error)
 	InsertHits(ctx context.Context, hits []models.ReleaseSubscriptionHit, baseline bool) (int, error)
 	ListPendingHits(ctx context.Context, subscriptionID uuid.UUID) ([]models.ReleaseSubscriptionHit, error)
 	MarkHitsNotified(ctx context.Context, subscriptionID uuid.UUID, infohashes []string) error
@@ -65,6 +68,10 @@ type tierResolver interface {
 // the enricher has no mappers to answer with.
 type AiringChecker interface {
 	IsAiringSeriesChecked(ctx context.Context, videoID string) (bool, error)
+	// IsAiringSeasonChecked is the season-grained question the sweep asks:
+	// a returning series has finished seasons behind it, and a
+	// subscription to one of those will never fire.
+	IsAiringSeasonChecked(ctx context.Context, videoID string, season int) (bool, error)
 }
 
 // PollConfig is the scheduling policy, all of it flag-backed.
@@ -465,6 +472,51 @@ func (p *Poller) notify(ctx context.Context, sub *models.ReleaseSubscription, fo
 		return true, err
 	}
 	return true, p.store.MarkNotified(ctx, sub.ID)
+}
+
+// SweepFinishedSeasons closes every open season subscription whose season
+// is no longer airing, with the same final letter a completing poll sends.
+// It exists because the subscribe rule used to ask at series grain (Silo S01
+// was accepted while S03 was in production, 2026-09-03), so rows were
+// written that no poll can ever fulfil. A checked answer only: an airing
+// check that could not answer leaves the row alone.
+func (p *Poller) SweepFinishedSeasons(ctx context.Context) (closed, kept int, err error) {
+	if p.airing == nil {
+		return 0, 0, errors.New("sweep: no airing checker")
+	}
+	subs, err := p.store.ListOpenSeasons(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	for i := range subs {
+		sub := &subs[i]
+		if sub.Season == nil || *sub.Season <= 0 {
+			kept++
+			continue
+		}
+		airing, aerr := p.airing.IsAiringSeasonChecked(ctx, sub.VideoID, int(*sub.Season))
+		if aerr != nil {
+			log.WithError(aerr).WithField("subscription_id", sub.ID).Warn("sweep: airing check failed; keeping the subscription")
+			kept++
+			continue
+		}
+		if airing {
+			kept++
+			continue
+		}
+		if _, nerr := p.notify(ctx, sub, true); nerr != nil {
+			log.WithError(nerr).WithField("subscription_id", sub.ID).Error("sweep: failed to send the final subscription update")
+		}
+		p.announceCompletion(ctx, sub)
+		if merr := p.store.MarkChecked(ctx, sub.ID, models.ReleaseSubscriptionStateCompleted, p.retryAt()); merr != nil {
+			log.WithError(merr).WithField("subscription_id", sub.ID).Error("sweep: failed to complete the subscription")
+			kept++
+			continue
+		}
+		log.WithField("subscription_id", sub.ID).WithField("video_id", sub.VideoID).WithField("season", *sub.Season).Info("sweep: season finished, subscription completed")
+		closed++
+	}
+	return closed, kept, nil
 }
 
 // announceCompletion tells the user their season is done. The state itself

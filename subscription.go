@@ -116,6 +116,15 @@ func pollSubscriptions(c *cli.Context) error {
 		rss.NewPollConfig(c),
 	)
 
+	if c.Bool(rss.SweepFinishedSeasonsFlag) {
+		closed, kept, err := poller.SweepFinishedSeasons(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to sweep finished seasons")
+		}
+		log.WithField("closed", closed).WithField("kept", kept).Info("release subscription sweep completed")
+		return nil
+	}
+
 	n, err := poller.Run(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to poll release subscriptions")

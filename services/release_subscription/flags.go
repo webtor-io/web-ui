@@ -18,6 +18,9 @@ const (
 	IntervalFreeFlag    = "subscription-interval-free"
 	IntervalMaxFlag     = "subscription-interval-max"
 	HotWindowFlag       = "subscription-hot-window"
+	// SweepFinishedSeasonsFlag turns a poll run into a one-off sweep that
+	// completes season subscriptions whose season is no longer airing.
+	SweepFinishedSeasonsFlag = "subscription-sweep-finished-seasons"
 )
 
 // RegisterPollFlags declares the poller's scheduling policy.
@@ -28,6 +31,11 @@ const (
 // those backs off on its own once the show goes quiet between seasons.
 func RegisterPollFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
+		cli.BoolFlag{
+			Name:   SweepFinishedSeasonsFlag,
+			Usage:  "instead of polling, complete every season subscription whose season is no longer airing (one-off repair)",
+			EnvVar: "RELEASE_SUB_SWEEP_FINISHED_SEASONS",
+		},
 		cli.IntFlag{
 			Name:   PollBatchFlag,
 			Usage:  "max subscriptions polled in one run",

@@ -37,6 +37,10 @@ func (s *fakeStore) ListDue(context.Context, time.Time, int) ([]models.ReleaseSu
 	return s.due, nil
 }
 
+func (s *fakeStore) ListOpenSeasons(context.Context) ([]models.ReleaseSubscription, error) {
+	return s.due, nil
+}
+
 func (s *fakeStore) InsertHits(_ context.Context, hits []models.ReleaseSubscriptionHit, baseline bool) (int, error) {
 	if s.insertErr != nil {
 		return 0, s.insertErr
@@ -116,10 +120,22 @@ func (t fakeTier) IsFree(string, *string) bool { return t.free }
 type fakeAiring struct {
 	airing bool
 	err    error
+	// seasons, when set, answers the season-grained check per season number.
+	seasons map[int]bool
 }
 
 func (a fakeAiring) IsAiringSeriesChecked(context.Context, string) (bool, error) {
 	return a.airing, a.err
+}
+
+func (a fakeAiring) IsAiringSeasonChecked(_ context.Context, _ string, season int) (bool, error) {
+	if a.err != nil {
+		return false, a.err
+	}
+	if a.seasons != nil {
+		return a.seasons[season], nil
+	}
+	return a.airing, nil
 }
 
 // --- helpers ---
@@ -1025,5 +1041,47 @@ func TestPreferencesFilterWhatIsRecorded(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The sweep closes only the seasons that are no longer airing, mails each
+// of them the completion notice once, and leaves the rest untouched. An
+// airing check that cannot answer keeps the row — completion is terminal.
+func TestSweepFinishedSeasonsClosesOnlyFinishedOnes(t *testing.T) {
+	finished := seasonSub()
+	one := int16(1)
+	finished.Season = &one
+	airing := seasonSub()
+	three := int16(3)
+	airing.Season = &three
+	store := &fakeStore{due: []models.ReleaseSubscription{*airing, *finished}}
+	mail := &fakeMailer{}
+	p := NewPoller(store, &fakeSearch{}, mail, fakeTier{}, fakeAiring{seasons: map[int]bool{1: false, 3: true}}, testConfig())
+
+	closed, kept, err := p.SweepFinishedSeasons(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closed != 1 || kept != 1 {
+		t.Fatalf("closed=%d kept=%d, want 1/1", closed, kept)
+	}
+	if store.checkedState != models.ReleaseSubscriptionStateCompleted {
+		t.Errorf("finished season must be marked completed, got %q", store.checkedState)
+	}
+	if len(mail.offs) != 1 || !mail.offs[0] {
+		t.Errorf("completion notices: %v, want exactly one 'completed'", mail.offs)
+	}
+}
+
+func TestSweepFinishedSeasonsKeepsRowsItCannotJudge(t *testing.T) {
+	store := &fakeStore{due: []models.ReleaseSubscription{*seasonSub()}}
+	mail := &fakeMailer{}
+	p := NewPoller(store, &fakeSearch{}, mail, fakeTier{}, fakeAiring{err: errors.New("tmdb down")}, testConfig())
+	closed, kept, err := p.SweepFinishedSeasons(context.Background())
+	if err != nil || closed != 0 || kept != 1 || len(mail.offs) != 0 || store.checkedState != "" {
+		t.Fatalf("err=%v closed=%d kept=%d offs=%v state=%q — an unanswered check must change nothing", err, closed, kept, mail.offs, store.checkedState)
+	}
+	if _, _, err := NewPoller(store, &fakeSearch{}, mail, fakeTier{}, nil, testConfig()).SweepFinishedSeasons(context.Background()); err == nil {
+		t.Error("without an airing checker the sweep must refuse to run")
 	}
 }

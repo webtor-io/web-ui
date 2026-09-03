@@ -134,6 +134,10 @@ func (f subAiring) IsAiringSeriesChecked(context.Context, string) (bool, error) 
 	return f.airing, nil
 }
 
+func (f subAiring) IsAiringSeasonChecked(context.Context, string, int) (bool, error) {
+	return f.airing, nil
+}
+
 type subMeta struct {
 	md  *models.VideoMetadata
 	err error

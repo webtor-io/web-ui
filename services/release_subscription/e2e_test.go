@@ -194,6 +194,20 @@ func (m *memStore) ListDue(_ context.Context, now time.Time, limit int) ([]model
 	return out, nil
 }
 
+func (m *memStore) ListOpenSeasons(_ context.Context) ([]models.ReleaseSubscription, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []models.ReleaseSubscription
+	for _, s := range m.subs {
+		if s.Enabled && s.IsSeason() && s.State != models.ReleaseSubscriptionStateCompleted {
+			row := *s
+			row.User = m.users[s.UserID]
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
 // InsertHits is the ON CONFLICT DO NOTHING: a hash already recorded for this
 // subscription is skipped, which is what keeps it out of a second letter.
 func (m *memStore) InsertHits(_ context.Context, hits []models.ReleaseSubscriptionHit, baseline bool) (int, error) {

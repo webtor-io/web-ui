@@ -152,6 +152,14 @@ func (s pgStore) ListDue(ctx context.Context, now time.Time, limit int) ([]model
 	return models.ListDueReleaseSubscriptions(ctx, db, now, limit)
 }
 
+func (s pgStore) ListOpenSeasons(ctx context.Context) ([]models.ReleaseSubscription, error) {
+	db, err := s.db()
+	if err != nil {
+		return nil, err
+	}
+	return models.ListOpenSeasonReleaseSubscriptions(ctx, db)
+}
+
 func (s pgStore) InsertHits(ctx context.Context, hits []models.ReleaseSubscriptionHit, baseline bool) (int, error) {
 	db, err := s.db()
 	if err != nil {
