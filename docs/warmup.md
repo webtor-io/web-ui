@@ -154,7 +154,14 @@ same figure the resource badge shows as "Caching 51% · 2.3 MB/s". It is rewritt
 event and on every 1 s watchdog tick, so a silent swarm shows a moving
 countdown rather than a frozen spinner. The seeder's own stats cadence is the
 other half of the latency (`torrent-web-seeder` StatStream ticker and Stat
-cache TTL, both 3 s before 2026-09).
+cache TTL, both 3 s before 2026-09; 1 s since).
+
+That cadence is for the browser, not for Loki: `services/job` logs
+`StatusUpdate` items at Debug (every other job item stays Info) and drops a
+redraw whose tag and text equal the previous one, so a static line costs no
+Redis publish, log line or observer push per tick. Before that (2026-09-02,
+`44382e9`) the same lines were Info and made web-ui's log volume grow fivefold
+at the same number of jobs.
 
 ## Three no-peers reasons
 

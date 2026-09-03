@@ -60,6 +60,10 @@ type Job struct {
 	Queue          string
 	l              []LogItem
 	lmux           sync.Mutex
+	// lastStatus is the previous StatusUpdate line (tag + text) while no other
+	// item has been logged since; an identical redraw is dropped so a static
+	// line does not publish, log or push once per watchdog tick.
+	lastStatus     *LogItem
 	runnable       Runnable
 	observers      map[string]*Observer
 	closed         bool
@@ -99,7 +103,9 @@ var levelMap = map[LogItemLevel]log.Level{
 	InProgress:     log.InfoLevel,
 	Download:       log.InfoLevel,
 	Redirect:       log.InfoLevel,
-	StatusUpdate:   log.InfoLevel,
+	// StatusUpdate redraws a live line (the warm-up watchdog rewrites it every
+	// second); it goes to the UI, not to Loki — Debug keeps it out of prod logs.
+	StatusUpdate:   log.DebugLevel,
 	RenderTemplate: log.InfoLevel,
 	Custom:         log.InfoLevel,
 	Skip:           log.InfoLevel,
@@ -238,6 +244,16 @@ func (s *Job) log(l LogItem) error {
 		s.cur = l.Tag
 	} else if l.Tag == "" {
 		l.Tag = s.cur
+	}
+	if l.Level == StatusUpdate {
+		if s.lastStatus != nil && s.lastStatus.Tag == l.Tag && s.lastStatus.Status == l.Status {
+			s.lmux.Unlock()
+			return nil
+		}
+		ls := l
+		s.lastStatus = &ls
+	} else {
+		s.lastStatus = nil
 	}
 	s.l = append(s.l, l)
 	s.lmux.Unlock()
