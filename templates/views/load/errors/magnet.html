@@ -4,7 +4,9 @@
      the metadata within the wait; "invalid" — the link itself is broken, so
      there is nothing to retry. Long — the ten-minute attempt is what failed. */}}
 {{ $dead := eq .Data.Kind "dead" }}
-<div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+{{/* text-left: the home page's hero centres its text and this card lives
+     inside it; the no-peers card on a resource page has no such parent. */}}
+<div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 text-left">
     <div class="flex items-start gap-3">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
             <path d="M6 15a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1a2 2 0 0 0-2 2v10a1 1 0 0 1-2 0V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2z"/>
@@ -26,9 +28,11 @@
     {{- end }}
 </div>
 
-<div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
-    <a class="close closeable-close">{{ t $.Lang "home.gotIt" }}</a>
-    {{- if $dead }}
+{{/* No "got it" of its own: the progress log that hosts a load job (home
+     page) shows its own close link once the job fails, and two of them
+     stood side by side. */}}
+{{- if $dead }}
+<div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center text-left">
     {{/* The same submit the home form does, with the ten-minute wait. It lands
          in "main" like the form, so the new job's log replaces this one. */}}
     <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="main">
@@ -39,8 +43,8 @@
         {{- end }}
         <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="magnet-retry-long" data-umami-event-after_long="{{ if .Data.Long }}1{{ else }}0{{ end }}">{{ t $.Lang "load.magnet.retryLong" }}</button>
     </form>
-    {{- end }}
 </div>
+{{- end }}
 <script>
 (function () {
     if (!window.umami) return;
