@@ -106,7 +106,9 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service, thumb *thumbnail.Service, uc *claims.Claims) *Jobs {
 	return &Jobs{
 		q:             q,
-		tb:            tm,
+		// Jobs render their own cards (load/errors/*): views are registered
+		// per owner, and nobody else claims the load/ tree.
+		tb:            tm.MustRegisterViews("load/**/*"),
 		api:           api,
 		enricher:      enricher,
 		i18n:          i18nSvc,
