@@ -41,3 +41,24 @@ func TestFormatWarmupLine(t *testing.T) {
 		}
 	}
 }
+
+// The magnet wait shows seconds below a minute (the warm-up's own line) and
+// m:ss above it, and nothing once the deadline has passed.
+func TestMagnetCountdown(t *testing.T) {
+	cases := []struct {
+		left time.Duration
+		want string
+	}{
+		{43 * time.Second, "job.warmupCountdown{Seconds=43}"},
+		{9*time.Minute + 57*time.Second, "9:57"},
+		{10 * time.Minute, "10:00"},
+		{60 * time.Second, "1:00"},
+		{0, ""},
+		{-3 * time.Second, ""},
+	}
+	for _, c := range cases {
+		if got := magnetCountdown(tpStub, c.left); got != c.want {
+			t.Errorf("left=%s: got %q, want %q", c.left, got, c.want)
+		}
+	}
+}

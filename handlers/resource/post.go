@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/handlers/common"
@@ -26,6 +27,8 @@ type PostArgs struct {
 	Instruction string
 	HintVideoID string
 	Claims      *api.Claims
+	MagnetWait  time.Duration
+	Debug       string
 }
 
 func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
@@ -63,12 +66,31 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 
 	hintVideoID, _ := c.GetPostForm("hint_video_id")
 
+	// "magnet-wait=long" is the dead-magnet card's retry: ten minutes instead
+	// of one. Only that value means anything; the ordinary submit has none.
+	var magnetWait time.Duration
+	if v, _ := c.GetPostForm("magnet-wait"); v == "long" {
+		magnetWait = scripts.MagnetWaitLong
+	}
+	// Dev-only failure playback; the query form works on the magnet GET route
+	// too (/magnet:?xt=...&debug=magnet_dead).
+	debug := ""
+	if gin.Mode() != gin.ReleaseMode {
+		if v, ok := c.GetPostForm("debug"); ok {
+			debug = v
+		} else {
+			debug = c.Query("debug")
+		}
+	}
+
 	return &PostArgs{
 		File:        fd,
 		Query:       query,
 		Claims:      api.GetClaimsFromContext(c),
 		Instruction: instruction,
 		HintVideoID: hintVideoID,
+		MagnetWait:  magnetWait,
+		Debug:       debug,
 	}, nil
 }
 
@@ -96,6 +118,8 @@ func (s *Handler) post(c *gin.Context) {
 		Query:       args.Query,
 		File:        args.File,
 		HintVideoID: args.HintVideoID,
+		MagnetWait:  args.MagnetWait,
+		Debug:       args.Debug,
 	})
 	if err != nil {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))

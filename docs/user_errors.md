@@ -28,6 +28,7 @@ Every render logs one structured line — `user error shown` with `err_key` and
 
 | Key | Matches | What happened | What the user can do |
 |---|---|---|---|
+| *(card)* `load/errors/magnet` | `*scripts.MagnetError` from the load job | the magnet did not become a torrent: `dead` (no peer had the metadata within the wait, 60 s by default) or `invalid` (broken link); the load job renders a card instead of a red line, with a countdown while waiting | dead: "try again for 10 minutes" (`magnet-wait=long`, rest-api and magnet2torrent cap at 10 min), .torrent or another source; invalid: fix the link. Dev: `/magnet:?xt=urn:btih:<40 hex>&debug=magnet_dead\|magnet_dead_long\|magnet_invalid` |
 | `error.magnet_no_metadata` | `failed to magnetize`, `magnet timeout` | magnet2torrent found no peer with the metadata within the 60 s deadline; measured 2026-09-04: such magnets stay unresolvable on a warm client too (5/60), i.e. dead magnets | use the .torrent file or another source; retrying rarely helps (504) |
 | `error.magnet_invalid` | `failed to parse magnet` | the magnet link itself is broken (infohash missing / cut short) | copy the full link or upload the .torrent (400) |
 | `error.upstream_unavailable` | `failed to retrieve resource / stream url / download link`, `stats returned status`, `warmup returned status` | rest-api / thp / seeder did not answer | retry in a minute (ours to fix) |
