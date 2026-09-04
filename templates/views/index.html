@@ -114,8 +114,8 @@
     {{ end }}
 
     {{ if has . "Job" }}
-    <div id="log-load" class="w-full max-w-[680px]" data-async-layout="{{`{{ template "load/progress" . }}`}}">
-        {{ template "load/progress" . }}
+    <div id="log-load" class="w-full max-w-[680px]" data-async-layout="{{`{{ template "load/progress" $ }}`}}">
+        {{ template "load/progress" $ }}
     </div>
     {{ end }}
 

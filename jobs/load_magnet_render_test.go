@@ -61,3 +61,36 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 		}
 	}
 }
+
+// The log host partial is called with the root context ($) — a view's dot is
+// its Data, and "$.Lang" inside the partial once resolved against PostData
+// and failed at request time. Render it the way index.html and the retry
+// layout do.
+func TestLoadProgressPartialRenders(t *testing.T) {
+	tpl, err := template.New("progress.html").Funcs(template.FuncMap{
+		"t":             func(lang, key string, args ...interface{}) string { return key },
+		"makeJobLogURL": func(lang string, j interface{}) string { return "/" + lang + "/queue/load/job/x/log" },
+		"asset":         func(p string) template.HTML { return template.HTML("<script src=\"" + p + "\"></script>") },
+	}).ParseFiles("../templates/partials/load/progress.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	type postData struct{ Job interface{} }
+	ctx := struct {
+		Lang string
+		Data postData
+	}{Lang: "ru", Data: postData{Job: struct{}{}}}
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "load/progress", &ctx); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buf.String()
+	for _, w := range []string{`data-async-progress-log="/ru/queue/load/job/x/log"`, "home.gotIt", "load.js", `class="log-target"`} {
+		if !strings.Contains(out, w) {
+			t.Errorf("missing %q in\n%s", w, out)
+		}
+	}
+	if strings.Contains(out, "<form") {
+		t.Error("the host must be a div: cards inside carry their own forms")
+	}
+}

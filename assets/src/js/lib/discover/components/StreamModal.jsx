@@ -276,7 +276,7 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
                     // emitted by the job carry their own forms) inside #log-load,
                     // so the dead-magnet card's retry re-renders the log here
                     // instead of navigating "main" away from the modal.
-                    <div id="log-load" data-async-layout={'{{ template "load/progress" . }}'}>
+                    <div id="log-load" data-async-layout={'{{ template "load/progress" $ }}'}>
                         <div class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
                             {fileIdx != null && <input type="hidden" name="file-idx" value={fileIdx} />}
                             <div class="log-target"></div>

@@ -8,11 +8,13 @@
      link into "main", hidden inputs such as file-idx become query params).
      The wrapper #log-load is what a retry targets: the server answers with
      this very partial (data-async-layout) and the new job's log takes over
-     in place — the streaming buttons do the same with #log-<item>. */}}
-<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL $.Lang .Job }}" data-async-target="main">
+     in place — the streaming buttons do the same with #log-<item>.
+     Called with the root context ($): .Lang and .Data.Job, like the
+     release-subscribe banner — a view's dot is its Data. */}}
+<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main">
     <div class="log-target"></div>
     <div class="pt-3 justify-end flex hidden alert-close-wrapper">
-        <a class="closeable-close close">{{ t $.Lang "home.gotIt" }}</a>
+        <a class="closeable-close close">{{ t .Lang "home.gotIt" }}</a>
     </div>
 </div>
 {{ "load.js" | asset }}
