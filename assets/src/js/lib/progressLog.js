@@ -101,10 +101,18 @@ class Renderer {
         div.setAttribute('task-custom', data.tag);
         this.lt.appendChild(div);
         loadAsyncView(div, data.body);
-        for (const close of div.querySelectorAll('.closeable-close')) {
+        const closes = div.querySelectorAll('.closeable-close');
+        for (const close of closes) {
             close.addEventListener('click', () => {
                 this.el.classList.add('hidden');
             });
+        }
+        if (closes.length) {
+            // A card that brings its own "got it" (no-peers, dead magnet)
+            // owns the footer: the host's close link would stand right
+            // under it as a second "got it" (home page log, 2026-09-04).
+            this.customClose = true;
+            this.hideClose();
         }
     }
     addSummary(data) {
@@ -162,6 +170,7 @@ class Renderer {
     }
 
     showClose() {
+        if (this.customClose) return;
         const wrapper = this.el.querySelector('.alert-close-wrapper');
         if (!wrapper) return;
         wrapper.classList.remove('hidden');

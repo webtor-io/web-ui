@@ -28,11 +28,12 @@
     {{- end }}
 </div>
 
-{{/* No "got it" of its own: the progress log that hosts a load job (home
-     page) shows its own close link once the job fails, and two of them
-     stood side by side. */}}
-{{- if $dead }}
+{{/* Same footer as action/errors/no_peers: "got it" and the retry in one
+     row. progressLog.js hides the host's own close link when a card brings
+     its own, so the home page log does not show a second one. */}}
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center text-left">
+    <a class="close closeable-close">{{ t $.Lang "home.gotIt" }}</a>
+    {{- if $dead }}
     {{/* The same submit the home form does, with the ten-minute wait. It lands
          in "main" like the form, so the new job's log replaces this one. */}}
     <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="main">
@@ -43,8 +44,8 @@
         {{- end }}
         <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="magnet-retry-long" data-umami-event-after_long="{{ if .Data.Long }}1{{ else }}0{{ end }}">{{ t $.Lang "load.magnet.retryLong" }}</button>
     </form>
+    {{- end }}
 </div>
-{{- end }}
 <script>
 (function () {
     if (!window.umami) return;
