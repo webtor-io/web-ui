@@ -675,7 +675,7 @@ export async function initPlayer(target) {
 // (subdomain/path/query baked in by torrent-http-proxy) and returns
 // them in data-src. For subs uploaded after the initial render, the
 // <video> has no matching <track> yet — create one on first click.
-function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label) {
+function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label, srclang) {
     for (const t of video.querySelectorAll('track')) {
         if (t.id === trackID) return true;
     }
@@ -685,6 +685,9 @@ function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label) {
     track.kind = 'subtitles';
     track.src = wrappedSrc;
     track.label = label || 'Subtitle';
+    // HTML requires srclang on a subtitles track; 'und' when the upload
+    // declares no language. An empty attribute is not a valid tag.
+    track.srclang = srclang || 'und';
     video.appendChild(track);
     return true;
 }
@@ -707,6 +710,7 @@ function activateSubtitle(container, target) {
                 id,
                 target.getAttribute('data-src') || '',
                 target.getAttribute('data-label') || target.textContent.trim(),
+                target.getAttribute('data-srclang') || '',
             );
         }
     }

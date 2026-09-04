@@ -96,6 +96,10 @@ type UserSubtitleTrack struct {
 	Size         int64
 	DeleteURL    string
 	OriginalName string
+	// SrcLang is the BCP-47 tag rendered into <track srclang>. HTML requires
+	// the attribute for kind="subtitles"; "und" stands in when the filename
+	// declares no language.
+	SrcLang string
 	// Selected marks the track the viewer should end up watching with. Set
 	// only on the response to an upload: the player switches to it without a
 	// second click. A plain list render leaves every track unselected so a

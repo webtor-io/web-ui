@@ -234,6 +234,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 		res = append(res, ListItem{
 			ID:       t.ID,
 			Label:    t.Label,
+			SrcLang:  t.SrcLang,
 			Kind:     "subtitles",
 			Src:      t.Src,
 			Provider: "UserSubtitle",

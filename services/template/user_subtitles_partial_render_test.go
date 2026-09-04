@@ -45,8 +45,8 @@ func TestUserSubtitlesPartialMarksSelected(t *testing.T) {
 		Path:       "/movie.mkv",
 		EIURL:      "http://ei",
 		UserSubtitles: []models.UserSubtitleTrack{
-			{ID: "us-old", OriginalName: "old.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1"},
-			{ID: "us-new", OriginalName: "new.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", Selected: true},
+			{ID: "us-old", OriginalName: "old.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "und"},
+			{ID: "us-new", OriginalName: "new.en.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", Selected: true, SrcLang: "en"},
 		},
 	}
 
@@ -64,6 +64,12 @@ func TestUserSubtitlesPartialMarksSelected(t *testing.T) {
 		t.Errorf("expected exactly one autoselect marker, got %d:\n%s",
 			strings.Count(out, `data-autoselect="true"`), out)
 	}
+	// The player reads the language off the list item when it creates the
+	// <track> for a subtitle uploaded after the initial render.
+	if !strings.Contains(out, `data-srclang="en"`) || !strings.Contains(out, `data-srclang="und"`) {
+		t.Errorf("list items must expose srclang:\n%s", out)
+	}
+
 	// The marker has to sit on the uploaded track, not just anywhere.
 	newIdx := strings.Index(out, `data-id="us-new"`)
 	oldIdx := strings.Index(out, `data-id="us-old"`)

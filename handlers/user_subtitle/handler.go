@@ -233,6 +233,7 @@ func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, sel
 		id := us.TrackID(sub.UserSubtitleID)
 		tracks = append(tracks, models.UserSubtitleTrack{
 			ID:           id,
+			SrcLang:      us.LangFromName(sub.OriginalName),
 			Label:        sub.OriginalName,
 			OriginalName: sub.OriginalName,
 			Format:       sub.Format,

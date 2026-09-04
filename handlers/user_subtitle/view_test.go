@@ -8,6 +8,26 @@ import (
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 )
 
+// Every rendered track must carry a language tag: HTML requires srclang on
+// kind="subtitles", and an empty attribute is not a valid tag. The language
+// comes from the filename when it declares one.
+func TestBuildViewDerivesSrcLang(t *testing.T) {
+	named, plain := sub(t, "Coyote.vs.Acme.en.srt"), sub(t, "subtitles.srt")
+	v := buildView([]*models.UserSubtitle{named, plain}, "res", "/movie.mkv", "http://ei", "", "", nil)
+
+	if got := v.UserSubtitles[0].SrcLang; got != "en" {
+		t.Errorf("named upload: SrcLang = %q, want \"en\"", got)
+	}
+	if got := v.UserSubtitles[1].SrcLang; got != us.UndeterminedLang {
+		t.Errorf("plain upload: SrcLang = %q, want %q", got, us.UndeterminedLang)
+	}
+	for _, tr := range v.UserSubtitles {
+		if tr.SrcLang == "" {
+			t.Errorf("track %q rendered an empty srclang", tr.OriginalName)
+		}
+	}
+}
+
 func sub(t *testing.T, name string) *models.UserSubtitle {
 	t.Helper()
 	id := uuid.NewV4()
