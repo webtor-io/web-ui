@@ -22,6 +22,11 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	id := fmt.Sprintf("%x", sha1.Sum([]byte(hash+"/"+c.Lang)))
+	// A load job is keyed by hash+lang and its log is kept in Redis, so a
+	// second visit replays the first run — including a failure. The
+	// dead-magnet retry must run again, not replay the card it was clicked
+	// on; the dev playback likewise. Purge drops the stored log first.
+	purge := args.MagnetWait > 0 || args.Debug != ""
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
 		err = ls.Run(ctx, j)
 		if me, ok := err.(*scripts.MagnetError); ok {
@@ -47,7 +52,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		}
 		j.Redirect(web.LangURL(c.Lang, "/"+rID), s.T(c, "job.redirecting"))
 		return
-	}), false, s.errorFormatter(c))
+	}), purge, s.errorFormatter(c))
 	return
 }
 
