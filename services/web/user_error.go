@@ -84,6 +84,22 @@ func ClassifyError(err error) string {
 	case strings.Contains(msg, "failed to validate"):
 		return "error.validation_failed"
 
+	// --- magnet resolution: before the chain, it is the step that precedes it ---
+
+	case strings.Contains(msg, "failed to parse magnet"):
+		// The link itself is broken (infohash cut short, wrong encoding):
+		// nothing on the network will change that.
+		return "error.magnet_invalid"
+
+	case strings.Contains(msg, "failed to magnetize"),
+		strings.Contains(msg, "magnet timeout"):
+		// magnet2torrent found no peer with the metadata within the
+		// deadline. Measured 2026-09-04: such magnets stay unresolvable on
+		// a warm client too (5 of 60), so "try again" is the wrong advice —
+		// the message must say nobody is sharing it and point at a .torrent
+		// or another source instead of inviting a retry loop.
+		return "error.magnet_no_metadata"
+
 	// --- streaming chain, in the order the request travels ---
 
 	case strings.Contains(msg, "failed to retrieve resource"),
@@ -140,6 +156,12 @@ func StatusForErrKey(key string) int {
 		return http.StatusUnauthorized
 	case "error.service_unavailable", "error.upstream_unavailable":
 		return http.StatusServiceUnavailable
+	case "error.magnet_invalid":
+		return http.StatusBadRequest
+	case "error.magnet_no_metadata":
+		// Nothing answered upstream within the deadline: a gateway timeout,
+		// not a server fault.
+		return http.StatusGatewayTimeout
 	default:
 		return http.StatusInternalServerError
 	}

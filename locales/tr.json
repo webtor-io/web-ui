@@ -1553,6 +1553,8 @@
     "error.stream_stalled": "Oynatma zamanında başlamadı: dönüştürücü torrentten veri almadı. Bir dakika sonra tekrar deneyin veya dosyayı indirin.",
     "error.probe_failed": "Bu dosyanın medya bilgisi okunamadı — video olmayabilir ya da kapsayıcı bozuk. İndirmeyi deneyin.",
     "error.upstream_unavailable": "Akış arka ucumuz yanıt vermedi. Sorun bizde — lütfen bir dakika sonra tekrar deneyin.",
+    "error.magnet_no_metadata": "Bu torrenti BitTorrent ağında bir dakika içinde bulamadık — şu anda kimse paylaşmıyor gibi görünüyor. Yeniden denemek nadiren işe yarar: daha sonra deneyin, .torrent dosyasını kullanın veya başka bir kaynak seçin.",
+    "error.magnet_invalid": "Bu magnet bağlantısı bozuk — infohash eksik veya kesilmiş. Tam magnet bağlantısını kopyalayın ya da .torrent dosyasını yükleyin.",
     "error.support_infohash_required": "Torrentin infohash'ini, magnet'ini veya bağlantısını ekleyin — yoksa hangi torrenti kastettiğinizi bilemeyiz.",
     "error.subscriptionFailed": "Abonelik oluşturulamadı",
     "error.subscriptionLimit": "Abonelik sınırına ulaştın. Birini sil ya da planını yükselt.",

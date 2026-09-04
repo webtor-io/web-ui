@@ -1563,6 +1563,8 @@
     "error.stream_stalled": "Odtwarzanie nie ruszyło na czas: konwerter nie otrzymał danych z torrenta. Spróbuj za minutę albo pobierz plik.",
     "error.probe_failed": "Nie udało się odczytać informacji o mediach tego pliku — może to nie wideo, albo kontener jest uszkodzony. Spróbuj go pobrać.",
     "error.upstream_unavailable": "Nasz backend streamingu nie odpowiedział. To po naszej stronie — spróbuj ponownie za minutę.",
+    "error.magnet_no_metadata": "Nie znaleźliśmy tego torrenta w sieci BitTorrent w ciągu minuty — wygląda na to, że nikt go teraz nie udostępnia. Ponowna próba rzadko pomaga: spróbuj później, użyj pliku .torrent lub innego źródła.",
+    "error.magnet_invalid": "Ten link magnet jest uszkodzony — brakuje infohasha lub jest ucięty. Skopiuj pełny link magnet albo wgraj plik .torrent.",
     "error.support_infohash_required": "Podaj infohash, magnet lub link do torrenta — bez tego nie wiemy, o który torrent chodzi.",
     "error.subscriptionFailed": "Nie udało się utworzyć subskrypcji",
     "error.subscriptionLimit": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",

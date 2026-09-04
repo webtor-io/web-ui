@@ -28,6 +28,8 @@ Every render logs one structured line — `user error shown` with `err_key` and
 
 | Key | Matches | What happened | What the user can do |
 |---|---|---|---|
+| `error.magnet_no_metadata` | `failed to magnetize`, `magnet timeout` | magnet2torrent found no peer with the metadata within the 60 s deadline; measured 2026-09-04: such magnets stay unresolvable on a warm client too (5/60), i.e. dead magnets | use the .torrent file or another source; retrying rarely helps (504) |
+| `error.magnet_invalid` | `failed to parse magnet` | the magnet link itself is broken (infohash missing / cut short) | copy the full link or upload the .torrent (400) |
 | `error.upstream_unavailable` | `failed to retrieve resource / stream url / download link`, `stats returned status`, `warmup returned status` | rest-api / thp / seeder did not answer | retry in a minute (ours to fix) |
 | `error.probe_failed` | `failed to get probe data` | content-prober could not read the media | download instead |
 | `error.resolution_not_supported` | `over 1080p is not supported` | transcoder refuses >1080p non-h264 | download instead |

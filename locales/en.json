@@ -1614,6 +1614,8 @@
     "error.stream_stalled": "Playback didn't start in time: the converter received no data from the torrent. Try again in a minute, or download the file.",
     "error.probe_failed": "We couldn't read this file's media info — it may not be a video, or the container is damaged. Try downloading it.",
     "error.upstream_unavailable": "Our streaming backend didn't answer. This is on our side — please try again in a minute.",
+    "error.magnet_no_metadata": "We couldn't find this torrent in the BitTorrent network within a minute — nobody seems to be sharing it right now. Retrying rarely helps: try later, use the .torrent file instead, or pick another source.",
+    "error.magnet_invalid": "This magnet link is broken — the infohash is missing or cut short. Copy the full magnet link or upload the .torrent file.",
     "error.support_infohash_required": "Please add the torrent's infohash, magnet or link — without it we can't tell which torrent you mean.",
     "error.subscriptionFailed": "Couldn't create the subscription",
     "error.subscriptionLimit": "Subscription limit reached. Remove one or upgrade your plan.",

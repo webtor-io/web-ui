@@ -1563,6 +1563,8 @@
     "error.stream_stalled": "Přehrávání nezačalo včas: převodník nedostal z torrentu žádná data. Zkuste to za minutu, nebo si soubor stáhněte.",
     "error.probe_failed": "Nepodařilo se přečíst informace o médiu tohoto souboru — možná to není video, nebo je kontejner poškozený. Zkuste ho stáhnout.",
     "error.upstream_unavailable": "Náš streamovací backend neodpověděl. Je to na naší straně — zkuste to prosím za minutu.",
+    "error.magnet_no_metadata": "Tento torrent jsme v síti BitTorrent do minuty nenašli — zdá se, že ho teď nikdo nesdílí. Opakování málokdy pomůže: zkus to později, použij soubor .torrent nebo jiný zdroj.",
+    "error.magnet_invalid": "Tento magnet odkaz je poškozený — chybí infohash nebo je useknutý. Zkopíruj celý magnet odkaz nebo nahraj soubor .torrent.",
     "error.support_infohash_required": "Uveďte infohash, magnet nebo odkaz na torrent — bez toho nepoznáme, o který torrent jde.",
     "error.subscriptionFailed": "Odběr se nepodařilo vytvořit",
     "error.subscriptionLimit": "Dosáhl jsi limitu odběrů. Jeden smaž nebo změň tarif.",

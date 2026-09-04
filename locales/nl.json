@@ -1553,6 +1553,8 @@
     "error.stream_stalled": "Het afspelen startte niet op tijd: de converter kreeg geen data van de torrent. Probeer het over een minuut opnieuw of download het bestand.",
     "error.probe_failed": "De media-informatie van dit bestand kon niet worden gelezen — misschien is het geen video, of is de container beschadigd. Probeer het te downloaden.",
     "error.upstream_unavailable": "Onze streaming-backend antwoordde niet. Dat ligt aan ons — probeer het over een minuut opnieuw.",
+    "error.magnet_no_metadata": "We hebben deze torrent binnen een minuut niet in het BitTorrent-netwerk gevonden — niemand lijkt hem nu te delen. Opnieuw proberen helpt zelden: probeer het later, gebruik het .torrent-bestand of een andere bron.",
+    "error.magnet_invalid": "Deze magnetlink is kapot — de infohash ontbreekt of is afgekapt. Kopieer de volledige magnetlink of upload het .torrent-bestand.",
     "error.support_infohash_required": "Voeg de infohash, magnet of link van de torrent toe — anders weten we niet welke torrent je bedoelt.",
     "error.subscriptionFailed": "Het abonnement kon niet worden aangemaakt",
     "error.subscriptionLimit": "Abonnementslimiet bereikt. Verwijder er een of stap over op een ander plan.",

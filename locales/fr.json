@@ -1553,6 +1553,8 @@
     "error.stream_stalled": "La lecture n’a pas démarré à temps : le convertisseur n’a reçu aucune donnée du torrent. Réessayez dans une minute ou téléchargez le fichier.",
     "error.probe_failed": "Impossible de lire les informations média de ce fichier — ce n’est peut-être pas une vidéo, ou le conteneur est endommagé. Essayez de le télécharger.",
     "error.upstream_unavailable": "Notre backend de streaming n’a pas répondu. C’est de notre côté — réessayez dans une minute.",
+    "error.magnet_no_metadata": "Nous n'avons pas trouvé ce torrent sur le réseau BitTorrent en une minute : personne ne semble le partager en ce moment. Réessayer aide rarement : tentez plus tard, utilisez le fichier .torrent ou une autre source.",
+    "error.magnet_invalid": "Ce lien magnet est cassé : l'infohash manque ou est tronqué. Copiez le lien magnet complet ou envoyez le fichier .torrent.",
     "error.support_infohash_required": "Indiquez l’infohash, le magnet ou le lien du torrent — sans cela nous ne savons pas de quel torrent il s’agit.",
     "error.subscriptionFailed": "Impossible de créer l'abonnement",
     "error.subscriptionLimit": "Limite d'abonnements atteinte. Supprimez-en un ou changez d'offre.",

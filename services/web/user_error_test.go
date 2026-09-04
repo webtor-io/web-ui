@@ -50,6 +50,10 @@ func TestClassifyError_StreamingChain(t *testing.T) {
 		"failed to retrieve resource: access is forbidden url=x": "error.forbidden",
 		"failed to retrieve resource: resource not found":        "error.not_found",
 		"something nobody anticipated":                           "error.generic",
+		// magnet resolution precedes the chain and has its own two faces
+		"failed to magnetize: Post \"http://rest-api/resource/\": context deadline exceeded":            "error.magnet_no_metadata",
+		"magnet timeout: rpc error: code = Canceled desc = context canceled":                              "error.magnet_no_metadata",
+		"failed to magnetize: failed to parse magnet: error parsing v1 infohash \"urn:btih:5e4bd524\"": "error.magnet_invalid",
 	}
 	for msg, want := range cases {
 		if got := ClassifyError(errors.New(msg)); got != want {
@@ -58,5 +62,8 @@ func TestClassifyError_StreamingChain(t *testing.T) {
 	}
 	if StatusForErrKey("error.upstream_unavailable") != 503 {
 		t.Error("upstream failures must be retry-able (503)")
+	}
+	if StatusForErrKey("error.magnet_no_metadata") != 504 || StatusForErrKey("error.magnet_invalid") != 400 {
+		t.Error("magnet: no metadata is a gateway timeout, a broken link is a bad request")
 	}
 }
