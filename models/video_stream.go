@@ -96,6 +96,11 @@ type UserSubtitleTrack struct {
 	Size         int64
 	DeleteURL    string
 	OriginalName string
+	// Selected marks the track the viewer should end up watching with. Set
+	// only on the response to an upload: the player switches to it without a
+	// second click. A plain list render leaves every track unselected so a
+	// re-render never overrides a choice already made.
+	Selected bool
 }
 
 // UserSubtitleView is the flat data shape consumed by the

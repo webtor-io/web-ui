@@ -89,12 +89,17 @@ func (s *Handler) upload(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), uploadTimeout)
 	defer cancel()
 
-	if _, err := s.svc.Upload(ctx, user.ID, resourceID, path, file.Filename, data); err != nil {
+	uploaded, err := s.svc.Upload(ctx, user.ID, resourceID, path, file.Filename, data)
+	if err != nil {
 		s.respondError(c, user.ID, resourceID, path, translateUploadError(err))
 		return
 	}
 
-	s.respondSuccess(c, user.ID, resourceID, path, "toast.user_subtitle.uploaded")
+	var selectedID string
+	if uploaded != nil {
+		selectedID = us.TrackID(uploaded.UserSubtitleID)
+	}
+	s.respondSuccess(c, user.ID, resourceID, path, "toast.user_subtitle.uploaded", selectedID)
 }
 
 func (s *Handler) delete(c *gin.Context) {
@@ -128,7 +133,7 @@ func (s *Handler) delete(c *gin.Context) {
 		return
 	}
 
-	s.respondSuccess(c, user.ID, resourceID, path, "toast.user_subtitle.deleted")
+	s.respondSuccess(c, user.ID, resourceID, path, "toast.user_subtitle.deleted", "")
 }
 
 // file streams the raw blob. The :name suffix is decorative (so the player
@@ -167,9 +172,9 @@ func (s *Handler) file(c *gin.Context) {
 // respondSuccess renders the async view on XHR requests (so the "My
 // Subtitles" panel swaps in place) and falls back to the classic redirect
 // for non-async form submits.
-func (s *Handler) respondSuccess(c *gin.Context, userID uuid.UUID, resourceID, path, toastKey string) {
+func (s *Handler) respondSuccess(c *gin.Context, userID uuid.UUID, resourceID, path, toastKey string, selectedID string) {
 	if isAsync(c) {
-		s.renderView(c, userID, resourceID, path, c.PostForm("ei_url"), "")
+		s.renderView(c, userID, resourceID, path, c.PostForm("ei_url"), "", selectedID)
 		return
 	}
 	web.RedirectWithSuccessAndMessage(c, toastKey)
@@ -177,7 +182,7 @@ func (s *Handler) respondSuccess(c *gin.Context, userID uuid.UUID, resourceID, p
 
 func (s *Handler) respondError(c *gin.Context, userID uuid.UUID, resourceID, path string, err error) {
 	if isAsync(c) && resourceID != "" && path != "" {
-		s.renderView(c, userID, resourceID, path, c.PostForm("ei_url"), web.ClassifyError(err))
+		s.renderView(c, userID, resourceID, path, c.PostForm("ei_url"), web.ClassifyError(err), "")
 		return
 	}
 	web.RedirectWithError(c, err)
@@ -193,7 +198,7 @@ func (s *Handler) respondError(c *gin.Context, userID uuid.UUID, resourceID, pat
 // initial render (hidden form field). We use it as the base when wrapping
 // each subtitle through /ext/~vtt/ so the proxy's embedded auth (whether
 // in the subdomain, path, or query) is preserved verbatim.
-func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path, eiURL, errKey string) {
+func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path, eiURL, errKey, selectedID string) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), deleteTimeout)
 	defer cancel()
 
@@ -203,30 +208,47 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 	}
 
 	ei := ra.ExportItem{URL: eiURL}
+	var wrap func(*models.UserSubtitle) string
+	if eiURL != "" && s.sapi != nil {
+		wrap = func(sub *models.UserSubtitle) string {
+			return s.sapi.AttachExternalSubtitle(ei, s.svc.PublicURL(sub.Hash, sub.OriginalName))
+		}
+	}
+
+	data := buildView(list, resourceID, path, eiURL, errKey, selectedID, wrap)
+	s.tb.Build("user_subtitle/view").HTML(http.StatusOK, web.NewContext(c).WithData(data))
+}
+
+// buildView shapes the list into what the partial renders. selectedID names
+// the track the player should switch to — set after an upload, empty on every
+// other render. wrap may be nil when there is no export URL to hang the
+// subtitle off (the list still renders, just without playable sources).
+func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, selectedID string, wrap func(*models.UserSubtitle) string) *models.UserSubtitleView {
 	tracks := make([]models.UserSubtitleTrack, 0, len(list))
 	for _, sub := range list {
 		var wrapped string
-		if eiURL != "" && s.sapi != nil {
-			wrapped = s.sapi.AttachExternalSubtitle(ei, s.svc.PublicURL(sub.Hash, sub.OriginalName))
+		if wrap != nil {
+			wrapped = wrap(sub)
 		}
+		id := us.TrackID(sub.UserSubtitleID)
 		tracks = append(tracks, models.UserSubtitleTrack{
-			ID:           us.TrackID(sub.UserSubtitleID),
+			ID:           id,
 			Label:        sub.OriginalName,
 			OriginalName: sub.OriginalName,
 			Format:       sub.Format,
 			Size:         sub.Size,
 			Src:          wrapped,
 			DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
+			Selected:     selectedID != "" && id == selectedID,
 		})
 	}
-	data := &models.UserSubtitleView{
+	return &models.UserSubtitleView{
 		ResourceID:    resourceID,
 		Path:          path,
 		EIURL:         eiURL,
 		UserSubtitles: tracks,
 		ErrKey:        errKey,
 	}
-	s.tb.Build("user_subtitle/view").HTML(http.StatusOK, web.NewContext(c).WithData(data))
 }
 
 func isAsync(c *gin.Context) bool {

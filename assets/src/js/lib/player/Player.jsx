@@ -689,6 +689,52 @@ function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label) {
     return true;
 }
 
+// activateSubtitle switches playback to the subtitle the given list item
+// stands for. Shared by the click handler and by the auto-selection that runs
+// after an upload, so both paths create the <track>, persist the choice
+// through markTrack and end with the same textTracks state.
+function activateSubtitle(container, target) {
+    const provider = target.getAttribute('data-provider');
+    const id = target.getAttribute('data-id');
+    // User subs uploaded after the initial page render have no matching
+    // <track> yet — create it here so the textTracks mode='showing' loop
+    // below finds something to activate.
+    if (provider === 'UserSubtitle' && id && id !== 'none') {
+        const video = container.querySelector('video.player');
+        if (video) {
+            ensureUserSubtitleTrack(
+                video,
+                id,
+                target.getAttribute('data-src') || '',
+                target.getAttribute('data-label') || target.textContent.trim(),
+            );
+        }
+    }
+    markTrack(container, target, 'subtitle');
+    const hls = window.hlsPlayer;
+    const mpId = target.getAttribute('data-mp-id');
+
+    if (hls && provider === 'MediaProbe') {
+        hls.subtitleDisplay = true;
+        hls.subtitleTrack = parseInt(mpId);
+        for (const p of document.querySelectorAll('video.player')) {
+            for (const t of p.textTracks) {
+                if (t.id) t.mode = 'hidden';
+            }
+        }
+    } else {
+        if (hls) {
+            hls.subtitleTrack = -1;
+            hls.subtitleDisplay = false;
+        }
+        for (const p of document.querySelectorAll('video.player, audio.player')) {
+            for (const t of p.textTracks) {
+                t.mode = (id && id !== 'none' && t.id === id) ? 'showing' : 'hidden';
+            }
+        }
+    }
+}
+
 function wireTrackHandlers(container) {
     // Delegate subtitle clicks on #subtitles so items swapped into
     // #my-subtitles via async still work without re-binding.
@@ -697,47 +743,11 @@ function wireTrackHandlers(container) {
         subtitlesModal.addEventListener('click', (e) => {
             const target = e.target.closest('.subtitle');
             if (!target || !subtitlesModal.contains(target)) return;
-            const provider = target.getAttribute('data-provider');
-            const id = target.getAttribute('data-id');
-            // User subs uploaded after the initial page render have no
-            // matching <track> yet — create it on first click so the
-            // textTracks mode='showing' loop below finds something to
-            // activate.
-            if (provider === 'UserSubtitle' && id && id !== 'none') {
-                const video = container.querySelector('video.player');
-                if (video) {
-                    ensureUserSubtitleTrack(
-                        video,
-                        id,
-                        target.getAttribute('data-src') || '',
-                        target.getAttribute('data-label') || target.textContent.trim(),
-                    );
-                }
-                if (window.umami) window.umami.track('user-subtitle-select');
+            if (target.getAttribute('data-provider') === 'UserSubtitle') {
+                const id = target.getAttribute('data-id');
+                if (id && id !== 'none' && window.umami) window.umami.track('user-subtitle-select');
             }
-            markTrack(container, target, 'subtitle');
-            const hls = window.hlsPlayer;
-            const mpId = target.getAttribute('data-mp-id');
-
-            if (hls && provider === 'MediaProbe') {
-                hls.subtitleDisplay = true;
-                hls.subtitleTrack = parseInt(mpId);
-                for (const p of document.querySelectorAll('video.player')) {
-                    for (const t of p.textTracks) {
-                        if (t.id) t.mode = 'hidden';
-                    }
-                }
-            } else {
-                if (hls) {
-                    hls.subtitleTrack = -1;
-                    hls.subtitleDisplay = false;
-                }
-                for (const p of document.querySelectorAll('video.player, audio.player')) {
-                    for (const t of p.textTracks) {
-                        t.mode = (id && id !== 'none' && t.id === id) ? 'showing' : 'hidden';
-                    }
-                }
-            }
+            activateSubtitle(container, target);
         });
     }
 
@@ -784,7 +794,17 @@ function wireTrackHandlers(container) {
     const mySubsContainer = container.querySelector('#my-subtitles');
     if (mySubsContainer) {
         window.addEventListener('async', (e) => {
-            if (e.detail && e.detail.target === mySubsContainer) syncMySubtitleMark();
+            if (!e.detail || e.detail.target !== mySubsContainer) return;
+            // A freshly uploaded subtitle comes back marked by the server.
+            // Switch to it right away: the viewer uploaded a file to watch
+            // with, and making them hunt for it in the list afterwards reads
+            // as "subtitles don't work".
+            const fresh = mySubsContainer.querySelector('.subtitle[data-autoselect="true"]');
+            if (fresh) {
+                activateSubtitle(container, fresh);
+                return;
+            }
+            syncMySubtitleMark();
         });
     }
 
