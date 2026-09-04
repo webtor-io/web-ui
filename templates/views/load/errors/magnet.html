@@ -34,9 +34,11 @@
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center text-left">
     <a class="close closeable-close">{{ t $.Lang "home.gotIt" }}</a>
     {{- if $dead }}
-    {{/* The same submit the home form does, with the ten-minute wait. It lands
-         in "main" like the form, so the new job's log replaces this one. */}}
-    <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="main">
+    {{/* Same shape as the streaming retries: the form targets the log host
+         (#log-load, see partials/load/progress), whose data-async-layout
+         makes the server answer with a fresh host bound to the new job —
+         the log is replaced in place, the page around it stays. */}}
+    <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="#log-load" data-async-push-state="false">
         <input type="hidden" name="resource" value="{{ .Data.Query }}" />
         <input type="hidden" name="magnet-wait" value="long" />
         {{- if .Data.HintVideoID }}

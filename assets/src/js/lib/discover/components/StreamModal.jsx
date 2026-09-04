@@ -260,10 +260,10 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
 
     useEffect(() => {
         if (!logUrl || !containerRef.current) return;
-        const form = containerRef.current.querySelector('form');
-        if (!form) return;
+        const host = containerRef.current.querySelector('.progress-alert');
+        if (!host) return;
 
-        const sdk = initProgressLog(form);
+        const sdk = initProgressLog(host);
         return () => sdk.destroy();
     }, [logUrl]);
 
@@ -272,10 +272,16 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
             <ModalHeader title={title} poster={poster} subtitle={t('discover.preparingResource')} />
             <div ref={containerRef}>
                 {logUrl ? (
-                    <form class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
-                        {fileIdx != null && <input type="hidden" name="file-idx" value={fileIdx} />}
-                        <div class="log-target"></div>
-                    </form>
+                    // Same host shape as partials/load/progress.html: a div (cards
+                    // emitted by the job carry their own forms) inside #log-load,
+                    // so the dead-magnet card's retry re-renders the log here
+                    // instead of navigating "main" away from the modal.
+                    <div id="log-load" data-async-layout={'{{ template "load/progress" . }}'}>
+                        <div class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
+                            {fileIdx != null && <input type="hidden" name="file-idx" value={fileIdx} />}
+                            <div class="log-target"></div>
+                        </div>
+                    </div>
                 ) : (
                     <div class="text-center py-4">
                         <span class="loading loading-spinner loading-md text-w-cyan"></span>

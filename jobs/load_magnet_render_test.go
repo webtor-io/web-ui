@@ -41,7 +41,7 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 		return buf.String()
 	}
 	dead := render("en", &MagnetErrorData{Kind: "dead", WaitedSec: 60, Query: "magnet:?xt=urn:btih:00"})
-	for _, w := range []string{"Nobody is sharing", "for a minute", "60 s", `name="magnet-wait" value="long"`, "magnet-retry-long", "Try again for 10 minutes", `kind: 'dead'`} {
+	for _, w := range []string{"Nobody is sharing", "for a minute", "60 s", `name="magnet-wait" value="long"`, `data-async-target="#log-load"`, "magnet-retry-long", "Try again for 10 minutes", `kind: 'dead'`} {
 		if !strings.Contains(dead, w) {
 			t.Errorf("dead: missing %q", w)
 		}

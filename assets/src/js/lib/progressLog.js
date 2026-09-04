@@ -59,6 +59,8 @@ class SDK {
         return new Entry(this, data.tag);
     }
 }
+import { rebindAsync } from './async';
+
 export function initProgressLog(el, func) {
     const r = new Renderer(el, func);
     function onMessage(data) {
@@ -218,7 +220,26 @@ class Renderer {
                 this.el.setAttribute('action', data.location);
                 this.el.requestSubmit();
             } else {
-                window.location.href = data.location;
+                // Div hosts (nested-form friendly, see partials/load/progress)
+                // navigate asynchronously too: a throwaway link into the
+                // host's target, with the host's hidden inputs (file-idx)
+                // carried as query params — what the form path did.
+                const target = this.el.getAttribute('data-async-target');
+                if (!target) {
+                    window.location.href = data.location;
+                    return;
+                }
+                const u = new URL(data.location, window.location.origin);
+                for (const inp of this.el.querySelectorAll('input[type=hidden]')) {
+                    if (inp.name) u.searchParams.set(inp.name, inp.value);
+                }
+                const a = document.createElement('a');
+                a.href = u.toString();
+                a.setAttribute('data-async-target', target);
+                a.classList.add('hidden');
+                this.el.appendChild(a);
+                rebindAsync(this.el);
+                a.click();
             }
         }
         if (data.level === 'rendertemplate') {

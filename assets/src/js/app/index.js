@@ -10,11 +10,9 @@ av(async function() {
         const initDrop = (await import('../lib/drop')).initDrop;
         initDrop(dropzone);
     }
-    const progress = this.querySelector('.progress-alert');
-    if (progress != null) {
-        const initProgressLog = (await import('../lib/progressLog')).initProgressLog;
-        initProgressLog(progress);
-    }
+    // The load job's log host is initialised by load.js, shipped with
+    // partials/load/progress.html — so a retry that re-renders the host
+    // into #log-load gets the same init without this view being reloaded.
     const initHeroPointer = (await import('../lib/heroPointer')).initHeroPointer;
     destroyHeroPointer = initHeroPointer(this);
 }, function() {

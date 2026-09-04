@@ -114,12 +114,9 @@
     {{ end }}
 
     {{ if has . "Job" }}
-    <form class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL $.Lang .Job }}" data-async-target="main">
-        <div class="log-target"></div>
-        <div class="pt-3 justify-end flex hidden alert-close-wrapper">
-            <a class="closeable-close close">{{ t $.Lang "home.gotIt" }}</a>
-        </div>
-    </form>
+    <div id="log-load" class="w-full max-w-[680px]" data-async-layout="{{`{{ template "load/progress" . }}`}}">
+        {{ template "load/progress" . }}
+    </div>
     {{ end }}
 
     {{ if $.ErrKey }}

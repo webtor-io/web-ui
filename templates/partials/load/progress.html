@@ -1,0 +1,19 @@
+{{ define "load/progress" }}
+{{/* Host of a load job's log (home page, Discover's stream modal). A div, not
+     a form, for the same reason as action/post.html: cards emitted via
+     j.Custom (load/errors/magnet) carry their own <form>, and HTML5 forbids
+     nested forms — inside a <form> host the card's form was flattened and
+     its fields (magnet-wait) never reached the server. The redirect after a
+     successful load goes through progressLog.js's div-host path (an async
+     link into "main", hidden inputs such as file-idx become query params).
+     The wrapper #log-load is what a retry targets: the server answers with
+     this very partial (data-async-layout) and the new job's log takes over
+     in place — the streaming buttons do the same with #log-<item>. */}}
+<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL $.Lang .Job }}" data-async-target="main">
+    <div class="log-target"></div>
+    <div class="pt-3 justify-end flex hidden alert-close-wrapper">
+        <a class="closeable-close close">{{ t $.Lang "home.gotIt" }}</a>
+    </div>
+</div>
+{{ "load.js" | asset }}
+{{ end }}
