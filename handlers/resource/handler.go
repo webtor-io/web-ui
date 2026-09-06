@@ -30,10 +30,12 @@ type Handler struct {
 	vault          *vault.Vault
 	enricher       *enrich.Enricher
 	useDirectLinks bool
+	secret         string
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher) {
-	helper := NewHelper()
+	secret := c.String(common.SessionSecretFlag)
+	helper := NewHelper(secret)
 	h := &Handler{
 		api:            api,
 		jobs:           jobs,
@@ -42,6 +44,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		vault:          v,
 		enricher:       en,
 		useDirectLinks: c.BoolT(common.UseDirectLinks),
+		secret:         secret,
 	}
 	r.POST("/", h.post)
 	r.GET("/share", h.share)
@@ -64,11 +67,28 @@ func (s *Handler) downloadTorrent(c *gin.Context) {
 	resourceID := strings.TrimSuffix(c.Param("resource_id"), ".torrent")
 	claims := api.GetClaimsFromContext(c)
 
+	// The link on the resource page carries a short-lived token bound to
+	// the infohash (torrent_link.go). A missing or stale one — a bookmark,
+	// a link copied onto a torrent index — lands on the resource page,
+	// where a person finds a fresh button and a crawler finds HTML.
+	if s.secret != "" {
+		if err := CheckTorrentFileToken(s.secret, c.Query("t"), resourceID, time.Now()); err != nil {
+			c.Redirect(http.StatusFound, "/"+resourceID)
+			return
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	torrent, err := s.api.GetTorrentCached(ctx, claims, resourceID)
 	if err != nil {
+		// A banned torrent is refused upstream (PermissionDenied); that is
+		// a plain "not available", not a server fault.
+		if strings.Contains(err.Error(), "PermissionDenied") || strings.Contains(err.Error(), "restricted") {
+			c.String(http.StatusNotFound, "not available")
+			return
+		}
 		_ = c.Error(errors.Wrap(err, "failed to get torrent"))
 		c.String(http.StatusInternalServerError, "failed to get torrent")
 		return
@@ -90,5 +110,7 @@ func (s *Handler) downloadTorrent(c *gin.Context) {
 	filename := info.Name + ".torrent"
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	c.Header("Content-Length", fmt.Sprintf("%d", len(torrent)))
+	// Signed per page render — never let an edge cache hand it out by URL.
+	c.Header("Cache-Control", "private, no-store")
 	c.Data(http.StatusOK, "application/x-bittorrent", torrent)
 }

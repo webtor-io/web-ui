@@ -3,6 +3,7 @@ package resource
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/helpers"
@@ -140,10 +141,28 @@ func (s *Helper) MakePagination(lr *ra.ListResponse, page uint, pageSize uint) [
 }
 
 type Helper struct {
+	// secret signs .torrent links; empty means links stay plain (no session
+	// secret configured — the check is skipped on the way in as well).
+	secret string
 }
 
-func NewHelper() *Helper {
-	return &Helper{}
+func NewHelper(secret string) *Helper {
+	return &Helper{secret: secret}
+}
+
+// TorrentFileURL is the download link for the resource's .torrent file,
+// signed for a few hours so the URL cannot be planted on a torrent index as a
+// permanent host (see torrent_link.go).
+func (s *Helper) TorrentFileURL(r *ExtendedResource) string {
+	plain := "/" + r.ID + ".torrent"
+	if s.secret == "" {
+		return plain
+	}
+	tok, err := SignTorrentFileToken(s.secret, r.ID, time.Now())
+	if err != nil {
+		return plain
+	}
+	return plain + "?t=" + tok
 }
 
 func (s *Helper) getMetadata(gd *GetData) *models.VideoMetadata {
