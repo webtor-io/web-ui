@@ -162,7 +162,7 @@ func (s *Helper) TorrentFileURL(r *ExtendedResource) string {
 	if err != nil {
 		return plain
 	}
-	return plain + "?t=" + tok
+	return plain + "?token=" + tok
 }
 
 func (s *Helper) getMetadata(gd *GetData) *models.VideoMetadata {

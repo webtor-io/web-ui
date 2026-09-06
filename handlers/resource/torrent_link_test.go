@@ -69,10 +69,10 @@ func TestTorrentFileURLFallsBackWithoutSecret(t *testing.T) {
 		t.Fatalf("no secret: %s", got)
 	}
 	got := NewHelper("s3cret").TorrentFileURL(gd)
-	if !strings.HasPrefix(got, "/"+gd.ID+".torrent?t=") {
+	if !strings.HasPrefix(got, "/"+gd.ID+".torrent?token=") {
 		t.Fatalf("signed: %s", got)
 	}
-	if err := CheckTorrentFileToken("s3cret", strings.TrimPrefix(got, "/"+gd.ID+".torrent?t="), gd.ID, time.Now()); err != nil {
+	if err := CheckTorrentFileToken("s3cret", strings.TrimPrefix(got, "/"+gd.ID+".torrent?token="), gd.ID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 }

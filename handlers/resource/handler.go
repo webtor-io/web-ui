@@ -72,7 +72,7 @@ func (s *Handler) downloadTorrent(c *gin.Context) {
 	// a link copied onto a torrent index — lands on the resource page,
 	// where a person finds a fresh button and a crawler finds HTML.
 	if s.secret != "" {
-		if err := CheckTorrentFileToken(s.secret, c.Query("t"), resourceID, time.Now()); err != nil {
+		if err := CheckTorrentFileToken(s.secret, c.Query("token"), resourceID, time.Now()); err != nil {
 			c.Redirect(http.StatusFound, "/"+resourceID)
 			return
 		}

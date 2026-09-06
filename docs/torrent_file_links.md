@@ -1,7 +1,7 @@
 # .torrent download links
 
 `GET /<infohash>.torrent` returns the torrent file. Since 2026-09-06 the link
-rendered on the resource page carries a token: `/<infohash>.torrent?t=<jwt>`,
+rendered on the resource page carries a token: `/<infohash>.torrent?token=<jwt>`,
 HS256 on the session secret, audience `torrent-file`, subject = infohash,
 lifetime 6 hours (`handlers/resource/torrent_link.go`).
 
