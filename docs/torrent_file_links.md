@@ -40,7 +40,8 @@ skipped and the attribute is empty.
 
 Renewal: when the stream is refused (token expired), `status.js` fetches the
 page route with `X-Requested-With: XMLHttpRequest` and
-`X-Layout: {{ template "resource/status_token" . }}` — the server renders
-only that fragment (a span carrying `data-status-token`), the badge reads it
-and reopens — at most once a minute. A person's edge challenge clearance
+`X-Layout: {{ template "resource/status_container" . }}` — the server renders
+the whole `#torrent-status` block (fresh badge markup with the token in
+`data-status-token`), the client swaps the badge in, takes the token and
+reopens — at most once a minute. A person's edge challenge clearance
 lets that fetch through; a client that never loaded the page cannot renew.

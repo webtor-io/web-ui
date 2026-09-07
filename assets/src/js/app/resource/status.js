@@ -183,15 +183,16 @@ av(async function() {
     };
 
     // The token lives an hour; a long download or vaulting is watched for
-    // longer. When the stream is refused, ask the page route for just the
-    // token fragment (X-Layout renders "resource/status_token", see
-    // templates/views/resource/get.html) — same URL, so the edge's
-    // challenge clearance a person already holds lets it through and a
-    // client that never loaded the page stops right here. At most once per
-    // REFRESH_MIN_MS, so a genuinely dead stream does not turn into a loop.
+    // longer. When the stream is refused, re-render the badge block itself:
+    // the page route with X-Layout "resource/status_container" returns the
+    // same #torrent-status markup the page shipped, fresh badge and fresh
+    // token inside (templates/views/resource/get.html). Same URL, so the
+    // edge's challenge clearance a person already holds lets it through and
+    // a client that never loaded the page stops right here. At most once
+    // per REFRESH_MIN_MS, so a dead stream never becomes a loop.
     const REFRESH_MIN_MS = 60 * 1000;
     let lastRefresh = 0;
-    const refreshToken = async () => {
+    const refreshBadge = async () => {
         if (!statusToken || Date.now() - lastRefresh < REFRESH_MIN_MS) return false;
         lastRefresh = Date.now();
         try {
@@ -199,14 +200,18 @@ av(async function() {
                 credentials: 'same-origin',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-Layout': '{{ template "resource/status_token" . }}',
+                    'X-Layout': '{{ template "resource/status_container" . }}',
                 },
             });
             if (!res.ok) return false;
-            const html = await res.text();
-            const m = html.match(/data-status-token="([^"]+)"/);
-            if (!m || m[1] === statusToken) return false;
-            statusToken = m[1];
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            const fresh = doc.querySelector('#torrent-status');
+            const tok = fresh && fresh.dataset.statusToken;
+            if (!tok || tok === statusToken) return false;
+            statusToken = tok;
+            container.dataset.statusToken = tok;
+            const freshBadge = fresh.querySelector('#torrent-status-badge');
+            if (freshBadge) badge.innerHTML = freshBadge.innerHTML;
             return true;
         } catch (err) {
             return false;
@@ -236,7 +241,7 @@ av(async function() {
             if (source.readyState === EventSource.CLOSED) {
                 container._statusSource = null;
                 if (container._statusGone) return;
-                refreshToken().then((ok) => { if (ok) open(); });
+                refreshBadge().then((ok) => { if (ok) open(); });
             }
         };
     };
