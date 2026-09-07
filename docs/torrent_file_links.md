@@ -38,10 +38,9 @@ clients that never loaded the page (it is challenged at the edge), each stream
 making a seeder load the torrent. Without a session secret the check is
 skipped and the attribute is empty.
 
-Renewal: when the stream is refused (token expired), `status.js` fetches the
-page route with `X-Requested-With: XMLHttpRequest` and
-`X-Layout: {{ template "resource/status_container" . }}` — the server renders
-the whole `#torrent-status` block (fresh badge markup with the token in
-`data-status-token`), the client swaps the badge in, takes the token and
-reopens — at most once a minute. A person's edge challenge clearance
+Renewal: when the stream is refused (token expired), `status.js` calls the
+view's built-in `reload()` (`lib/async.js`, any element with
+`data-async-layout`): the page URL is re-fetched with `X-Layout: {{ template
+"resource/status_inner" $ }}`, the inner partial (badge + token) is swapped in
+and the view re-inits — at most once a minute. A person's edge challenge clearance
 lets that fetch through; a client that never loaded the page cannot renew.

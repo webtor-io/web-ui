@@ -4,15 +4,18 @@
      Called with (withContext $ .Resource): .Ctx = request context (Lang),
      .Data = the resource. The magnet button has no data-umami-event — the
      copy-magnet event fires from share.js only after a successful copy. */}}
-{{/* The status badge block. Rendered inline on the page and re-rendered on demand by
-     assets/src/js/app/resource/status.js, which fetches the page URL with
-     X-Layout: {{ template "resource/status_container" . }} when the stream token
-     expires and swaps in the fresh badge + token. Same route, same edge challenge.
-     Called with the view context ($): .Data = GetData. */}}
+{{/* The status badge block. The outer div is an async-layout target: status.js calls
+     this.reload() when the stream token expires, which re-fetches the page URL with
+     X-Layout = data-async-layout and swaps the inner partial (fresh badge + fresh token) in,
+     then the view re-inits (lib/async.js asyncLayout, lib/loadAsyncView.js). Same route,
+     same edge challenge. Called with the view context ($): .Data = GetData. */}}
+{{ define "resource/status_inner" }}
+<div id="torrent-status-badge" data-status-token="{{ .Data.Resource | statusToken }}">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
+{{ "resource/status.js" | asset }}
+{{ end }}
 {{ define "resource/status_container" }}
-<div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-status-token="{{ .Data.Resource | statusToken }}">
-    <div id="torrent-status-badge">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
-    {{ "resource/status.js" | asset }}
+<div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
+    {{ template "resource/status_inner" . }}
 </div>
 {{ end }}
 {{ define "resource/torrent_magnet_split" }}

@@ -157,6 +157,7 @@ av(async function() {
 
     const badge = container.querySelector('#torrent-status-badge');
     if (!badge) return;
+    container._statusGone = false;
 
     // Show loading state until first SSE message arrives
     badge.innerHTML = renderLoading();
@@ -175,52 +176,33 @@ av(async function() {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
     // Page-issued, hash-bound, short-lived (handlers/resource/torrent_link.go).
-    let statusToken = container.dataset.statusToken || '';
-    const pageUrl = `${langPrefix}/${resourceId}`;
-    const buildUrl = () => {
-        const tok = statusToken ? `&token=${encodeURIComponent(statusToken)}` : '';
-        return `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}${tok}`;
-    };
+    const statusToken = badge.dataset.statusToken || '';
+    if (statusToken) extra += `&token=${encodeURIComponent(statusToken)}`;
+    const url = `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`;
 
     // The token lives an hour; a long download or vaulting is watched for
-    // longer. When the stream is refused, re-render the badge block itself:
-    // the page route with X-Layout "resource/status_container" returns the
-    // same #torrent-status markup the page shipped, fresh badge and fresh
-    // token inside (templates/views/resource/get.html). Same URL, so the
-    // edge's challenge clearance a person already holds lets it through and
-    // a client that never loaded the page stops right here. At most once
-    // per REFRESH_MIN_MS, so a dead stream never becomes a loop.
-    const REFRESH_MIN_MS = 60 * 1000;
-    let lastRefresh = 0;
-    const refreshBadge = async () => {
-        if (!statusToken || Date.now() - lastRefresh < REFRESH_MIN_MS) return false;
-        lastRefresh = Date.now();
-        try {
-            const res = await fetch(pageUrl, {
-                credentials: 'same-origin',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-Layout': '{{ template "resource/status_container" . }}',
-                },
-            });
-            if (!res.ok) return false;
-            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-            const fresh = doc.querySelector('#torrent-status');
-            const tok = fresh && fresh.dataset.statusToken;
-            if (!tok || tok === statusToken) return false;
-            statusToken = tok;
-            container.dataset.statusToken = tok;
-            const freshBadge = fresh.querySelector('#torrent-status-badge');
-            if (freshBadge) badge.innerHTML = freshBadge.innerHTML;
-            return true;
-        } catch (err) {
-            return false;
-        }
+    // longer. When the stream is refused, reload this view the async way:
+    // this.reload() (lib/async.js asyncLayout) re-fetches the page URL with
+    // X-Layout "resource/status_inner", swaps in the fresh badge with the
+    // fresh token, and re-runs this init. Same URL, so the edge's challenge
+    // clearance a person already holds lets it through and a client that
+    // never loaded the page stops right here. At most once per
+    // RELOAD_MIN_MS per view, so a dead stream never becomes a loop.
+    const RELOAD_MIN_MS = 60 * 1000;
+    const renew = () => {
+        if (!statusToken || typeof container.reload !== 'function') return;
+        const last = container._statusReloadAt || 0;
+        if (Date.now() - last < RELOAD_MIN_MS) return;
+        container._statusReloadAt = Date.now();
+        // loadAsyncView only destroys views *inside* the target; this view is
+        // the target, so drop our own listeners before the swap re-inits it.
+        if (container._statusTeardown) { container._statusTeardown(); container._statusTeardown = null; }
+        container.reload();
     };
 
     const open = () => {
         if (container._statusSource || container._statusGone) return;
-        const source = new EventSource(buildUrl());
+        const source = new EventSource(url);
         container._statusSource = source;
         source.onmessage = (e) => {
             try {
@@ -241,7 +223,7 @@ av(async function() {
             if (source.readyState === EventSource.CLOSED) {
                 container._statusSource = null;
                 if (container._statusGone) return;
-                refreshBadge().then((ok) => { if (ok) open(); });
+                renew();
             }
         };
     };
