@@ -174,6 +174,9 @@ av(async function() {
     for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders', 'checking']) {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
+    // Page-issued, hash-bound, short-lived (handlers/resource/torrent_link.go).
+    const statusToken = container.dataset.statusToken || '';
+    if (statusToken) extra += `&token=${encodeURIComponent(statusToken)}`;
     const url = `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`;
 
     const open = () => {

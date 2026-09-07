@@ -402,6 +402,16 @@ func (s *Handler) status(c *gin.Context) {
 	}
 
 	resourceID := c.Param("resource_id")
+	// The page hands the badge a short-lived token bound to the infohash
+	// (torrent_link.go). CSRF alone was not enough: one harvested session
+	// cookie + CSRF pair opened streams indefinitely from clients that never
+	// loaded the (edge-challenged) page.
+	if s.secret != "" {
+		if err := CheckStatusToken(s.secret, c.Query("token"), resourceID, time.Now()); err != nil {
+			c.String(http.StatusForbidden, "status token missing or expired")
+			return
+		}
+	}
 	claims := api.GetClaimsFromContext(c)
 
 	c.Header("Content-Type", "text/event-stream")

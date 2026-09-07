@@ -26,3 +26,14 @@ useless as a hosted link while keeping the button on the page working.
 
 The authenticated API (`/api/v1/resource/{id}.torrent`, Bearer key) and
 rest-api's `.torrent` endpoint are separate code paths and unchanged.
+
+# Status stream token
+
+`GET /<infohash>/status` (the badge's SSE) additionally requires
+`token=<jwt>` since 2026-09-07: same signing, audience `torrent-status`,
+subject = infohash, lifetime 1 hour, minted at page render into
+`data-status-token` on `#torrent-status`. The CSRF check stays. Reason: one
+harvested session cookie + CSRF pair was enough to open streams forever from
+clients that never loaded the page (it is challenged at the edge), each stream
+making a seeder load the torrent. Without a session secret the check is
+skipped and the attribute is empty.

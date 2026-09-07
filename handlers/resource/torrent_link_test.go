@@ -76,3 +76,34 @@ func TestTorrentFileURLFallsBackWithoutSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A status token opens only the status stream of its own resource, for an
+// hour; the .torrent token of the same resource does not open the stream.
+func TestStatusToken(t *testing.T) {
+	const secret = "s3cret"
+	const hash = "08ada5a7a6183aae1e09d831df6748d566095a10"
+	now := time.Date(2026, 9, 7, 19, 0, 0, 0, time.UTC)
+	tok, err := SignStatusToken(secret, hash, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckStatusToken(secret, tok, hash, now.Add(30*time.Minute)); err != nil {
+		t.Fatalf("fresh status token rejected: %v", err)
+	}
+	if err := CheckStatusToken(secret, tok, hash, now.Add(statusTokenTTL+time.Minute)); err == nil {
+		t.Fatal("expired status token accepted")
+	}
+	if err := CheckStatusToken(secret, tok, "0000000000000000000000000000000000000000", now); err == nil {
+		t.Fatal("status token accepted for another resource")
+	}
+	fileTok, _ := SignTorrentFileToken(secret, hash, now)
+	if err := CheckStatusToken(secret, fileTok, hash, now); err == nil {
+		t.Fatal(".torrent token opened the status stream")
+	}
+	if err := CheckTorrentFileToken(secret, tok, hash, now); err == nil {
+		t.Fatal("status token fetched the .torrent")
+	}
+	if got := NewHelper("").StatusToken(&ExtendedResource{ResourceResponse: &ra.ResourceResponse{ID: hash}}); got != "" {
+		t.Fatalf("no secret must mean no token, got %q", got)
+	}
+}

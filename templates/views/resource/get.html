@@ -185,7 +185,7 @@
                 {{ end }}
                 <div class="flex items-center gap-2 mb-3">
                     {{ if .TorrentStatus }}
-                    <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
+                    <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}" data-status-token="{{ .Resource | statusToken }}">
                         <div id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</div>
                         {{ "resource/status.js" | asset }}
                     </div>
@@ -256,7 +256,7 @@
                 </div>
                 {{ if .TorrentStatus }}
                 <div class="mb-4">
-                    <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}">
+                    <div id="torrent-status" data-resource-id="{{ .Resource.ID }}" data-csrf="{{ $.CSRF }}" data-status-token="{{ .Resource | statusToken }}">
                         <span id="torrent-status-badge">{{ template "resource/status" (withContext $ .TorrentStatus) }}</span>
                         {{ "resource/status.js" | asset }}
                     </div>
