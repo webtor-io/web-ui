@@ -4,6 +4,10 @@
      Called with (withContext $ .Resource): .Ctx = request context (Lang),
      .Data = the resource. The magnet button has no data-umami-event — the
      copy-magnet event fires from share.js only after a successful copy. */}}
+{{/* Token-only fragment for the status badge's renewal (assets/src/js/app/resource/status.js):
+     the badge fetches the page URL with X-Layout: {{ template "resource/status_token" . }} and
+     reads data-status-token from this span — same route, same edge challenge, no page HTML. */}}
+{{ define "resource/status_token" }}<span data-status-token="{{ .Data.Resource | statusToken }}"></span>{{ end }}
 {{ define "resource/torrent_magnet_split" }}
                     {{/* Right-aligned only from md, where it shares the line with the
                          Vault/Library buttons; below that the row wraps and the group

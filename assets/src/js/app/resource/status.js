@@ -183,18 +183,25 @@ av(async function() {
     };
 
     // The token lives an hour; a long download or vaulting is watched for
-    // longer. When the stream is refused, re-read the page — the edge's
-    // challenge clearance a person already holds lets it through, a client
-    // that never loaded the page stops right here — and take a fresh token
-    // from it. At most once per REFRESH_MIN_MS, so a genuinely dead stream
-    // does not turn into a page-fetch loop.
+    // longer. When the stream is refused, ask the page route for just the
+    // token fragment (X-Layout renders "resource/status_token", see
+    // templates/views/resource/get.html) — same URL, so the edge's
+    // challenge clearance a person already holds lets it through and a
+    // client that never loaded the page stops right here. At most once per
+    // REFRESH_MIN_MS, so a genuinely dead stream does not turn into a loop.
     const REFRESH_MIN_MS = 60 * 1000;
     let lastRefresh = 0;
     const refreshToken = async () => {
         if (!statusToken || Date.now() - lastRefresh < REFRESH_MIN_MS) return false;
         lastRefresh = Date.now();
         try {
-            const res = await fetch(pageUrl, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
+            const res = await fetch(pageUrl, {
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Layout': '{{ template "resource/status_token" . }}',
+                },
+            });
             if (!res.ok) return false;
             const html = await res.text();
             const m = html.match(/data-status-token="([^"]+)"/);
