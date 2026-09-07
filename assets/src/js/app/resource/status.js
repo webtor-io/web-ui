@@ -175,13 +175,40 @@ av(async function() {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
     // Page-issued, hash-bound, short-lived (handlers/resource/torrent_link.go).
-    const statusToken = container.dataset.statusToken || '';
-    if (statusToken) extra += `&token=${encodeURIComponent(statusToken)}`;
-    const url = `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`;
+    let statusToken = container.dataset.statusToken || '';
+    const pageUrl = `${langPrefix}/${resourceId}`;
+    const buildUrl = () => {
+        const tok = statusToken ? `&token=${encodeURIComponent(statusToken)}` : '';
+        return `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}${tok}`;
+    };
+
+    // The token lives an hour; a long download or vaulting is watched for
+    // longer. When the stream is refused, re-read the page — the edge's
+    // challenge clearance a person already holds lets it through, a client
+    // that never loaded the page stops right here — and take a fresh token
+    // from it. At most once per REFRESH_MIN_MS, so a genuinely dead stream
+    // does not turn into a page-fetch loop.
+    const REFRESH_MIN_MS = 60 * 1000;
+    let lastRefresh = 0;
+    const refreshToken = async () => {
+        if (!statusToken || Date.now() - lastRefresh < REFRESH_MIN_MS) return false;
+        lastRefresh = Date.now();
+        try {
+            const res = await fetch(pageUrl, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
+            if (!res.ok) return false;
+            const html = await res.text();
+            const m = html.match(/data-status-token="([^"]+)"/);
+            if (!m || m[1] === statusToken) return false;
+            statusToken = m[1];
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
 
     const open = () => {
         if (container._statusSource || container._statusGone) return;
-        const source = new EventSource(url);
+        const source = new EventSource(buildUrl());
         container._statusSource = source;
         source.onmessage = (e) => {
             try {
@@ -197,8 +224,12 @@ av(async function() {
             }
         };
         source.onerror = () => {
+            // A refused stream (403 — token expired) closes the EventSource
+            // for good; network blips reconnect on their own with the same URL.
             if (source.readyState === EventSource.CLOSED) {
                 container._statusSource = null;
+                if (container._statusGone) return;
+                refreshToken().then((ok) => { if (ok) open(); });
             }
         };
     };
