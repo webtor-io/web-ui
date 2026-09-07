@@ -174,31 +174,76 @@ av(async function() {
     for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders', 'checking']) {
         if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
     }
-    const source = new EventSource(`${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`);
-    container._statusSource = source;
+    const url = `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`;
 
-    source.onmessage = (e) => {
-        try {
-            const status = JSON.parse(e.data);
-            badge.innerHTML = renderBadge(status);
-            paintBars(resourceId, status);
-            if (status.state === 'vaulted') {
-                source.close();
+    const open = () => {
+        if (container._statusSource || container._statusGone) return;
+        const source = new EventSource(url);
+        container._statusSource = source;
+        source.onmessage = (e) => {
+            try {
+                const status = JSON.parse(e.data);
+                badge.innerHTML = renderBadge(status);
+                paintBars(resourceId, status);
+                if (status.state === 'vaulted') {
+                    source.close();
+                    container._statusSource = null;
+                }
+            } catch (err) {
+                // Ignore parse errors
+            }
+        };
+        source.onerror = () => {
+            if (source.readyState === EventSource.CLOSED) {
                 container._statusSource = null;
             }
-        } catch (err) {
-            // Ignore parse errors
-        }
+        };
     };
 
-    source.onerror = () => {
-        if (source.readyState === EventSource.CLOSED) {
-            container._statusSource = null;
-        }
+    // Opening the stream makes a seeder load the torrent and keep it for
+    // minutes, so it waits for a sign that someone is actually looking:
+    // the tab visible for STATUS_SETTLE_MS, or any interaction, whichever
+    // comes first. Headless farms leave within 0–3 s and never interact
+    // (2026-09: 85% of stream opens were theirs, at 13–15k an hour); a
+    // person still sees the spinner at once and a verdict a few seconds
+    // later. The countdown restarts whenever the tab goes to the background.
+    const STATUS_SETTLE_MS = 3000;
+    let timer = null;
+    const arm = () => {
+        if (timer || container._statusSource) return;
+        if (document.visibilityState !== 'visible') return;
+        timer = setTimeout(() => { timer = null; open(); }, STATUS_SETTLE_MS);
     };
+    const disarm = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+    };
+    const onVisibility = () => {
+        if (document.visibilityState === 'visible') arm(); else disarm();
+    };
+    const onInteract = () => {
+        if (document.visibilityState !== 'visible') return;
+        disarm();
+        open();
+    };
+    const interactions = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'];
+    document.addEventListener('visibilitychange', onVisibility);
+    for (const ev of interactions) {
+        window.addEventListener(ev, onInteract, { passive: true, once: true });
+    }
+    container._statusTeardown = () => {
+        disarm();
+        document.removeEventListener('visibilitychange', onVisibility);
+        for (const ev of interactions) window.removeEventListener(ev, onInteract);
+    };
+    arm();
 
 }, function() {
     const container = this;
+    container._statusGone = true;
+    if (container._statusTeardown) {
+        container._statusTeardown();
+        container._statusTeardown = null;
+    }
     if (container._statusSource) {
         container._statusSource.close();
         container._statusSource = null;
