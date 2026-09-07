@@ -37,3 +37,8 @@ harvested session cookie + CSRF pair was enough to open streams forever from
 clients that never loaded the page (it is challenged at the edge), each stream
 making a seeder load the torrent. Without a session secret the check is
 skipped and the attribute is empty.
+
+Renewal: when the stream is refused (token expired), `status.js` re-fetches
+the resource page with the same cookies, reads the new `data-status-token`
+and reopens — at most once a minute. A person's edge challenge clearance
+lets that fetch through; a client that never loaded the page cannot renew.
