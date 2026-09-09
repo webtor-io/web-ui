@@ -80,6 +80,12 @@
              so the counter cannot disagree with the modal the user is looking
              at. */}}
         <div id="onboarding-modal" data-async-layout="{{`{{ template "onboarding_checklist/modal" (withContext $ .Onboarding) }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}"></div>
+        {{ if useActionTurnstile }}
+        {{/* Invisible Turnstile for job starts (lib/turnstileAction.js). Rendered on demand,
+             nothing visible unless Cloudflare decides a human must click. */}}
+        <div id="turnstile-action" data-sitekey="{{ actionTurnstileSiteKey }}"></div>
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+        {{ end }}
         {{ "layout.js" | asset }}
         {{- if useSuperTokens }}
         {{ "auth.js" | asset }}

@@ -156,7 +156,7 @@ func StatusForErrKey(key string) int {
 		return http.StatusUnauthorized
 	case "error.service_unavailable", "error.upstream_unavailable":
 		return http.StatusServiceUnavailable
-	case "error.magnet_invalid":
+	case "error.magnet_invalid", "error.turnstile_failed":
 		return http.StatusBadRequest
 	case "error.magnet_no_metadata":
 		// Nothing answered upstream within the deadline: a gateway timeout,

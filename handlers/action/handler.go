@@ -1,8 +1,11 @@
 package action
 
 import (
+	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/services/auth"
 	"net/http"
 	"net/url"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -52,16 +55,25 @@ type PostData struct {
 }
 
 type Handler struct {
-	jobs *j.Jobs
-	tb   template.Builder[*web.Context]
-	api  *api.Api
+	jobs     *j.Jobs
+	tb       template.Builder[*web.Context]
+	api      *api.Api
+	verifier ActionVerifier
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, apiSvc *api.Api) {
+// ActionVerifier checks the Turnstile token a job start carries. Satisfied
+// by *turnstile.Service; a nil verifier means the widget is not configured
+// and nothing is checked.
+type ActionVerifier interface {
+	Validate(token string, remoteIP string) error
+}
+
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, apiSvc *api.Api, verifier ActionVerifier) {
 	h := &Handler{
-		tb:   tm.MustRegisterViews("action/**/*").WithHelper(NewHelper()),
-		jobs: jobs,
-		api:  apiSvc,
+		tb:       tm.MustRegisterViews("action/**/*").WithHelper(NewHelper()),
+		jobs:     jobs,
+		api:      apiSvc,
+		verifier: verifier,
 	}
 	r.POST("/download-file", func(c *gin.Context) {
 		h.post(c, "download")
@@ -208,6 +220,18 @@ func (s *Handler) post(c *gin.Context, action string) {
 		return
 	}
 	d.Args = args
+	// Anonymous job starts carry a Turnstile token from the invisible
+	// widget on the page (assets/src/js/lib/turnstileAction.js). A bot
+	// that cannot run the widget gets the card and no seeder is touched;
+	// a signed-in person is not asked. Fail closed: a missing token is a
+	// refusal, otherwise skipping the script would be the bypass.
+	if err := s.verifyAction(c); err != nil {
+		postTpl.HTML(
+			http.StatusBadRequest,
+			web.NewContext(c).WithData(d).WithErr(web.NewUserError("error.turnstile_failed", err)),
+		)
+		return
+	}
 	actionJob, err = s.jobs.Action(
 		web.NewContext(c),
 		args.ResourceID,
@@ -230,4 +254,27 @@ func (s *Handler) post(c *gin.Context, action string) {
 	}
 	d.Job = actionJob
 	postTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
+}
+
+// verifyAction runs the Turnstile check for anonymous requests when a
+// verifier is configured. The client's address is what Cloudflare saw
+// (CF-Connecting-IP), not the edge's; without the header siteverify simply
+// skips the address match.
+func (s *Handler) verifyAction(c *gin.Context) error {
+	if s.verifier == nil || isNilVerifier(s.verifier) {
+		return nil
+	}
+	// GetUserFromContext hands back an empty User for a guest; signed in
+	// means an account id.
+	if u := auth.GetUserFromContext(c); u != nil && u.ID != uuid.Nil {
+		return nil
+	}
+	return s.verifier.Validate(c.PostForm("cf-turnstile-response"), c.GetHeader("CF-Connecting-IP"))
+}
+
+// isNilVerifier catches a typed nil (*turnstile.Service)(nil) stored in the
+// interface, which is what the constructor returns when unconfigured.
+func isNilVerifier(v ActionVerifier) bool {
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Ptr && rv.IsNil()
 }

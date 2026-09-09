@@ -432,6 +432,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Turnstile
 	ts := turnstile.New(c)
+	actionTS := turnstile.NewAction(c)
 
 	if asc != nil {
 		defer asc.Close()
@@ -482,7 +483,7 @@ func serve(c *cli.Context) error {
 	sitemap.RegisterHandler(c, r)
 
 	// Setting ActionHandler
-	wa.RegisterHandler(r, tm, jobs, sapi)
+	wa.RegisterHandler(r, tm, jobs, sapi, actionTS)
 
 	// Setting Payments client (shared by profile and donate)
 	payClient := npg.New(c)

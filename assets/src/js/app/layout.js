@@ -89,6 +89,7 @@ window.progress = {
 };
 
 import {bindAsync} from '../lib/async';
+import initTurnstileAction from '../lib/turnstileAction';
 import initAsyncView from '../lib/asyncView';
 import loadAsyncView from '../lib/loadAsyncView';
 import toast from '../lib/toast';
@@ -106,6 +107,7 @@ document.addEventListener('click', (e) => {
         document.documentElement.lang = lang;
     }
 }, true);
+initTurnstileAction();
 bindAsync({
     async fetch(f, url, fetchParams) {
         showProgress();
