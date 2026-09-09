@@ -103,9 +103,15 @@ const (
 // paused after — whoever is or is not around, nothing moves. Nobody around
 // for the whole of noSeedersAfter → no seeders: the swarm got its time to
 // appear before we say it is gone.
-func judgeSwarm(state string, observed time.Duration, activity bool, seeders, peers int) swarmVerdict {
+func judgeSwarm(state string, observed time.Duration, activity bool, live bool, seeders, peers int) swarmVerdict {
 	if state != "caching" || activity {
 		return verdictCaching
+	}
+	// A cold reply (the seeder did not load the torrent, nobody is
+	// streaming it) has no swarm by design: what is stored is paused, and
+	// nothing can be said about seeders — neither "checking" nor "none".
+	if !live {
+		return verdictPaused
 	}
 	if observed < settleAfter {
 		return verdictChecking
@@ -174,6 +180,9 @@ type TorrentStatsData struct {
 	PiecesDone  int
 	PiecesTotal int
 	Rate        float64
+	// Live is false for a cold reply: the seeder read the numbers from
+	// disk and did not join the swarm, so an empty swarm means nothing.
+	Live bool
 }
 
 // withSwarm copies the swarm counters and the piece bar from a stats event
@@ -649,7 +658,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		}
 		if lastStats != nil && !statsStale && !firstStatsAt.IsZero() {
 			activity := hasActive(lastStats.Active) || (!lastProgressAt.IsZero() && time.Since(lastProgressAt) < settleAfter)
-			switch judgeSwarm(status.State, time.Since(firstStatsAt), activity, lastStats.Seeders, lastStats.Peers) {
+			switch judgeSwarm(status.State, time.Since(firstStatsAt), activity, lastStats.Live, lastStats.Seeders, lastStats.Peers) {
 			case verdictChecking:
 				status.Checking = true
 			case verdictPaused:
@@ -746,6 +755,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 					lastProgressAt = now
 				}
 				lastStats = &TorrentStatsData{
+					Live:        ev.Live == nil || *ev.Live,
 					Rate:        rps,
 					Total:       ev.Total,
 					Completed:   ev.Completed,

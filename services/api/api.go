@@ -127,6 +127,10 @@ type EventData struct {
 	} `json:"pieces"`
 	Seeders  int `json:"seeders"`
 	Leechers int `json:"leechers"`
+	// Live says whether the seeder answered from a loaded torrent (true)
+	// or from disk for a torrent nobody is streaming (false). Seeders
+	// before 2026-09-09 do not send it: nil reads as live.
+	Live *bool `json:"live"`
 }
 
 type ExtSubtitle struct {

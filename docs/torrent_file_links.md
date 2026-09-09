@@ -44,3 +44,13 @@ view's built-in `reload()` (`lib/async.js`, any element with
 "resource/status_inner" $ }}`, the inner partial (badge + token) is swapped in
 and the view re-inits — at most once a minute. A person's edge challenge clearance
 lets that fetch through; a client that never loaded the page cannot renew.
+
+# Live and cold status
+
+Since 2026-09-09 the seeder answers stats without loading a torrent nobody is
+streaming (`live: false` in the event; see torrent-web-seeder README, "Stats
+look but do not touch"). web-ui reads `live`; a missing field (older seeder)
+counts as live. For a cold reply `judgeSwarm` says "paused" straight away and
+never "checking" or "no seeders" — there is no swarm to judge. The badge opens
+its stream immediately again; the visibility/interaction deferral of
+2026-09-07 was removed with it.

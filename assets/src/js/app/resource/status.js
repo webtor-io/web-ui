@@ -228,42 +228,12 @@ av(async function() {
         };
     };
 
-    // Opening the stream makes a seeder load the torrent and keep it for
-    // minutes, so it waits for a sign that someone is actually looking:
-    // the tab visible for STATUS_SETTLE_MS, or any interaction, whichever
-    // comes first. Headless farms leave within 0–3 s and never interact
-    // (2026-09: 85% of stream opens were theirs, at 13–15k an hour); a
-    // person still sees the spinner at once and a verdict a few seconds
-    // later. The countdown restarts whenever the tab goes to the background.
-    const STATUS_SETTLE_MS = 3000;
-    let timer = null;
-    const arm = () => {
-        if (timer || container._statusSource) return;
-        if (document.visibilityState !== 'visible') return;
-        timer = setTimeout(() => { timer = null; open(); }, STATUS_SETTLE_MS);
-    };
-    const disarm = () => {
-        if (timer) { clearTimeout(timer); timer = null; }
-    };
-    const onVisibility = () => {
-        if (document.visibilityState === 'visible') arm(); else disarm();
-    };
-    const onInteract = () => {
-        if (document.visibilityState !== 'visible') return;
-        disarm();
-        open();
-    };
-    const interactions = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'];
-    document.addEventListener('visibilitychange', onVisibility);
-    for (const ev of interactions) {
-        window.addEventListener(ev, onInteract, { passive: true, once: true });
-    }
-    container._statusTeardown = () => {
-        disarm();
-        document.removeEventListener('visibilitychange', onVisibility);
-        for (const ev of interactions) window.removeEventListener(ev, onInteract);
-    };
-    arm();
+    // Opened at once: since 2026-09-09 a stream for a torrent nobody is
+    // streaming is answered from disk without loading it (torrent-web-seeder
+    // cold stats), so there is nothing left to defer. The teardown hook is
+    // kept for renew(), which reloads this view.
+    container._statusTeardown = null;
+    open();
 
 }, function() {
     const container = this;
