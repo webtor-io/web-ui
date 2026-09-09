@@ -28,7 +28,6 @@ const READY = 'turnstileReady';
 let widgetId = null;
 let pending = null;
 let interactive = false;
-let placedAfter = null;
 
 function container() {
     return document.getElementById('turnstile-action');
@@ -41,29 +40,32 @@ function isActionForm(form) {
     return ACTIONS.test(path);
 }
 
-// place puts the widget container right above the form's job-log area
-// (data-async-target, the full-width block under the buttons where the
-// progress and the player appear) — so an interactive challenge sits on its
-// own line under the buttons, not squeezed between them. Forms without a
-// target get it right after themselves. A rendered widget does not survive
-// a DOM move, so it is re-rendered when the form changes.
+// place puts the widget container inside the form's job-log area
+// (data-async-target: the full-width block under the buttons where the
+// progress and the player will render), so an interactive challenge shows
+// exactly where the job's own messages will. The log render replaces that
+// block's innerHTML, so the widget must be gone before the form goes out:
+// park() removes it and returns the container to <body>. A widget is
+// therefore rendered fresh for every submit — it is execute-mode, cheap.
 function place(form) {
     const el = container();
-    if (!el || placedAfter === form) return;
-    if (widgetId !== null && typeof turnstile !== 'undefined') {
-        try { turnstile.remove(widgetId); } catch (e) { /* already gone */ }
-        widgetId = null;
-    }
+    if (!el) return;
     const sel = form.getAttribute('data-async-target');
     const target = sel ? document.querySelector(sel) : null;
-    if (target && target !== form) target.insertAdjacentElement('beforebegin', el);
+    if (target && target !== form) target.appendChild(el);
     else form.insertAdjacentElement('afterend', el);
-    placedAfter = form;
 }
 
-// The container is shown only while Cloudflare wants a click and hidden
-// again once the token is in (the "success" tick has no business staying
-// on the page).
+function park() {
+    const el = container();
+    if (widgetId !== null && typeof turnstile !== 'undefined') {
+        try { turnstile.remove(widgetId); } catch (e) { /* already gone */ }
+    }
+    widgetId = null;
+    if (el) { el.classList.add('hidden'); document.body.appendChild(el); }
+}
+
+// The container is shown only while Cloudflare wants a click.
 function show(on) {
     const el = container();
     if (el) el.classList.toggle('hidden', !on);
@@ -136,6 +138,7 @@ export default function init() {
         const submitter = e.submitter || null;
         place(form);
         getToken().then((token) => {
+            park();
             setToken(form, token);
             form.dataset[READY] = '1';
             if (submitter && form.contains(submitter)) form.requestSubmit(submitter);
