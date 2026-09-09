@@ -1,8 +1,12 @@
 // Turnstile on job starts. The five action forms (download-file,
 // download-dir, preview-image, stream-audio, stream-video) carry a token
-// from an *invisible* Turnstile widget; handlers/action refuses an anonymous
-// start without one. The widget lives in #turnstile-action (layouts/main),
-// rendered once with execution "execute" so nothing happens until a submit.
+// from a Turnstile widget; handlers/action refuses an anonymous start
+// without one. The widget is a *managed* one rendered with appearance
+// "interaction-only": nothing is shown while Cloudflare can vouch for the
+// visitor silently, and when it wants a click the checkbox appears right
+// under the form that was submitted — the container is moved next to it
+// before the first render. (An invisible widget was tried first: it never
+// shows the checkbox, so a visitor Cloudflare is unsure about just fails.)
 //
 // The submit is intercepted in the capture phase on document — before
 // lib/async.js's own submit listener on the form — stopped, the token is
@@ -13,13 +17,18 @@
 // Fail closed: if the Turnstile script never loads (blocker, network) the
 // form goes out after TOKEN_TIMEOUT_MS without a token and the server
 // answers with the "couldn't confirm you're not a robot" card. Letting it
-// through untagged would make "don't load the script" the bypass.
+// through untagged would make "don't load the script" the bypass. A
+// visible interactive challenge gets INTERACTIVE_TIMEOUT_MS instead —
+// a person needs time to click.
 const ACTIONS = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
 const TOKEN_TIMEOUT_MS = 6000;
+const INTERACTIVE_TIMEOUT_MS = 120000;
 const READY = 'turnstileReady';
 
 let widgetId = null;
 let pending = null;
+let interactive = false;
+let placedAfter = null;
 
 function container() {
     return document.getElementById('turnstile-action');
@@ -32,16 +41,34 @@ function isActionForm(form) {
     return ACTIONS.test(path);
 }
 
+// place moves the widget container right after the form being submitted,
+// so an interactive challenge shows where the person is looking. A rendered
+// widget does not survive a DOM move, so it is re-rendered when the form
+// changes.
+function place(form) {
+    const el = container();
+    if (!el || placedAfter === form) return;
+    if (widgetId !== null && typeof turnstile !== 'undefined') {
+        try { turnstile.remove(widgetId); } catch (e) { /* already gone */ }
+        widgetId = null;
+    }
+    form.insertAdjacentElement('afterend', el);
+    placedAfter = form;
+}
+
 function ensureWidget() {
     const el = container();
     if (!el || typeof turnstile === 'undefined') return false;
     if (widgetId === null) {
+        interactive = false;
         widgetId = turnstile.render(el, {
             sitekey: el.dataset.sitekey,
+            appearance: 'interaction-only',
             execution: 'execute',
             callback: (token) => { if (pending) { const p = pending; pending = null; p(token); } },
             'error-callback': () => { if (pending) { const p = pending; pending = null; p(''); } },
             'expired-callback': () => {},
+            'before-interactive-callback': () => { interactive = true; if (pending && pending.extend) pending.extend(); },
         });
     }
     return widgetId !== null;
@@ -53,8 +80,11 @@ function getToken() {
     return new Promise((resolve) => {
         if (!ensureWidget()) { resolve(''); return; }
         let done = false;
+        let timer = null;
         const finish = (t) => { if (done) return; done = true; clearTimeout(timer); resolve(t || ''); };
-        const timer = setTimeout(() => finish(''), TOKEN_TIMEOUT_MS);
+        timer = setTimeout(() => finish(''), TOKEN_TIMEOUT_MS);
+        // Cloudflare decided to show the checkbox: give the person time.
+        finish.extend = () => { clearTimeout(timer); timer = setTimeout(() => finish(''), INTERACTIVE_TIMEOUT_MS); };
         pending = finish;
         try {
             turnstile.reset(widgetId);
@@ -91,6 +121,7 @@ export default function init() {
         // Remember the button that submitted, so requestSubmit() keeps its
         // name/value (select.js and the download split button rely on it).
         const submitter = e.submitter || null;
+        place(form);
         getToken().then((token) => {
             setToken(form, token);
             form.dataset[READY] = '1';
