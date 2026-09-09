@@ -85,7 +85,7 @@
              interaction-only. Invisible while Cloudflare can vouch silently; when it wants a
              click, the script moves this container under the submitted form and the
              checkbox appears there. */}}
-        <div id="turnstile-action" class="my-2" data-sitekey="{{ actionTurnstileSiteKey }}"></div>
+        <div id="turnstile-action" class="hidden mt-3" data-sitekey="{{ actionTurnstileSiteKey }}"></div>
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
         {{ end }}
         {{ "layout.js" | asset }}

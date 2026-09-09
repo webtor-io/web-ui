@@ -41,10 +41,12 @@ function isActionForm(form) {
     return ACTIONS.test(path);
 }
 
-// place moves the widget container right after the form being submitted,
-// so an interactive challenge shows where the person is looking. A rendered
-// widget does not survive a DOM move, so it is re-rendered when the form
-// changes.
+// place puts the widget container right above the form's job-log area
+// (data-async-target, the full-width block under the buttons where the
+// progress and the player appear) — so an interactive challenge sits on its
+// own line under the buttons, not squeezed between them. Forms without a
+// target get it right after themselves. A rendered widget does not survive
+// a DOM move, so it is re-rendered when the form changes.
 function place(form) {
     const el = container();
     if (!el || placedAfter === form) return;
@@ -52,8 +54,19 @@ function place(form) {
         try { turnstile.remove(widgetId); } catch (e) { /* already gone */ }
         widgetId = null;
     }
-    form.insertAdjacentElement('afterend', el);
+    const sel = form.getAttribute('data-async-target');
+    const target = sel ? document.querySelector(sel) : null;
+    if (target && target !== form) target.insertAdjacentElement('beforebegin', el);
+    else form.insertAdjacentElement('afterend', el);
     placedAfter = form;
+}
+
+// The container is shown only while Cloudflare wants a click and hidden
+// again once the token is in (the "success" tick has no business staying
+// on the page).
+function show(on) {
+    const el = container();
+    if (el) el.classList.toggle('hidden', !on);
 }
 
 function ensureWidget() {
@@ -65,10 +78,10 @@ function ensureWidget() {
             sitekey: el.dataset.sitekey,
             appearance: 'interaction-only',
             execution: 'execute',
-            callback: (token) => { if (pending) { const p = pending; pending = null; p(token); } },
-            'error-callback': () => { if (pending) { const p = pending; pending = null; p(''); } },
+            callback: (token) => { show(false); if (pending) { const p = pending; pending = null; p(token); } },
+            'error-callback': () => { show(false); if (pending) { const p = pending; pending = null; p(''); } },
             'expired-callback': () => {},
-            'before-interactive-callback': () => { interactive = true; if (pending && pending.extend) pending.extend(); },
+            'before-interactive-callback': () => { interactive = true; show(true); if (pending && pending.extend) pending.extend(); },
         });
     }
     return widgetId !== null;
@@ -81,7 +94,7 @@ function getToken() {
         if (!ensureWidget()) { resolve(''); return; }
         let done = false;
         let timer = null;
-        const finish = (t) => { if (done) return; done = true; clearTimeout(timer); resolve(t || ''); };
+        const finish = (t) => { if (done) return; done = true; clearTimeout(timer); show(false); resolve(t || ''); };
         timer = setTimeout(() => finish(''), TOKEN_TIMEOUT_MS);
         // Cloudflare decided to show the checkbox: give the person time.
         finish.extend = () => { clearTimeout(timer); timer = setTimeout(() => finish(''), INTERACTIVE_TIMEOUT_MS); };
