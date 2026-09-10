@@ -35,6 +35,12 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   the wait reads as the first step of the job and not as a dead button. The
   server's reply replaces the block: the job's log on success, the card on
   refusal. The live widget appears under that step.
+- Signed-in accounts: the server does not check them, and neither does the
+  client — `layouts/main` renders `#turnstile-action` only when `.User` has
+  no auth, and the submit handler also steps aside when `window._userId` is
+  set (the nav partial sets it; async navigation re-renders the nav). Known
+  gap: sign-out is an async view, so a visitor who signs out and starts a job
+  without a page load has no widget and gets the card once; a reload fixes it.
 - Deadlines: the script missing → the form goes out at once without a token
   (fail closed: the server refuses, the card says to disable blockers or
   sign in); script loaded but silent → 15 s; checkbox shown → 120 s.

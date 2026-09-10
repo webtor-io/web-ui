@@ -80,8 +80,10 @@
              so the counter cannot disagree with the modal the user is looking
              at. */}}
         <div id="onboarding-modal" data-async-layout="{{`{{ template "onboarding_checklist/modal" (withContext $ .Onboarding) }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}"></div>
-        {{ if useActionTurnstile }}
-        {{/* Turnstile for job starts (lib/turnstileAction.js): a managed widget, appearance
+        {{ if and useActionTurnstile (not (.User | hasAuth)) }}
+        {{/* Turnstile for job starts (lib/turnstileAction.js), anonymous visitors only — the
+             server does not check a signed-in account (handlers/action.verifyAction), so no
+             widget and no "checking" step for one either. A managed widget, appearance
              interaction-only, rendered here at page load so the challenge is warm when a
              button is pressed. On submit the script writes a "checking" step into the
              form's job-log block (data-label is that line); when Cloudflare wants a click

@@ -223,6 +223,12 @@ export default function init() {
     document.addEventListener('submit', (e) => {
         const form = e.target;
         if (!isActionForm(form)) return;
+        // A signed-in account is not checked by the server, so it gets no
+        // step and no widget either. The layout renders the container only
+        // for anonymous visitors; _userId (set by the nav partial, which
+        // async navigation re-renders) covers a sign-in within the same
+        // page session.
+        if (window._userId) return;
         if (form.dataset[READY]) {
             // second pass, token attached — let async.js take it
             setTimeout(() => { delete form.dataset[READY]; }, 0);
