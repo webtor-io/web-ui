@@ -420,7 +420,10 @@
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.unzipTorrent.q" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.unzipTorrent.a" }}</p></div>
+                <div class="collapse-content">
+                    <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.unzipTorrent.a" }}</p>
+                    <a href="{{ langPath $.Lang "/open-torrents-on-pc" }}" data-async-target="main" class="inline-block mt-2 text-[0.92rem] text-w-cyan hover:underline">{{ t $.Lang "about.faq.guideLink" }} →</a>
+                </div>
             </div>
 
             {{ if aiEnabled }}
