@@ -8,6 +8,10 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/webtor-io/web-ui/services/turnstile"
 
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
@@ -226,6 +230,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 	// a signed-in person is not asked. Fail closed: a missing token is a
 	// refusal, otherwise skipping the script would be the bypass.
 	if err := s.verifyAction(c); err != nil {
+		logRefusal(c, action, err)
 		postTpl.HTML(
 			http.StatusBadRequest,
 			web.NewContext(c).WithData(d).WithErr(web.NewUserError("error.turnstile_failed", err)),
@@ -270,6 +275,31 @@ func (s *Handler) verifyAction(c *gin.Context) error {
 		return nil
 	}
 	return s.verifier.Validate(c.PostForm("cf-turnstile-response"), c.GetHeader("CF-Connecting-IP"))
+}
+
+// logRefusal leaves one warning per refused start with what is needed to
+// tell the cases apart: siteverify's codes (missing token = a client that
+// never ran the widget; timeout-or-duplicate = a token used twice or too
+// late), the country Cloudflare saw, the User-Agent and the referer. No
+// token contents.
+func logRefusal(c *gin.Context, action string, err error) {
+	codes := "unknown"
+	var ve *turnstile.VerifyError
+	if errors.As(err, &ve) && len(ve.Codes) > 0 {
+		codes = strings.Join(ve.Codes, ",")
+	}
+	ua := c.Request.UserAgent()
+	if len(ua) > 120 {
+		ua = ua[:120]
+	}
+	log.WithFields(log.Fields{
+		"action":    action,
+		"codes":     codes,
+		"token_len": len(c.PostForm("cf-turnstile-response")),
+		"country":   c.GetHeader("CF-IPCountry"),
+		"ua":        ua,
+		"referer":   c.Request.Referer(),
+	}).Warn("turnstile refused job start")
 }
 
 // isNilVerifier catches a typed nil (*turnstile.Service)(nil) stored in the

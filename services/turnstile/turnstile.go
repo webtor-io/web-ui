@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -74,12 +75,29 @@ func newService(sk, secret string) *Service {
 }
 
 type verifyResponse struct {
-	Success bool `json:"success"`
+	Success    bool     `json:"success"`
+	ErrorCodes []string `json:"error-codes"`
+}
+
+// VerifyError is a refusal by siteverify (or an empty token). Codes are
+// Cloudflare's error-codes verbatim — "timeout-or-duplicate",
+// "invalid-input-response" and so on — or "missing-input-response" when no
+// token came at all; the action handler logs them so refusals can be told
+// apart (bot without a widget vs. a token used twice vs. a stale page).
+type VerifyError struct {
+	Codes []string
+}
+
+func (e *VerifyError) Error() string {
+	if len(e.Codes) == 0 {
+		return "turnstile verification failed"
+	}
+	return "turnstile verification failed: " + strings.Join(e.Codes, ",")
 }
 
 func (s *Service) Validate(token string, remoteIP string) error {
 	if token == "" {
-		return errors.New("missing turnstile token")
+		return &VerifyError{Codes: []string{"missing-input-response"}}
 	}
 	form := url.Values{
 		"secret":   {s.secretKey},
@@ -98,7 +116,7 @@ func (s *Service) Validate(token string, remoteIP string) error {
 		return errors.Wrap(err, "failed to decode turnstile response")
 	}
 	if !result.Success {
-		return errors.New("turnstile verification failed")
+		return &VerifyError{Codes: result.ErrorCodes}
 	}
 	return nil
 }

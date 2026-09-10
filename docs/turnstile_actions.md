@@ -21,17 +21,34 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
 - `handlers/action.verifyAction`: verifier call for anonymous requests, the
   client address from `CF-Connecting-IP` (the ingress does not restore it).
   Failure answers the usual card, `error.turnstile_failed`, 400.
-- `assets/src/js/lib/turnstileAction.js`: invisible widget in
-  `#turnstile-action` (layouts/main), capture-phase interception of the five
-  forms, token into a hidden input, re-submit. Fail closed after 6 s without
-  the script: the server refuses, the card says to disable blockers or sign in.
+- `assets/src/js/lib/turnstileAction.js`: capture-phase interception of the
+  five forms, token into a hidden input, re-submit. Two widgets: a *warm*
+  one rendered at page load into the hidden `#turnstile-action`
+  (layouts/main), so the silent path costs one `execute()`; and, when
+  Cloudflare wants a click, a *live* one rendered fresh inside the form's
+  job-log block — a widget does not survive being moved in the DOM (checked
+  on stage 2026-09-10: after `appendChild` the iframe is gone and the
+  checkbox is dead).
+- The moment a button is pressed the script writes a step into the form's
+  job-log block (`#log-<id>`) in the job log's own markup — "Checking that
+  you are not a robot" (`action.turnstileCheck`) with the pulsing dot — so
+  the wait reads as the first step of the job and not as a dead button. The
+  server's reply replaces the block: the job's log on success, the card on
+  refusal. The live widget appears under that step.
+- Deadlines: the script missing → the form goes out at once without a token
+  (fail closed: the server refuses, the card says to disable blockers or
+  sign in); script loaded but silent → 15 s; checkbox shown → 120 s.
 - The widget is a separate Turnstile widget in **managed** mode rendered with
-  `appearance: interaction-only`: nothing is shown while Cloudflare vouches
-  silently; when it wants a click, the container is moved right under the
-  submitted form and the checkbox appears there (a person then gets two
-  minutes instead of six seconds). Invisible mode was tried first and
-  rejected: it never shows the checkbox, so an unsure visitor just fails. The
-  support form keeps its own managed widget.
+  `appearance: interaction-only`. Invisible mode was tried first and rejected:
+  it never shows the checkbox, so an unsure visitor just fails. The support
+  form keeps its own managed widget.
+- `handlers/action.logRefusal`: every refusal is one warning `turnstile
+  refused job start` with `codes` (siteverify's `error-codes`;
+  `missing-input-response` when no token came), `country` (`CF-IPCountry`),
+  `ua`, `referer`, `action`. Loki: `{app="web-ui"} |= "turnstile refused"`.
+  Read the codes before drawing conclusions from the 400 count on these
+  endpoints: a client that never ran the widget and a person whose token was
+  used twice both get a 400.
 
 ## Testing the unhappy paths
 

@@ -1563,6 +1563,7 @@
     "error.magnet_no_metadata": "Wir haben diesen Torrent innerhalb einer Minute nicht im BitTorrent-Netz gefunden — offenbar teilt ihn gerade niemand. Ein neuer Versuch hilft selten: probiere es später, nutze die .torrent-Datei oder eine andere Quelle.",
     "error.magnet_invalid": "Dieser Magnet-Link ist defekt — der Infohash fehlt oder ist abgeschnitten. Kopiere den vollständigen Magnet-Link oder lade die .torrent-Datei hoch.",
     "error.turnstile_failed": "Wir konnten nicht bestätigen, dass Sie kein Roboter sind. Versuchen Sie es erneut – wenn es weiter fehlschlägt, deaktivieren Sie Inhaltsblocker für diese Seite oder melden Sie sich an.",
+    "action.turnstileCheck": "Wir prüfen, dass Sie kein Roboter sind",
     "error.support_infohash_required": "Bitte gib Infohash, Magnet oder Link des Torrents an – sonst wissen wir nicht, welchen du meinst.",
     "error.subscriptionFailed": "Abo konnte nicht angelegt werden",
     "error.subscriptionLimit": "Abo-Limit erreicht. Lösche eines oder wechsle den Tarif.",

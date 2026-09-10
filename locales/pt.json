@@ -1563,6 +1563,7 @@
     "error.magnet_no_metadata": "Não encontramos este torrent na rede BitTorrent em um minuto — parece que ninguém está compartilhando agora. Tentar de novo raramente ajuda: tente mais tarde, use o arquivo .torrent ou outra fonte.",
     "error.magnet_invalid": "Este link magnet está quebrado — falta o infohash ou ele está cortado. Copie o link magnet completo ou envie o arquivo .torrent.",
     "error.turnstile_failed": "Não conseguimos confirmar que você não é um robô. Tente novamente; se continuar falhando, desative bloqueadores de conteúdo para este site ou entre na sua conta.",
+    "action.turnstileCheck": "Verificando que você não é um robô",
     "error.support_infohash_required": "Informe o infohash, o magnet ou o link do torrent — sem isso não sabemos de qual torrent você fala.",
     "error.subscriptionFailed": "Não foi possível criar a assinatura",
     "error.subscriptionLimit": "Limite de assinaturas atingido. Remova uma ou mude de plano.",

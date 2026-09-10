@@ -1573,6 +1573,7 @@
     "error.magnet_no_metadata": "Nie znaleźliśmy tego torrenta w sieci BitTorrent w ciągu minuty — wygląda na to, że nikt go teraz nie udostępnia. Ponowna próba rzadko pomaga: spróbuj później, użyj pliku .torrent lub innego źródła.",
     "error.magnet_invalid": "Ten link magnet jest uszkodzony — brakuje infohasha lub jest ucięty. Skopiuj pełny link magnet albo wgraj plik .torrent.",
     "error.turnstile_failed": "Nie udało się potwierdzić, że nie jesteś robotem. Spróbuj ponownie — jeśli nadal nie działa, wyłącz blokowanie treści dla tej strony lub zaloguj się.",
+    "action.turnstileCheck": "Sprawdzamy, czy nie jesteś robotem",
     "error.support_infohash_required": "Podaj infohash, magnet lub link do torrenta — bez tego nie wiemy, o który torrent chodzi.",
     "error.subscriptionFailed": "Nie udało się utworzyć subskrypcji",
     "error.subscriptionLimit": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",

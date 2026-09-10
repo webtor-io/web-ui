@@ -81,11 +81,12 @@
              at. */}}
         <div id="onboarding-modal" data-async-layout="{{`{{ template "onboarding_checklist/modal" (withContext $ .Onboarding) }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}"></div>
         {{ if useActionTurnstile }}
-        {{/* Turnstile for job starts (lib/turnstileAction.js): managed widget, appearance
-             interaction-only. Invisible while Cloudflare can vouch silently; when it wants a
-             click, the script moves this container under the submitted form and the
-             checkbox appears there. */}}
-        <div id="turnstile-action" class="hidden mt-3" data-sitekey="{{ actionTurnstileSiteKey }}"></div>
+        {{/* Turnstile for job starts (lib/turnstileAction.js): a managed widget, appearance
+             interaction-only, rendered here at page load so the challenge is warm when a
+             button is pressed. On submit the script writes a "checking" step into the
+             form's job-log block (data-label is that line); when Cloudflare wants a click
+             a fresh widget is rendered inside that block, under the step. */}}
+        <div id="turnstile-action" class="hidden" data-sitekey="{{ actionTurnstileSiteKey }}" data-label="{{ t $.Lang "action.turnstileCheck" }}"></div>
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
         {{ end }}
         {{ "layout.js" | asset }}
