@@ -292,9 +292,18 @@ func logRefusal(c *gin.Context, action string, err error) {
 	if len(ua) > 120 {
 		ua = ua[:120]
 	}
+	// reason is what the client says happened when it sent no token
+	// (turnstileAction.js: no-script, silent-timeout, interactive-timeout,
+	// widget-error…, with the elapsed ms); "absent" means the request did
+	// not carry the field at all — no script ran the interception.
+	reason := c.PostForm("cf-turnstile-reason")
+	if _, ok := c.GetPostForm("cf-turnstile-response"); !ok {
+		reason = "absent"
+	}
 	log.WithFields(log.Fields{
 		"action":    action,
 		"codes":     codes,
+		"reason":    reason,
 		"token_len": len(c.PostForm("cf-turnstile-response")),
 		"country":   c.GetHeader("CF-IPCountry"),
 		"ua":        ua,

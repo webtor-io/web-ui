@@ -64,7 +64,7 @@ function widgetOptions(onInteractive) {
         appearance: 'interaction-only',
         execution: 'execute',
         callback: (token) => { if (pending) pending.finish(token); },
-        'error-callback': () => { if (pending) pending.finish(''); },
+        'error-callback': () => { if (pending) pending.finish('', 'widget-error'); },
         'expired-callback': () => {},
         'before-interactive-callback': onInteractive,
     };
@@ -108,7 +108,7 @@ function dropWarm() {
 }
 
 function renderLive(slot) {
-    if (!slot || !hasTurnstile()) { if (pending) pending.finish(''); return; }
+    if (!slot || !hasTurnstile()) { if (pending) pending.finish('', 'no-live-slot'); return; }
     try {
         liveId = turnstile.render(slot, widgetOptions(() => {
             if (pending) pending.interactive();
@@ -116,7 +116,7 @@ function renderLive(slot) {
         turnstile.execute(liveId);
     } catch (e) {
         liveId = null;
-        if (pending) pending.finish('');
+        if (pending) pending.finish('', 'live-render-failed');
     }
 }
 
@@ -170,16 +170,18 @@ function stepBlock(form) {
 // success is replaced by the job's own log, a refusal by the server's card.
 function getToken(form) {
     return new Promise((resolve) => {
-        if (!hasTurnstile() || !container()) { resolve(''); return; }
+        if (!hasTurnstile() || !container()) { form.dataset.turnstileReason = 'no-script:0'; resolve(''); return; }
         const step = stepBlock(form);
         let done = false;
         let timer = null;
-        const finish = (t) => {
+        const started = Date.now();
+        const finish = (t, reason) => {
             if (done) return;
             done = true;
             clearTimeout(timer);
             pending = null;
             dropLive();
+            form.dataset.turnstileReason = t ? '' : `${reason || 'unknown'}:${Date.now() - started}`;
             if (step.line) step.line.classList.replace('inprogress', t ? 'done' : 'error');
             step.detach();
             // A used warm widget is reset for the next start; one that
@@ -192,29 +194,39 @@ function getToken(form) {
         };
         const interactive = () => {
             clearTimeout(timer);
-            timer = setTimeout(() => finish(''), INTERACTIVE_TIMEOUT_MS);
+            timer = setTimeout(() => finish('', 'interactive-timeout'), INTERACTIVE_TIMEOUT_MS);
         };
         pending = { finish, interactive, slot: step.slot };
-        timer = setTimeout(() => finish(''), SILENT_TIMEOUT_MS);
+        timer = setTimeout(() => finish('', 'silent-timeout'), SILENT_TIMEOUT_MS);
         if (warmId === null) renderWarm();
-        if (warmId === null) { finish(''); return; }
+        if (warmId === null) { finish('', 'no-widget'); return; }
         try {
             turnstile.execute(warmId);
         } catch (e) {
-            finish('');
+            finish('', 'execute-failed');
         }
     });
 }
 
-function setToken(form, token) {
-    let input = form.querySelector('input[name="cf-turnstile-response"]');
+function hidden(form, name, value) {
+    let input = form.querySelector(`input[name="${name}"]`);
     if (!input) {
         input = document.createElement('input');
         input.type = 'hidden';
-        input.name = 'cf-turnstile-response';
+        input.name = name;
         form.appendChild(input);
     }
-    input.value = token;
+    input.value = value;
+}
+
+// setToken writes the token and, when there is none, why — the server logs
+// the reason next to siteverify's code, so a refusal can be read as "the
+// script never ran", "the widget was silent for 15 s" or "the checkbox was
+// shown and nobody clicked it for two minutes".
+function setToken(form, token) {
+    hidden(form, 'cf-turnstile-response', token);
+    hidden(form, 'cf-turnstile-reason', token ? '' : (form.dataset.turnstileReason || 'unknown'));
+    delete form.dataset.turnstileReason;
 }
 
 export default function init() {
