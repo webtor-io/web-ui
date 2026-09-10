@@ -320,3 +320,34 @@ func TestParseItem_MultiSegmentPath(t *testing.T) {
 		})
 	}
 }
+
+// seriesAIPathHint — the AI/path-title skip gate in mapMetadata only
+// sees pathHint. For series that used to be the torrent ROOT alone, so
+// a clean root over a flagged episode folder ("Murrsuit/drunk furs
+// trying to make porn - season 1/…") slipped past every skip check and
+// still spent a Claude call (skiplist-weekly 2026-08-17..09-07).
+func TestSeriesAIPathHint(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		// Clean series: root folder only, as before.
+		{"Stand.Up.S13.Complete/01 - haunt in inn.mkv", "Stand.Up.S13.Complete"},
+		{"/Stand.Up.S13.Complete/S01/01.mkv", "Stand.Up.S13.Complete"},
+		// Single-file series: nothing to cut.
+		{"Some.Show.S01E01.mkv", "Some.Show.S01E01.mkv"},
+		// Marker below the root: keep the full path so the gate sees it.
+		{"Murrsuit/drunk furs trying to make porn - season 1/ep01.mp4", "Murrsuit/drunk furs trying to make porn - season 1/ep01.mp4"},
+		{"Packs/Premier League 2026 S01/E01.mkv", "Packs/Premier League 2026 S01/E01.mkv"},
+		{"Misc/Udemy - Go Bootcamp S01/01.mp4", "Misc/Udemy - Go Bootcamp S01/01.mp4"},
+		// Marker in the root: still the full path — one rule ("flagged
+		// anywhere → full path"), and a flagged hint never reaches Claude.
+		{"Brazzers.S01/e01.mp4", "Brazzers.S01/e01.mp4"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := seriesAIPathHint(c.path); got != c.want {
+			t.Errorf("seriesAIPathHint(%q) = %q, want %q", c.path, got, c.want)
+		}
+	}
+}

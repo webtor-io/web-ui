@@ -113,7 +113,14 @@ const (
 	// Multi-word brands embed `\.?` between tokens so both the dotted
 	// form ("Facial.Abuse") and the concatenated form ("FacialAbuse")
 	// match — the parser doesn't strip dots before field matching.
-	adultStudioAlternation = `blackedraw|blacked|brazzers|naughtyamerica|mylf|milfy|mylfx|milfty|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|momswap|familyswap|sislovesme|daughterswap|dadcrush|dontfuckmydaughter|mydadshotgirlfriend|mommys?[\s.-]?girl|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|vixen\s*-\s*[a-z]+|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial[\s.-]?abuse|ghetto[\s.-]?gaggers|pure[\s.-]?taboo|enature|family[\s.-]?therapy(?:[\s.-]?xxx)?|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|lethal[\s.-]?hardcore|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media|intimatepov|rickysroom|loveherfeet|showstars|badoinkvr|baikal[\s.-]?films|elitepain|graias|raging[\s.-]?stallion|sexmex|trickymasseur|woodmancastingx?|pornpros|castingcouch[\s.-]?hd|swallowed|swallowsalon|mommyandme|vrconk|czechvr|realjamvr|darkroomvr|tmwvrnet|vrcosplayx|vrhush|dancingbear|hijab[\s.-]?hookups|please-cuck[\s.-]?me|please-fuck[\s.-]?my[\s.-]?wife|familytherapyxxx|naturist[\s.-]?freedom|gangland[\s.-]?cream[\s.-]?pie|faphouse|fap[\s.-]?house|corbin[\s.-]?fisher|fantia|fansly|analvids|nympho|vrspy|carib(?:beancom)?|clips4sale|private[\s.-]?(?:media|society)|roccosiffredi|cospuri|wifey\.com|familiestied|kinkclassics|cmnm|jm[\s.-]?productions|perverted[\s.-]?stories|marc[\s.-]?dorcel|dorcel|allblackx|brasileirinhas|milfvr|netvideogirls|publicbang|amateurallure|alisonprod|sleazy[\s.-]?germany|pervtherapy|filthypov|inkasex|sweetsinner|czech[\s.-]?(?:massage|streets|casting|wife|home|experiment|garden|gangbang|fantasy|sauna|spy|taxi|hunter|orgasm|parties|pool|snooper|supermodels|switch|twins)`
+	//
+	// Weekly skiplist mining 2026-09-07: `brazzers(?:exxtra)?` — the
+	// sub-label form "brazzersexxtra.26.09.01.name" failed the trailing
+	// `\b` of the bare entry; `myfriendshotmom` (10 rows, always
+	// "<site>.<first>.<last>"); and the candidates that repeated for
+	// three weeks with 0 FP: `hidden[\s.-]?zone`, `n?sxyprn`,
+	// `sorefordays`, `nyap2p`.
+	adultStudioAlternation = `blackedraw|blacked|brazzers(?:exxtra)?|naughtyamerica|mylf|milfy|mylfx|milfty|hegre|onlyfans|only[\s.-]+fans|manyvids|pornstarwife|wowgirls|spankmonster|momswapped|momswap|familyswap|sislovesme|daughterswap|dadcrush|dontfuckmydaughter|mydadshotgirlfriend|mommys?[\s.-]?girl|latinpapixxl|latinpapi|allover30|gilfaf|edgedandbound|maturenl|mofos|ersties|hgshequ|hhd800|fakehub|bangbros|realitykings|teamskeet|atkgalleria|atkhairy|czechcasting|fc2[\s.-]?ppv|heyzo|10musume|1pondo|s-cute|stickam|voyeur-russian|julesjordan|nubilesporn|exploitedcollegegirls|kink\.com|milflicious|wankzvr|tushy|deeper\.com|vixen\.com|vixen\s*-\s*[a-z]+|strippers4k|rkprime|backroomcastingcouch|angelslove|beautyangels|cockyboys|facial[\s.-]?abuse|ghetto[\s.-]?gaggers|pure[\s.-]?taboo|enature|family[\s.-]?therapy(?:[\s.-]?xxx)?|slr\s+originals|slroriginals|color[\s.-]?climax|1by[\s.-]?day|tamedteens|legalporno|lethal[\s.-]?hardcore|mtcang|madoubt|argentinacasting|defloration|hookuphotshot|vrlatina|pornolab|blacksonblondes|sexuallybroken|faketaxi|adorable[\s.-]?teens|missax|naturistin|xxxviciosaszt|prime[\s.-]?revolution|stripchat|fansly\.com|sandra[\s.-]?flame|youngperps|momcomesfirst|mollyredwolf|tonightsgirlfriend|migoto[\s.-]?vr|eporner\.com|evil[\s.-]?angel|virtual[\s.-]?taboo|kinkvr|slr[\s_-]+vr[a-z]+|bonkge|cameel|sexandsubmission|hardcoregangbang|cuckoldsessions|transroommates|fuckingmachines|publicdisgrace|dungeonsex|electrosluts|whippedass|girlsdoporn|teensexmania|slim4k|trans500|wakeupnfuck|wunf|crushcuties|thisvid\.com|pornovrai|cockhero|cock[\s.-]?hero|nextdoor[\s.-]?mature|xvideosred|oopsfamily|slim[\s.-]?vr|metart|narcos[\s.-]?gx|treasure[\s.-]?island[\s.-]?media|intimatepov|rickysroom|loveherfeet|showstars|badoinkvr|baikal[\s.-]?films|elitepain|graias|raging[\s.-]?stallion|sexmex|trickymasseur|woodmancastingx?|pornpros|castingcouch[\s.-]?hd|swallowed|swallowsalon|mommyandme|vrconk|czechvr|realjamvr|darkroomvr|tmwvrnet|vrcosplayx|vrhush|dancingbear|hijab[\s.-]?hookups|please-cuck[\s.-]?me|please-fuck[\s.-]?my[\s.-]?wife|familytherapyxxx|naturist[\s.-]?freedom|gangland[\s.-]?cream[\s.-]?pie|faphouse|fap[\s.-]?house|corbin[\s.-]?fisher|fantia|fansly|analvids|nympho|vrspy|carib(?:beancom)?|clips4sale|private[\s.-]?(?:media|society)|roccosiffredi|cospuri|wifey\.com|familiestied|kinkclassics|cmnm|jm[\s.-]?productions|perverted[\s.-]?stories|marc[\s.-]?dorcel|dorcel|allblackx|brasileirinhas|milfvr|netvideogirls|publicbang|amateurallure|alisonprod|sleazy[\s.-]?germany|pervtherapy|filthypov|inkasex|sweetsinner|czech[\s.-]?(?:massage|streets|casting|wife|home|experiment|garden|gangbang|fantasy|sauna|spy|taxi|hunter|orgasm|parties|pool|snooper|supermodels|switch|twins)|myfriendshotmom|hidden[\s.-]?zone|n?sxyprn|sorefordays|nyap2p`
 
 	// kindAlternation — anime release-segment tags. Shared by the Kind
 	// field-parser (captures the tag word) and the Episode anchor that
@@ -260,7 +267,18 @@ var fieldParsers = FieldParsers{
 	// alternations first so a "DTS-HD MA" match doesn't get cut
 	// short by the bare "DTS" alternative.
 	{FieldTypeAudio, NewRegexpMatcher(`(?i)\b((DTS[\s.-]?HD(?:[\s.-]?MA)?|TrueHD|Atmos|E[\s.-]?AC3|FLAC|MP3|DDP[\s.]?[57]\.[01]|DDP|DD\+?5\.?1|DD5\.?1|Dual[\- ]Audio|LiNE|DTS|AAC[.-]LC|AAC(?:\.?2\.0)?|AC3(?:(?:[\s-]+)?\.?5\.1)?|[5-9]\.1|[5-9]ch|2CH))\b`), nil},
-	{FieldTypeWebsite, NewRegexpMatcher(`^((www\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}))`, `^(\[ ?([^\]]+?) ?\])`), nil},
+	// Third pattern: CN "visit our site for more" banner in fullwidth
+	// brackets, anywhere in the name — "【更多高清电影请访问 <site>】<title>".
+	// Keyed on the banner verbs (更多 / 请访问 / 访问 / 訪問) rather than
+	// on any `【…】` so fansub group tags are untouched. Unanchored: the
+	// leading form leaked into Title verbatim, the trailing form only
+	// survived because Year/Resolution cut Title short (weekly skiplist
+	// mining 2026-09-07, 23 rows/month).
+	{FieldTypeWebsite, NewRegexpMatcher(
+		`^((www\.[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}))`,
+		`^(\[ ?([^\]]+?) ?\])`,
+		`(【([^】]{0,60}(?:更多|请访问|訪問|访问)[^】]{0,60})】)`,
+	), nil},
 	// Scene-release date. Runs BEFORE Year + Episode so the year-shaped
 	// trailing group in "DD.MM.YYYY" doesn't get split between Year and
 	// Date, and so the 2-digit groups in "YY.MM.DD" don't get eaten by
@@ -554,7 +572,10 @@ var adultMatcher = NewRegexpMatcher(
 	// don't appear inside other common Chinese words, and Chinese
 	// titles concatenate ideographs (so "[^CJK]" would block real
 	// hits like "极品...内射" mid-string).
-	`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃|巨乳|自慰|性爱|肉棒|耳舐め))`,
+	// Weekly skiplist mining 2026-09-07 added 做爱/做愛, 少妇/少婦, 爆乳,
+	// 美乳, 口交, 人妻 (each ≥3 rows/week, 0 FP). 偷情 was seen too but is
+	// deliberately absent — it is the CN release title of "Closer" (2004).
+	`((无码|無碼|中文字幕|流出|探花|美穴|馒头|内射|中出|偷拍|啪啪|淫|网黄|網黃|巨乳|自慰|性爱|肉棒|耳舐め|做爱|做愛|少妇|少婦|爆乳|美乳|口交|人妻))`,
 	// Chinese / paywall-rip filename prefix: `<prefix>.<tld><sep>` —
 	// signature shape of paywall-scraped adult content from CN
 	// forums (4k2.com@, 2048.vip-, big2048.com@, 489155.com@,
@@ -590,25 +611,37 @@ var adultMatcher = NewRegexpMatcher(
 // enrichment on sports broadcasts (TMDB/OMDB/KPU don't index them
 // and Claude has nothing to add).
 //
-// Three pattern groups:
+// Four pattern groups:
 //
 //   1. League abbreviations as standalone tokens (NBA, NHL, WWE, ...).
 //      The `\b...\b` word boundary keeps "Mr. NBA" / "NBA documentary"
 //      flagged but skips substrings like "NB" inside "NBNA".
 //   2. Multi-word competition names ("Premier League", "Champions
-//      League", "World Cup"). The `\s+` accommodates the parser's
-//      "underscore→space" preprocessing.
+//      League", "World Cup"). The inter-token separator is `[\s._-]+`
+//      (not bare `\s+`): the parser only rewrites underscores to
+//      spaces, so the dotted scene form "Premier.League.2026" and the
+//      hyphenated "Formula-One-2026" were slipping past — weekly
+//      skiplist mining 2026-09-07.
 //   3. Russian Cyrillic markers (НХЛ, КХЛ, РПЛ, хоккей, футбол).
 //      Non-Cyrillic prefix guard prevents false matches inside
 //      compound words.
+//   4. Football fixtures "<Team> vs|at <Team> DD.MM.YYYY" (48 rows over
+//      4 weeks, 0 FP — weekly skiplist mining 2026-09-07). The dotted
+//      broadcast date is the anchor: "Kramer vs Kramer 1979" and
+//      "Alien vs Predator 2004" carry a bare year and stay clean.
 //
 // Wrestling-specific show names (Monday Night Raw, SmackDown, NXT,
 // Dynamite, Collision, Rampage) are included because they're 1:1
 // with WWE/AEW programming with no overlap with non-sport titles.
 var sportMatcher = NewRegexpMatcher(
-	`(?i)\b((NBA|NHL|NFL|MLB|MLS|WNBA|WWE|AEW|UFC|ATP|WTA|PGA|MotoGP|NASCAR|F1|Formula\s*(?:1|One)|IndyCar))\b`,
+	`(?i)\b((NBA|NHL|NFL|MLB|MLS|WNBA|WWE|AEW|UFC|ATP|WTA|PGA|MotoGP|NASCAR|F1|Formula[\s._-]*(?:1|One)|IndyCar))\b`,
 	`(?i)\b((Monday\s+Night\s+Raw|SmackDown|NXT|Dynamite|Collision|Rampage|WrestleMania|SummerSlam|Royal\s+Rumble|Survivor\s+Series))\b`,
-	`(?i)\b((Premier\s+League|Champions\s+League|Europa\s+League|La\s+Liga|Bundesliga|Serie\s+A|Ligue\s+1|World\s+Cup|FIFA|UEFA|UEFA\s+Euro|Euro\s*20\d{2}|Copa\s+Am[eé]rica|African\s+Cup|Stanley\s+Cup|Super\s+Bowl|Eurocup|Euroleague|IPL\s*20\d{2}|Royal\s+Challengers|Knight\s+Riders|Mumbai\s+Indians|Chennai\s+Super\s+Kings|Sunrisers\s+Hyderabad|Delhi\s+Capitals|Punjab\s+Kings|Rajasthan\s+Royals|Gujarat\s+Titans|Lucknow\s+Super))\b`,
+	`(?i)\b((Premier[\s._-]+League|Champions[\s._-]+League|Europa[\s._-]+League|La[\s._-]+Liga|Bundesliga|Serie[\s._-]+A|Ligue[\s._-]+1|World[\s._-]+Cup|FIFA|UEFA|UEFA[\s._-]+Euro|Euro[\s._-]*20\d{2}|Copa[\s._-]+Am[eé]rica|African[\s._-]+Cup|Stanley[\s._-]+Cup|Super[\s._-]+Bowl|Eurocup|Euroleague|IPL[\s._-]*20\d{2}|Royal[\s._-]+Challengers|Knight[\s._-]+Riders|Mumbai[\s._-]+Indians|Chennai[\s._-]+Super[\s._-]+Kings|Sunrisers[\s._-]+Hyderabad|Delhi[\s._-]+Capitals|Punjab[\s._-]+Kings|Rajasthan[\s._-]+Royals|Gujarat[\s._-]+Titans|Lucknow[\s._-]+Super))\b`,
+	// Football fixtures — see group 4 above. Team names are 3-29 chars
+	// of letters / spaces / apostrophes on each side of the verb so a
+	// stray "at" inside a long sentence can't bridge two unrelated
+	// phrases into a match.
+	`(?i)\b(([a-z][a-z\s']{2,28}\s(?:vs|at)\s[a-z][a-z\s']{2,28}\s\d{2}\.\d{2}\.\d{4}))\b`,
 	// Cycling grand tours — "109th Giro d'Italia 2026 Stage 05" /
 	// "Tour de France 2024" / "Vuelta a España". The apostrophe in
 	// "d'Italia" is `['\x{2019}]?` so both ASCII and Unicode curly
@@ -628,7 +661,7 @@ var sportMatcher = NewRegexpMatcher(
 // TMDB/OMDB/KPU. Downstream enrichment skips both AI fallback and
 // path-title fallback when this flag fires.
 //
-// Five pattern groups, all high-confidence:
+// Six pattern groups, all high-confidence:
 //
 //   1. Mainstream e-learning platforms ("Udemy", "Coursera",
 //      "Pluralsight", "MasterClass", ...). These names are
@@ -652,12 +685,22 @@ var sportMatcher = NewRegexpMatcher(
 //      ("DLC_AbilityTutorial_..."). Per-user request, these are
 //      treated as courses since they are interactive-software
 //      tutorials with no movie/TV metadata.
+//   6. The Teaching Company / The Great Courses (18 rows, 0 FP —
+//      weekly skiplist mining 2026-09-07). Anchored forms ONLY: the
+//      dash-prefixed "TTC - <course>" / "TTC-Video-<course>", the
+//      "TGC_NNNN_LectNN" lecture filenames and the spelled-out brand.
+//      Bare "TTC" as a word is never a marker (Toronto Transit
+//      Commission documentaries, "TTC 2019"). Note the parser rewrites
+//      `_` to a space before matching, so the lecture form is
+//      `[\s_]`-separated here.
 var courseMatcher = NewRegexpMatcher(
 	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy|gumroad|john[\s.-]?danaher|master[\s.-]?toddy|chael[\s.-]?sonnen|henry[\s.-]?akins|evenant|flux[\s.-]?academy|zerotomastery|ross[\s.-]?jeffries|rsd[\s.-](?:julien|max|tyler|luke)))\b`,
 	`(?i)(\[\s*(freecoursesite|freecoursesonline|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
 	`(?i)\b([a-z0-9-]+\.(courses))\b`,
 	`(?i)\b((dlc[\s_]+\w*tutorial|ubisoft[\s.]?connect[\s.]?rip|steam[\s.-]?rip|gog[\s.-]?rip|epic[\s.-]?games[\s.-]?rip))\b`,
 	`(?i)((видео[\s_-]?(?:курс|школа|урок)))`,
+	`(?i)\b((ttc[\s._-]*[-–]|the\s+great\s+courses(?:\s+plus)?))`,
+	`(?i)\b((tgc[\s_]\d{3,5}[\s_]lect\d+))\b`,
 )
 
 var parser = NewCompoundParser([]Parser{

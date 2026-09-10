@@ -546,6 +546,24 @@ func mergeKeepFirstNonZero(dst, src *ptn.TorrentInfo) {
 // like "01 - first joke.mkv" carries no series title, whereas the
 // parent folder ("Stand.Up.S13.Complete") usually does. Returns the
 // path unchanged when there is no separator.
+// seriesAIPathHint picks the pathHint handed to mapMetadata for a
+// series: the torrent root (see the call site for why Claude gets the
+// root, not the episode filename) UNLESS some deeper segment carries an
+// adult / sport / course marker. The skip gates in mapMetadata and
+// tryAIFallback only ever see pathHint, so a clean root over a flagged
+// episode folder ("Murrsuit/drunk furs trying to make porn - season
+// 1/…") used to slip past all three and still spend a Claude call —
+// the same rows that scanSidecarFlags / saveResourceMetadata already
+// classified as adult. Keeping the full path for those is safe: a
+// flagged hint never reaches Claude, it only changes what the gate
+// inspects (skiplist-weekly 2026-08-17..09-07, 4 weeks running).
+func seriesAIPathHint(fullPath string) string {
+	if isAdultPath(fullPath) || isSportPath(fullPath) || isCoursePath(fullPath) {
+		return fullPath
+	}
+	return torrentRoot(fullPath)
+}
+
 func torrentRoot(path string) string {
 	for _, part := range strings.Split(path, "/") {
 		if part != "" {
@@ -939,7 +957,7 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 			// nothing usable from "01 - haunt in inn" but everything it
 			// needs from "Stand.Up.S13.Complete". Top-level torrents
 			// (single-file series, unusual) keep the full path as-is.
-			seriesPath = torrentRoot(seriesPath)
+			seriesPath = seriesAIPathHint(seriesPath)
 			md, err = s.mapMetadata(ctx, ser.VideoContent, ser.GetContentType(), force, hintVideoID, seriesPath, budget)
 		}
 		if err != nil {
