@@ -1572,7 +1572,7 @@
     "error.upstream_unavailable": "Náš streamovací backend neodpověděl. Je to na naší straně — zkuste to prosím za minutu.",
     "error.magnet_no_metadata": "Tento torrent jsme v síti BitTorrent do minuty nenašli — zdá se, že ho teď nikdo nesdílí. Opakování málokdy pomůže: zkus to později, použij soubor .torrent nebo jiný zdroj.",
     "error.magnet_invalid": "Tento magnet odkaz je poškozený — chybí infohash nebo je useknutý. Zkopíruj celý magnet odkaz nebo nahraj soubor .torrent.",
-    "error.turnstile_failed": "Nepodařilo se ověřit, že nejste robot. Zkuste to znovu – pokud to nepomůže, vypněte pro tento web blokování obsahu nebo se přihlaste.",
+    "error.turnstile_failed": "Nepodařilo se ověřit, že nejste robot. Zkuste to znovu – pokud to nepomůže, vypněte pro tento web blokování obsahu nebo se přihlaste. Pokud jste odkaz otevřeli uvnitř aplikace (Telegram, Facebook…), otevřete ho v běžném prohlížeči.",
     "action.turnstileCheck": "Ověřujeme, že nejste robot",
     "error.support_infohash_required": "Uveďte infohash, magnet nebo odkaz na torrent — bez toho nepoznáme, o který torrent jde.",
     "error.subscriptionFailed": "Odběr se nepodařilo vytvořit",
