@@ -5,6 +5,7 @@ import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { applyCueOffset } from './cue-offset';
+import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
@@ -195,6 +196,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             isSession,
             resourceID: resourceID || '',
         });
+        const modal = document.getElementById('subtitles');
+        const uiLang = document.documentElement.lang || '';
+        if (window.umami && modal) {
+            window.umami.track('subtitle-resolved', { ...resolveSubtitleLevel(readTracks(modal), uiLang), uiLang });
+        }
     }, [state.currentTime, isVideo, isSession, resourceID]);
 
     // Grace soft CTA — fires once when movie-time crosses the grace window.
@@ -751,9 +757,10 @@ function wireTrackHandlers(container) {
         subtitlesModal.addEventListener('click', (e) => {
             const target = e.target.closest('.subtitle');
             if (!target || !subtitlesModal.contains(target)) return;
-            if (target.getAttribute('data-provider') === 'UserSubtitle') {
-                const id = target.getAttribute('data-id');
-                if (id && id !== 'none' && window.umami) window.umami.track('user-subtitle-select');
+            const id = target.getAttribute('data-id');
+            if (id && id !== 'none' && window.umami) {
+                window.umami.track('subtitle-select', selectEventData(target));
+                if (target.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
             }
             activateSubtitle(container, target);
         });
