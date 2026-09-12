@@ -67,7 +67,7 @@
                     <h3 class="font-bold text-lg">OpenSubtitles</h3>
                     <ul class="flex flex-wrap">
                         {{ range $openSubs }}
-                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
+                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
                         {{ end }}
                     </ul>
                 </div>

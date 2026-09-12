@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
 	"strconv"
+	"strings"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
@@ -20,6 +21,7 @@ type ListItem struct {
 	Provider string
 	Src      string
 	Kind     string
+	Source   string
 }
 
 type Helper struct {
@@ -168,6 +170,37 @@ func (s *Helper) FilterSubtitlesByProvider(subs []ListItem, provider string, exc
 	return res
 }
 
+// Bitmap subtitle codecs cannot be rendered by the browser (they need
+// OCR) and cannot be translated. hdmv_pgs is also dropped by
+// content-transcoder from the HLS subtitle group, so it must not
+// consume an MPID; the other bitmap codecs stay in the group and keep
+// their slot even though we hide them.
+var bitmapSubtitleCodecs = map[string]bool{
+	"hdmv_pgs_subtitle": true,
+	"dvd_subtitle":      true,
+	"dvb_subtitle":      true,
+	"xsub":              true,
+}
+
+// embeddedSubtitleVisible reports whether an embedded subtitle stream
+// is offered in the picker and whether it occupies an index in the
+// transcoder's HLS subtitle group (see content-transcoder
+// services/hls.go: everything but hdmv_pgs is included). "Forced"
+// tracks carry only foreign-language lines and are hidden by title
+// until content-prober exposes ffprobe's disposition flags.
+func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHLS bool) {
+	if codecName == "hdmv_pgs_subtitle" {
+		return false, false
+	}
+	if bitmapSubtitleCodecs[codecName] {
+		return false, true
+	}
+	if strings.Contains(strings.ToLower(title), "forced") {
+		return false, true
+	}
+	return true, true
+}
+
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
@@ -178,7 +211,14 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 	if mp != nil {
 		i := 0
 		for _, stream := range mp.Streams {
-			if stream.CodecType == "subtitle" {
+			if stream.CodecType != "subtitle" {
+				continue
+			}
+			visible, counts := embeddedSubtitleVisible(stream.CodecName, stream.Tags.Title)
+			if !counts {
+				continue
+			}
+			if visible {
 				label := fmt.Sprintf("Subtitle #%v", i+1)
 				if stream.Tags.Title != "" {
 					label = stream.Tags.Title
@@ -195,8 +235,8 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 					Kind:     "subtitles",
 					Provider: "MediaProbe",
 				})
-				i++
 			}
+			i++
 		}
 	}
 	for i, t := range tag.Tracks {
@@ -217,6 +257,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Kind:     string(t.Kind),
 			Src:      t.Src,
 			Provider: "OpenSubtitles",
+			Source:   t.Source,
 		})
 	}
 	for i, t := range ext.Tracks {
