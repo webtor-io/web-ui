@@ -562,7 +562,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				j.InProgress(s.t("job.loadingSubtitles"))
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
-				subs, err := s.api.GetOpenSubtitles(osCtx, subtitles.URL)
+				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, sc.Item))
+				subs, err := s.api.GetOpenSubtitles(osCtx, subsURL)
 				if err != nil {
 					j.Warn(errors.Wrap(err, "failed to get OpenSubtitles"))
 				} else {
