@@ -23,7 +23,13 @@ function baseLang(tag) {
 
 export function readTracks(modal) {
     if (!modal) return [];
-    return Array.from(modal.querySelectorAll('li.subtitle'))
+    // Not `li.subtitle`: user-uploaded subtitles render the `.subtitle`
+    // marker on a `<div>` inside a plain `<li>`
+    // (templates/partials/action/user_subtitles.html), while embedded/
+    // sidecar/OpenSubtitles tracks render it directly on the `<li>`
+    // (templates/views/action/stream_video.html). `[data-provider]` is the
+    // trait both share.
+    return Array.from(modal.querySelectorAll('.subtitle[data-provider]'))
         .filter((el) => el.getAttribute('data-id') !== 'none')
         .map(selectEventData);
 }
