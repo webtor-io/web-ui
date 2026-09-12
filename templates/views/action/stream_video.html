@@ -32,8 +32,13 @@
         {{ end }}
         {{ end }}
     </video>
-    <input type="checkbox" id="subtitles-checkbox" class="modal-toggle" />
-    <div class="modal w-full h-full" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}">
+    {{/* Native <dialog> + showModal(), not a checkbox modal: the player goes
+         fullscreen on its own container, and a fullscreen element only
+         renders its own subtree — a CSS-toggled sibling is invisible until
+         the user leaves fullscreen. A modal dialog lives in the top layer
+         and stacks above the fullscreen element, so the picker opens
+         in-place. Opened from Player.jsx (handleCaptionsClick). */}}
+    <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}">
         {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
         {{ $openSubs := filterSubtitlesByProvider $subs "OpenSubtitles" false }}
         {{ $otherSubs := filterSubtitlesByProvider $subs "OpenSubtitles" true }}
@@ -80,12 +85,12 @@
                     <label for="my-subtitles" class="btn btn-soft-purple w-full sm:w-auto">{{ t $.Lang "action.stream.mySubtitles" }}</label>
                     {{ end }}
                 </div>
-                <label for="subtitles-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</label>
+                <form method="dialog" class="w-full sm:w-auto"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>
-    </div>
-    <input type="checkbox" id="embed-checkbox" class="modal-toggle" />
-    <div class="modal w-full h-full" id="embed">
+    </dialog>
+    {{/* Same reasoning as #subtitles above — must show over the fullscreen player. */}}
+    <dialog class="modal" id="embed">
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
             <div class="flex">
                 <textarea name="description" class="textarea textarea-bordered w-full" readonly><video controls src="{{ .Resource.MagnetURI }}" data-path="{{ .Item.PathStr }}"></video><script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script></textarea>
@@ -94,11 +99,11 @@
                 <div class="flex-grow text-sm flex items-center">
                     <p>{{ tpHTML $.Lang "action.stream.embedHelp" "Link" (printf "<a class=\"link\" href=\"https://github.com/webtor-io/embed-sdk-js\">%s</a>" (t $.Lang "action.stream.embedLinkText")) }}</p>
                 </div>
-                <label for="embed-checkbox" class="btn btn-soft-cyan copy">{{ t $.Lang "action.stream.copy" }}</label>
-                <label for="embed-checkbox" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</label>
+                <button type="button" class="btn btn-soft-cyan copy">{{ t $.Lang "action.stream.copy" }}</button>
+                <form method="dialog"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>
-    </div>
+    </dialog>
     {{ if .GraceDurationSec }}
     <div id="grace-cta" class="absolute bottom-20 left-1/2 -translate-x-1/2 hidden z-modal w-[calc(100%-2rem)] max-w-sm">
         <div class="relative rounded-xl border border-w-line/60 bg-w-card/95 backdrop-blur-md shadow-2xl p-4">

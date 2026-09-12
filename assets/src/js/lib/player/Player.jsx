@@ -369,17 +369,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // Session cleanup removed — sessions have server-side TTL
 
-    // Captions modal toggle — use original (non-cloned) checkbox outside player
-    const handleCaptionsClick = useCallback(() => {
-        const checkbox = document.getElementById('subtitles-checkbox');
-        if (checkbox) checkbox.checked = !checkbox.checked;
-    }, []);
-
-    // Embed modal toggle
-    const handleEmbedClick = useCallback(() => {
-        const checkbox = document.getElementById('embed-checkbox');
-        if (checkbox) checkbox.checked = !checkbox.checked;
-    }, []);
+    // Captions / embed modals are native <dialog>s that live OUTSIDE the
+    // player container (see stream_video.html). They must be opened with
+    // showModal(): fullscreen is requested on the player container, and
+    // only the fullscreen element's subtree is rendered — a CSS-toggled
+    // sibling would stay invisible until the user left fullscreen. A modal
+    // dialog joins the top layer above the fullscreen element instead.
+    const handleCaptionsClick = useCallback(() => toggleDialog('subtitles'), []);
+    const handleEmbedClick = useCallback(() => toggleDialog('embed'), []);
 
     // In-player share click — same handler as the header button (see
     // assets/src/js/lib/share/share.js), tagged `location:'player'` so we
@@ -739,6 +736,13 @@ function activateSubtitle(container, target) {
     }
 }
 
+function toggleDialog(id) {
+    const dialog = document.getElementById(id);
+    if (!dialog || typeof dialog.showModal !== 'function') return;
+    if (dialog.open) dialog.close();
+    else dialog.showModal();
+}
+
 function wireTrackHandlers(container) {
     // Delegate subtitle clicks on #subtitles so items swapped into
     // #my-subtitles via async still work without re-binding.
@@ -872,10 +876,11 @@ function markTrack(container, el, type) {
 }
 
 function wireEmbedCopy(container) {
-    const copy = container.querySelector('#embed label.copy');
+    // type="button" — deliberately not a method="dialog" submit, so copying
+    // leaves the embed dialog open.
+    const copy = container.querySelector('#embed .copy');
     if (!copy) return;
-    copy.addEventListener('click', (e) => {
-        e.preventDefault();
+    copy.addEventListener('click', () => {
         const textarea = container.querySelector('#embed textarea');
         if (!textarea) return;
         navigator.clipboard.writeText(textarea.value).then(() => {

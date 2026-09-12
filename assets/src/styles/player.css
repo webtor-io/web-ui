@@ -41,6 +41,14 @@ body:not([data-iframe-height]) .wt-preview-mount {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
+/* Idle pointer follows the controls: once they auto-hide (playing, no
+   mouse activity for 3s — Player.jsx resetHideTimer) the arrow goes too,
+   so a stationary cursor doesn't sit over the picture in fullscreen. Any
+   mousemove re-adds .wt-player--controls-visible and the cursor returns. */
+.wt-player--video:not(.wt-player--controls-visible) {
+    cursor: none;
+}
+
 /* In embed — no border/radius */
 body[data-iframe-height] .wt-player {
     border-radius: 0;
