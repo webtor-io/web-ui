@@ -106,7 +106,23 @@ export function remapTrackIds(hls) {
     }
 }
 
-function remapTrackGroup(elements, hlsTracks) {
+/**
+ * Pair rendered track elements with HLS.js track indices.
+ *
+ * Equal counts mean the manifest and the picker list the same tracks in
+ * the same order, so a sequential assignment is exact.
+ *
+ * Differing counts are a normal state since GetSubtitles started hiding
+ * bitmap and "forced" embedded tracks (handlers/action/helper.go): the
+ * hidden track still occupies an index in the transcoder's HLS group,
+ * so there are more manifest tracks than elements. In that case the
+ * server-rendered `data-mp-id` is authoritative and already correct —
+ * only an exact lang+name match may refine it. The old lang-only and
+ * name-only fallbacks are deliberately gone: with a hidden neighbour
+ * sharing the language they hand a visible element the hidden track's
+ * index, which plays the wrong (or no) subtitle.
+ */
+export function remapTrackGroup(elements, hlsTracks) {
     if (!elements.length || !hlsTracks.length) return;
 
     if (elements.length === hlsTracks.length) {
@@ -120,40 +136,13 @@ function remapTrackGroup(elements, hlsTracks) {
     for (const el of elements) {
         const lang = (el.getAttribute('data-srclang') || '').toLowerCase();
         const label = el.textContent.trim();
+        if (!lang || !label) continue;
 
-        let matched = false;
-        // Exact lang+name match
         for (let i = 0; i < hlsTracks.length; i++) {
             if (used.has(i)) continue;
             const hlsLang = (hlsTracks[i].lang || '').toLowerCase();
             const hlsName = (hlsTracks[i].name || '').trim();
-            if (lang && hlsLang && lang === hlsLang && label && hlsName && label === hlsName) {
-                el.setAttribute('data-mp-id', String(i));
-                used.add(i);
-                matched = true;
-                break;
-            }
-        }
-        if (matched) continue;
-
-        // Fallback: lang only
-        for (let i = 0; i < hlsTracks.length; i++) {
-            if (used.has(i)) continue;
-            const hlsLang = (hlsTracks[i].lang || '').toLowerCase();
-            if (lang && hlsLang && lang === hlsLang) {
-                el.setAttribute('data-mp-id', String(i));
-                used.add(i);
-                matched = true;
-                break;
-            }
-        }
-        if (matched) continue;
-
-        // Fallback: name only
-        for (let i = 0; i < hlsTracks.length; i++) {
-            if (used.has(i)) continue;
-            const hlsName = (hlsTracks[i].name || '').trim();
-            if (label && hlsName && label === hlsName) {
+            if (hlsLang && hlsName && lang === hlsLang && label === hlsName) {
                 el.setAttribute('data-mp-id', String(i));
                 used.add(i);
                 break;
