@@ -9,6 +9,7 @@ import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-te
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
+import { getLang } from '../i18n';
 import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 
@@ -197,7 +198,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             resourceID: resourceID || '',
         });
         const modal = document.getElementById('subtitles');
-        const uiLang = document.documentElement.lang || '';
+        // getLang(), not document.documentElement.lang: the embed
+        // layouts render <html> without a lang attribute, which would
+        // report every embedded play as having no UI language.
+        const uiLang = getLang();
         if (window.umami && modal) {
             window.umami.track('subtitle-resolved', { ...resolveSubtitleLevel(readTracks(modal), uiLang), uiLang });
         }

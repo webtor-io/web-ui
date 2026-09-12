@@ -102,6 +102,11 @@ func TestEmbeddedSubtitleVisible(t *testing.T) {
 		{"dvb_subtitle", "", false, true},
 		{"subrip", "Forced", false, true},
 		{"subrip", "eng forced narrative", false, true},
+		{"subrip", "FORCED (English)", false, true},
+		// "forced" as a substring of an ordinary word is not a forced
+		// track -- hiding these loses a real subtitle stream.
+		{"subrip", "Unforced", true, true},
+		{"subrip", "Reinforced Steel", true, true},
 	}
 	for _, c := range cases {
 		v, n := embeddedSubtitleVisible(c.codec, c.title)

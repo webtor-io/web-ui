@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
+	"regexp"
 	"strconv"
-	"strings"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
@@ -182,6 +182,11 @@ var bitmapSubtitleCodecs = map[string]bool{
 	"xsub":              true,
 }
 
+// forcedTitleRe matches "forced" as a whole word. A plain substring
+// test also hides "Unforced" and "Reinforced", losing a real subtitle
+// stream from the picker.
+var forcedTitleRe = regexp.MustCompile(`(?i)\bforced\b`)
+
 // embeddedSubtitleVisible reports whether an embedded subtitle stream
 // is offered in the picker and whether it occupies an index in the
 // transcoder's HLS subtitle group (see content-transcoder
@@ -195,7 +200,7 @@ func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHL
 	if bitmapSubtitleCodecs[codecName] {
 		return false, true
 	}
-	if strings.Contains(strings.ToLower(title), "forced") {
+	if forcedTitleRe.MatchString(title) {
 		return false, true
 	}
 	return true, true
