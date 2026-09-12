@@ -146,3 +146,49 @@ func GetMovieWithMetadataByResourceID(ctx context.Context, db *pg.DB, resourceID
 
 	return &m, nil
 }
+
+// GetMovieWithMetadataByResourceIDAndPath resolves the movie row that
+// belongs to one file of a torrent. A resource can hold several movie
+// rows (a multi-film pack), and GetMovieWithMetadataByResourceID picks
+// an arbitrary one — fine for the poster/title fallback it was written
+// for, wrong for anything keyed to the file being played, such as the
+// OpenSubtitles imdb hint.
+//
+// Resolution order:
+//
+//   - a row whose path equals pathStr — the file is enriched, use it;
+//   - otherwise, if the resource has exactly one movie row, use it: a
+//     single-film torrent's path column may be empty (rows written
+//     before the column existed) or stale (renamed file), and the one
+//     row can only be about that film;
+//   - otherwise nil, nil — several candidates and none matched, so no
+//     hint at all beats confidently naming the wrong film.
+func GetMovieWithMetadataByResourceIDAndPath(ctx context.Context, db *pg.DB, resourceID string, pathStr string) (*Movie, error) {
+	var movies []*Movie
+
+	err := db.Model(&movies).
+		Context(ctx).
+		Where("resource_id = ?", resourceID).
+		Relation("MovieMetadata").
+		Select()
+
+	if err != nil && !errors.Is(err, pg.ErrNoRows) {
+		return nil, err
+	}
+
+	return pickMovieRow(movies, pathStr), nil
+}
+
+// pickMovieRow implements the resolution order documented on
+// GetMovieWithMetadataByResourceIDAndPath.
+func pickMovieRow(movies []*Movie, pathStr string) *Movie {
+	for _, m := range movies {
+		if m.Path != nil && *m.Path == pathStr {
+			return m
+		}
+	}
+	if len(movies) == 1 {
+		return movies[0]
+	}
+	return nil
+}

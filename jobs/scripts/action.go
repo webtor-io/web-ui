@@ -401,10 +401,15 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// thumbnail-skip decision below (no point regenerating a worse
 	// preview when an IMDb poster already exists). Apply localized
 	// title/plot in-place so non-EN viewers see the matching language.
+	//
+	// Resolved against the exported file's path: a resource can hold
+	// several movie rows (multi-film pack), and the content type tells
+	// subtitleHints whether the id addresses a film or a show.
 	var enrichedMD *models.VideoMetadata
+	var enrichedCT models.ContentType
 	if s.enricher != nil {
 		emdCtx, emdCancel := context.WithTimeout(ctx, 5*time.Second)
-		enrichedMD, _ = s.enricher.GetEnrichedResource(emdCtx, resourceID)
+		enrichedMD, enrichedCT, _ = s.enricher.GetEnrichedResourceForPath(emdCtx, resourceID, exportResponse.Source.PathStr)
 		if enrichedMD != nil {
 			s.enricher.Localize(emdCtx, enrichedMD, c.Lang)
 		}
@@ -562,7 +567,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				j.InProgress(s.t("job.loadingSubtitles"))
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
-				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, sc.Item))
+				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item))
 				subs, err := s.api.GetOpenSubtitles(osCtx, subsURL)
 				if err != nil {
 					j.Warn(errors.Wrap(err, "failed to get OpenSubtitles"))

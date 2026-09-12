@@ -1047,6 +1047,33 @@ func (s *Enricher) GetEnrichedResource(ctx context.Context, resourceID string) (
 	return nil, nil
 }
 
+// GetEnrichedResourceForPath is GetEnrichedResource with the content
+// type and, for multi-movie packs, the movie row that belongs to the
+// given file path. ct is "" when nothing is enriched.
+//
+// Callers that key behaviour to the kind of content (a series' stored
+// tt id is the SHOW's, so it only addresses an episode together with
+// season+episode) need the type, and callers that key it to the file
+// being played need the path: one resource_id can hold several movie
+// rows, and GetEnrichedResource picks an arbitrary one.
+func (s *Enricher) GetEnrichedResourceForPath(ctx context.Context, resourceID string, pathStr string) (*models.VideoMetadata, models.ContentType, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, "", errors.New("no db")
+	}
+	if movie, err := models.GetMovieWithMetadataByResourceIDAndPath(ctx, db, resourceID, pathStr); err == nil && movie != nil {
+		if md := movie.GetMetadata(); md != nil {
+			return md, models.ContentTypeMovie, nil
+		}
+	}
+	if series, err := models.GetSeriesWithMetadataByResourceID(ctx, db, resourceID); err == nil && series != nil {
+		if md := series.GetMetadata(); md != nil {
+			return md, models.ContentTypeSeries, nil
+		}
+	}
+	return nil, "", nil
+}
+
 // LookupByTitleYear iterates through configured metadata mappers (TMDB, OMDB,
 // Kinopoisk, ...) and returns the first matching video metadata for the given
 // title and optional year.
