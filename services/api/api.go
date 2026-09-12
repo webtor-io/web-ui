@@ -140,6 +140,7 @@ type ExtSubtitle struct {
 	Format  string `json:"format"`
 	Id      string `json:"id"`
 	Hash    string `json:"hash"`
+	Source  string `json:"source"`
 }
 
 type MediaProbe struct {
@@ -607,7 +608,8 @@ func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end in
 }
 
 type OpenSubtitleTrack struct {
-	ID string
+	ID     string
+	Source string
 	*ra.ExportTrack
 }
 
@@ -642,7 +644,8 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 				SrcLang: esub.Srclang,
 				Label:   esub.Label,
 			},
-			ID: esub.Id,
+			ID:     esub.Id,
+			Source: esub.Source,
 		})
 	}
 	return subs, nil
