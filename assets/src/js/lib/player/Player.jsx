@@ -725,12 +725,19 @@ function activateSubtitle(container, target) {
     const hls = window.hlsPlayer;
     const mpId = target.getAttribute('data-mp-id');
 
+    // Side-loaded <track> elements (they carry an id) go to 'disabled', not
+    // 'hidden': a hidden track is still fetched by the browser, so with 40+
+    // OpenSubtitles tracks in the list every selection fired a burst of
+    // downloads that tripped OpenSubtitles' 5 req/s limit and came back as
+    // 404s (87% of track fetches arrived in bursts of 5+ per torrent).
+    // Only the selected track loads. hls.js-managed tracks have no id and
+    // keep the previous handling.
     if (hls && provider === 'MediaProbe') {
         hls.subtitleDisplay = true;
         hls.subtitleTrack = parseInt(mpId);
         for (const p of document.querySelectorAll('video.player')) {
             for (const t of p.textTracks) {
-                if (t.id) t.mode = 'hidden';
+                if (t.id) t.mode = 'disabled';
             }
         }
     } else {
@@ -740,7 +747,8 @@ function activateSubtitle(container, target) {
         }
         for (const p of document.querySelectorAll('video.player, audio.player')) {
             for (const t of p.textTracks) {
-                t.mode = (id && id !== 'none' && t.id === id) ? 'showing' : 'hidden';
+                if (id && id !== 'none' && t.id === id) t.mode = 'showing';
+                else t.mode = t.id ? 'disabled' : 'hidden';
             }
         }
     }
