@@ -2,7 +2,10 @@ package action
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
+
+	"golang.org/x/text/language"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
@@ -112,6 +115,64 @@ func TestEmbeddedSubtitleVisible(t *testing.T) {
 		v, n := embeddedSubtitleVisible(c.codec, c.title)
 		if v != c.visible || n != c.counts {
 			t.Errorf("%s/%q: got (%v,%v) want (%v,%v)", c.codec, c.title, v, n, c.visible, c.counts)
+		}
+	}
+}
+
+func osTrack(id, lang string) api.OpenSubtitleTrack {
+	return api.OpenSubtitleTrack{ID: id, Source: "imdb", ExportTrack: &ra.ExportTrack{Src: "u" + id, SrcLang: lang, Label: lang + " " + id, Kind: "subtitles"}}
+}
+
+func TestGetSubtitlesPreloadsUILanguageAndEnglishOnly(t *testing.T) {
+	var os []api.OpenSubtitleTrack
+	for _, lang := range []string{"de", "pt", "en", "ru"} {
+		for i := 1; i <= 3; i++ {
+			os = append(os, osTrack(lang+strconv.Itoa(i), lang))
+		}
+	}
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.BrazilianPortuguese}, FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, nil, &ra.ExportTag{}, os, &models.ExternalData{}, nil)
+	got := map[string]bool{}
+	for _, it := range items {
+		if it.Preload {
+			got[it.ID] = true
+		}
+	}
+	for _, id := range []string{"os-pt1", "os-pt2", "os-pt3", "os-en1", "os-en2", "os-en3"} {
+		if !got[id] {
+			t.Errorf("%s should be preloaded, got %v", id, got)
+		}
+	}
+	for _, id := range []string{"os-de1", "os-ru1", "none"} {
+		if got[id] {
+			t.Errorf("%s must not be preloaded", id)
+		}
+	}
+}
+
+func TestGetSubtitlesPreloadIsCapped(t *testing.T) {
+	var os []api.OpenSubtitleTrack
+	for i := 1; i <= 12; i++ {
+		os = append(os, osTrack("en"+strconv.Itoa(i), "en"))
+	}
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.English}, FallbackLangTag: language.English}
+	n := 0
+	for _, it := range NewHelper().GetSubtitles(ud, nil, &ra.ExportTag{}, os, &models.ExternalData{}, nil) {
+		if it.Preload {
+			n++
+		}
+	}
+	if n != maxPreloadTracks {
+		t.Fatalf("preloaded %d tracks, want cap %d", n, maxPreloadTracks)
+	}
+}
+
+func TestGetSubtitlesPreloadNeverIncludesEmbedded(t *testing.T) {
+	mp := probeWith(`[{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng"}}]`)
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.English}, FallbackLangTag: language.English}
+	for _, it := range NewHelper().GetSubtitles(ud, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil) {
+		if it.Provider == "MediaProbe" && it.Preload {
+			t.Fatalf("embedded track marked preload: %+v", it)
 		}
 	}
 }

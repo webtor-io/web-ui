@@ -24,11 +24,16 @@
         {{ range .ExportTag.Sources }}
         <source src="{{ .Src }}" type="{{ .Type }}">
         {{ end }}
+        {{/* Browsers fetch every <track> element on page load regardless of
+             its mode, and with 40+ OpenSubtitles tracks that burst tripped
+             the proxy's per-session caps (429). Only tracks marked Preload
+             (default, viewer's language, English; see markPreload) are
+             rendered so the native iOS menu still offers them; the rest are
+             created on selection by activateSubtitle in Player.jsx from the
+             list items' data-src/data-label/data-srclang. */}}
         {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
-        {{ if ne .Provider "MediaProbe" }}
-        {{ if ne .ID "none" }}
+        {{ if .Preload }}
         <track src="{{ .Src }}" id="{{ .ID }}" srclang="{{ .SrcLang }}" label="{{ .Label }}" kind="{{ .Kind }}" {{ if .Default }}default="default"{{ end }}>
-        {{ end }}
         {{ end }}
         {{ end }}
     </video>
@@ -57,7 +62,7 @@
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
                     <ul class="flex flex-wrap">
                         {{ range $otherSubs }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
+                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
                         {{ end }}
                     </ul>
                 </div>
@@ -67,7 +72,7 @@
                     <h3 class="font-bold text-lg">OpenSubtitles</h3>
                     <ul class="flex flex-wrap">
                         {{ range $openSubs }}
-                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
+                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
                         {{ end }}
                     </ul>
                 </div>

@@ -682,14 +682,20 @@ export async function initPlayer(target) {
 // (subdomain/path/query baked in by torrent-http-proxy) and returns
 // them in data-src. For subs uploaded after the initial render, the
 // <video> has no matching <track> yet — create one on first click.
-function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label, srclang) {
+// ensureTrackElement creates the <track> for a side-loaded subtitle the
+// first time it is selected. The server renders only the default track:
+// browsers fetch every <track> element on page load regardless of mode,
+// and 40+ OpenSubtitles tracks per page tripped the ingress per-IP rate
+// limit and OpenSubtitles' 5 req/s (a burst of 40 requests in one second
+// per viewer). Creating tracks lazily makes each selection one download.
+function ensureTrackElement(video, trackID, wrappedSrc, label, srclang, kind) {
     for (const t of video.querySelectorAll('track')) {
         if (t.id === trackID) return true;
     }
     if (!wrappedSrc) return false;
     const track = document.createElement('track');
     track.id = trackID;
-    track.kind = 'subtitles';
+    track.kind = kind || 'subtitles';
     track.src = wrappedSrc;
     track.label = label || 'Subtitle';
     // HTML requires srclang on a subtitles track; 'und' when the upload
@@ -706,18 +712,19 @@ function ensureUserSubtitleTrack(video, trackID, wrappedSrc, label, srclang) {
 function activateSubtitle(container, target) {
     const provider = target.getAttribute('data-provider');
     const id = target.getAttribute('data-id');
-    // User subs uploaded after the initial page render have no matching
-    // <track> yet — create it here so the textTracks mode='showing' loop
-    // below finds something to activate.
-    if (provider === 'UserSubtitle' && id && id !== 'none') {
-        const video = container.querySelector('video.player');
+    // Side-loaded tracks (OpenSubtitles, sidecar files, embed externals,
+    // user uploads) exist as <track> elements only once selected — see
+    // ensureTrackElement.
+    if (provider !== 'MediaProbe' && id && id !== 'none') {
+        const video = container.querySelector('video.player, audio.player');
         if (video) {
-            ensureUserSubtitleTrack(
+            ensureTrackElement(
                 video,
                 id,
                 target.getAttribute('data-src') || '',
                 target.getAttribute('data-label') || target.textContent.trim(),
                 target.getAttribute('data-srclang') || '',
+                target.getAttribute('data-kind') || 'subtitles',
             );
         }
     }

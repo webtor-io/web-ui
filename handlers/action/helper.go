@@ -22,7 +22,19 @@ type ListItem struct {
 	Src      string
 	Kind     string
 	Source   string
+	// Preload marks side-loaded tracks rendered as <track> elements in the
+	// page. Browsers fetch every <track> on load regardless of mode, so
+	// only the default track plus the viewer's language and English are
+	// rendered (capped by maxPreloadTracks); the rest are created on
+	// selection by the player. Embedded tracks are never <track> elements.
+	Preload bool
 }
+
+// maxPreloadTracks bounds how many side-loaded tracks are rendered as
+// <track> elements: enough for the native iOS subtitle menu to offer the
+// viewer's language and English, few enough that the page-load burst
+// stays well under the proxy's per-session concurrency caps.
+const maxPreloadTracks = 8
 
 type Helper struct {
 }
@@ -286,5 +298,38 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Provider: "UserSubtitle",
 		})
 	}
-	return s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud)
+	return s.markPreload(s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud), ud)
+}
+
+// markPreload sets Preload on the default track and on side-loaded tracks in
+// the viewer's preferred language or English, in list order, up to
+// maxPreloadTracks.
+func (s *Helper) markPreload(lis []ListItem, ud *models.VideoStreamUserData) []ListItem {
+	wanted := map[string]bool{"en": true}
+	if ud != nil && len(ud.AcceptLangTags) > 0 {
+		if base, conf := ud.AcceptLangTags[0].Base(); conf != language.No {
+			wanted[base.String()] = true
+		}
+	}
+	n := 0
+	for i, li := range lis {
+		if li.ID == "none" || li.Provider == "MediaProbe" || li.Src == "" {
+			continue
+		}
+		if n >= maxPreloadTracks {
+			break
+		}
+		if li.Default {
+			lis[i].Preload = true
+			n++
+			continue
+		}
+		if t, err := language.Parse(li.SrcLang); err == nil {
+			if base, _ := t.Base(); wanted[base.String()] {
+				lis[i].Preload = true
+				n++
+			}
+		}
+	}
+	return lis
 }
