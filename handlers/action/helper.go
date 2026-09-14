@@ -150,6 +150,16 @@ func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStrea
 func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lIndex int, err error) {
 	lx := langIndex{}
 	for i, li := range lis {
+		// Forced (signs-only) tracks are never a candidate for automatic
+		// language-based selection: they're not a full subtitle track, and
+		// picking one silently instead of "no subtitle" or a real track in
+		// the viewer's language would be a worse default. Task 3 adds the
+		// one case where a forced track IS the right default (forced track
+		// in the preferred language while the audio is already in that
+		// language) as a rule on top of this, not by loosening this one.
+		if li.Forced {
+			continue
+		}
 		if t, err := language.Parse(li.SrcLang); err == nil {
 			if _, ok := lx[t]; !ok {
 				lx[t] = i

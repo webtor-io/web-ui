@@ -222,3 +222,53 @@ func TestGetSubtitlesPreloadNeverIncludesEmbedded(t *testing.T) {
 		}
 	}
 }
+
+// TestForcedTrackNeverAutoSelectedByLanguage pins the legacy
+// language-matching path (used when there's no explicit selection and no
+// SubtitleOpts.PreferredLang rule yet -- Task 3 adds that): a forced
+// (signs-only) track must never win automatic selection just because it
+// happens to match the viewer's language and precede the real track in
+// probe order.
+func TestForcedTrackNeverAutoSelectedByLanguage(t *testing.T) {
+	mp := probeWith(`[
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English (Forced)"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}}
+	]`)
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.English}, FallbackLangTag: language.English}
+	got := subtitleItems(NewHelper().GetSubtitles(ud, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, SubtitleOpts{}))
+	if it, ok := got["mp-0"]; !ok || it.Default {
+		t.Fatalf("forced track must not be auto-selected: %+v", got)
+	}
+	if it, ok := got["mp-1"]; !ok || !it.Default {
+		t.Fatalf("plain track in the accept language must be selected: %+v", got)
+	}
+}
+
+// TestForcedOnlyLanguageMatchFallsThroughToNone covers the other half of the
+// guard: when the ONLY track in the viewer's language is forced, that still
+// must not become Default -- matchLang reports "no match" and
+// selectListItem falls back to lis[0] ("None"), not to the forced track.
+func TestForcedOnlyLanguageMatchFallsThroughToNone(t *testing.T) {
+	mp := probeWith(`[
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English (Forced)"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"rus","title":"Russian"}}
+	]`)
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.English}, FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, SubtitleOpts{})
+	got := subtitleItems(items)
+	if it, ok := got["mp-0"]; !ok || it.Default {
+		t.Fatalf("forced track must never be the language-match fallback: %+v", got)
+	}
+	found := false
+	for _, it := range items {
+		if it.ID == "none" {
+			found = true
+			if !it.Default {
+				t.Fatalf("expected fallback to None when only a forced track matches the viewer's language: %+v", items)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("None item missing")
+	}
+}
