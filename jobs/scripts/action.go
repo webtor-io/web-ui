@@ -19,6 +19,7 @@ import (
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
 	"github.com/webtor-io/web-ui/services/web"
@@ -421,6 +422,16 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		emdCancel()
 	}
 	sc.Title = resourceLeafTitle(enrichedMD, sc.Resource, sc.Item)
+
+	preferred := s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
+	var castNames []string
+	if enrichedMD != nil && s.prefs.TranslateEnabled() {
+		nCtx, nCancel := context.WithTimeout(ctx, 3*time.Second)
+		castNames = s.prefs.CastNames(nCtx, enrichedMD.VideoID, 30)
+		nCancel()
+	}
+	adult := s.prefs.IsAdultResource(ctx, resourceID)
+	sc.SubtitleOpts = buildSubtitleOpts(c, s.prefs.TranslateEnabled(), s.prefs.FreeForAll(), adult, preferred, castNames)
 
 	se := exportResponse.ExportItems["stream"]
 
@@ -1148,6 +1159,7 @@ type ActionScript struct {
 	userSubtitles *us.Service
 	thumbnail     *thumb.Service
 	enricher      *enrich.Enricher
+	prefs         *streamprefs.Service
 	resourceId    string
 	itemId        string
 	action        string
@@ -1279,7 +1291,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -1356,6 +1368,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			userSubtitles: userSubtitles,
 			thumbnail:     thumbnailSvc,
 			enricher:      enricher,
+			prefs:         prefs,
 			c:             c,
 			resourceId:    resourceID,
 			itemId:        itemID,

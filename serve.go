@@ -68,6 +68,7 @@ import (
 	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
 	s3svc "github.com/webtor-io/web-ui/services/s3"
+	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
@@ -143,6 +144,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = thumb.RegisterFlags(c.Flags)
 	c.Flags = donate.RegisterFlags(c.Flags)
 	c.Flags = memwatch.RegisterFlags(c.Flags)
+	c.Flags = streamprefs.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -422,7 +424,7 @@ func serve(c *cli.Context) error {
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc, streamprefs.New(c, pg))
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)

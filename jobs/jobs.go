@@ -9,6 +9,7 @@ import (
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
+	"github.com/webtor-io/web-ui/services/streamprefs"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
@@ -80,6 +81,7 @@ type Jobs struct {
 	userSubtitles *us.Service
 	thumbnail     *thumbnail.Service
 	claims        *claims.Claims
+	prefs         *streamprefs.Service
 	warmup        scripts.WarmupSettings
 	grace         scripts.GraceSettings
 }
@@ -103,7 +105,7 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 	}
 }
 
-func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service, thumb *thumbnail.Service, uc *claims.Claims) *Jobs {
+func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api *api.Api, enricher *enrich.Enricher, i18nSvc *i18n.Service, userSubtitles *us.Service, thumb *thumbnail.Service, uc *claims.Claims, prefs *streamprefs.Service) *Jobs {
 	return &Jobs{
 		q: q,
 		// Jobs render their own cards (load/errors/*): views are registered
@@ -115,6 +117,7 @@ func New(c *cli.Context, q *job.Queues, tm *template.Manager[*web.Context], api 
 		userSubtitles: userSubtitles,
 		thumbnail:     thumb,
 		claims:        uc,
+		prefs:         prefs,
 		warmup: scripts.WarmupSettings{
 			TimeoutMin:            c.Int(warmupTimeoutMinFlag),
 			NoPeersTimeoutSec:     c.Int(warmupNoPeersTimeoutSecFlag),
