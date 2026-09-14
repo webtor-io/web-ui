@@ -21,7 +21,7 @@ type LangDisplay struct {
 // already canonical by the time it gets here (Helper.canonizeSrcLangs in
 // handlers/action runs golang.org/x/text over it), so the base language is
 // the part before the first separator — the same rule baseLang() applies on
-// the client (assets/src/js/lib/player/subtitle-rules.js), which is what
+// the client (assets/src/js/lib/player/track-picker.js), which is what
 // keeps server-rendered groups and client-recomputed groups agreeing.
 func NewLangDisplay(tag string) LangDisplay {
 	base := strings.TrimSpace(tag)

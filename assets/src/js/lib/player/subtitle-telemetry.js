@@ -22,12 +22,10 @@ function levelOf(track) {
 }
 
 // readAllTracks is every item the picker renders, the "None" entry
-// included. Not `li.subtitle`: user-uploaded subtitles render the
-// `.subtitle` marker on a `<div>` inside a plain `<li>`
-// (templates/partials/action/user_subtitles.html), while embedded/
-// sidecar/OpenSubtitles tracks render it directly on the `<li>`
-// (templates/views/action/stream_video.html). `[data-provider]` is the
-// trait both share.
+// included. `[data-provider]` is the trait every chip shares: tracks live
+// in #subtitle-tracks and the "None" entry is the "Off" chip at the head
+// of that row (templates/views/action/stream_video.html), with the uploads
+// rendered into the same flat row by the user_subtitles_view partial.
 export function readAllTracks(modal) {
     if (!modal) return [];
     return Array.from(modal.querySelectorAll('.subtitle[data-provider]')).map(trackData);

@@ -9,6 +9,15 @@ import { reloadSubtitleTrack } from './subtitle-track-reload.js';
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
+import {
+    refresh,
+    refreshMarks,
+    applyLangFilter,
+    applyFlagSupport,
+    setChipActive,
+    expandedLang,
+    toggleLangOverflow,
+} from './track-picker.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
@@ -155,6 +164,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // hide it. Left visible it freezes at whatever percent was last seen and
     // reads as a translation stuck forever.
     const progressSpanRef = useRef(null);
+    // The chip's spinner, paired with progressSpanRef: a spinner left
+    // running after the poll stops says a translation is still going.
+    const progressSpinnerRef = useRef(null);
 
     const stopTranslationProgress = useCallback(() => {
         pollingIdRef.current = '';
@@ -163,6 +175,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (progressSpanRef.current) {
             progressSpanRef.current.hidden = true;
             progressSpanRef.current = null;
+        }
+        if (progressSpinnerRef.current) {
+            progressSpinnerRef.current.hidden = true;
+            progressSpinnerRef.current = null;
         }
         if (pollStopRef.current) {
             pollStopRef.current();
@@ -188,20 +204,29 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const runID = runSeqRef.current;
         const lang = el.getAttribute('data-srclang') || '';
         const span = el.querySelector('.tr-progress');
+        const spinner = el.querySelector('.tr-spinner');
         progressSpanRef.current = span;
+        progressSpinnerRef.current = spinner;
         const startedAt = translationStartedAtRef.current.get(id);
         let cues = 0;
         let lastReloadAt = 0;
         let trackErrorReported = false;
         if (span) {
             span.hidden = false;
-            span.textContent = tf('player.subtitleTranslating', 0);
+            // Design (docs/uikit.html §19): the chip says "· 0%". The
+            // sentence "Translating… 0%" is still the one localized string,
+            // and it lives in the title.
+            span.textContent = '· 0%';
+            span.title = tf('player.subtitleTranslating', 0);
         }
+        if (spinner) spinner.hidden = false;
         const fail = (code) => {
             pollStopRef.current = null;
             pollingIdRef.current = '';
             if (progressSpanRef.current === span) progressSpanRef.current = null;
+            if (progressSpinnerRef.current === spinner) progressSpinnerRef.current = null;
             if (span) span.hidden = true;
+            if (spinner) spinner.hidden = true;
             if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
         };
         // One 'track' error per run: a broken revision usually stays
@@ -238,7 +263,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onProgress: (p) => {
                 cues = p.total;
                 const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
-                if (span) span.textContent = tf('player.subtitleTranslating', pct);
+                if (span) {
+                    span.textContent = `· ${pct}%`;
+                    span.title = tf('player.subtitleTranslating', pct);
+                }
                 // total === 0 means the job has not counted the cues yet:
                 // the file on the other end is still empty, so a reload
                 // would only replace subtitles with nothing.
@@ -248,12 +276,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 pollStopRef.current = null;
                 pollingIdRef.current = '';
                 if (progressSpanRef.current === span) progressSpanRef.current = null;
+                if (progressSpinnerRef.current === spinner) progressSpinnerRef.current = null;
                 // Final: a later re-selection must neither poll nor
                 // report this translation again.
                 translationStatusRef.current.set(id, 'done');
                 cues = p.total || cues;
                 reload(p.done, true);
                 if (span) span.hidden = true;
+                if (spinner) spinner.hidden = true;
                 if (window.umami) window.umami.track('subtitle-translate-done', {
                     lang,
                     seconds: Math.round((Date.now() - startedAt) / 100) / 10,
@@ -634,7 +664,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // only the fullscreen element's subtree is rendered — a CSS-toggled
     // sibling would stay invisible until the user left fullscreen. A modal
     // dialog joins the top layer above the fullscreen element instead.
-    const handleCaptionsClick = useCallback(() => toggleDialog('subtitles'), []);
+    const handleCaptionsClick = useCallback(() => {
+        toggleDialog('subtitles');
+        // Opening the picker is the one moment the viewer is guaranteed to
+        // be looking at it, and plenty can have moved while it was closed:
+        // the engagement-gate AI auto-start, an audio switch re-picking the
+        // subtitle, an upload. Recompute the counts, the dot and both
+        // "Now:" lines against what is actually playing.
+        const modal = document.getElementById('subtitles');
+        if (modal && modal.open) {
+            applyFlagSupport(modal);
+            refresh(modal);
+        }
+    }, []);
     const handleEmbedClick = useCallback(() => toggleDialog('embed'), []);
 
     // In-player share click — same handler as the header button (see
@@ -1084,12 +1126,49 @@ function wireTrackHandlers(container, hooks = {}) {
             activateSubtitle(container, target);
             if (hooks.onSubtitleSelect) hooks.onSubtitleSelect(target);
         });
+
+        // Language row, "+N" and the uploads disclosure. One more delegate
+        // on the same modal, for the same reason as the one above: the
+        // uploads toggle is part of the markup the async swap replaces.
+        subtitlesModal.addEventListener('click', (e) => {
+            // A language chip never changes what is playing — it only
+            // filters the track row. The one chip that does change playback
+            // is "Off", and that is a .subtitle handled above.
+            const lang = e.target.closest('.lang[data-lang]');
+            if (lang && subtitlesModal.contains(lang)) {
+                applyLangFilter(subtitlesModal, lang.getAttribute('data-lang'));
+                return;
+            }
+            // "+N" is a toggle, not a one-way reveal: expanded it reads "×"
+            // and is the only way back to the short row.
+            const more = e.target.closest('#subtitle-lang-more');
+            if (more && subtitlesModal.contains(more)) {
+                toggleLangOverflow(subtitlesModal);
+                return;
+            }
+            const upload = e.target.closest('#my-uploads-toggle');
+            if (upload && subtitlesModal.contains(upload)) {
+                const panel = subtitlesModal.querySelector('#my-uploads-panel');
+                if (!panel) return;
+                const open = panel.hidden;
+                panel.hidden = !open;
+                upload.setAttribute('aria-expanded', open ? 'true' : 'false');
+                // The toggle and the panel are both replaced on every async
+                // swap; the wrapper is not, so the open state lives there.
+                const wrap = subtitlesModal.querySelector('#my-subtitles');
+                if (wrap) wrap.setAttribute('data-upload-open', open ? 'true' : 'false');
+            }
+        });
     }
 
-    // Audio click handlers (no async swap — direct binding is enough)
+    // Audio click handlers (no async swap — direct binding is enough).
+    // e.target.closest, not e.target: a chip's click lands on the flag
+    // <span> or the check <svg> as often as on the button itself, and
+    // markTrack would then mark a <span> and read data-mp-id as null.
     for (const audio of container.querySelectorAll('.audio')) {
         audio.addEventListener('click', (e) => {
-            const target = e.target;
+            const target = e.target.closest('.audio');
+            if (!target) return;
             markTrack(container, target, 'audio');
             if (window.hlsPlayer && target.getAttribute('data-provider') === 'MediaProbe') {
                 window.hlsPlayer.audioTrack = parseInt(target.getAttribute('data-mp-id'));
@@ -1098,12 +1177,11 @@ function wireTrackHandlers(container, hooks = {}) {
         });
     }
 
-    // Sync the visual "active" marker on .subtitle items in #my-subtitles:
-    // the <track default> in <video> already drives playback correctly on
-    // reload, but the list items never go through the click path and so
-    // lose their text-primary/underline marker. Re-derive it from the
-    // currently-showing (or default) <track> and re-run on async swap.
-    const syncMySubtitleMark = () => {
+    // The <track default> in <video> drives playback correctly on reload,
+    // but the uploads' chips are re-rendered by the partial and never go
+    // through the click path, so they lose the active marker. Re-derive it
+    // from the live textTracks and re-run on every async swap.
+    const syncUploadMarks = () => {
         const video = container.querySelector('video.player');
         const mySubs = container.querySelector('#my-subtitles');
         if (!video || !mySubs) return;
@@ -1118,66 +1196,69 @@ function wireTrackHandlers(container, hooks = {}) {
         if (!activeID) return;
         for (const item of mySubs.querySelectorAll('.subtitle')) {
             const isActive = item.getAttribute('data-id') === activeID;
-            item.classList.toggle('text-primary', isActive);
-            item.classList.toggle('underline', isActive);
+            setChipActive(item, isActive);
             if (isActive) item.setAttribute('data-default', 'true');
             else item.removeAttribute('data-default');
         }
     };
-    syncMySubtitleMark();
+    syncUploadMarks();
     // loadAsyncView dispatches an 'async' CustomEvent after swapping a
     // target's innerHTML; re-sync when #my-subtitles content is replaced.
     const mySubsContainer = container.querySelector('#my-subtitles');
     if (mySubsContainer) {
         window.addEventListener('async', (e) => {
             if (!e.detail || e.detail.target !== mySubsContainer) return;
+            // The panel and its toggle are part of the swapped markup; the
+            // wrapper is not, so it is what remembers whether the viewer had
+            // the upload form open. After a delete the viewer is still
+            // looking at the panel: it must come back open, or removing two
+            // files in a row means re-opening it between them.
+            if (mySubsContainer.getAttribute('data-upload-open') === 'true') {
+                const panel = mySubsContainer.querySelector('#my-uploads-panel');
+                const toggle = mySubsContainer.querySelector('#my-uploads-toggle');
+                if (panel) panel.hidden = false;
+                if (toggle) toggle.setAttribute('aria-expanded', 'true');
+            }
             // A freshly uploaded subtitle comes back marked by the server.
             // Switch to it right away: the viewer uploaded a file to watch
-            // with, and making them hunt for it in the list afterwards reads
+            // with, and making them hunt for it in the row afterwards reads
             // as "subtitles don't work".
             const fresh = mySubsContainer.querySelector('.subtitle[data-autoselect="true"]');
-            if (fresh) {
-                activateSubtitle(container, fresh);
-                return;
-            }
-            syncMySubtitleMark();
+            if (fresh) activateSubtitle(container, fresh);
+            else syncUploadMarks();
+            // The set of chips itself changed, so this is the full pass and
+            // not refreshMarks: an upload can bring a language the server
+            // never rendered a chip for, and a delete can empty the expanded
+            // one. `current` keeps the viewer where they were whenever that
+            // language survived the swap.
+            if (subtitlesModal) refresh(subtitlesModal, { current: expandedLang(subtitlesModal) });
         });
     }
 
-    // Subtitles modal view toggles — OpenSubtitles and My Subtitles are
-    // alternate views inside the same modal alongside #embedded. Clicking a
-    // toggle shows its view and hides every other; clicking the active one
-    // returns to #embedded.
-    const embedded = container.querySelector('#embedded');
-    const viewIDs = ['opensubtitles', 'my-subtitles'];
-    const views = viewIDs
-        .map((id) => ({ id, el: container.querySelector('#' + id) }))
-        .filter((v) => v.el);
-    for (const v of views) {
-        const toggle = container.querySelector(`label[for=${v.id}]`);
-        if (!toggle) continue;
-        toggle.addEventListener('click', (e) => {
-            const isHidden = v.el.classList.contains('hidden');
-            if (isHidden) {
-                if (embedded) embedded.classList.add('hidden');
-                for (const other of views) {
-                    if (other.id === v.id) continue;
-                    other.el.classList.add('hidden');
-                }
-                v.el.classList.remove('hidden');
-                e.target.classList.remove('btn-outline');
-            } else {
-                v.el.classList.add('hidden');
-                if (embedded) embedded.classList.remove('hidden');
-                e.target.classList.add('btn-outline');
-            }
-        });
+    // First pass: hide the tracks of every collapsed language, drop the
+    // flags where the platform draws regional indicators as letter pairs,
+    // and fill both "Now:" lines. (refresh ends with applyFlagSupport of
+    // its own; the explicit call is what makes the mount-time guarantee
+    // independent of refresh's internals.)
+    if (subtitlesModal) {
+        applyFlagSupport(subtitlesModal);
+        refresh(subtitlesModal);
     }
 }
 
+// markTrack moves the active marker of one group (audio or subtitle) onto
+// `el`. The look is a cyan fill plus the check icon that is already in
+// every chip's markup — toggled, never rebuilt: a chip carries its origin
+// badge, its property tag and, on the AI item, the .tr-progress span of a
+// running translation, and innerHTML would throw all three away mid-poll.
+//
+// `persist` is what separates a choice from a rule the player applied for
+// the viewer: the engagement-gate AI auto-start and the audio-switch
+// re-pick pass false and never PUT, so `Saved` keeps meaning "the viewer
+// chose this".
 function markTrack(container, el, type, persist = true) {
     if (el.getAttribute('data-default') === 'true') return;
-    el.classList.add('text-primary', 'underline');
+    setChipActive(el, true);
     el.setAttribute('data-default', 'true');
 
     const s = container.querySelector('#subtitles');
@@ -1185,9 +1266,13 @@ function markTrack(container, el, type, persist = true) {
     const es = s.querySelectorAll(`.${type}`);
     for (const ee of es) {
         if (ee === el) continue;
-        ee.classList.remove('text-primary', 'underline');
+        setChipActive(ee, false);
         ee.removeAttribute('data-default');
     }
+    // The dot on the language chip and the "Now:" line, not the language
+    // filter: the viewer's expanded language is their own choice and must
+    // not jump under them because playback moved.
+    refreshMarks(s);
 
     if (!persist) return;
     fetch(`/stream-video/${type}`, {

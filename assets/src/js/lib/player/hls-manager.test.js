@@ -4,8 +4,9 @@ import { remapTrackGroup } from './hls-manager.js';
 
 // Fake DOM element: records every setAttribute so a test can tell an
 // untouched element from one that was re-pointed to the same value.
-function makeEl({ mpId = '', srclang = '', label = '' } = {}) {
+function makeEl({ mpId = '', srclang = '', label = '', dataLabel = null } = {}) {
     const attrs = { 'data-mp-id': mpId, 'data-srclang': srclang };
+    if (dataLabel !== null) attrs['data-label'] = dataLabel;
     const writes = [];
     return {
         textContent: label,
@@ -77,4 +78,24 @@ test('no elements or no tracks is a no-op', () => {
     remapTrackGroup([], [{ lang: 'en', name: 'English' }]);
     assert.equal(el.mpId, '3');
     assert.deepEqual(el.writes, []);
+});
+
+// The picker chip's text is no longer the track name: it carries the
+// origin code, any property tag and the source suffix around the label.
+// data-label (controller ruling R7) is what still equals the manifest's
+// track name, and the exact lang+name pass is the only thing that may
+// refine a server-rendered id — reading textContent here would make that
+// pass dead code on every chip.
+test('counts differ: the exact match reads data-label, not the chip\'s decorated text', () => {
+    const el = makeEl({
+        mpId: '0',
+        srclang: 'en',
+        dataLabel: 'English',
+        label: 'EM English forced \u00b7 hash',
+    });
+    remapTrackGroup([el], [
+        { lang: 'en', name: 'Forced' },
+        { lang: 'en', name: 'English' },
+    ]);
+    assert.equal(el.mpId, '1');
 });

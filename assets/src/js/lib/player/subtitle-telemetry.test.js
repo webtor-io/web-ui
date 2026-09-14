@@ -61,7 +61,7 @@ test('selectEventData reads data attributes', () => {
     assert.deepEqual(selectEventData(el), { provider: 'OpenSubtitles', srclang: 'en', source: 'hash', badge: 'os' });
 });
 
-test('readTracks queries .subtitle[data-provider], not li.subtitle (user uploads render the marker on a div)', () => {
+test('readTracks queries .subtitle[data-provider], the trait every chip in the row shares', () => {
     const userEl = makeAttrEl({ 'data-id': 'u1', 'data-provider': 'UserSubtitle', 'data-srclang': 'ru', 'data-source': '', 'data-badge': 'user', 'data-rank': '0' });
     const trEl = makeAttrEl({
         'data-id': 'tr-ru', 'data-provider': 'Translated', 'data-srclang': 'ru', 'data-source': '',
