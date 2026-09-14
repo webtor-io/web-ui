@@ -102,8 +102,12 @@
                         <span class="lang-dot w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true"{{ if not .Active }} hidden{{ end }}></span>
                     </button>
                     {{ end }}
+                    {{/* The whole label lives in .more-count: track-picker.js
+                         rewrites that span's text ("+3" collapsed, "×"
+                         expanded), so a literal "+" outside it would survive
+                         the rewrite and read "++3" / "+×". */}}
                     <button type="button" id="subtitle-lang-more" class="lang-chip text-w-muted"
-                            aria-expanded="false" title="{{ t $.Lang "action.stream.moreLanguages" }}" aria-label="{{ t $.Lang "action.stream.moreLanguages" }}"{{ if not $row.Overflow }} hidden{{ end }}>+<span class="more-count">{{ $row.Overflow }}</span></button>
+                            aria-expanded="false" title="{{ t $.Lang "action.stream.moreLanguages" }}" aria-label="{{ t $.Lang "action.stream.moreLanguages" }}"{{ if not $row.Overflow }} hidden{{ end }}><span class="more-count">+{{ $row.Overflow }}</span></button>
                     {{/* Cloned by track-picker.js when an upload introduces a
                          language the server did not render a chip for. Filled
                          through textContent only — no HTML is built in JS. */}}

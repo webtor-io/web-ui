@@ -295,7 +295,11 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	if tracksAt < 0 {
 		t.Fatal("no #subtitle-tracks container")
 	}
-	tracks := html[tracksAt:]
+	ctaAt := strings.Index(html, `id="translate-cta"`)
+	if ctaAt < tracksAt {
+		t.Fatal("the CTA card no longer follows the track row")
+	}
+	tracks := html[tracksAt:ctaAt]
 	// hls-manager.remapTrackGroup assigns data-mp-id by DOM order when the
 	// counts match, so the embedded chips must appear in GetSubtitles order.
 	// Scoped to the track row on purpose: the audio chips above carry
@@ -304,26 +308,67 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		t.Errorf("embedded subtitle chips are out of GetSubtitles order (mp-0 at %d, mp-1 at %d)", a, b)
 	}
 
-	// The language filter runs server-side (R4), so the fixture's English
-	// chips are collapsed while the expanded language is Portuguese. Pinned
-	// because the next assertion is only meaningful while it holds.
-	if !strings.Contains(tracks, `hidden`) {
-		t.Error("no chip is collapsed, so the server-side language filter is not running")
+	// startTag returns the <button …> opening tag of the chip carrying the
+	// given attribute, without its closing ">". Searching the whole element
+	// for "hidden" would prove nothing: chip-check, tr-progress, the "+N"
+	// button and the CTA card all carry it.
+	// Scoped to the track row: the audio chips above reuse the same
+	// data-id values ("mp-0"), so an unscoped search would read the wrong
+	// element and pass for the wrong reason.
+	startTag := func(needle string) string {
+		at := strings.Index(tracks, needle)
+		if at < 0 {
+			t.Fatalf("no chip with %s in the track row:\n%s", needle, tracks)
+		}
+		open := strings.LastIndex(tracks[:at], "<button")
+		end := strings.Index(tracks[at:], ">")
+		if open < 0 || end < 0 {
+			t.Fatalf("could not isolate the start tag of %s", needle)
+		}
+		return tracks[open : at+end]
+	}
+
+	// The language filter runs server-side (R4): the expanded language is
+	// Portuguese (the AI track is the default), so the three English chips
+	// are collapsed and the Portuguese one is not.
+	if tag := startTag(`data-id="mp-0"`); !strings.Contains(tag, " hidden") {
+		t.Errorf("an English chip is not collapsed while Portuguese is expanded:\n%s", tag)
+	}
+	if tag := startTag(`data-id="et-1"`); !strings.Contains(tag, " hidden") {
+		t.Errorf("the sidecar chip is not collapsed while Portuguese is expanded:\n%s", tag)
+	}
+	if tag := startTag(`data-id="tr-pt"`); strings.Contains(tag, " hidden") {
+		t.Errorf("the expanded language's chip is collapsed:\n%s", tag)
 	}
 	// ...but "Off" is not a language and must never be collapsed by it:
 	// otherwise a viewer whose expanded language is anything but "und"
 	// cannot turn subtitles off at all without JavaScript.
-	offAt := strings.Index(html, `id="subtitle-off"`)
-	if offAt < 0 {
-		t.Fatal("no Off chip")
-	}
-	open := strings.LastIndex(html[:offAt], "<button")
-	closeAt := strings.Index(html[offAt:], ">")
-	if open < 0 || closeAt < 0 {
-		t.Fatal("could not isolate the Off chip's start tag")
-	}
-	if tag := html[open : offAt+closeAt]; strings.Contains(tag, "hidden") {
+	if tag := startTag(`id="subtitle-off"`); strings.Contains(tag, " hidden") {
 		t.Errorf("the Off chip is hidden by the language filter:\n%s", tag)
+	}
+	// And it is the FIRST chip of the row (R1): the player looks the "None"
+	// item up by data-id, but a viewer reaching for "off" scans from the
+	// left. Compared against the first `class="subtitle ` in the row, which
+	// is the Off chip's own class attribute when the order is right.
+	off, firstChip := strings.Index(tracks, `id="subtitle-off"`), strings.Index(tracks, `class="subtitle `)
+	if off < 0 || firstChip < 0 {
+		t.Fatal("the track row has no Off chip or no subtitle chips at all")
+	}
+	if off > firstChip {
+		t.Errorf("the Off chip is not the first .subtitle of #subtitle-tracks (off at %d, first chip at %d)", off, firstChip)
+	}
+
+	// The "+N" disclosure's whole label lives in .more-count, because
+	// track-picker.js rewrites that span's text on every refresh. A literal
+	// "+" left outside it would survive the rewrite and read "++3".
+	moreAt := strings.Index(html, `id="subtitle-lang-more"`)
+	if moreAt < 0 {
+		t.Fatal("no #subtitle-lang-more button")
+	}
+	moreEnd := strings.Index(html[moreAt:], "</button>") + moreAt
+	if inner := html[moreAt+strings.Index(html[moreAt:], ">")+1 : moreEnd]; inner != `<span class="more-count">+0</span>` {
+		// Task 3 rewrites .more-count wholesale, so the "+" belongs inside it.
+		t.Errorf("the +N button must render its whole label inside .more-count, got %q", inner)
 	}
 }
 
