@@ -870,21 +870,39 @@ input:-webkit-autofill:focus {
   background: rgba(232, 67, 147, 0.06);
 }
 
-/* "My Subtitles" selected row: highlight the whole <li> in the purple
-   tone that matches btn-soft-purple, and undo the generic
-   text-primary/underline applied to .subtitle by markTrack — inside
-   this list the active state is row-level, not inline text. */
-#my-subtitles ul > li:has(.subtitle[data-default="true"]) {
-  background-color: rgba(108, 92, 231, 0.12);
-  box-shadow: inset 3px 0 0 #6c5ce7;
+/* ===== Track picker chips (player audio/subtitle modal) =====
+   One place for the chip look, because three renderers write it: the
+   stream_video.html dialog, the user_subtitles_view partial, and
+   assets/src/js/lib/player/track-picker.js, which toggles the active
+   state on selection. The JS only ever adds or removes
+   .track-chip-active / .lang-chip-active — no utility strings in
+   JavaScript, so a restyle here reaches every chip at once.
+   See docs/uikit.html section 19.
+
+   The -active rules carry !important for the same reason .btn-soft does:
+   they have to beat daisyUI's own .btn-ghost declarations, which are not
+   less specific than a single class of ours. */
+.track-chip {
+  @apply btn btn-sm btn-ghost border border-w-line text-w-sub gap-2 hover:border-w-cyan/30 hover:text-w-cyan;
 }
-#my-subtitles .subtitle.text-primary,
-#my-subtitles .subtitle.underline {
-  color: inherit;
-  text-decoration: none;
+.track-chip-active {
+  background-color: rgba(0, 206, 201, 0.15) !important;
+  border-color: rgba(0, 206, 201, 0.30) !important;
+  color: #00cec9 !important;
 }
-#my-subtitles ul > li:has(.subtitle[data-default="true"]) .subtitle > div:first-child {
-  color: #a29bfe;
+/* A locked chip (the AI track on a free account) is drawn dimmed and can
+   never become active, so it never collides with .track-chip-active. */
+.chip-locked {
+  @apply opacity-70 text-w-muted;
+}
+
+.lang-chip {
+  @apply btn btn-xs btn-ghost border border-w-line text-w-sub gap-1 hover:border-w-cyan/30 hover:text-w-cyan;
+}
+.lang-chip-active {
+  background-color: rgba(0, 206, 201, 0.15) !important;
+  border-color: rgba(0, 206, 201, 0.30) !important;
+  color: #00cec9 !important;
 }
 
 .btn-pink {

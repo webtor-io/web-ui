@@ -708,7 +708,7 @@ func TestUserSubtitleViewCarriesDefaultAndSaved(t *testing.T) {
 		t.Fatalf("fixture: the saved upload must be the default, got %s", defaultID(items))
 	}
 
-	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items)
+	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items, "pt")
 	if len(v.UserSubtitles) != 2 {
 		t.Fatalf("view must keep every upload: %+v", v.UserSubtitles)
 	}
@@ -731,7 +731,7 @@ func TestUserSubtitleViewLadderPickIsNotSaved(t *testing.T) {
 	if defaultID(items) != "us-1" {
 		t.Fatalf("fixture: the ladder must pick the Portuguese upload, got %s", defaultID(items))
 	}
-	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items)
+	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items, "pt")
 	if !v.UserSubtitles[0].Default || v.UserSubtitles[0].Saved {
 		t.Fatalf("a ladder pick is Default but not Saved: %+v", v.UserSubtitles[0])
 	}

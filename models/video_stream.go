@@ -127,4 +127,10 @@ type UserSubtitleView struct {
 	EIURL         string
 	UserSubtitles []UserSubtitleTrack
 	ErrKey        string
+	// ExpandedLang is the language the picker's track row opens on, so the
+	// uploads' chips are collapsed by the same rule as every other chip and
+	// the no-JS page is consistent. Empty on the async reload, which has no
+	// language row to consult: nothing is collapsed there and the client
+	// re-applies the filter right after the swap.
+	ExpandedLang string
 }

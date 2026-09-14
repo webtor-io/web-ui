@@ -117,7 +117,7 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 // originCodes maps an origin badge to the fixed two-letter code the picker
 // shows. Codes never localize (docs/uikit.html §19): they are codes, and
 // their meaning is carried by title= and by the legend line, both built
-// from the action.stream.badge.* keys.
+// from the action.stream.origin.* keys.
 var originCodes = map[string]string{
 	"user":     "MY",
 	"embedded": "EM",
@@ -146,12 +146,19 @@ func (s *Helper) OriginCodeForBadge(badge string) string {
 
 // OriginKey is the i18n key that explains the code in the viewer's
 // language: the chip's title and the legend line both use it.
+//
+// Keyed by the code (action.stream.origin.em), not by the provider badge
+// (action.stream.badge.embedded): the old badge.* values are the short
+// in-chip words the redesign stopped rendering, and two of them ("OS",
+// "AI") are the codes themselves — a legend built from those would read
+// "OS OS · AI AI". The badge.* keys stay in the locale files for
+// telemetry and back-compat.
 func (s *Helper) OriginKey(li ListItem) string {
-	b := badgeFor(li.Provider, false)
-	if _, ok := originCodes[b]; !ok {
+	c, ok := originCodes[badgeFor(li.Provider, false)]
+	if !ok {
 		return ""
 	}
-	return "action.stream.badge." + b
+	return "action.stream.origin." + strings.ToLower(c)
 }
 
 // PropertyTags are what kind of track this is, as opposed to where it came

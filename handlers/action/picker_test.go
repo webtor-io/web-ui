@@ -154,13 +154,13 @@ func TestOriginCodeAndPropertyTags(t *testing.T) {
 		key  string
 		tags []string
 	}{
-		{ListItem{Provider: "MediaProbe", Badge: "embedded"}, "EM", "action.stream.badge.embedded", nil},
-		{ListItem{Provider: "MediaProbe", Badge: "forced", Forced: true}, "EM", "action.stream.badge.embedded", []string{"forced"}},
-		{ListItem{Provider: "ExportTag", Badge: "sidecar"}, "IN", "action.stream.badge.sidecar", nil},
-		{ListItem{Provider: "External", Badge: "sidecar"}, "IN", "action.stream.badge.sidecar", nil},
-		{ListItem{Provider: "OpenSubtitles", Badge: "os"}, "OS", "action.stream.badge.os", nil},
-		{ListItem{Provider: "UserSubtitle", Badge: "user"}, "MY", "action.stream.badge.user", nil},
-		{ListItem{Provider: "Translated", Badge: "ai"}, "AI", "action.stream.badge.ai", nil},
+		{ListItem{Provider: "MediaProbe", Badge: "embedded"}, "EM", "action.stream.origin.em", nil},
+		{ListItem{Provider: "MediaProbe", Badge: "forced", Forced: true}, "EM", "action.stream.origin.em", []string{"forced"}},
+		{ListItem{Provider: "ExportTag", Badge: "sidecar"}, "IN", "action.stream.origin.in", nil},
+		{ListItem{Provider: "External", Badge: "sidecar"}, "IN", "action.stream.origin.in", nil},
+		{ListItem{Provider: "OpenSubtitles", Badge: "os"}, "OS", "action.stream.origin.os", nil},
+		{ListItem{Provider: "UserSubtitle", Badge: "user"}, "MY", "action.stream.origin.my", nil},
+		{ListItem{Provider: "Translated", Badge: "ai"}, "AI", "action.stream.origin.ai", nil},
 		{ListItem{ID: "none"}, "", "", nil},
 	}
 	for _, c := range cases {

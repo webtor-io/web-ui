@@ -17,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/stremio"
 )
 
 // TestStreamVideoRenders is the render guard called for in the
@@ -57,6 +58,13 @@ func TestStreamVideoRenders(t *testing.T) {
 		"getDurationSec":            helper.GetDurationSec,
 		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
 		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
 
 		// Stubs for the web.Helper-bound funcs this view also needs, same
 		// spirit as about_render_test.go / user_subtitles_partial_render_test.go:
@@ -145,6 +153,13 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"getDurationSec":            helper.GetDurationSec,
 		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
 		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -235,14 +250,80 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		`data-badge="forced"`,         // the embedded "Forced (English)" track
 		`data-forced="true"`,
 		`data-locked="true"`,
-		`🔒`,                  // lock glyph on the locked AI item
-		`id="translate-cta"`, // the CTA card
+		`aria-disabled="true"`, // a locked chip is not activatable
+		`id="translate-cta"`,   // the CTA card
 		`action.stream.translate.locked`,
 		`action.stream.translate.cta`,
+		`action.stream.locked.aria`, // the lock is an icon plus this sr-only text
+		// The redesign's own contract: one flat container for the tracks, a
+		// language row above it, and the codes the chips are read by.
+		`id="subtitle-tracks"`,
+		`id="subtitle-langs"`,
+		`id="subtitle-off"`,
+		`id="lang-chip-template"`,
+		`class="lang lang-chip`,
+		`class="subtitle track-chip`,
+		`aria-pressed="true"`, // the expanded language chip
+		// title= is what tells a chip's origin badge from the legend line,
+		// which renders the same codes with no title at all.
+		`title="action.stream.origin.em">EM<`,
+		`title="action.stream.origin.in">IN<`,
+		`title="action.stream.origin.ai">AI<`,
+		`class="tr-progress`,
+		`class="tr-spinner`,
+		`data-lang="en"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered stream_video.html missing %q", want)
 		}
+	}
+
+	// The sub-views the redesign replaced, and the roles ruling R2 replaced:
+	// the language row is a filter (role="group" + aria-pressed), not a
+	// tablist, and the Off chip is a chip of the track row rather than an
+	// aria-owns reference from the language row.
+	for _, gone := range []string{
+		`id="embedded"`, `id="opensubtitles"`, `label for="opensubtitles"`, `label for="my-subtitles"`,
+		`aria-owns=`, `role="tab"`, `aria-selected=`, `🔒`,
+	} {
+		if strings.Contains(html, gone) {
+			t.Errorf("rendered stream_video.html still contains the removed markup %q", gone)
+		}
+	}
+
+	tracksAt := strings.Index(html, `id="subtitle-tracks"`)
+	if tracksAt < 0 {
+		t.Fatal("no #subtitle-tracks container")
+	}
+	tracks := html[tracksAt:]
+	// hls-manager.remapTrackGroup assigns data-mp-id by DOM order when the
+	// counts match, so the embedded chips must appear in GetSubtitles order.
+	// Scoped to the track row on purpose: the audio chips above carry
+	// mp-ids too, and an unscoped search would pass on those alone.
+	if a, b := strings.Index(tracks, `data-mp-id="0"`), strings.Index(tracks, `data-mp-id="1"`); a < 0 || b < 0 || a > b {
+		t.Errorf("embedded subtitle chips are out of GetSubtitles order (mp-0 at %d, mp-1 at %d)", a, b)
+	}
+
+	// The language filter runs server-side (R4), so the fixture's English
+	// chips are collapsed while the expanded language is Portuguese. Pinned
+	// because the next assertion is only meaningful while it holds.
+	if !strings.Contains(tracks, `hidden`) {
+		t.Error("no chip is collapsed, so the server-side language filter is not running")
+	}
+	// ...but "Off" is not a language and must never be collapsed by it:
+	// otherwise a viewer whose expanded language is anything but "und"
+	// cannot turn subtitles off at all without JavaScript.
+	offAt := strings.Index(html, `id="subtitle-off"`)
+	if offAt < 0 {
+		t.Fatal("no Off chip")
+	}
+	open := strings.LastIndex(html[:offAt], "<button")
+	closeAt := strings.Index(html[offAt:], ">")
+	if open < 0 || closeAt < 0 {
+		t.Fatal("could not isolate the Off chip's start tag")
+	}
+	if tag := html[open : offAt+closeAt]; strings.Contains(tag, "hidden") {
+		t.Errorf("the Off chip is hidden by the language filter:\n%s", tag)
 	}
 }
 
@@ -274,6 +355,13 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"getDurationSec":            helper.GetDurationSec,
 		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
 		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -336,8 +424,113 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 	// The seam the new argument exists for: the viewer's saved choice is
 	// one of their own uploads, and the view model carries that across.
 	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
-	v := helper.UserSubtitleView(data.VideoStreamUserData.ResourceID, data.Item.PathStr, data.EIURL, data.UserSubtitles, items)
+	v := helper.UserSubtitleView(data.VideoStreamUserData.ResourceID, data.Item.PathStr, data.EIURL, data.UserSubtitles, items, "pt")
 	if len(v.UserSubtitles) != 1 || !v.UserSubtitles[0].Default || !v.UserSubtitles[0].Saved {
 		t.Fatalf("the saved upload must reach the partial marked: %+v", v.UserSubtitles)
+	}
+}
+
+// TestStreamVideoRendersUploadChipsInsideTheTrackRow is the one case that
+// renders the real user_subtitles_view partial inside the dialog instead of
+// stubbing it. The redesign moved the uploads out of their own sub-view and
+// into the flat track row, which puts two things at risk that a stub hides:
+// the chips have to land inside #subtitle-tracks (the picker reads them
+// there), and each upload must be rendered exactly once — the dialog
+// filters UserSubtitle items out of its own loop precisely because the
+// partial renders them.
+func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string { return key }
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
+
+		"domain":        func() string { return "https://example.com" },
+		"langPath":      func(lang, p string) string { return p },
+		"json":          func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":         func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":       func(interface{}) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		"withContext":   func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":             echo,
+		"tp":            echoVariadic,
+		"tpHTML":        echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).ParseFiles(
+		"../../templates/views/action/stream_video.html",
+		"../../templates/partials/action/user_subtitles.html",
+	)
+	if err != nil {
+		t.Fatalf("failed to parse templates: %v", err)
+	}
+
+	userSubs := []models.UserSubtitleTrack{
+		{ID: "us-1", Label: "movie.pt.srt", OriginalName: "movie.pt.srt", SrcLang: "pt", Src: "https://x.test/movie.vtt", Format: "srt", Size: 1024, DeleteURL: "/user-subtitle/delete/1"},
+	}
+	data := &scripts.StreamContent{
+		ExportTag:            &ra.ExportTag{},
+		Resource:             &ra.ResourceResponse{},
+		Item:                 &ra.ListItem{PathStr: "movie.mkv"},
+		Title:                "Movie",
+		MediaProbe:           nil,
+		UserSubtitles:        userSubs,
+		UserSubtitlesEnabled: true,
+		EIURL:                "http://ei.example.com",
+		VideoStreamUserData:  &models.VideoStreamUserData{ResourceID: "res", ItemID: "item", SubtitleID: "us-1"},
+		Settings:             &models.StreamSettings{},
+		ExternalData:         &models.ExternalData{},
+		SubtitleOpts:         models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": struct{}{},
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	// Rendered once, by the partial — not once here and once by the
+	// dialog's own loop.
+	if n := strings.Count(html, `data-id="us-1"`); n != 1 {
+		t.Errorf("the upload must be rendered exactly once, got %d:\n%s", n, html)
+	}
+	if !strings.Contains(html, `data-provider="UserSubtitle"`) {
+		t.Fatal("the partial did not render the upload's chip")
+	}
+
+	tracksAt := strings.Index(html, `id="subtitle-tracks"`)
+	chipAt := strings.Index(html, `data-provider="UserSubtitle"`)
+	ctaAt := strings.Index(html, `id="translate-cta"`)
+	if tracksAt < 0 || ctaAt < 0 {
+		t.Fatal("the dialog is missing its track row or its CTA card")
+	}
+	if chipAt < tracksAt || chipAt > ctaAt {
+		t.Errorf("the MY chip is outside #subtitle-tracks (row at %d, chip at %d, next block at %d)", tracksAt, chipAt, ctaAt)
+	}
+	// The uploads disclosure comes from the same partial, so an upload or a
+	// delete re-sends it together with the chips.
+	for _, want := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, `action="/user-subtitle/delete/1"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("rendered dialog missing %q", want)
+		}
 	}
 }

@@ -45,57 +45,148 @@
          in-place. Opened from Player.jsx (handleCaptionsClick). */}}
     <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}" data-preferred-lang="{{ .SubtitleOpts.PreferredLang }}">
         {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
-        {{ $openSubs := filterSubtitlesByProvider $subs "OpenSubtitles" false }}
-        {{ $otherSubs := filterSubtitlesByProvider $subs "OpenSubtitles" true }}
-        {{ $otherSubs = filterSubtitlesByProvider $otherSubs "UserSubtitle" true }}
+        {{/* Uploads are rendered by the user_subtitles_view partial, which is
+             also the async-reload target (handlers/user_subtitle): it is the
+             only markup the server can re-send after an upload, so the MY
+             chips have to come from there. They are excluded here to avoid
+             rendering each of them twice. Where the partial is not rendered
+             at all (embed layouts carry DomainSettings), the uploads stay in
+             the flat list so they do not disappear. */}}
+        {{ $withUploads := and (not .DomainSettings) .UserSubtitlesEnabled }}
+        {{ $flat := $subs }}
+        {{ if $withUploads }}{{ $flat = filterSubtitlesByProvider $subs "UserSubtitle" true }}{{ end }}
+        {{ $row := subtitleLangGroups $subs .SubtitleOpts.PreferredLang }}
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
-            <div class="flex flex-col sm:flex-row gap-4 sm:gap-0" id="embedded">
-                <div class="flex-1">
+
+            {{/* ===== AUDIO ===== */}}
+            <div class="mb-6">
+                <div class="flex items-baseline justify-between gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.audio" }}</h3>
-                    <ul class="flex flex-wrap">
-                        {{ range getAudioTracks .VideoStreamUserData .MediaProbe }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" {{ if .Default }}data-default="true" {{ end }} class="audio cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}</li>
-                        {{ end }}
-                    </ul>
+                    <span id="audio-now" class="text-xs text-w-muted truncate">{{ t $.Lang "action.stream.now" }} <span class="now-value text-w-text"></span></span>
                 </div>
-                <div class="flex-1">
-                    <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
-                    <ul class="flex flex-wrap">
-                        {{ range $otherSubs }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}" {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" {{ end }}{{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}{{ if .Locked }} opacity-70{{ end }}">
-                          {{ .Label }}{{ if .Badge }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $.Lang (printf "action.stream.badge.%s" .Badge) }}</span>{{ end }}{{ if .SourceBadge }} <span class="text-xs text-w-muted">{{ t $.Lang "action.stream.translate.from" }} {{ t $.Lang (printf "action.stream.badge.%s" .SourceBadge) }}</span>{{ end }}{{ if .Locked }} <span aria-hidden="true">🔒</span>{{ end }}{{ if eq .Provider "Translated" }} <span class="tr-progress text-xs text-w-muted" hidden></span>{{ end }}
-                        </li>
-                        {{ end }}
-                    </ul>
-                    <div id="translate-cta" class="mt-3 p-3 rounded-xl bg-base-200/60 border border-w-line" hidden>
-                        <div class="text-sm">{{ t $.Lang "action.stream.translate.locked" }}</div>
-                        <a href="{{ langPath $.Lang "/donate" }}" target="_blank" class="btn btn-sm btn-soft mt-2" data-umami-event="donate-subtitle-translate" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">{{ t $.Lang "action.stream.translate.cta" }}</a>
-                    </div>
-                </div>
-            </div>
-            <div class="flex hidden" id="opensubtitles">
-                <div class="flex-1">
-                    <h3 class="font-bold text-lg">OpenSubtitles</h3>
-                    <ul class="flex flex-wrap">
-                        {{ range $openSubs }}
-                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-rank="{{ .Rank }}" {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}{{ if .Badge }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $.Lang (printf "action.stream.badge.%s" .Badge) }}</span>{{ end }}</li>
-                        {{ end }}
-                    </ul>
-                </div>
-            </div>
-            {{ if and (not .DomainSettings) .UserSubtitlesEnabled }}
-            {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs }}
-            <div class="flex flex-col hidden" id="my-subtitles" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
-                {{ template "user_subtitles_view" withContext $ $usv }}
-            </div>
-            {{ end }}
-            <div class="modal-action flex-col sm:flex-row">
-                <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:mr-auto">
-                    {{ if $openSubs }}<label for="opensubtitles" class="btn btn-soft-cyan w-full sm:w-auto">OpenSubtitles</label>{{ end }}
-                    {{ if and (not .DomainSettings) .UserSubtitlesEnabled }}
-                    <label for="my-subtitles" class="btn btn-soft-purple w-full sm:w-auto">{{ t $.Lang "action.stream.mySubtitles" }}</label>
+                <div id="audio-tracks" class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="{{ t $.Lang "action.stream.audio" }}">
+                    {{ range getAudioTracks .VideoStreamUserData .MediaProbe }}
+                    {{ $d := langDisplay .SrcLang }}{{ $sfx := audioSuffix . }}
+                    <button type="button" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+                            data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-label="{{ .Label }}"
+                            data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
+                            {{ if .Default }}data-default="true" {{ end }}
+                            class="audio track-chip{{ if .Default }} track-chip-active{{ end }}">
+                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ if $d.Name }}<span><span class="chip-flag">{{ $d.Flag }}</span> {{ $d.Name }}</span>{{ else }}<span class="font-mono text-xs text-w-muted">{{ $d.Code }}</span>{{ end }}
+                        {{ if $sfx }}<span class="text-w-muted font-normal max-w-[14rem] truncate" title="{{ $sfx }}">{{ if $d.Name }}· {{ end }}{{ $sfx }}</span>{{ end }}
+                    </button>
                     {{ end }}
                 </div>
+            </div>
+
+            {{/* ===== SUBTITLES ===== */}}
+            <div>
+                <div class="flex items-baseline justify-between gap-3 mb-2">
+                    <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
+                    <span id="subtitle-now" class="text-xs text-w-muted truncate">{{ t $.Lang "action.stream.now" }} <span class="now-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub align-middle" hidden></span> <span class="now-value text-w-text"></span></span>
+                </div>
+
+                {{/* The language row is a filter, not a choice: pressing a chip
+                     collapses the other languages in the track row below and
+                     changes nothing about playback. Hence role="group" with
+                     aria-pressed buttons rather than a tablist — there are no
+                     tab panels, and the one real choice (which track plays)
+                     lives in the radiogroup underneath. */}}
+                <div id="subtitle-langs" class="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleLanguage" }}">
+                    {{ range $row.Groups }}
+                    <button type="button" class="lang lang-chip{{ if eq .Lang $row.Expanded }} lang-chip-active{{ end }}"
+                            data-lang="{{ .Lang }}" aria-pressed="{{ if eq .Lang $row.Expanded }}true{{ else }}false{{ end }}"{{ if .Overflow }} hidden{{ end }}>
+                        {{ if .Name }}<span class="chip-flag">{{ .Flag }}</span> <span class="lang-name">{{ .Name }}</span>{{ else }}<span class="lang-name font-mono">{{ .Code }}</span>{{ end }}
+                        <span class="lang-count text-w-muted font-normal">{{ .Count }}</span>
+                        <span class="lang-dot w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true"{{ if not .Active }} hidden{{ end }}></span>
+                    </button>
+                    {{ end }}
+                    <button type="button" id="subtitle-lang-more" class="lang-chip text-w-muted"
+                            aria-expanded="false" title="{{ t $.Lang "action.stream.moreLanguages" }}" aria-label="{{ t $.Lang "action.stream.moreLanguages" }}"{{ if not $row.Overflow }} hidden{{ end }}>+<span class="more-count">{{ $row.Overflow }}</span></button>
+                    {{/* Cloned by track-picker.js when an upload introduces a
+                         language the server did not render a chip for. Filled
+                         through textContent only — no HTML is built in JS. */}}
+                    <template id="lang-chip-template">
+                        <button type="button" class="lang lang-chip" data-lang="" aria-pressed="false">
+                            <span class="chip-flag"></span> <span class="lang-name"></span>
+                            <span class="lang-count text-w-muted font-normal">0</span>
+                            <span class="lang-dot w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true" hidden></span>
+                        </button>
+                    </template>
+                </div>
+
+                {{/* The "Off" chip is the first chip of this row, not of the
+                     language row: it is the real .subtitle element for the
+                     "None" item (data-id="none"), which the player looks up by
+                     that id (findSubtitleItem, pickDefaultSubtitle,
+                     hasSavedDefault). Putting a second copy in the language
+                     row would give the picker two sources of truth. "Off" is
+                     not a language, so the language filter never hides it —
+                     the server skips it below and applyLangFilter skips
+                     data-id="none". */}}
+                <div id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3" role="radiogroup" aria-label="{{ t $.Lang "action.stream.subtitles" }}">
+                    {{ range $subs }}{{ if eq .ID "none" }}
+                    {{ $d := langDisplay .SrcLang }}
+                    <button type="button" id="subtitle-off" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+                            data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}"
+                            {{/* Every chip carries the language triplet the
+                                 picker groups and labels by. "Off" is not a
+                                 language — it resolves to und and both
+                                 groupByLang and applyLangFilter skip it by
+                                 data-id — but the attributes are there so no
+                                 reader has to special-case their absence. */}}
+                            data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
+                            {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}
+                            class="subtitle track-chip{{ if .Default }} track-chip-active{{ end }}">
+                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ t $.Lang "action.stream.off" }}
+                    </button>
+                    {{ end }}{{ end }}
+                    {{ range $flat }}{{ if ne .ID "none" }}
+                    {{ $d := langDisplay .SrcLang }}{{ $oc := originCode . }}
+                    <button type="button" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+                            data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}"
+                            data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
+                            {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" aria-disabled="true" {{ end }}{{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}
+                            {{ if ne $d.Lang $row.Expanded }}hidden{{ end }}
+                            class="subtitle track-chip{{ if .Default }} track-chip-active{{ else if .Locked }} chip-locked{{ end }}">
+                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}">{{ $oc }}</span>{{ end }}
+                        <span class="max-w-[14rem] truncate" title="{{ .Label }}">{{ .Label }}</span>
+                        {{ range propertyTags . }}<span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="{{ t $.Lang (printf "action.stream.badge.%s" .) }}">{{ . }}</span>{{ end }}
+                        {{ if .Source }}<span class="text-w-muted font-normal">· {{ .Source }}</span>{{ end }}
+                        {{ if .SourceBadge }}<span class="text-w-muted font-normal">· {{ t $.Lang "action.stream.translate.from" }} {{ originCodeForBadge .SourceBadge }}</span>{{ end }}
+                        {{ if eq .Provider "Translated" }}<span class="tr-progress text-w-muted font-normal" hidden></span><span class="tr-spinner loading loading-spinner loading-xs text-w-pinkL" aria-hidden="true" hidden></span>{{ end }}
+                        {{ if .Locked }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="sr-only">{{ t $.Lang "action.stream.locked.aria" }}</span>{{ end }}
+                    </button>
+                    {{ end }}{{ end }}
+                    {{ if $withUploads }}
+                    {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs $row.Expanded }}
+                    {{/* display:contents — the partial's chips join this flex
+                         row directly while #my-subtitles stays the element
+                         loadAsyncView swaps innerHTML on. */}}
+                    <div id="my-subtitles" class="contents" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
+                        {{ template "user_subtitles_view" withContext $ $usv }}
+                    </div>
+                    {{ end }}
+                </div>
+
+                <div id="translate-cta" class="mb-3 p-3 rounded-xl bg-base-200/60 border border-w-line max-w-md" hidden>
+                    <div class="text-sm">{{ t $.Lang "action.stream.translate.locked" }}</div>
+                    <a href="{{ langPath $.Lang "/donate" }}" target="_blank" class="btn btn-sm btn-soft mt-2" data-umami-event="donate-subtitle-translate" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">{{ t $.Lang "action.stream.translate.cta" }}</a>
+                </div>
+
+                <p class="text-[0.7rem] text-w-muted">
+                    <span class="font-mono">EM</span> {{ t $.Lang "action.stream.origin.em" }} ·
+                    <span class="font-mono">IN</span> {{ t $.Lang "action.stream.origin.in" }} ·
+                    <span class="font-mono">OS</span> {{ t $.Lang "action.stream.origin.os" }} ·
+                    <span class="font-mono">MY</span> {{ t $.Lang "action.stream.origin.my" }} ·
+                    <span class="font-mono">AI</span> {{ t $.Lang "action.stream.origin.ai" }}
+                </p>
+            </div>
+
+            <div class="modal-action">
                 <form method="dialog" class="w-full sm:w-auto"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>

@@ -98,7 +98,13 @@ func NewHelper() *Helper {
 // lets the "My Subtitles" rows carry the same data-default/data-saved
 // markers as the other two lists; pass nil when there is no ladder result
 // to copy from (the async reload) and the rows stay unmarked.
-func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.UserSubtitleTrack, lis []ListItem) *models.UserSubtitleView {
+//
+// expandedLang is the language the track row opens on (LangRow.Expanded):
+// the partial renders its chips inside that row, so it has to collapse them
+// by the same rule. It is passed in rather than recomputed here because the
+// template has already built the row — recomputing would need the viewer's
+// preferred language too, and the two results could drift apart.
+func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.UserSubtitleTrack, lis []ListItem, expandedLang string) *models.UserSubtitleView {
 	marks := make(map[string]ListItem, len(lis))
 	for _, li := range lis {
 		if li.Provider == "UserSubtitle" {
@@ -118,6 +124,7 @@ func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.
 		Path:          path,
 		EIURL:         eiURL,
 		UserSubtitles: out,
+		ExpandedLang:  expandedLang,
 	}
 }
 
