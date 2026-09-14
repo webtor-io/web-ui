@@ -64,6 +64,11 @@ func TestUserSubtitlesPartialMarksSelected(t *testing.T) {
 		t.Errorf("expected exactly one autoselect marker, got %d:\n%s",
 			strings.Count(out, `data-autoselect="true"`), out)
 	}
+	// Every upload row carries the "mine" origin badge the picker shows
+	// next to the label (one per rendered track).
+	if n := strings.Count(out, `data-badge="user"`); n != 2 {
+		t.Errorf("expected two user badges, got %d:\n%s", n, out)
+	}
 	// The player reads the language off the list item when it creates the
 	// <track> for a subtitle uploaded after the initial render.
 	if !strings.Contains(out, `data-srclang="en"`) || !strings.Contains(out, `data-srclang="und"`) {
