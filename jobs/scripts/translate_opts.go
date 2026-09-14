@@ -35,6 +35,20 @@ func buildSubtitleOpts(c *web.Context, enabled, freeForAll, adult, embed bool, p
 //
 // buildSubtitleOpts keeps its own adult/embed gates: this is the switch,
 // those are defence in depth for any other caller.
+// DebugTierFree is the debug value that previews the stream page as a
+// free viewer: the AI track renders locked with the CTA even for a paid
+// account. It only ever downgrades, so the action handler lets it
+// through in release builds too (the other debug values stay dev-only).
+const DebugTierFree = "tier:free"
+
+// previewAsFree applies DebugTierFree to the computed options.
+func previewAsFree(o models.SubtitleOpts, debug string) models.SubtitleOpts {
+	if debug == DebugTierFree {
+		o.Paid = false
+	}
+	return o
+}
+
 func subtitleOptsFor(enabled, embed bool, c *web.Context, freeForAll, adult bool, preferred string, names []string) models.SubtitleOpts {
 	if !enabled || embed {
 		return models.SubtitleOpts{}

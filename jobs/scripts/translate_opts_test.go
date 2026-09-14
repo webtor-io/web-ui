@@ -4,9 +4,26 @@ import (
 	"testing"
 
 	claimsproto "github.com/webtor-io/claims-provider/proto"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/web"
 )
+
+func TestPreviewAsFreeOnlyDowngrades(t *testing.T) {
+	paid := models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true}
+	if got := previewAsFree(paid, DebugTierFree); got.Paid || !got.Translate || got.PreferredLang != "pt" {
+		t.Fatalf("tier:free must only clear Paid: %+v", got)
+	}
+	if got := previewAsFree(paid, ""); !got.Paid {
+		t.Fatal("no debug value keeps the computed tier")
+	}
+	if got := previewAsFree(paid, "slow_download"); !got.Paid {
+		t.Fatal("other debug values are not a tier preview")
+	}
+	if got := previewAsFree(models.SubtitleOpts{Translate: true}, DebugTierFree); got.Paid {
+		t.Fatal("a free viewer stays free")
+	}
+}
 
 func TestIsPaidForTranslate(t *testing.T) {
 	if isPaidForTranslate(&web.Context{}) {

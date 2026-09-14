@@ -81,6 +81,13 @@ not implemented yet.
 | `subtitle-translate-enabled` | `SUBTITLE_TRANSLATE_ENABLED` | `TranslateEnabled()`; off by default. Master switch for offering the AI item at all. |
 | `subtitle-translate-free` | `SUBTITLE_TRANSLATE_FREE` | `FreeForAll()`; when set, every viewer may activate the AI track (for deployments without `claims-provider`). |
 
+**Preview as a free viewer.** Append `&debug=tier:free` to the resource hash
+(`#action=stream&debug=tier:free`): `previewAsFree` (`jobs/scripts/translate_opts.go`) clears
+`Paid` on the computed options, so a paid account sees the AI track locked with the CTA. The value
+only ever downgrades, which is why `handlers/action/handler.go` lets it through under
+`GIN_MODE=release` while every other `debug` value stays dev-only; it is part of the job cache
+key, so the preview never contaminates the paid render.
+
 **The flag is a master switch, not an AI-item gate.** `subtitleOptsFor`
 (`jobs/scripts/translate_opts.go`) returns the zero `SubtitleOpts` — `PreferredLang == ""` — when
 the feature is off *or* the request comes from the embed widget, and `GetSubtitles` reads an empty

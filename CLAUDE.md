@@ -213,6 +213,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 - Test API without RapidAPI: port-forward `rest-api` from K8s or set `REST_API_SERVICE_HOST/PORT`
 - Asset path issues: use `--assets-path` or `WEB_ASSETS_HOST` for CDN
 - Ad testing: set cookie `test-ads` or query param `test-ads`
+- **Subtitle picker as a free viewer (works in release)** — append `&debug=tier:free` to the resource hash (`#action=stream&debug=tier:free`): the AI subtitle track renders locked with the CTA even for a paid account. Downgrade-only, so `handlers/action/handler.go` lets this one `debug` value through under `GIN_MODE=release`; the value is part of the job cache key. See `docs/subtitle_translate.md`.
 - **Streaming-error modals (dev-only)** — append `&debug=<error>` to the resource hash to short-circuit `streamContent` and render the error template without any rest-api work. Gated by `gin.Mode() != gin.ReleaseMode` in `handlers/action/handler.go` so it's a no-op under `GIN_MODE=release`. Values:
     - `debug=slow_download` — cap-modal (`IsRateLimited=true`, fake 5/10/15 Mbps, rate=5M). Useful because under grace=ON this branch is otherwise unreachable for free users.
     - `debug=slow_download_bt` — BT-slow variant (`IsRateLimited=false`, 1/10/15 Mbps).

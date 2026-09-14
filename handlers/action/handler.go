@@ -14,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/services/turnstile"
 
 	j "github.com/webtor-io/web-ui/jobs"
+	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/web"
@@ -142,10 +143,12 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 
 	// Dev-only: lets the client force a specific error path via
 	// `?debug=slow_download|no_peers` on the resource hash. Ignored in
-	// release builds so the parameter can't be abused in prod.
+	// release builds so the parameter can't be abused in prod — except
+	// `debug=tier:free`, which only ever downgrades (a paid viewer sees
+	// the page as a free one) and is therefore safe everywhere.
 	debug := ""
-	if gin.Mode() != gin.ReleaseMode {
-		if v, ok := c.GetPostForm("debug"); ok {
+	if v, ok := c.GetPostForm("debug"); ok {
+		if gin.Mode() != gin.ReleaseMode || v == scripts.DebugTierFree {
 			debug = v
 		}
 	}
