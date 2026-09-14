@@ -570,3 +570,68 @@ func TestLadderSavedChoiceClearsExternalDefault(t *testing.T) {
 		t.Fatalf("want exactly one default (os-7), got %d, default=%s", n, defaultID(items))
 	}
 }
+
+// TestLadderLockedNeverWinsLanguageFallback: the ladder-miss fallback runs
+// the legacy Accept-Language match, which must not see AI items at all --
+// otherwise the locked tr-pt item is the only "pt" track in the list and
+// wins the match with an empty Src.
+func TestLadderLockedNeverWinsLanguageFallback(t *testing.T) {
+	tag, os := humanTracks()
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.Portuguese}, FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	tr, ok := byID(items)["tr-pt"]
+	if !ok || !tr.Locked {
+		t.Fatalf("the locked AI item must still be listed: %+v", tr)
+	}
+	if d := defaultID(items); d == "tr-pt" {
+		t.Fatal("a locked item must never be the Accept-Language match")
+	}
+}
+
+// TestLadderLockedNeverWinsEnglishFallback is the same hole reached through
+// the fallback language rather than Accept-Language: FallbackLangTag is
+// always English, so a locked tr-en item would win whenever the file has no
+// English human track.
+func TestLadderLockedNeverWinsEnglishFallback(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-de.vtt", SrcLang: "de", Label: "German.srt", Kind: "subtitles"}}}
+	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]`)
+	ud := &models.VideoStreamUserData{FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, mp, tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "en", Translate: true, Paid: false})
+	tr, ok := byID(items)["tr-en"]
+	if !ok || !tr.Locked {
+		t.Fatalf("the locked AI item must still be listed: %+v", tr)
+	}
+	if d := defaultID(items); d == "tr-en" {
+		t.Fatalf("a locked item must never be the English fallback, default=%s", d)
+	}
+}
+
+// TestLadderSavedLockedChoiceIgnored: the viewer saved the AI track while
+// they were paying and has since dropped to free. The stale choice must not
+// select a track they cannot turn on.
+func TestLadderSavedLockedChoiceIgnored(t *testing.T) {
+	tag, os := humanTracks()
+	ud := &models.VideoStreamUserData{SubtitleID: "tr-pt", FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	if d := defaultID(items); d == "tr-pt" {
+		t.Fatal("a saved choice pointing at a locked item must be ignored")
+	}
+	if tr := byID(items)["tr-pt"]; !tr.Locked || tr.Src != "" {
+		t.Fatalf("the item stays listed and locked: %+v", tr)
+	}
+}
+
+// TestLadderSavedAIChoiceHonouredWhenPaid is the other half: the same saved
+// choice is still honoured for a viewer who may activate it.
+func TestLadderSavedAIChoiceHonouredWhenPaid(t *testing.T) {
+	tag, os := humanTracks()
+	ud := &models.VideoStreamUserData{SubtitleID: "tr-pt", FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if d := defaultID(items); d != "tr-pt" {
+		t.Fatalf("default=%s: the saved AI choice must win for a paid viewer", d)
+	}
+}

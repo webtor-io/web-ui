@@ -175,6 +175,14 @@ func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lInd
 		if li.Forced {
 			continue
 		}
+		// AI translations are never a candidate here either. applyLadder
+		// promotes the AI item itself when the viewer may activate it;
+		// everything that reaches this function is a fallback, and a
+		// fallback that lands on a locked item selects a track with no
+		// Src -- subtitles "on" and nothing on screen.
+		if li.Provider == "Translated" {
+			continue
+		}
 		if t, err := language.Parse(li.SrcLang); err == nil {
 			if _, ok := lx[t]; !ok {
 				lx[t] = i
@@ -449,10 +457,12 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 		}
 	}
 	// The viewer's saved choice always wins, and is the only default:
-	// ExternalData may have marked a track Default already.
+	// ExternalData may have marked a track Default already. A choice that
+	// now points at a locked item (an AI track saved while the viewer was
+	// paying) is ignored, and the ladder decides as if nothing was saved.
 	if ud.SubtitleID != "" {
 		for i := range lis {
-			if lis[i].ID == ud.SubtitleID {
+			if lis[i].ID == ud.SubtitleID && !lis[i].Locked {
 				for j := range lis {
 					lis[j].Default = false
 				}
