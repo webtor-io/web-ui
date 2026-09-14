@@ -8,6 +8,6 @@ type SubtitleOpts struct {
 	Translate bool
 	// Paid marks whether the viewer's tier may activate a translated track.
 	Paid bool
-	// Names are the file/library display names considered for NSFW gating.
+	// Names is the glossary passed to the translator (cast names from TMDB credits).
 	Names []string
 }
