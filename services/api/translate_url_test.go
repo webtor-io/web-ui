@@ -15,6 +15,14 @@ func TestTranslateURL(t *testing.T) {
 		{"https://x.test/ext/aGVsbG8%3D%3D/user.srt~vtt/user.vtt?token=T", "es", nil,
 			"https://x.test/ext/aGVsbG8%3D%3D/user.srt~vtt/user.vtt~tr:es/user.vtt?token=T"},
 		{"", "pt", nil, ""},
+		// A src with no scheme/host cannot be turned into a URL the proxy
+		// can fetch: parsed.Scheme + "://" + parsed.Host would produce
+		// "://path/x~tr:pt/x.vtt", a string that looks like a URL and is
+		// not one. No item is better than an item that 404s.
+		{"/ext/abc/movie.srt~vtt/movie.vtt?token=T", "pt", nil, ""},
+		{"movie.srt~vtt/movie.vtt", "pt", nil, ""},
+		{"//x.test/abc/movie.vtt", "pt", nil, ""},
+		{"https:///abc/movie.vtt", "pt", nil, ""},
 	}
 	for _, c := range cases {
 		if got := TranslateURL(c.src, c.lang, c.names); got != c.want {

@@ -105,6 +105,14 @@ func (s *Service) CastNames(ctx context.Context, videoID string, limit int) []st
 	return castNamesFromMetadata(info.Metadata, limit)
 }
 
+// castNameMaxRunes bounds a single glossary entry. The names ride on every
+// translated subtitle URL as a `names=` query parameter, so the count alone
+// does not bound the URL: TMDB credits are free text and one absurd entry
+// is enough to push the request past what the proxy chain will carry. Runes,
+// not bytes -- a 40-character Cyrillic or CJK name must survive whole rather
+// than be cut mid-character.
+const castNameMaxRunes = 40
+
 func castNamesFromMetadata(md map[string]any, limit int) []string {
 	credits, _ := md["credits"].(map[string]any)
 	cast, _ := credits["cast"].([]any)
@@ -112,11 +120,19 @@ func castNamesFromMetadata(md map[string]any, limit int) []string {
 	for _, c := range cast {
 		m, _ := c.(map[string]any)
 		if name, _ := m["name"].(string); strings.TrimSpace(name) != "" {
-			out = append(out, strings.TrimSpace(name))
+			out = append(out, capRunes(strings.TrimSpace(name), castNameMaxRunes))
 		}
 		if len(out) == limit {
 			break
 		}
 	}
 	return out
+}
+
+func capRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max])
 }

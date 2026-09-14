@@ -437,6 +437,13 @@ func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
 		if first == nil {
 			first = li
 		}
+		// A switch, so the two cases are exclusive: when the audio is
+		// English the `audioLang` case shadows `"en"` and `en` stays nil.
+		// That is the intended outcome, not an oversight -- the two
+		// preferences want the same track there, and `audio` is returned
+		// first anyway. It does mean `en` is not a running "best English
+		// track": with English audio it is always nil, so nothing may read
+		// it as one.
 		switch baseLang(li.SrcLang) {
 		case audioLang:
 			if audio == nil && audioLang != "" {
@@ -499,7 +506,13 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 					// one even hidden in the markup.
 					tr.Locked = true
 				}
-				lis = append(lis, tr)
+				// TranslateURL refuses a source that is not an absolute
+				// URL, and an unlocked item with no Src is a track that
+				// selects and shows nothing. The locked item is the one
+				// legitimate Src-less case (it is an upsell, not a track).
+				if tr.Locked || tr.Src != "" {
+					lis = append(lis, tr)
+				}
 			}
 		}
 	}

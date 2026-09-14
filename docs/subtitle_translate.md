@@ -213,10 +213,17 @@ trip" / cache-key section).
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
 
+**Telemetry: not comparable across this release.** Do not read a day-over-day or week-over-week
+line through the deploy date. `subtitle-resolved.count` grows for reasons that are not "more
+subtitles were found" — forced tracks are now listed in any language, and the `Translated` item is
+an extra list entry; `subtitle-select` gained a `badge` field (rows before the deploy have none);
+and level `'5'` did not exist before, so any level histogram changes shape rather than moving.
+Compare within a period on one side of the deploy, or re-baseline.
+
 Disagreement with spec: the design spec (line ~219) also calls for a "bad translation" variant of
 the existing `report-problem` control with `data-provider=Translated`. **Not implemented** — no
-code path sets that variant. Flag for the controller; not tracked in `rulings.md` or `progress.md`
-as descoped.
+code path sets that variant. Deferred to a follow-up by controller ruling (the form lives on the
+resource page); the spec is amended.
 
 ## Template attributes (`data-*` per list-item kind)
 
@@ -242,12 +249,14 @@ selector, filtering out `data-id="none"`.
 
 ## Known limitations
 
-- **Job cache key ignores tier/preferred-language changes.** The 10-minute streaming-job cache key
-  (`jobs/scripts/action.go`, `Action`) is built from resource/item/action/role/settings/audio+
-  subtitle choice/`c.Lang`/session — it does **not** include paid-tier status or
-  `stremio_settings.preferred_language`. A viewer who upgrades their plan or changes their
-  preferred language may keep seeing the old `SubtitleOpts` (locked item, or old language) until
-  the current bucket rolls over. Parked as a follow-up, not fixed in this task.
+- **Job cache key ignores a preferred-language change.** The 10-minute streaming-job cache key
+  (`jobs/scripts/action.go`, `Action`) is built from resource/item/action/`c.ApiClaims.Role`/
+  settings/audio+subtitle choice/`c.Lang`/session. Tier **is** in it — `Role` is the tier name
+  (`services/api/api.go`: `cl.Role = uc.Context.Tier.Name`), so a viewer who upgrades gets a
+  different key and the lock lifts at once. What is not in it is
+  `stremio_settings.preferred_language`: a viewer who changes that in their profile may keep
+  seeing the old `SubtitleOpts` (ladder run on the old language) until the current 10-minute
+  bucket rolls over. Parked as a follow-up, not fixed in this task.
 - **Embedded-only source files get no AI item.** If every text-subtitle candidate is a `MediaProbe`
   (embedded) stream, `pickTranslationSource` finds no URL-backed source, so no `Translated` item is
   added regardless of how many embedded tracks exist.

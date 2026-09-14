@@ -762,3 +762,40 @@ func TestAudioTracksAreNeverMarkedSaved(t *testing.T) {
 		}
 	}
 }
+
+// TestLadderNoTranslatedItemWithoutAUsableURL covers the pairing between
+// TranslateURL's absolute-URL guard and the ladder: when the source track's
+// Src is not something the proxy can be pointed at, TranslateURL returns ""
+// and a paid viewer must get no item rather than one that selects and shows
+// nothing. A free viewer is unaffected — the locked item never had a Src.
+func TestLadderNoTranslatedItemWithoutAUsableURL(t *testing.T) {
+	relative := &ra.ExportTag{Tracks: []ra.ExportTrack{
+		{Src: "/ext/abc/movie.srt~vtt/movie.vtt", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"},
+	}}
+	paid := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), relative, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if _, ok := byID(paid)["tr-pt"]; ok {
+		t.Fatalf("a paid viewer must not get an AI item with no URL behind it: %+v", byID(paid)["tr-pt"])
+	}
+
+	// Negative control on the fixture: the same source with an absolute
+	// URL does produce the item, so the test is not passing for the wrong
+	// reason (say, pickTranslationSource rejecting the track outright).
+	absolute := &ra.ExportTag{Tracks: []ra.ExportTrack{
+		{Src: "https://x.test/ext/abc/movie.srt~vtt/movie.vtt", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"},
+	}}
+	ok2 := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), absolute, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr, found := byID(ok2)["tr-pt"]
+	if !found || tr.Src == "" {
+		t.Fatalf("an absolute source still produces the AI item: %+v", tr)
+	}
+
+	// A free viewer gets the locked upsell either way: it never carries a
+	// Src, so there is no dead URL to protect them from.
+	free := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), relative, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	if lock, found := byID(free)["tr-pt"]; !found || !lock.Locked || lock.Src != "" {
+		t.Fatalf("free viewer keeps the locked item: %+v", lock)
+	}
+}
