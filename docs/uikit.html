@@ -2122,6 +2122,137 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
   <hr class="uikit-divider">
 
+  <!-- =========================================================
+       19. TRACK PICKER (AUDIO + SUBTITLES)
+       ========================================================= -->
+  <div class="uikit-section" id="track-picker">
+    <h2>19. Track Picker (audio &amp; subtitles)</h2>
+    <p class="desc">The player's audio/subtitle dialog. One screen, no sub-views: language chips first (the Discover filter pattern), then the tracks of that language as chips with a fixed origin code. The active track is always visible from the main screen.</p>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Origin codes (same in every locale)</h3>
+    <div class="uikit-row mb-2">
+      <span class="badge badge-sm font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="Embedded in the video file">EM</span>
+      <span class="badge badge-sm font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="Included in the torrent">IN</span>
+      <span class="badge badge-sm font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="OpenSubtitles">OS</span>
+      <span class="badge badge-sm font-semibold tracking-wider bg-w-purple/10 border-w-purple/30 text-w-purpleL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="My uploads">MY</span>
+      <span class="badge badge-sm font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="AI translation">AI</span>
+      <span class="text-w-muted text-xs">&larr; origin (where the track comes from)</span>
+    </div>
+    <div class="uikit-row mb-6">
+      <span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="Signs &amp; songs only">forced</span>
+      <span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="Subtitles for the deaf and hard of hearing">sdh</span>
+      <span class="text-w-muted text-xs">&larr; properties (what kind of track), lowercase, secondary</span>
+    </div>
+    <div class="uikit-label mb-6">origin: badge badge-sm font-mono font-semibold tracking-wider &middot; neutral for EM/IN/OS, purple for MY, pink for AI &middot; always carries title="&lt;localized name&gt;"</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Dialog</h3>
+    <div class="w-full max-w-5xl rounded-2xl p-6 bg-base-100 border border-w-line mb-4">
+
+      <!-- AUDIO -->
+      <div class="mb-6">
+        <div class="flex items-baseline justify-between mb-2">
+          <h3 class="font-bold text-lg">Audio</h3>
+          <span class="text-xs text-w-muted">Now: <span class="text-w-text">🇬🇧 English</span></span>
+        </div>
+        <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Audio track">
+          <button class="btn btn-sm bg-w-cyan/15 border border-w-cyan/30 text-w-cyan gap-1.5" role="radio" aria-checked="true">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            🇬🇧 English
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1.5" role="radio" aria-checked="false">🇷🇺 Russian <span class="text-w-muted" style="font-weight:400">&middot; Dub</span></button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1.5" role="radio" aria-checked="false">🇬🇧 English <span class="text-w-muted" style="font-weight:400">&middot; Commentary</span></button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1.5" role="radio" aria-checked="false"><span class="text-xs text-w-muted" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">UND</span> Track 4</button>
+        </div>
+      </div>
+
+      <!-- SUBTITLES -->
+      <div>
+        <div class="flex items-baseline justify-between mb-2">
+          <h3 class="font-bold text-lg">Subtitles</h3>
+          <span class="text-xs text-w-muted">Now: <span class="badge badge-xs font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub align-middle" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">OS</span> <span class="text-w-text">🇷🇺 Russian</span></span>
+        </div>
+
+        <!-- language row: the Discover chip pattern; the chip of the active track's language carries a dot -->
+        <div class="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Subtitle language">
+          <button class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan" role="tab" aria-selected="false">Off</button>
+          <button class="btn btn-xs bg-w-cyan/15 border border-w-cyan/30 text-w-cyan gap-1" role="tab" aria-selected="true">🇷🇺 Russian <span class="text-w-muted">4</span> <span class="w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true"></span></button>
+          <button class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1" role="tab" aria-selected="false">🇬🇧 English <span class="text-w-muted">3</span></button>
+          <button class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1" role="tab" aria-selected="false">🇪🇸 Spanish <span class="text-w-muted">1</span></button>
+          <button class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-1" role="tab" aria-selected="false">🇩🇪 German <span class="text-w-muted">2</span></button>
+          <button class="btn btn-xs btn-ghost border border-w-line text-w-muted hover:border-w-cyan/30 hover:text-w-cyan" role="tab" aria-selected="false">+6</button>
+        </div>
+
+        <!-- tracks of the chosen language -->
+        <div class="flex flex-wrap gap-1.5 mb-3" role="radiogroup" aria-label="Russian subtitles">
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-2" role="radio" aria-checked="false">
+            <span class="badge badge-xs font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="Embedded in the video file">EM</span> Russian
+          </button>
+          <button class="btn btn-sm bg-w-cyan/15 border border-w-cyan/30 text-w-cyan gap-2" role="radio" aria-checked="true">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="badge badge-xs font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="OpenSubtitles">OS</span> Russian <span class="text-w-muted" style="font-weight:400">&middot; hash</span>
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-2" role="radio" aria-checked="false">
+            <span class="badge badge-xs font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="Included in the torrent">IN</span> Movie.forced.srt <span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider">forced</span>
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-cyan/30 hover:text-w-cyan gap-2" role="radio" aria-checked="false">
+            <span class="badge badge-xs font-semibold tracking-wider bg-w-purple/10 border-w-purple/30 text-w-purpleL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="My uploads">MY</span> sintel.ru.srt
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink/40 hover:text-w-pinkL gap-2" role="radio" aria-checked="false">
+            <span class="badge badge-xs font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace" title="AI translation">AI</span> Russian <span class="text-w-muted" style="font-weight:400">&middot; from EM</span>
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-muted hover:border-w-purple/40 hover:text-w-purpleL gap-1.5" style="border-style:dashed" aria-label="Upload subtitles">+ Upload</button>
+        </div>
+
+        <!-- states -->
+        <h4 class="text-xs font-semibold text-w-muted uppercase tracking-widest mt-6 mb-2">AI track states</h4>
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          <button class="btn btn-sm bg-w-cyan/15 border border-w-cyan/30 text-w-cyan gap-2" aria-checked="true" role="radio">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="badge badge-xs font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">AI</span> Russian
+            <span class="text-w-muted" style="font-weight:400">&middot; 37%</span>
+            <span class="loading loading-spinner loading-xs text-w-pinkL" aria-hidden="true"></span>
+          </button>
+          <button class="btn btn-sm btn-ghost border border-w-line text-w-muted opacity-70 gap-2" role="radio" aria-checked="false" aria-disabled="true" aria-describedby="translate-cta-demo">
+            <span class="badge badge-xs font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">AI</span> Russian
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span class="sr-only">locked, supporters only</span>
+          </button>
+          <span class="text-xs text-w-muted self-center">translating &middot; locked (free viewer)</span>
+        </div>
+        <div id="translate-cta-demo" class="p-3 rounded-xl bg-base-200/60 border border-w-line max-w-md">
+          <div class="text-sm">AI subtitles in your language are part of the supporter plan.</div>
+          <a class="btn btn-sm btn-soft mt-2">Unlock AI subtitles</a>
+        </div>
+
+        <p class="text-[0.7rem] text-w-muted mt-4">
+          <span class="" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">EM</span> embedded &middot; <span class="" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">IN</span> in torrent &middot; <span class="" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">OS</span> OpenSubtitles &middot; <span class="" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">MY</span> my uploads &middot; <span class="" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">AI</span> translation
+        </p>
+      </div>
+
+      <div class="modal-action">
+        <a class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">Close</a>
+      </div>
+    </div>
+    <div class="uikit-label mb-6">language chips: chipClass('xs') from discover &middot; track chips: chipClass('sm') + origin badge + optional property badge &middot; active = check icon + cyan fill, exactly one per group &middot; the language chip of the active track carries a 6px cyan dot so the selection is visible even when another language is expanded</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Mobile (&lt; 640px)</h3>
+    <div class="uikit-note">
+      &bull; Audio and Subtitles stack; both keep the "Now:" summary on the heading line so the current choice is readable without scrolling the chip rows.<br>
+      &bull; Chips wrap; touch target is the full <code>btn-sm</code> height (2rem) — do not shrink track chips to <code>btn-xs</code> on mobile, only the language row is <code>xs</code>.<br>
+      &bull; Long file names truncate with <code>max-w-[14rem] truncate</code> inside the chip; the full name lives in <code>title</code>.<br>
+      &bull; Flags: guarded by <code>supportsFlagEmoji()</code> (Windows renders bare letter pairs) — fall back to the language name only, exactly as Discover does.
+    </div>
+
+    <div class="uikit-rule">
+      <strong>Rules:</strong> language first, origin second, file name last. Origin codes never localize (they are codes, like ISO tags); their meaning localizes in <code>title</code> and in the legend line. One active chip per group, marked by the check icon — never by underline alone (fails on colour-blind and on touch hover). "Off" is an explicit chip, not the absence of a selection. No sub-views: OpenSubtitles and My uploads are origins inside the same list, not separate screens.
+    </div>
+    <div class="uikit-note">
+      <strong>Why chips and not Netflix-style rows:</strong> rows scale better past ~15 items, but our lists are bounded (≤3 OS tracks per language, a handful of embedded/sidecar) and the language row already narrows them to a few chips; chips match Discover and keep audio and subtitles in one viewport. If a language ever exceeds ~8 tracks, switch that group to rows — the origin badge and check icon carry over unchanged.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>
