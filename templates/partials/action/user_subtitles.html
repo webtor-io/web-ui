@@ -21,8 +21,9 @@
                          data-src="{{ .Src }}"
                          data-label="{{ .OriginalName }}"
                          data-srclang="{{ .SrcLang }}"
+                         data-badge="user"
                          {{ if .Selected }}data-autoselect="true"{{ end }}>
-                        <div class="font-medium text-sm break-all">{{ .OriginalName }}</div>
+                        <div class="font-medium text-sm break-all">{{ .OriginalName }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $lang "action.stream.badge.user" }}</span></div>
                         <div class="text-xs text-w-muted mt-0.5">{{ .Format }} · {{ .Size | bitsForHumans }}</div>
                     </div>
                     <form method="post"

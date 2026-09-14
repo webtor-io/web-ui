@@ -7,13 +7,16 @@ package template_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"html/template"
+	"strings"
 	"testing"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/handlers/action"
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/api"
 )
 
 // TestStreamVideoRenders is the render guard called for in the
@@ -110,5 +113,135 @@ func TestStreamVideoRenders(t *testing.T) {
 	}
 	if buf.Len() == 0 {
 		t.Fatal("rendered stream_video.html is empty")
+	}
+}
+
+// TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a
+// fixture that makes handlers/action.Helper.GetSubtitles actually produce a
+// Forced item, a Locked Translated item (with a non-empty SourceBadge), and
+// checks that the template renders the data-rank/data-source-badge
+// attributes, the lock, and the always-present (hidden) translate-cta card
+// for those shapes -- none of which the base TestStreamVideoRenders fixture
+// above exercises (it has no subtitles at all).
+//
+// Fixture: one audio track (eng) + two embedded subtitle streams (a plain
+// English one and a "Forced (English)" one) + one ExportTag sidecar track in
+// English, with SubtitleOpts{PreferredLang: "pt", Translate: true, Paid:
+// false}. No human track exists in Portuguese, so the ladder adds a locked
+// AI item translated from the English sidecar (mirrors
+// handlers/action.TestLadderLockedForFree, which asserts the same opts
+// produce Locked=true/Src=""/Default=true on the Go side).
+func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string { return key }
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return false },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<!--stub-->{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"Forced (English)"}}
+	]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"},
+		}},
+		Resource:             &ra.ResourceResponse{},
+		Item:                 &ra.ListItem{PathStr: "movie.mkv"},
+		Title:                "Movie",
+		MediaProbe:           &mp,
+		OpenSubtitles:        nil,
+		UserSubtitles:        nil,
+		UserSubtitlesEnabled: false,
+		EIURL:                "http://ei.example.com",
+		VideoStreamUserData:  &models.VideoStreamUserData{ResourceID: "res", ItemID: "item"},
+		Settings:             &models.StreamSettings{},
+		ExternalData:         &models.ExternalData{},
+		DomainSettings:       nil,
+		TranscoderSession:    nil,
+		SubtitleOpts:         models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false},
+	}
+
+	// Sanity-check the fixture actually produces the three shapes this test
+	// means to exercise, so a change to the ladder that silently stops
+	// producing them fails here with a clear message instead of a passing
+	// render test that no longer covers anything.
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	var forcedOK, translatedOK bool
+	for _, it := range items {
+		if it.Forced && it.Badge == "forced" {
+			forcedOK = true
+		}
+		if it.Provider == "Translated" {
+			if !it.Locked || it.Src != "" || it.SourceBadge == "" || it.Rank != 5 {
+				t.Fatalf("fixture's Translated item does not have the expected shape: %+v", it)
+			}
+			translatedOK = true
+		}
+	}
+	if !forcedOK {
+		t.Fatal("fixture did not produce a Forced item -- test no longer covers the forced/locked/rank markup")
+	}
+	if !translatedOK {
+		t.Fatal("fixture did not produce a Translated item -- test no longer covers the AI/lock/CTA markup")
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	for _, want := range []string{
+		`data-rank="5"`,               // Translated item's ladder rank
+		`data-source-badge="sidecar"`, // AI item translated from the ExportTag sidecar track
+		`data-badge="forced"`,         // the embedded "Forced (English)" track
+		`data-forced="true"`,
+		`data-locked="true"`,
+		`🔒`,                        // lock glyph on the locked AI item
+		`id="translate-cta"`,       // the CTA card
+		`action.stream.translate.locked`,
+		`action.stream.translate.cta`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("rendered stream_video.html missing %q", want)
+		}
 	}
 }
