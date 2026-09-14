@@ -121,3 +121,108 @@ func TestUserSubtitlesPartialMarksNothingByDefault(t *testing.T) {
 		t.Errorf("plain render must not mark any track:\n%s", buf.String())
 	}
 }
+
+// TestUserSubtitlesPartialMarksDefaultAndSaved covers the markers the
+// player's audio-switch rule reads off this list. The "My Subtitles" tab
+// renders from its own view model, so before UserSubtitleTrack carried
+// Default/Saved a viewer whose saved choice was one of their own uploads
+// had a list where nothing was marked: pickDefaultSubtitle saw no default
+// to keep and hasSavedDefault saw no saved choice to respect, so switching
+// the audio track re-decided over an explicit choice.
+func TestUserSubtitlesPartialMarksDefaultAndSaved(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
+	tpl, err := template.New("user_subtitles.html").Funcs(template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(any) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse partial: %v", err)
+	}
+
+	var buf bytes.Buffer
+	err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+		"Data": &models.UserSubtitleView{
+			ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+			UserSubtitles: []models.UserSubtitleTrack{
+				{ID: "us-other", OriginalName: "other.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1"},
+				{ID: "us-chosen", OriginalName: "chosen.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", Default: true, Saved: true},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to render: %v", err)
+	}
+	out := buf.String()
+
+	// Exactly one of each, and both on the chosen row.
+	if n := strings.Count(out, `data-default="true"`); n != 1 {
+		t.Errorf("expected exactly one default marker, got %d:\n%s", n, out)
+	}
+	if n := strings.Count(out, `data-saved="true"`); n != 1 {
+		t.Errorf("expected exactly one saved marker, got %d:\n%s", n, out)
+	}
+	chosen := strings.Index(out, `data-id="us-chosen"`)
+	other := strings.Index(out, `data-id="us-other"`)
+	if chosen < 0 || other < 0 || other > chosen {
+		t.Fatalf("fixture order changed:\n%s", out)
+	}
+	if d := strings.Index(out, `data-default="true"`); d < chosen {
+		t.Errorf("default marker is not on the chosen upload:\n%s", out)
+	}
+	if sv := strings.Index(out, `data-saved="true"`); sv < chosen {
+		t.Errorf("saved marker is not on the chosen upload:\n%s", out)
+	}
+}
+
+// TestUserSubtitlesPartialSavedIsIndependentOfDefault pins that the two
+// markers are separate signals: a row can be playing without being the
+// viewer's own choice (a ladder pick), and the audio rule is allowed to
+// override exactly that case.
+func TestUserSubtitlesPartialSavedIsIndependentOfDefault(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
+	tpl, err := template.New("user_subtitles.html").Funcs(template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(any) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse partial: %v", err)
+	}
+
+	var buf bytes.Buffer
+	err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+		"Data": &models.UserSubtitleView{
+			ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+			UserSubtitles: []models.UserSubtitleTrack{
+				{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", Default: true},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to render: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `data-default="true"`) {
+		t.Errorf("a ladder pick still renders as the default:\n%s", out)
+	}
+	if strings.Contains(out, `data-saved`) {
+		t.Errorf("a ladder pick is not the viewer's saved choice:\n%s", out)
+	}
+}

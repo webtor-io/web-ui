@@ -105,6 +105,16 @@ type UserSubtitleTrack struct {
 	// second click. A plain list render leaves every track unselected so a
 	// re-render never overrides a choice already made.
 	Selected bool
+	// Default and Saved mirror the same fields of the corresponding
+	// action.ListItem (matched by ID) so the "My Subtitles" tab marks its
+	// rows exactly like the other two lists. They are separate from
+	// Selected, which is about the upload that just happened: Default is
+	// "this is the track playing", Saved is "the viewer chose it
+	// themselves", and the player's audio-switch rule reads both off the
+	// DOM. Without them an upload the viewer had chosen was invisible to
+	// that rule and got re-decided over.
+	Default bool
+	Saved   bool
 }
 
 // UserSubtitleView is the flat data shape consumed by the

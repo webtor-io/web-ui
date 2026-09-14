@@ -71,3 +71,36 @@ func TestBuildViewSelectsNothingWithoutUpload(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildViewMarksUploadAsSavedDefault covers the async-reload half of the
+// Default/Saved markers. This handler has no ladder result to copy from (it
+// knows a resource id and a path, not the subtitle list), but it does know
+// the one row the player is about to activate and persist: the upload that
+// just happened. Marking it keeps the two renders of the same partial
+// (initial page and async reload) consistent instead of the reload silently
+// producing rows the audio-switch rule reads as "nothing chosen".
+func TestBuildViewMarksUploadAsSavedDefault(t *testing.T) {
+	a, b := sub(t, "old.srt"), sub(t, "new.srt")
+	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", us.TrackID(b.UserSubtitleID), nil)
+
+	for _, tr := range v.UserSubtitles {
+		want := tr.ID == us.TrackID(b.UserSubtitleID)
+		if tr.Default != want || tr.Saved != want {
+			t.Errorf("track %q: Default = %v, Saved = %v, want both %v", tr.OriginalName, tr.Default, tr.Saved, want)
+		}
+	}
+}
+
+// Negative control: a reload with no upload (a delete, say) marks nothing.
+// The server has no way to know the viewer's choice here, and guessing one
+// would plant a data-saved the viewer never made.
+func TestBuildViewMarksNothingWithoutUpload(t *testing.T) {
+	a, b := sub(t, "one.srt"), sub(t, "two.srt")
+	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", "", nil)
+
+	for _, tr := range v.UserSubtitles {
+		if tr.Default || tr.Saved {
+			t.Errorf("track %q: Default = %v, Saved = %v, want both false", tr.OriginalName, tr.Default, tr.Saved)
+		}
+	}
+}

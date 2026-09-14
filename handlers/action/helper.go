@@ -83,12 +83,33 @@ func NewHelper() *Helper {
 // partial expects. Called from the stream_video template so that the
 // initial render and the async-reload response (from the /user-subtitle
 // handler) feed the same shape into the same partial.
-func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.UserSubtitleTrack) *models.UserSubtitleView {
+//
+// lis is the output of GetSubtitles for the same render: the uploads
+// appear there too (provider UserSubtitle, same ID), and that is the only
+// place the ladder's verdict exists. Copying Default/Saved across is what
+// lets the "My Subtitles" rows carry the same data-default/data-saved
+// markers as the other two lists; pass nil when there is no ladder result
+// to copy from (the async reload) and the rows stay unmarked.
+func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.UserSubtitleTrack, lis []ListItem) *models.UserSubtitleView {
+	marks := make(map[string]ListItem, len(lis))
+	for _, li := range lis {
+		if li.Provider == "UserSubtitle" {
+			marks[li.ID] = li
+		}
+	}
+	out := make([]models.UserSubtitleTrack, len(subs))
+	copy(out, subs)
+	for i := range out {
+		if li, ok := marks[out[i].ID]; ok {
+			out[i].Default = li.Default
+			out[i].Saved = li.Saved
+		}
+	}
 	return &models.UserSubtitleView{
 		ResourceID:    resourceID,
 		Path:          path,
 		EIURL:         eiURL,
-		UserSubtitles: subs,
+		UserSubtitles: out,
 	}
 }
 

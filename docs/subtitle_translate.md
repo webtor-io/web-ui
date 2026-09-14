@@ -207,7 +207,17 @@ as descoped.
 | `.audio` `<li>` | `#embedded` audio column | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-default` |
 | `.subtitle` `<li>` | `#embedded` subtitles column (`$otherSubs`: embedded/sidecar/AI, excludes OpenSubtitles & user uploads) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-source-badge` (Translated only), `data-forced`, `data-locked`, `data-default`, `data-saved` |
 | `.subtitle` `<li>` | `#opensubtitles` (`$openSubs`) | `data-id`, `data-provider`, `data-srclang`, `data-source`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-rank`, `data-default`, `data-saved` (never `forced`/`locked`/`source-badge`) |
-| `.subtitle` on a `<div>` inside `<li>` | `#my-subtitles` (`templates/partials/action/user_subtitles.html`) | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-autoselect="true"` when just uploaded (separate mechanism from `data-default`, unrelated to the ladder) |
+| `.subtitle` on a `<div>` inside `<li>` | `#my-subtitles` (`templates/partials/action/user_subtitles.html`) | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded (separate mechanism from `data-default`, unrelated to the ladder) |
+
+`data-default`/`data-saved` on the uploads list come from `UserSubtitleTrack.Default`/`.Saved`,
+copied by `Helper.UserSubtitleView` out of the matching `ListItem` (`us-<uuid>`) of the same
+`GetSubtitles` call the modal renders from — the tab has its own view model, so without that copy
+the player's audio-switch rule read every upload as "nothing chosen" and could switch away from a
+subtitle the viewer had uploaded and picked. The async reload after an upload
+(`handlers/user_subtitle`, `buildView`) has no ladder result to copy from and marks only the
+just-uploaded row (which the player activates and persists immediately); a reload for any other
+reason — a delete — marks nothing, and `syncMySubtitleMark` in `Player.jsx` re-derives
+`data-default` from the live `textTracks`.
 
 `readTracks` (`subtitle-telemetry.js`) matches all three list-item shapes via the `.subtitle[data-provider]`
 selector, filtering out `data-id="none"`.

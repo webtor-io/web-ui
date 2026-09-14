@@ -109,3 +109,27 @@ test('hasSavedDefault only counts a default the viewer saved themselves', () => 
     assert.equal(hasSavedDefault([]), false);
     assert.equal(hasSavedDefault(null), false);
 });
+
+test('an audio switch keeps a user-uploaded default when nothing in the preferred language qualifies', () => {
+    // The "My Subtitles" list renders from its own view model. Until
+    // UserSubtitleTrack carried Default/Saved those rows had no
+    // data-default at all, so this fallback saw no current default and
+    // switched the audio track straight to 'none' — the viewer's own
+    // upload disappeared the moment they touched the audio menu.
+    const tracks = [
+        T('us-1', 0, 'de', { provider: 'UserSubtitle', badge: 'user', isDefault: true }),
+        T('os-1', 3, 'fr'),
+    ];
+    assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'us-1');
+    // And a saved upload is a manual choice: the audio rule leaves it alone.
+    assert.equal(hasSavedDefault([T('us-1', 0, 'de', { provider: 'UserSubtitle', isDefault: true, saved: true })]), true);
+});
+
+test('a user upload in the preferred language outranks every other source on an audio switch', () => {
+    const tracks = [
+        T('us-1', 0, 'pt', { provider: 'UserSubtitle', badge: 'user' }),
+        T('mp-0', 1, 'pt'),
+        T('os-1', 3, 'pt'),
+    ];
+    assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'us-1');
+});

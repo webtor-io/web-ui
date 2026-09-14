@@ -84,7 +84,7 @@
                 </div>
             </div>
             {{ if and (not .DomainSettings) .UserSubtitlesEnabled }}
-            {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles }}
+            {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs }}
             <div class="flex flex-col hidden" id="my-subtitles" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
                 {{ template "user_subtitles_view" withContext $ $usv }}
             </div>

@@ -689,3 +689,50 @@ func TestLadderSavedAIChoiceHonouredWhenPaid(t *testing.T) {
 		t.Fatalf("default=%s: the saved AI choice must win for a paid viewer", d)
 	}
 }
+
+// TestUserSubtitleViewCarriesDefaultAndSaved pins the seam between the
+// ladder and the "My Subtitles" tab. That tab renders from its own view
+// model, so the items it produces never carried Default/Saved — a viewer
+// whose saved choice is one of their own uploads got a list where nothing
+// is marked, and the player's audio-switch rule (which reads data-saved off
+// the DOM) could not see the choice at all and re-decided over it.
+func TestUserSubtitleViewCarriesDefaultAndSaved(t *testing.T) {
+	h := NewHelper()
+	userSubs := []models.UserSubtitleTrack{
+		{ID: "us-1", Label: "a.srt", Src: "https://x/a.vtt"},
+		{ID: "us-2", Label: "b.srt", Src: "https://x/b.vtt"},
+	}
+	items := h.GetSubtitles(&models.VideoStreamUserData{SubtitleID: "us-2"}, audioProbe("eng"), &ra.ExportTag{}, nil, &models.ExternalData{}, userSubs,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if defaultID(items) != "us-2" {
+		t.Fatalf("fixture: the saved upload must be the default, got %s", defaultID(items))
+	}
+
+	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items)
+	if len(v.UserSubtitles) != 2 {
+		t.Fatalf("view must keep every upload: %+v", v.UserSubtitles)
+	}
+	if v.UserSubtitles[0].Default || v.UserSubtitles[0].Saved {
+		t.Fatalf("us-1 is neither the default nor the saved choice: %+v", v.UserSubtitles[0])
+	}
+	if !v.UserSubtitles[1].Default || !v.UserSubtitles[1].Saved {
+		t.Fatalf("us-2 is the viewer's saved default: %+v", v.UserSubtitles[1])
+	}
+}
+
+// TestUserSubtitleViewLadderPickIsNotSaved is the negative half: an upload
+// the ladder picked is Default but not Saved, so the audio rule may still
+// override it.
+func TestUserSubtitleViewLadderPickIsNotSaved(t *testing.T) {
+	h := NewHelper()
+	userSubs := []models.UserSubtitleTrack{{ID: "us-1", Label: "a.pt.srt", SrcLang: "pt", Src: "https://x/a.vtt"}}
+	items := h.GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), &ra.ExportTag{}, nil, &models.ExternalData{}, userSubs,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if defaultID(items) != "us-1" {
+		t.Fatalf("fixture: the ladder must pick the Portuguese upload, got %s", defaultID(items))
+	}
+	v := h.UserSubtitleView("res", "/movie.mkv", "http://ei", userSubs, items)
+	if !v.UserSubtitles[0].Default || v.UserSubtitles[0].Saved {
+		t.Fatalf("a ladder pick is Default but not Saved: %+v", v.UserSubtitles[0])
+	}
+}

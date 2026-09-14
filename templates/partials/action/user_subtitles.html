@@ -26,7 +26,12 @@
                               rendered from its own view model, so the rank
                               is fixed here rather than carried per item. */}}
                          data-rank="0"
-                         {{ if .Selected }}data-autoselect="true"{{ end }}>
+                         {{/* Same markers as the other two subtitle lists
+                              (stream_video.html): data-default is "this is
+                              the track playing", data-saved is "the viewer
+                              chose it themselves". The player's
+                              audio-switch rule reads both. */}}
+                         {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}{{ if .Selected }}data-autoselect="true"{{ end }}>
                         <div class="font-medium text-sm break-all">{{ .OriginalName }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $lang "action.stream.badge.user" }}</span></div>
                         <div class="text-xs text-w-muted mt-0.5">{{ .Format }} · {{ .Size | bitsForHumans }}</div>
                     </div>
