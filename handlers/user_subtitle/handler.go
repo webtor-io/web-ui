@@ -224,32 +224,19 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 // other render. wrap may be nil when there is no export URL to hang the
 // subtitle off (the list still renders, just without playable sources).
 func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, selectedID string, wrap func(*models.UserSubtitle) string) *models.UserSubtitleView {
-	tracks := make([]models.UserSubtitleTrack, 0, len(list))
-	for _, sub := range list {
-		var wrapped string
-		if wrap != nil {
-			wrapped = wrap(sub)
-		}
-		id := us.TrackID(sub.UserSubtitleID)
-		tracks = append(tracks, models.UserSubtitleTrack{
-			ID:           id,
-			SrcLang:      us.LangFromName(sub.OriginalName),
-			Label:        sub.OriginalName,
-			OriginalName: sub.OriginalName,
-			Format:       sub.Format,
-			Size:         sub.Size,
-			Src:          wrapped,
-			DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
-			// Selected (data-autoselect) is the only marker this response
-			// sends. Default/Saved belong to the initial render, where
-			// Helper.UserSubtitleView copies them off the ladder result;
-			// here they would break the very thing they describe, because
-			// markTrack returns early on data-default="true" — the
-			// client's activateSubtitle would then never persist the
-			// choice, never clear the previous row's highlight, and never
-			// mark the upload as playing.
-			Selected: selectedID != "" && id == selectedID,
-		})
+	// us.Tracks is shared with the initial render (jobs/scripts) so the two
+	// shapes cannot drift; only the per-response markers are set here.
+	tracks := us.Tracks(list, wrap)
+	for i := range tracks {
+		// Selected (data-autoselect) is the only marker this response
+		// sends. Default/Saved belong to the initial render, where
+		// Helper.UserSubtitleView copies them off the ladder result;
+		// here they would break the very thing they describe, because
+		// markTrack returns early on data-default="true" — the
+		// client's activateSubtitle would then never persist the
+		// choice, never clear the previous row's highlight, and never
+		// mark the upload as playing.
+		tracks[i].Selected = selectedID != "" && tracks[i].ID == selectedID
 	}
 	return &models.UserSubtitleView{
 		ResourceID:    resourceID,

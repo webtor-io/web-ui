@@ -579,18 +579,14 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			if listErr != nil {
 				log.WithError(listErr).Warn("failed to load user subtitles")
 			} else {
-				for _, sub := range list {
-					publicURL := s.userSubtitles.PublicURL(sub.Hash, sub.OriginalName)
-					sc.UserSubtitles = append(sc.UserSubtitles, models.UserSubtitleTrack{
-						ID:           us.TrackID(sub.UserSubtitleID),
-						Src:          s.api.AttachExternalSubtitle(se, publicURL),
-						Label:        sub.OriginalName,
-						Format:       sub.Format,
-						Size:         sub.Size,
-						OriginalName: sub.OriginalName,
-						DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
-					})
-				}
+				// Same mapper as the async reload after an upload or a
+				// delete (handlers/user_subtitle.buildView): a field only
+				// one of the two paths fills is a field the page loses on
+				// reload — SrcLang was exactly that, and without it every
+				// upload landed in the "Unknown" language group after F5.
+				sc.UserSubtitles = us.Tracks(list, func(sub *models.UserSubtitle) string {
+					return s.api.AttachExternalSubtitle(se, s.userSubtitles.PublicURL(sub.Hash, sub.OriginalName))
+				})
 			}
 		}
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
