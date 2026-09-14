@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { baseLang, pickDefaultSubtitle, shouldStartTranslation, hasSavedDefault } from './subtitle-rules.js';
+import { baseLang, pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 
 // Tracks carry the rank the server rendered as data-rank (see
 // ladderRank in handlers/action/helper.go): 0 user upload, 1 embedded,
@@ -72,23 +72,32 @@ test('the none entry is never a candidate on its own merits', () => {
     assert.equal(pickDefaultSubtitle([{ id: 'none', rank: 9, srclang: '', forced: false, locked: false }], 'en', 'pt'), 'none');
 });
 
-test('shouldStartTranslation runs a translation once per item per page load', () => {
+test('translationAction: start once, resume an interrupted run, never a finished one', () => {
     const tr = { id: 'tr-ru', provider: 'Translated', locked: false };
-    const started = new Set();
-    assert.equal(shouldStartTranslation(tr, started), true);
-    started.add('tr-ru');
-    // Warm cache: the click already ran it, so the engagement-gate
-    // auto-start must not fire a second start/done pair.
-    assert.equal(shouldStartTranslation(tr, started), false);
-    assert.equal(shouldStartTranslation({ id: 'tr-de', provider: 'Translated', locked: false }, started), true);
+    const status = new Map();
+    assert.equal(translationAction(tr, status), 'start');
+
+    // The run is under way; the viewer selects another track (which stops
+    // the poll) and comes back. Polling must pick up again, silently.
+    status.set('tr-ru', 'running');
+    assert.equal(translationAction(tr, status), 'resume');
+
+    // Finished: re-selecting it neither polls nor re-reports.
+    status.set('tr-ru', 'done');
+    assert.equal(translationAction(tr, status), 'none');
+
+    // Another language is its own translation.
+    assert.equal(translationAction({ id: 'tr-de', provider: 'Translated', locked: false }, status), 'start');
 });
 
-test('shouldStartTranslation ignores everything that is not a runnable AI item', () => {
-    const started = new Set();
-    assert.equal(shouldStartTranslation({ id: 'os-1', provider: 'OpenSubtitles', locked: false }, started), false);
-    assert.equal(shouldStartTranslation({ id: 'tr-ru', provider: 'Translated', locked: true }, started), false);
-    assert.equal(shouldStartTranslation({ id: '', provider: 'Translated', locked: false }, started), false);
-    assert.equal(shouldStartTranslation(null, started), false);
+test('translationAction: nothing to do for anything that is not a runnable AI item', () => {
+    const status = new Map();
+    assert.equal(translationAction({ id: 'os-1', provider: 'OpenSubtitles', locked: false }, status), 'none');
+    assert.equal(translationAction({ id: 'tr-ru', provider: 'Translated', locked: true }, status), 'none');
+    assert.equal(translationAction({ id: '', provider: 'Translated', locked: false }, status), 'none');
+    assert.equal(translationAction(null, status), 'none');
+    // A missing status map is the same as an empty one.
+    assert.equal(translationAction({ id: 'tr-ru', provider: 'Translated', locked: false }, null), 'start');
 });
 
 test('hasSavedDefault only counts a default the viewer saved themselves', () => {

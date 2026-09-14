@@ -216,11 +216,17 @@ selector, filtering out `data-id="none"`.
   lets the browser reparse from scratch — no incremental cue-append; the file is just short early
   on and grows with each revision. The 15 s throttle bounds the cost (and the blank-cue window) but
   does not remove it: the subtitle text catches up in steps while the percentage moves smoothly.
-- **A translation is started once per item per page load.** `shouldStartTranslation`
-  (`subtitle-rules.js`) keeps a set of started ids so a warm cache cannot fire a second
-  `subtitle-translate-start`/`done` pair via the engagement-gate auto-start. The consequence: if
-  the viewer selects another subtitle mid-translation (which stops the poll) and comes back, the
-  poll does not resume — the track keeps the revision it had until the page is reloaded.
+- **A translation is reported once per item per page load.** `translationAction(track, status)`
+  (`subtitle-rules.js`) reads a per-item status map (`'running'`/`'done'`) and answers `'start'`,
+  `'resume'` or `'none'`. `'start'` emits `subtitle-translate-start`; `'resume'` polls again
+  **silently** after the viewer selected another track mid-run and came back (same translation, so
+  no second start event — `done` still fires once, with the wall time since the *first* start);
+  `'none'` covers a finished item, a locked one and anything that is not an AI track, so a warm
+  cache cannot fire a second start/done pair via the engagement-gate auto-start. Re-selecting the
+  item whose poll is running right now is also a no-op (`pollingIdRef` in `Player.jsx`) rather than
+  a self-inflicted stop.
+- **After an error, the item stays `'running'`.** Re-selecting it resumes (a silent retry) rather
+  than reporting a fresh start; each attempt can still emit its own `subtitle-translate-error`.
 - **Polling gives up after 15 minutes** (`POLL_TIMEOUT_MS`, `subtitle-progress.js`) with
   `subtitle-translate-error {code:'timeout'}`; a run that outlives the cap is treated as gone.
 

@@ -6,7 +6,7 @@ import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
 import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
-import { pickDefaultSubtitle, shouldStartTranslation, hasSavedDefault } from './subtitle-rules.js';
+import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
@@ -134,11 +134,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // the player fighting the viewer.
     const manualSubtitleRef = useRef(false);
     const pollStopRef = useRef(null);
-    // Ids whose translation this page load already started. Without it a
-    // warm cache double-counts: the click starts and finishes the run,
-    // and the engagement-gate auto-start then finds the same item still
-    // marked default with no poll running and starts it again.
-    const startedTranslationsRef = useRef(new Set());
+    // What this page load already did to each AI item: id → 'running' |
+    // 'done'. translationAction turns it into start / resume / none, so
+    // a warm cache cannot double-count and an interrupted run can be
+    // picked up again without a second start event.
+    const translationStatusRef = useRef(new Map());
+    // When each item's first run began. A resumed run reports its total
+    // wall time, not the time since the resume.
+    const translationStartedAtRef = useRef(new Map());
     // The item the running poll belongs to, so re-selecting it does not
     // kill its own progress.
     const pollingIdRef = useRef('');
@@ -151,19 +154,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
     }, []);
 
-    // startTranslationProgress runs one translation to completion. Callers
-    // must have cleared shouldStartTranslation first — it is what keeps
-    // one run per item per page load.
-    const startTranslationProgress = useCallback((el) => {
+    // startTranslationProgress polls one translation to completion.
+    // Callers ask translationAction first; `resume` is its 'resume'
+    // answer — same run, so no second subtitle-translate-start.
+    const startTranslationProgress = useCallback((el, resume = false) => {
         stopTranslationProgress();
         const src = el.getAttribute('data-src') || '';
         const id = el.getAttribute('data-id') || '';
         if (!src || !id) return;
-        startedTranslationsRef.current.add(id);
+        translationStatusRef.current.set(id, 'running');
+        if (!resume || !translationStartedAtRef.current.has(id)) {
+            translationStartedAtRef.current.set(id, Date.now());
+        }
         pollingIdRef.current = id;
         const lang = el.getAttribute('data-srclang') || '';
         const span = el.querySelector('.tr-progress');
-        const startedAt = Date.now();
+        const startedAt = translationStartedAtRef.current.get(id);
         let cues = 0;
         let lastReloadAt = 0;
         let trackErrorReported = false;
@@ -191,7 +197,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             lastReloadAt = now;
             reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError);
         };
-        if (window.umami) window.umami.track('subtitle-translate-start', {
+        if (!resume && window.umami) window.umami.track('subtitle-translate-start', {
             lang,
             // Which human track the machine works from: a translation of
             // an OpenSubtitles imdb match is a weaker claim than one of
@@ -211,6 +217,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onDone: (p) => {
                 pollStopRef.current = null;
                 pollingIdRef.current = '';
+                // Final: a later re-selection must neither poll nor
+                // report this translation again.
+                translationStatusRef.current.set(id, 'done');
                 cues = p.total || cues;
                 reload(p.done, true);
                 if (span) span.hidden = true;
@@ -223,6 +232,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onError: fail,
         });
     }, [stopTranslationProgress]);
+
+    // translationActionFor answers translationAction for a list element,
+    // with one addition the pure rule cannot know: the item whose poll is
+    // running right now needs nothing done to it at all.
+    const translationActionFor = useCallback((el) => {
+        const data = itemData(el);
+        if (data.id && data.id === pollingIdRef.current) return 'none';
+        return translationAction(data, translationStatusRef.current);
+    }, []);
 
     // Track-list hooks. wireTrackHandlers() runs before this component
     // mounts (initPlayer wires the modals first), so it is handed a plain
@@ -242,13 +260,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
         trackHooks.onSubtitleSelect = (el) => {
             manualSubtitleRef.current = true;
-            const data = itemData(el);
+            // Decided before stopping anything: stopTranslationProgress
+            // clears pollingIdRef, which is part of the answer.
+            const action = translationActionFor(el);
             // Clicking the item that is translating right now (a viewer
             // who thinks nothing happened) must not stop its own poll.
-            if (data.id !== pollingIdRef.current) stopTranslationProgress();
-            if (shouldStartTranslation(data, startedTranslationsRef.current)) {
-                startTranslationProgress(el);
-            }
+            if (itemData(el).id !== pollingIdRef.current) stopTranslationProgress();
+            if (action !== 'none') startTranslationProgress(el, action === 'resume');
         };
         trackHooks.onAudioSelect = (el) => {
             if (manualSubtitleRef.current) return;
@@ -262,18 +280,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             const item = findSubtitleItem(modal, id);
             // Already the active one — leave it, and any running poll, alone.
             if (!item || item.getAttribute('data-default') === 'true') return;
+            const action = translationActionFor(item);
             stopTranslationProgress();
             activateSubtitle(trackContainer, item);
-            if (shouldStartTranslation(itemData(item), startedTranslationsRef.current)) {
-                startTranslationProgress(item);
-            }
+            if (action !== 'none') startTranslationProgress(item, action === 'resume');
         };
         return () => {
             trackHooks.onSubtitleSelect = null;
             trackHooks.onAudioSelect = null;
             stopTranslationProgress();
         };
-    }, [trackHooks, trackContainer, startTranslationProgress, stopTranslationProgress]);
+    }, [trackHooks, trackContainer, startTranslationProgress, stopTranslationProgress, translationActionFor]);
 
     // Sync ref with state for use in closures that don't re-bind
     const setSessionSeekingWithRef = useCallback((val) => {
@@ -388,12 +405,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // for every viewer who opens the page), so when the server made
         // it the default the player is what actually starts it. A manual
         // pick in the first seconds clears data-default on this item;
-        // shouldStartTranslation covers the case where that pick was this
-        // very item and its translation already ran.
+        // translationAction covers the case where that pick was this very
+        // item and its translation already ran or is still running.
         const auto = modal.querySelector('.subtitle[data-provider="Translated"][data-default="true"]');
-        if (auto && trackContainer && shouldStartTranslation(itemData(auto), startedTranslationsRef.current)) {
-            activateSubtitle(trackContainer, auto);
-            startTranslationProgress(auto);
+        if (auto && trackContainer) {
+            const action = translationActionFor(auto);
+            if (action !== 'none') {
+                activateSubtitle(trackContainer, auto);
+                startTranslationProgress(auto, action === 'resume');
+            }
         }
     }, [state.currentTime, isVideo, isSession, resourceID]);
 

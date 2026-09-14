@@ -65,20 +65,34 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     return current ? current.id : 'none';
 }
 
-// shouldStartTranslation decides whether selecting this item should kick
-// off a translation run. `startedIDs` is the set of item ids whose
-// translation this page load already started: a warm cache finishes in
-// one poll, and without the set the auto-start at the engagement gate
-// would run again over an item the viewer had already clicked — two
-// `subtitle-translate-start` and two `subtitle-translate-done` events for
-// one translation.
-export function shouldStartTranslation(track, startedIDs) {
-    if (!track || !track.id) return false;
-    if (track.provider !== 'Translated') return false;
+// translationAction decides what selecting this item should do, given
+// what already happened to it this page load. `status` is a Map of item
+// id to 'running' (a run was started) or 'done' (a run reached the final
+// progress).
+//
+//   'start'  — nothing has run for this item yet.
+//   'resume' — a run was started and interrupted before it finished
+//              (the viewer selected another track, which stops the poll).
+//              Poll again, but do NOT re-emit subtitle-translate-start:
+//              it is the same translation, and counting it twice would
+//              inflate the start rate against a flat done rate.
+//   'none'   — not a runnable AI item, or its translation already
+//              finished: re-selecting it must neither poll nor report.
+//
+// Without the 'done' state a warm cache double-counts — the click runs
+// the translation to completion and the engagement-gate auto-start finds
+// the item still marked default with no poll running. Without 'resume' a
+// viewer who switches away mid-translation and comes back is stuck with
+// a frozen partial file for the life of the page.
+export function translationAction(track, status) {
+    if (!track || !track.id) return 'none';
+    if (track.provider !== 'Translated') return 'none';
     // A locked item has no Src: there is nothing to poll.
-    if (track.locked) return false;
-    if (startedIDs && startedIDs.has(track.id)) return false;
-    return true;
+    if (track.locked) return 'none';
+    const state = status && typeof status.get === 'function' ? status.get(track.id) : undefined;
+    if (state === 'done') return 'none';
+    if (state === 'running') return 'resume';
+    return 'start';
 }
 
 // hasSavedDefault reports whether the default the server rendered is the
