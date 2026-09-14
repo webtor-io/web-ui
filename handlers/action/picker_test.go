@@ -69,6 +69,28 @@ func TestSubtitleLangGroupsExpandsPreferredWhenNothingIsActive(t *testing.T) {
 	}
 }
 
+// An empty preferredLang must not resolve to "und" and collide with the
+// real Unknown-language group: with no active track and no preference, the
+// group with the most tracks must win the tie-break, not whichever group
+// happens to be untagged.
+func TestSubtitleLangGroupsEmptyPreferredDoesNotCollideWithUnknown(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Label: "None"},
+		li("a", "", "ExportTag", false),
+		li("b", "en", "OpenSubtitles", false),
+		li("c", "en", "MediaProbe", false),
+		li("d", "en", "UserSubtitle", false),
+	}
+	row := h.SubtitleLangGroups(lis, "")
+	if row.Expanded != "en" {
+		t.Errorf("Expanded = %q, want %q", row.Expanded, "en")
+	}
+	if row.Groups[0].Lang != "en" {
+		t.Errorf("the larger group must sort first when there is no active track and no preference, got %+v", row.Groups)
+	}
+}
+
 // maxVisibleLangChips is 6 (controller ruling on the brief's 4 — the design
 // was redrawn wider). Six single-track languages plus the active one (added
 // last, so insertion order alone would push it into the overflow) proves

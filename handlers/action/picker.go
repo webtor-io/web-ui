@@ -58,7 +58,15 @@ type LangRow struct {
 // at the head of the track row, not the language row, so it never enters
 // grouping here in the first place.
 func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRow {
-	preferred := stremio.NewLangDisplay(preferredLang).Lang
+	// preferred stays "" when preferredLang is unset: NewLangDisplay("")
+	// resolves to "und", which is also the group untagged tracks land in, and
+	// "" never equals a real group's Lang, so leaving it unresolved is what
+	// keeps a missing preference from winning the tie-break against the
+	// genuine Unknown-language group.
+	var preferred string
+	if preferredLang != "" {
+		preferred = stremio.NewLangDisplay(preferredLang).Lang
+	}
 	var order []string
 	byLang := map[string]*LangGroup{}
 	for _, li := range lis {
