@@ -5,6 +5,10 @@ module.exports = {
     fontFamily: {
       'sans': ['Inter', 'system-ui', 'sans-serif'],
       'logo': ['Comfortaa', 'cursive'],
+      // Declaring fontFamily outside `extend` drops Tailwind's defaults, so
+      // `font-mono` was silently a no-op (device/get.html, about.html and the
+      // track picker's origin codes all use it). Restore the mono stack.
+      'mono': ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
     },
     extend: {
       minWidth: {
