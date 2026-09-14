@@ -64,6 +64,11 @@ type StreamContent struct {
 	// ApiClaims.Rate. Shown on the "Continue at X Mbps" secondary CTA. Zero
 	// when the claim is missing/unparseable — template hides the line.
 	GraceFreeRateMbps int
+	// SubtitleOpts carries the viewer-specific inputs of the subtitle
+	// ladder (preferred language, translate/paid gating, display names).
+	// Computed in a later task; the zero value keeps template calls to
+	// getSubtitles well-formed in the meantime.
+	SubtitleOpts models.SubtitleOpts
 }
 
 const (

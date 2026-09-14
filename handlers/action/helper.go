@@ -28,7 +28,22 @@ type ListItem struct {
 	// rendered (capped by maxPreloadTracks); the rest are created on
 	// selection by the player. Embedded tracks are never <track> elements.
 	Preload bool
+	// Forced marks "signs only" tracks (foreign-language lines and
+	// on-screen text). They are never a full subtitle by the ladder and
+	// never a translation source; they are the default when the audio is
+	// already in the viewer's language.
+	Forced bool
+	// Locked is a track the viewer may not activate (AI translation for a
+	// free account): rendered with a lock and a CTA, no Src.
+	Locked bool
+	// Badge names the origin for the picker: user, embedded, sidecar, os,
+	// ai, forced (i18n key action.stream.badge.<Badge>).
+	Badge string
 }
+
+// SubtitleOpts is defined once in models (see models/subtitle_opts.go);
+// this alias keeps the action package's call sites and signatures short.
+type SubtitleOpts = models.SubtitleOpts
 
 // maxPreloadTracks bounds how many side-loaded tracks are rendered as
 // <track> elements: enough for the native iOS subtitle menu to offer the
@@ -200,25 +215,51 @@ var bitmapSubtitleCodecs = map[string]bool{
 var forcedTitleRe = regexp.MustCompile(`(?i)\bforced\b`)
 
 // embeddedSubtitleVisible reports whether an embedded subtitle stream
-// is offered in the picker and whether it occupies an index in the
+// is offered in the picker, whether it occupies an index in the
 // transcoder's HLS subtitle group (see content-transcoder
-// services/hls.go: everything but hdmv_pgs is included). "Forced"
-// tracks carry only foreign-language lines and are hidden by title
-// until content-prober exposes ffprobe's disposition flags.
-func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHLS bool) {
+// services/hls.go: everything but hdmv_pgs is included), and whether
+// it is a "forced" (signs-only) track by title until content-prober
+// exposes ffprobe's disposition flags.
+func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHLS bool, forced bool) {
 	if codecName == "hdmv_pgs_subtitle" {
-		return false, false
+		return false, false, false
 	}
 	if bitmapSubtitleCodecs[codecName] {
-		return false, true
+		return false, true, false
 	}
-	if forcedTitleRe.MatchString(title) {
-		return false, true
-	}
-	return true, true
+	return true, true, forcedTitleRe.MatchString(title)
 }
 
-func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack) []ListItem {
+// sidecarForced reports whether a side-loaded (ExportTag) track is a
+// "forced" (signs-only) track by its label or source URL.
+func sidecarForced(label, src string) bool {
+	return forcedTitleRe.MatchString(label) || forcedTitleRe.MatchString(src)
+}
+
+// badgeFor names the origin badge shown on a list item (i18n key
+// action.stream.badge.<Badge>). A forced track always gets "forced"
+// regardless of provider, since that is the more useful signal to the
+// viewer than where the track came from.
+func badgeFor(provider string, forced bool) string {
+	if forced {
+		return "forced"
+	}
+	switch provider {
+	case "UserSubtitle":
+		return "user"
+	case "MediaProbe":
+		return "embedded"
+	case "ExportTag", "External":
+		return "sidecar"
+	case "OpenSubtitles":
+		return "os"
+	case "Translated":
+		return "ai"
+	}
+	return ""
+}
+
+func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
 		ID:    "none",
@@ -231,7 +272,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			if stream.CodecType != "subtitle" {
 				continue
 			}
-			visible, counts := embeddedSubtitleVisible(stream.CodecName, stream.Tags.Title)
+			visible, counts, forced := embeddedSubtitleVisible(stream.CodecName, stream.Tags.Title)
 			if !counts {
 				continue
 			}
@@ -251,12 +292,15 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 					SrcLang:  srcLang,
 					Kind:     "subtitles",
 					Provider: "MediaProbe",
+					Forced:   forced,
+					Badge:    badgeFor("MediaProbe", forced),
 				})
 			}
 			i++
 		}
 	}
 	for i, t := range tag.Tracks {
+		forced := sidecarForced(t.Label, t.Src)
 		res = append(res, ListItem{
 			ID:       "et-" + strconv.Itoa(i+1),
 			Label:    t.Label,
@@ -264,6 +308,8 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Kind:     string(t.Kind),
 			Src:      t.Src,
 			Provider: "ExportTag",
+			Forced:   forced,
+			Badge:    badgeFor("ExportTag", forced),
 		})
 	}
 	for _, t := range opensubs {
@@ -275,6 +321,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Src:      t.Src,
 			Provider: "OpenSubtitles",
 			Source:   t.Source,
+			Badge:    badgeFor("OpenSubtitles", false),
 		})
 	}
 	for i, t := range ext.Tracks {
@@ -286,6 +333,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Kind:     "subtitles",
 			Src:      t.Src,
 			Provider: "External",
+			Badge:    badgeFor("External", false),
 		})
 	}
 	for _, t := range userSubs {
@@ -296,6 +344,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Kind:     "subtitles",
 			Src:      t.Src,
 			Provider: "UserSubtitle",
+			Badge:    badgeFor("UserSubtitle", false),
 		})
 	}
 	return s.markPreload(s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud), ud)

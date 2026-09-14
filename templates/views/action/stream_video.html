@@ -31,7 +31,7 @@
              rendered so the native iOS menu still offers them; the rest are
              created on selection by activateSubtitle in Player.jsx from the
              list items' data-src/data-label/data-srclang. */}}
-        {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
+        {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
         {{ if .Preload }}
         <track src="{{ .Src }}" id="{{ .ID }}" srclang="{{ .SrcLang }}" label="{{ .Label }}" kind="{{ .Kind }}" {{ if .Default }}default="default"{{ end }}>
         {{ end }}
@@ -44,7 +44,7 @@
          and stacks above the fullscreen element, so the picker opens
          in-place. Opened from Player.jsx (handleCaptionsClick). */}}
     <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}">
-        {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles }}
+        {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
         {{ $openSubs := filterSubtitlesByProvider $subs "OpenSubtitles" false }}
         {{ $otherSubs := filterSubtitlesByProvider $subs "OpenSubtitles" true }}
         {{ $otherSubs = filterSubtitlesByProvider $otherSubs "UserSubtitle" true }}
