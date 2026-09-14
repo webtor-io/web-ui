@@ -4,8 +4,10 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
-import { applyCueOffset } from './cue-offset';
+import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
 import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
+import { pickDefaultSubtitle } from './subtitle-rules.js';
+import { pollProgress, withRev } from './subtitle-progress.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
@@ -39,7 +41,7 @@ function loadCastSender() {
  * Main Player Preact component.
  * Wraps <video>/<audio>, renders custom controls, manages HLS + session seeking.
  */
-function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize }) {
+function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize, trackContainer, trackHooks }) {
     const containerRef = useRef(containerEl);
     const videoRef = useRef(videoEl);
     const [seekOffset, setSeekOffset] = useState(0);
@@ -107,6 +109,108 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         video.addEventListener('load', onTrackLoad, true);
         return () => video.removeEventListener('load', onTrackLoad, true);
     }, [seekOffset, isSession]);
+
+    // --- AI subtitle translation ------------------------------------
+    // The translated .vtt is written cue by cue, so the player polls the
+    // progress header and reloads the <track> with a bumped &rev= as
+    // lines arrive instead of waiting for the whole file.
+    //
+    // manualSubtitleRef records that the viewer picked a subtitle
+    // themselves, which switches the audio-language rule off for the
+    // rest of the session: re-deciding over an explicit choice reads as
+    // the player fighting the viewer.
+    const manualSubtitleRef = useRef(false);
+    const pollStopRef = useRef(null);
+
+    const stopTranslationProgress = useCallback(() => {
+        if (pollStopRef.current) {
+            pollStopRef.current();
+            pollStopRef.current = null;
+        }
+    }, []);
+
+    const startTranslationProgress = useCallback((el) => {
+        stopTranslationProgress();
+        const src = el.getAttribute('data-src') || '';
+        const id = el.getAttribute('data-id') || '';
+        if (!src || !id) return;
+        const lang = el.getAttribute('data-srclang') || '';
+        const span = el.querySelector('.tr-progress');
+        const startedAt = Date.now();
+        let cues = 0;
+        if (span) {
+            span.hidden = false;
+            span.textContent = tf('player.subtitleTranslating', 0);
+        }
+        if (window.umami) window.umami.track('subtitle-translate-start', {
+            lang,
+            // Which human track the machine works from: a translation of
+            // an OpenSubtitles imdb match is a weaker claim than one of
+            // the viewer's own upload.
+            source: el.getAttribute('data-source-badge') || '',
+        });
+        pollStopRef.current = pollProgress(src, {
+            onProgress: (p) => {
+                cues = p.total;
+                const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
+                if (span) span.textContent = tf('player.subtitleTranslating', pct);
+                reloadSubtitleTrack(videoRef.current, id, withRev(src, p.done));
+            },
+            onDone: (p) => {
+                pollStopRef.current = null;
+                cues = p.total || cues;
+                reloadSubtitleTrack(videoRef.current, id, withRev(src, p.done));
+                if (span) span.hidden = true;
+                if (window.umami) window.umami.track('subtitle-translate-done', {
+                    lang,
+                    seconds: Math.round((Date.now() - startedAt) / 100) / 10,
+                    cues,
+                });
+            },
+            onError: (code) => {
+                pollStopRef.current = null;
+                if (span) span.hidden = true;
+                if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
+            },
+        });
+    }, [stopTranslationProgress]);
+
+    // Track-list hooks. wireTrackHandlers() runs before this component
+    // mounts (initPlayer wires the modals first), so it is handed a plain
+    // object that stays empty until this effect fills it in: the refs and
+    // tf() belong to the component that owns them, and the module-scope
+    // handler only calls through.
+    useEffect(() => {
+        if (!trackHooks) return;
+        trackHooks.onSubtitleSelect = (el) => {
+            manualSubtitleRef.current = true;
+            stopTranslationProgress();
+            if (el.getAttribute('data-provider') === 'Translated') startTranslationProgress(el);
+        };
+        trackHooks.onAudioSelect = (el) => {
+            if (manualSubtitleRef.current) return;
+            const modal = findSubtitlesModal(trackContainer);
+            if (!modal) return;
+            const id = pickDefaultSubtitle(
+                readTracks(modal),
+                el.getAttribute('data-srclang') || '',
+                modal.getAttribute('data-preferred-lang') || '',
+            );
+            const item = findSubtitleItem(modal, id);
+            // Already the active one — leave it, and any running poll, alone.
+            if (!item || item.getAttribute('data-default') === 'true') return;
+            stopTranslationProgress();
+            activateSubtitle(trackContainer, item);
+            if (item.getAttribute('data-provider') === 'Translated' && item.getAttribute('data-locked') !== 'true') {
+                startTranslationProgress(item);
+            }
+        };
+        return () => {
+            trackHooks.onSubtitleSelect = null;
+            trackHooks.onAudioSelect = null;
+            stopTranslationProgress();
+        };
+    }, [trackHooks, trackContainer, startTranslationProgress, stopTranslationProgress]);
 
     // Sync ref with state for use in closures that don't re-bind
     const setSessionSeekingWithRef = useCallback((val) => {
@@ -202,8 +306,26 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // layouts render <html> without a lang attribute, which would
         // report every embedded play as having no UI language.
         const uiLang = getLang();
-        if (window.umami && modal) {
-            window.umami.track('subtitle-resolved', { ...resolveSubtitleLevel(readTracks(modal), uiLang), uiLang });
+        if (!modal) return;
+        const audioEl = modal.querySelector('.audio[data-default="true"]');
+        const audioLang = audioEl ? (audioEl.getAttribute('data-srclang') || '') : '';
+        if (window.umami) {
+            window.umami.track('subtitle-resolved', {
+                ...resolveSubtitleLevel(readTracks(modal), uiLang, { audioLang }),
+                uiLang,
+                audioLang,
+            });
+        }
+        // The AI track is deliberately not rendered as a <track>
+        // (markPreload skips it — preloading would start a translation
+        // for every viewer who opens the page), so when the server made
+        // it the default the player is what actually starts it. A manual
+        // pick in the first seconds clears data-default on this item, and
+        // pollStopRef catches the case where that pick was this very item.
+        const auto = modal.querySelector('.subtitle[data-provider="Translated"][data-default="true"]:not([data-locked="true"])');
+        if (auto && trackContainer && !pollStopRef.current) {
+            activateSubtitle(trackContainer, auto);
+            startTranslationProgress(auto);
         }
     }, [state.currentTime, isVideo, isSession, resourceID]);
 
@@ -655,8 +777,11 @@ export async function initPlayer(target) {
     mountEl.appendChild(playerContainer);
     playerContainer.appendChild(videoEl);
 
-    // Wire track handlers on original modals (stay outside player, no overflow issues)
-    wireTrackHandlers(target);
+    // Wire track handlers on original modals (stay outside player, no overflow issues).
+    // The modals are wired before Preact renders, so `trackHooks` is the
+    // hand-off point: the component fills it in on mount.
+    const trackHooks = {};
+    wireTrackHandlers(target, trackHooks);
 
     // Wire embed copy button
     wireEmbedCopy(target);
@@ -670,7 +795,7 @@ export async function initPlayer(target) {
 
     // Render Preact controls into the player container (after video)
     render(
-        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} />,
+        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} trackContainer={target} trackHooks={trackHooks} />,
         playerContainer
     );
 
@@ -703,6 +828,37 @@ function ensureTrackElement(video, trackID, wrappedSrc, label, srclang, kind) {
     track.srclang = srclang || 'und';
     video.appendChild(track);
     return true;
+}
+
+// findSubtitleItem locates a list item by data-id without CSS.escape:
+// track ids come from the torrent (file paths, stream indexes) and are
+// not guaranteed to be valid selector literals.
+function findSubtitleItem(modal, id) {
+    for (const el of modal.querySelectorAll('.subtitle')) {
+        if (el.getAttribute('data-id') === id) return el;
+    }
+    return null;
+}
+
+function findSubtitlesModal(container) {
+    return (container && container.querySelector('#subtitles')) || document.getElementById('subtitles');
+}
+
+// reloadSubtitleTrack swaps in a newer revision of a partially written
+// VTT. Re-parsing drops the cue list and flips the track mode, so both
+// are snapshotted and put back once the new revision has loaded
+// (cue-offset.js). The session cue-offset is re-applied by the capture
+// 'load' listener the player already installs.
+function reloadSubtitleTrack(video, id, nextSrc) {
+    if (!video || !id || !nextSrc) return;
+    let el = null;
+    for (const t of video.querySelectorAll('track')) {
+        if (t.id === id) { el = t; break; }
+    }
+    if (!el || el.getAttribute('src') === nextSrc) return;
+    const saved = captureTrackState([el.track]);
+    el.addEventListener('load', () => restoreTrackState(saved), { once: true });
+    el.setAttribute('src', nextSrc);
 }
 
 // activateSubtitle switches playback to the subtitle the given list item
@@ -768,7 +924,11 @@ function toggleDialog(id) {
     else dialog.showModal();
 }
 
-function wireTrackHandlers(container) {
+// wireTrackHandlers binds the picker modals. It stays module-scope and
+// ref-free: `hooks` is the object the mounted component fills with
+// onSubtitleSelect/onAudioSelect (see the trackHooks effect), so the
+// session-scoped state those need lives in the component, not here.
+function wireTrackHandlers(container, hooks = {}) {
     // Delegate subtitle clicks on #subtitles so items swapped into
     // #my-subtitles via async still work without re-binding.
     const subtitlesModal = container.querySelector('#subtitles');
@@ -776,12 +936,25 @@ function wireTrackHandlers(container) {
         subtitlesModal.addEventListener('click', (e) => {
             const target = e.target.closest('.subtitle');
             if (!target || !subtitlesModal.contains(target)) return;
+            // A locked item (the AI translation on a free account) has no
+            // Src to activate — turning it on would leave subtitles
+            // "selected" with nothing on screen. Reveal the upgrade card
+            // and leave the current selection untouched.
+            if (target.getAttribute('data-locked') === 'true') {
+                const cta = subtitlesModal.querySelector('#translate-cta');
+                if (cta) cta.hidden = false;
+                if (window.umami) window.umami.track('subtitle-translate-lock-click', {
+                    lang: target.getAttribute('data-srclang') || '',
+                });
+                return;
+            }
             const id = target.getAttribute('data-id');
             if (id && id !== 'none' && window.umami) {
                 window.umami.track('subtitle-select', selectEventData(target));
                 if (target.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
             }
             activateSubtitle(container, target);
+            if (hooks.onSubtitleSelect) hooks.onSubtitleSelect(target);
         });
     }
 
@@ -793,6 +966,7 @@ function wireTrackHandlers(container) {
             if (window.hlsPlayer && target.getAttribute('data-provider') === 'MediaProbe') {
                 window.hlsPlayer.audioTrack = parseInt(target.getAttribute('data-mp-id'));
             }
+            if (hooks.onAudioSelect) hooks.onAudioSelect(target);
         });
     }
 
