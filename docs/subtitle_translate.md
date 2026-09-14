@@ -35,7 +35,8 @@ of a translation (`isHumanFull`, `pickTranslationSource`).
 
 ## Default-track rules
 
-Order of evaluation in `applyLadder` (only runs when `SubtitleOpts.PreferredLang != ""`):
+Order of evaluation in `applyLadder` (only runs when `SubtitleOpts.PreferredLang != ""`, i.e. the
+feature is on and this is not an embed — see *Gating and flags*):
 
 1. **Saved choice wins.** `VideoStreamUserData.SubtitleID` is honored as-is, *unless* it points at
    a `Locked` item (an AI track saved while paid, now lapsed, or a stale link) — a locked default
@@ -50,7 +51,7 @@ Order of evaluation in `applyLadder` (only runs when `SubtitleOpts.PreferredLang
    preferred language wins; failing that, if translation is offered (`Translate=true`,
    `Paid=true`), the `Translated` item becomes default instead — never a `Locked` one.
 5. **Phase-1 fallback on a ladder miss.** If the preferred language yields nothing activatable
-   (feature disabled, embed, NSFW, free viewer facing a locked item, or the language is outside
+   (NSFW, free viewer facing a locked item, or the language is outside
    `stremio.LanguageByCode`), `applyLadder` falls back to the old phase-1 selection
    (`selectListItem`/`matchLang`: Accept-Language, then English) instead of "None" — the ladder
    must never take away subtitles phase 1 would have turned on.
@@ -80,7 +81,20 @@ not implemented yet.
 | `subtitle-translate-enabled` | `SUBTITLE_TRANSLATE_ENABLED` | `TranslateEnabled()`; off by default. Master switch for offering the AI item at all. |
 | `subtitle-translate-free` | `SUBTITLE_TRANSLATE_FREE` | `FreeForAll()`; when set, every viewer may activate the AI track (for deployments without `claims-provider`). |
 
-`buildSubtitleOpts` (`jobs/scripts/translate_opts.go`) combines these with two more gates:
+**The flag is a master switch, not an AI-item gate.** `subtitleOptsFor`
+(`jobs/scripts/translate_opts.go`) returns the zero `SubtitleOpts` — `PreferredLang == ""` — when
+the feature is off *or* the request comes from the embed widget, and `GetSubtitles` reads an empty
+`PreferredLang` as "take the phase-1 path": `selectListItem`/`matchLang` only, `applyLadder` never
+runs. So with the flag off a deployment keeps phase-1 selection unchanged, and embeds always use
+phase-1 selection. Two things are *not* gated, because they are not part of the selection rule:
+**forced tracks stay visible** in any language with the `forced` badge (`badgeFor` runs for every
+item), and `matchLang` keeps skipping forced tracks. `jobs/scripts/action.go` also skips the reads
+that only feed the ladder in that case — preferred language, `resource_metadata`, TMDB credits —
+so the flag costs nothing when off.
+
+`buildSubtitleOpts` (`jobs/scripts/translate_opts.go`) is then reached only with the feature on and
+outside an embed; it keeps its own `adult`/`embed` gates as defence in depth and combines the flags
+with two more gates:
 
 - **Tier.** `Paid = FreeForAll() || isPaidForTranslate(c)`, where the latter is true iff
   `c.Claims.Context.Tier.Id != 0`. A non-paid viewer still gets the list item (so it's visible as

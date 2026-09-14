@@ -49,3 +49,34 @@ func TestTranslateOptsShape(t *testing.T) {
 		t.Fatalf("the embed only switches translation off: %+v", o)
 	}
 }
+
+// TestSubtitleOptsForMasterSwitch pins the rule that makes the feature flag
+// (and the embed widget) a true master switch rather than a gate on the AI
+// item alone: with either of them in force the page must render exactly as
+// phase 1 did. PreferredLang is what decides that -- GetSubtitles takes the
+// legacy selectListItem path when it is empty and runs applyLadder when it
+// is not -- so a non-empty PreferredLang with the flag off would still
+// change the default track, the forced-track rule and the audio rule for
+// every viewer on a deployment that never switched the feature on.
+func TestSubtitleOptsForMasterSwitch(t *testing.T) {
+	paid := &web.Context{Claims: &claims.Data{Context: &claimsproto.Context{Tier: &claimsproto.Tier{Id: 2}}}}
+
+	o := subtitleOptsFor(false, false, paid, false, false, "pt", []string{"A"})
+	if o.PreferredLang != "" || o.Translate {
+		t.Fatalf("feature flag off ⇒ phase-1 selection, no ladder input: %+v", o)
+	}
+	o = subtitleOptsFor(true, true, paid, false, false, "pt", []string{"A"})
+	if o.PreferredLang != "" || o.Translate {
+		t.Fatalf("embed ⇒ phase-1 selection, no ladder input: %+v", o)
+	}
+	o = subtitleOptsFor(true, false, paid, false, false, "pt", []string{"A"})
+	if o.PreferredLang != "pt" || !o.Translate || !o.Paid || len(o.Names) != 1 {
+		t.Fatalf("enabled and not an embed ⇒ the full ladder input: %+v", o)
+	}
+	// The NSFW gate still only removes the AI item: the ladder itself keeps
+	// running on the preferred language.
+	o = subtitleOptsFor(true, false, paid, false, true, "pt", nil)
+	if o.PreferredLang != "pt" || o.Translate {
+		t.Fatalf("adult ⇒ ladder without the AI item: %+v", o)
+	}
+}

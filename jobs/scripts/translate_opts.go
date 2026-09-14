@@ -23,3 +23,21 @@ func buildSubtitleOpts(c *web.Context, enabled, freeForAll, adult, embed bool, p
 		Names:         names,
 	}
 }
+
+// subtitleOptsFor is the master switch in front of buildSubtitleOpts. The
+// feature flag and the embed widget do not merely withhold the AI item:
+// they put the page back on the phase-1 selection entirely. That is what an
+// empty PreferredLang means to GetSubtitles -- it takes the legacy
+// selectListItem path and never enters applyLadder -- so a deployment that
+// never switched the feature on keeps the exact behaviour it had, forced
+// tracks and audio rule included, and an embed keeps the selection its
+// third-party host has been getting all along.
+//
+// buildSubtitleOpts keeps its own adult/embed gates: this is the switch,
+// those are defence in depth for any other caller.
+func subtitleOptsFor(enabled, embed bool, c *web.Context, freeForAll, adult bool, preferred string, names []string) models.SubtitleOpts {
+	if !enabled || embed {
+		return models.SubtitleOpts{}
+	}
+	return buildSubtitleOpts(c, enabled, freeForAll, adult, embed, preferred, names)
+}

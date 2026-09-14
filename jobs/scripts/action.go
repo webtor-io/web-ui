@@ -423,15 +423,30 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	sc.Title = resourceLeafTitle(enrichedMD, sc.Resource, sc.Item)
 
-	preferred := s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
+	// Subtitle-ladder inputs. The feature flag and the embed widget are the
+	// master switch (subtitleOptsFor): with either in force the render must
+	// be byte-for-byte phase 1, so none of the reads that feed the ladder
+	// happen at all -- no profile language, no resource_metadata, no TMDB
+	// credits. On a deployment with the flag off this is three DB round
+	// trips per stream page that never run.
+	translateEnabled, isEmbed := s.prefs.TranslateEnabled(), dsd != nil
+	var preferred string
 	var castNames []string
-	if enrichedMD != nil && s.prefs.TranslateEnabled() {
-		nCtx, nCancel := context.WithTimeout(ctx, 3*time.Second)
-		castNames = s.prefs.CastNames(nCtx, enrichedMD.VideoID, 30)
-		nCancel()
+	var adult bool
+	if translateEnabled && !isEmbed {
+		preferred = s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
+		if enrichedMD != nil {
+			nCtx, nCancel := context.WithTimeout(ctx, 3*time.Second)
+			castNames = s.prefs.CastNames(nCtx, enrichedMD.VideoID, 30)
+			nCancel()
+		}
+		// Bounded like CastNames above: a slow metadata read must not hold
+		// up the stream page, and a miss reads as not-adult anyway.
+		aCtx, aCancel := context.WithTimeout(ctx, 3*time.Second)
+		adult = s.prefs.IsAdultResource(aCtx, resourceID)
+		aCancel()
 	}
-	adult := s.prefs.IsAdultResource(ctx, resourceID)
-	sc.SubtitleOpts = buildSubtitleOpts(c, s.prefs.TranslateEnabled(), s.prefs.FreeForAll(), adult, dsd != nil, preferred, castNames)
+	sc.SubtitleOpts = subtitleOptsFor(translateEnabled, isEmbed, c, s.prefs.FreeForAll(), adult, preferred, castNames)
 
 	se := exportResponse.ExportItems["stream"]
 
