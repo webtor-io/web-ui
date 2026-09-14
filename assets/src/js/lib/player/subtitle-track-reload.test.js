@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reloadSubtitleTrack } from './subtitle-track-reload.js';
+import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.js';
 
 // A <track> element stand-in with faithful add/removeEventListener
 // semantics — the whole point of the test is which listeners are attached
@@ -28,6 +28,16 @@ function makeTrack(id, cues = []) {
 }
 
 const videoWith = (...tracks) => ({ querySelectorAll: () => tracks });
+
+// A <video> whose <track> children can actually be removed — dropDeletedTracks
+// is about the elements disappearing, so the fake has to let them.
+function videoTree(...tracks) {
+    const kids = tracks.slice();
+    const video = { querySelectorAll: () => kids.slice() };
+    for (const t of kids) t.remove = () => { const i = kids.indexOf(t); if (i >= 0) kids.splice(i, 1); };
+    video.ids = () => kids.map((t) => t.id);
+    return video;
+}
 
 test('a reload swaps src and reports that it happened', () => {
     const el = makeTrack('tr-pt');
@@ -99,4 +109,40 @@ test('the error is reported to the caller once the cues are back', () => {
     // (from a later revision that was never started) reports nothing.
     el.fire('error');
     assert.equal(reported, 1);
+});
+
+// Deleting an upload swaps #my-subtitles, which takes the chip away; the
+// <track> lives in <video> and survives, so the deleted file's subtitles
+// kept showing until a reload — with no chip marked and a blank "Now:".
+test('a deleted upload takes its <track> with it and reports that it was showing', () => {
+    const gone = makeTrack('us-deleted');
+    const kept = makeTrack('os-1');
+    kept.track.mode = 'disabled';
+    const video = videoTree(gone, kept);
+
+    assert.equal(dropDeletedTracks(video, ['none', 'os-1', 'mp-0']), 'us-deleted');
+    assert.deepEqual(video.ids(), ['os-1']);
+});
+
+// The orphan test is against EVERY chip in the dialog. Measured against the
+// uploads alone, the preloaded OpenSubtitles and sidecar tracks look like
+// orphans too — and the viewer loses the track they are actually watching.
+test('tracks whose chips are still there are left alone', () => {
+    const os = makeTrack('os-1');
+    const em = makeTrack('us-kept');
+    const video = videoTree(os, em);
+
+    assert.equal(dropDeletedTracks(video, ['none', 'os-1', 'us-kept']), '');
+    assert.deepEqual(video.ids(), ['os-1', 'us-kept']);
+});
+
+// A deleted upload that was not the one playing goes just as quietly, and
+// the caller is told nothing happened to playback.
+test('a deleted upload that was not playing reports no showing track', () => {
+    const gone = makeTrack('us-deleted');
+    gone.track.mode = 'disabled';
+    const video = videoTree(gone, makeTrack('os-1'));
+
+    assert.equal(dropDeletedTracks(video, ['os-1']), '');
+    assert.deepEqual(video.ids(), ['os-1']);
 });

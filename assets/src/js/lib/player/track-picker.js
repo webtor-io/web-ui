@@ -122,6 +122,12 @@ export function expandedLangFor(chips, { preferred = '', current = '' } = {}) {
 // A chip whose language lost its last track gets count 0 and hidden — it is
 // gone, not collapsed, so it is not counted into the overflow either: "+1"
 // next to a chip nothing can bring back would be a lie.
+//
+// The expanded language is never cut by the overflow, wherever it sorts: the
+// viewer reached it by opening "+N" and pressing it, and collapsing the row
+// again would hide the very chip whose tracks are on screen — leaving a
+// pressed-but-invisible filter and no way back to it short of re-expanding.
+// (An emptied language is still hidden: that is "gone", not "collapsed".)
 export function langRowOps(chips, rowChips, expanded, preferred = '') {
     const groups = groupByLang(chips, preferred);
     const pos = new Map(groups.map((g, i) => [g.lang, i]));
@@ -136,7 +142,7 @@ export function langRowOps(chips, rowChips, expanded, preferred = '') {
             count: g ? g.count : 0,
             active: !!(g && g.active),
             selected: lang === exp,
-            hidden: !g || i >= MAX_VISIBLE_LANGS,
+            hidden: !g || (i >= MAX_VISIBLE_LANGS && lang !== exp),
         };
     };
 

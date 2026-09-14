@@ -5,7 +5,7 @@ import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { applyCueOffset } from './cue-offset';
-import { reloadSubtitleTrack } from './subtitle-track-reload.js';
+import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.js';
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
@@ -1044,11 +1044,19 @@ function activateSubtitle(container, target, { persist = true } = {}) {
     if (provider !== 'MediaProbe' && id && id !== 'none') {
         const video = container.querySelector('video.player, audio.player');
         if (video) {
+            // data-label only. A chip's text is decorated now — the origin
+            // code ("OS"), the property tag ("forced"), the source suffix
+            // ("· opensubtitles") — and that whole string used to land in
+            // <track label>, which is what the native iOS track menu
+            // shows. Every chip that reaches here is side-loaded and
+            // carries data-label; the "Off" chip, the one without it, is
+            // excluded by the id guard above. ensureTrackElement supplies
+            // its own last-resort name.
             ensureTrackElement(
                 video,
                 id,
                 target.getAttribute('data-src') || '',
-                target.getAttribute('data-label') || target.textContent.trim(),
+                target.getAttribute('data-label') || '',
                 target.getAttribute('data-srclang') || '',
                 target.getAttribute('data-kind') || 'subtitles',
             );
@@ -1181,6 +1189,11 @@ function wireTrackHandlers(container, hooks = {}) {
     // but the uploads' chips are re-rendered by the partial and never go
     // through the click path, so they lose the active marker. Re-derive it
     // from the live textTracks and re-run on every async swap.
+    const setMark = (el, on) => {
+        setChipActive(el, on);
+        if (on) el.setAttribute('data-default', 'true');
+        else el.removeAttribute('data-default');
+    };
     const syncUploadMarks = () => {
         const video = container.querySelector('video.player');
         const mySubs = container.querySelector('#my-subtitles');
@@ -1190,15 +1203,31 @@ function wireTrackHandlers(container, hooks = {}) {
             if (t.mode === 'showing' && t.id) { activeID = t.id; break; }
         }
         if (!activeID) {
+            // The <track default> attribute answers "what is playing" only
+            // while nothing else claims it. An embedded (MediaProbe) track
+            // is driven by hls.js and has no <track> element at all, so
+            // "no showing textTrack" does not mean "nothing is playing" —
+            // and a stale default left on a side-loaded track would then
+            // hand the marker to an upload as well, leaving two chips with
+            // data-default and two check marks.
+            const marked = (subtitlesModal || container).querySelectorAll('.subtitle[data-default="true"]');
+            for (const el of marked) {
+                if (!mySubs.contains(el)) return;
+            }
             const dt = video.querySelector('track[default]');
             if (dt && dt.id) activeID = dt.id;
         }
         if (!activeID) return;
-        for (const item of mySubs.querySelectorAll('.subtitle')) {
-            const isActive = item.getAttribute('data-id') === activeID;
-            setChipActive(item, isActive);
-            if (isActive) item.setAttribute('data-default', 'true');
-            else item.removeAttribute('data-default');
+        const mine = Array.from(mySubs.querySelectorAll('.subtitle'));
+        const active = mine.find((el) => el.getAttribute('data-id') === activeID) || null;
+        for (const el of mine) setMark(el, el === active);
+        if (!active) return;
+        // Exactly one marker per group, as after a click: markTrack's
+        // clearing loop without the PUT — nothing was chosen here, the DOM
+        // is only catching up with what is already playing.
+        for (const el of (subtitlesModal || container).querySelectorAll('.subtitle')) {
+            if (el === active || mySubs.contains(el)) continue;
+            setMark(el, false);
         }
     };
     syncUploadMarks();
@@ -1225,7 +1254,25 @@ function wireTrackHandlers(container, hooks = {}) {
             // as "subtitles don't work".
             const fresh = mySubsContainer.querySelector('.subtitle[data-autoselect="true"]');
             if (fresh) activateSubtitle(container, fresh);
-            else syncUploadMarks();
+            else {
+                // A delete takes the chip away but not the <track>: that
+                // one lives in <video>, which this swap never touches, so
+                // the deleted file's subtitles stayed on screen with
+                // nothing marked and "Now:" blank. Drop the orphans and,
+                // when the viewer deleted what was playing, land on "Off" —
+                // the honest reading of "I removed that file". persist:
+                // false, because they chose a deletion, not a track.
+                const video = container.querySelector('video.player, audio.player');
+                const chipIDs = [];
+                for (const el of (subtitlesModal || container).querySelectorAll('.subtitle')) {
+                    const cid = el.getAttribute('data-id');
+                    if (cid) chipIDs.push(cid);
+                }
+                const wasShowing = dropDeletedTracks(video, chipIDs);
+                const off = wasShowing && subtitlesModal ? findSubtitleItem(subtitlesModal, 'none') : null;
+                if (off) activateSubtitle(container, off, { persist: false });
+                else syncUploadMarks();
+            }
             // The set of chips itself changed, so this is the full pass and
             // not refreshMarks: an upload can bring a language the server
             // never rendered a chip for, and a delete can empty the expanded

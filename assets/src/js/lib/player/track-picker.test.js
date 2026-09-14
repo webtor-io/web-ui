@@ -474,3 +474,35 @@ test('"+N" hides itself when nothing is collapsed', () => {
     refresh(container);
     assert.equal(more.hidden, true);
 });
+
+// The chip a viewer reached through "+N" and pressed is theirs: collapsing
+// the row again must not hide it. Without this the filter stayed pressed on
+// an invisible chip — tracks of a language with no chip on screen, and no
+// way back to it short of re-expanding the row.
+test('collapsing the row keeps the expanded language chip visible and pressed', () => {
+    const langs = ['en', 'de', 'fr', 'es', 'it', 'pl', 'nl', 'cs'];
+    const { container, more } = buildPicker({
+        tracks: [offChip()].concat(langs.map((l, i) => ({ id: 'x' + i, lang: l, name: l.toUpperCase(), label: l }))),
+        row: langs.map((l, i) => ({ lang: l, count: 1, selected: i === 0 })),
+    });
+    refresh(container);
+    const chipOf = (l) => langsOf(container).find((c) => c.getAttribute('data-lang') === l);
+    assert.equal(chipOf('cs').hidden, true, 'the 8th language starts collapsed');
+
+    // Open the row and press the last chip — the path the viewer takes.
+    assert.equal(toggleLangOverflow(container), true);
+    applyLangFilter(container, 'cs');
+    assert.equal(chipOf('cs').getAttribute('aria-pressed'), 'true');
+
+    assert.equal(toggleLangOverflow(container), false);
+    assert.equal(chipOf('cs').hidden, false, 'the pressed chip survives the collapse');
+    assert.equal(chipOf('cs').getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(visibleTracks(container), ['none', 'x7'], 'its tracks are the ones on screen');
+    // Only the languages actually put away are counted: "+2" next to a
+    // visible chip would be a lie of exactly the kind "+N" must not tell.
+    assert.equal(more.querySelector('.more-count').textContent, '+1');
+    assert.deepEqual(
+        langsOf(container).filter((c) => c.hidden).map((c) => c.getAttribute('data-lang')),
+        ['nl'],
+    );
+});

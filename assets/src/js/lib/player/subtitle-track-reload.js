@@ -59,3 +59,30 @@ export function reloadSubtitleTrack(video, id, nextSrc, onError) {
     el.setAttribute('src', nextSrc);
     return true;
 }
+
+// dropDeletedTracks removes the <track> elements the picker has no chip for
+// any more and reports whether the one that was showing was among them.
+//
+// Deleting an upload replaces the contents of #my-subtitles, so its chip
+// goes; the <track> does not — it lives in <video>, which the async swap
+// never touches. The subtitles of a file the viewer just deleted therefore
+// kept playing until a reload, with no chip marked and a blank "Now:".
+//
+// `chipIDs` must be every chip in the dialog, not just the uploads: the
+// preloaded OpenSubtitles, sidecar and embedded tracks are <track> elements
+// too, and measuring orphanhood against the uploads alone would delete the
+// track the viewer is actually watching. An id is the whole test — chips
+// and tracks are rendered from one list (getSubtitles), and "Off" has no
+// <track> to orphan.
+export function dropDeletedTracks(video, chipIDs) {
+    if (!video || !video.querySelectorAll) return '';
+    const chips = new Set(chipIDs || []);
+    let showing = '';
+    for (const el of Array.from(video.querySelectorAll('track'))) {
+        if (!el.id || chips.has(el.id)) continue;
+        if (el.track && el.track.mode === 'showing') showing = el.id;
+        clearPending(el);
+        if (el.remove) el.remove();
+    }
+    return showing;
+}
