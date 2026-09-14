@@ -235,8 +235,8 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		`data-badge="forced"`,         // the embedded "Forced (English)" track
 		`data-forced="true"`,
 		`data-locked="true"`,
-		`🔒`,                        // lock glyph on the locked AI item
-		`id="translate-cta"`,       // the CTA card
+		`🔒`,                  // lock glyph on the locked AI item
+		`id="translate-cta"`, // the CTA card
 		`action.stream.translate.locked`,
 		`action.stream.translate.cta`,
 	} {
