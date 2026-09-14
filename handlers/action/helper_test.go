@@ -3,6 +3,7 @@ package action
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 
 	"golang.org/x/text/language"
@@ -270,5 +271,246 @@ func TestForcedOnlyLanguageMatchFallsThroughToNone(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("None item missing")
+	}
+}
+
+// humanTracks is the common fixture of the ladder tests: one English
+// sidecar plus two OpenSubtitles tracks (a German imdb match and an
+// English hash match).
+func humanTracks() (*ra.ExportTag, []api.OpenSubtitleTrack) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-en.vtt?token=T", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"}}}
+	os := []api.OpenSubtitleTrack{
+		{ID: "1", Source: "imdb", ExportTrack: &ra.ExportTrack{Src: "https://x/os-de.vtt?token=T", SrcLang: "de", Label: "German", Kind: "subtitles"}},
+		{ID: "2", Source: "hash", ExportTrack: &ra.ExportTrack{Src: "https://x/os-en.vtt?token=T", SrcLang: "en", Label: "English", Kind: "subtitles"}},
+	}
+	return tag, os
+}
+
+func byID(items []ListItem) map[string]ListItem {
+	m := map[string]ListItem{}
+	for _, it := range items {
+		m[it.ID] = it
+	}
+	return m
+}
+
+func defaultID(items []ListItem) string {
+	for _, it := range items {
+		if it.Default {
+			return it.ID
+		}
+	}
+	return ""
+}
+
+func audioProbe(lang string) *api.MediaProbe {
+	return probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"` + lang + `"}},{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}}]`)
+}
+
+func TestLadderTranslatedIsDefaultWhenNoHumanTrackInPreferredLang(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true, Names: []string{"Hildy"}})
+	got := byID(items)
+	tr, ok := got["tr-pt"]
+	if !ok || tr.Provider != "Translated" || tr.SrcLang != "pt" || tr.Badge != "ai" || tr.Locked || tr.Preload {
+		t.Fatalf("translated item: %+v", tr)
+	}
+	if !strings.Contains(tr.Src, "~tr:pt/") || !strings.Contains(tr.Src, "names=Hildy") {
+		t.Fatalf("src=%q", tr.Src)
+	}
+	// source: audio is English → the English track wins (sidecar comes before OS in list order)
+	if !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
+		t.Fatalf("expected the English sidecar as source, got %q", tr.Src)
+	}
+	if defaultID(items) != "tr-pt" {
+		t.Fatalf("default=%s", defaultID(items))
+	}
+}
+
+func TestLadderHumanTrackBeatsTranslation(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "de", Translate: true, Paid: true})
+	if defaultID(items) != "os-1" {
+		t.Fatalf("default=%s want os-1 (human German)", defaultID(items))
+	}
+	if _, ok := byID(items)["tr-de"]; ok {
+		t.Fatal("no AI item when a human track exists in the preferred language")
+	}
+}
+
+func TestLadderOrderUserEmbeddedSidecarOS(t *testing.T) {
+	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"rus","title":"Russian"}}]`)
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "sc-ru", SrcLang: "ru", Label: "Movie.rus.srt", Kind: "subtitles"}}}
+	os := []api.OpenSubtitleTrack{{ID: "9", Source: "hash", ExportTrack: &ra.ExportTrack{Src: "os-ru", SrcLang: "ru", Label: "Russian", Kind: "subtitles"}}}
+	user := []models.UserSubtitleTrack{{ID: "us-1", Src: "u", Label: "mine.srt", SrcLang: "ru"}}
+	opts := SubtitleOpts{PreferredLang: "ru", Translate: true, Paid: true}
+	if d := defaultID(NewHelper().GetSubtitles(&models.VideoStreamUserData{}, mp, tag, os, &models.ExternalData{}, user, opts)); d != "us-1" {
+		t.Errorf("user upload must win: %s", d)
+	}
+	if d := defaultID(NewHelper().GetSubtitles(&models.VideoStreamUserData{}, mp, tag, os, &models.ExternalData{}, nil, opts)); d != "mp-0" {
+		t.Errorf("embedded must beat sidecar: %s", d)
+	}
+	if d := defaultID(NewHelper().GetSubtitles(&models.VideoStreamUserData{}, nil, tag, os, &models.ExternalData{}, nil, opts)); d != "et-1" {
+		t.Errorf("sidecar must beat OpenSubtitles: %s", d)
+	}
+	if d := defaultID(NewHelper().GetSubtitles(&models.VideoStreamUserData{}, nil, &ra.ExportTag{}, os, &models.ExternalData{}, nil, opts)); d != "os-9" {
+		t.Errorf("OpenSubtitles last: %s", d)
+	}
+}
+
+func TestLadderOSHashBeatsImdb(t *testing.T) {
+	os := []api.OpenSubtitleTrack{
+		{ID: "1", Source: "imdb", ExportTrack: &ra.ExportTrack{Src: "a", SrcLang: "pt", Label: "pt", Kind: "subtitles"}},
+		{ID: "2", Source: "hash", ExportTrack: &ra.ExportTrack{Src: "b", SrcLang: "pt", Label: "pt", Kind: "subtitles"}},
+	}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), &ra.ExportTag{}, os, &models.ExternalData{}, nil, SubtitleOpts{PreferredLang: "pt"})
+	if defaultID(items) != "os-2" {
+		t.Fatalf("default=%s want os-2 (hash match)", defaultID(items))
+	}
+}
+
+func TestLadderAudioMatchesPreferredNoAutoSubtitles(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("por"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if defaultID(items) != "none" {
+		t.Fatalf("default=%s want none", defaultID(items))
+	}
+	tr, ok := byID(items)["tr-pt"]
+	if !ok || tr.Default {
+		t.Fatalf("AI item must still be offered, not default: %+v", tr)
+	}
+}
+
+func TestLadderAudioMatchesPreferredForcedIsDefault(t *testing.T) {
+	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"por"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"por","title":"Portuguese (Forced)"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"por","title":"Portuguese"}}]`)
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, SubtitleOpts{PreferredLang: "pt"})
+	if defaultID(items) != "mp-0" {
+		t.Fatalf("default=%s want mp-0 (forced pt)", defaultID(items))
+	}
+}
+
+func TestLadderForcedNeverFullDefaultNorSource(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/forced.vtt", SrcLang: "en", Label: "Movie.forced.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if _, ok := byID(items)["tr-pt"]; ok {
+		t.Fatal("a forced track is not a translation source")
+	}
+	if d := defaultID(items); d == "et-1" {
+		t.Fatal("forced must not be the full default")
+	}
+}
+
+// TestLadderForcedInPreferredLangIsNotTheDefault is the negative control of
+// the Forced guard in bestByLadder: a forced track that IS in the preferred
+// language, with the audio in another one, still must not be selected —
+// only the audio rule (TestLadderAudioMatchesPreferredForcedIsDefault) may
+// turn a forced track on.
+func TestLadderForcedInPreferredLangIsNotTheDefault(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/pt.vtt", SrcLang: "pt", Label: "Movie.forced.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s: a forced track must not be the full-subtitle default", d)
+	}
+}
+
+func TestLadderLockedForFree(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	tr := byID(items)["tr-pt"]
+	if !tr.Locked || tr.Src != "" || !tr.Default {
+		t.Fatalf("free: %+v", tr)
+	}
+}
+
+func TestLadderSavedChoiceWins(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "os-1"}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if defaultID(items) != "os-1" {
+		t.Fatalf("saved choice must win: %s", defaultID(items))
+	}
+}
+
+func TestLadderSourcePrefersAudioLangThenEnglish(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{
+		{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "en.srt", Kind: "subtitles"},
+		{Src: "https://x/sc-fr.vtt", SrcLang: "fr", Label: "fr.srt", Kind: "subtitles"},
+	}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("fra"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if tr := byID(items)["tr-pt"]; !strings.HasPrefix(tr.Src, "https://x/sc-fr.vtt~tr:pt/") {
+		t.Fatalf("French audio → French source, got %q", tr.Src)
+	}
+	items = NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("deu"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if tr := byID(items)["tr-pt"]; !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
+		t.Fatalf("no source in the audio language → English, got %q", tr.Src)
+	}
+}
+
+func TestLadderNoTranslationWithoutSource(t *testing.T) {
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), &ra.ExportTag{}, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if _, ok := byID(items)["tr-pt"]; ok {
+		t.Fatal("embedded-only files have no translation source in phase 2")
+	}
+}
+
+func TestLadderDisabledFallsBackToOldSelection(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.German}, FallbackLangTag: language.English}, nil, tag, os, &models.ExternalData{}, nil, SubtitleOpts{})
+	if defaultID(items) != "os-1" {
+		t.Fatalf("without PreferredLang the Accept-Language match applies: %s", defaultID(items))
+	}
+}
+
+// TestLadderRankAndSourceBadge pins the two fields the template and the
+// player read instead of reimplementing the ladder (R-N, R-O): every item
+// carries its ladder rank, and the AI item names the origin of the track
+// it was translated from.
+func TestLadderRankAndSourceBadge(t *testing.T) {
+	tag, os := humanTracks()
+	user := []models.UserSubtitleTrack{{ID: "us-1", Src: "https://x/mine.vtt", Label: "mine.srt", SrcLang: "ja"}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, user,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	got := byID(items)
+	for id, want := range map[string]int{"us-1": 0, "mp-0": 1, "et-1": 2, "os-2": 3, "os-1": 4, "tr-pt": 5} {
+		it, ok := got[id]
+		if !ok {
+			t.Fatalf("%s missing from %+v", id, got)
+		}
+		if it.Rank != want {
+			t.Errorf("%s rank=%d want %d", id, it.Rank, want)
+		}
+	}
+	tr := got["tr-pt"]
+	if tr.Source != "et-1" || tr.SourceBadge != "sidecar" {
+		t.Errorf("AI item must name its source: source=%q badge=%q", tr.Source, tr.SourceBadge)
+	}
+}
+
+// TestLadderExternalDefaultIsKept covers an embed that asked for a specific
+// track: that explicit choice stands, and the ladder must not add a second
+// Default item to the list.
+func TestLadderExternalDefaultIsKept(t *testing.T) {
+	ext := &models.ExternalData{Tracks: []models.ExternalTrack{{Src: "https://x/e.vtt", SrcLang: "en", Label: "External", Default: true}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), &ra.ExportTag{}, nil, ext, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	n := 0
+	for _, it := range items {
+		if it.Default {
+			n++
+		}
+	}
+	if n != 1 || defaultID(items) != "ext-1" {
+		t.Fatalf("want exactly one default (ext-1), got %d, default=%s", n, defaultID(items))
 	}
 }

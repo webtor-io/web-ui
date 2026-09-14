@@ -9,6 +9,7 @@ import (
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"golang.org/x/text/language"
 )
 
@@ -39,6 +40,15 @@ type ListItem struct {
 	// Badge names the origin for the picker: user, embedded, sidecar, os,
 	// ai, forced (i18n key action.stream.badge.<Badge>).
 	Badge string
+	// Rank is the item's place in the ladder (see ladderRank): the player
+	// renders it as data-rank and reuses it when it has to pick a default
+	// itself, so the order lives in Go only and is never reimplemented in
+	// JS.
+	Rank int
+	// SourceBadge is set on the Translated item alone: the Badge of the
+	// human track the translation is made from, so the picker can say
+	// "AI - from <origin>" without knowing the ladder.
+	SourceBadge string
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -269,6 +279,199 @@ func badgeFor(provider string, forced bool) string {
 	return ""
 }
 
+// baseLang reduces a language tag to its base ("por" and "pt-BR" both
+// become "pt"), the granularity every rule of the ladder works at. An
+// unparseable or undetermined tag yields "", which the rules read as
+// "language unknown".
+func baseLang(tag string) string {
+	t, err := language.Parse(tag)
+	if err != nil {
+		return ""
+	}
+	b, conf := t.Base()
+	if conf == language.No {
+		return ""
+	}
+	return b.String()
+}
+
+// defaultAudioLang is the base language of the audio the viewer will
+// actually hear: the Default item of GetAudioTracks (the Accept-Language
+// match), not the first audio stream of the probe. "" when the language
+// of that track is unknown.
+func (s *Helper) defaultAudioLang(ud *models.VideoStreamUserData, mp *api.MediaProbe) string {
+	for _, a := range s.GetAudioTracks(ud, mp) {
+		if a.Default {
+			return baseLang(a.SrcLang)
+		}
+	}
+	return ""
+}
+
+// ladderRank orders subtitle sources from the one the viewer trusts most
+// (what they uploaded themselves) to the one they trust least (a machine
+// translation). Within OpenSubtitles a hash match is a match on this very
+// file, while an imdb match is only the same title, so it can be out of
+// sync. The rank is also rendered as data-rank: the player reuses this
+// order when it has to pick a default itself instead of reimplementing
+// the ladder in JS.
+func ladderRank(li ListItem) int {
+	switch li.Provider {
+	case "UserSubtitle":
+		return 0
+	case "MediaProbe":
+		return 1
+	case "ExportTag", "External":
+		return 2
+	case "OpenSubtitles":
+		if li.Source == "hash" {
+			return 3
+		}
+		return 4
+	case "Translated":
+		return 5
+	}
+	return 9
+}
+
+// isHumanFull reports whether the item is a complete, human-made subtitle
+// track: not the "None" entry, not a signs-only (forced) track, not a
+// machine translation.
+func isHumanFull(li ListItem) bool {
+	return li.ID != "none" && !li.Forced && li.Provider != "Translated"
+}
+
+// bestByLadder returns the index of the best item in lang by ladderRank,
+// among forced or among full tracks (never mixing the two), or -1.
+func bestByLadder(lis []ListItem, lang string, forced bool) int {
+	best, rank := -1, 99
+	for i, li := range lis {
+		if li.ID == "none" || li.Provider == "Translated" || li.Forced != forced || baseLang(li.SrcLang) != lang {
+			continue
+		}
+		if r := ladderRank(li); r < rank {
+			best, rank = i, r
+		}
+	}
+	return best
+}
+
+// pickTranslationSource picks the human track the AI translation is made
+// from: a non-forced, URL-backed track, preferring the audio language (a
+// transcription of what is being said, not a translation of a
+// translation), then English, then anything. Embedded tracks have no URL
+// of their own to feed the proxy chain, so they cannot be a source yet.
+func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
+	var first, en, audio *ListItem
+	for i := range lis {
+		li := &lis[i]
+		if !isHumanFull(*li) || li.Src == "" || li.Provider == "MediaProbe" {
+			continue
+		}
+		if first == nil {
+			first = li
+		}
+		switch baseLang(li.SrcLang) {
+		case audioLang:
+			if audio == nil && audioLang != "" {
+				audio = li
+			}
+		case "en":
+			if en == nil {
+				en = li
+			}
+		}
+	}
+	if audio != nil {
+		return audio
+	}
+	if en != nil {
+		return en
+	}
+	return first
+}
+
+// applyLadder decides what the viewer gets selected when they have a
+// preferred content language: the best human track in that language, or
+// an AI translation when there is none, or nothing at all when the audio
+// is already in that language (then only a forced track, if the file has
+// one, is turned on). The viewer's own saved choice always wins.
+func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts) []ListItem {
+	lang := opts.PreferredLang
+	humanIdx := bestByLadder(lis, lang, false)
+	if humanIdx < 0 && opts.Translate {
+		if src := pickTranslationSource(lis, audioLang); src != nil {
+			name := lang
+			if l := stremio.LanguageByCode(lang); l != nil {
+				name = l.Name
+			}
+			tr := ListItem{
+				ID:       "tr-" + lang,
+				Label:    name + " · AI",
+				SrcLang:  lang,
+				Kind:     "subtitles",
+				Provider: "Translated",
+				Badge:    badgeFor("Translated", false),
+				// Source is the id of the track being translated, and
+				// SourceBadge its origin, so the picker can show where the
+				// translation comes from.
+				Source:      src.ID,
+				SourceBadge: src.Badge,
+			}
+			tr.Rank = ladderRank(tr)
+			if opts.Paid {
+				tr.Src = api.TranslateURL(src.Src, lang, opts.Names)
+			} else {
+				// A locked item carries no Src on purpose: the URL is the
+				// entitlement, so a free viewer must not receive one even
+				// hidden in the markup.
+				tr.Locked = true
+			}
+			lis = append(lis, tr)
+		}
+	}
+	// The viewer's saved choice always wins.
+	if ud != nil && ud.SubtitleID != "" {
+		for i := range lis {
+			if lis[i].ID == ud.SubtitleID {
+				lis[i].Default = true
+				return lis
+			}
+		}
+	}
+	// An embed that asked for a specific track (ExternalData) has already
+	// marked it Default; that is the caller's explicit choice, and the
+	// ladder neither overrides it nor adds a second default to the list.
+	for _, li := range lis {
+		if li.Default {
+			return lis
+		}
+	}
+	// Subtitles are only needed when the audio is not already in the
+	// preferred language; an unknown audio language counts as needed.
+	needed := audioLang == "" || audioLang != lang
+	if !needed {
+		if f := bestByLadder(lis, lang, true); f >= 0 {
+			lis[f].Default = true
+		} else {
+			lis[0].Default = true // "none"
+		}
+		return lis
+	}
+	if humanIdx >= 0 {
+		lis[humanIdx].Default = true
+		return lis
+	}
+	for i := range lis {
+		if lis[i].Provider == "Translated" {
+			lis[i].Default = true
+			return lis
+		}
+	}
+	lis[0].Default = true
+	return lis
+}
+
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
@@ -357,7 +560,14 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Badge:    badgeFor("UserSubtitle", false),
 		})
 	}
-	return s.markPreload(s.selectListItem(s.canonizeSrcLangs(res), ud.SubtitleID, ud), ud)
+	lis := s.canonizeSrcLangs(res)
+	for i := range lis {
+		lis[i].Rank = ladderRank(lis[i])
+	}
+	if opts.PreferredLang == "" {
+		return s.markPreload(s.selectListItem(lis, ud.SubtitleID, ud), ud)
+	}
+	return s.markPreload(s.applyLadder(lis, ud, s.defaultAudioLang(ud, mp), opts), ud)
 }
 
 // markPreload sets Preload on the default track and on side-loaded tracks in
@@ -372,7 +582,10 @@ func (s *Helper) markPreload(lis []ListItem, ud *models.VideoStreamUserData) []L
 	}
 	n := 0
 	for i, li := range lis {
-		if li.ID == "none" || li.Provider == "MediaProbe" || li.Src == "" {
+		// The Translated item is never a <track> in the page: the
+		// translation is produced on demand and polled by the player, so
+		// preloading it would start that work for every viewer.
+		if li.ID == "none" || li.Provider == "MediaProbe" || li.Src == "" || li.Provider == "Translated" {
 			continue
 		}
 		if n >= maxPreloadTracks {
