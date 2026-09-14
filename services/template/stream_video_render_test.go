@@ -245,3 +245,99 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		}
 	}
 }
+
+// TestStreamVideoRendersMySubtitlesTab executes the one call site the two
+// tests above never reach: `userSubtitleView` inside the
+// `{{ if and (not .DomainSettings) .UserSubtitlesEnabled }}` branch. Both of
+// them set UserSubtitlesEnabled false, so the branch is parsed but never
+// run — and that helper is bound by reflection like getSubtitles, so its
+// arity (the ladder-result argument added for the Default/Saved copy) is
+// only checked when the branch actually executes. A missing argument there
+// type-checks fine and blows up at tm.Init() or in production.
+//
+// The real partial is stubbed the same way the other two tests stub it: the
+// markup it produces has its own render test
+// (user_subtitles_partial_render_test.go). What is under test here is the
+// call, and that the ladder marks the upload it should — asserted directly
+// on the helper's output, since the stub swallows the rendered row.
+func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string { return key }
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return true },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	// The stub records that the branch was entered, so a template change
+	// that quietly stops rendering the tab cannot leave this test passing
+	// while covering nothing. An element, not an HTML comment: html/template
+	// strips comments from its output, so a comment marker would never show
+	// up however well the branch ran.
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<span data-stub="my-subtitles"></span>{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	userSubs := []models.UserSubtitleTrack{
+		{ID: "us-1", Label: "movie.pt.srt", OriginalName: "movie.pt.srt", SrcLang: "pt", Src: "https://x.test/ext/abc/movie.srt~vtt/movie.vtt", Format: "srt", Size: 1024, DeleteURL: "/user-subtitle/delete/1"},
+	}
+	data := &scripts.StreamContent{
+		ExportTag:            &ra.ExportTag{},
+		Resource:             &ra.ResourceResponse{},
+		Item:                 &ra.ListItem{PathStr: "movie.mkv"},
+		Title:                "Movie",
+		MediaProbe:           nil,
+		OpenSubtitles:        nil,
+		UserSubtitles:        userSubs,
+		UserSubtitlesEnabled: true,
+		EIURL:                "http://ei.example.com",
+		VideoStreamUserData:  &models.VideoStreamUserData{ResourceID: "res", ItemID: "item", SubtitleID: "us-1"},
+		Settings:             &models.StreamSettings{},
+		ExternalData:         &models.ExternalData{},
+		DomainSettings:       nil,
+		TranscoderSession:    nil,
+		SubtitleOpts:         models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": struct{}{},
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	if !strings.Contains(buf.String(), `data-stub="my-subtitles"`) {
+		t.Fatalf("the my-subtitles branch was not entered, so userSubtitleView never ran:\n%s", buf.String())
+	}
+
+	// The seam the new argument exists for: the viewer's saved choice is
+	// one of their own uploads, and the view model carries that across.
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	v := helper.UserSubtitleView(data.VideoStreamUserData.ResourceID, data.Item.PathStr, data.EIURL, data.UserSubtitles, items)
+	if len(v.UserSubtitles) != 1 || !v.UserSubtitles[0].Default || !v.UserSubtitles[0].Saved {
+		t.Fatalf("the saved upload must reach the partial marked: %+v", v.UserSubtitles)
+	}
+}

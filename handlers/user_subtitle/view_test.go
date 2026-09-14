@@ -72,35 +72,34 @@ func TestBuildViewSelectsNothingWithoutUpload(t *testing.T) {
 	}
 }
 
-// TestBuildViewMarksUploadAsSavedDefault covers the async-reload half of the
-// Default/Saved markers. This handler has no ladder result to copy from (it
-// knows a resource id and a path, not the subtitle list), but it does know
-// the one row the player is about to activate and persist: the upload that
-// just happened. Marking it keeps the two renders of the same partial
-// (initial page and async reload) consistent instead of the reload silently
-// producing rows the audio-switch rule reads as "nothing chosen".
-func TestBuildViewMarksUploadAsSavedDefault(t *testing.T) {
+// TestBuildViewNeverMarksDefaultOrSaved pins that this handler's response
+// carries Selected and nothing else. Default and Saved exist for the initial
+// render, where Helper.UserSubtitleView copies them off the ladder result;
+// here they would be actively wrong. markTrack returns early when the
+// element already has data-default="true", so a server-rendered default on
+// the just-uploaded row makes the client's activateSubtitle a no-op: it
+// never PUTs ud.SubtitleID, the previously active row keeps its highlight
+// (two defaults in the DOM at once), and the upload the viewer just made is
+// never marked as playing. data-autoselect is the whole signal the player
+// needs; it sets data-default and persists the choice itself.
+func TestBuildViewNeverMarksDefaultOrSaved(t *testing.T) {
 	a, b := sub(t, "old.srt"), sub(t, "new.srt")
-	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", us.TrackID(b.UserSubtitleID), nil)
+	uploaded := us.TrackID(b.UserSubtitleID)
 
-	for _, tr := range v.UserSubtitles {
-		want := tr.ID == us.TrackID(b.UserSubtitleID)
-		if tr.Default != want || tr.Saved != want {
-			t.Errorf("track %q: Default = %v, Saved = %v, want both %v", tr.OriginalName, tr.Default, tr.Saved, want)
+	for _, selectedID := range []string{uploaded, ""} {
+		v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", selectedID, nil)
+		for _, tr := range v.UserSubtitles {
+			if tr.Default || tr.Saved {
+				t.Errorf("selectedID=%q track %q: Default = %v, Saved = %v, want both false",
+					selectedID, tr.OriginalName, tr.Default, tr.Saved)
+			}
 		}
-	}
-}
-
-// Negative control: a reload with no upload (a delete, say) marks nothing.
-// The server has no way to know the viewer's choice here, and guessing one
-// would plant a data-saved the viewer never made.
-func TestBuildViewMarksNothingWithoutUpload(t *testing.T) {
-	a, b := sub(t, "one.srt"), sub(t, "two.srt")
-	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", "", nil)
-
-	for _, tr := range v.UserSubtitles {
-		if tr.Default || tr.Saved {
-			t.Errorf("track %q: Default = %v, Saved = %v, want both false", tr.OriginalName, tr.Default, tr.Saved)
+		// And the signal that IS the handler's to send still arrives.
+		for _, tr := range v.UserSubtitles {
+			if want := selectedID != "" && tr.ID == uploaded; tr.Selected != want {
+				t.Errorf("selectedID=%q track %q: Selected = %v, want %v",
+					selectedID, tr.OriginalName, tr.Selected, want)
+			}
 		}
 	}
 }

@@ -231,12 +231,6 @@ func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, sel
 			wrapped = wrap(sub)
 		}
 		id := us.TrackID(sub.UserSubtitleID)
-		// selected is the track the player activates (and persists through
-		// markTrack) as soon as this response lands, so the row is rendered
-		// as the saved default straight away. Every other reload leaves both
-		// markers off: this handler has no ladder result to copy them from,
-		// and inventing one would plant a choice the viewer never made.
-		selected := selectedID != "" && id == selectedID
 		tracks = append(tracks, models.UserSubtitleTrack{
 			ID:           id,
 			SrcLang:      us.LangFromName(sub.OriginalName),
@@ -246,9 +240,15 @@ func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, sel
 			Size:         sub.Size,
 			Src:          wrapped,
 			DeleteURL:    us.DeleteURL(sub.UserSubtitleID),
-			Selected:     selected,
-			Default:      selected,
-			Saved:        selected,
+			// Selected (data-autoselect) is the only marker this response
+			// sends. Default/Saved belong to the initial render, where
+			// Helper.UserSubtitleView copies them off the ladder result;
+			// here they would break the very thing they describe, because
+			// markTrack returns early on data-default="true" — the
+			// client's activateSubtitle would then never persist the
+			// choice, never clear the previous row's highlight, and never
+			// mark the upload as playing.
+			Selected: selectedID != "" && id == selectedID,
 		})
 	}
 	return &models.UserSubtitleView{

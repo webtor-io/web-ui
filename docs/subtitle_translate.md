@@ -135,6 +135,20 @@ subtitle URL web-ui already built for the source track (sidecar `~vtt`, OpenSubt
 user-upload `/ext/…~vtt`) and adds `?names=<csv>` when a glossary is present — the proxy resolves
 the inner chain itself.
 
+**The source URL must be absolute.** The output is built as `scheme://host` + path, so a relative
+or scheme-less source would come out as `://…` or `https:///…` — a string that looks like a URL
+and is not one. `TranslateURL` returns `""` for those, and `applyLadder` then **drops the
+Translated item entirely** rather than offering an unlocked track with no `Src` (subtitles
+"selected" with nothing on screen). Every subtitle URL web-ui actually builds is absolute, so this
+is a guard, not a routine path.
+
+This leaves a deliberate asymmetry: the drop is keyed on `Src == ""` *and* `!Locked`, so a **free**
+viewer still sees the locked AI item for a source that could never have produced a URL. That is
+correct rather than an oversight — the locked item is an upsell, not a track; it never carried a
+`Src` and never will, and hiding it would make the CTA's presence depend on a property of a source
+the viewer cannot see. The cost is that such a viewer could upgrade and then find no AI item at
+all, which is the same outcome every unsupported source already gives (see *Known limitations*).
+
 **Translation source selection** (`pickTranslationSource`): a non-forced, URL-backed human track,
 preferring the active audio's language (transcribing what's said, not translating a translation),
 then English, then any. Embedded (`MediaProbe`) tracks are never a source — they have no
@@ -238,11 +252,16 @@ resource page); the spec is amended.
 copied by `Helper.UserSubtitleView` out of the matching `ListItem` (`us-<uuid>`) of the same
 `GetSubtitles` call the modal renders from — the tab has its own view model, so without that copy
 the player's audio-switch rule read every upload as "nothing chosen" and could switch away from a
-subtitle the viewer had uploaded and picked. The async reload after an upload
-(`handlers/user_subtitle`, `buildView`) has no ladder result to copy from and marks only the
-just-uploaded row (which the player activates and persists immediately); a reload for any other
-reason — a delete — marks nothing, and `syncMySubtitleMark` in `Player.jsx` re-derives
-`data-default` from the live `textTracks`.
+subtitle the viewer had uploaded and picked.
+
+**Only the initial render carries them.** The async reload (`handlers/user_subtitle`, `buildView`)
+sends `data-autoselect` and nothing else, and that is deliberate rather than a gap: `markTrack`
+returns early when the element already has `data-default="true"`, so a server-rendered default on
+the just-uploaded row would make the client's `activateSubtitle` a no-op — it would never PUT
+`ud.SubtitleID`, never clear the previously active row's highlight (two defaults in the DOM at
+once), and never mark the upload as playing. The client owns both markers after a reload:
+`activateSubtitle` sets and persists the uploaded one, and `syncMySubtitleMark` in `Player.jsx`
+re-derives `data-default` from the live `textTracks` for every other reload.
 
 `readTracks` (`subtitle-telemetry.js`) matches all three list-item shapes via the `.subtitle[data-provider]`
 selector, filtering out `data-id="none"`.
