@@ -938,17 +938,6 @@ input:-webkit-autofill:focus {
   color: #00cec9 !important;
 }
 
-.btn-soft-purple {
-  background-color: rgba(108, 92, 231, 0.10) !important;
-  border-color: rgba(108, 92, 231, 0.30) !important;
-  color: #a29bfe !important;
-}
-.btn-soft-purple:hover {
-  background-color: rgba(108, 92, 231, 0.20) !important;
-  border-color: rgba(108, 92, 231, 0.45) !important;
-  color: #a29bfe !important;
-}
-
 .toggle-soft:checked,
 .toggle-soft[aria-checked=true] {
   --input-color: #fd79a8 !important;

@@ -5,20 +5,55 @@ the main site (not embed), authenticated users only.
 
 ## Flow
 
-1. While streaming video, the user opens the subtitles modal and clicks
-   **My Subtitles**.
-2. If unauthenticated: a sign-in CTA is shown with `return-url` pointing at
-   the current page.
+1. While streaming video, the user opens the track picker and clicks the
+   dashed **`+ My Subtitles`** chip (`#my-uploads-toggle`) at the end of the
+   subtitle chip row. There is no separate tab any more: the chip is a
+   disclosure that opens `#my-uploads-panel` inline, on its own flex line
+   below the chips.
+2. If unauthenticated: a sign-in CTA is shown inside the panel, with
+   `return-url` pointing at the current page.
 3. If authenticated: drag-and-drop or file-picker submits a standard POST
    multipart form to `/user-subtitle`.
 4. The server hashes the file (SHA-256), stores the raw blob in S3 under
    the hash, and inserts a binding row.
-5. The next player render picks up the new track. The track appears under
-   its original filename via the `UserSubtitle` provider and is wrapped
+5. The next player render picks up the new track. The track appears as an
+   `MY` chip in the same subtitle chip row as every other origin, under
+   its original filename via the `UserSubtitle` provider, and is wrapped
    through `torrent-http-proxy`'s `/ext/` → `~vtt/` chain so SRT/ASS/SSA
    content is converted to VTT on the fly (same path used for
    OpenSubtitles). ASS/SSA styling, positioning and karaoke tags are
    dropped in conversion — cues come back as plain text.
+
+## UI: chips in the picker, deletion in the panel
+
+The uploads partial (`templates/partials/action/user_subtitles.html`) emits
+two things into the picker, and both come from the same template because it
+is also the async reload target:
+
+- **The `MY` chips**, rendered into `#subtitle-tracks` through the
+  `#my-subtitles` wrapper (`class="contents"`, i.e. `display:contents`), so
+  they join the flat chip row alongside `EM`/`IN`/`OS`/`AI` tracks instead of
+  living on a screen of their own.
+- **The `+ My Subtitles` disclosure and its panel** — the upload form plus one
+  row per file, each row carrying **its own delete `<form>`** posting to
+  `POST /user-subtitle/delete/:id`.
+
+Selection and deletion are deliberately different elements. A chip is a
+`role="radio"` that only switches the track; a file can only be destroyed
+from its row in the panel, so an accidental tap on a chip cannot delete an
+upload.
+
+Both forms (upload and delete) still carry
+`data-async-target="#my-subtitles"` and `data-async-push-state="false"` — the
+swap target and the routes are unchanged by the redesign. After the swap
+`Player.jsx` re-runs `refresh()` from
+`assets/src/js/lib/player/track-picker.js`, so the chip row, the language
+counts and the expanded language resync; the panel is re-opened from
+`data-upload-open` on `#my-subtitles`, because the wrapper survives the swap
+while the toggle and panel inside it are replaced.
+
+See `docs/subtitle_translate.md` ("Template attributes", "Picker behaviour")
+and `docs/uikit.html` §19 for the full chip contract.
 
 ## Storage
 
@@ -96,8 +131,8 @@ blob is never missing for a live binding.
 ## Configuration
 
 - `AWS_USER_SUBTITLE_BUCKET` — required. When empty the service is
-  disabled: handlers skip registration and the UI hides the **My
-  Subtitles** tab.
+  disabled: handlers skip registration and the picker renders neither `MY`
+  chips nor the `+ My Subtitles` chip and panel.
 - Reuses the shared `AWS_*` credentials + endpoint + region from the
   common S3 client.
 
@@ -136,7 +171,7 @@ Two client-side mechanisms fix this (`cue-offset.js`):
    from them on every call, so repeated seeks never accumulate drift.
    Wired in `Player.jsx` as an effect on `seekOffset` plus a capturing
    `load` listener on the `<video>` (covers lazily-loaded tracks and
-   tracks added mid-session from the My Subtitles tab).
+   tracks added mid-session from the uploads panel).
 2. `captureTrackState` / `restoreTrackState` around a session seek
    (`session-seek.js`) — hls.js flips element-backed tracks to
    `disabled` **and clears their cue lists** on `loadSource()`, so the

@@ -212,10 +212,19 @@ trip" / cache-key section).
   goes on, so a failure restores the *latest* snapshot rather than one from several revisions ago.
   `onTrackError` additionally checks the run identity (`runSeqRef`): a `<track>` whose `src` a
   stopped run set can still fail afterwards, and that event must not kill the current run.
-- **Progress text.** `player.subtitleTranslating` = `"Translating… %v%"`, next to the active AI
-  item (`.tr-progress` span), hidden again on done, on error, and whenever the poll is stopped
-  (`stopTranslationProgress` holds the span in `progressSpanRef`) — a span left visible freezes at
-  the last percent and reads as a translation stuck forever.
+- **Progress text.** The AI chip's `.tr-progress` span shows the bare percentage — `· 0%` on
+  start, then `· N%` on every 3 s poll. The localized sentence
+  `player.subtitleTranslating` = `"Translating… %v%"` is **not** the span's text any more: it is
+  written into the span's `title` (same value, refreshed with each percentage), so the chip stays
+  the width of a chip while the sentence is still available on hover and to assistive tech. The
+  design reason is in `docs/uikit.html` §19 — a chip row cannot carry a sentence per chip.
+- **Progress spinner.** A `.tr-spinner` (`loading loading-spinner loading-xs`) sits beside the span
+  on the same chip. Both are `hidden` in the markup and are unhidden together when a run starts or
+  resumes, and hidden again on done, on error, and whenever the poll is stopped
+  (`stopTranslationProgress` holds them in `progressSpanRef`/`progressSpinnerRef` and clears both
+  refs). Either one left visible freezes at the last percent and reads as a translation stuck
+  forever, so they are always toggled as a pair; `setChipActive` never rebuilds a chip's
+  `innerHTML`, so neither element is lost when the viewer switches tracks mid-run.
 - **Auto-start.** Translation does **not** start on page load and there is no dedicated 5-second
   timer: it piggybacks on the existing `stream-start` engagement gate, which fires once
   `state.currentTime >= 5` (5 s of actual playback, not wall-clock time since load). If the AI item
@@ -246,32 +255,160 @@ the existing `report-problem` control with `data-provider=Translated`. **Not imp
 code path sets that variant. Deferred to a follow-up by controller ruling (the form lives on the
 resource page); the spec is amended.
 
-## Template attributes (`data-*` per list-item kind)
+## Template attributes (`data-*` per chip)
+
+Since the picker redesign there is one flat container per group and no sub-views. Every chip is a
+`<button type="button">`; the `.audio`/`.subtitle` marker classes and the whole `data-*` set are
+unchanged from the `<li>` era, so every JS reader (`readAllTracks`, `readTracks`,
+`findSubtitleItem`, `remapTrackGroup`, `initDefaultTracks`) kept working across the change.
+
+### Ids (`templates/views/action/stream_video.html`)
+
+| id | element | role |
+|---|---|---|
+| `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang` |
+| `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
+| `#audio-now` | `<span>` | "Now:" line for audio — one `.now-value` child, no `.now-origin` (audio has no origin code) |
+| `#subtitle-langs` | `<div role="group">` | subtitle **language** row — a filter, not a choice |
+| `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
+| `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
+| `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
+| `#subtitle-off` | first `<button>` of `#subtitle-tracks` | the "Off" chip — it **is** the `none` list item |
+| `#subtitle-now` | `<span>` | "Now:" for subtitles — `.now-origin` badge (hidden when empty) + `.now-value` |
+| `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
+| `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
+| `#my-uploads-panel` | `<div class="basis-full" hidden>` | upload form + one row per file, each row with its own delete form |
+| `#translate-cta` | `<div hidden>` | the locked-AI card, below the track row |
+
+### Chips
 
 | Kind | Where | Attributes |
 |---|---|---|
-| `.audio` `<li>` | `#embedded` audio column | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-default` |
-| `.subtitle` `<li>` | `#embedded` subtitles column (`$otherSubs`: embedded/sidecar/AI, excludes OpenSubtitles & user uploads) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-source-badge` (Translated only), `data-forced`, `data-locked`, `data-default`, `data-saved` |
-| `.subtitle` `<li>` | `#opensubtitles` (`$openSubs`) | `data-id`, `data-provider`, `data-srclang`, `data-source`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-rank`, `data-default`, `data-saved` (never `forced`/`locked`/`source-badge`) |
-| `.subtitle` on a `<div>` inside `<li>` | `#my-subtitles` (`templates/partials/action/user_subtitles.html`) | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded (separate mechanism from `data-default`, unrelated to the ladder) |
+| `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
+| `.subtitle#subtitle-off` | first chip of `#subtitle-tracks` | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-lang-name=""`, `data-lang-flag=""`, `data-default`, `data-saved`. No `data-label` — `syncNow` falls back to `textContent`, i.e. the localized "Off" |
+| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved` |
+| `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded |
+| `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
+
+**Classes.** `.track-chip` / `.track-chip-active` on audio and subtitle chips, `.lang-chip` /
+`.lang-chip-active` on language chips, `.chip-locked` on a locked AI chip. They are defined once
+in `assets/src/styles/style.css` and are the only thing JS touches: `setChipActive` toggles
+`track-chip-active` (plus `aria-checked` and the check icon's `hidden`) and never writes a
+Tailwind utility string, never rebuilds a chip's `innerHTML` — which is why `.tr-progress` and
+`.tr-spinner` survive every selection.
+
+**Children of a chip**, in order: `svg.chip-check` (hidden unless active) · `span.chip-origin`
+(the `EM`/`IN`/`OS`/`MY`/`AI` badge, `title` = the localized origin name) · the label span
+(`title` = the full label, visually truncated) · property-tag badges · `· Source` ·
+`· from <CODE>` · on `Provider == "Translated"` `span.tr-progress` (text `· 37%`, `title` =
+the localized `player.subtitleTranslating` sentence) and `span.tr-spinner`, both `hidden` until a
+translation polls and hidden again together on done/error/stop · on a locked chip a padlock `<svg>`
+and an `sr-only` explanation. A language chip holds `span.chip-flag`, `span.lang-name`,
+`span.lang-count` and `span.lang-dot` (hidden unless the playing track is in that language).
+
+**ARIA.** Audio and subtitle chips are `role="radio"` with `aria-checked`; language chips are
+plain buttons with `aria-pressed` — **never** `aria-selected` / `role="tab"`, because there are no
+tab panels and the one real choice (which track plays) lives in the radiogroup underneath.
+
+**Server-side `hidden`.** The dialog and the uploads partial both render the bare `hidden`
+attribute on every subtitle chip whose `data-lang` differs from the expanded language
+(`LangRow.Expanded`), so a page whose picker JS never loaded still shows one coherent language.
+The Off chip is never hidden this way, and `applyLangFilter` skips `data-id="none"` for the same
+reason. `ExpandedLang` is empty on the async reload of the uploads partial (it has no language row
+to consult), so nothing is collapsed for the instant between the swap and the client's `refresh`.
+
+**Refresh order.** `refresh(container)` in `assets/src/js/lib/player/track-picker.js` is
+`syncLangRow` → `applyLangFilter` → `applyFlagSupport` → `syncNow`, and returns the language it
+settled on. `Player.jsx` calls it after mount, on dialog open, and after the `#my-subtitles` async
+swap (upload **and** delete). A plain selection calls `refreshMarks` (`syncLangRow` + `syncNow`)
+instead: picking a track moves the dot and both "Now:" lines without yanking the viewer out of the
+language they were browsing.
+
+**"+N".** `maxVisibleLangChips = 6` (`handlers/action/picker.go`) is mirrored by
+`MAX_VISIBLE_LANGS = 6` (`track-picker.js`). `#subtitle-lang-more` is a toggle, not a one-way
+expand: collapsed it reads `+N` (N = language chips currently hidden; a language whose count fell
+to zero is gone, not collapsed), expanded it reads `×`. `aria-label` stays
+`action.stream.moreLanguages` in both states, and the button hides itself at N = 0.
+
+**Origin codes.** `EM` embedded, `IN` in torrent, `OS` OpenSubtitles, `MY` my uploads, `AI`
+translation — the same two letters in every locale. Their meaning is carried by the chip's `title`
+and by the legend line under the row, both built from `action.stream.origin.{em,in,os,my,ai}`
+(`Helper.OriginKey`). The older `action.stream.badge.*` keys stay in the locale files for
+telemetry and back-compat but are no longer rendered — except `action.stream.badge.forced`, because
+`forced` is a **property tag**, not an origin: a forced embedded track shows `EM` + `forced`
+(`Helper.PropertyTags`). `sdh` is drawn in the uikit and waits for `content-prober` to expose
+ffprobe's disposition flags.
+
+`data-lang` is the base language tag the chip groups under, `und` when unknown;
+`data-lang-name`/`data-lang-flag` carry the display strings so the client can clone a new language
+chip out of `#lang-chip-template` without a language table of its own. All three come from
+`stremio.NewLangDisplay`.
 
 `data-default`/`data-saved` on the uploads list come from `UserSubtitleTrack.Default`/`.Saved`,
 copied by `Helper.UserSubtitleView` out of the matching `ListItem` (`us-<uuid>`) of the same
-`GetSubtitles` call the modal renders from — the tab has its own view model, so without that copy
-the player's audio-switch rule read every upload as "nothing chosen" and could switch away from a
-subtitle the viewer had uploaded and picked.
+`GetSubtitles` call the dialog renders from — the partial has its own view model, so without that
+copy the player's audio-switch rule read every upload as "nothing chosen" and could switch away
+from a subtitle the viewer had uploaded and picked.
 
 **Only the initial render carries them.** The async reload (`handlers/user_subtitle`, `buildView`)
 sends `data-autoselect` and nothing else, and that is deliberate rather than a gap: `markTrack`
 returns early when the element already has `data-default="true"`, so a server-rendered default on
-the just-uploaded row would make the client's `activateSubtitle` a no-op — it would never PUT
-`ud.SubtitleID`, never clear the previously active row's highlight (two defaults in the DOM at
-once), and never mark the upload as playing. The client owns both markers after a reload:
-`activateSubtitle` sets and persists the uploaded one, and `syncMySubtitleMark` in `Player.jsx`
+the just-uploaded chip would make the client's `activateSubtitle` a no-op — it would never PUT
+`ud.SubtitleID`, never clear the previously active chip's mark (two defaults in the DOM at once),
+and never mark the upload as playing. The client owns both markers after a reload:
+`activateSubtitle` sets and persists the uploaded one, and `syncUploadMarks` in `Player.jsx`
 re-derives `data-default` from the live `textTracks` for every other reload.
 
-`readTracks` (`subtitle-telemetry.js`) matches all three list-item shapes via the `.subtitle[data-provider]`
-selector, filtering out `data-id="none"`.
+`readTracks` (`subtitle-telemetry.js`) matches every subtitle chip via the
+`.subtitle[data-provider]` selector, filtering out `data-id="none"`.
+
+## Picker behaviour
+
+One screen, no sub-views (`docs/uikit.html` §19). Audio is a chip row; subtitles are a language
+row plus the tracks of the expanded language.
+
+- **The language row filters only.** Pressing a language chip collapses the other languages in the
+  track row and changes nothing about playback. The chip of the language currently playing keeps a
+  cyan dot, so the selection stays visible while the viewer browses another language.
+- **Off is the first chip of the track row**, not a language chip. It is the real `.subtitle`
+  element for the `none` item, which the player looks up by that id (`findSubtitleItem`,
+  `pickDefaultSubtitle`, `hasSavedDefault`); a second copy in the language row would give the
+  picker two sources of truth.
+- **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
+  underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
+  active per group, and a locked chip can never take the mark.
+- **"Now:" line** on both headings (`#audio-now`, `#subtitle-now`): origin badge, then flag and
+  language name, falling back to the chip's `data-label`. Written by JS only, so it is empty
+  without JS.
+- **Uploads are inline.** The dashed `+ My Subtitles` chip (`action.stream.mySubtitles`, the same key the old tab used) opens `#my-uploads-panel` on its own flex
+  line: the upload form and one row per file, each row carrying its own delete form that posts to
+  the unchanged `POST /user-subtitle/delete/:id` with `data-async-target="#my-subtitles"`.
+  Deletion is deliberately not on the chip — a chip is a radio button, and an accidental tap must
+  not destroy a file. After the swap `Player.jsx` re-runs `refresh`, so the chip row, the language
+  counts and the expanded language all follow; the panel re-opens from `data-upload-open` on
+  `#my-subtitles` (the wrapper survives the swap, the toggle and panel inside it do not).
+- **Flags fall back.** `supportsFlagEmoji()` (`lib/discover/lang.js`) hides every `.chip-flag`
+  where the platform draws bare letter pairs (Windows outside Firefox); the language names stay.
+- **Language-row order**: the active language, then the viewer's preferred language, then by track
+  count, then the order `GetSubtitles` produced. `SubtitleLangGroups` (Go) and `groupByLang` (JS)
+  must stay identical — the client recomputes the row after an upload changes the counts — and the
+  same fixture is in both test suites. There is deliberately **no** alphabetical tie-break: it
+  would reshuffle every equal-count group on the first refresh after an upload.
+- **Without JS** (picker JS failed, player loaded): every chip renders, the expanded language's
+  tracks are visible, the active track carries its check and fill from SSR and the counts are
+  right. Missing are the filter (the language row is inert), the dot, and both "Now:" lines.
+  Switching tracks needed JS before the redesign too — the handlers were always client-side.
+
+**Known a11y wart (follow-up).** `#my-uploads-toggle` and `#my-uploads-panel` render *inside*
+`#subtitle-tracks[role="radiogroup"]`, because the uploads partial is a single async swap target
+that must emit both the MY chips and the panel, and its `#my-subtitles` wrapper
+(`display:contents`) sits inside the row. The radiogroup therefore contains a disclosure button
+and, when open, two forms. Ruling R8 asks for them as siblings after the radiogroup; moving them
+is markup-only plus a re-scope of `readChips` in `track-picker.js`.
+
+Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `OriginCodeForBadge`,
+`OriginKey`, `PropertyTags`, `AudioSuffix`) and `services/stremio/lang_display.go`
+(`langDisplay`). Client side: `assets/src/js/lib/player/track-picker.js`, wired in `Player.jsx`.
 
 ## Known limitations
 
