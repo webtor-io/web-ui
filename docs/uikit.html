@@ -2156,9 +2156,9 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
             <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             <span><span class="chip-flag">🇬🇧</span> English</span>
           </button>
-          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span><span class="chip-flag">🇷🇺</span> Russian</span> <span class="text-w-muted max-w-[14rem] truncate" style="font-weight:400" title="Dub">&middot; Dub</span></button>
-          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span><span class="chip-flag">🇬🇧</span> English</span> <span class="text-w-muted max-w-[14rem] truncate" style="font-weight:400" title="Commentary">&middot; Commentary</span></button>
-          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span class="font-mono text-xs text-w-muted">UND</span> <span class="text-w-muted max-w-[14rem] truncate" style="font-weight:400" title="Track 4">Track 4</span></button>
+          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span><span class="chip-flag">🇷🇺</span> Russian</span> <span class="text-w-muted max-w-[9rem] sm:max-w-[14rem] truncate" style="font-weight:400" title="Dub">&middot; Dub</span></button>
+          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span><span class="chip-flag">🇬🇧</span> English</span> <span class="text-w-muted max-w-[9rem] sm:max-w-[14rem] truncate" style="font-weight:400" title="Commentary">&middot; Commentary</span></button>
+          <button type="button" class="audio track-chip" role="radio" aria-checked="false"><span class="font-mono text-xs text-w-muted">UND</span> <span class="text-w-muted max-w-[9rem] sm:max-w-[14rem] truncate" style="font-weight:400" title="Track 4">Track 4</span></button>
         </div>
       </div>
       <div class="uikit-label mb-6">id <code>#audio-tracks</code>, <code>role="radiogroup"</code> &middot; chips <code>.audio.track-chip</code> / <code>.track-chip-active</code>, <code>role="radio" aria-checked</code> &middot; "Now:" is <code>#audio-now &gt; .now-value</code> (no origin code — audio has none) &middot; a track with no language tag renders its mono code <code>UND</code> instead of flag + name</div>
@@ -2189,25 +2189,25 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
           </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="Embedded in the video">EM</span>
-            <span class="max-w-[14rem] truncate" title="Russian">Russian</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span>
           </button>
           <button type="button" class="subtitle track-chip track-chip-active" role="radio" aria-checked="true">
             <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="OpenSubtitles">OS</span>
-            <span class="max-w-[14rem] truncate" title="Russian">Russian</span> <span class="text-w-muted" style="font-weight:400">&middot; hash</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span> <span class="text-w-muted" style="font-weight:400">&middot; hash</span>
           </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="Included in the torrent">IN</span>
-            <span class="max-w-[14rem] truncate" title="Movie.forced.srt">Movie.forced.srt</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Movie.forced.srt">Movie.forced.srt</span>
             <span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="signs only">forced</span>
           </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-purple/10 border-w-purple/30 text-w-purpleL" title="My uploads">MY</span>
-            <span class="max-w-[14rem] truncate" title="sintel.ru.srt">sintel.ru.srt</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="sintel.ru.srt">sintel.ru.srt</span>
           </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" title="AI translation">AI</span>
-            <span class="max-w-[14rem] truncate" title="Russian">Russian</span> <span class="text-w-muted" style="font-weight:400">&middot; from EM</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span> <span class="text-w-muted" style="font-weight:400">&middot; from EM</span>
           </button>
         </div>
 
@@ -2288,13 +2288,13 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <button type="button" class="subtitle track-chip track-chip-active" role="radio" aria-checked="true">
         <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
         <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" title="AI translation">AI</span>
-        <span class="max-w-[14rem] truncate" title="Russian">Russian</span>
+        <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span>
         <span class="tr-progress text-w-muted" style="font-weight:400" title="Translating… 37%">&middot; 37%</span>
         <span class="tr-spinner loading loading-spinner loading-xs text-w-pinkL" aria-hidden="true"></span>
       </button>
       <button type="button" class="subtitle track-chip chip-locked" role="radio" aria-checked="false" aria-disabled="true">
         <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" title="AI translation">AI</span>
-        <span class="max-w-[14rem] truncate" title="Russian">Russian</span>
+        <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span>
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span class="sr-only">locked, supporters only</span>
       </button>
@@ -2306,7 +2306,7 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
     <div class="uikit-note">
       &bull; Audio and Subtitles stack; both keep the "Now:" summary on the heading line so the current choice is readable without scrolling the chip rows.<br>
       &bull; Chips wrap; touch target is the full <code>btn-sm</code> height (2rem) — do not shrink track chips to <code>btn-xs</code> on mobile, only the language row is <code>xs</code>.<br>
-      &bull; Long file names truncate with <code>max-w-[14rem] truncate</code> inside the chip; the full name lives in <code>title</code>.<br>
+      &bull; Long file names truncate with <code>max-w-[9rem] sm:max-w-[14rem] truncate</code> inside the chip; the full name lives in <code>title</code>.<br>
       &bull; Flags: guarded by <code>supportsFlagEmoji()</code> (Windows renders bare letter pairs) — <code>applyFlagSupport</code> hides every <code>.chip-flag</code> and the language names stay, exactly as Discover does.
     </div>
 

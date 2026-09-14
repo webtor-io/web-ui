@@ -74,7 +74,7 @@
                             class="audio track-chip{{ if .Default }} track-chip-active{{ end }}">
                         <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
                         {{ if $d.Name }}<span><span class="chip-flag">{{ $d.Flag }}</span> {{ $d.Name }}</span>{{ else }}<span class="font-mono text-xs text-w-muted">{{ $d.Code }}</span>{{ end }}
-                        {{ if $sfx }}<span class="text-w-muted font-normal max-w-[14rem] truncate" title="{{ $sfx }}">{{ if $d.Name }}· {{ end }}{{ $sfx }}</span>{{ end }}
+                        {{ if $sfx }}<span class="text-w-muted font-normal max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ $sfx }}">{{ if $d.Name }}· {{ end }}{{ $sfx }}</span>{{ end }}
                     </button>
                     {{ end }}
                 </div>
@@ -157,7 +157,7 @@
                             class="subtitle track-chip{{ if .Default }} track-chip-active{{ else if .Locked }} chip-locked{{ end }}">
                         <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
                         {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}">{{ $oc }}</span>{{ end }}
-                        <span class="max-w-[14rem] truncate" title="{{ .Label }}">{{ .Label }}</span>
+                        <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ .Label }}">{{ .Label }}</span>
                         {{ range propertyTags . }}<span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="{{ t $.Lang (printf "action.stream.badge.%s" .) }}">{{ . }}</span>{{ end }}
                         {{ if .Source }}<span class="text-w-muted font-normal">· {{ .Source }}</span>{{ end }}
                         {{ if .SourceBadge }}<span class="text-w-muted font-normal">· {{ t $.Lang "action.stream.translate.from" }} {{ originCodeForBadge .SourceBadge }}</span>{{ end }}

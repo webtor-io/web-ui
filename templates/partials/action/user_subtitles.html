@@ -32,7 +32,7 @@
             class="subtitle track-chip{{ if .Default }} track-chip-active{{ end }}">
         <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
         <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-purple/10 border-w-purple/30 text-w-purpleL" title="{{ t $lang "action.stream.origin.my" }}">MY</span>
-        <span class="max-w-[14rem] truncate" title="{{ .OriginalName }}">{{ .OriginalName }}</span>
+        <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ .OriginalName }}">{{ .OriginalName }}</span>
     </button>
     {{ end }}
 {{ end }}
