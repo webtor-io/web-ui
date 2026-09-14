@@ -736,3 +736,29 @@ func TestUserSubtitleViewLadderPickIsNotSaved(t *testing.T) {
 		t.Fatalf("a ladder pick is Default but not Saved: %+v", v.UserSubtitles[0])
 	}
 }
+
+// TestAudioTracksAreNeverMarkedSaved pins that Saved is a subtitle-only
+// field. The audio list shares selectListItem with the subtitle list, so a
+// saved audio choice used to set Saved on an audio item — a value nothing
+// reads (the template renders data-saved on subtitle items only) and that
+// would mean something different if it ever were read: for subtitles Saved
+// switches the audio-language rule off, and the audio list has no such rule.
+func TestAudioTracksAreNeverMarkedSaved(t *testing.T) {
+	ud := &models.VideoStreamUserData{AudioID: "mp-1", FallbackLangTag: language.English}
+	mp := probeWith(`[
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"por"}}
+	]`)
+	tracks := NewHelper().GetAudioTracks(ud, mp)
+	if len(tracks) != 2 {
+		t.Fatalf("fixture: expected 2 audio tracks, got %d", len(tracks))
+	}
+	if defaultID(tracks) != "mp-1" {
+		t.Fatalf("fixture: the saved audio choice must be the default, got %s", defaultID(tracks))
+	}
+	for _, a := range tracks {
+		if a.Saved {
+			t.Errorf("audio item %s is marked Saved; Saved is a subtitle-only field", a.ID)
+		}
+	}
+}

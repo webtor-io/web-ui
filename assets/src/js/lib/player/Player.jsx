@@ -4,7 +4,8 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
-import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
+import { applyCueOffset } from './cue-offset';
+import { reloadSubtitleTrack } from './subtitle-track-reload.js';
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
@@ -145,9 +146,24 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // The item the running poll belongs to, so re-selecting it does not
     // kill its own progress.
     const pollingIdRef = useRef('');
+    // Monotonic run id. A <track> error can arrive long after the run that
+    // asked for that revision was stopped (the element keeps loading), and
+    // without an identity check the late event would kill whatever run is
+    // current and report an error against the wrong translation.
+    const runSeqRef = useRef(0);
+    // The ".tr-progress" span of the running poll, so stopping the poll can
+    // hide it. Left visible it freezes at whatever percent was last seen and
+    // reads as a translation stuck forever.
+    const progressSpanRef = useRef(null);
 
     const stopTranslationProgress = useCallback(() => {
         pollingIdRef.current = '';
+        // Any event from the run being stopped is now stale.
+        runSeqRef.current++;
+        if (progressSpanRef.current) {
+            progressSpanRef.current.hidden = true;
+            progressSpanRef.current = null;
+        }
         if (pollStopRef.current) {
             pollStopRef.current();
             pollStopRef.current = null;
@@ -167,8 +183,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             translationStartedAtRef.current.set(id, Date.now());
         }
         pollingIdRef.current = id;
+        // stopTranslationProgress above already bumped the counter; this run
+        // owns the value it left behind.
+        const runID = runSeqRef.current;
         const lang = el.getAttribute('data-srclang') || '';
         const span = el.querySelector('.tr-progress');
+        progressSpanRef.current = span;
         const startedAt = translationStartedAtRef.current.get(id);
         let cues = 0;
         let lastReloadAt = 0;
@@ -180,12 +200,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const fail = (code) => {
             pollStopRef.current = null;
             pollingIdRef.current = '';
+            if (progressSpanRef.current === span) progressSpanRef.current = null;
             if (span) span.hidden = true;
             if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
         };
         // One 'track' error per run: a broken revision usually stays
-        // broken, and a report per poll would drown the real rate.
+        // broken, and a report per poll would drown the real rate. The
+        // identity check is the other half — a <track> whose src this run
+        // set can still fail after the run was stopped, and that event
+        // belongs to nobody.
         const onTrackError = () => {
+            if (runID !== runSeqRef.current) return;
             if (trackErrorReported) return;
             trackErrorReported = true;
             stopTranslationProgress();
@@ -194,8 +219,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const reload = (done, force) => {
             const now = Date.now();
             if (!force && now - lastReloadAt < TRACK_RELOAD_INTERVAL_MS) return;
-            lastReloadAt = now;
-            reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError);
+            // Only a reload that actually swapped the src spends the
+            // throttle window: stamping on a no-op (same revision, or no
+            // <track> element yet) would hold off the next real one for
+            // another 15 s.
+            if (reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError)) {
+                lastReloadAt = now;
+            }
         };
         if (!resume && window.umami) window.umami.track('subtitle-translate-start', {
             lang,
@@ -217,6 +247,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onDone: (p) => {
                 pollStopRef.current = null;
                 pollingIdRef.current = '';
+                if (progressSpanRef.current === span) progressSpanRef.current = null;
                 // Final: a later re-selection must neither poll nor
                 // report this translation again.
                 translationStatusRef.current.set(id, 'done');
@@ -938,29 +969,6 @@ function findSubtitleItem(modal, id) {
 
 function findSubtitlesModal(container) {
     return (container && container.querySelector('#subtitles')) || document.getElementById('subtitles');
-}
-
-// reloadSubtitleTrack swaps in a newer revision of a partially written
-// VTT. Re-parsing drops the cue list and flips the track mode, so both
-// are snapshotted and put back once the new revision has loaded
-// (cue-offset.js). The session cue-offset is re-applied by the capture
-// 'load' listener the player already installs.
-function reloadSubtitleTrack(video, id, nextSrc, onError) {
-    if (!video || !id || !nextSrc) return;
-    let el = null;
-    for (const t of video.querySelectorAll('track')) {
-        if (t.id === id) { el = t; break; }
-    }
-    if (!el || el.getAttribute('src') === nextSrc) return;
-    const saved = captureTrackState([el.track]);
-    el.addEventListener('load', () => restoreTrackState(saved), { once: true });
-    // A revision that fails to load leaves the track empty; put the cues
-    // the viewer already had back on screen and report it once.
-    el.addEventListener('error', () => {
-        restoreTrackState(saved);
-        if (onError) onError();
-    }, { once: true });
-    el.setAttribute('src', nextSrc);
 }
 
 // itemData reads the fields the pure rules in subtitle-rules.js need off

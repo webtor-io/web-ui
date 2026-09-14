@@ -179,12 +179,22 @@ trip" / cache-key section).
   track is briefly empty on every swap: reloads are therefore throttled to at most one per
   `TRACK_RELOAD_INTERVAL_MS` (15 s, `Player.jsx`) and always happen on the final progress, while
   the `.tr-progress` percentage still updates on every 3 s poll. No reload happens while
-  `total === 0` (nothing to fetch yet). `captureTrackState`/`restoreTrackState` (`cue-offset.js`)
-  snapshot and restore cues/mode around the swap, and the same snapshot is restored if the new
-  revision fails to load (`error` on the `<track>` → `subtitle-translate-error {code:'track'}`,
-  once per run); session cue-offset (mid-movie resume) reapplies via the existing `load` listener.
+  `total === 0` (nothing to fetch yet). `reloadSubtitleTrack` (`subtitle-track-reload.js` — its own
+  module so the listener lifetime is testable; `node --test` cannot parse `Player.jsx`) returns
+  whether it actually swapped the `src`, and **only a real swap stamps the throttle** — a no-op
+  must not hold off the next real reload for another 15 s.
+  `captureTrackState`/`restoreTrackState` (`cue-offset.js`) snapshot and restore cues/mode around
+  the swap, and the same snapshot is restored if the new revision fails to load (`error` on the
+  `<track>` → `subtitle-translate-error {code:'track'}`, once per run); session cue-offset
+  (mid-movie resume) reapplies via the existing `load` listener. There is **one `load`/`error`
+  listener pair per `<track>` at a time**: the pending pair is removed before the next revision's
+  goes on, so a failure restores the *latest* snapshot rather than one from several revisions ago.
+  `onTrackError` additionally checks the run identity (`runSeqRef`): a `<track>` whose `src` a
+  stopped run set can still fail afterwards, and that event must not kill the current run.
 - **Progress text.** `player.subtitleTranslating` = `"Translating… %v%"`, next to the active AI
-  item (`.tr-progress` span), hidden again on done/error.
+  item (`.tr-progress` span), hidden again on done, on error, and whenever the poll is stopped
+  (`stopTranslationProgress` holds the span in `progressSpanRef`) — a span left visible freezes at
+  the last percent and reads as a translation stuck forever.
 - **Auto-start.** Translation does **not** start on page load and there is no dedicated 5-second
   timer: it piggybacks on the existing `stream-start` engagement gate, which fires once
   `state.currentTime >= 5` (5 s of actual playback, not wall-clock time since load). If the AI item
@@ -278,6 +288,8 @@ selector, filtering out `data-id="none"`.
   covers the upload partial.
 - JS: `npm test` (`node --test`, plain-JS modules only — cannot parse JSX, so `Player.jsx` itself
   isn't covered, only the modules it imports). Covers `subtitle-rules.test.js`
-  (`pickDefaultSubtitle`, `baseLang`), `subtitle-progress.test.js` (`parseProgress`, `withRev`,
-  `pollProgress`), `subtitle-telemetry.test.js` (`readTracks`, `selectEventData`,
-  `resolveSubtitleLevel`).
+  (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
+  `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`),
+  `subtitle-telemetry.test.js` (`readAllTracks`, `readTracks`, `selectEventData`,
+  `resolveSubtitleLevel`), `subtitle-track-reload.test.js` (`reloadSubtitleTrack`: listener
+  lifetime, latest-snapshot restore, the did-it-reload return value).

@@ -167,12 +167,21 @@ func (s *Helper) GetAudioTracks(ud *models.VideoStreamUserData, mp *api.MediaPro
 			}
 		}
 	}
-	return s.selectListItem(s.canonizeSrcLangs(res), ud.AudioID, ud)
+	// markSaved=false: Saved is a subtitle-only field (the audio list has
+	// no rule the player must not re-decide over), so the audio choice is
+	// honoured without writing a value nothing reads.
+	return s.selectListItem(s.canonizeSrcLangs(res), ud.AudioID, ud, false)
 }
 
 type langIndex map[language.Tag]int
 
-func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStreamUserData) []ListItem {
+// selectListItem marks the default of a list: the viewer's saved id when
+// it names one of the items, otherwise an Accept-Language match, otherwise
+// the first item. markSaved says whether a matched id also sets Saved --
+// true for the subtitle list, where "the viewer chose this" is a state the
+// player has to respect, false for the audio list, which has no such rule
+// and would only be carrying a field nobody reads.
+func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStreamUserData, markSaved bool) []ListItem {
 	if len(lis) == 0 {
 		return lis
 	}
@@ -181,7 +190,7 @@ func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStrea
 			lis[i].Default = true
 			// id is the viewer's saved choice on every call that passes
 			// one; the ladder's fallback call passes "" and marks nothing.
-			lis[i].Saved = id != ""
+			lis[i].Saved = markSaved && id != ""
 			return lis
 		}
 	}
@@ -545,7 +554,7 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	// The preferred language yielded nothing activatable. Falling through
 	// to "None" would take subtitles away from viewers who had them in
 	// phase 1, so the old Accept-Language selection decides instead.
-	return s.selectListItem(lis, "", ud)
+	return s.selectListItem(lis, "", ud, true)
 }
 
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {
@@ -641,7 +650,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 		lis[i].Rank = ladderRank(lis[i])
 	}
 	if opts.PreferredLang == "" {
-		return s.markPreload(s.selectListItem(lis, ud.SubtitleID, ud), ud)
+		return s.markPreload(s.selectListItem(lis, ud.SubtitleID, ud, true), ud)
 	}
 	return s.markPreload(s.applyLadder(lis, ud, s.defaultAudioLang(ud, mp), opts), ud)
 }
