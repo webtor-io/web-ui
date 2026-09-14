@@ -156,8 +156,16 @@ trip" / cache-key section).
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
   fighting the viewer. `manualSubtitleRef` is also seeded on mount from a `data-saved` default
   (`ListItem.Saved`, set where `ud.SubtitleID` wins): a choice the viewer saved in an earlier
-  session is as explicit as one made in this one. *(Spec says the audio element carries `data-audio-lang`; the shipped code
+  session is as explicit as one made in this one. The seed reads `readAllTracks`, not `readTracks`:
+  a saved **"None"** is a choice too, and `readTracks` drops the `none` entry — missing it turned
+  subtitles back on over an explicit off. *(Spec says the audio element carries `data-audio-lang`; the shipped code
   instead reuses the existing `data-srclang` attribute on `.audio` items — see ledger.)*
+- **Only deliberate activations are persisted.** `activateSubtitle(container, item, {persist})`
+  passes `persist` through to `markTrack`, which is what issues the `PUT /stream-video/subtitle`
+  that becomes `ud.SubtitleID`. Clicking a list item and uploading a file persist; the
+  engagement-gate AI auto-start and the audio-switch re-pick do not. `Saved` therefore means
+  exactly "the viewer chose it", and a rule the player applied on the viewer's behalf never comes
+  back next page load as a choice that switches the rule off.
 - **Lock → CTA.** Clicking a `Locked` item never activates it (no `Src` to activate); it reveals
   `#translate-cta` (the `/donate` link, event `donate-subtitle-translate`) and fires
   `subtitle-translate-lock-click {lang}`.

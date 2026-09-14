@@ -59,6 +59,14 @@ type ListItem struct {
 	// data-saved: the player re-runs the ladder when the viewer switches
 	// audio, and a choice the viewer made themselves must survive that.
 	// Default alone cannot say which of the two it is.
+	//
+	// It means exactly "the viewer chose this": the player writes
+	// ud.SubtitleID only on a click and on an upload, never on the
+	// activations it performs by itself (the engagement-gate AI auto-start,
+	// the audio-switch re-pick) -- see activateSubtitle's persist flag in
+	// Player.jsx. Otherwise a rule the player applied on the viewer's behalf
+	// would come back on the next page load as a choice that switches the
+	// rule off.
 	Saved bool
 }
 

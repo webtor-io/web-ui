@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
+import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 
 function makeAttrEl(attrs) {
     return { getAttribute: (n) => (n in attrs ? attrs[n] : null) };
@@ -86,4 +86,29 @@ test('readTracks defaults a missing rank to last', () => {
 
 test('readTracks tolerates a missing modal', () => {
     assert.deepEqual(readTracks(null), []);
+});
+
+test('readAllTracks keeps the None entry so a saved "no subtitles" choice is visible', () => {
+    // readTracks drops "None" because every consumer that ranks or reports
+    // tracks treats "no subtitle" as the absence of one. hasSavedDefault is
+    // the exception: choosing None IS a choice, and dropping it meant an
+    // audio switch turned subtitles back on over an explicit off.
+    const noneEl = makeAttrEl({
+        'data-id': 'none', 'data-provider': '', 'data-srclang': '', 'data-source': '',
+        'data-default': 'true', 'data-saved': 'true',
+    });
+    const osEl = makeAttrEl({ 'data-id': 'os-1', 'data-provider': 'OpenSubtitles', 'data-srclang': 'en', 'data-source': 'hash', 'data-rank': '3' });
+    const modal = {
+        querySelectorAll: (selector) => (selector === '.subtitle[data-provider]' ? [noneEl, osEl] : []),
+    };
+    const all = readAllTracks(modal);
+    assert.deepEqual(all.map((t) => t.id), ['none', 'os-1']);
+    assert.equal(all[0].saved, true);
+    assert.equal(all[0].isDefault, true);
+    // readTracks still drops it, for everything that ranks or reports.
+    assert.deepEqual(readTracks(modal).map((t) => t.id), ['os-1']);
+});
+
+test('readAllTracks tolerates a missing modal', () => {
+    assert.deepEqual(readAllTracks(null), []);
 });

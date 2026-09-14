@@ -21,17 +21,26 @@ function levelOf(track) {
     }
 }
 
-export function readTracks(modal) {
+// readAllTracks is every item the picker renders, the "None" entry
+// included. Not `li.subtitle`: user-uploaded subtitles render the
+// `.subtitle` marker on a `<div>` inside a plain `<li>`
+// (templates/partials/action/user_subtitles.html), while embedded/
+// sidecar/OpenSubtitles tracks render it directly on the `<li>`
+// (templates/views/action/stream_video.html). `[data-provider]` is the
+// trait both share.
+export function readAllTracks(modal) {
     if (!modal) return [];
-    // Not `li.subtitle`: user-uploaded subtitles render the `.subtitle`
-    // marker on a `<div>` inside a plain `<li>`
-    // (templates/partials/action/user_subtitles.html), while embedded/
-    // sidecar/OpenSubtitles tracks render it directly on the `<li>`
-    // (templates/views/action/stream_video.html). `[data-provider]` is the
-    // trait both share.
-    return Array.from(modal.querySelectorAll('.subtitle[data-provider]'))
-        .filter((el) => el.getAttribute('data-id') !== 'none')
-        .map(trackData);
+    return Array.from(modal.querySelectorAll('.subtitle[data-provider]')).map(trackData);
+}
+
+// readTracks is readAllTracks without "None": everything that ranks or
+// reports tracks treats "no subtitle" as the absence of a track, not as a
+// candidate or a level. The one caller that must see it is hasSavedDefault
+// — choosing "None" is a choice like any other, and hiding it let an audio
+// switch turn subtitles back on over an explicit off — so that call reads
+// readAllTracks instead.
+export function readTracks(modal) {
+    return readAllTracks(modal).filter((t) => t.id !== 'none');
 }
 
 // trackData is the full read of a list item — everything the default

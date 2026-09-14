@@ -5,7 +5,7 @@ import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
-import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
+import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
 import { Controls } from './Controls';
@@ -254,8 +254,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // session rather than this one. Without this seed the audio
         // switch would re-decide over it and turn off subtitles the
         // viewer had explicitly asked for.
+        // readAllTracks, not readTracks: "None" is a saved choice like any
+        // other, and readTracks drops it. Missing it meant an audio switch
+        // turned subtitles back on over an explicit off.
         const modalAtMount = findSubtitlesModal(trackContainer);
-        if (modalAtMount && hasSavedDefault(readTracks(modalAtMount))) {
+        if (modalAtMount && hasSavedDefault(readAllTracks(modalAtMount))) {
             manualSubtitleRef.current = true;
         }
         trackHooks.onSubtitleSelect = (el) => {
@@ -282,7 +285,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             if (!item || item.getAttribute('data-default') === 'true') return;
             const action = translationActionFor(item);
             stopTranslationProgress();
-            activateSubtitle(trackContainer, item);
+            // The audio rule decided this, not the viewer: marking it saved
+            // would make the next page load treat the player's own pick as
+            // an explicit choice and stop re-running the rule.
+            activateSubtitle(trackContainer, item, { persist: false });
             if (action !== 'none') startTranslationProgress(item, action === 'resume');
         };
         return () => {
@@ -411,7 +417,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (auto && trackContainer) {
             const action = translationActionFor(auto);
             if (action !== 'none') {
-                activateSubtitle(trackContainer, auto);
+                // Same reasoning as the audio-switch re-pick: the server made
+                // this the default, the player is only carrying it out.
+                activateSubtitle(trackContainer, auto, { persist: false });
                 startTranslationProgress(auto, action === 'resume');
             }
         }
@@ -967,9 +975,17 @@ function itemData(el) {
 
 // activateSubtitle switches playback to the subtitle the given list item
 // stands for. Shared by the click handler and by the auto-selection that runs
-// after an upload, so both paths create the <track>, persist the choice
+// after an upload, so both paths create the <track>, mark the list item
 // through markTrack and end with the same textTracks state.
-function activateSubtitle(container, target) {
+//
+// persist says whether the choice is written back to the session
+// (ud.SubtitleID, which renders as ListItem.Saved). Only what the viewer did
+// on purpose counts: clicking an item, or uploading a file to watch with.
+// The automatic activations — the engagement-gate AI auto-start and the
+// audio-switch re-pick — pass persist:false, so `Saved` keeps meaning
+// exactly "the viewer chose this" and a rule the player applied for them
+// never comes back as a choice the next rule has to respect.
+function activateSubtitle(container, target, { persist = true } = {}) {
     const provider = target.getAttribute('data-provider');
     const id = target.getAttribute('data-id');
     // Side-loaded tracks (OpenSubtitles, sidecar files, embed externals,
@@ -988,7 +1004,7 @@ function activateSubtitle(container, target) {
             );
         }
     }
-    markTrack(container, target, 'subtitle');
+    markTrack(container, target, 'subtitle', persist);
     const hls = window.hlsPlayer;
     const mpId = target.getAttribute('data-mp-id');
 
@@ -1151,7 +1167,7 @@ function wireTrackHandlers(container, hooks = {}) {
     }
 }
 
-function markTrack(container, el, type) {
+function markTrack(container, el, type, persist = true) {
     if (el.getAttribute('data-default') === 'true') return;
     el.classList.add('text-primary', 'underline');
     el.setAttribute('data-default', 'true');
@@ -1165,6 +1181,7 @@ function markTrack(container, el, type) {
         ee.removeAttribute('data-default');
     }
 
+    if (!persist) return;
     fetch(`/stream-video/${type}`, {
         method: 'PUT',
         headers: {
