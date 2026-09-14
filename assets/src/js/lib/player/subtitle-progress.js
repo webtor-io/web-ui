@@ -17,25 +17,51 @@ export function parseProgress(header) {
     return { done, total, final: total > 0 && done >= total };
 }
 
+// POLL_TIMEOUT_MS bounds a single translation run. A job that neither
+// finishes nor fails leaves the player polling for the life of the page;
+// fifteen minutes is well past the longest observed run, so passing it
+// means the job is gone, not slow.
+export const POLL_TIMEOUT_MS = 15 * 60 * 1000;
+
+// A scheme ("https:", "blob:") with an authority. Anything else is
+// either protocol-relative, root-relative or relative to the page.
+const ABSOLUTE = /^[a-z][a-z0-9+.-]*:\/\//i;
+
 // withRev busts the browser's cache for the partially-written track.
 // The URL is signed, so the token and every other query parameter must
-// survive untouched; only `rev` is added or replaced.
+// survive untouched; only `rev` is added or replaced. The placeholder
+// base is only there to get a parser: whatever shape the input had is
+// put back, because a protocol-relative src rewritten as https:// would
+// break on an http page and a relative one rewritten as /path would
+// point at the site root.
 export function withRev(src, n) {
-    const u = new URL(src, 'https://placeholder.invalid');
+    const s = String(src || '');
+    const u = new URL(s, 'https://placeholder.invalid');
     u.searchParams.set('rev', String(n));
-    if (/^https?:/i.test(src)) return u.toString();
-    return u.pathname + u.search;
+    if (ABSOLUTE.test(s)) return u.toString();
+    if (s.startsWith('//')) return u.toString().replace(/^https?:/i, '');
+    if (s.startsWith('/')) return u.pathname + u.search + u.hash;
+    const q = s.search(/[?#]/);
+    return (q < 0 ? s : s.slice(0, q)) + u.search + u.hash;
 }
 
 // pollProgress HEADs src every intervalMs, reports changes and stops on
 // completion or on a non-200. Returns a stop() function — call it when
 // the viewer selects another track or the player unmounts.
-export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, onProgress, onDone, onError } = {}) {
+export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, onProgress, onDone, onError } = {}) {
     let stopped = false;
     let last = -1;
     let timer = null;
+    const deadline = Date.now() + timeoutMs;
     const tick = async () => {
         if (stopped) return;
+        if (Date.now() >= deadline) {
+            // Reported as an error, not silence: the viewer is looking at
+            // a percentage that stopped moving, and a run that outlives
+            // the cap is a failure worth counting.
+            if (onError) onError('timeout');
+            return;
+        }
         let res;
         try {
             res = await fetchImpl(src, { method: 'HEAD', cache: 'no-store' });

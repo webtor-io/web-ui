@@ -50,6 +50,8 @@ function trackData(el) {
         forced: el.getAttribute('data-forced') === 'true',
         locked: el.getAttribute('data-locked') === 'true',
         isDefault: el.getAttribute('data-default') === 'true',
+        // The viewer's own earlier choice, as opposed to a ladder pick.
+        saved: el.getAttribute('data-saved') === 'true',
         sourceBadge: el.getAttribute('data-source-badge') || '',
     };
 }
@@ -65,9 +67,13 @@ export function selectEventData(el) {
 
 // resolveSubtitleLevel summarises what the viewer actually got.
 // `needed` separates "no subtitles offered" from "no subtitles wanted":
-// when the audio is already in the UI language, an empty list is the
-// right answer, and counting it as a miss would bury the real ones.
-export function resolveSubtitleLevel(tracks, uiLang, { audioLang = '' } = {}) {
+// when the audio is already in the language the viewer wants to read,
+// an empty list is the right answer, and counting it as a miss would
+// bury the real ones. That language is the preferred content language
+// (`data-preferred-lang`, what the ladder itself ran on); the UI
+// language stands in only when no preference is configured, so the two
+// halves of the same question are never asked of different languages.
+export function resolveSubtitleLevel(tracks, uiLang, { audioLang = '', preferredLang = '' } = {}) {
     let best = null;
     let hasUiLang = false;
     let badge = '';
@@ -84,7 +90,7 @@ export function resolveSubtitleLevel(tracks, uiLang, { audioLang = '' } = {}) {
         count: tracks.length,
         badge,
         // Unknown audio language ⇒ assume subtitles are needed.
-        needed: !audioLang || baseLang(audioLang) !== ui,
+        needed: !audioLang || baseLang(audioLang) !== (baseLang(preferredLang) || ui),
         translated: badge === 'ai',
     };
 }

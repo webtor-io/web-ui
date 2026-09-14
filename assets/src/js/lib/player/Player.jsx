@@ -6,7 +6,7 @@ import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
 import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
 import { readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
-import { pickDefaultSubtitle } from './subtitle-rules.js';
+import { pickDefaultSubtitle, shouldStartTranslation, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
@@ -16,6 +16,19 @@ import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 
 let _currentPlayer = null;
+
+// ENGAGEMENT_SECONDS is the playback time (not wall clock) after which a
+// session counts as real viewing: the stream-start event and the AI
+// translation auto-start both hang off it, so press-play-and-bounce
+// neither skews the denominator nor spends a translation.
+const ENGAGEMENT_SECONDS = 5;
+
+// TRACK_RELOAD_INTERVAL_MS throttles the <track> src swaps. Every swap
+// refetches the whole partial VTT and leaves the track without cues
+// while the browser reparses it, so reloading on each 3 s poll would
+// blank the subtitles five times a minute. The percentage keeps updating
+// on every poll; only the text catches up in steps.
+const TRACK_RELOAD_INTERVAL_MS = 15000;
 
 // Cast sender SDK loader — module-level so repeated player inits (one per
 // file click) share a single <script> append and a single
@@ -121,27 +134,63 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // the player fighting the viewer.
     const manualSubtitleRef = useRef(false);
     const pollStopRef = useRef(null);
+    // Ids whose translation this page load already started. Without it a
+    // warm cache double-counts: the click starts and finishes the run,
+    // and the engagement-gate auto-start then finds the same item still
+    // marked default with no poll running and starts it again.
+    const startedTranslationsRef = useRef(new Set());
+    // The item the running poll belongs to, so re-selecting it does not
+    // kill its own progress.
+    const pollingIdRef = useRef('');
 
     const stopTranslationProgress = useCallback(() => {
+        pollingIdRef.current = '';
         if (pollStopRef.current) {
             pollStopRef.current();
             pollStopRef.current = null;
         }
     }, []);
 
+    // startTranslationProgress runs one translation to completion. Callers
+    // must have cleared shouldStartTranslation first — it is what keeps
+    // one run per item per page load.
     const startTranslationProgress = useCallback((el) => {
         stopTranslationProgress();
         const src = el.getAttribute('data-src') || '';
         const id = el.getAttribute('data-id') || '';
         if (!src || !id) return;
+        startedTranslationsRef.current.add(id);
+        pollingIdRef.current = id;
         const lang = el.getAttribute('data-srclang') || '';
         const span = el.querySelector('.tr-progress');
         const startedAt = Date.now();
         let cues = 0;
+        let lastReloadAt = 0;
+        let trackErrorReported = false;
         if (span) {
             span.hidden = false;
             span.textContent = tf('player.subtitleTranslating', 0);
         }
+        const fail = (code) => {
+            pollStopRef.current = null;
+            pollingIdRef.current = '';
+            if (span) span.hidden = true;
+            if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
+        };
+        // One 'track' error per run: a broken revision usually stays
+        // broken, and a report per poll would drown the real rate.
+        const onTrackError = () => {
+            if (trackErrorReported) return;
+            trackErrorReported = true;
+            stopTranslationProgress();
+            fail('track');
+        };
+        const reload = (done, force) => {
+            const now = Date.now();
+            if (!force && now - lastReloadAt < TRACK_RELOAD_INTERVAL_MS) return;
+            lastReloadAt = now;
+            reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError);
+        };
         if (window.umami) window.umami.track('subtitle-translate-start', {
             lang,
             // Which human track the machine works from: a translation of
@@ -154,12 +203,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 cues = p.total;
                 const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
                 if (span) span.textContent = tf('player.subtitleTranslating', pct);
-                reloadSubtitleTrack(videoRef.current, id, withRev(src, p.done));
+                // total === 0 means the job has not counted the cues yet:
+                // the file on the other end is still empty, so a reload
+                // would only replace subtitles with nothing.
+                if (p.total > 0) reload(p.done, false);
             },
             onDone: (p) => {
                 pollStopRef.current = null;
+                pollingIdRef.current = '';
                 cues = p.total || cues;
-                reloadSubtitleTrack(videoRef.current, id, withRev(src, p.done));
+                reload(p.done, true);
                 if (span) span.hidden = true;
                 if (window.umami) window.umami.track('subtitle-translate-done', {
                     lang,
@@ -167,11 +220,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     cues,
                 });
             },
-            onError: (code) => {
-                pollStopRef.current = null;
-                if (span) span.hidden = true;
-                if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
-            },
+            onError: fail,
         });
     }, [stopTranslationProgress]);
 
@@ -182,10 +231,24 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // handler only calls through.
     useEffect(() => {
         if (!trackHooks) return;
+        // A default the viewer saved earlier (ud.SubtitleID, rendered as
+        // data-saved) is already a manual choice — made in an earlier
+        // session rather than this one. Without this seed the audio
+        // switch would re-decide over it and turn off subtitles the
+        // viewer had explicitly asked for.
+        const modalAtMount = findSubtitlesModal(trackContainer);
+        if (modalAtMount && hasSavedDefault(readTracks(modalAtMount))) {
+            manualSubtitleRef.current = true;
+        }
         trackHooks.onSubtitleSelect = (el) => {
             manualSubtitleRef.current = true;
-            stopTranslationProgress();
-            if (el.getAttribute('data-provider') === 'Translated') startTranslationProgress(el);
+            const data = itemData(el);
+            // Clicking the item that is translating right now (a viewer
+            // who thinks nothing happened) must not stop its own poll.
+            if (data.id !== pollingIdRef.current) stopTranslationProgress();
+            if (shouldStartTranslation(data, startedTranslationsRef.current)) {
+                startTranslationProgress(el);
+            }
         };
         trackHooks.onAudioSelect = (el) => {
             if (manualSubtitleRef.current) return;
@@ -201,7 +264,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             if (!item || item.getAttribute('data-default') === 'true') return;
             stopTranslationProgress();
             activateSubtitle(trackContainer, item);
-            if (item.getAttribute('data-provider') === 'Translated' && item.getAttribute('data-locked') !== 'true') {
+            if (shouldStartTranslation(itemData(item), startedTranslationsRef.current)) {
                 startTranslationProgress(item);
             }
         };
@@ -294,7 +357,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // button is always visible.
     useEffect(() => {
         if (streamStartFiredRef.current) return;
-        if (state.currentTime < 5) return;
+        if (state.currentTime < ENGAGEMENT_SECONDS) return;
         streamStartFiredRef.current = true;
         if (window.umami) window.umami.track('stream-start', {
             isVideo,
@@ -309,9 +372,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (!modal) return;
         const audioEl = modal.querySelector('.audio[data-default="true"]');
         const audioLang = audioEl ? (audioEl.getAttribute('data-srclang') || '') : '';
+        // The ladder ran on the preferred content language, so `needed`
+        // is measured against that one; the UI language only stands in
+        // when no preference is configured.
+        const preferredLang = modal.getAttribute('data-preferred-lang') || '';
         if (window.umami) {
             window.umami.track('subtitle-resolved', {
-                ...resolveSubtitleLevel(readTracks(modal), uiLang, { audioLang }),
+                ...resolveSubtitleLevel(readTracks(modal), uiLang, { audioLang, preferredLang }),
                 uiLang,
                 audioLang,
             });
@@ -320,10 +387,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // (markPreload skips it — preloading would start a translation
         // for every viewer who opens the page), so when the server made
         // it the default the player is what actually starts it. A manual
-        // pick in the first seconds clears data-default on this item, and
-        // pollStopRef catches the case where that pick was this very item.
-        const auto = modal.querySelector('.subtitle[data-provider="Translated"][data-default="true"]:not([data-locked="true"])');
-        if (auto && trackContainer && !pollStopRef.current) {
+        // pick in the first seconds clears data-default on this item;
+        // shouldStartTranslation covers the case where that pick was this
+        // very item and its translation already ran.
+        const auto = modal.querySelector('.subtitle[data-provider="Translated"][data-default="true"]');
+        if (auto && trackContainer && shouldStartTranslation(itemData(auto), startedTranslationsRef.current)) {
             activateSubtitle(trackContainer, auto);
             startTranslationProgress(auto);
         }
@@ -849,7 +917,7 @@ function findSubtitlesModal(container) {
 // are snapshotted and put back once the new revision has loaded
 // (cue-offset.js). The session cue-offset is re-applied by the capture
 // 'load' listener the player already installs.
-function reloadSubtitleTrack(video, id, nextSrc) {
+function reloadSubtitleTrack(video, id, nextSrc, onError) {
     if (!video || !id || !nextSrc) return;
     let el = null;
     for (const t of video.querySelectorAll('track')) {
@@ -858,7 +926,23 @@ function reloadSubtitleTrack(video, id, nextSrc) {
     if (!el || el.getAttribute('src') === nextSrc) return;
     const saved = captureTrackState([el.track]);
     el.addEventListener('load', () => restoreTrackState(saved), { once: true });
+    // A revision that fails to load leaves the track empty; put the cues
+    // the viewer already had back on screen and report it once.
+    el.addEventListener('error', () => {
+        restoreTrackState(saved);
+        if (onError) onError();
+    }, { once: true });
     el.setAttribute('src', nextSrc);
+}
+
+// itemData reads the fields the pure rules in subtitle-rules.js need off
+// a picker list item.
+function itemData(el) {
+    return {
+        id: el.getAttribute('data-id') || '',
+        provider: el.getAttribute('data-provider') || '',
+        locked: el.getAttribute('data-locked') === 'true',
+    };
 }
 
 // activateSubtitle switches playback to the subtitle the given list item

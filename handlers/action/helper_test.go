@@ -447,6 +447,60 @@ func TestLadderSavedChoiceWins(t *testing.T) {
 	}
 }
 
+// TestLadderSavedChoiceIsMarkedSaved pins the difference between "the
+// viewer chose this" and "the ladder picked this". The player re-runs the
+// ladder when the audio track changes, and Default alone cannot tell it
+// which of the two it is looking at: without Saved it would re-decide
+// over a choice the viewer made explicitly and switch their subtitles
+// off.
+func TestLadderSavedChoiceIsMarkedSaved(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "os-1"}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	for _, li := range items {
+		if li.ID == "os-1" {
+			if !li.Saved {
+				t.Fatal("the saved choice must be marked Saved")
+			}
+			continue
+		}
+		if li.Saved {
+			t.Fatalf("only the saved choice may be marked Saved, got %s", li.ID)
+		}
+	}
+}
+
+// TestLadderPickIsNotMarkedSaved is the negative half: an item the ladder
+// chose is Default but not Saved, so the audio rule stays free to
+// override it.
+func TestLadderPickIsNotMarkedSaved(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	for _, li := range items {
+		if li.Saved {
+			t.Fatalf("no saved choice was made, but %s is marked Saved", li.ID)
+		}
+	}
+}
+
+// TestLegacySavedChoiceIsMarkedSaved covers the phase-1 path (no
+// preferred language): the same saved id goes through selectListItem.
+func TestLegacySavedChoiceIsMarkedSaved(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "os-1", FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{})
+	saved := byID(items)["os-1"]
+	if !saved.Default || !saved.Saved {
+		t.Fatalf("legacy saved choice: default=%v saved=%v", saved.Default, saved.Saved)
+	}
+	for _, li := range items {
+		if li.ID != "os-1" && li.Saved {
+			t.Fatalf("only the saved choice may be marked Saved, got %s", li.ID)
+		}
+	}
+}
+
 func TestLadderSourcePrefersAudioLangThenEnglish(t *testing.T) {
 	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{
 		{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "en.srt", Kind: "subtitles"},

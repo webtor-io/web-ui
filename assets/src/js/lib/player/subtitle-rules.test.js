@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { baseLang, pickDefaultSubtitle } from './subtitle-rules.js';
+import { baseLang, pickDefaultSubtitle, shouldStartTranslation, hasSavedDefault } from './subtitle-rules.js';
 
 // Tracks carry the rank the server rendered as data-rank (see
 // ladderRank in handlers/action/helper.go): 0 user upload, 1 embedded,
@@ -70,4 +70,33 @@ test('no preferred language: nothing to pick', () => {
 
 test('the none entry is never a candidate on its own merits', () => {
     assert.equal(pickDefaultSubtitle([{ id: 'none', rank: 9, srclang: '', forced: false, locked: false }], 'en', 'pt'), 'none');
+});
+
+test('shouldStartTranslation runs a translation once per item per page load', () => {
+    const tr = { id: 'tr-ru', provider: 'Translated', locked: false };
+    const started = new Set();
+    assert.equal(shouldStartTranslation(tr, started), true);
+    started.add('tr-ru');
+    // Warm cache: the click already ran it, so the engagement-gate
+    // auto-start must not fire a second start/done pair.
+    assert.equal(shouldStartTranslation(tr, started), false);
+    assert.equal(shouldStartTranslation({ id: 'tr-de', provider: 'Translated', locked: false }, started), true);
+});
+
+test('shouldStartTranslation ignores everything that is not a runnable AI item', () => {
+    const started = new Set();
+    assert.equal(shouldStartTranslation({ id: 'os-1', provider: 'OpenSubtitles', locked: false }, started), false);
+    assert.equal(shouldStartTranslation({ id: 'tr-ru', provider: 'Translated', locked: true }, started), false);
+    assert.equal(shouldStartTranslation({ id: '', provider: 'Translated', locked: false }, started), false);
+    assert.equal(shouldStartTranslation(null, started), false);
+});
+
+test('hasSavedDefault only counts a default the viewer saved themselves', () => {
+    assert.equal(hasSavedDefault([T('os-1', 3, 'pt', { isDefault: true, saved: true })]), true);
+    // A ladder pick is not a choice: the audio rule may override it.
+    assert.equal(hasSavedDefault([T('os-1', 3, 'pt', { isDefault: true })]), false);
+    // Saved, but the ladder moved on (e.g. the saved item is now locked).
+    assert.equal(hasSavedDefault([T('os-1', 3, 'pt', { saved: true })]), false);
+    assert.equal(hasSavedDefault([]), false);
+    assert.equal(hasSavedDefault(null), false);
 });

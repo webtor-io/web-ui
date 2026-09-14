@@ -140,7 +140,9 @@ trip" / cache-key section).
 - **Audio switch re-pick.** `onAudioSelect` calls `pickDefaultSubtitle(readTracks(modal), audioLang,
   preferredLang)` and activates the result, unless the viewer already made a manual subtitle choice
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
-  fighting the viewer. *(Spec says the audio element carries `data-audio-lang`; the shipped code
+  fighting the viewer. `manualSubtitleRef` is also seeded on mount from a `data-saved` default
+  (`ListItem.Saved`, set where `ud.SubtitleID` wins): a choice the viewer saved in an earlier
+  session is as explicit as one made in this one. *(Spec says the audio element carries `data-audio-lang`; the shipped code
   instead reuses the existing `data-srclang` attribute on `.audio` items — see ledger.)*
 - **Lock → CTA.** Clicking a `Locked` item never activates it (no `Src` to activate); it reveals
   `#translate-cta` (the `/donate` link, event `donate-subtitle-translate`) and fires
@@ -149,11 +151,16 @@ trip" / cache-key section).
   starts a job). `X-Subtitle-Progress: done/total`; `0/0` means "not registered yet, keep polling"
   (never final). Done ⇔ `total > 0 && done >= total`. A non-200 response calls `onError` once and
   **stops the poll** — it does not retry.
-- **`rev` reload.** Every progress change rewrites the `<track>` `src` via `withRev`
+- **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
-  through untouched), forcing a refetch. `captureTrackState`/`restoreTrackState` (`cue-offset.js`)
-  snapshot and restore cues/mode/active cue around the reload so playback doesn't visibly hiccup;
-  session cue-offset (mid-movie resume) reapplies via the existing `load` listener.
+  through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
+  track is briefly empty on every swap: reloads are therefore throttled to at most one per
+  `TRACK_RELOAD_INTERVAL_MS` (15 s, `Player.jsx`) and always happen on the final progress, while
+  the `.tr-progress` percentage still updates on every 3 s poll. No reload happens while
+  `total === 0` (nothing to fetch yet). `captureTrackState`/`restoreTrackState` (`cue-offset.js`)
+  snapshot and restore cues/mode around the swap, and the same snapshot is restored if the new
+  revision fails to load (`error` on the `<track>` → `subtitle-translate-error {code:'track'}`,
+  once per run); session cue-offset (mid-movie resume) reapplies via the existing `load` listener.
 - **Progress text.** `player.subtitleTranslating` = `"Translating… %v%"`, next to the active AI
   item (`.tr-progress` span), hidden again on done/error.
 - **Auto-start.** Translation does **not** start on page load and there is no dedicated 5-second
@@ -166,11 +173,11 @@ trip" / cache-key section).
 
 | Event | Fields | Notes |
 |---|---|---|
-| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ 5 s). `needed = audioLang base != uiLang base` (unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
+| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
-| `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, or `0` for a network error. |
+| `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
 
@@ -184,8 +191,8 @@ as descoped.
 | Kind | Where | Attributes |
 |---|---|---|
 | `.audio` `<li>` | `#embedded` audio column | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-default` |
-| `.subtitle` `<li>` | `#embedded` subtitles column (`$otherSubs`: embedded/sidecar/AI, excludes OpenSubtitles & user uploads) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-source-badge` (Translated only), `data-forced`, `data-locked`, `data-default` |
-| `.subtitle` `<li>` | `#opensubtitles` (`$openSubs`) | `data-id`, `data-provider`, `data-srclang`, `data-source`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-rank`, `data-default` (never `forced`/`locked`/`source-badge`) |
+| `.subtitle` `<li>` | `#embedded` subtitles column (`$otherSubs`: embedded/sidecar/AI, excludes OpenSubtitles & user uploads) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-source-badge` (Translated only), `data-forced`, `data-locked`, `data-default`, `data-saved` |
+| `.subtitle` `<li>` | `#opensubtitles` (`$openSubs`) | `data-id`, `data-provider`, `data-srclang`, `data-source`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-rank`, `data-default`, `data-saved` (never `forced`/`locked`/`source-badge`) |
 | `.subtitle` on a `<div>` inside `<li>` | `#my-subtitles` (`templates/partials/action/user_subtitles.html`) | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-autoselect="true"` when just uploaded (separate mechanism from `data-default`, unrelated to the ladder) |
 
 `readTracks` (`subtitle-telemetry.js`) matches all three list-item shapes via the `.subtitle[data-provider]`
@@ -205,9 +212,17 @@ selector, filtering out `data-id="none"`.
 - **Translations of embedded HLS subtitle tracks are not supported.** Same root cause, from the
   source side: embedded tracks are served through the transcoder's HLS subtitle group with no
   independent URL for the `~tr:` mod to attach to. Deferred to phase 3+ in the spec.
-- **Every progress step refetches the whole partial VTT.** The `rev` reload swaps the `<track>`
-  `src` and lets the browser reparse from scratch each poll tick — no incremental cue-append; the
-  file is just short early on and grows with each revision.
+- **Each reload refetches the whole partial VTT.** The `rev` reload swaps the `<track>` `src` and
+  lets the browser reparse from scratch — no incremental cue-append; the file is just short early
+  on and grows with each revision. The 15 s throttle bounds the cost (and the blank-cue window) but
+  does not remove it: the subtitle text catches up in steps while the percentage moves smoothly.
+- **A translation is started once per item per page load.** `shouldStartTranslation`
+  (`subtitle-rules.js`) keeps a set of started ids so a warm cache cannot fire a second
+  `subtitle-translate-start`/`done` pair via the engagement-gate auto-start. The consequence: if
+  the viewer selects another subtitle mid-translation (which stops the poll) and comes back, the
+  poll does not resume — the track keeps the revision it had until the page is reloaded.
+- **Polling gives up after 15 minutes** (`POLL_TIMEOUT_MS`, `subtitle-progress.js`) with
+  `subtitle-translate-error {code:'timeout'}`; a run that outlives the cap is treated as gone.
 
 ## Testing
 

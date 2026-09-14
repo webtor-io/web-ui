@@ -64,3 +64,27 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     const current = list.find((t) => t.isDefault && t.id && t.id !== 'none');
     return current ? current.id : 'none';
 }
+
+// shouldStartTranslation decides whether selecting this item should kick
+// off a translation run. `startedIDs` is the set of item ids whose
+// translation this page load already started: a warm cache finishes in
+// one poll, and without the set the auto-start at the engagement gate
+// would run again over an item the viewer had already clicked — two
+// `subtitle-translate-start` and two `subtitle-translate-done` events for
+// one translation.
+export function shouldStartTranslation(track, startedIDs) {
+    if (!track || !track.id) return false;
+    if (track.provider !== 'Translated') return false;
+    // A locked item has no Src: there is nothing to poll.
+    if (track.locked) return false;
+    if (startedIDs && startedIDs.has(track.id)) return false;
+    return true;
+}
+
+// hasSavedDefault reports whether the default the server rendered is the
+// viewer's own earlier choice (ud.SubtitleID) rather than a ladder pick.
+// The audio-switch rule must leave a saved choice alone — re-deciding
+// over it would turn off subtitles the viewer explicitly asked for.
+export function hasSavedDefault(tracks) {
+    return (Array.isArray(tracks) ? tracks : []).some((t) => t.saved && t.isDefault);
+}

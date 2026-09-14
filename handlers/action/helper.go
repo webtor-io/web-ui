@@ -54,6 +54,12 @@ type ListItem struct {
 	// not reported, unlike Source, which stays the OpenSubtitles
 	// hash|imdb enum for every provider.
 	SourceID string
+	// Saved marks the default that came from the viewer's own earlier
+	// choice (ud.SubtitleID) rather than from the ladder. Rendered as
+	// data-saved: the player re-runs the ladder when the viewer switches
+	// audio, and a choice the viewer made themselves must survive that.
+	// Default alone cannot say which of the two it is.
+	Saved bool
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -144,6 +150,9 @@ func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStrea
 	for i, li := range lis {
 		if li.ID == id {
 			lis[i].Default = true
+			// id is the viewer's saved choice on every call that passes
+			// one; the ladder's fallback call passes "" and marks nothing.
+			lis[i].Saved = id != ""
 			return lis
 		}
 	}
@@ -467,6 +476,7 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 					lis[j].Default = false
 				}
 				lis[i].Default = true
+				lis[i].Saved = true
 				return lis
 			}
 		}

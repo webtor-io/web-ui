@@ -62,7 +62,7 @@
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
                     <ul class="flex flex-wrap">
                         {{ range $otherSubs }}
-                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}" {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" {{ end }}{{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}{{ if .Locked }} opacity-70{{ end }}">
+                        <li data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}" {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" {{ end }}{{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}{{ if .Locked }} opacity-70{{ end }}">
                           {{ .Label }}{{ if .Badge }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $.Lang (printf "action.stream.badge.%s" .Badge) }}</span>{{ end }}{{ if .SourceBadge }} <span class="text-xs text-w-muted">{{ t $.Lang "action.stream.translate.from" }} {{ t $.Lang (printf "action.stream.badge.%s" .SourceBadge) }}</span>{{ end }}{{ if .Locked }} <span aria-hidden="true">🔒</span>{{ end }}{{ if eq .Provider "Translated" }} <span class="tr-progress text-xs text-w-muted" hidden></span>{{ end }}
                         </li>
                         {{ end }}
@@ -78,7 +78,7 @@
                     <h3 class="font-bold text-lg">OpenSubtitles</h3>
                     <ul class="flex flex-wrap">
                         {{ range $openSubs }}
-                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-rank="{{ .Rank }}" {{ if .Default }}data-default="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}{{ if .Badge }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $.Lang (printf "action.stream.badge.%s" .Badge) }}</span>{{ end }}</li>
+                        <li data-id="{{ .ID }}" data-provider="{{ .Provider }}" data-srclang="{{ .SrcLang }}" data-source="{{ .Source }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-rank="{{ .Rank }}" {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }} class="subtitle cursor-pointer pr-3{{ if .Default }} text-primary underline{{ end }}">{{ .Label }}{{ if .Badge }} <span class="badge badge-xs bg-w-cyan/10 text-w-cyan align-middle">{{ t $.Lang (printf "action.stream.badge.%s" .Badge) }}</span>{{ end }}</li>
                         {{ end }}
                     </ul>
                 </div>

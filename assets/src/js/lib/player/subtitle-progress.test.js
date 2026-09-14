@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProgress, withRev, pollProgress } from './subtitle-progress.js';
+import { parseProgress, withRev, pollProgress, POLL_TIMEOUT_MS } from './subtitle-progress.js';
 
 test('parseProgress', () => {
     assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false });
@@ -14,6 +14,11 @@ test('withRev appends or replaces rev', () => {
     assert.equal(withRev('https://x/a.vtt?token=T', 3), 'https://x/a.vtt?token=T&rev=3');
     assert.equal(withRev('https://x/a.vtt?token=T&rev=3', 4), 'https://x/a.vtt?token=T&rev=4');
     assert.equal(withRev('https://x/a.vtt', 1), 'https://x/a.vtt?rev=1');
+    // Protocol-relative and relative forms keep their shape: rewriting
+    // them as https:// or /path would point the track somewhere else.
+    assert.equal(withRev('//cdn/a.vtt?token=T', 2), '//cdn/a.vtt?token=T&rev=2');
+    assert.equal(withRev('/ext/a.vtt?token=T', 2), '/ext/a.vtt?token=T&rev=2');
+    assert.equal(withRev('sub/a.vtt?token=T', 2), 'sub/a.vtt?token=T&rev=2');
 });
 
 test('pollProgress reports changes and stops when final', async () => {
@@ -59,4 +64,20 @@ test('stop() ends the poll', async () => {
     const after = calls;
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(calls, after);
+});
+
+test('pollProgress gives up after the timeout and reports it', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    let err = null;
+    pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, timeoutMs: 5, onError: (c) => { err = c; } });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(err, 'timeout');
+    const after = calls;
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(calls, after, 'polling must stop at the deadline');
+});
+
+test('the default timeout is 15 minutes', () => {
+    assert.equal(POLL_TIMEOUT_MS, 15 * 60 * 1000);
 });
