@@ -431,7 +431,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		nCancel()
 	}
 	adult := s.prefs.IsAdultResource(ctx, resourceID)
-	sc.SubtitleOpts = buildSubtitleOpts(c, s.prefs.TranslateEnabled(), s.prefs.FreeForAll(), adult, preferred, castNames)
+	sc.SubtitleOpts = buildSubtitleOpts(c, s.prefs.TranslateEnabled(), s.prefs.FreeForAll(), adult, dsd != nil, preferred, castNames)
 
 	se := exportResponse.ExportItems["stream"]
 

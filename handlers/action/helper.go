@@ -49,6 +49,11 @@ type ListItem struct {
 	// human track the translation is made from, so the picker can say
 	// "AI - from <origin>" without knowing the ladder.
 	SourceBadge string
+	// SourceID is set on the Translated item alone: the ID of the list
+	// item being translated. Diagnostics only -- it is not rendered and
+	// not reported, unlike Source, which stays the OpenSubtitles
+	// hash|imdb enum for every provider.
+	SourceID string
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -308,6 +313,12 @@ func (s *Helper) defaultAudioLang(ud *models.VideoStreamUserData, mp *api.MediaP
 	return ""
 }
 
+// rankUnknown is the rank of an item outside the ladder ("None", and any
+// provider added later without a rank of its own): it always sorts last.
+// Ranks 6-8 are reserved for sources between the AI translation and
+// unknown (phase 3 whisper transcription takes 6).
+const rankUnknown = 9
+
 // ladderRank orders subtitle sources from the one the viewer trusts most
 // (what they uploaded themselves) to the one they trust least (a machine
 // translation). Within OpenSubtitles a hash match is a match on this very
@@ -331,7 +342,7 @@ func ladderRank(li ListItem) int {
 	case "Translated":
 		return 5
 	}
-	return 9
+	return rankUnknown
 }
 
 // isHumanFull reports whether the item is a complete, human-made subtitle
@@ -395,45 +406,56 @@ func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
 // preferred content language: the best human track in that language, or
 // an AI translation when there is none, or nothing at all when the audio
 // is already in that language (then only a forced track, if the file has
-// one, is turned on). The viewer's own saved choice always wins.
+// one, is turned on). The viewer's own saved choice always wins. When the
+// preferred language yields nothing at all, the phase-1 selection
+// (Accept-Language, then the English fallback) still applies: a language
+// the ladder cannot serve must not switch subtitles off.
+//
+// lis always starts with the "None" item, which GetSubtitles prepends
+// before anything else, so lis[0] is the safe "no subtitles" default.
 func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts) []ListItem {
 	lang := opts.PreferredLang
 	humanIdx := bestByLadder(lis, lang, false)
 	if humanIdx < 0 && opts.Translate {
-		if src := pickTranslationSource(lis, audioLang); src != nil {
-			name := lang
-			if l := stremio.LanguageByCode(lang); l != nil {
-				name = l.Name
+		// A language the translation service does not know is not offered
+		// at all: an item leading to a rejected request is worse than no
+		// item.
+		if l := stremio.LanguageByCode(lang); l != nil {
+			if src := pickTranslationSource(lis, audioLang); src != nil {
+				tr := ListItem{
+					ID:       "tr-" + lang,
+					Label:    l.Name + " · AI",
+					SrcLang:  lang,
+					Kind:     "subtitles",
+					Provider: "Translated",
+					Badge:    badgeFor("Translated", false),
+					// SourceBadge is the origin shown in the picker,
+					// SourceID the item it came from; Source stays empty
+					// (it is the OpenSubtitles hash|imdb enum).
+					SourceBadge: src.Badge,
+					SourceID:    src.ID,
+				}
+				tr.Rank = ladderRank(tr)
+				if opts.Paid {
+					tr.Src = api.TranslateURL(src.Src, lang, opts.Names)
+				} else {
+					// A locked item carries no Src on purpose: the URL is
+					// the entitlement, so a free viewer must not receive
+					// one even hidden in the markup.
+					tr.Locked = true
+				}
+				lis = append(lis, tr)
 			}
-			tr := ListItem{
-				ID:       "tr-" + lang,
-				Label:    name + " · AI",
-				SrcLang:  lang,
-				Kind:     "subtitles",
-				Provider: "Translated",
-				Badge:    badgeFor("Translated", false),
-				// Source is the id of the track being translated, and
-				// SourceBadge its origin, so the picker can show where the
-				// translation comes from.
-				Source:      src.ID,
-				SourceBadge: src.Badge,
-			}
-			tr.Rank = ladderRank(tr)
-			if opts.Paid {
-				tr.Src = api.TranslateURL(src.Src, lang, opts.Names)
-			} else {
-				// A locked item carries no Src on purpose: the URL is the
-				// entitlement, so a free viewer must not receive one even
-				// hidden in the markup.
-				tr.Locked = true
-			}
-			lis = append(lis, tr)
 		}
 	}
-	// The viewer's saved choice always wins.
-	if ud != nil && ud.SubtitleID != "" {
+	// The viewer's saved choice always wins, and is the only default:
+	// ExternalData may have marked a track Default already.
+	if ud.SubtitleID != "" {
 		for i := range lis {
 			if lis[i].ID == ud.SubtitleID {
+				for j := range lis {
+					lis[j].Default = false
+				}
 				lis[i].Default = true
 				return lis
 			}
@@ -447,14 +469,14 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 			return lis
 		}
 	}
-	// Subtitles are only needed when the audio is not already in the
-	// preferred language; an unknown audio language counts as needed.
-	needed := audioLang == "" || audioLang != lang
-	if !needed {
+	// Subtitles are not needed when the audio is already in the preferred
+	// language. lang is never "" here (GetSubtitles takes the legacy path
+	// then), so an unknown audio language ("") counts as needed.
+	if audioLang == lang {
 		if f := bestByLadder(lis, lang, true); f >= 0 {
 			lis[f].Default = true
 		} else {
-			lis[0].Default = true // "none"
+			lis[0].Default = true // "None"
 		}
 		return lis
 	}
@@ -463,13 +485,18 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 		return lis
 	}
 	for i := range lis {
-		if lis[i].Provider == "Translated" {
+		// A locked item cannot be turned on, so it cannot be the default
+		// either: the free viewer would face a player with subtitles
+		// "selected" and nothing on screen.
+		if lis[i].Provider == "Translated" && !lis[i].Locked {
 			lis[i].Default = true
 			return lis
 		}
 	}
-	lis[0].Default = true
-	return lis
+	// The preferred language yielded nothing activatable. Falling through
+	// to "None" would take subtitles away from viewers who had them in
+	// phase 1, so the old Accept-Language selection decides instead.
+	return s.selectListItem(lis, "", ud)
 }
 
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {

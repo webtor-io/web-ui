@@ -22,23 +22,30 @@ func TestIsPaidForTranslate(t *testing.T) {
 
 func TestTranslateOptsShape(t *testing.T) {
 	paid := &web.Context{Claims: &claims.Data{Context: &claimsproto.Context{Tier: &claimsproto.Tier{Id: 2}}}}
-	o := buildSubtitleOpts(paid, true, false, false, "pt", []string{"A"})
+	o := buildSubtitleOpts(paid, true, false, false, false, "pt", []string{"A"})
 	if !o.Translate || !o.Paid || o.PreferredLang != "pt" || len(o.Names) != 1 {
 		t.Fatalf("%+v", o)
 	}
-	o = buildSubtitleOpts(&web.Context{}, true, true, false, "pt", nil)
+	o = buildSubtitleOpts(&web.Context{}, true, true, false, false, "pt", nil)
 	if !o.Paid {
 		t.Fatal("free-for-all flag makes everyone paid")
 	}
-	o = buildSubtitleOpts(paid, true, true, true, "pt", nil)
+	o = buildSubtitleOpts(paid, true, true, true, false, "pt", nil)
 	if o.Translate {
 		t.Fatal("adult resource → no translation even when enabled and free for all")
 	}
-	o = buildSubtitleOpts(paid, false, false, false, "pt", nil)
+	o = buildSubtitleOpts(paid, false, false, false, false, "pt", nil)
 	if o.Translate {
 		t.Fatal("feature flag off → no translation")
 	}
 	if o.PreferredLang != "pt" {
 		t.Fatal("preferred language still drives the ladder when translation is off")
+	}
+	o = buildSubtitleOpts(paid, true, true, false, true, "pt", nil)
+	if o.Translate {
+		t.Fatal("embed widget → no AI track in phase 2, even for a paid viewer")
+	}
+	if o.PreferredLang != "pt" || !o.Paid {
+		t.Fatalf("the embed only switches translation off: %+v", o)
 	}
 }

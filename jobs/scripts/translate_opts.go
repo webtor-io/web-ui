@@ -12,10 +12,13 @@ func isPaidForTranslate(c *web.Context) bool {
 // buildSubtitleOpts assembles the viewer-facing subtitle-ladder inputs.
 // adult switches the AI track off entirely for NSFW resources (spec decision 13):
 // no item, no lock, no CTA — the ladder simply never sees Translate=true.
-func buildSubtitleOpts(c *web.Context, enabled, freeForAll, adult bool, preferred string, names []string) models.SubtitleOpts {
+// embed does the same for the embed widget, which does not get AI
+// translation in phase 2: the CTA has nowhere to lead on a third-party
+// page, and the cost would be charged to a viewer we cannot identify.
+func buildSubtitleOpts(c *web.Context, enabled, freeForAll, adult, embed bool, preferred string, names []string) models.SubtitleOpts {
 	return models.SubtitleOpts{
 		PreferredLang: preferred,
-		Translate:     enabled && !adult,
+		Translate:     enabled && !adult && !embed,
 		Paid:          freeForAll || isPaidForTranslate(c),
 		Names:         names,
 	}

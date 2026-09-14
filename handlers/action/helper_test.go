@@ -420,13 +420,21 @@ func TestLadderForcedInPreferredLangIsNotTheDefault(t *testing.T) {
 	}
 }
 
+// TestLadderLockedForFree: a free viewer sees the AI item with a lock and
+// no Src, and it is never the default -- a "selected" track that cannot be
+// turned on would leave the player with subtitles on and nothing on
+// screen. The default comes from the phase-1 fallback instead.
 func TestLadderLockedForFree(t *testing.T) {
 	tag, os := humanTracks()
-	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+	ud := &models.VideoStreamUserData{FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
 	tr := byID(items)["tr-pt"]
-	if !tr.Locked || tr.Src != "" || !tr.Default {
+	if !tr.Locked || tr.Src != "" || tr.Default {
 		t.Fatalf("free: %+v", tr)
+	}
+	if d := defaultID(items); d != "mp-0" {
+		t.Fatalf("default=%s: want the Accept-Language pick (the embedded English track)", d)
 	}
 }
 
@@ -492,8 +500,11 @@ func TestLadderRankAndSourceBadge(t *testing.T) {
 		}
 	}
 	tr := got["tr-pt"]
-	if tr.Source != "et-1" || tr.SourceBadge != "sidecar" {
-		t.Errorf("AI item must name its source: source=%q badge=%q", tr.Source, tr.SourceBadge)
+	if tr.SourceID != "et-1" || tr.SourceBadge != "sidecar" {
+		t.Errorf("AI item must name its source: sourceID=%q badge=%q", tr.SourceID, tr.SourceBadge)
+	}
+	if tr.Source != "" {
+		t.Errorf("Source is the OpenSubtitles hash|imdb enum and goes to telemetry; the AI item must leave it empty, got %q", tr.Source)
 	}
 }
 
@@ -512,5 +523,50 @@ func TestLadderExternalDefaultIsKept(t *testing.T) {
 	}
 	if n != 1 || defaultID(items) != "ext-1" {
 		t.Fatalf("want exactly one default (ext-1), got %d, default=%s", n, defaultID(items))
+	}
+}
+
+// TestLadderNoPreferredMatchKeepsPhaseOneSelection: the preferred language
+// yields neither a human track nor an AI one (translation off). The ladder
+// must not switch subtitles off -- the phase-1 Accept-Language selection
+// still decides.
+func TestLadderNoPreferredMatchKeepsPhaseOneSelection(t *testing.T) {
+	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]`)
+	os := []api.OpenSubtitleTrack{osTrack("7", "en")}
+	ud := &models.VideoStreamUserData{FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, mp, &ra.ExportTag{}, os, &models.ExternalData{}, nil, SubtitleOpts{PreferredLang: "pt"})
+	if d := defaultID(items); d != "os-7" {
+		t.Fatalf("default=%s want os-7: a ladder miss must not take subtitles away", d)
+	}
+}
+
+// TestLadderUnknownLanguageHasNoAIItem: a preferred language the
+// translation service does not know gets no AI item at all -- an item that
+// leads to a rejected request is worse than no item.
+func TestLadderUnknownLanguageHasNoAIItem(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "eo", Translate: true, Paid: true})
+	if _, ok := byID(items)["tr-eo"]; ok {
+		t.Fatal("no AI item for a language the service does not support")
+	}
+}
+
+// TestLadderSavedChoiceClearsExternalDefault: an embed marks a track
+// Default, the viewer has since picked another one. Exactly one item may
+// end up Default, and it is the viewer's.
+func TestLadderSavedChoiceClearsExternalDefault(t *testing.T) {
+	ext := &models.ExternalData{Tracks: []models.ExternalTrack{{Src: "https://x/e.vtt", SrcLang: "en", Label: "External", Default: true}}}
+	os := []api.OpenSubtitleTrack{osTrack("7", "de")}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "os-7"}, audioProbe("eng"), &ra.ExportTag{}, os, ext, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	n := 0
+	for _, it := range items {
+		if it.Default {
+			n++
+		}
+	}
+	if n != 1 || defaultID(items) != "os-7" {
+		t.Fatalf("want exactly one default (os-7), got %d, default=%s", n, defaultID(items))
 	}
 }
