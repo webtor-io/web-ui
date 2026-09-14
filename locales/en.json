@@ -648,7 +648,7 @@
     "action.stream.origin.em": "Embedded in the video",
     "action.stream.origin.in": "Included in the torrent",
     "action.stream.origin.os": "OpenSubtitles",
-    "action.stream.origin.my": "My uploads",
+    "action.stream.origin.my": "My Subtitles",
     "action.stream.origin.ai": "AI translation",
     "action.stream.translate.locked": "AI subtitles in your language are part of the supporter plan.",
     "action.stream.translate.cta": "Unlock AI subtitles",

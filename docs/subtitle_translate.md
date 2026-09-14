@@ -259,8 +259,13 @@ resource page); the spec is amended.
 
 Since the picker redesign there is one flat container per group and no sub-views. Every chip is a
 `<button type="button">`; the `.audio`/`.subtitle` marker classes and the whole `data-*` set are
-unchanged from the `<li>` era, so every JS reader (`readAllTracks`, `readTracks`,
-`findSubtitleItem`, `remapTrackGroup`, `initDefaultTracks`) kept working across the change.
+unchanged from the `<li>` era, so `readAllTracks`, `readTracks`, `findSubtitleItem` and
+`initDefaultTracks` kept working across the change untouched. One reader did change:
+`remapTrackGroup` (`hls-manager.js`) matched a manifest track name against the element's
+`textContent`, and a chip's text is now decorated (origin code, property tag, source suffix), so
+it reads `data-label` — which is why every audio chip carries one (R7). `activateSubtitle` reads
+the same attribute for the `<track label>` it creates, and no longer falls back to the chip text
+for the same reason.
 
 ### Ids (`templates/views/action/stream_video.html`)
 
@@ -359,6 +364,14 @@ and never mark the upload as playing. The client owns both markers after a reloa
 `activateSubtitle` sets and persists the uploaded one, and `syncUploadMarks` in `Player.jsx`
 re-derives `data-default` from the live `textTracks` for every other reload.
 
+`syncUploadMarks` falls back to the `<track default>` attribute when no `textTrack` is showing —
+but only while no chip outside the uploads already carries `data-default`. An embedded
+(`MediaProbe`) track is driven by hls.js and has no `<track>` element, so "nothing showing" is
+also what an embedded track playing looks like; taking a stale `default` as the answer there
+marked an upload as well and left two chips with a check. When it does mark a chip it clears
+every other `.subtitle` in the dialog, exactly as `markTrack` does, without the PUT: nothing was
+chosen here, the DOM is catching up with what is already playing.
+
 `readTracks` (`subtitle-telemetry.js`) matches every subtitle chip via the
 `.subtitle[data-provider]` selector, filtering out `data-id="none"`.
 
@@ -369,7 +382,10 @@ row plus the tracks of the expanded language.
 
 - **The language row filters only.** Pressing a language chip collapses the other languages in the
   track row and changes nothing about playback. The chip of the language currently playing keeps a
-  cyan dot, so the selection stays visible while the viewer browses another language.
+  cyan dot, so the selection stays visible while the viewer browses another language. Past six
+  chips the tail goes behind "+N" — except the expanded language, which is never collapsed
+  wherever it sorts, and is not counted into "+N": a pressed but invisible filter leaves its
+  tracks on screen with no chip pointing at them.
 - **Off is the first chip of the track row**, not a language chip. It is the real `.subtitle`
   element for the `none` item, which the player looks up by that id (`findSubtitleItem`,
   `pickDefaultSubtitle`, `hasSavedDefault`); a second copy in the language row would give the
@@ -387,6 +403,13 @@ row plus the tracks of the expanded language.
   not destroy a file. After the swap `Player.jsx` re-runs `refresh`, so the chip row, the language
   counts and the expanded language all follow; the panel re-opens from `data-upload-open` on
   `#my-subtitles` (the wrapper survives the swap, the toggle and panel inside it do not).
+- **Deleting the upload that is playing lands on Off.** The swap replaces `#my-subtitles`, so the
+  chip goes, but the `<track>` lives in `<video>` and would keep the deleted file's subtitles on
+  screen with nothing marked and "Now:" blank. `dropDeletedTracks` (`subtitle-track-reload.js`)
+  removes every `<track>` no chip claims any more — the test is the id against **all** chips in
+  the dialog, since the preloaded OpenSubtitles and sidecar tracks are `<track>` elements too —
+  and reports whether one of them was showing; when it was, the player activates `none` with
+  `persist: false`. The viewer chose a deletion, not a track, so nothing is PUT.
 - **Flags fall back.** `supportsFlagEmoji()` (`lib/discover/lang.js`) hides every `.chip-flag`
   where the platform draws bare letter pairs (Windows outside Firefox); the language names stay.
 - **Language-row order**: the active language, then the viewer's preferred language, then by track
