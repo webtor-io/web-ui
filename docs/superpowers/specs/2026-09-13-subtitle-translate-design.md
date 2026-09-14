@@ -216,7 +216,8 @@ Go, urfave/cli, шаблон srt2vtt. Зависимости: `common-services` 
 - `subtitle-translate-start` `{lang, source, cues}`, `subtitle-translate-done` `{lang,
   seconds, cues}`, `subtitle-translate-error` `{lang, code}`, `subtitle-translate-lock-click`
   `{lang}`. `badge` получает значение `forced`.
-- `report-problem` в модалке получает вариант «плохой перевод» с `data-provider=Translated`.
+- `report-problem` получает вариант «плохой перевод» с `data-provider=Translated` — отложено в follow-up:
+  форма живёт на странице ресурса (`resource/get.html`), не в модалке плеера (2026-09-14).
 
 ## Пороги успеха (8 недель после релиза)
 
