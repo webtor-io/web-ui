@@ -25,6 +25,13 @@ type LangGroup struct {
 	// carries a dot for it, so the selection stays visible even while the
 	// viewer is browsing another language's tracks.
 	Active bool
+	// suggested is "the track the subtitles switch would turn on lives
+	// here" (ListItem.Suggested), which only exists while subtitles are off
+	// -- so it is never true at the same time as Active. Not rendered: it
+	// exists to put that language ahead of the merely-large ones, because a
+	// row that opens anywhere else makes the viewer hunt for the track the
+	// switch is about to give them.
+	suggested bool
 	// Overflow chips are rendered but hidden behind the "+N" button.
 	Overflow bool
 }
@@ -44,9 +51,11 @@ type LangRow struct {
 // Order (owner, 2026-09-15): the viewer's preferred language first
 // whatever is playing — including a group whose only track is the AI
 // translation, which is exactly the case the ladder added it for — then
-// the language of the track playing, then by track count, then by the
-// order GetSubtitles produced (a stable sort keeps the ladder as the
-// tie-break rather than a map's iteration).
+// the language of the track playing, then the language of the track the
+// subtitles switch would turn on (ListItem.Suggested, which exists only
+// while subtitles are off, so it never competes with Active), then by
+// track count, then by the order GetSubtitles produced (a stable sort
+// keeps the ladder as the tie-break rather than a map's iteration).
 //
 // Preferred ahead of active is deliberate: the row is where the viewer
 // looks for their own language, and what is playing stays visible through
@@ -95,6 +104,9 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 		if li.Default {
 			g.Active = true
 		}
+		if li.Suggested {
+			g.suggested = true
+		}
 	}
 	out := make([]LangGroup, 0, len(order))
 	for _, l := range order {
@@ -106,6 +118,9 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 		}
 		if out[i].Active != out[j].Active {
 			return out[i].Active
+		}
+		if out[i].suggested != out[j].suggested {
+			return out[i].suggested
 		}
 		if out[i].Count != out[j].Count {
 			return out[i].Count > out[j].Count
@@ -120,8 +135,11 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 		}
 	}
 	// The row opens on its first chip, which the comparator above has
-	// already made the preferred language when it has any tracks, the
-	// active one otherwise, and the largest group when neither applies.
+	// already made the preferred language when it has any tracks, then the
+	// active one, then the suggested one, and the largest group when none
+	// of those applies. Expanded and "first" have to be the same chip:
+	// Overflow is assigned by index, so a language expanded from further
+	// down the row would be pressed and collapsed at once.
 	if len(row.Groups) > 0 {
 		row.Expanded = row.Groups[0].Lang
 	}

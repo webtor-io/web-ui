@@ -261,6 +261,7 @@ function trackChip(kind, o) {
     };
     if (o.locked) a['data-locked'] = 'true';
     if (o.def) a['data-default'] = 'true';
+    if (o.suggested) a['data-suggested'] = 'true';
     const kids = [el('svg', { class: 'chip-check' })];
     if (o.origin) kids.push(span('chip-origin badge badge-xs font-mono', o.origin));
     kids.push(span('chip-label', o.label || ''));
@@ -726,4 +727,50 @@ test('offStateAfterActivate: activating a track switches on and keeps the memory
 test('offStateAfterActivate: nothing was playing, so nothing is remembered', () => {
     assert.deepEqual(offStateAfterActivate('', 'none', 'a'), { off: true, lastId: '' });
     assert.deepEqual(offStateAfterActivate('none', 'none', 'a'), { off: true, lastId: '' });
+});
+
+// The mirror of SubtitleLangGroups' suggested clause: with subtitles off
+// and no group in the preferred language, the row opens where the track
+// the switch would turn on lives, not on the biggest group. On the client
+// that falls out of readChips reading the muted choice as the active one —
+// one mechanism, not a second ordering rule — and it follows
+// data-last-subtitle when the viewer switched off in this session, which
+// the server cannot know.
+test('the row opens on the suggested language when the preferred one has no tracks', () => {
+    const { container } = buildPicker({
+        preferred: 'pt',
+        off: true,
+        tracks: [
+            offChip(true),
+            { id: 'a', lang: 'en', name: 'English', label: 'a' },
+            { id: 'b', lang: 'en', name: 'English', label: 'b' },
+            { id: 'c', lang: 'en', name: 'English', label: 'c' },
+            { id: 'd', lang: 'ru', name: 'Russian', label: 'mine.ru.srt', suggested: true },
+        ],
+        // Nothing pressed yet: a first open, before the viewer filtered.
+        row: [{ lang: 'en', count: 3 }, { lang: 'ru', count: 1 }],
+    });
+    assert.equal(refresh(container), 'ru');
+    // The client never reorders the row — that is the server's job
+    // (SubtitleLangGroups), and syncLangRow only updates the chips in
+    // place. What it does move is the pressed state and the filter.
+    const [en, ru] = langsOf(container);
+    assert.equal(ru.getAttribute('aria-pressed'), 'true');
+    assert.equal(en.getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(visibleTracks(container), ['d']);
+
+    // ...and a within-session memory wins over the server's suggestion:
+    // what comes back is what the viewer had, not what the ladder guessed.
+    const { container: c2 } = buildPicker({
+        preferred: 'pt',
+        off: true,
+        lastId: 'a',
+        tracks: [
+            offChip(true),
+            { id: 'a', lang: 'en', name: 'English', label: 'a' },
+            { id: 'd', lang: 'ru', name: 'Russian', label: 'mine.ru.srt', suggested: true },
+        ],
+        row: [{ lang: 'en', count: 1 }, { lang: 'ru', count: 1 }],
+    });
+    assert.equal(refresh(c2), 'en');
 });

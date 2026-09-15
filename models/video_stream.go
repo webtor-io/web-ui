@@ -115,6 +115,12 @@ type UserSubtitleTrack struct {
 	// that rule and got re-decided over.
 	Default bool
 	Saved   bool
+	// Suggested mirrors action.ListItem.Suggested: the track the picker's
+	// subtitles switch would turn on while they are off. Uploads are rank 0
+	// on the ladder, so this is the row it lands on most often — and
+	// without copying it here the chip the client has to find by
+	// data-suggested was the one chip that never carried it.
+	Suggested bool
 }
 
 // UserSubtitleView is the flat data shape consumed by the
@@ -133,4 +139,12 @@ type UserSubtitleView struct {
 	// language row to consult: nothing is collapsed there and the client
 	// re-applies the filter right after the swap.
 	ExpandedLang string
+	// SubtitlesOff is the state of the picker's switch at render time, taken
+	// from the same ladder result Default/Saved/Suggested come from. The
+	// partial needs it for one reason: while subtitles are off it is the
+	// Suggested chip, not the Default one, that wears the check and the
+	// fill, and this markup has to agree with the dialog's own track row
+	// rather than wait for the client's first refresh. False on the async
+	// reload, which has no ladder result to read.
+	SubtitlesOff bool
 }

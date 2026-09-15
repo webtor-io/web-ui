@@ -463,3 +463,80 @@ func TestUserSubtitlesPartialHasOneCloseControlPerPanel(t *testing.T) {
 		})
 	}
 }
+
+// TestUserSubtitlesPartialMarksTheSuggestion: an upload is rank 0, so it is
+// the likeliest thing the subtitles switch would turn on — and until the
+// partial renders data-suggested, the one chip most often suggested was the
+// one chip the client could not find. The muted look travels with it: while
+// subtitles are off the suggested chip wears the check and the fill, here
+// exactly as in the dialog's own track row.
+func TestUserSubtitlesPartialMarksTheSuggestion(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
+	funcs := template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(any) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		"langDisplay":   stremio.NewHelper().LangDisplay,
+	}
+	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
+		ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse partial: %v", err)
+	}
+
+	render := func(v *models.UserSubtitleView) string {
+		var buf bytes.Buffer
+		if err := tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+			"Ctx":  map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+			"Data": v,
+		}); err != nil {
+			t.Fatalf("failed to render: %v", err)
+		}
+		return buf.String()
+	}
+
+	subs := []models.UserSubtitleTrack{
+		{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "en", Suggested: true},
+		{ID: "us-2", OriginalName: "b.srt", Format: "srt", Size: 10, Src: "http://b", DeleteURL: "/d/2", SrcLang: "en"},
+	}
+	out := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs, SubtitlesOff: true})
+
+	if n := strings.Count(out, `data-suggested="true"`); n != 1 {
+		t.Fatalf("expected exactly one suggested chip, got %d:\n%s", n, out)
+	}
+	at := strings.Index(out, `data-id="us-1"`)
+	chip := out[strings.LastIndex(out[:at], "<button"):]
+	chip = chip[:strings.Index(chip, "</button>")]
+	for _, want := range []string{`data-suggested="true"`, "track-chip-active", `aria-checked="true"`} {
+		if !strings.Contains(chip, want) {
+			t.Errorf("the suggested upload is missing %q while subtitles are off:\n%s", want, chip)
+		}
+	}
+	// The other upload stays unmarked: one answer per row.
+	at2 := strings.Index(out, `data-id="us-2"`)
+	chip2 := out[strings.LastIndex(out[:at2], "<button"):]
+	chip2 = chip2[:strings.Index(chip2, "</button>")]
+	if strings.Contains(chip2, "track-chip-active") || strings.Contains(chip2, `aria-checked="true"`) {
+		t.Errorf("a chip that is neither playing nor suggested is marked:\n%s", chip2)
+	}
+
+	// Negative control: subtitles on. Nothing is suggested then — Default
+	// alone says what is playing — so the flag must not paint a second
+	// chosen-looking chip.
+	subs[0].Suggested = false
+	subs[1].Default = true
+	on := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs})
+	if strings.Contains(on, `data-suggested="true"`) {
+		t.Errorf("nothing may be suggested while subtitles are on:\n%s", on)
+	}
+	if n := strings.Count(on, "track-chip-active"); n != 1 {
+		t.Errorf("expected exactly one active chip with subtitles on, got %d", n)
+	}
+}

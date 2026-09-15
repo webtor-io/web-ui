@@ -959,3 +959,32 @@ func TestNothingToTurnOnSuggestsNothing(t *testing.T) {
 		t.Fatalf("suggested=%s want nothing: there is no subtitle to turn on", s)
 	}
 }
+
+// TestSavedOffAndLadderOffSuggestTheSameTrack is an outcome test: the
+// suggestion is the ladder's own answer in both directions. With the audio
+// already in the viewer's language and a forced track available, the ladder
+// turns on the forced track — so that is what the switch promises, whether
+// the viewer saved "off" themselves or the ladder arrived there.
+func TestSavedOffAndLadderOffSuggestTheSameTrack(t *testing.T) {
+	// English audio, English preference, one full English track and one
+	// forced English track.
+	mp := probeWith(`[
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"Forced (English)"}}
+	]`)
+	opts := SubtitleOpts{PreferredLang: "en", Translate: true, Paid: true}
+
+	// The ladder's own answer, nothing saved: the forced track plays.
+	on := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, opts)
+	if d := defaultID(on); d != "mp-1" {
+		t.Fatalf("default=%s want mp-1 (the forced track) -- fixture no longer covers this case", d)
+	}
+
+	// The viewer saved "off" instead. The switch must promise the same
+	// track, not the full one a different order would have picked.
+	off := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, opts)
+	if s := suggestedID(t, off); s != "mp-1" {
+		t.Fatalf("suggested=%s want mp-1: saved-off and the ladder must agree", s)
+	}
+}

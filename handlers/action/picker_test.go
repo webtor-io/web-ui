@@ -265,3 +265,35 @@ func TestSubtitleLangGroupsFallsBackToActiveWhenPreferredHasNoTracks(t *testing.
 		t.Fatalf("Expanded = %q, groups = %+v, want ru first", row.Expanded, row.Groups)
 	}
 }
+
+// TestSubtitleLangGroupsExpandsTheSuggestedLanguage: with subtitles off and
+// no group in the preferred language, "the biggest group" is an arbitrary
+// answer — the row should open where the track the switch would turn on
+// lives, so the viewer can see it. It also has to be first, not merely
+// Expanded: a language past the sixth chip would be expanded and collapsed
+// at once, a pressed filter with no visible chip.
+func TestSubtitleLangGroupsExpandsTheSuggestedLanguage(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Label: "None", Default: true},
+		li("a", "en", "MediaProbe", false),
+		li("b", "en", "OpenSubtitles", false),
+		li("c", "en", "ExportTag", false),
+		li("d", "ru", "UserSubtitle", false),
+	}
+	lis[4].Suggested = true
+
+	row := h.SubtitleLangGroups(lis, "pt") // preferred language has no tracks
+	if row.Expanded != "ru" {
+		t.Errorf("Expanded = %q, want ru (the suggested track's language)", row.Expanded)
+	}
+	if row.Groups[0].Lang != "ru" {
+		t.Fatalf("order = %+v, want ru first", row.Groups)
+	}
+
+	// The preferred language still wins when it has tracks of its own.
+	lis = append(lis, li("e", "pt", "OpenSubtitles", false))
+	if row := h.SubtitleLangGroups(lis, "pt"); row.Expanded != "pt" {
+		t.Errorf("Expanded = %q, want pt: the preferred language still comes first", row.Expanded)
+	}
+}

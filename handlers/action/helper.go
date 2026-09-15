@@ -105,10 +105,11 @@ func NewHelper() *Helper {
 //
 // lis is the output of GetSubtitles for the same render: the uploads
 // appear there too (provider UserSubtitle, same ID), and that is the only
-// place the ladder's verdict exists. Copying Default/Saved across is what
-// lets the "My Subtitles" rows carry the same data-default/data-saved
-// markers as the other two lists; pass nil when there is no ladder result
-// to copy from (the async reload) and the rows stay unmarked.
+// place the ladder's verdict exists. Copying Default/Saved/Suggested across
+// is what lets the "My Subtitles" rows carry the same
+// data-default/data-saved/data-suggested markers as the other two lists;
+// pass nil when there is no ladder result to copy from (the async reload)
+// and the rows stay unmarked.
 //
 // expandedLang is the language the track row opens on (LangRow.Expanded):
 // the partial renders its chips inside that row, so it has to collapse them
@@ -128,6 +129,17 @@ func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.
 		if li, ok := marks[out[i].ID]; ok {
 			out[i].Default = li.Default
 			out[i].Saved = li.Saved
+			out[i].Suggested = li.Suggested
+		}
+	}
+	// Whether the switch is off is a property of the whole list, not of any
+	// upload: it is off when the "None" item is the default. Read from the
+	// same lis the marks come from, so it is false on the async reload for
+	// the same reason the marks are.
+	off := false
+	for _, li := range lis {
+		if li.ID == "none" && li.Default {
+			off = true
 		}
 	}
 	return &models.UserSubtitleView{
@@ -136,6 +148,7 @@ func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.
 		EIURL:         eiURL,
 		UserSubtitles: out,
 		ExpandedLang:  expandedLang,
+		SubtitlesOff:  off,
 	}
 }
 
@@ -626,27 +639,41 @@ func markSuggested(lis []ListItem, i int) {
 // the audio is already in the viewer's language, not only when the viewer
 // saved it.
 //
-// The order is the ladder's: the best human track in the preferred
-// language, an AI translation when there is none, the Accept-Language
-// pick, and finally the best activatable track on the list whatever its
-// language. That last step is the one the ladder itself would never take
-// -- but the ladder answers "should subtitles be on", and this answers
-// "the viewer just said they should be". A switch that does nothing when
-// pressed is worse than one that gives the best track available.
+// It asks the ladder first, through the same ladderPick the saved-off
+// branch of applyLadder uses, so both ways of arriving at "off" promise
+// the same track (a forced track wins when the audio is already in the
+// viewer's language, exactly as it would if it were playing). ladderPick
+// returns index 0 -- the "None" item -- when its answer is "no subtitles";
+// only then do the extra rungs below apply, and they exist because the
+// viewer has just said they want subtitles anyway: the best human track in
+// the preferred language, an AI translation, the Accept-Language pick, and
+// finally the best activatable track whatever its language.
+//
+// Honest note: at this call site that first question can only be answered
+// "None" today. Every state that reaches offSuggestion is one the ladder
+// already resolved to "no subtitles" (a saved off whose own ladderPick
+// found nothing, or the audio being in the viewer's language with no forced
+// track), so removing the call changes no outcome and no test goes red for
+// it. It stays because it is the difference between two orders that must
+// agree and one order written once.
+//
+// That last rung is the one the ladder itself would never take. The ladder
+// answers "should subtitles be on"; this answers "the viewer just said they
+// should be", and a switch that does nothing when pressed is worse than one
+// that gives the best track available.
 //
 // -1 when there is nothing to turn on at all (an empty list, or only a
 // locked AI item): then the switch has no promise to make.
 func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts) int {
+	humanIdx := -1
 	if opts.PreferredLang != "" {
-		if i := bestByLadder(lis, opts.PreferredLang, false); i >= 0 {
-			return i
-		}
-		// A forced track is what the ladder turns on when the audio is
-		// already in the viewer's language; it is also the only subtitle
-		// that case wants.
-		if i := bestByLadder(lis, opts.PreferredLang, true); i >= 0 {
-			return i
-		}
+		humanIdx = bestByLadder(lis, opts.PreferredLang, false)
+	}
+	if i := s.ladderPick(lis, ud, audioLang, opts, humanIdx); i > 0 {
+		return i
+	}
+	if humanIdx >= 0 {
+		return humanIdx
 	}
 	for i := range lis {
 		if lis[i].Provider == "Translated" && !lis[i].Locked {

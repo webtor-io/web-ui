@@ -2,6 +2,7 @@
 {{ $lang := .Ctx.Lang }}
 {{ $data := .Data }}
 {{ $expanded := $data.ExpandedLang }}
+{{ $off := $data.SubtitlesOff }}
 {{/* Rendered inside #subtitle-tracks (the flat chip row) through a
      display:contents wrapper, so this template emits chips first and only
      then the "My uploads" disclosure, whose panel `basis-full` pushes onto
@@ -16,21 +17,27 @@
 {{ if .Ctx.User | hasAuth }}
     {{ range $data.UserSubtitles }}
     {{ $d := langDisplay .SrcLang }}
-    <button type="button" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+    {{/* An upload is rank 0 on the ladder, so it is the likeliest thing the
+         subtitles switch would turn on: it has to carry data-suggested like
+         any other chip, and wear the muted block's check and fill while the
+         switch is off — the same rule stream_video.html applies to the
+         chips it renders itself. */}}
+    {{ $marked := or .Default (and $off .Suggested) }}
+    <button type="button" role="radio" aria-checked="{{ if $marked }}true{{ else }}false{{ end }}"
             data-id="{{ .ID }}" data-provider="UserSubtitle" data-src="{{ .Src }}" data-label="{{ .OriginalName }}" data-srclang="{{ .SrcLang }}" data-kind="subtitles" data-badge="user"
             data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
             {{/* ladderRank("UserSubtitle") — this list is rendered from its
                  own view model, so the rank is fixed here rather than
                  carried per item. */}}
             data-rank="0"
-            {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}{{ if .Selected }}data-autoselect="true" {{ end }}
+            {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}{{ if .Suggested }}data-suggested="true" {{ end }}{{ if .Selected }}data-autoselect="true" {{ end }}{{ if $off }}aria-disabled="true" {{ end }}
             {{/* Collapsed by the same rule as every other chip in the row.
                  ExpandedLang is empty on the async reload, which has no
                  language row to consult: nothing is collapsed then and the
                  client re-applies the filter right after the swap. */}}
             {{ if and $expanded (ne $d.Lang $expanded) }}hidden{{ end }}
-            class="subtitle track-chip{{ if .Default }} track-chip-active{{ end }}">
-        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+            class="subtitle track-chip{{ if $marked }} track-chip-active{{ end }}">
+        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not $marked }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
         <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-purple/10 border-w-purple/30 text-w-purpleL" title="{{ t $lang "action.stream.origin.my" }}">MY</span>
         <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ .OriginalName }}">{{ .OriginalName }}</span>
     </button>

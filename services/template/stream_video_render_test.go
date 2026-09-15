@@ -753,3 +753,121 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		}
 	}
 }
+
+// TestStreamVideoRendersASuggestedUpload is the one path the tests above
+// stub out: the dialog with UserSubtitlesEnabled, rendering the REAL
+// uploads partial, with the ladder's suggestion landing on an upload.
+//
+// That combination is the common one, not a corner: an upload is rank 0, so
+// whenever the viewer has subtitles off and has ever uploaded a file in
+// their language, the track the switch would turn on is that file — and its
+// chip comes from a different template, fed by a different view model. The
+// marker has to survive that hop, which is what this asserts end to end
+// (helper → UserSubtitleView → partial → markup).
+func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string { return key }
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
+
+		"domain":        func() string { return "https://example.com" },
+		"langPath":      func(lang, p string) string { return p },
+		"json":          func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":         func(p string) template.HTML { return template.HTML(p) },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		// The uploads partial renders its chips only for a signed-in viewer.
+		"hasAuth":     func(interface{}) bool { return true },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	// The real partial this time, not the stub: its markup is what is under
+	// test.
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html", "../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse templates: %v", err)
+	}
+
+	// Japanese audio, English preference, one English upload and one English
+	// sidecar: the ladder prefers the upload (rank 0 beats rank 2), and the
+	// viewer has subtitles off, so that upload is the suggestion.
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"},
+		}},
+		Resource:             &ra.ResourceResponse{},
+		Item:                 &ra.ListItem{PathStr: "movie.mkv"},
+		Title:                "Movie",
+		MediaProbe:           &mp,
+		UserSubtitles:        []models.UserSubtitleTrack{{ID: "us-1", OriginalName: "mine.en.srt", Format: "srt", Size: 10, Src: "https://x/mine.vtt", DeleteURL: "/d/1", SrcLang: "en"}},
+		UserSubtitlesEnabled: true,
+		EIURL:                "http://ei.example.com",
+		VideoStreamUserData:  &models.VideoStreamUserData{ResourceID: "res", ItemID: "item", SubtitleID: "none"},
+		Settings:             &models.StreamSettings{},
+		ExternalData:         &models.ExternalData{},
+		SubtitleOpts:         models.SubtitleOpts{PreferredLang: "en"},
+	}
+
+	// Fixture guard: the suggestion must actually be the upload, or this
+	// test would pass while covering the sidecar chip the dialog renders
+	// itself.
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	for _, it := range items {
+		if it.Suggested && it.ID != "us-1" {
+			t.Fatalf("the fixture suggests %s, not the upload -- the partial hop is no longer covered", it.ID)
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": struct{}{},
+		"CSRF": "csrf",
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	at := strings.Index(html, `data-id="us-1"`)
+	if at < 0 {
+		t.Fatalf("the upload's chip was not rendered:\n%s", html)
+	}
+	chip := html[strings.LastIndex(html[:at], "<button"):]
+	chip = chip[:strings.Index(chip, "</button>")]
+	for _, want := range []string{`data-suggested="true"`, `aria-checked="true"`, "track-chip-active", `aria-disabled="true"`} {
+		if !strings.Contains(chip, want) {
+			t.Errorf("the suggested upload is missing %q:\n%s", want, chip)
+		}
+	}
+	// One suggestion in the whole dialog: the sidecar must not carry it too.
+	if n := strings.Count(html, `data-suggested="true"`); n != 1 {
+		t.Errorf("expected exactly one suggested chip in the dialog, got %d", n)
+	}
+	if !strings.Contains(html, `data-subtitles-off="true"`) {
+		t.Error("the switch must render off for a saved 'none'")
+	}
+}

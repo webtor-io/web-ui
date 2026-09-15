@@ -292,7 +292,7 @@ for the same reason.
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
 | `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
 | `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), plus `aria-disabled="true"` on every chip while the block is muted |
-| `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded |
+| `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 
 **Classes.** `.track-chip` / `.track-chip-active` on audio and subtitle chips, `.lang-chip` /
@@ -353,9 +353,16 @@ ffprobe's disposition flags.
 chip out of `#lang-chip-template` without a language table of its own. All three come from
 `stremio.NewLangDisplay`.
 
-`data-default`/`data-saved` on the uploads list come from `UserSubtitleTrack.Default`/`.Saved`,
-copied by `Helper.UserSubtitleView` out of the matching `ListItem` (`us-<uuid>`) of the same
-`GetSubtitles` call the dialog renders from — the partial has its own view model, so without that
+`data-default`/`data-saved`/`data-suggested` on the uploads list come from
+`UserSubtitleTrack.Default`/`.Saved`/`.Suggested`, copied by `Helper.UserSubtitleView` out of the
+matching `ListItem` (`us-<uuid>`) of the same `GetSubtitles` call the dialog renders from.
+`Suggested` matters most here: an upload is rank 0, so whenever the viewer has subtitles off and
+has ever uploaded a file in their language, the track the switch would turn on **is** that
+upload — and without the copy the one chip most often suggested was the one chip carrying no
+`data-suggested` for the client to find. The view model also carries `SubtitlesOff` (derived from
+the same list: the `none` item being default), because while subtitles are off it is the suggested
+chip, not the default one, that wears the check and the fill, and this partial has to agree with
+the dialog's own track row rather than wait for the client's first `refresh` — the partial has its own view model, so without that
 copy the player's audio-switch rule read every upload as "nothing chosen" and could switch away
 from a subtitle the viewer had uploaded and picked.
 
@@ -423,10 +430,13 @@ row plus the tracks of the expanded language.
     `toggleDecision` (`track-picker.js`) is that whole rule as a pure function.
   - `ListItem.Suggested` (`data-suggested`) is the server's half: whenever the render's default is
     `none` — the viewer saved it, or the ladder arrived there because the audio is already in their
-    language — `GetSubtitles` names the track the switch would turn on (`offSuggestion`: best human
-    track in the preferred language, forced track, AI translation, Accept-Language pick, then the
-    best activatable track at all). Never the `none` item, never a locked one, and never while
-    subtitles are on — with a track playing, `data-default` already answers that question.
+    language — `GetSubtitles` names the track the switch would turn on. `offSuggestion` asks
+    `ladderPick` first, the same function the saved-off branch uses, so both ways of arriving at
+    "off" promise the same track (a forced track wins when the audio is already in the viewer's
+    language); only when the ladder's own answer is "None" do the extra rungs apply — best human
+    track in the preferred language, AI translation, Accept-Language pick, then the best
+    activatable track at all. Never the `none` item, never a locked one, and never while subtitles
+    are on: with a track playing, `data-default` already answers that question.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.
@@ -462,8 +472,11 @@ row plus the tracks of the expanded language.
 - **Flags fall back.** `supportsFlagEmoji()` (`lib/discover/lang.js`) hides every `.chip-flag`
   where the platform draws bare letter pairs (Windows outside Firefox); the language names stay.
 - **Language-row order** (owner, 2026-09-15): the viewer's **preferred** language first — including
-  a group whose only track is the AI translation — then the language of the track playing, then by
-  track count, then the order `GetSubtitles` produced. The row opens on that first chip
+  a group whose only track is the AI translation — then the language of the track playing, then the
+  language of the track the switch would turn on (`Suggested`, which exists only while subtitles
+  are off, so it never competes with the playing one), then by track count, then the order
+  `GetSubtitles` produced. Expanded and first are always the same chip: `Overflow` is assigned by
+  index, so a language expanded from further down the row would be pressed and collapsed at once. The row opens on that first chip
   (`LangRow.Expanded`), so a page opens in the viewer's own language whatever is playing; the
   playing track keeps the cyan dot on its chip wherever it sorts, and may sit hidden under the
   filter, which is accepted. A preferred language with no tracks at all changes nothing — the
@@ -472,7 +485,11 @@ row plus the tracks of the expanded language.
   row after an upload changes the counts — and the same fixture is in both test suites. On the
   client the viewer's own browsing choice still comes first: `expandedLangFor` keeps the pressed
   language whenever it still has tracks, and falls back to this order otherwise (on a first open
-  the pressed chip *is* the server's `Expanded`). There is deliberately **no** alphabetical
+  the pressed chip *is* the server's `Expanded`). The suggested-language rule needs no clause of
+  its own there: `readChips` already reads the muted choice — `data-last-subtitle` this session,
+  else the `data-suggested` chip — as the active one, so it sorts into the same slot. The client
+  never reorders the row itself; `syncLangRow` updates the chips in place and the order stays the
+  server's. There is deliberately **no** alphabetical
   tie-break: it would reshuffle every equal-count group on the first refresh after an upload.
 - **Without JS** (picker JS failed, player loaded): every chip renders, the expanded language's
   tracks are visible, the active track carries its check and fill from SSR and the counts are
