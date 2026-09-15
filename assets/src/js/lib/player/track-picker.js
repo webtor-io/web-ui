@@ -21,7 +21,10 @@
 //                      row: the player activates it by id, the viewer
 //                      switches it through #subtitles-toggle, and the
 //                      filter never unhides it.
-//   #subtitles-toggle  the on/off switch of the whole subtitle block.
+//   #subtitles-toggle  the on/off switch of the whole subtitle block, the
+//                      first child of #subtitle-langs (the chips live in
+//                      .lang-row beside it, which is what the muted state
+//                      dims — the switch itself never fades).
 //                      Off is mirrored on the dialog as
 //                      data-subtitles-off="true", the chip that comes back
 //                      as data-last-subtitle (this session) or
@@ -279,6 +282,16 @@ function mutedChoiceID(container, chips) {
     return '';
 }
 
+// langRowBox is where the language chips live: .lang-row inside
+// #subtitle-langs, which also holds the switch. Older markup (and the
+// tests' minimal fixtures) put the chips straight into the row, so the
+// container itself is the fallback.
+function langRowBox(container) {
+    const row = container && container.querySelector && container.querySelector('#subtitle-langs');
+    if (!row) return null;
+    return row.querySelector('.lang-row') || row;
+}
+
 function langChipEls(container) {
     const row = container && container.querySelector && container.querySelector('#subtitle-langs');
     if (!row) return [];
@@ -386,7 +399,10 @@ export function syncLangRow(container, expanded) {
             const name = el.querySelector('.lang-name');
             if (name) name.textContent = m.name || m.lang.toUpperCase();
             applyLangUpdate(el, m, rowExpanded);
-            row.insertBefore(el, more || null);
+            // Into the chips' own box, next to the "+N" it must precede —
+            // insertBefore throws when the reference node is not a child of
+            // the node it is called on, and `more` lives in .lang-row.
+            (more && more.parentNode ? more.parentNode : (langRowBox(container) || row)).insertBefore(el, more || null);
         }
     }
     if (more) {
@@ -473,9 +489,13 @@ export function applyOffState(container, off) {
     if (container.setAttribute) container.setAttribute('data-subtitles-off', next ? 'true' : 'false');
     const toggle = container.querySelector('#subtitles-toggle');
     if (toggle) toggle.checked = !next;
-    for (const sel of ['#subtitle-langs', '#subtitle-tracks']) {
-        const box = container.querySelector(sel);
+    // The chips dim, the switch does not: it is the way back.
+    for (const box of [langRowBox(container), container.querySelector('#subtitle-tracks')]) {
         if (box && box.classList) box.classList.toggle('picker-off', next);
+    }
+    const toggleBox = container.querySelector('#subtitle-langs');
+    if (toggleBox && toggleBox.classList && toggleBox !== langRowBox(container)) {
+        toggleBox.classList.remove('picker-off');
     }
     const chips = readChips(container);
     // What the switch would give back keeps the active mark: activating

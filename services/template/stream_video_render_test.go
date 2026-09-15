@@ -306,9 +306,9 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		// on "None": the switch renders off, both rows are muted, and the
 		// track the switch would turn on carries data-suggested.
 		`id="subtitles-toggle"`,
-		`class="toggle toggle-soft">`,
+		`class="toggle toggle-soft toggle-sm">`,
 		`data-subtitles-off="true"`,
-		`id="subtitle-langs" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
+		`class="lang-row flex flex-wrap items-center gap-1.5 picker-off"`,
 		`id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
 		`data-suggested="true"`,
 	} {
@@ -393,6 +393,26 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	langs := html[langsAt:tracksAt]
 	if strings.Contains(langs, `data-id="none"`) {
 		t.Errorf("the None item is back in the language row:\n%s", langs)
+	}
+	// The switch leads the language row (owner, 2026-09-16) — where the Off
+	// chip used to be — and the heading line above carries nothing but the
+	// title.
+	toggleAt := strings.Index(langs, `id="subtitles-toggle"`)
+	if toggleAt < 0 {
+		t.Fatalf("the switch is not in the language row:\n%s", langs)
+	}
+	if firstLang := strings.Index(langs, `class="lang lang-chip`); firstLang >= 0 && toggleAt > firstLang {
+		t.Errorf("the switch must come before the first language chip (toggle at %d, first chip at %d)", toggleAt, firstLang)
+	}
+	// ...and it is outside the part that dims: a control at half opacity is
+	// the one thing that must stay legible while subtitles are off.
+	rowAt := strings.Index(langs, `class="lang-row`)
+	if rowAt < 0 || toggleAt > rowAt {
+		t.Errorf("the switch must sit beside .lang-row, not inside it (toggle at %d, row at %d)", toggleAt, rowAt)
+	}
+	heading := html[strings.LastIndex(html[:langsAt], `<div class="flex items-baseline`):langsAt]
+	if strings.Contains(heading, "subtitles-toggle") {
+		t.Errorf("the heading line still carries the switch:\n%s", heading)
 	}
 	offAt := strings.Index(tracks, `id="subtitle-none"`)
 	if offAt < 0 {
@@ -737,7 +757,7 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 	html := buf.String()
 
 	for _, want := range []string{
-		`class="toggle toggle-soft" checked`,
+		`class="toggle toggle-soft toggle-sm" checked`,
 		`data-subtitles-off="false"`,
 	} {
 		if !strings.Contains(html, want) {

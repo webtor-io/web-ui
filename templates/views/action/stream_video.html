@@ -89,17 +89,6 @@
             <div>
                 <div class="flex items-baseline justify-between gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
-                    {{/* The switch for the whole block (docs/uikit.html §6),
-                         not a chip in the rows: turning subtitles off is a
-                         different kind of act from choosing between tracks,
-                         and the rows below stay readable (muted, the choice
-                         still marked) so the viewer can see what comes back.
-                         The "None" item itself stays in #subtitle-tracks as a
-                         hidden carrier -- the player activates it by id. */}}
-                    <label class="label cursor-pointer gap-3 justify-start">
-                        <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
-                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft"{{ if not $off }} checked{{ end }}>
-                    </label>
                 </div>
 
                 {{/* The language row is a filter, not a choice: pressing a chip
@@ -108,7 +97,22 @@
                      aria-pressed buttons rather than a tablist — there are no
                      tab panels, and the one real choice (which track plays)
                      lives in the radiogroup underneath. */}}
-                <div id="subtitle-langs" class="flex flex-wrap gap-1.5 mb-3{{ if $off }} picker-off{{ end }}" role="group" aria-label="{{ t $.Lang "action.stream.subtitleLanguage" }}">
+                <div id="subtitle-langs" class="flex items-start gap-2 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleLanguage" }}">
+                    {{/* The switch leads the language row, where the "Off"
+                         chip used to be (owner, 2026-09-16): the same place
+                         the eye already looks for "no subtitles". It is not a
+                         language, and — unlike the chips — it must stay
+                         legible while subtitles are off, so the dimming lives
+                         on .lang-row beside it rather than on this container.
+                         (An `opacity` on a display:contents wrapper would
+                         paint nothing: no box, no group to fade.) The "None"
+                         item itself stays in #subtitle-tracks as a hidden
+                         carrier the player activates by id. */}}
+                    <label class="flex items-center cursor-pointer shrink-0 py-1">
+                        <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
+                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft toggle-sm"{{ if not $off }} checked{{ end }}>
+                    </label>
+                    <div class="lang-row flex flex-wrap items-center gap-1.5{{ if $off }} picker-off{{ end }}">
                     {{ range $row.Groups }}
                     <button type="button" class="lang lang-chip{{ if eq .Lang $row.Expanded }} lang-chip-active{{ end }}"
                             data-lang="{{ .Lang }}" aria-pressed="{{ if eq .Lang $row.Expanded }}true{{ else }}false{{ end }}"{{ if .Overflow }} hidden{{ end }}>
@@ -133,6 +137,7 @@
                             <span class="lang-dot w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true" hidden></span>
                         </button>
                     </template>
+                    </div>
                 </div>
 
                 {{/* The "None" item has no chip of its own any more — the

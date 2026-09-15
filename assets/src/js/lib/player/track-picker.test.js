@@ -305,7 +305,13 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
 
     const toggle = el('input', { type: 'checkbox', id: 'subtitles-toggle', class: 'toggle toggle-soft' });
     toggle.checked = !off;
-    const langs = el('div', { id: 'subtitle-langs', role: 'group' }, rowEls.concat([more, template]));
+    // Same shape as the template: the switch leads #subtitle-langs and the
+    // chips live in .lang-row beside it, which is what the muted state dims.
+    const langRow = el('div', { class: 'lang-row' + (off ? ' picker-off' : '') }, rowEls.concat([more, template]));
+    const langs = el('div', { id: 'subtitle-langs', role: 'group' }, [
+        el('label', { class: 'flex items-center' }, [toggle]),
+        langRow,
+    ]);
     const uploads = el('div', { id: 'my-subtitles', class: 'contents' });
     const tracksBox = el('div', { id: 'subtitle-tracks', role: 'radiogroup' }, trackEls.concat([uploads]));
     const audioBox = el('div', { id: 'audio-tracks', role: 'radiogroup' }, audio.map((t) => trackChip('audio', t)));
@@ -315,7 +321,6 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
         el('span', { id: 'audio-now' }, [span('now-value')]),
         audioBox,
         el('span', { id: 'subtitle-now' }, [span('now-origin'), span('now-value')]),
-        toggle,
         langs,
         tracksBox,
     ]);
@@ -428,8 +433,9 @@ test('post-upload: a new language gets a chip cloned from the template, counts f
     // The viewer was looking at English and stays there.
     assert.equal(expandedLang(container), 'en');
     assert.deepEqual(visibleTracks(container), ['a', 'us-2']);
-    // The clone is inserted before the "+N" button, not after it.
-    const kids = container.querySelector('#subtitle-langs').children;
+    // The clone is inserted before the "+N" button, not after it — and into
+    // the chips' own box (.lang-row), not next to the switch.
+    const kids = container.querySelector('.lang-row').children;
     assert.ok(kids.indexOf(chips[1]) < kids.findIndex((k) => k.getAttribute('id') === 'subtitle-lang-more'));
 });
 
@@ -630,9 +636,12 @@ test('applyOffState mutes both rows, marks the chips disabled and leaves them in
     applyOffState(container, true);
     assert.equal(container.getAttribute('data-subtitles-off'), 'true');
     assert.equal(container.querySelector('#subtitles-toggle').checked, false);
-    for (const id of ['#subtitle-langs', '#subtitle-tracks']) {
-        assert.ok(container.querySelector(id).classList.contains('picker-off'), `${id} is not muted`);
+    for (const sel of ['.lang-row', '#subtitle-tracks']) {
+        assert.ok(container.querySelector(sel).classList.contains('picker-off'), `${sel} is not muted`);
     }
+    // ...but never the switch's own container: it is the way back, and a
+    // control at half opacity is the one thing that must stay legible.
+    assert.equal(container.querySelector('#subtitle-langs').classList.contains('picker-off'), false);
     // Muted, not disabled: the chips stay clickable (clicking one switches
     // subtitles back on), only the ARIA state says they are inert for now.
     assert.deepEqual(readChips(container).map((c) => c.el.getAttribute('aria-disabled')), ['true', 'true', 'true']);
@@ -651,8 +660,8 @@ test('applyOffState(false) clears the muted state but never unlocks a locked chi
     applyOffState(container, false);
     assert.equal(container.getAttribute('data-subtitles-off'), 'false');
     assert.equal(container.querySelector('#subtitles-toggle').checked, true);
-    for (const id of ['#subtitle-langs', '#subtitle-tracks']) {
-        assert.equal(container.querySelector(id).classList.contains('picker-off'), false, `${id} is still muted`);
+    for (const sel of ['.lang-row', '#subtitle-tracks']) {
+        assert.equal(container.querySelector(sel).classList.contains('picker-off'), false, `${sel} is still muted`);
     }
     assert.deepEqual(readChips(container).map((c) => c.el.getAttribute('aria-disabled')), [null, null, 'true']);
 });

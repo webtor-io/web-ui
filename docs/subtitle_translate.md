@@ -272,7 +272,8 @@ for the same reason.
 | id | element | role |
 |---|---|---|
 | `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang`, `data-subtitles-off` (`"true"` while subtitles are off) and, once the viewer has switched them off in this session, `data-last-subtitle` (the id to restore) |
-| `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft">` | the subtitles on/off switch, on the "Subtitles" heading line (`docs/uikit.html` §6). Checked iff the default item is not `none`; labelled by an `sr-only` span |
+| `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft toggle-sm">` | the subtitles on/off switch, **first child of `#subtitle-langs`** — where the "Off" chip used to be (owner, 2026-09-16) — in a `<label class="flex items-center">` with an `sr-only` name. Checked iff the default item is not `none` |
+| `.lang-row` | `<div>` inside `#subtitle-langs` | the language chips, "+N" and the `<template>`. Exists so the muted state can dim the chips without dimming the switch beside them; `applyOffState` writes `.picker-off` here, never on `#subtitle-langs` |
 | `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
 | `#subtitle-langs` | `<div role="group">` | subtitle **language** row — a filter, not a choice |
 | `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
@@ -406,7 +407,7 @@ row plus the tracks of the expanded language.
   tracks on screen with no chip pointing at them.
 - **Subtitles are switched, not chosen off** (owner, 2026-09-15). The "Subtitles" heading carries
   a `toggle toggle-soft`; there is no "Off" chip in either row. Off does **not** empty the block:
-  both rows go `.picker-off` (dimmed), every chip keeps its classes — including the active mark on
+  the chips go `.picker-off` (dimmed — `.lang-row` and `#subtitle-tracks`, never the switch itself), every chip keeps its classes — including the active mark on
   the track that comes back, which also carries `aria-checked="true"`, since a chip drawn as
   chosen and announced as unchosen is the worst of both — and the language chip of that track
   keeps its dot. The chips stay
