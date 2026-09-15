@@ -294,7 +294,7 @@ for the same reason.
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
 | `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
-| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated and unlocked only), plus `aria-disabled="true"` on every chip while the block is muted |
+| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), plus `aria-disabled="true"` on every chip while the block is muted |
 | `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 
@@ -473,8 +473,10 @@ row plus the tracks of the expanded language.
   - **`Offered` is a different field from `Suggested`** (owner review, 2026-09-16). They answer
     two questions — "what can the viewer start here" and "what would the switch bring back" — and
     one list usually needs both, on two different chips. `data-offered` marks the translation the
-    ladder would have chosen; `data-suggested` stays the switch's restore candidate, computed by
-    `offSuggestion`, and is never a translation. A **locked** item is never `Offered`: a free
+    ladder would have chosen, and never the one already playing — a translation the viewer saved
+    comes back as `Default`, and inviting them to start what is on screen is nonsense;
+    `data-suggested` stays the switch's restore candidate, computed by `offSuggestion`, and is
+    never a translation. A **locked** item is never `Offered`: a free
     viewer cannot run it, so its chip keeps the old name-plus-lock shape and the upsell CTA.
   - the chip says which it is: offered, it reads as a verb (`✦` + the `AI` badge +
     `action.stream.translate.action`, "Translate to Portuguese") and wears `.chip-offered`, an

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     MAX_VISIBLE_LANGS,
     applyOffState,
+    offerPending,
     offStateAfterActivate,
     restoreSavedTranslation,
     toggleDecision,
@@ -18,6 +19,7 @@ import {
     setChipActive,
     toggleLangOverflow,
     refresh,
+    refreshMarks,
 } from './track-picker.js';
 
 // ---- the pure half --------------------------------------------------
@@ -874,30 +876,44 @@ test('the AI chip is a verb until it is playing', () => {
     assert.deepEqual(shown('.ai-label'), [true], 'playing: the track name shows');
 });
 
-test('the hint shows exactly when the only offer is a translation', () => {
+test('the hint explains a pending offer, and nothing else', () => {
     const { container } = buildPicker({
         preferred: 'de',
         off: true,
         tracks: [offChip(true), { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
         row: [{ lang: 'de', count: 1, selected: true }],
     });
-    applyOffState(container, true);
+    refreshMarks(container);
     assert.equal(container.querySelector('#subtitle-hint').hidden, false);
-    // Switched back on (by a click on the chip, say): the hint goes.
-    applyOffState(container, false);
+
+    // Taken: the chip becomes the one playing and stops being on offer, so
+    // the explanation goes with it.
+    const chip = container.querySelector('[data-id="tr-de"]');
+    setChipActive(chip, true);
+    chip.setAttribute('data-default', 'true');
+    refreshMarks(container);
     assert.equal(container.querySelector('#subtitle-hint').hidden, true);
 
-    // Negative control for the "only a translation" half: a real track is
-    // offered instead, so the switch has something to give and the hint
-    // would be a lie.
+    // Negative control: no offer at all — a real track is what the switch
+    // would restore, and there is nothing to explain.
     const { container: c2 } = buildPicker({
         preferred: 'de',
         off: true,
         tracks: [offChip(true), { id: 'a', lang: 'de', label: 'German', suggested: true }],
         row: [{ lang: 'de', count: 1, selected: true }],
     });
-    applyOffState(c2, true);
+    refreshMarks(c2);
     assert.equal(c2.querySelector('#subtitle-hint').hidden, true);
+});
+
+test('offerPending: marked, and not the track already playing', () => {
+    const ai = (extra = {}) => ({ id: 'tr-de', offered: true, isDefault: false, ...extra });
+    assert.equal(offerPending([ai()]), 'tr-de');
+    // Negative control, clause by clause: an unmarked chip is not an offer,
+    // and an offer that is playing has been taken.
+    assert.equal(offerPending([ai({ offered: false })]), null);
+    assert.equal(offerPending([ai({ isDefault: true })]), null);
+    assert.equal(offerPending([]), null);
 });
 
 // An offered translation is not "what comes back": the switch refuses it,
@@ -937,19 +953,22 @@ test('restoreSavedTranslation: only a saved, playing, unlocked translation', () 
     assert.equal(restoreSavedTranslation([]), null);
 });
 
-test('the hint follows the switch’s own answer, not the mere presence of an offer', () => {
-    // (a) An offer, but a human track is playing: subtitles are on, so
-    // there is nothing to explain.
+// The hint describes the offer, not the switch (owner, 2026-09-16, second
+// ruling): it stands whether or not the switch has something else to
+// restore, and whether or not subtitles are on — what it says is "your
+// language has no subtitles yet", and that is true in all of those states.
+test('the hint stands while the offer does, whatever the switch could do', () => {
+    // Subtitles on, a human track playing, the offer still pending.
     const { container: on } = buildPicker({
         preferred: 'de',
         tracks: [offChip(), { id: 'a', lang: 'de', label: 'German', def: true }, { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
         row: [{ lang: 'de', count: 2, selected: true }],
     });
-    applyOffState(on, false);
-    assert.equal(on.querySelector('#subtitle-hint').hidden, true);
+    refreshMarks(on);
+    assert.equal(on.querySelector('#subtitle-hint').hidden, false);
 
-    // ...and with subtitles off but a real track to restore, the switch
-    // would not refuse either.
+    // Subtitles off with a real track to restore: the switch has an answer,
+    // and the offer is still worth explaining.
     const { container: restorable } = buildPicker({
         preferred: 'de',
         off: true,
@@ -960,8 +979,8 @@ test('the hint follows the switch’s own answer, not the mere presence of an of
         ],
         row: [{ lang: 'de', count: 2, selected: true }],
     });
-    applyOffState(restorable, true);
-    assert.equal(restorable.querySelector('#subtitle-hint').hidden, true);
+    refreshMarks(restorable);
+    assert.equal(restorable.querySelector('#subtitle-hint').hidden, false);
 });
 
 // (b) The viewer ran the translation, then switched subtitles off. The

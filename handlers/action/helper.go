@@ -83,6 +83,11 @@ type ListItem struct {
 	// for the viewer. Rendered as data-offered and drawn as an action
 	// ("Translate to <language>", accent outline) rather than a selection.
 	//
+	// Never together with Default: a translation the viewer saved comes
+	// back playing, and the chip then reads as a track. "Offered and not
+	// playing" is exactly what the picker's hint explains, on both sides
+	// (template, and offerPending in track-picker.js).
+	//
 	// A separate field from Suggested on purpose (owner review): they
 	// answer different questions -- "what would the switch bring back" and
 	// "what can the viewer start here" -- and one list often needs both,
@@ -582,7 +587,7 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 						// Same split as below: an offer, never the switch's
 						// answer. What the switch restores is decided by
 						// offSuggestion once the defaults are settled.
-						lis[p].Offered = true
+						markOffered(lis, p)
 					} else {
 						markSuggested(lis, p)
 					}
@@ -604,7 +609,7 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	// the phase-1 selection decides what actually plays, which is "None"
 	// when it finds nothing.
 	if lis[pick].Provider == "Translated" {
-		lis[pick].Offered = true
+		markOffered(lis, pick)
 		return s.selectListItem(lis, "", ud, true)
 	}
 	lis[pick].Default = true
@@ -654,6 +659,23 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 	// to "None" would take subtitles away from viewers who had them in
 	// phase 1, so the old Accept-Language selection decides instead.
 	return s.fallbackIndex(lis, ud)
+}
+
+// markOffered marks the translation the viewer may start. Never the item
+// that is already playing: a translation saved in an earlier session comes
+// back as Default, and an invitation to start what is already on screen is
+// nonsense -- the chip has to read as a track, not as a verb.
+//
+// The Default case cannot reach here today (applyLadder's saved-choice
+// branch returns before either call site), which is why this says the rule
+// rather than enforcing a possibility: it is the one place both call sites
+// pass through, so a reordering that made it reachable would still be
+// caught here rather than in the markup.
+func markOffered(lis []ListItem, i int) {
+	if i < 0 || i >= len(lis) || lis[i].Default {
+		return
+	}
+	lis[i].Offered = true
 }
 
 // markSuggested marks the item the picker would turn on. "None" is never

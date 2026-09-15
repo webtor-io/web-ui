@@ -1171,3 +1171,29 @@ func TestOfferedIsNeverLocked(t *testing.T) {
 		t.Error("a locked translation is not an offer")
 	}
 }
+
+// TestSavedTranslationIsPlayingNotOffered: the viewer chose the
+// translation in an earlier session, so this page is playing it -- an
+// offer to start what is already on screen is nonsense, and the chip must
+// read as a track (name + progress), not as a verb.
+//
+// The property holds through applyLadder's ordering (the saved-choice
+// branch returns before anything is offered) and is written down in
+// markOffered; this test is what would catch a reordering.
+func TestSavedTranslationIsPlayingNotOffered(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "en.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "tr-pt"}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr := byID(items)["tr-pt"]
+	if !tr.Default || !tr.Saved {
+		t.Fatalf("the saved translation must be the one playing: %+v", tr)
+	}
+	if tr.Offered {
+		t.Error("what is playing is never on offer")
+	}
+	for _, it := range items {
+		if it.Offered && it.Default {
+			t.Errorf("%s is both playing and on offer", it.ID)
+		}
+	}
+}

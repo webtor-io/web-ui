@@ -21,6 +21,8 @@
 //                      row: the player activates it by id, the viewer
 //                      switches it through #subtitles-toggle, and the
 //                      filter never unhides it.
+//   #subtitle-hint     explains a pending offer (a translation marked
+//                      data-offered that is not the track playing).
 //   #subtitles-toggle  the on/off switch of the whole subtitle block, the
 //                      first child of #subtitle-langs (the chips live in
 //                      .lang-row beside it, which is what the muted state
@@ -46,7 +48,6 @@
 
 import { supportsFlagEmoji } from '../discover/lang.js';
 import { pickDefaultSubtitle } from './subtitle-rules.js';
-import { readTracks } from './subtitle-telemetry.js';
 
 // Mirrors maxVisibleLangChips in handlers/action/picker.go. Changing one
 // without the other makes the row jump between the server's first paint and
@@ -213,6 +214,23 @@ export function toggleDecision({ on, lastId = '', suggestedId = '', tracks = [],
     return { activateId: id, persist: true };
 }
 
+// offerPending is the translation the picker is inviting the viewer to
+// start: marked Offered by the ladder and not the track already playing.
+// That pair is exactly what #subtitle-hint explains ("no subtitles in your
+// language yet — turn on the AI translation"), which is why the hint is
+// read off the chips rather than off the switch: it describes an offer,
+// not a refusal.
+//
+// An offer that has been taken is no longer pending on either count — the
+// chip becomes the default, and setChipActive drops data-offered — so the
+// hint goes as soon as the run starts and does not come back.
+export function offerPending(chips) {
+    for (const c of Array.isArray(chips) ? chips : []) {
+        if (c && c.offered && !c.isDefault) return c.id;
+    }
+    return null;
+}
+
 // offStateAfterActivate is the switch's state after an activation, whoever
 // asked for it: the viewer flipping the switch, the viewer pressing a chip,
 // or the player itself (a deleted upload landing on "None", the
@@ -272,6 +290,7 @@ function chipData(el) {
         langFlag: attr(el, 'data-lang-flag'),
         isDefault: attr(el, 'data-default') === 'true',
         locked: attr(el, 'data-locked') === 'true',
+        offered: attr(el, 'data-offered') === 'true',
         el,
     };
 }
@@ -541,12 +560,6 @@ export function applyOffState(container, off) {
     for (const box of [langRowBox(container), container.querySelector('#subtitle-tracks')]) {
         if (box && box.classList) box.classList.toggle('picker-off', next);
     }
-    // Why the switch will not turn subtitles on -- asked of the switch
-    // itself, not of a second rule that could drift from it: there is a
-    // translation to start, and the decision that runs when the switch is
-    // flipped comes back empty-handed.
-    const hint = container.querySelector('#subtitle-hint');
-    if (hint) hint.hidden = !(next && !!offeredTranslation(container) && switchWouldRefuse(container));
     const toggleBox = container.querySelector('#subtitle-langs');
     if (toggleBox && toggleBox.classList && toggleBox !== langRowBox(container)) {
         toggleBox.classList.remove('picker-off');
@@ -567,30 +580,13 @@ export function applyOffState(container, off) {
     return next;
 }
 
-// offeredTranslation is the chip the viewer may start a translation from:
-// the ladder's answer, marked data-offered by the server. Null when there
-// is none (no AI item, or a locked one, which is an upsell rather than an
-// action).
-function offeredTranslation(container) {
-    if (!container || !container.querySelector) return null;
-    return container.querySelector('.subtitle[data-offered="true"]');
-}
-
-// switchWouldRefuse runs the switch's own decision without acting on it:
-// true when flipping it on would find nothing to activate. The inputs are
-// read off the DOM exactly as setSubtitlesOff reads them, so the hint and
-// the switch can never disagree about what would happen.
-function switchWouldRefuse(container) {
-    const audioEl = container.querySelector('.audio[data-default="true"]');
-    const suggested = container.querySelector('.subtitle[data-suggested="true"]');
-    return toggleDecision({
-        on: true,
-        lastId: attr(container, 'data-last-subtitle'),
-        suggestedId: suggested ? attr(suggested, 'data-id') : '',
-        tracks: readTracks(container),
-        audioLang: audioEl ? attr(audioEl, 'data-srclang') : '',
-        preferredLang: attr(container, 'data-preferred-lang'),
-    }).activateId === '';
+// syncHint shows or hides the explanation of a pending offer. Called
+// wherever the chips may have moved: the full refresh, and refreshMarks --
+// which every activation ends in -- so an offer taken stops being
+// explained the moment it is taken.
+function syncHint(container) {
+    const hint = container && container.querySelector && container.querySelector('#subtitle-hint');
+    if (hint) hint.hidden = !offerPending(readChips(container));
 }
 
 // refreshMarks is what a selection needs: the row's counts and dot, and the
@@ -598,6 +594,7 @@ function switchWouldRefuse(container) {
 // viewer's expanded language is their choice and must not jump under them.
 export function refreshMarks(container) {
     syncLangRow(container);
+    syncHint(container);
     syncNow(container);
 }
 
@@ -615,6 +612,7 @@ export function refresh(container, { current = '' } = {}) {
     applyLangFilter(container, lang);
     applyFlagSupport(container);
     applyOffState(container);
+    syncHint(container);
     syncNow(container);
     return lang;
 }

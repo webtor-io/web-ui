@@ -1054,10 +1054,9 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		}
 	}
 
-	// Subtitles are off, and the switch has the Japanese sidecar to restore
-	// — so it will not refuse, and the hint (which says the switch has
-	// nothing to give) stays hidden. The hint follows the switch's own
-	// decision, never the mere presence of an offer.
+	// Subtitles are off and the switch has the Japanese sidecar to restore —
+	// which changes nothing about the hint: it explains the pending offer,
+	// not what the switch would do.
 	if !strings.Contains(html, `data-subtitles-off="true"`) {
 		t.Error("the switch must render off: the ladder's answer was the translation")
 	}
@@ -1069,8 +1068,8 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		t.Fatal("no #subtitle-hint element")
 	}
 	hint := html[hintAt : hintAt+strings.Index(html[hintAt:], "</p>")]
-	if !strings.Contains(hint[:strings.Index(hint, ">")], "hidden") {
-		t.Errorf("the hint must stay hidden while the switch has a track to restore:\n%s", hint)
+	if strings.Contains(hint[:strings.Index(hint, ">")], "hidden") {
+		t.Errorf("the hint must stand while the offer is pending:\n%s", hint)
 	}
 	if !strings.Contains(hint, "action.stream.translate.hint:Portuguese") {
 		t.Errorf("the hint must name the viewer's language:\n%s", hint)
@@ -1227,8 +1226,8 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		t.Errorf("only a translation is ever offered:\n%s", forced)
 	}
 
-	// Subtitles are off, the switch has a track to restore, so the hint —
-	// which explains a switch that refuses — stays hidden.
+	// Subtitles are off and the forced track is what the switch would
+	// restore; the offer is still pending, so its explanation stands.
 	if !strings.Contains(html, `data-subtitles-off="true"`) {
 		t.Error("the switch must render off")
 	}
@@ -1236,7 +1235,123 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 	if hintAt < 0 {
 		t.Fatal("no #subtitle-hint element")
 	}
+	if strings.Contains(html[hintAt:hintAt+strings.Index(html[hintAt:], ">")], "hidden") {
+		t.Error("the hint must stand while the offer is pending")
+	}
+}
+
+// TestStreamVideoRendersASavedTranslationAsPlaying: the viewer chose the
+// translation in an earlier session, so this page is playing it. The chip
+// must read as a track — name, source suffix, progress span — with no
+// offer markup on it, and the hint that explains an offer must be gone
+// too. (The run itself is restored by Player.jsx at mount; that half lives
+// in track-picker's tests.)
+func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string {
+		out := key
+		for i := 1; i < len(args); i += 2 {
+			out += ":" + fmt.Sprint(args[i])
+		}
+		return out
+	}
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return false },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<!--stub-->{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+		}},
+		Resource:            &ra.ResourceResponse{},
+		Item:                &ra.ListItem{PathStr: "movie.mkv"},
+		Title:               "Movie",
+		MediaProbe:          &mp,
+		EIURL:               "http://ei.example.com",
+		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: "res", ItemID: "item", SubtitleID: "tr-pt"},
+		Settings:            &models.StreamSettings{},
+		ExternalData:        &models.ExternalData{},
+		SubtitleOpts:        models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	if tr := byIDTest(items)["tr-pt"]; !tr.Default || !tr.Saved || tr.Offered {
+		t.Fatalf("fixture: the saved translation must be playing and not offered, got %+v", tr)
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data, "Lang": "en", "User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	at := strings.Index(html, `data-id="tr-pt"`)
+	if at < 0 {
+		t.Fatalf("the AI chip was not rendered:\n%s", html)
+	}
+	chip := html[strings.LastIndex(html[:at], "<button"):]
+	chip = chip[:strings.Index(chip, "</button>")]
+
+	for _, want := range []string{`data-default="true"`, `data-saved="true"`, "track-chip-active", `title="Portuguese · AI"`} {
+		if !strings.Contains(chip, want) {
+			t.Errorf("the playing translation is missing %q:\n%s", want, chip)
+		}
+	}
+	for _, gone := range []string{`data-offered`, "chip-offered", "action.stream.translate.action", "ai-action"} {
+		if strings.Contains(chip, gone) {
+			t.Errorf("what is playing must carry no offer markup (%q):\n%s", gone, chip)
+		}
+	}
+	// Nothing pending, nothing to explain.
+	hintAt := strings.Index(html, `id="subtitle-hint"`)
+	if hintAt < 0 {
+		t.Fatal("no #subtitle-hint element")
+	}
 	if !strings.Contains(html[hintAt:hintAt+strings.Index(html[hintAt:], ">")], "hidden") {
-		t.Error("the hint must be hidden while the switch has something to restore")
+		t.Error("the hint must be hidden when no offer is pending")
+	}
+	if !strings.Contains(html, `data-subtitles-off="false"`) {
+		t.Error("subtitles are on: the saved translation is what is playing")
 	}
 }

@@ -218,17 +218,18 @@
                     {{ end }}
                 </div>
 
-                {{/* Why the switch will not turn subtitles on here, and only
-                     then: subtitles are off, it has nothing to restore
-                     (no .Suggested), and the one thing in the viewer's
-                     language is a translation they must start themselves.
-                     That is the same question toggleDecision asks on the
-                     client — applyOffState re-derives the answer from the
-                     decision itself rather than from a second rule. */}}
-                {{ $aiOffer := false }}{{ $canRestore := false }}
-                {{ range $subs }}{{ if .Offered }}{{ $aiOffer = true }}{{ end }}{{ if .Suggested }}{{ $canRestore = true }}{{ end }}{{ end }}
+                {{/* What the offer above means, in words: the viewer's
+                     language has no subtitles yet and the translation is
+                     there to be started. It explains the offer, so it stands
+                     exactly while one is pending — marked .Offered and not
+                     the track already playing — whatever the switch could or
+                     could not do. The client reads the same pair off the
+                     chips (offerPending in track-picker.js) and re-applies it
+                     on every refresh. */}}
+                {{ $offerPending := false }}
+                {{ range $subs }}{{ if and .Offered (not .Default) }}{{ $offerPending = true }}{{ end }}{{ end }}
                 {{ $pd := langDisplay .SubtitleOpts.PreferredLang }}
-                <p id="subtitle-hint" class="text-xs text-w-muted mb-3"{{ if not (and $off $aiOffer (not $canRestore)) }} hidden{{ end }}>{{ tp $.Lang "action.stream.translate.hint" "Language" $pd.Name }}</p>
+                <p id="subtitle-hint" class="text-xs text-w-muted mb-3"{{ if not $offerPending }} hidden{{ end }}>{{ tp $.Lang "action.stream.translate.hint" "Language" $pd.Name }}</p>
 
                 <div id="translate-cta" class="mb-3 p-3 rounded-xl bg-base-200/60 border border-w-line max-w-md" hidden>
                     <div class="text-sm">{{ t $.Lang "action.stream.translate.locked" }}</div>
