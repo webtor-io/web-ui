@@ -2214,7 +2214,13 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
         <div class="flex flex-wrap gap-1.5 mb-3">
           <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-muted hover:border-w-purple/40 hover:text-w-purpleL gap-1.5" style="border-style:dashed" aria-expanded="true" aria-controls="my-uploads-demo">+ My Subtitles</button>
           <div id="my-uploads-demo" class="basis-full w-full mt-2 p-4 rounded-xl bg-base-200/50 border border-w-line">
-            <h3 class="font-bold text-lg mb-3">My Subtitles</h3>
+            <!-- heading line: the panel's own close control (#my-uploads-close), type="button" — the panel holds the upload form and one delete form per row, so a submit here would post one of them -->
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <h3 class="font-bold text-lg">My Subtitles</h3>
+              <button type="button" class="btn btn-ghost btn-xs text-w-muted hover:text-base-content" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
             <ul class="w-full bg-base-200/50 rounded-xl divide-y divide-w-line mb-4">
               <li class="p-3 flex items-center gap-4">
                 <div class="flex-1 min-w-0">
@@ -2348,6 +2354,9 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
     </div>
     <div class="uikit-note">
       <strong>Uploads row — mockup vs. code.</strong> Drawn here as a row <em>below</em> the track radiogroup, which is where it belongs (ruling R8). <strong>In the shipped markup it is not there yet:</strong> <code>#my-uploads-toggle</code> and <code>#my-uploads-panel</code> are emitted by <code>templates/partials/action/user_subtitles.html</code> together with the <code>MY</code> chips, and that partial renders <em>inside</em> <code>#subtitle-tracks</code> through the <code>#my-subtitles</code> wrapper (<code>class="contents"</code>, i.e. <code>display:contents</code>) — because the partial is a single async swap target that has to emit chips and panel at once. Visually identical (the panel's <code>basis-full</code> pushes it onto its own flex line); the cost is that a <code>role="radiogroup"</code> contains a disclosure button and, when open, two forms. Moving it out is markup-only plus a re-scope of <code>readChips</code> in <code>track-picker.js</code>; tracked as a follow-up.
+    </div>
+    <div class="uikit-note">
+      <strong>The panel says how to close itself.</strong> It opens from the dashed chip and closes from either that chip again or the <code>&times;</code> in its heading line (<code>#my-uploads-close</code>, <code>btn btn-ghost btn-xs</code>, <code>aria-label</code> = <code>action.stream.close</code>). Both go through one function in <code>Player.jsx</code>, so both leave the same state: <code>hidden</code> on the panel, <code>aria-expanded="false"</code> on the chip, <code>data-upload-open="false"</code> on the <code>#my-subtitles</code> wrapper &mdash; the one element the async swap does not replace, which is why the open state lives there.
     </div>
     <div class="uikit-note">
       <strong>Deletion never lives on a chip.</strong> A chip is a radio button and an accidental tap must not destroy a file, so each upload's delete control is a <code>&lt;form&gt;</code> in its own panel row, posting to <code>POST /user-subtitle/delete/:id</code> with <code>data-async-target="#my-subtitles"</code>. After the swap <code>Player.jsx</code> re-runs <code>refresh()</code> and the chip row, the language counts and the expanded language all resync.

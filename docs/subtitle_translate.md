@@ -281,7 +281,8 @@ for the same reason.
 | `#subtitle-off` | first child of `#subtitle-tracks` | the `none` list item, since 2026-09-15 a **hidden state carrier** and not a control: `hidden`, `aria-hidden="true"`, `tabindex="-1"`, no label and no chip classes. The player still activates it by `data-id="none"` (`findSubtitleItem`, `pickDefaultSubtitle`, `hasSavedDefault`, `dropDeletedTracks`); the act of turning subtitles off belongs to `#subtitles-toggle` |
 | `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
 | `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
-| `#my-uploads-panel` | `<div class="basis-full" hidden>` | upload form + one row per file, each row with its own delete form |
+| `#my-uploads-panel` | `<div class="basis-full" hidden>` | heading line (`action.stream.mySubtitles` + the close control), upload form, one row per file, each row with its own delete form |
+| `#my-uploads-close` | `<button type="button" class="btn btn-ghost btn-xs">` | the panel's own "×", in its heading line (`aria-label` = `action.stream.close`). Closes the panel exactly as pressing the chip again does — same function in `Player.jsx`, same three writes |
 | `#translate-cta` | `<div hidden>` | the locked-AI card, below the track row |
 
 ### Chips
@@ -422,6 +423,10 @@ row plus the tracks of the expanded language.
   not destroy a file. After the swap `Player.jsx` re-runs `refresh`, so the chip row, the language
   counts and the expanded language all follow; the panel re-opens from `data-upload-open` on
   `#my-subtitles` (the wrapper survives the swap, the toggle and panel inside it do not).
+  The panel closes from the chip again **or** from the "×" in its heading line
+  (`#my-uploads-close`, owner 2026-09-15): the way back should not depend on remembering which
+  chip opened it. Both controls go through `setUploadPanel`, so the state left behind is the same
+  one either way.
 - **Deleting the upload that is playing lands on Off.** The swap replaces `#my-subtitles`, so the
   chip goes, but the `<track>` lives in `<video>` and would keep the deleted file's subtitles on
   screen with nothing marked. `dropDeletedTracks` (`subtitle-track-reload.js`)

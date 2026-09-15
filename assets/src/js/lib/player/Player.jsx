@@ -1153,6 +1153,20 @@ function toggleDialog(id) {
     else dialog.showModal();
 }
 
+// setUploadPanel opens or closes the "My subtitles" panel. The open state
+// is written on #my-subtitles, the wrapper the async swap does NOT replace
+// (the toggle and the panel inside it are), so a delete or an upload can
+// put the panel back the way the viewer had it.
+function setUploadPanel(modal, open) {
+    const panel = modal.querySelector('#my-uploads-panel');
+    if (!panel) return;
+    panel.hidden = !open;
+    const toggle = modal.querySelector('#my-uploads-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const wrap = modal.querySelector('#my-subtitles');
+    if (wrap) wrap.setAttribute('data-upload-open', open ? 'true' : 'false');
+}
+
 // wireTrackHandlers binds the picker modals. It stays module-scope and
 // ref-free: `hooks` is the object the mounted component fills with
 // onSubtitleSelect/onAudioSelect (see the trackHooks effect), so the
@@ -1226,14 +1240,14 @@ function wireTrackHandlers(container, hooks = {}) {
             if (upload && subtitlesModal.contains(upload)) {
                 const panel = subtitlesModal.querySelector('#my-uploads-panel');
                 if (!panel) return;
-                const open = panel.hidden;
-                panel.hidden = !open;
-                upload.setAttribute('aria-expanded', open ? 'true' : 'false');
-                // The toggle and the panel are both replaced on every async
-                // swap; the wrapper is not, so the open state lives there.
-                const wrap = subtitlesModal.querySelector('#my-subtitles');
-                if (wrap) wrap.setAttribute('data-upload-open', open ? 'true' : 'false');
+                setUploadPanel(subtitlesModal, panel.hidden);
+                return;
             }
+            // The panel's own "×". Same state change as pressing the chip
+            // again, through the same function: two controls, one way the
+            // panel can be open or closed.
+            const uploadClose = e.target.closest('#my-uploads-close');
+            if (uploadClose && subtitlesModal.contains(uploadClose)) setUploadPanel(subtitlesModal, false);
         });
     }
 
@@ -1311,10 +1325,7 @@ function wireTrackHandlers(container, hooks = {}) {
             // looking at the panel: it must come back open, or removing two
             // files in a row means re-opening it between them.
             if (mySubsContainer.getAttribute('data-upload-open') === 'true') {
-                const panel = mySubsContainer.querySelector('#my-uploads-panel');
-                const toggle = mySubsContainer.querySelector('#my-uploads-toggle');
-                if (panel) panel.hidden = false;
-                if (toggle) toggle.setAttribute('aria-expanded', 'true');
+                setUploadPanel(subtitlesModal || container, true);
             }
             // A freshly uploaded subtitle comes back marked by the server.
             // Switch to it right away: the viewer uploaded a file to watch

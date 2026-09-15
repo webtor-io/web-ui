@@ -391,3 +391,75 @@ func TestUserSubtitlesPartialCollapsesChipsOutsideTheExpandedLanguage(t *testing
 		}
 	}
 }
+
+// TestUserSubtitlesPartialHasOneCloseControlPerPanel: the panel is a
+// disclosure the viewer opened from a chip, and the way back was the same
+// chip — findable only if you remember pressing it. It now carries an
+// explicit "×" in its heading line (owner, 2026-09-15). Exactly one per
+// rendered panel: two would be two ways to say the same thing in the same
+// corner, and the delegate in Player.jsx binds by id.
+func TestUserSubtitlesPartialHasOneCloseControlPerPanel(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
+	funcs := template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(any) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		"langDisplay":   stremio.NewHelper().LangDisplay,
+	}
+	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
+		ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse partial: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		subs []models.UserSubtitleTrack
+	}{
+		{"with uploads", []models.UserSubtitleTrack{{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "en"}}},
+		{"empty", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+				"Ctx":  map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+				"Data": &models.UserSubtitleView{ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei", UserSubtitles: tc.subs},
+			})
+			if err != nil {
+				t.Fatalf("failed to render: %v", err)
+			}
+			out := buf.String()
+
+			if n := strings.Count(out, `id="my-uploads-close"`); n != 1 {
+				t.Fatalf("expected exactly one panel close control, got %d:\n%s", n, out)
+			}
+			panelAt := strings.Index(out, `id="my-uploads-panel"`)
+			closeAt := strings.Index(out, `id="my-uploads-close"`)
+			if panelAt < 0 || closeAt < panelAt {
+				t.Errorf("the close control must be inside the panel (panel at %d, close at %d)", panelAt, closeAt)
+			}
+			// In the heading line, so it reads as the panel's own control
+			// and not as something belonging to the first upload row.
+			listAt := strings.Index(out, "<ul")
+			if listAt >= 0 && closeAt > listAt {
+				t.Errorf("the close control must sit in the heading line, above the uploads list")
+			}
+			// It closes the panel; it must never be mistaken for a submit
+			// inside the upload or delete forms.
+			openAt := strings.LastIndex(out[:closeAt], "<button")
+			btn := out[openAt : closeAt+strings.Index(out[closeAt:], ">")]
+			for _, want := range []string{`type="button"`, "btn-xs", `aria-label="Close"`} {
+				if !strings.Contains(btn, want) {
+					t.Errorf("close control missing %q:\n%s", want, btn)
+				}
+			}
+		})
+	}
+}

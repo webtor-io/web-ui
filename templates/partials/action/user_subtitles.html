@@ -39,7 +39,24 @@
 <button type="button" id="my-uploads-toggle" class="btn btn-sm btn-ghost border border-dashed border-w-line text-w-muted hover:border-w-purple/40 hover:text-w-purpleL gap-1.5"
         aria-expanded="false" aria-controls="my-uploads-panel">+ {{ t $lang "action.stream.mySubtitles" }}</button>
 <div id="my-uploads-panel" class="basis-full w-full mt-2 p-4 rounded-xl bg-base-200/50 border border-w-line" hidden>
-    <h3 class="font-bold text-lg mb-3">{{ t $lang "action.stream.mySubtitles" }}</h3>
+    {{/* The panel opens from the chip above and used to close only by
+         pressing that same chip again — a way back you have to remember.
+         The "×" says it out loud. It is the panel's own control, so it
+         lives in the heading line rather than next to the first upload row,
+         and it is type="button": the panel holds the upload form and one
+         delete form per file, and a default submit button here would post
+         whichever one it landed in. Player.jsx closes the panel from the
+         same delegate as the chip, so both paths leave the same state
+         behind (hidden panel, aria-expanded="false", data-upload-open
+         false on the wrapper that survives the async swap). */}}
+    <div class="flex items-start justify-between gap-3 mb-3">
+        <h3 class="font-bold text-lg">{{ t $lang "action.stream.mySubtitles" }}</h3>
+        <button type="button" id="my-uploads-close" class="btn btn-ghost btn-xs text-w-muted hover:text-base-content" aria-label="{{ t $lang "action.stream.close" }}" aria-controls="my-uploads-panel">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
     {{ if $data.ErrKey }}
         <div class="text-sm text-error mb-3">{{ t $lang $data.ErrKey }}</div>
     {{ end }}
