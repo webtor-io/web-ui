@@ -578,7 +578,18 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 			}
 		}
 	}
-	lis[s.ladderPick(lis, ud, audioLang, opts, humanIdx)].Default = true
+	pick := s.ladderPick(lis, ud, audioLang, opts, humanIdx)
+	// A translation is never turned on for the viewer (owner, 2026-09-16):
+	// starting one spends tokens, so it takes an explicit click. Where the
+	// ladder chose it, the item is marked Suggested instead -- the picker
+	// draws that as an offer ("Translate to Portuguese"), not as a
+	// selection -- and the phase-1 selection decides what actually plays,
+	// which is "None" when it finds nothing.
+	if lis[pick].Provider == "Translated" {
+		lis[pick].Suggested = true
+		return s.selectListItem(lis, "", ud, true)
+	}
+	lis[pick].Default = true
 	return lis
 }
 
@@ -612,9 +623,11 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 		return humanIdx
 	}
 	for i := range lis {
-		// A locked item cannot be turned on, so it cannot be the default
-		// either: the free viewer would face a player with subtitles
-		// "selected" and nothing on screen.
+		// An offer, not a selection: since 2026-09-16 applyLadder turns
+		// this answer into Suggested rather than Default, and the picker
+		// refuses to start a translation without a click. A locked item is
+		// not even offered -- it cannot be turned on, and the lock plus its
+		// CTA already say so.
 		if lis[i].Provider == "Translated" && !lis[i].Locked {
 			return i
 		}
@@ -649,14 +662,20 @@ func markSuggested(lis []ListItem, i int) {
 //     language: the ladder never turns a forced track on there (that rule
 //     is for audio already in the viewer's language), so it lands on "None"
 //     and this is what the switch has to offer;
-//  3. an unlocked AI translation -- applyLadder only ever creates one in
-//     the preferred language, so this rung needs no language test of its
-//     own;
-//  4. the Accept-Language pick (fallbackIndex), which knows nothing about
+//  3. the Accept-Language pick (fallbackIndex), which knows nothing about
 //     the preferred language;
-//  5. the best activatable track whatever its language.
+//  4. the best activatable track whatever its language.
 //
-// Rung 5 is the one the ladder itself would never take. The ladder answers
+// What is NOT a rung, since 2026-09-16: the AI translation. The switch
+// restores what the viewer had; it never spends tokens on their behalf, so
+// a translation is reached only by clicking its chip -- or through
+// data-last-subtitle, which names one they already ran this session and is
+// therefore cached and free. Where the ladder would have chosen it,
+// applyLadder marks it Suggested and the picker shows that as an offer;
+// since a list carries at most one Suggested item, this function is not
+// even called in that state.
+//
+// Rung 4 is the one the ladder itself would never take. The ladder answers
 // "should subtitles be on"; this answers "the viewer just said they should
 // be", and a switch that does nothing when pressed is worse than one that
 // gives the best track available.
@@ -678,15 +697,15 @@ func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, o
 			return i
 		}
 	}
-	for i := range lis {
-		if lis[i].Provider == "Translated" && !lis[i].Locked {
-			return i
-		}
-	}
 	if i := s.fallbackIndex(lis, ud); i > 0 {
 		return i
 	}
 	for i := range lis {
+		// No Translated guard here, and none is needed: the AI item is
+		// appended last and exists only when some side-loaded track was
+		// found to translate FROM, so that source -- activatable, earlier
+		// in the list -- is always reached first. A guard that cannot fire
+		// reads like a rule and is really a decoration.
 		if lis[i].ID != "none" && !lis[i].Locked {
 			return i
 		}

@@ -603,6 +603,8 @@
     "action.stream.translate.locked": "Napisy AI w Twoim języku są częścią planu wspierającego.",
     "action.stream.translate.cta": "Odblokuj napisy AI",
     "action.stream.translate.from": "z",
+    "action.stream.translate.action": "Przetłumacz na {{.Language}}",
+    "action.stream.translate.hint": "Nie ma jeszcze napisów w języku {{.Language}} — włącz tłumaczenie AI.",
     "player.play": "Odtwarzaj",
     "player.pause": "Pauza",
     "player.mute": "Wycisz",

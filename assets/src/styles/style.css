@@ -905,6 +905,13 @@ input:-webkit-autofill:focus {
   color: #00cec9 !important;
 }
 
+/* The AI chip the ladder offers but never turns on: an accent outline so
+   the eye lands on it, without the cyan fill that means "this is playing".
+   A translation costs tokens, so it is an invitation, not a selection. */
+.chip-suggested {
+  @apply border-w-pink/40;
+}
+
 /* The subtitle block while the switch on its heading is off: both rows are
    dimmed and the chosen track keeps its mark, so the viewer sees what
    comes back instead of an empty list. Dimming only — every chip stays

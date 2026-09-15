@@ -156,12 +156,20 @@
                     {{ end }}{{ end }}
                     {{ range $flat }}{{ if ne .ID "none" }}
                     {{ $d := langDisplay .SrcLang }}{{ $oc := originCode . }}
+                    {{/* The AI chip is an offer, never a selection the viewer
+                         did not make: a translation costs tokens, so it is
+                         marked Suggested and outlined (.chip-suggested)
+                         rather than wearing the "this is what comes back"
+                         check and fill. Every other suggested chip does wear
+                         it — the switch restores those for free. */}}
+                    {{ $ai := eq .Provider "Translated" }}
+                    {{ $marked := or .Default (and $off .Suggested (not $ai)) }}
                     {{/* aria-checked follows the look: while the block is
                          muted the suggested chip wears the check and the
                          fill, so a reader must hear it as the chosen one
                          too — the switch, not this radiogroup, is what says
                          subtitles are off. */}}
-                    <button type="button" role="radio" aria-checked="{{ if or .Default (and $off .Suggested) }}true{{ else }}false{{ end }}"
+                    <button type="button" role="radio" aria-checked="{{ if $marked }}true{{ else }}false{{ end }}"
                             data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}"
                             data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
                             {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" {{ end }}{{ if or .Locked $off }}aria-disabled="true" {{ end }}{{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}{{ if .Suggested }}data-suggested="true" {{ end }}
@@ -173,13 +181,20 @@
                                  (helper.go markSuggested); the client
                                  remembers a within-session choice in
                                  data-last-subtitle instead. */}}
-                            class="subtitle track-chip{{ if or .Default (and $off .Suggested) }} track-chip-active{{ else if .Locked }} chip-locked{{ end }}">
-                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not (or .Default (and $off .Suggested)) }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                            class="subtitle track-chip{{ if $marked }} track-chip-active{{ else if .Locked }} chip-locked{{ end }}{{ if and $ai .Suggested }} chip-suggested{{ end }}">
+                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not $marked }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                        {{/* Two states, two spans, no innerHTML: idle the AI
+                             chip is a verb ("✦ AI Translate to Portuguese"),
+                             playing it reads like any other track
+                             ("Portuguese · from EM" plus the progress).
+                             setChipActive flips .ai-action / .ai-label. */}}
+                        {{ if $ai }}<span class="ai-action" aria-hidden="true"{{ if .Default }} hidden{{ end }}>✦</span>{{ end }}
                         {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}">{{ $oc }}</span>{{ end }}
-                        <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ .Label }}">{{ .Label }}</span>
+                        {{ if $ai }}<span class="ai-action max-w-[9rem] sm:max-w-[14rem] truncate"{{ if .Default }} hidden{{ end }}>{{ tp $.Lang "action.stream.translate.action" "Language" $d.Name }}</span>{{ end }}
+                        <span class="{{ if $ai }}ai-label {{ end }}max-w-[9rem] sm:max-w-[14rem] truncate"{{ if and $ai (not .Default) }} hidden{{ end }} title="{{ .Label }}">{{ .Label }}</span>
                         {{ range propertyTags . }}<span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="{{ t $.Lang (printf "action.stream.badge.%s" .) }}">{{ . }}</span>{{ end }}
                         {{ if .Source }}<span class="text-w-muted font-normal">· {{ .Source }}</span>{{ end }}
-                        {{ if .SourceBadge }}<span class="text-w-muted font-normal">· {{ t $.Lang "action.stream.translate.from" }} {{ originCodeForBadge .SourceBadge }}</span>{{ end }}
+                        {{ if .SourceBadge }}<span class="ai-label text-w-muted font-normal"{{ if not .Default }} hidden{{ end }}>· {{ t $.Lang "action.stream.translate.from" }} {{ originCodeForBadge .SourceBadge }}</span>{{ end }}
                         {{ if eq .Provider "Translated" }}<span class="tr-progress text-w-muted font-normal" hidden></span><span class="tr-spinner loading loading-spinner loading-xs text-w-pinkL" aria-hidden="true" hidden></span>{{ end }}
                         {{ if .Locked }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="sr-only">{{ t $.Lang "action.stream.locked.aria" }}</span>{{ end }}
                     </button>
@@ -194,6 +209,15 @@
                     </div>
                     {{ end }}
                 </div>
+
+                {{/* Why the switch will not turn subtitles on here: the only
+                     thing in the viewer's language is a translation, and
+                     starting one is their call (owner, 2026-09-16). Rendered
+                     visible in exactly that state; applyOffState re-applies
+                     the same rule on the client. */}}
+                {{ $aiOffer := false }}{{ range $subs }}{{ if and .Suggested (eq .Provider "Translated") }}{{ $aiOffer = true }}{{ end }}{{ end }}
+                {{ $pd := langDisplay .SubtitleOpts.PreferredLang }}
+                <p id="subtitle-hint" class="text-xs text-w-muted mb-3"{{ if not (and $off $aiOffer) }} hidden{{ end }}>{{ tp $.Lang "action.stream.translate.hint" "Language" $pd.Name }}</p>
 
                 <div id="translate-cta" class="mb-3 p-3 rounded-xl bg-base-200/60 border border-w-line max-w-md" hidden>
                     <div class="text-sm">{{ t $.Lang "action.stream.translate.locked" }}</div>

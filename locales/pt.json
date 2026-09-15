@@ -593,6 +593,8 @@
     "action.stream.translate.locked": "As legendas por IA no seu idioma fazem parte do plano de apoiador.",
     "action.stream.translate.cta": "Desbloquear legendas IA",
     "action.stream.translate.from": "de",
+    "action.stream.translate.action": "Traduzir para {{.Language}}",
+    "action.stream.translate.hint": "Ainda não há legendas em {{.Language}} — ative a tradução com IA.",
     "player.play": "Reproduzir",
     "player.pause": "Pausar",
     "player.mute": "Mudo",

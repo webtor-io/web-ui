@@ -593,6 +593,8 @@
     "action.stream.translate.locked": "Les sous-titres IA dans votre langue font partie de l'abonnement soutien.",
     "action.stream.translate.cta": "Débloquer les sous-titres IA",
     "action.stream.translate.from": "de",
+    "action.stream.translate.action": "Traduire en {{.Language}}",
+    "action.stream.translate.hint": "Pas encore de sous-titres en {{.Language}} — activez la traduction IA.",
     "player.play": "Lecture",
     "player.pause": "Pause",
     "player.mute": "Couper le son",

@@ -603,6 +603,8 @@
     "action.stream.translate.locked": "AI-субтитры на вашем языке входят в подписку.",
     "action.stream.translate.cta": "Открыть AI-субтитры",
     "action.stream.translate.from": "из",
+    "action.stream.translate.action": "Перевести на {{.Language}}",
+    "action.stream.translate.hint": "Субтитров на {{.Language}} пока нет — включите AI-перевод.",
     "player.play": "Воспроизвести",
     "player.pause": "Пауза",
     "player.mute": "Выключить звук",

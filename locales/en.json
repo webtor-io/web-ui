@@ -651,6 +651,8 @@
     "action.stream.translate.locked": "AI subtitles in your language are part of the supporter plan.",
     "action.stream.translate.cta": "Unlock AI subtitles",
     "action.stream.translate.from": "from",
+    "action.stream.translate.action": "Translate to {{.Language}}",
+    "action.stream.translate.hint": "No subtitles in {{.Language}} yet — turn on the AI translation.",
     "player.play": "Play",
     "player.pause": "Pause",
     "player.mute": "Mute",

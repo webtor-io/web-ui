@@ -307,7 +307,11 @@ func audioProbe(lang string) *api.MediaProbe {
 	return probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"` + lang + `"}},{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}}]`)
 }
 
-func TestLadderTranslatedIsDefaultWhenNoHumanTrackInPreferredLang(t *testing.T) {
+// Renamed 2026-09-16: the ladder builds the translation item and offers it,
+// but never turns it on -- see TestLadderNeverDefaultsTheTranslation. What
+// this still pins is everything about the item itself: provider, language,
+// badge, the ~tr URL with the viewer's names, and the source it picked.
+func TestLadderTranslatedIsOfferedWhenNoHumanTrackInPreferredLang(t *testing.T) {
 	tag, os := humanTracks()
 	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true, Names: []string{"Hildy"}})
@@ -323,8 +327,8 @@ func TestLadderTranslatedIsDefaultWhenNoHumanTrackInPreferredLang(t *testing.T) 
 	if !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
 		t.Fatalf("expected the English sidecar as source, got %q", tr.Src)
 	}
-	if defaultID(items) != "tr-pt" {
-		t.Fatalf("default=%s", defaultID(items))
+	if !tr.Suggested || tr.Default {
+		t.Fatalf("the translation is offered, never turned on: suggested=%v default=%v", tr.Suggested, tr.Default)
 	}
 }
 
@@ -1018,5 +1022,83 @@ func TestOffSuggestsAForcedTrackInThePreferredLanguage(t *testing.T) {
 	}
 	if s := suggestedID(t, items); s != "et-2" {
 		t.Fatalf("suggested=%s want et-2 (the forced track in the viewer's language)", s)
+	}
+}
+
+// TestLadderNeverDefaultsTheTranslation is the owner's rule of 2026-09-16:
+// a translation costs tokens, so it is never turned on for the viewer. The
+// ladder marks it Suggested -- the picker draws that as an offer, not as a
+// selection -- and the phase-1 selection decides what actually plays.
+//
+// Negative control for the same guard: TestLadderTranslatedIsSuggestedNotDefault
+// below asserts the item is still offered, so "never Default" cannot be
+// satisfied by dropping the item altogether.
+func TestLadderNeverDefaultsTheTranslation(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	for _, it := range items {
+		if it.Provider == "Translated" && it.Default {
+			t.Fatalf("the AI translation must never be the default: %+v", it)
+		}
+	}
+	// The phase-1 fallback decides instead: the English sidecar matches
+	// Accept-Language.
+	if d := defaultID(items); d != "mp-0" {
+		t.Fatalf("default=%s want mp-0 (the Accept-Language pick)", d)
+	}
+}
+
+// TestLadderTranslatedIsSuggestedNotDefault: where the ladder would have
+// turned the translation on, it offers it instead.
+func TestLadderTranslatedIsSuggestedNotDefault(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr := byID(items)["tr-pt"]
+	if !tr.Suggested {
+		t.Fatalf("the AI item must be offered: %+v", tr)
+	}
+	if s := suggestedID(t, items); s != "tr-pt" {
+		t.Fatalf("suggested=%s want tr-pt", s)
+	}
+}
+
+// TestLadderTranslationOfferSurvivesWithNoOtherTrack: nothing else is
+// activatable at all, so the list falls to "None" -- subtitles off, with
+// the translation offered. The picker's switch will refuse to start it (an
+// explicit click only) and show the hint instead; here we pin the server
+// half: off, and the offer standing.
+func TestLadderTranslationOfferSurvivesWithNoOtherTrack(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-ja.vtt", SrcLang: "ja", Label: "jp.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none", d)
+	}
+	if s := suggestedID(t, items); s != "tr-pt" {
+		t.Fatalf("suggested=%s want tr-pt: the offer is what the picker has to show", s)
+	}
+}
+
+// TestOffSuggestionNeverOffersTheTranslation: the rung that used to hand an
+// unlocked AI item to the switch is gone. Turning subtitles on must not
+// spend tokens; only a chip the viewer clicks, or one they chose earlier in
+// this session (already translated, hence free), may start one.
+func TestOffSuggestionNeverOffersTheTranslation(t *testing.T) {
+	// Saved off, audio in the viewer's language (so the ladder's own answer
+	// is "no subtitles" and it marks nothing), and an English sidecar whose
+	// absolute URL lets the AI item exist and be unlocked.
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "en.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("por"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	// Fixture guard: a test that finds no AI item would pass for the wrong
+	// reason — there would be nothing to refuse.
+	tr, ok := byID(items)["tr-pt"]
+	if !ok || tr.Locked {
+		t.Fatalf("fixture must produce an unlocked AI item, got %+v", tr)
+	}
+	if s := suggestedID(t, items); s == "tr-pt" {
+		t.Fatal("the switch must never promise to start a translation")
 	}
 }

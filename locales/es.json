@@ -593,6 +593,8 @@
     "action.stream.translate.locked": "Los subtítulos con IA en tu idioma forman parte del plan de apoyo.",
     "action.stream.translate.cta": "Desbloquear subtítulos IA",
     "action.stream.translate.from": "de",
+    "action.stream.translate.action": "Traducir al {{.Language}}",
+    "action.stream.translate.hint": "Aún no hay subtítulos en {{.Language}}: activa la traducción con IA.",
     "player.play": "Reproducir",
     "player.pause": "Pausar",
     "player.mute": "Silenciar",

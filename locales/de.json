@@ -593,6 +593,8 @@
     "action.stream.translate.locked": "KI-Untertitel in deiner Sprache sind Teil des Unterstützer-Abos.",
     "action.stream.translate.cta": "KI-Untertitel freischalten",
     "action.stream.translate.from": "von",
+    "action.stream.translate.action": "Auf {{.Language}} übersetzen",
+    "action.stream.translate.hint": "Noch keine Untertitel auf {{.Language}} — schalte die KI-Übersetzung ein.",
     "player.play": "Abspielen",
     "player.pause": "Pause",
     "player.mute": "Stummschalten",
