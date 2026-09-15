@@ -1011,6 +1011,18 @@ function findSubtitleItem(modal, id) {
     return null;
 }
 
+// trackSubtitleSelect reports an activation the viewer asked for, whether
+// they pressed a chip or flipped the switch: the same two events either
+// way, so the ladder-level metric keeps counting every deliberate
+// selection exactly once. "None" is not a track and reports nothing.
+function trackSubtitleSelect(el) {
+    if (!el || !window.umami) return;
+    const id = el.getAttribute('data-id');
+    if (!id || id === 'none') return;
+    window.umami.track('subtitle-select', selectEventData(el));
+    if (el.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
+}
+
 // subtitlesOff reads the switch's state off the dialog, which is where
 // the server renders it and where every other reader (track-picker's
 // readChips, the click delegate) looks for it.
@@ -1048,8 +1060,16 @@ function setSubtitlesOff(container, modal, off) {
         preferredLang: modal.getAttribute('data-preferred-lang') || '',
     });
     const item = decision.activateId ? findSubtitleItem(modal, decision.activateId) : null;
-    if (item) activateSubtitle(container, item, { persist: decision.persist });
+    if (!item) {
+        // Nothing to turn on (no track in the viewer's language, or the only
+        // one is locked). The switch must not claim otherwise: put it back
+        // where it was instead of leaving it on over silence.
+        applyOffState(modal, true);
+        return null;
+    }
+    activateSubtitle(container, item, { persist: decision.persist });
     applyOffState(modal, off);
+    return item;
 }
 
 // suggestedSubtitleID is the server's answer to "what would be playing if
@@ -1192,10 +1212,7 @@ function wireTrackHandlers(container, hooks = {}) {
                 return;
             }
             const id = target.getAttribute('data-id');
-            if (id && id !== 'none' && window.umami) {
-                window.umami.track('subtitle-select', selectEventData(target));
-                if (target.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
-            }
+            trackSubtitleSelect(target);
             // Picking a track while the switch is off means "on, with this
             // one". One act for the viewer, so one activation and one PUT:
             // the switch is flipped around the same activateSubtitle call
@@ -1213,7 +1230,18 @@ function wireTrackHandlers(container, hooks = {}) {
         const toggleEl = subtitlesModal.querySelector('#subtitles-toggle');
         if (toggleEl) {
             toggleEl.addEventListener('change', () => {
-                setSubtitlesOff(container, subtitlesModal, !toggleEl.checked);
+                const item = setSubtitlesOff(container, subtitlesModal, !toggleEl.checked);
+                // Flipping the switch is as manual as pressing a chip, and
+                // the component has to hear about it: onSubtitleSelect is
+                // what sets manualSubtitleRef, without which the next audio
+                // switch re-runs the ladder and turns subtitles back on over
+                // an explicit off. It also stops a translation poll the
+                // viewer just switched away from, and starts one when the
+                // track that came back is an AI item.
+                if (item) {
+                    trackSubtitleSelect(item);
+                    if (hooks.onSubtitleSelect) hooks.onSubtitleSelect(item);
+                }
             });
         }
 

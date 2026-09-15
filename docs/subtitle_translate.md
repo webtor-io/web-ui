@@ -236,7 +236,7 @@ trip" / cache-key section).
 | Event | Fields | Notes |
 |---|---|---|
 | `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
-| `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. |
+| `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activations the player performs by itself (the audio-switch re-pick, the engagement-gate AI auto-start). |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
@@ -399,11 +399,16 @@ row plus the tracks of the expanded language.
   clickable, and clicking one is "on, with this track": one activation, one `PUT`.
   - Switching off remembers what was playing on the dialog (`data-last-subtitle`) and activates
     the `none` item through the normal path (`persist: true`, so the next page load reproduces it).
+  - Either way the switch reports itself as a manual choice (`hooks.onSubtitleSelect`, the same
+    hook a chip press uses): that is what sets `manualSubtitleRef`, without which the next **audio**
+    switch would re-run the ladder and turn subtitles back on over an explicit off. It also stops a
+    translation poll the viewer switched away from, and starts one when the track that came back is
+    an AI item.
   - Switching on activates, in order: `data-last-subtitle` (this session), the server's
     `data-suggested`, then the ladder rule (`pickDefaultSubtitle`). A candidate counts only while
-    it is still in the list and not locked. With nothing activatable at all, nothing happens and
-    nothing is persisted — `toggleDecision` (`track-picker.js`) is that whole rule as a pure
-    function.
+    it is still in the list and not locked. With nothing activatable at all the switch goes back to
+    off rather than claiming a track: nothing is activated and nothing is persisted —
+    `toggleDecision` (`track-picker.js`) is that whole rule as a pure function.
   - `ListItem.Suggested` (`data-suggested`) is the server's half: whenever the render's default is
     `none` — the viewer saved it, or the ladder arrived there because the audio is already in their
     language — `GetSubtitles` names the track the switch would turn on (`offSuggestion`: best human
