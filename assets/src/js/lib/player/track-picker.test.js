@@ -4,6 +4,7 @@ import {
     MAX_VISIBLE_LANGS,
     applyOffState,
     offStateAfterActivate,
+    restoreSavedTranslation,
     toggleDecision,
     groupByLang,
     activeLang,
@@ -262,7 +263,10 @@ function trackChip(kind, o) {
     if (o.locked) a['data-locked'] = 'true';
     if (o.def) a['data-default'] = 'true';
     if (o.suggested) a['data-suggested'] = 'true';
-    if (o.ai) a['data-provider'] = 'Translated';
+    // Every chip the server renders carries data-provider (empty for the
+    // "None" carrier), and readTracks selects on it — a fixture that leaves
+    // it off hides its own tracks from the switch's decision.
+    a['data-provider'] = o.ai ? 'Translated' : (o.provider || '');
     if (o.offered) a['data-offered'] = 'true';
     const kids = [el('svg', { class: 'chip-check' })];
     if (o.origin) kids.push(span('chip-origin badge badge-xs font-mono', o.origin));
@@ -914,4 +918,68 @@ test('the row does not follow an offered translation', () => {
     const [en, de] = langsOf(container);
     assert.equal(de.querySelector('.lang-dot').hidden, true, 'an offer is not a selection');
     assert.equal(en.querySelector('.lang-dot').hidden, true);
+});
+
+// ---- a saved translation comes back ----------------------------------
+
+test('restoreSavedTranslation: only a saved, playing, unlocked translation', () => {
+    const tr = (extra = {}) => ({ id: 'tr-de', provider: 'Translated', isDefault: true, saved: true, locked: false, ...extra });
+    assert.equal(restoreSavedTranslation([tr()]), 'tr-de');
+    // Negative control, one clause at a time: the ladder's own pick (not
+    // saved) must not start a run, a saved choice that is not what is
+    // playing is not this page's state, a locked item cannot run at all,
+    // and a human track needs no restoring here — the <track> element and
+    // its default attribute already do that.
+    assert.equal(restoreSavedTranslation([tr({ saved: false })]), null);
+    assert.equal(restoreSavedTranslation([tr({ isDefault: false })]), null);
+    assert.equal(restoreSavedTranslation([tr({ locked: true })]), null);
+    assert.equal(restoreSavedTranslation([{ id: 'os-1', provider: 'OpenSubtitles', isDefault: true, saved: true }]), null);
+    assert.equal(restoreSavedTranslation([]), null);
+});
+
+test('the hint follows the switch’s own answer, not the mere presence of an offer', () => {
+    // (a) An offer, but a human track is playing: subtitles are on, so
+    // there is nothing to explain.
+    const { container: on } = buildPicker({
+        preferred: 'de',
+        tracks: [offChip(), { id: 'a', lang: 'de', label: 'German', def: true }, { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
+        row: [{ lang: 'de', count: 2, selected: true }],
+    });
+    applyOffState(on, false);
+    assert.equal(on.querySelector('#subtitle-hint').hidden, true);
+
+    // ...and with subtitles off but a real track to restore, the switch
+    // would not refuse either.
+    const { container: restorable } = buildPicker({
+        preferred: 'de',
+        off: true,
+        tracks: [
+            offChip(true),
+            { id: 'a', lang: 'de', label: 'German', suggested: true },
+            { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true },
+        ],
+        row: [{ lang: 'de', count: 2, selected: true }],
+    });
+    applyOffState(restorable, true);
+    assert.equal(restorable.querySelector('#subtitle-hint').hidden, true);
+});
+
+// (b) The viewer ran the translation, then switched subtitles off. The
+// offer is spent — the run is cached and comes back through
+// data-last-subtitle — so the hint must not resurface.
+test('the hint does not come back after the translation has been run', () => {
+    const { container } = buildPicker({
+        preferred: 'de',
+        tracks: [offChip(), { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
+        row: [{ lang: 'de', count: 1, selected: true }],
+    });
+    const chip = container.querySelector('[data-id="tr-de"]');
+    // As a click leaves it: activated, so no longer on offer.
+    setChipActive(chip, true);
+    assert.equal(chip.getAttribute('data-offered'), null);
+    assert.equal(chip.classList.contains('chip-offered'), false);
+
+    container.setAttribute('data-last-subtitle', 'tr-de');
+    applyOffState(container, true);
+    assert.equal(container.querySelector('#subtitle-hint').hidden, true);
 });

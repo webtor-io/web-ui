@@ -46,6 +46,7 @@
 
 import { supportsFlagEmoji } from '../discover/lang.js';
 import { pickDefaultSubtitle } from './subtitle-rules.js';
+import { readTracks } from './subtitle-telemetry.js';
 
 // Mirrors maxVisibleLangChips in handlers/action/picker.go. Changing one
 // without the other makes the row jump between the server's first paint and
@@ -235,6 +236,27 @@ export function offStateAfterActivate(prevDefaultId, newId, lastId = '') {
     return { off: true, lastId: prev };
 }
 
+// restoreSavedTranslation answers "did this page load with a translation
+// the viewer had chosen, and does it need starting?" -- and nothing else.
+//
+// The server renders such an item Default+Saved, but a translation is not a
+// <track> in the page (markPreload skips it: preloading would start a run
+// for everyone who opens the page), so unlike every other saved choice it
+// does not resume by itself. Until 2026-09-16 the engagement gate happened
+// to start it; that gate is gone, and this is the one automatic start that
+// survives it -- the run is the viewer's own, already paid for and cached,
+// so bringing it back costs nothing.
+//
+// Saved AND playing AND unlocked, all three: the ladder's own pick is not
+// the viewer's choice, a saved id that is not the default is some other
+// page's state, and a locked item cannot run at all.
+export function restoreSavedTranslation(tracks) {
+    for (const t of Array.isArray(tracks) ? tracks : []) {
+        if (t && t.id && t.provider === 'Translated' && t.isDefault && t.saved && !t.locked) return t.id;
+    }
+    return null;
+}
+
 // ---- DOM half -------------------------------------------------------
 
 function attr(el, name) {
@@ -332,6 +354,13 @@ export function setChipActive(el, on) {
     if (el.setAttribute) el.setAttribute('aria-checked', active ? 'true' : 'false');
     const check = el.querySelector && el.querySelector('.chip-check');
     if (check) check.hidden = !active;
+    // An offer taken is an offer spent: the run is cached from here on and
+    // comes back through data-last-subtitle, so the accent (and the hint
+    // that reads this attribute) must not resurface after it.
+    if (active && attr(el, 'data-offered') === 'true') {
+        el.removeAttribute('data-offered');
+        el.classList.remove('chip-offered');
+    }
     // The AI chip is a verb until it is the track playing: "✦ AI Translate
     // to German" idle, "German · from IN" plus the progress once it is on.
     // Both states ship in the markup and are toggled here, so the chip
@@ -512,11 +541,12 @@ export function applyOffState(container, off) {
     for (const box of [langRowBox(container), container.querySelector('#subtitle-tracks')]) {
         if (box && box.classList) box.classList.toggle('picker-off', next);
     }
-    // Why the switch will not turn subtitles on: the only thing in the
-    // viewer's language is a translation, and starting one is their call.
-    // Same rule the server renders the hint by.
+    // Why the switch will not turn subtitles on -- asked of the switch
+    // itself, not of a second rule that could drift from it: there is a
+    // translation to start, and the decision that runs when the switch is
+    // flipped comes back empty-handed.
     const hint = container.querySelector('#subtitle-hint');
-    if (hint) hint.hidden = !(next && !!offeredTranslation(container));
+    if (hint) hint.hidden = !(next && !!offeredTranslation(container) && switchWouldRefuse(container));
     const toggleBox = container.querySelector('#subtitle-langs');
     if (toggleBox && toggleBox.classList && toggleBox !== langRowBox(container)) {
         toggleBox.classList.remove('picker-off');
@@ -544,6 +574,23 @@ export function applyOffState(container, off) {
 function offeredTranslation(container) {
     if (!container || !container.querySelector) return null;
     return container.querySelector('.subtitle[data-offered="true"]');
+}
+
+// switchWouldRefuse runs the switch's own decision without acting on it:
+// true when flipping it on would find nothing to activate. The inputs are
+// read off the DOM exactly as setSubtitlesOff reads them, so the hint and
+// the switch can never disagree about what would happen.
+function switchWouldRefuse(container) {
+    const audioEl = container.querySelector('.audio[data-default="true"]');
+    const suggested = container.querySelector('.subtitle[data-suggested="true"]');
+    return toggleDecision({
+        on: true,
+        lastId: attr(container, 'data-last-subtitle'),
+        suggestedId: suggested ? attr(suggested, 'data-id') : '',
+        tracks: readTracks(container),
+        audioLang: audioEl ? attr(audioEl, 'data-srclang') : '',
+        preferredLang: attr(container, 'data-preferred-lang'),
+    }).activateId === '';
 }
 
 // refreshMarks is what a selection needs: the row's counts and dot, and the

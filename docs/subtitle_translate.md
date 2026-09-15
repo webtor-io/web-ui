@@ -459,7 +459,15 @@ row plus the tracks of the expanded language.
     `provider === "Translated"`, `toggleDecision` accepts one only through `data-last-subtitle`
     (already run this session, therefore cached and free), and `offSuggestion` lost its AI rung.
   - the 5-second engagement-gate auto-start in `Player.jsx` is **gone**. A run starts on a click
-    of the chip, or on the switch restoring `data-last-subtitle`.
+    of the chip, on the switch restoring `data-last-subtitle`, or on the **mount-time restore of a
+    saved translation**: a translation is not a `<track>` in the page (`markPreload` skips it), so
+    unlike every other saved choice it cannot resume by itself, and the deleted gate was what used
+    to start it. `restoreSavedTranslation` (`track-picker.js`) answers whether to — saved **and**
+    playing **and** unlocked — and `Player.jsx` runs the click path once with `persist: false`.
+    That run is the viewer's own and already cached, which is what makes it the one automatic
+    start left.
+  - an offer taken is an offer spent: `setChipActive` drops `data-offered` and `.chip-offered`
+    when the chip is activated, so the accent and the hint cannot resurface after a run.
   - **`Offered` is a different field from `Suggested`** (owner review, 2026-09-16). They answer
     two questions — "what can the viewer start here" and "what would the switch bring back" — and
     one list usually needs both, on two different chips. `data-offered` marks the translation the
@@ -474,7 +482,13 @@ row plus the tracks of the expanded language.
     only for an offered item, so nothing hidden lingers on a locked chip.
   - `#subtitle-hint` under the track row (`action.stream.translate.hint`) explains the one state
     where the switch refuses to turn anything on: subtitles are off, there is an offer to start,
-    and nothing at all for the switch to restore.
+    and the switch's own decision comes back empty. The client asks `toggleDecision` itself
+    (`switchWouldRefuse`) rather than re-deriving the condition, so the hint and the switch cannot
+    disagree; the server renders the same answer from `Offered` and the absence of `Suggested`.
+    **Reachability:** with `offSuggestion`'s last rung ("the best activatable track whatever its
+    language") the switch nearly always has something to restore, because a translation only
+    exists when there is a source track to translate *from* — so this hint is close to
+    unreachable today. See the round-4 concerns.
   - both sentences are rendered **server-side** with the language name substituted: Go templates
     take `{{.Param}}`, the client's `tf` takes `%v`, and a chip Go renders once has no reason to
     learn the client's formatter. The name comes from `langDisplay` and is the same English name

@@ -16,6 +16,7 @@ import {
     applyFlagSupport,
     applyOffState,
     offStateAfterActivate,
+    restoreSavedTranslation,
     toggleDecision,
     setChipActive,
     expandedLang,
@@ -146,6 +147,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // rest of the session: re-deciding over an explicit choice reads as
     // the player fighting the viewer.
     const manualSubtitleRef = useRef(false);
+    // Whether the saved translation this page opened with has been brought
+    // back. The effect that does it can re-run (its callbacks are
+    // dependencies); the restore must happen once.
+    const savedTranslationRef = useRef(false);
     const pollStopRef = useRef(null);
     // What this page load already did to each AI item: id → 'running' |
     // 'done'. translationAction turns it into start / resume / none, so
@@ -355,6 +360,23 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             activateSubtitle(trackContainer, item, { persist: false });
             if (action !== 'none') startTranslationProgress(item, action === 'resume');
         };
+        // A translation the viewer chose in an earlier session comes back on
+        // its own. Every other saved choice resumes from the <track> the
+        // server rendered; a translation has none (markPreload skips it, or
+        // opening the page would start a run for everyone), so it needs this
+        // one call -- the same path a click takes, minus the PUT, since
+        // nothing was chosen here that was not already chosen. The run is
+        // the viewer's own and cached, which is why this is the one
+        // automatic start left after the engagement gate went away.
+        if (modalAtMount && trackContainer && !savedTranslationRef.current) {
+            const id = restoreSavedTranslation(readAllTracks(modalAtMount));
+            const el = id ? findSubtitleItem(modalAtMount, id) : null;
+            if (el) {
+                savedTranslationRef.current = true;
+                activateSubtitle(trackContainer, el, { persist: false });
+                trackHooks.onSubtitleSelect(el);
+            }
+        }
         return () => {
             trackHooks.onSubtitleSelect = null;
             trackHooks.onAudioSelect = null;
@@ -472,11 +494,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
         // No AI auto-start here any more (owner, 2026-09-16). The player
         // used to activate a server-defaulted translation once playback
-        // passed this gate; the server no longer defaults one, and a
-        // translation is started by exactly two things: a click on its chip
-        // and the switch restoring data-last-subtitle — one the viewer
-        // chose earlier in this session, so it is already cached. This
-        // effect is telemetry only.
+        // passed this gate; the server offers a translation now and never
+        // turns one on. A run begins on a click of the chip, on the switch
+        // restoring data-last-subtitle, or on the mount-time restore of a
+        // translation the viewer saved in an earlier session — all three
+        // are the viewer's own choice, and the last two are already cached.
+        // This effect is telemetry only.
     }, [state.currentTime, isVideo, isSession, resourceID]);
 
     // Grace soft CTA — fires once when movie-time crosses the grace window.
