@@ -594,6 +594,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Další jazyky",
     "action.stream.subtitleLanguage": "Jazyk titulků",
+    "action.stream.subtitleControls": "Titulky: zapnout/vypnout a jazyk",
     "action.stream.locked.aria": "uzamčeno, jen pro podporovatele",
     "action.stream.origin.em": "Vložené ve videu",
     "action.stream.origin.in": "Součást torrentu",

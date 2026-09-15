@@ -584,6 +584,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Altre lingue",
     "action.stream.subtitleLanguage": "Lingua dei sottotitoli",
+    "action.stream.subtitleControls": "Sottotitoli: attiva/disattiva e lingua",
     "action.stream.locked.aria": "bloccato, solo per i sostenitori",
     "action.stream.origin.em": "Incorporati nel video",
     "action.stream.origin.in": "Inclusi nel torrent",

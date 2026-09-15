@@ -184,7 +184,7 @@ trip" / cache-key section).
 - **Only deliberate activations are persisted.** `activateSubtitle(container, item, {persist})`
   passes `persist` through to `markTrack`, which is what issues the `PUT /stream-video/subtitle`
   that becomes `ud.SubtitleID`. Clicking a list item and uploading a file persist; the
-  engagement-gate AI auto-start and the audio-switch re-pick do not. `Saved` therefore means
+  audio-switch re-pick does not. `Saved` therefore means
   exactly "the viewer chose it", and a rule the player applied on the viewer's behalf never comes
   back next page load as a choice that switches the rule off.
 - **Lock → CTA.** Clicking a `Locked` item never activates it (no `Src` to activate); it reveals
@@ -225,11 +225,12 @@ trip" / cache-key section).
   refs). Either one left visible freezes at the last percent and reads as a translation stuck
   forever, so they are always toggled as a pair; `setChipActive` never rebuilds a chip's
   `innerHTML`, so neither element is lost when the viewer switches tracks mid-run.
-- **Auto-start.** Translation does **not** start on page load and there is no dedicated 5-second
-  timer: it piggybacks on the existing `stream-start` engagement gate, which fires once
-  `state.currentTime >= 5` (5 s of actual playback, not wall-clock time since load). If the AI item
-  is still the default at that point (not overridden by a manual pick) and not locked, the player
-  activates it and starts the progress poll — matching the spec's "starts 5 seconds into viewing."
+- **No auto-start** (owner, 2026-09-16). Nothing the player does on its own begins a translation:
+  there is no page-load start, and the `stream-start` engagement gate it used to piggyback on
+  (`state.currentTime >= 5`) no longer touches the AI item — that effect is telemetry only. A run
+  begins on a click of the chip, on the switch restoring `data-last-subtitle`, or on the
+  mount-time restore of a translation saved in an earlier session. See "Picker behaviour". The
+  spec's old "starts 5 seconds into viewing" is superseded by decision 14.
 
 ## Telemetry (Umami)
 
@@ -237,7 +238,7 @@ trip" / cache-key section).
 |---|---|---|
 | `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
-| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip or on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session). Rates before and after that date are not comparable. |
+| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
@@ -275,7 +276,7 @@ for the same reason.
 | `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft toggle-sm">` | the subtitles on/off switch, **first child of `#subtitle-langs`** — where the "Off" chip used to be (owner, 2026-09-16) — in a `<label class="flex items-center">` with an `sr-only` name. Checked iff the default item is not `none` |
 | `.lang-row` | `<div>` inside `#subtitle-langs` | the language chips, "+N" and the `<template>`. Exists so the muted state can dim the chips without dimming the switch beside them; `applyOffState` writes `.picker-off` here, never on `#subtitle-langs` |
 | `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
-| `#subtitle-langs` | `<div role="group">` | subtitle **language** row — a filter, not a choice |
+| `#subtitle-langs` | `<div role="group">` | the switch plus the language row (`aria-label` = `action.stream.subtitleControls`, which names both — the chips alone are a filter, not a choice) |
 | `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
 | `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
 | `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
@@ -406,8 +407,9 @@ row plus the tracks of the expanded language.
   chips the tail goes behind "+N" — except the expanded language, which is never collapsed
   wherever it sorts, and is not counted into "+N": a pressed but invisible filter leaves its
   tracks on screen with no chip pointing at them.
-- **Subtitles are switched, not chosen off** (owner, 2026-09-15). The "Subtitles" heading carries
-  a `toggle toggle-soft`; there is no "Off" chip in either row. Off does **not** empty the block:
+- **Subtitles are switched, not chosen off** (owner, 2026-09-15). A `toggle toggle-soft toggle-sm`
+  leads the language row — where the "Off" chip used to be (owner, 2026-09-16) — and there is no
+  "Off" chip in either row. Off does **not** empty the block:
   the chips go `.picker-off` (dimmed — `.lang-row` and `#subtitle-tracks`, never the switch itself), every chip keeps its classes — including the active mark on
   the track that comes back, which also carries `aria-checked="true"`, since a chip drawn as
   chosen and announced as unchosen is the worst of both — and the language chip of that track
@@ -592,7 +594,8 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   **silently** after the viewer selected another track mid-run and came back (same translation, so
   no second start event — `done` still fires once, with the wall time since the *first* start);
   `'none'` covers a finished item, a locked one and anything that is not an AI track, so a warm
-  cache cannot fire a second start/done pair via the engagement-gate auto-start. Re-selecting the
+  cache cannot fire a second start/done pair when the same item is activated again (the
+  mount-time restore of a saved translation, say). Re-selecting the
   item whose poll is running right now is also a no-op (`pollingIdRef` in `Player.jsx`) rather than
   a self-inflicted stop.
 - **After an error, the item stays `'running'`.** Re-selecting it resumes (a silent retry) rather

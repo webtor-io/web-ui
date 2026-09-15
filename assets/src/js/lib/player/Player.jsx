@@ -32,9 +32,9 @@ import '../../../styles/player.css';
 let _currentPlayer = null;
 
 // ENGAGEMENT_SECONDS is the playback time (not wall clock) after which a
-// session counts as real viewing: the stream-start event and the AI
-// translation auto-start both hang off it, so press-play-and-bounce
-// neither skews the denominator nor spends a translation.
+// session counts as real viewing, so press-play-and-bounce does not skew
+// the denominator. Telemetry only since 2026-09-16 — the AI translation
+// auto-start used to hang off it and no longer exists.
 const ENGAGEMENT_SECONDS = 5;
 
 // TRACK_RELOAD_INTERVAL_MS throttles the <track> src swaps. Every swap
@@ -684,8 +684,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         toggleDialog('subtitles');
         // Opening the picker is the one moment the viewer is guaranteed to
         // be looking at it, and plenty can have moved while it was closed:
-        // the engagement-gate AI auto-start, an audio switch re-picking the
-        // subtitle, an upload. Recompute the counts, the dot and both
+        // an audio switch re-picking the subtitle, an upload, a translation
+        // the viewer started. Recompute the counts, the dot and both
         // "Now:" lines against what is actually playing.
         const modal = document.getElementById('subtitles');
         if (modal && modal.open) {
@@ -1103,8 +1103,9 @@ function itemData(el) {
 // persist says whether the choice is written back to the session
 // (ud.SubtitleID, which renders as ListItem.Saved). Only what the viewer did
 // on purpose counts: clicking an item, or uploading a file to watch with.
-// The automatic activations — the engagement-gate AI auto-start and the
-// audio-switch re-pick — pass persist:false, so `Saved` keeps meaning
+// The activations the player performs for the viewer — the audio-switch
+// re-pick and the mount-time restore of a saved translation — pass
+// persist:false, so `Saved` keeps meaning
 // exactly "the viewer chose this" and a rule the player applied for them
 // never comes back as a choice the next rule has to respect.
 function activateSubtitle(container, target, { persist = true } = {}) {
@@ -1404,8 +1405,8 @@ function wireTrackHandlers(container, hooks = {}) {
 // running translation, and innerHTML would throw all three away mid-poll.
 //
 // `persist` is what separates a choice from a rule the player applied for
-// the viewer: the engagement-gate AI auto-start and the audio-switch
-// re-pick pass false and never PUT, so `Saved` keeps meaning "the viewer
+// the viewer: the audio-switch re-pick and the mount-time restore of a
+// saved translation pass false and never PUT, so `Saved` keeps meaning "the viewer
 // chose this".
 function markTrack(container, el, type, persist = true) {
     if (el.getAttribute('data-default') === 'true') return;

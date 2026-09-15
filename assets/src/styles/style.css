@@ -916,7 +916,8 @@ input:-webkit-autofill:focus {
   border-color: rgba(232, 67, 147, 0.40) !important;
 }
 
-/* The subtitle block while the switch on its heading is off: both rows are
+/* The subtitle block while the switch leading the language row is off:
+   the chip rows are
    dimmed and the chosen track keeps its mark, so the viewer sees what
    comes back instead of an empty list. Dimming only — every chip stays
    clickable, and clicking one turns subtitles back on with that track

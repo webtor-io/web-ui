@@ -584,6 +584,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Más idiomas",
     "action.stream.subtitleLanguage": "Idioma de los subtítulos",
+    "action.stream.subtitleControls": "Subtítulos: activar/desactivar e idioma",
     "action.stream.locked.aria": "bloqueado, solo para mecenas",
     "action.stream.origin.em": "Incrustados en el vídeo",
     "action.stream.origin.in": "Incluidos en el torrent",

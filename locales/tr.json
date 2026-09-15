@@ -584,6 +584,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Daha fazla dil",
     "action.stream.subtitleLanguage": "Altyazı dili",
+    "action.stream.subtitleControls": "Altyazı: açma/kapatma ve dil",
     "action.stream.locked.aria": "kilitli, yalnızca destekçiler için",
     "action.stream.origin.em": "Videoya gömülü",
     "action.stream.origin.in": "Torrent içinde",

@@ -310,6 +310,9 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		// on "None": the switch renders off, both rows are muted, and the
 		// track the switch would turn on carries data-suggested.
 		`id="subtitles-toggle"`,
+		// The group holds the switch and the language filter, so its name
+		// covers both (M10).
+		`aria-label="action.stream.subtitleControls"`,
 		`class="toggle toggle-soft toggle-sm">`,
 		`data-subtitles-off="true"`,
 		`class="lang-row flex flex-wrap items-center gap-1.5 picker-off"`,

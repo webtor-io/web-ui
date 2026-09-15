@@ -90,8 +90,9 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
 //              finished: re-selecting it must neither poll nor report.
 //
 // Without the 'done' state a warm cache double-counts — the click runs
-// the translation to completion and the engagement-gate auto-start finds
-// the item still marked default with no poll running. Without 'resume' a
+// the translation to completion and a second activation of the same item
+// (the mount-time restore of a saved translation, say) finds it marked
+// default with no poll running. Without 'resume' a
 // viewer who switches away mid-translation and comes back is stuck with
 // a frozen partial file for the life of the page.
 export function translationAction(track, status) {

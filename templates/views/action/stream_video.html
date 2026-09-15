@@ -97,7 +97,10 @@
                      aria-pressed buttons rather than a tablist — there are no
                      tab panels, and the one real choice (which track plays)
                      lives in the radiogroup underneath. */}}
-                <div id="subtitle-langs" class="flex items-start gap-2 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleLanguage" }}">
+                {{/* The group holds the switch AND the language filter now, so its name
+                     has to cover both — "Subtitle language" would misname the
+                     first control in it. */}}
+                <div id="subtitle-langs" class="flex items-start gap-2 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleControls" }}">
                     {{/* The switch leads the language row, where the "Off"
                          chip used to be (owner, 2026-09-16): the same place
                          the eye already looks for "no subtitles". It is not a

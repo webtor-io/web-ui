@@ -584,6 +584,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Mais idiomas",
     "action.stream.subtitleLanguage": "Idioma das legendas",
+    "action.stream.subtitleControls": "Legendas: ativar/desativar e idioma",
     "action.stream.locked.aria": "bloqueado, apenas para apoiadores",
     "action.stream.origin.em": "Embutidas no vídeo",
     "action.stream.origin.in": "Incluídas no torrent",

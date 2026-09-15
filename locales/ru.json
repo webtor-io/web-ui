@@ -594,6 +594,7 @@
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Ещё языки",
     "action.stream.subtitleLanguage": "Язык субтитров",
+    "action.stream.subtitleControls": "Субтитры: вкл./выкл. и язык",
     "action.stream.locked.aria": "недоступно, только для поддержавших",
     "action.stream.origin.em": "Встроенные в видео",
     "action.stream.origin.in": "В раздаче",
