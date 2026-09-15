@@ -236,8 +236,8 @@ trip" / cache-key section).
 | Event | Fields | Notes |
 |---|---|---|
 | `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
-| `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activations the player performs by itself (the audio-switch re-pick, the engagement-gate AI auto-start). |
-| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. |
+| `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
+| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip or on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session). Rates before and after that date are not comparable. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
@@ -285,6 +285,7 @@ for the same reason.
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | heading line (`action.stream.mySubtitles` + the close control), upload form, one row per file, each row with its own delete form |
 | `#my-uploads-close` | `<button type="button" class="btn btn-ghost btn-xs">` | the panel's own "×", in its heading line (`aria-label` = `action.stream.close`). Closes the panel exactly as pressing the chip again does — same function in `Player.jsx`, same three writes |
 | `#translate-cta` | `<div hidden>` | the locked-AI card, below the track row |
+| `#subtitle-hint` | `<p class="text-xs text-w-muted">` | why the switch will not turn subtitles on: the only thing in the viewer's language is a translation, and starting one is their call. Between the track row and the CTA card |
 
 ### Chips
 
@@ -449,6 +450,29 @@ row plus the tracks of the expanded language.
     first `Default` it finds (index 0) before it can consider anything else, so the call would be
     dead code that silently costs rung 2. The saved-off branch of `applyLadder` still uses
     `ladderPick`, where it runs *before* the defaults are cleared and can therefore answer.
+- **A translation is offered, never started for the viewer** (owner, 2026-09-16). Running one
+  spends tokens, so nothing but an explicit act begins it:
+  - the server never makes the AI item `Default`. Where the ladder's answer was the translation,
+    `applyLadder` marks it `Suggested` and the phase-1 selection decides what plays — often
+    nothing, i.e. subtitles off.
+  - no rule picks it up either: `pickDefaultSubtitle` (the audio-switch rule) skips
+    `provider === "Translated"`, `toggleDecision` accepts one only through `data-last-subtitle`
+    (already run this session, therefore cached and free), and `offSuggestion` lost its AI rung.
+  - the 5-second engagement-gate auto-start in `Player.jsx` is **gone**. A run starts on a click
+    of the chip, or on the switch restoring `data-last-subtitle`.
+  - the chip says which it is: idle it reads as a verb (`✦` + the `AI` badge +
+    `action.stream.translate.action`, "Translate to Portuguese") and wears `.chip-suggested`, an
+    accent outline instead of the cyan fill that means "this is playing"; active it reads as
+    before (`Portuguese · from IN` + progress). Two spans, `.ai-action` and `.ai-label`, flipped
+    by `setChipActive` — no `innerHTML`, so `.tr-progress` survives.
+  - `#subtitle-hint` under the track row (`action.stream.translate.hint`) explains the one state
+    where the switch refuses to turn anything on: the only thing in the viewer's language is a
+    translation. Rendered visible by the server in exactly that state; `applyOffState` re-applies
+    the same rule.
+  - both sentences are rendered **server-side** with the language name substituted: Go templates
+    take `{{.Param}}`, the client's `tf` takes `%v`, and a chip Go renders once has no reason to
+    learn the client's formatter. The name comes from `langDisplay` and is the same English name
+    every other chip shows.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.

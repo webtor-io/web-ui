@@ -22,10 +22,19 @@ export function baseLang(tag) {
 // forced or among full tracks, never mixing the two. Locked items are not
 // candidates: a locked track cannot be turned on, so selecting it would
 // leave the viewer with subtitles "on" and nothing on screen.
+//
+// Neither is an AI translation, since 2026-09-16 (owner): starting one
+// spends tokens, so no rule may pick it on the viewer's behalf -- not this
+// one, which runs when they switch the audio track, and not the subtitles
+// switch that calls through here. A translation is reached by clicking its
+// chip, or restored through data-last-subtitle when the viewer already ran
+// it in this session and it is cached. The item is still offered in the
+// picker (ListItem.Suggested, drawn as "Translate to <language>"); this is
+// about what happens without a click.
 function best(tracks, lang, forced) {
     let pick = null;
     for (const t of tracks) {
-        if (t.id === 'none' || t.locked) continue;
+        if (t.id === 'none' || t.locked || t.provider === 'Translated') continue;
         if (!!t.forced !== forced) continue;
         if (baseLang(t.srclang) !== lang) continue;
         if (!pick || rankOf(t) < rankOf(pick)) pick = t;
@@ -43,9 +52,10 @@ function rankOf(t) {
 //
 // Audio already in the viewer's language: only a forced (signs-only)
 // track is wanted — a full translation of dialogue the viewer
-// understands is noise. Audio in another language: the best full track
-// in the preferred language, AI translation included when nothing human
-// is available.
+// understands is noise. Audio in another language: the best full HUMAN
+// track in the preferred language — an AI translation is never the answer
+// here, because this rule runs without the viewer asking for anything (see
+// best).
 export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     const list = Array.isArray(tracks) ? tracks : [];
     const pref = baseLang(preferredLang);

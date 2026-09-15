@@ -22,14 +22,14 @@ test('baseLang reduces regional tags', () => {
 });
 
 test('audio in the preferred language: forced wins, else none', () => {
-    const tracks = [T('mp-0', 1, 'pt', { forced: true }), T('mp-1', 1, 'pt'), T('tr-pt', 5, 'pt')];
+    const tracks = [T('mp-0', 1, 'pt', { forced: true }), T('mp-1', 1, 'pt'), T('tr-pt', 5, 'pt', { provider: 'Translated' })];
     assert.equal(pickDefaultSubtitle(tracks, 'pt', 'pt'), 'mp-0');
     assert.equal(pickDefaultSubtitle([T('mp-1', 1, 'pt')], 'pt', 'pt'), 'none');
 });
 
-test('audio differs: ladder user > embedded > sidecar > os hash > os imdb > translated', () => {
+test('audio differs: ladder user > embedded > sidecar > os hash > os imdb', () => {
     const all = [
-        T('tr-pt', 5, 'pt'),
+        T('tr-pt', 5, 'pt', { provider: 'Translated' }),
         T('os-1', 4, 'pt'),
         T('os-2', 3, 'pt'),
         T('et-1', 2, 'pt'),
@@ -41,13 +41,24 @@ test('audio differs: ladder user > embedded > sidecar > os hash > os imdb > tran
     assert.equal(pickDefaultSubtitle(all.slice(0, 4), 'en', 'pt'), 'et-1');
     assert.equal(pickDefaultSubtitle(all.slice(0, 3), 'en', 'pt'), 'os-2');
     assert.equal(pickDefaultSubtitle(all.slice(0, 2), 'en', 'pt'), 'os-1');
-    assert.equal(pickDefaultSubtitle(all.slice(0, 1), 'en', 'pt'), 'tr-pt');
+    // ...and the ladder stops there. A translation is never picked by a
+    // rule (owner, 2026-09-16): starting one spends tokens, so it takes a
+    // click on its chip. With nothing else in the language the answer is
+    // "no subtitles", and the picker offers the translation instead.
+    assert.equal(pickDefaultSubtitle(all.slice(0, 1), 'en', 'pt'), 'none');
+});
+
+// Negative control for the same guard, from the other side: the rule still
+// picks a human track of the WORST rank over a translation.
+test('a translation never beats a human track, however far down the ladder', () => {
+    const tracks = [T('tr-pt', 5, 'pt', { provider: 'Translated' }), T('x-1', 9, 'pt')];
+    assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'x-1');
 });
 
 test('forced never counts as a full track and a locked track is never the pick', () => {
     // A locked AI item cannot be turned on, so selecting it would leave
     // the viewer with subtitles "on" and nothing on screen.
-    const tracks = [T('et-1', 2, 'pt', { forced: true }), T('tr-pt', 5, 'pt', { locked: true })];
+    const tracks = [T('et-1', 2, 'pt', { forced: true }), T('tr-pt', 5, 'pt', { locked: true, provider: 'Translated' })];
     assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'none');
     assert.equal(pickDefaultSubtitle([T('et-1', 2, 'pt', { forced: true })], 'en', 'pt'), 'none');
 });
@@ -55,7 +66,7 @@ test('forced never counts as a full track and a locked track is never the pick',
 test('nothing qualifies: the default the server already chose stands', () => {
     // Falling through to "none" would take subtitles away from a viewer
     // who had them before touching the audio menu.
-    const tracks = [T('tr-pt', 5, 'pt', { locked: true }), T('os-de', 3, 'de', { isDefault: true })];
+    const tracks = [T('tr-pt', 5, 'pt', { locked: true, provider: 'Translated' }), T('os-de', 3, 'de', { isDefault: true })];
     assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'os-de');
     assert.equal(pickDefaultSubtitle([T('os-de', 3, 'de')], 'en', 'pt'), 'none');
 });

@@ -192,15 +192,23 @@ export function langRowOps(chips, rowChips, expanded, preferred = '') {
 // deleted upload or an AI track a free viewer cannot open would leave
 // subtitles "on" with nothing on screen. When nothing at all is
 // activatable the answer is to activate nothing and persist nothing --
-// the switch has no track to give and must not claim otherwise.
+// the switch has no track to give and must not claim otherwise (the caller
+// puts the switch back and shows #subtitle-hint).
+//
+// A translation is a candidate for lastId ONLY (owner, 2026-09-16):
+// starting one spends tokens, so the switch never picks one up on the
+// viewer's behalf -- not from the server's offer, not from the ladder
+// rule. Through lastId it is free: the viewer ran that very translation
+// earlier in this session and it is cached.
 export function toggleDecision({ on, lastId = '', suggestedId = '', tracks = [], audioLang = '', preferredLang = '' } = {}) {
     if (!on) return { activateId: 'none', persist: true };
     const list = Array.isArray(tracks) ? tracks : [];
-    const usable = (id) => !!id && id !== 'none' && list.some((t) => t && t.id === id && !t.locked);
-    if (usable(lastId)) return { activateId: lastId, persist: true };
-    if (usable(suggestedId)) return { activateId: suggestedId, persist: true };
+    const usable = (id, allowAI) => !!id && id !== 'none' && list.some((t) =>
+        t && t.id === id && !t.locked && (allowAI || t.provider !== 'Translated'));
+    if (usable(lastId, true)) return { activateId: lastId, persist: true };
+    if (usable(suggestedId, false)) return { activateId: suggestedId, persist: true };
     const id = pickDefaultSubtitle(list, audioLang, preferredLang);
-    if (!usable(id)) return { activateId: '', persist: false };
+    if (!usable(id, false)) return { activateId: '', persist: false };
     return { activateId: id, persist: true };
 }
 
@@ -277,7 +285,11 @@ function mutedChoiceID(container, chips) {
     const last = attr(container, 'data-last-subtitle');
     if (last) return last;
     for (const c of chips) {
-        if (c.id !== 'none' && attr(c.el, 'data-suggested') === 'true') return c.id;
+        // An offered translation is not "what comes back": the switch
+        // refuses to start one, so the row must not put its dot on it
+        // either. (A translation the viewer already ran does come back --
+        // through data-last-subtitle, one branch up.)
+        if (c.id !== 'none' && attr(c.el, 'data-suggested') === 'true' && attr(c.el, 'data-provider') !== 'Translated') return c.id;
     }
     return '';
 }
@@ -321,6 +333,14 @@ export function setChipActive(el, on) {
     if (el.setAttribute) el.setAttribute('aria-checked', active ? 'true' : 'false');
     const check = el.querySelector && el.querySelector('.chip-check');
     if (check) check.hidden = !active;
+    // The AI chip is a verb until it is the track playing: "✦ AI Translate
+    // to German" idle, "German · from IN" plus the progress once it is on.
+    // Both states ship in the markup and are toggled here, so the chip
+    // keeps its origin badge and its .tr-progress span across every flip.
+    if (el.querySelectorAll) {
+        for (const n of el.querySelectorAll('.ai-action')) n.hidden = active;
+        for (const n of el.querySelectorAll('.ai-label')) n.hidden = !active;
+    }
 }
 
 function setLangChipActive(el, on) {
@@ -493,6 +513,11 @@ export function applyOffState(container, off) {
     for (const box of [langRowBox(container), container.querySelector('#subtitle-tracks')]) {
         if (box && box.classList) box.classList.toggle('picker-off', next);
     }
+    // Why the switch will not turn subtitles on: the only thing in the
+    // viewer's language is a translation, and starting one is their call.
+    // Same rule the server renders the hint by.
+    const hint = container.querySelector('#subtitle-hint');
+    if (hint) hint.hidden = !(next && translationIsTheOnlyOffer(container));
     const toggleBox = container.querySelector('#subtitle-langs');
     if (toggleBox && toggleBox.classList && toggleBox !== langRowBox(container)) {
         toggleBox.classList.remove('picker-off');
@@ -511,6 +536,15 @@ export function applyOffState(container, off) {
         if (muted) setChipActive(c.el, c.id === muted);
     }
     return next;
+}
+
+// translationIsTheOnlyOffer reports whether the picker's offer -- the one
+// Suggested chip -- is an AI translation the viewer can start. That is the
+// one state where the switch has nothing to give, because it will not
+// spend tokens on their behalf.
+function translationIsTheOnlyOffer(container) {
+    const el = container.querySelector && container.querySelector('.subtitle[data-suggested="true"][data-provider="Translated"]');
+    return !!el && attr(el, 'data-locked') !== 'true';
 }
 
 // refreshMarks is what a selection needs: the row's counts and dot, and the

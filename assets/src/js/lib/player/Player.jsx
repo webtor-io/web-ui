@@ -470,23 +470,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 audioLang,
             });
         }
-        // The AI track is deliberately not rendered as a <track>
-        // (markPreload skips it — preloading would start a translation
-        // for every viewer who opens the page), so when the server made
-        // it the default the player is what actually starts it. A manual
-        // pick in the first seconds clears data-default on this item;
-        // translationAction covers the case where that pick was this very
-        // item and its translation already ran or is still running.
-        const auto = modal.querySelector('.subtitle[data-provider="Translated"][data-default="true"]');
-        if (auto && trackContainer) {
-            const action = translationActionFor(auto);
-            if (action !== 'none') {
-                // Same reasoning as the audio-switch re-pick: the server made
-                // this the default, the player is only carrying it out.
-                activateSubtitle(trackContainer, auto, { persist: false });
-                startTranslationProgress(auto, action === 'resume');
-            }
-        }
+        // No AI auto-start here any more (owner, 2026-09-16). The player
+        // used to activate a server-defaulted translation once playback
+        // passed this gate; the server no longer defaults one, and a
+        // translation is started by exactly two things: a click on its chip
+        // and the switch restoring data-last-subtitle — one the viewer
+        // chose earlier in this session, so it is already cached. This
+        // effect is telemetry only.
     }, [state.currentTime, isVideo, isSession, resourceID]);
 
     // Grace soft CTA — fires once when movie-time crosses the grace window.

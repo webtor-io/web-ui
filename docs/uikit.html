@@ -2293,6 +2293,15 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">AI track states</h3>
     <div class="flex flex-wrap gap-1.5 mb-3">
+      <button type="button" class="subtitle track-chip chip-suggested" role="radio" aria-checked="false">
+        <span aria-hidden="true">&#10022;</span>
+        <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" title="AI translation">AI</span>
+        <span class="max-w-[9rem] sm:max-w-[14rem] truncate">Translate to Portuguese</span>
+      </button>
+      <span class="text-xs text-w-muted self-center">&larr; offered, never started for the viewer (<code>.chip-suggested</code>, the <code>.ai-action</code> spans)</span>
+    </div>
+    <p class="text-xs text-w-muted mb-3">No subtitles in Portuguese yet &mdash; turn on the AI translation. <span class="text-w-muted">&larr; <code>#subtitle-hint</code>, under the track row</span></p>
+    <div class="flex flex-wrap gap-1.5 mb-3">
       <button type="button" class="subtitle track-chip track-chip-active" role="radio" aria-checked="true">
         <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
         <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-w-pink/10 border-w-pink/30 text-w-pinkL" title="AI translation">AI</span>
@@ -2308,7 +2317,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       </button>
       <span class="text-xs text-w-muted self-center">translating &middot; locked (free viewer, <code>.chip-locked</code>)</span>
     </div>
-    <div class="uikit-label mb-6"><code>.tr-progress</code> carries only the bare percentage; the localized sentence <code>player.subtitleTranslating</code> lives in its <code>title</code>. <code>.tr-spinner</code> is its pair — both ship <code>hidden</code>, are unhidden on start/resume and hidden again on done/error/stop. A locked chip can never take <code>.track-chip-active</code>.</div>
+    <div class="uikit-label mb-6"><strong>A translation is an offer, not a selection</strong> (owner, 2026-09-16): starting one spends tokens, so the server never turns it on and no client rule picks it up &mdash; only a click on the chip, or the switch restoring a translation the viewer already ran this session. Idle the chip is a verb (<code>.ai-action</code>: <code>&#10022;</code> + <code>action.stream.translate.action</code>) with an accent outline instead of the cyan fill; playing it is the track name (<code>.ai-label</code>) plus the progress. <code>setChipActive</code> flips the two, so <code>.tr-progress</code> survives every selection. <code>#subtitle-hint</code> appears when the only thing in the viewer's language is that offer.<br>
+      <code>.tr-progress</code> carries only the bare percentage; the localized sentence <code>player.subtitleTranslating</code> lives in its <code>title</code>. <code>.tr-spinner</code> is its pair — both ship <code>hidden</code>, are unhidden on start/resume and hidden again on done/error/stop. A locked chip can never take <code>.track-chip-active</code>.</div>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Subtitles off (muted block)</h3>
     <div class="w-full max-w-2xl rounded-2xl p-4 bg-base-100 border border-w-line mb-2">

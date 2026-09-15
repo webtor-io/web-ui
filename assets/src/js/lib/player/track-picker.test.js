@@ -262,11 +262,19 @@ function trackChip(kind, o) {
     if (o.locked) a['data-locked'] = 'true';
     if (o.def) a['data-default'] = 'true';
     if (o.suggested) a['data-suggested'] = 'true';
+    if (o.ai) a['data-provider'] = 'Translated';
     const kids = [el('svg', { class: 'chip-check' })];
     if (o.origin) kids.push(span('chip-origin badge badge-xs font-mono', o.origin));
-    kids.push(span('chip-label', o.label || ''));
+    // The AI chip carries both of its states in the markup (see
+    // stream_video.html): the verb while idle, the track name while playing.
+    if (o.ai) kids.push(span('ai-action', 'Translate to ' + (o.name || o.lang)));
+    kids.push(span((o.ai ? 'ai-label ' : '') + 'chip-label', o.label || ''));
     const node = el('button', a, kids);
     node.querySelector('.chip-check').hidden = !o.def;
+    if (o.ai) {
+        node.querySelector('.ai-action').hidden = !!o.def;
+        node.querySelector('.ai-label').hidden = !o.def;
+    }
     node.hidden = !!o.hidden;
     return node;
 }
@@ -314,6 +322,8 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
     ]);
     const uploads = el('div', { id: 'my-subtitles', class: 'contents' });
     const tracksBox = el('div', { id: 'subtitle-tracks', role: 'radiogroup' }, trackEls.concat([uploads]));
+    const hint = el('p', { id: 'subtitle-hint' });
+    hint.hidden = true;
     const audioBox = el('div', { id: 'audio-tracks', role: 'radiogroup' }, audio.map((t) => trackChip('audio', t)));
     const attrs = { class: 'modal', 'data-preferred-lang': preferred, 'data-subtitles-off': off ? 'true' : 'false' };
     if (lastId) attrs['data-last-subtitle'] = lastId;
@@ -323,6 +333,7 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
         el('span', { id: 'subtitle-now' }, [span('now-origin'), span('now-value')]),
         langs,
         tracksBox,
+        hint,
     ]);
     container.querySelector('#subtitle-now').querySelector('.now-origin').hidden = true;
     return { container, uploads, more, langs, tracksBox };
@@ -802,4 +813,104 @@ test('setChipActive never marks the none carrier', () => {
     const chip = container.querySelector('[data-id="a"]');
     setChipActive(chip, true);
     assert.equal(chip.classList.contains('track-chip-active'), true);
+});
+
+// ---- a translation is never started for the viewer -------------------
+//
+// Owner, 2026-09-16: an AI translation costs tokens, so it takes an
+// explicit click. The switch may restore one only when the viewer already
+// ran it in this session (data-last-subtitle — cached, hence free).
+
+const AI = (id, extra = {}) => ({ id, provider: 'Translated', srclang: 'de', rank: 5, ...extra });
+
+test('toggleDecision: the switch never starts a translation it was only offered', () => {
+    // The server's offer is the AI item and nothing else is activatable.
+    assert.deepEqual(
+        toggleDecision({ on: true, suggestedId: 'tr-de', tracks: [AI('tr-de')], preferredLang: 'de' }),
+        { activateId: '', persist: false },
+    );
+    // ...and it is not reached through the ladder rule either.
+    assert.deepEqual(
+        toggleDecision({ on: true, tracks: [AI('tr-de')], audioLang: 'ja', preferredLang: 'de' }),
+        { activateId: '', persist: false },
+    );
+});
+
+test('toggleDecision: a human track wins over an offered translation', () => {
+    const tracks = [AI('tr-de'), { id: 'a', provider: 'OpenSubtitles', srclang: 'de', rank: 3 }];
+    assert.deepEqual(
+        toggleDecision({ on: true, suggestedId: 'tr-de', tracks, preferredLang: 'de' }),
+        { activateId: 'a', persist: true },
+    );
+});
+
+test('toggleDecision: the viewer’s own earlier translation does come back', () => {
+    // Already translated this session, so restoring it costs nothing.
+    assert.deepEqual(
+        toggleDecision({ on: true, lastId: 'tr-de', tracks: [AI('tr-de')], preferredLang: 'de' }),
+        { activateId: 'tr-de', persist: true },
+    );
+});
+
+test('the AI chip is a verb until it is playing', () => {
+    const { container } = buildPicker({
+        tracks: [offChip(), { id: 'tr-de', lang: 'de', label: 'German', ai: true }],
+        row: [{ lang: 'de', count: 1, selected: true }],
+    });
+    const chip = container.querySelector('[data-id="tr-de"]');
+    const shown = (sel) => Array.from(chip.querySelectorAll(sel)).map((n) => !n.hidden);
+
+    setChipActive(chip, false);
+    assert.deepEqual(shown('.ai-action'), [true], 'idle: the verb shows');
+    assert.deepEqual(shown('.ai-label'), [false], 'idle: the track name is hidden');
+
+    setChipActive(chip, true);
+    assert.deepEqual(shown('.ai-action'), [false], 'playing: the verb is hidden');
+    assert.deepEqual(shown('.ai-label'), [true], 'playing: the track name shows');
+});
+
+test('the hint shows exactly when the only offer is a translation', () => {
+    const { container } = buildPicker({
+        preferred: 'de',
+        off: true,
+        tracks: [offChip(true), { id: 'tr-de', lang: 'de', label: 'German', ai: true, suggested: true }],
+        row: [{ lang: 'de', count: 1, selected: true }],
+    });
+    applyOffState(container, true);
+    assert.equal(container.querySelector('#subtitle-hint').hidden, false);
+    // Switched back on (by a click on the chip, say): the hint goes.
+    applyOffState(container, false);
+    assert.equal(container.querySelector('#subtitle-hint').hidden, true);
+
+    // Negative control for the "only a translation" half: a real track is
+    // offered instead, so the switch has something to give and the hint
+    // would be a lie.
+    const { container: c2 } = buildPicker({
+        preferred: 'de',
+        off: true,
+        tracks: [offChip(true), { id: 'a', lang: 'de', label: 'German', suggested: true }],
+        row: [{ lang: 'de', count: 1, selected: true }],
+    });
+    applyOffState(c2, true);
+    assert.equal(c2.querySelector('#subtitle-hint').hidden, true);
+});
+
+// An offered translation is not "what comes back": the switch refuses it,
+// so the row must not follow it either — no dot, no expansion, nothing
+// that says "this one is yours" about a track nothing will activate.
+test('the row does not follow an offered translation', () => {
+    const { container } = buildPicker({
+        preferred: 'de',
+        off: true,
+        tracks: [
+            offChip(true),
+            { id: 'a', lang: 'en', name: 'English', label: 'English' },
+            { id: 'tr-de', lang: 'de', name: 'German', label: 'German', ai: true, suggested: true },
+        ],
+        row: [{ lang: 'en', count: 1 }, { lang: 'de', count: 1 }],
+    });
+    refresh(container);
+    const [en, de] = langsOf(container);
+    assert.equal(de.querySelector('.lang-dot').hidden, true, 'an offer is not a selection');
+    assert.equal(en.querySelector('.lang-dot').hidden, true);
 });

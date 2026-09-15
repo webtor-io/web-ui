@@ -61,23 +61,31 @@ type ListItem struct {
 	// Default alone cannot say which of the two it is.
 	//
 	// It means exactly "the viewer chose this": the player writes
-	// ud.SubtitleID only on a click and on an upload, never on the
-	// activations it performs by itself (the engagement-gate AI auto-start,
-	// the audio-switch re-pick) -- see activateSubtitle's persist flag in
+	// ud.SubtitleID only on a click, an upload, or a flick of the subtitles
+	// switch, never on the activation it performs by itself (the
+	// audio-switch re-pick) -- see activateSubtitle's persist flag in
 	// Player.jsx. Otherwise a rule the player applied on the viewer's behalf
 	// would come back on the next page load as a choice that switches the
 	// rule off.
 	Saved bool
-	// Suggested marks what the picker's subtitles toggle would turn on
-	// while the viewer has subtitles off (Saved "none"): the item the
-	// ladder -- or, with no preferred language, the Accept-Language
-	// selection -- would have made Default. Rendered as data-suggested.
+	// Suggested marks the one item the picker offers: rendered as
+	// data-suggested, and at most one per list.
 	//
-	// It exists only in that state, and never on the "None" item itself:
-	// with subtitles on, Default already answers the question, and two
-	// answers would let the picker restore something other than what is
-	// playing. Nothing is suggested when the ladder's own answer is "no
-	// subtitles" -- there is nothing to turn on.
+	// Two shapes of offer, and the picker draws them differently:
+	//
+	//   - while subtitles are off, the track the switch would turn on --
+	//     what the ladder (or, with no preferred language, the
+	//     Accept-Language selection) would have made Default. Drawn with
+	//     the muted "this is what comes back" check and fill.
+	//   - the AI translation, whenever the ladder's answer was a
+	//     translation (2026-09-16): never Default, because starting one
+	//     spends tokens. Drawn as an action ("Translate to <language>")
+	//     with an accent outline, and the switch refuses to start it.
+	//
+	// Never on the "None" item itself, and never on a locked one. With
+	// subtitles on and no translation to offer nothing is suggested at all:
+	// Default already answers what is playing, and two answers would let
+	// the picker restore something other than that.
 	Suggested bool
 }
 
