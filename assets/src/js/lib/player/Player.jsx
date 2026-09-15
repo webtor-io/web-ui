@@ -15,6 +15,7 @@ import {
     applyLangFilter,
     applyFlagSupport,
     applyOffState,
+    offStateAfterActivate,
     toggleDecision,
     setChipActive,
     expandedLang,
@@ -1023,13 +1024,6 @@ function trackSubtitleSelect(el) {
     if (el.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
 }
 
-// subtitlesOff reads the switch's state off the dialog, which is where
-// the server renders it and where every other reader (track-picker's
-// readChips, the click delegate) looks for it.
-function subtitlesOff(modal) {
-    return !!modal && modal.getAttribute('data-subtitles-off') === 'true';
-}
-
 // setSubtitlesOff performs the switch: remember what was playing, activate
 // what the rule decided, then redraw the muted state.
 //
@@ -1040,16 +1034,7 @@ function subtitlesOff(modal) {
 // every other chip's active mark on its way through, and the muted choice
 // has to keep its own.
 function setSubtitlesOff(container, modal, off) {
-    if (!modal) return;
-    if (off) {
-        const current = modal.querySelector('.subtitle[data-default="true"]');
-        const currentID = current ? current.getAttribute('data-id') : '';
-        // No memory beats a stale one: a data-last-subtitle naming a track
-        // nobody chose would come back on the next flick of the switch.
-        if (currentID && currentID !== 'none') modal.setAttribute('data-last-subtitle', currentID);
-        else modal.removeAttribute('data-last-subtitle');
-    }
-    modal.setAttribute('data-subtitles-off', off ? 'true' : 'false');
+    if (!modal) return null;
     const audioEl = modal.querySelector('.audio[data-default="true"]');
     const decision = toggleDecision({
         on: !off,
@@ -1067,8 +1052,9 @@ function setSubtitlesOff(container, modal, off) {
         applyOffState(modal, true);
         return null;
     }
+    // No applyOffState here: activating the item is what moves the switch
+    // (markTrack), so the state cannot be written twice and cannot disagree.
     activateSubtitle(container, item, { persist: decision.persist });
-    applyOffState(modal, off);
     return item;
 }
 
@@ -1120,8 +1106,8 @@ function activateSubtitle(container, target, { persist = true } = {}) {
             // ("· opensubtitles") — and that whole string used to land in
             // <track label>, which is what the native iOS track menu
             // shows. Every chip that reaches here is side-loaded and
-            // carries data-label; the "Off" chip, the one without it, is
-            // excluded by the id guard above. ensureTrackElement supplies
+            // carries data-label; the "None" carrier, the one without it,
+            // is excluded by the id guard above. ensureTrackElement supplies
             // its own last-resort name.
             ensureTrackElement(
                 video,
@@ -1211,16 +1197,12 @@ function wireTrackHandlers(container, hooks = {}) {
                 });
                 return;
             }
-            const id = target.getAttribute('data-id');
             trackSubtitleSelect(target);
             // Picking a track while the switch is off means "on, with this
-            // one". One act for the viewer, so one activation and one PUT:
-            // the switch is flipped around the same activateSubtitle call
-            // rather than turning subtitles on first and selecting after.
-            const wasOff = subtitlesOff(subtitlesModal) && id !== 'none';
-            if (wasOff) subtitlesModal.setAttribute('data-subtitles-off', 'false');
+            // one": one act for the viewer, so one activation and one PUT.
+            // Nothing to flip here — activating a track that is not "None"
+            // is what turns the switch on (markTrack).
             activateSubtitle(container, target);
-            if (wasOff) applyOffState(subtitlesModal, false);
             if (hooks.onSubtitleSelect) hooks.onSubtitleSelect(target);
         });
 
@@ -1412,10 +1394,16 @@ function wireTrackHandlers(container, hooks = {}) {
 // chose this".
 function markTrack(container, el, type, persist = true) {
     if (el.getAttribute('data-default') === 'true') return;
+    const s = container.querySelector('#subtitles');
+    // Read before anything moves: the switch's memory is the track being
+    // replaced, and a line further down there is no way to tell which chip
+    // that was.
+    const prev = s && type === 'subtitle' ? s.querySelector('.subtitle[data-default="true"]') : null;
+    const prevID = prev ? (prev.getAttribute('data-id') || '') : '';
+
     setChipActive(el, true);
     el.setAttribute('data-default', 'true');
 
-    const s = container.querySelector('#subtitles');
     if (!s) return;
     const es = s.querySelectorAll(`.${type}`);
     for (const ee of es) {
@@ -1423,9 +1411,24 @@ function markTrack(container, el, type, persist = true) {
         setChipActive(ee, false);
         ee.removeAttribute('data-default');
     }
+    if (type === 'subtitle') {
+        // The one writer of "are subtitles off": every activation moves the
+        // switch with it, including the ones the player performs for the
+        // viewer (a deleted upload landing on None, the audio-switch
+        // re-pick, an upload selected right after it was added). Kept here
+        // rather than at each call site because a second writer is exactly
+        // how the switch and the row drifted apart. After the clearing loop,
+        // because applyOffState puts the muted mark back.
+        const next = offStateAfterActivate(prevID, el.getAttribute('data-id') || '', s.getAttribute('data-last-subtitle') || '');
+        if (next.lastId) s.setAttribute('data-last-subtitle', next.lastId);
+        else s.removeAttribute('data-last-subtitle');
+        applyOffState(s, next.off);
+    }
     // The dot on the language chip and the "Now:" line, not the language
     // filter: the viewer's expanded language is their own choice and must
-    // not jump under them because playback moved.
+    // not jump under them because playback moved. After applyOffState: with
+    // subtitles off the row follows the muted choice, which the line above
+    // has just named.
     refreshMarks(s);
 
     if (!persist) return;

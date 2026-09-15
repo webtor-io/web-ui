@@ -145,13 +145,18 @@
                      element for the state, one control for the act. */}}
                 <div id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3{{ if $off }} picker-off{{ end }}" role="radiogroup" aria-label="{{ t $.Lang "action.stream.subtitles" }}">
                     {{ range $subs }}{{ if eq .ID "none" }}
-                    <button type="button" id="subtitle-off" class="subtitle" hidden aria-hidden="true" tabindex="-1"
+                    <button type="button" id="subtitle-none" class="subtitle" hidden aria-hidden="true" tabindex="-1"
                             data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}" data-lang="und"
                             {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}></button>
                     {{ end }}{{ end }}
                     {{ range $flat }}{{ if ne .ID "none" }}
                     {{ $d := langDisplay .SrcLang }}{{ $oc := originCode . }}
-                    <button type="button" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+                    {{/* aria-checked follows the look: while the block is
+                         muted the suggested chip wears the check and the
+                         fill, so a reader must hear it as the chosen one
+                         too — the switch, not this radiogroup, is what says
+                         subtitles are off. */}}
+                    <button type="button" role="radio" aria-checked="{{ if or .Default (and $off .Suggested) }}true{{ else }}false{{ end }}"
                             data-id="{{ .ID }}" data-mp-id="{{ .MPID }}" data-srclang="{{ .SrcLang }}" data-provider="{{ .Provider }}" data-src="{{ .Src }}" data-label="{{ .Label }}" data-kind="{{ .Kind }}" data-badge="{{ .Badge }}" data-source="{{ .Source }}" data-rank="{{ .Rank }}"
                             data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
                             {{ if .SourceBadge }}data-source-badge="{{ .SourceBadge }}" {{ end }}{{ if .Forced }}data-forced="true" {{ end }}{{ if .Locked }}data-locked="true" {{ end }}{{ if or .Locked $off }}aria-disabled="true" {{ end }}{{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}{{ if .Suggested }}data-suggested="true" {{ end }}

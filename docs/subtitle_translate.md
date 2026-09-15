@@ -278,7 +278,7 @@ for the same reason.
 | `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
 | `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
 | `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
-| `#subtitle-off` | first child of `#subtitle-tracks` | the `none` list item, since 2026-09-15 a **hidden state carrier** and not a control: `hidden`, `aria-hidden="true"`, `tabindex="-1"`, no label and no chip classes. The player still activates it by `data-id="none"` (`findSubtitleItem`, `pickDefaultSubtitle`, `hasSavedDefault`, `dropDeletedTracks`); the act of turning subtitles off belongs to `#subtitles-toggle` |
+| `#subtitle-none` | first child of `#subtitle-tracks` | the `none` list item, since 2026-09-15 a **hidden state carrier** and not a control (renamed from `#subtitle-off`, which read like the button it no longer is): `hidden`, `aria-hidden="true"`, `tabindex="-1"`, no label and no chip classes. The player still activates it by `data-id="none"` (`findSubtitleItem`, `pickDefaultSubtitle`, `hasSavedDefault`, `dropDeletedTracks`); the act of turning subtitles off belongs to `#subtitles-toggle` |
 | `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
 | `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | heading line (`action.stream.mySubtitles` + the close control), upload form, one row per file, each row with its own delete form |
@@ -290,7 +290,7 @@ for the same reason.
 | Kind | Where | Attributes |
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
-| `.subtitle#subtitle-off` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
+| `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
 | `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), plus `aria-disabled="true"` on every chip while the block is muted |
 | `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
@@ -395,10 +395,22 @@ row plus the tracks of the expanded language.
 - **Subtitles are switched, not chosen off** (owner, 2026-09-15). The "Subtitles" heading carries
   a `toggle toggle-soft`; there is no "Off" chip in either row. Off does **not** empty the block:
   both rows go `.picker-off` (dimmed), every chip keeps its classes — including the active mark on
-  the track that comes back — and the language chip of that track keeps its dot. The chips stay
+  the track that comes back, which also carries `aria-checked="true"`, since a chip drawn as
+  chosen and announced as unchosen is the worst of both — and the language chip of that track
+  keeps its dot. The chips stay
   clickable, and clicking one is "on, with this track": one activation, one `PUT`.
-  - Switching off remembers what was playing on the dialog (`data-last-subtitle`) and activates
-    the `none` item through the normal path (`persist: true`, so the next page load reproduces it).
+  - Switching off activates the `none` item through the normal path (`persist: true`, so the next
+    page load reproduces it), and that activation is what remembers the outgoing track.
+  - **The switch has one writer.** "Subtitles are off" means exactly "the `none` item is the
+    active one", and `markTrack` (`Player.jsx`) is the only place that writes it: every
+    activation moves the switch with it, including the ones the player performs for the viewer —
+    a deleted upload landing on `none`, the audio-switch re-pick returning `none`, an upload
+    selected while the switch was off. The decision is the pure
+    `offStateAfterActivate(prevDefaultId, newId, lastId)` (`track-picker.js`): off iff the new id
+    is `none`, and `data-last-subtitle` is written **only** on the way out — the track being
+    replaced, or nothing at all when nothing was playing (an older memory is dropped rather than
+    kept, since it would name a chip that may be gone). A second writer is exactly how the switch
+    and the row drifted apart before.
   - Either way the switch reports itself as a manual choice (`hooks.onSubtitleSelect`, the same
     hook a chip press uses): that is what sets `manualSubtitleRef`, without which the next **audio**
     switch would re-run the ladder and turn subtitles back on over an explicit off. It also stops a

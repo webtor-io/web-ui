@@ -288,7 +288,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		// language row above it, and the codes the chips are read by.
 		`id="subtitle-tracks"`,
 		`id="subtitle-langs"`,
-		`id="subtitle-off"`,
+		`id="subtitle-none"`,
 		`id="lang-chip-template"`,
 		`class="lang lang-chip`,
 		`class="subtitle track-chip`,
@@ -394,15 +394,25 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	if strings.Contains(langs, `data-id="none"`) {
 		t.Errorf("the None item is back in the language row:\n%s", langs)
 	}
-	offAt := strings.Index(tracks, `id="subtitle-off"`)
+	offAt := strings.Index(tracks, `id="subtitle-none"`)
 	if offAt < 0 {
 		t.Fatalf("the None carrier is not in the track row:\n%s", tracks)
 	}
 	if first := strings.Index(tracks, "<button"); first < 0 || first != strings.LastIndex(tracks[:offAt], "<button") {
 		t.Errorf("the None carrier is not the first element of #subtitle-tracks (first button at %d, carrier at %d)", first, offAt)
 	}
-	if tag := startTag(`id="subtitle-off"`); !strings.Contains(tag, " hidden") || !strings.Contains(tag, `aria-hidden="true"`) {
+	if tag := startTag(`id="subtitle-none"`); !strings.Contains(tag, " hidden") || !strings.Contains(tag, `aria-hidden="true"`) {
 		t.Errorf("the None carrier is not hidden from view and from readers:\n%s", tag)
+	}
+
+	// The suggested chip wears the active look while the block is muted, so
+	// it has to carry the ARIA state that look means. A chip drawn as chosen
+	// and announced as unchosen is the worst of both.
+	if tag := startTag(`data-suggested="true"`); !strings.Contains(tag, `aria-checked="true"`) || !strings.Contains(tag, "track-chip-active") {
+		t.Errorf("the suggested chip is not marked as the chosen one while muted:\n%s", tag)
+	}
+	if n := strings.Count(tracks, `aria-checked="true"`); n != 1 {
+		t.Errorf("exactly one chip may be aria-checked in the track row, got %d", n)
 	}
 
 	// The "+N" disclosure's whole label lives in .more-count, because

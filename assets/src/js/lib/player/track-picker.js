@@ -201,6 +201,29 @@ export function toggleDecision({ on, lastId = '', suggestedId = '', tracks = [],
     return { activateId: id, persist: true };
 }
 
+// offStateAfterActivate is the switch's state after an activation, whoever
+// asked for it: the viewer flipping the switch, the viewer pressing a chip,
+// or the player itself (a deleted upload landing on "None", the
+// audio-switch re-pick, an upload selected right after it was added).
+//
+// The invariant is one sentence — subtitles are off exactly when the
+// "None" item is the active one — and it has exactly one writer
+// (markTrack in Player.jsx) so that no activation can leave the switch
+// saying one thing and the track row another.
+//
+// What comes back is recorded only on the way out: activating "None"
+// remembers the track it replaced, and remembers nothing when there was
+// nothing playing (the chip was deleted with its file, or the page opened
+// off) — an older memory is dropped rather than kept, because a
+// data-last-subtitle naming a chip that is gone would resurrect it. Turning
+// subtitles on leaves the memory alone: it is overwritten the next time
+// they go off.
+export function offStateAfterActivate(prevDefaultId, newId, lastId = '') {
+    if (newId !== 'none') return { off: false, lastId };
+    const prev = prevDefaultId && prevDefaultId !== 'none' ? prevDefaultId : '';
+    return { off: true, lastId: prev };
+}
+
 // ---- DOM half -------------------------------------------------------
 
 function attr(el, name) {

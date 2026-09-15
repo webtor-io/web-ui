@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     MAX_VISIBLE_LANGS,
     applyOffState,
+    offStateAfterActivate,
     toggleDecision,
     groupByLang,
     activeLang,
@@ -696,4 +697,33 @@ test('the muted choice keeps its active mark while subtitles are off', () => {
         [false, true, false],
     );
     assert.equal(container.querySelector('[data-id="a"]').querySelector('.chip-check').hidden, false);
+});
+
+// ---- the switch follows what is playing ------------------------------
+//
+// The invariant is "off == the none item is the active one", and it is
+// written in exactly one place (markTrack in Player.jsx) so that the
+// activations the player performs for the viewer — a deleted upload
+// landing on none, the audio-switch re-pick returning none, an upload
+// selected while the switch was off — move the switch with them.
+
+test('offStateAfterActivate: activating none switches off and remembers the outgoing track', () => {
+    assert.deepEqual(offStateAfterActivate('a', 'none', ''), { off: true, lastId: 'a' });
+    // ...and replaces an older memory: what comes back is what was just
+    // taken away, not what the viewer chose two switches ago.
+    assert.deepEqual(offStateAfterActivate('b', 'none', 'a'), { off: true, lastId: 'b' });
+});
+
+test('offStateAfterActivate: activating a track switches on and keeps the memory', () => {
+    assert.deepEqual(offStateAfterActivate('none', 'a', 'b'), { off: false, lastId: 'b' });
+    assert.deepEqual(offStateAfterActivate('a', 'b', ''), { off: false, lastId: '' });
+});
+
+// Negative control for the "outgoing default only" guard: nothing was
+// playing (the chip was deleted with its file, or the page opened off), so
+// there is nothing to remember and an older memory must go too — a
+// data-last-subtitle naming a chip that is gone would resurrect it.
+test('offStateAfterActivate: nothing was playing, so nothing is remembered', () => {
+    assert.deepEqual(offStateAfterActivate('', 'none', 'a'), { off: true, lastId: '' });
+    assert.deepEqual(offStateAfterActivate('none', 'none', 'a'), { off: true, lastId: '' });
 });
