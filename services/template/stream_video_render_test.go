@@ -122,6 +122,35 @@ func TestStreamVideoRenders(t *testing.T) {
 	if buf.Len() == 0 {
 		t.Fatal("rendered stream_video.html is empty")
 	}
+
+	// Every player dialog closes on a click outside its box (owner,
+	// 2026-09-15). DaisyUI does that with one .modal-backdrop form as the
+	// dialog's last child: it stretches across the same grid cell as the
+	// .modal-box behind it (z-index -1), and its submit button closes the
+	// dialog through method="dialog". Two of them in one dialog would put a
+	// second full-size button over the box; none leaves the dialog
+	// closable only by its own button.
+	html := buf.String()
+	parts := strings.Split(html, "<dialog")
+	if len(parts) != 3 {
+		t.Fatalf("expected 2 dialogs in stream_video.html, got %d", len(parts)-1)
+	}
+	for _, d := range parts[1:] {
+		end := strings.Index(d, "</dialog>")
+		if end < 0 {
+			t.Fatalf("unterminated dialog: %.80s", d)
+		}
+		body := d[:end]
+		id := body[:strings.Index(body, ">")]
+		if n := strings.Count(body, `class="modal-backdrop"`); n != 1 {
+			t.Errorf("dialog %s has %d .modal-backdrop forms, want exactly 1", id, n)
+		}
+		// Last child: the backdrop is stacked behind the box, and markup
+		// order is what puts the box's own controls on top of it.
+		if at := strings.LastIndex(body, `class="modal-backdrop"`); at >= 0 && strings.Contains(body[at:], "modal-box") {
+			t.Errorf("dialog %s renders the backdrop before its box", id)
+		}
+	}
 }
 
 // TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a

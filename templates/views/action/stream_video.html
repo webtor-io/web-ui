@@ -203,6 +203,17 @@
                 <form method="dialog" class="w-full sm:w-auto"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>
+        {{/* Click outside the box closes the dialog (owner, 2026-09-15).
+             DaisyUI's backdrop: a form stretched across the same grid cell
+             as the .modal-box but behind it (z-index -1), whose submit
+             button closes the dialog through method="dialog" — type="button"
+             would not submit and the click would do nothing. Last child, so
+             the box's own controls stay above it. The label is literal and
+             untranslated, like every other modal in this codebase
+             (templates/partials/onboarding_checklist.html): the button is
+             visually hidden but focusable, and a translated one makes a
+             screen reader announce "Close" twice. */}}
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
     {{/* Same reasoning as #subtitles above — must show over the fullscreen player. */}}
     <dialog class="modal" id="embed">
@@ -218,6 +229,8 @@
                 <form method="dialog"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>
+        {{/* Same backdrop as #subtitles above. */}}
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
     {{ if .GraceDurationSec }}
     <div id="grace-cta" class="absolute bottom-20 left-1/2 -translate-x-1/2 hidden z-modal w-[calc(100%-2rem)] max-w-sm">

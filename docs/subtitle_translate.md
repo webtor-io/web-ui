@@ -427,6 +427,14 @@ row plus the tracks of the expanded language.
   the dialog, since the preloaded OpenSubtitles and sidecar tracks are `<track>` elements too —
   and reports whether one of them was showing; when it was, the player activates `none` with
   `persist: false`. The viewer chose a deletion, not a track, so nothing is PUT.
+- **Every player dialog closes on a click outside its box** (owner, 2026-09-15). `#subtitles` and
+  `#embed` each end with DaisyUI's backdrop — `<form method="dialog" class="modal-backdrop">` with
+  a submit button, as the dialog's **last** child. The form stretches across the same grid cell as
+  `.modal-box` at `z-index: -1`, so markup order is what keeps the box's own controls on top, and
+  `method="dialog"` is what closes the dialog (a `type="button"` there would submit nothing and the
+  click would do nothing). The dialog is modal, so the click never reaches the player underneath.
+  The button's label is literal and untranslated, like every other modal here: it is visually
+  hidden but focusable, and a translated one makes a screen reader announce "Close" twice.
 - **Flags fall back.** `supportsFlagEmoji()` (`lib/discover/lang.js`) hides every `.chip-flag`
   where the platform draws bare letter pairs (Windows outside Firefox); the language names stay.
 - **Language-row order**: the active language, then the viewer's preferred language, then by track
