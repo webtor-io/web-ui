@@ -774,3 +774,23 @@ test('the row opens on the suggested language when the preferred one has no trac
     });
     assert.equal(refresh(c2), 'en');
 });
+
+// The "None" carrier is hidden, has no label and is aria-hidden: marking it
+// would leave an invisible chip claiming to be the chosen one, and an
+// aria-checked radio in a group where nothing looks checked. data-default
+// still moves to it — that is the state — but the look never does.
+test('setChipActive never marks the none carrier', () => {
+    const { container } = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'de', label: 'German' }],
+        row: [{ lang: 'de', count: 1, selected: true }],
+    });
+    const carrier = container.querySelector('[data-id="none"]');
+    setChipActive(carrier, true);
+    assert.equal(carrier.classList.contains('track-chip-active'), false);
+    assert.equal(carrier.getAttribute('aria-checked'), 'false');
+    assert.equal(carrier.querySelector('.chip-check').hidden, true);
+    // ...and a real chip still takes it, so the guard is not a blanket "no".
+    const chip = container.querySelector('[data-id="a"]');
+    setChipActive(chip, true);
+    assert.equal(chip.classList.contains('track-chip-active'), true);
+});

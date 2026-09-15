@@ -988,3 +988,35 @@ func TestSavedOffAndLadderOffSuggestTheSameTrack(t *testing.T) {
 		t.Fatalf("suggested=%s want mp-1: saved-off and the ladder must agree", s)
 	}
 }
+
+// TestOffSuggestsAForcedTrackInThePreferredLanguage pins the rung between
+// "a full track in your language" and "an AI translation": a forced
+// (signs-only) track in the viewer's language beats a full track in a
+// language they did not ask for.
+//
+// Reachable exactly because the audio is in a third language: the ladder
+// never turns a forced track on here (that rule is for audio already in the
+// viewer's language), so it lands on "None" — and the switch then has the
+// forced track to offer. It is a real subtitle in the right language; the
+// English one is neither.
+func TestOffSuggestsAForcedTrackInThePreferredLanguage(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{
+		{Src: "https://x/full-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+		{Src: "https://x/forced-pt.vtt", SrcLang: "pt", Label: "Movie.pt.forced.srt", Kind: "subtitles"},
+	}}
+	// Japanese audio, Portuguese viewer, no AI (Translate off) and no
+	// Accept-Language match at all.
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt"})
+
+	forced := byID(items)["et-2"]
+	if !forced.Forced || forced.SrcLang != "pt" {
+		t.Fatalf("fixture no longer produces a forced pt track: %+v", forced)
+	}
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none -- the ladder must not turn the forced track on here", d)
+	}
+	if s := suggestedID(t, items); s != "et-2" {
+		t.Fatalf("suggested=%s want et-2 (the forced track in the viewer's language)", s)
+	}
+}

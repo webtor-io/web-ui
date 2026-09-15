@@ -295,10 +295,15 @@ function langChipEls(container) {
 // writes it next to this call and syncNow reads it back).
 //
 // A locked chip (the AI track on a free account) can never become active:
-// clicking it opens the upgrade CTA instead of switching the track.
+// clicking it opens the upgrade CTA instead of switching the track. Neither
+// can the "None" carrier: it is hidden, unlabelled and aria-hidden, so the
+// active look on it would be an invisible chip claiming to be the chosen
+// one and an aria-checked radio in a group where nothing appears checked.
+// Its data-default still moves -- that is the state the switch is read
+// from -- but never the look.
 export function setChipActive(el, on) {
     if (!el || !el.classList) return;
-    const active = !!on && attr(el, 'data-locked') !== 'true';
+    const active = !!on && attr(el, 'data-locked') !== 'true' && attr(el, 'data-id') !== 'none';
     el.classList.toggle(ACTIVE_TRACK_CLASS, active);
     if (el.setAttribute) el.setAttribute('aria-checked', active ? 'true' : 'false');
     const check = el.querySelector && el.querySelector('.chip-check');

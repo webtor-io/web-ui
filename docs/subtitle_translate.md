@@ -295,6 +295,11 @@ for the same reason.
 | `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 
+The `none` carrier never takes the active look: `setChipActive` refuses it by `data-id`, the way it
+refuses a locked chip. `data-default` still moves onto it — that is the state the switch is read
+from — but an invisible chip claiming to be the chosen one, in a group where nothing appears
+checked, is not a state worth drawing.
+
 **Classes.** `.track-chip` / `.track-chip-active` on audio and subtitle chips, `.lang-chip` /
 `.lang-chip-active` on language chips, `.chip-locked` on a locked AI chip, `.picker-off` on
 `#subtitle-langs` and `#subtitle-tracks` while the switch is off (`@apply opacity-50` — dimming
@@ -430,13 +435,19 @@ row plus the tracks of the expanded language.
     `toggleDecision` (`track-picker.js`) is that whole rule as a pure function.
   - `ListItem.Suggested` (`data-suggested`) is the server's half: whenever the render's default is
     `none` — the viewer saved it, or the ladder arrived there because the audio is already in their
-    language — `GetSubtitles` names the track the switch would turn on. `offSuggestion` asks
-    `ladderPick` first, the same function the saved-off branch uses, so both ways of arriving at
-    "off" promise the same track (a forced track wins when the audio is already in the viewer's
-    language); only when the ladder's own answer is "None" do the extra rungs apply — best human
-    track in the preferred language, AI translation, Accept-Language pick, then the best
-    activatable track at all. Never the `none` item, never a locked one, and never while subtitles
-    are on: with a track playing, `data-default` already answers that question.
+    language — `GetSubtitles` names the track the switch would turn on. `offSuggestion`'s rungs, in
+    order: **1.** the best full human track in the preferred language, **2.** a forced (signs-only)
+    track in that language — a real subtitle in the right language beats a full one in a language
+    the viewer did not ask for, and this is what the switch offers when the audio is in a third
+    language, **3.** an unlocked AI translation (only ever created in the preferred language),
+    **4.** the Accept-Language pick, **5.** the best activatable track whatever its language.
+    Never the `none` item, never a locked one, and never while subtitles are on: with a track
+    playing, `data-default` already answers that question.
+    Deliberately *not* routed through `ladderPick`, close as the orders are — every state that
+    reaches `offSuggestion` already has `none` marked `Default`, and `ladderPick` answers with the
+    first `Default` it finds (index 0) before it can consider anything else, so the call would be
+    dead code that silently costs rung 2. The saved-off branch of `applyLadder` still uses
+    `ladderPick`, where it runs *before* the defaults are cleared and can therefore answer.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.

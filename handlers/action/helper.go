@@ -639,41 +639,44 @@ func markSuggested(lis []ListItem, i int) {
 // the audio is already in the viewer's language, not only when the viewer
 // saved it.
 //
-// It asks the ladder first, through the same ladderPick the saved-off
-// branch of applyLadder uses, so both ways of arriving at "off" promise
-// the same track (a forced track wins when the audio is already in the
-// viewer's language, exactly as it would if it were playing). ladderPick
-// returns index 0 -- the "None" item -- when its answer is "no subtitles";
-// only then do the extra rungs below apply, and they exist because the
-// viewer has just said they want subtitles anyway: the best human track in
-// the preferred language, an AI translation, the Accept-Language pick, and
-// finally the best activatable track whatever its language.
+// The rungs, in order:
 //
-// Honest note: at this call site that first question can only be answered
-// "None" today. Every state that reaches offSuggestion is one the ladder
-// already resolved to "no subtitles" (a saved off whose own ladderPick
-// found nothing, or the audio being in the viewer's language with no forced
-// track), so removing the call changes no outcome and no test goes red for
-// it. It stays because it is the difference between two orders that must
-// agree and one order written once.
+//  1. the best full human track in the preferred language (the ladder's own
+//     first choice);
+//  2. a forced (signs-only) track in the preferred language -- a real
+//     subtitle in the right language beats a full one in a language the
+//     viewer did not ask for. Reached when the audio is in a third
+//     language: the ladder never turns a forced track on there (that rule
+//     is for audio already in the viewer's language), so it lands on "None"
+//     and this is what the switch has to offer;
+//  3. an unlocked AI translation -- applyLadder only ever creates one in
+//     the preferred language, so this rung needs no language test of its
+//     own;
+//  4. the Accept-Language pick (fallbackIndex), which knows nothing about
+//     the preferred language;
+//  5. the best activatable track whatever its language.
 //
-// That last rung is the one the ladder itself would never take. The ladder
-// answers "should subtitles be on"; this answers "the viewer just said they
-// should be", and a switch that does nothing when pressed is worse than one
-// that gives the best track available.
+// Rung 5 is the one the ladder itself would never take. The ladder answers
+// "should subtitles be on"; this answers "the viewer just said they should
+// be", and a switch that does nothing when pressed is worse than one that
+// gives the best track available.
+//
+// Deliberately NOT routed through ladderPick, close as the two orders are:
+// every state that reaches offSuggestion already has the "None" item marked
+// Default, and ladderPick answers with the first Default it finds -- index
+// 0, before it can consider anything else. Calling it here is dead code
+// that silently costs rung 2.
 //
 // -1 when there is nothing to turn on at all (an empty list, or only a
 // locked AI item): then the switch has no promise to make.
-func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts) int {
-	humanIdx := -1
+func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, opts SubtitleOpts) int {
 	if opts.PreferredLang != "" {
-		humanIdx = bestByLadder(lis, opts.PreferredLang, false)
-	}
-	if i := s.ladderPick(lis, ud, audioLang, opts, humanIdx); i > 0 {
-		return i
-	}
-	if humanIdx >= 0 {
-		return humanIdx
+		if i := bestByLadder(lis, opts.PreferredLang, false); i >= 0 {
+			return i
+		}
+		if i := bestByLadder(lis, opts.PreferredLang, true); i >= 0 {
+			return i
+		}
 	}
 	for i := range lis {
 		if lis[i].Provider == "Translated" && !lis[i].Locked {
@@ -802,7 +805,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 	// the ladder would have done instead); this fills in every other way of
 	// arriving at "no subtitles".
 	if lis[0].Default && !hasSuggestion(lis) {
-		markSuggested(lis, s.offSuggestion(lis, ud, audioLang, opts))
+		markSuggested(lis, s.offSuggestion(lis, ud, opts))
 	}
 	return s.markPreload(lis, ud)
 }

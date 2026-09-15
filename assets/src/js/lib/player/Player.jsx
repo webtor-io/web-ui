@@ -1024,15 +1024,17 @@ function trackSubtitleSelect(el) {
     if (el.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
 }
 
-// setSubtitlesOff performs the switch: remember what was playing, activate
-// what the rule decided, then redraw the muted state.
+// setSubtitlesOff performs the switch: decide what to activate, then
+// activate it. Nothing else — the activation is what writes the state
+// (markTrack: the attribute, the memory of what comes back, and the muted
+// redraw), so this function never touches data-subtitles-off itself.
 //
-// The attribute is written BEFORE the activation on purpose: markTrack
-// ends in refreshMarks, which asks track-picker what language is playing,
-// and the answer while subtitles are off is the muted choice — written
-// here, one line earlier. Redrawing comes last because markTrack clears
-// every other chip's active mark on its way through, and the muted choice
-// has to keep its own.
+// The one exception is the dead end: when the rule finds nothing
+// activatable there is no activation to carry the state, so the switch is
+// put back where it was from here.
+//
+// Returns the element it activated, or null, so the caller can report the
+// choice (telemetry, the manual-choice hook).
 function setSubtitlesOff(container, modal, off) {
     if (!modal) return null;
     const audioEl = modal.querySelector('.audio[data-default="true"]');
