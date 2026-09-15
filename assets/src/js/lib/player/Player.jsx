@@ -14,6 +14,8 @@ import {
     refreshMarks,
     applyLangFilter,
     applyFlagSupport,
+    applyOffState,
+    toggleDecision,
     setChipActive,
     expandedLang,
     toggleLangOverflow,
@@ -1009,6 +1011,55 @@ function findSubtitleItem(modal, id) {
     return null;
 }
 
+// subtitlesOff reads the switch's state off the dialog, which is where
+// the server renders it and where every other reader (track-picker's
+// readChips, the click delegate) looks for it.
+function subtitlesOff(modal) {
+    return !!modal && modal.getAttribute('data-subtitles-off') === 'true';
+}
+
+// setSubtitlesOff performs the switch: remember what was playing, activate
+// what the rule decided, then redraw the muted state.
+//
+// The attribute is written BEFORE the activation on purpose: markTrack
+// ends in refreshMarks, which asks track-picker what language is playing,
+// and the answer while subtitles are off is the muted choice — written
+// here, one line earlier. Redrawing comes last because markTrack clears
+// every other chip's active mark on its way through, and the muted choice
+// has to keep its own.
+function setSubtitlesOff(container, modal, off) {
+    if (!modal) return;
+    if (off) {
+        const current = modal.querySelector('.subtitle[data-default="true"]');
+        const currentID = current ? current.getAttribute('data-id') : '';
+        // No memory beats a stale one: a data-last-subtitle naming a track
+        // nobody chose would come back on the next flick of the switch.
+        if (currentID && currentID !== 'none') modal.setAttribute('data-last-subtitle', currentID);
+        else modal.removeAttribute('data-last-subtitle');
+    }
+    modal.setAttribute('data-subtitles-off', off ? 'true' : 'false');
+    const audioEl = modal.querySelector('.audio[data-default="true"]');
+    const decision = toggleDecision({
+        on: !off,
+        lastId: modal.getAttribute('data-last-subtitle') || '',
+        suggestedId: suggestedSubtitleID(modal),
+        tracks: readTracks(modal),
+        audioLang: audioEl ? (audioEl.getAttribute('data-srclang') || '') : '',
+        preferredLang: modal.getAttribute('data-preferred-lang') || '',
+    });
+    const item = decision.activateId ? findSubtitleItem(modal, decision.activateId) : null;
+    if (item) activateSubtitle(container, item, { persist: decision.persist });
+    applyOffState(modal, off);
+}
+
+// suggestedSubtitleID is the server's answer to "what would be playing if
+// subtitles were on" (ListItem.Suggested, rendered as data-suggested) —
+// the only thing a page opened with subtitles off has to restore from.
+function suggestedSubtitleID(modal) {
+    const el = modal && modal.querySelector('.subtitle[data-suggested="true"]');
+    return el ? (el.getAttribute('data-id') || '') : '';
+}
+
 function findSubtitlesModal(container) {
     return (container && container.querySelector('#subtitles')) || document.getElementById('subtitles');
 }
@@ -1131,9 +1182,26 @@ function wireTrackHandlers(container, hooks = {}) {
                 window.umami.track('subtitle-select', selectEventData(target));
                 if (target.getAttribute('data-provider') === 'UserSubtitle') window.umami.track('user-subtitle-select');
             }
+            // Picking a track while the switch is off means "on, with this
+            // one". One act for the viewer, so one activation and one PUT:
+            // the switch is flipped around the same activateSubtitle call
+            // rather than turning subtitles on first and selecting after.
+            const wasOff = subtitlesOff(subtitlesModal) && id !== 'none';
+            if (wasOff) subtitlesModal.setAttribute('data-subtitles-off', 'false');
             activateSubtitle(container, target);
+            if (wasOff) applyOffState(subtitlesModal, false);
             if (hooks.onSubtitleSelect) hooks.onSubtitleSelect(target);
         });
+
+        // The subtitles switch. It is a real checkbox (DaisyUI toggle), so
+        // the browser owns the pressed state and this only reacts to it —
+        // change, not click, so keyboard and label clicks arrive too.
+        const toggleEl = subtitlesModal.querySelector('#subtitles-toggle');
+        if (toggleEl) {
+            toggleEl.addEventListener('change', () => {
+                setSubtitlesOff(container, subtitlesModal, !toggleEl.checked);
+            });
+        }
 
         // Language row, "+N" and the uploads disclosure. One more delegate
         // on the same modal, for the same reason as the one above: the

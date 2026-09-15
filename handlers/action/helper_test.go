@@ -799,3 +799,163 @@ func TestLadderNoTranslatedItemWithoutAUsableURL(t *testing.T) {
 		t.Fatalf("free viewer keeps the locked item: %+v", lock)
 	}
 }
+
+// suggestedID is the item the picker would turn on when the viewer flips
+// subtitles back on. Exactly one item may carry it.
+func suggestedID(t *testing.T, items []ListItem) string {
+	t.Helper()
+	id := ""
+	for _, it := range items {
+		if !it.Suggested {
+			continue
+		}
+		if id != "" {
+			t.Fatalf("more than one item is Suggested: %s and %s", id, it.ID)
+		}
+		id = it.ID
+	}
+	return id
+}
+
+// TestLadderSavedOffSuggestsWhatItWouldHavePicked: "subtitles off" is a
+// state of the picker's toggle, not the absence of a choice. The ladder
+// still has to say what the toggle would turn on, or switching it on would
+// have nothing to activate on a page the viewer opened with subtitles off.
+func TestLadderSavedOffSuggestsWhatItWouldHavePicked(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "de", Translate: true, Paid: true})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none: the saved off must stand", d)
+	}
+	if !byID(items)["none"].Saved {
+		t.Fatal("the saved off must be marked Saved")
+	}
+	// The same item TestLadderHumanTrackBeatsTranslation gets as Default
+	// when nothing is saved.
+	if s := suggestedID(t, items); s != "os-1" {
+		t.Fatalf("suggested=%s want os-1 (the human German track the ladder would pick)", s)
+	}
+}
+
+// TestLadderSavedOffSuggestsTheAIItem is the same rule one rung down the
+// ladder: no human track in the preferred language, so what the toggle
+// would turn on is the AI translation.
+func TestLadderSavedOffSuggestsTheAIItem(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if s := suggestedID(t, items); s != "tr-pt" {
+		t.Fatalf("suggested=%s want tr-pt", s)
+	}
+}
+
+// TestLadderSavedOffNeverSuggestsALockedItem: a free viewer cannot
+// activate the AI track, so it must not be what the toggle promises. The
+// phase-1 fallback decides instead.
+func TestLadderSavedOffNeverSuggestsALockedItem(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none", FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	s := suggestedID(t, items)
+	if s == "tr-pt" {
+		t.Fatal("a locked item cannot be suggested: turning subtitles on would show nothing")
+	}
+	// mp-0 is the embedded English track audioProbe ships: first in list
+	// order, so it is the Accept-Language match.
+	if s != "mp-0" {
+		t.Fatalf("suggested=%s want mp-0 (the phase-1 Accept-Language pick)", s)
+	}
+}
+
+// TestLegacySavedOffSuggestsThePhaseOnePick covers the path with no
+// preferred content language: the suggestion is what the Accept-Language
+// selection would have chosen.
+func TestLegacySavedOffSuggestsThePhaseOnePick(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none", FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none", d)
+	}
+	if s := suggestedID(t, items); s != "mp-0" {
+		t.Fatalf("suggested=%s want mp-0 (the embedded English track, first in list order)", s)
+	}
+}
+
+// TestLadderSavedOffSuggestsTheEmbedsOwnTrack: an embed that asked for a
+// specific track keeps that answer even as a suggestion -- the ladder is
+// consulted only where the caller said nothing.
+func TestLadderSavedOffSuggestsTheEmbedsOwnTrack(t *testing.T) {
+	ext := &models.ExternalData{Tracks: []models.ExternalTrack{{Src: "https://x/e.vtt", SrcLang: "en", Label: "External", Default: true}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("eng"), &ra.ExportTag{}, nil, ext, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none", d)
+	}
+	if s := suggestedID(t, items); s != "ext-1" {
+		t.Fatalf("suggested=%s want ext-1", s)
+	}
+}
+
+// TestSuggestedOnlyExistsWhenSubtitlesAreOff is the negative control for
+// the guard: with any other saved choice -- or none at all -- there is
+// nothing to restore, and a Suggested item next to a Default one would
+// give the picker two answers to the same question.
+func TestSuggestedOnlyExistsWhenSubtitlesAreOff(t *testing.T) {
+	tag, os := humanTracks()
+	for _, saved := range []string{"", "os-1"} {
+		items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: saved, FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+			SubtitleOpts{PreferredLang: "de", Translate: true, Paid: true})
+		if s := suggestedID(t, items); s != "" {
+			t.Fatalf("saved=%q: nothing may be Suggested while subtitles are on, got %s", saved, s)
+		}
+		// ...and the legacy path says the same.
+		items = NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: saved, FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+			SubtitleOpts{})
+		if s := suggestedID(t, items); s != "" {
+			t.Fatalf("saved=%q (legacy): nothing may be Suggested while subtitles are on, got %s", saved, s)
+		}
+	}
+}
+
+// TestOffByTheLadderAlsoSuggestsATrack: the ladder reaches "no subtitles"
+// on its own whenever the audio is already in the viewer's language --
+// which is the common case, and the one where the switch would otherwise
+// have nothing to turn on. It suggests the best track in that language.
+func TestOffByTheLadderAlsoSuggestsATrack(t *testing.T) {
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("eng"), &ra.ExportTag{}, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "en", Translate: true, Paid: true})
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none (English audio, English viewer)", d)
+	}
+	if s := suggestedID(t, items); s != "mp-0" {
+		t.Fatalf("suggested=%s want mp-0 (the embedded English track)", s)
+	}
+}
+
+// TestNothingToTurnOnSuggestsNothing is the other half: a list whose only
+// subtitle is a locked AI item has nothing the switch can give, and
+// promising the item that means "off" -- or one that shows nothing -- would
+// be a lie.
+func TestNothingToTurnOnSuggestsNothing(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "en.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("eng"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	locked := byID(items)["tr-pt"]
+	if !locked.Locked {
+		t.Fatalf("fixture no longer produces a locked AI item: %+v", locked)
+	}
+	for _, it := range items {
+		if it.Suggested && (it.Locked || it.ID == "none") {
+			t.Fatalf("the switch must not promise %s (locked=%v)", it.ID, it.Locked)
+		}
+	}
+
+	// ...and with no subtitle at all on the list, nothing is suggested.
+	empty := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]`), &ra.ExportTag{}, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	if s := suggestedID(t, empty); s != "" {
+		t.Fatalf("suggested=%s want nothing: there is no subtitle to turn on", s)
+	}
+}

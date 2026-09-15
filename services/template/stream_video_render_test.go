@@ -272,6 +272,16 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		`class="tr-progress`,
 		`class="tr-spinner`,
 		`data-lang="en"`,
+		// The switch that replaced the Off chip. In this fixture the AI item
+		// is locked and nothing matches Accept-Language, so the ladder lands
+		// on "None": the switch renders off, both rows are muted, and the
+		// track the switch would turn on carries data-suggested.
+		`id="subtitles-toggle"`,
+		`class="toggle toggle-soft">`,
+		`data-subtitles-off="true"`,
+		`id="subtitle-langs" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
+		`id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
+		`data-suggested="true"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered stream_video.html missing %q", want)
@@ -285,6 +295,9 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	for _, gone := range []string{
 		`id="embedded"`, `id="opensubtitles"`, `label for="opensubtitles"`, `label for="my-subtitles"`,
 		`aria-owns=`, `role="tab"`, `aria-selected=`, `🔒`,
+		// The Off chip and its label: the switch on the heading replaced
+		// both, and action.stream.off was dropped from every locale.
+		`action.stream.off`,
 	} {
 		if strings.Contains(html, gone) {
 			t.Errorf("rendered stream_video.html still contains the removed markup %q", gone)
@@ -340,28 +353,27 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	if tag := startTag(`data-id="tr-pt"`); strings.Contains(tag, " hidden") {
 		t.Errorf("the expanded language's chip is collapsed:\n%s", tag)
 	}
-	// ...but "Off" is not a language and must never be collapsed by it:
-	// otherwise a viewer whose expanded language is anything but "und"
-	// cannot turn subtitles off at all without JavaScript. It lives in the
-	// language row (first button there, next to the languages it switches
-	// off), so it is looked up in that slice, not in the track row.
+	// ...but the "None" item is not a language either, and since the toggle
+	// replaced its chip it is a hidden state carrier at the head of the
+	// track row: the player still activates it by id, the viewer never
+	// sees it, and the language row holds languages only.
 	langsAt := strings.Index(html, `id="subtitle-langs"`)
 	if langsAt < 0 || langsAt > tracksAt {
 		t.Fatalf("no language row before the track row (langs at %d, tracks at %d)", langsAt, tracksAt)
 	}
 	langs := html[langsAt:tracksAt]
-	offAt := strings.Index(langs, `id="subtitle-off"`)
+	if strings.Contains(langs, `data-id="none"`) {
+		t.Errorf("the None item is back in the language row:\n%s", langs)
+	}
+	offAt := strings.Index(tracks, `id="subtitle-off"`)
 	if offAt < 0 {
-		t.Fatalf("the Off chip is not in the language row:\n%s", langs)
+		t.Fatalf("the None carrier is not in the track row:\n%s", tracks)
 	}
-	if open := strings.LastIndex(langs[:offAt], "<button"); open < 0 || strings.Contains(langs[open:offAt+strings.Index(langs[offAt:], ">")], " hidden") {
-		t.Errorf("the Off chip is hidden by the language filter:\n%s", langs)
+	if first := strings.Index(tracks, "<button"); first < 0 || first != strings.LastIndex(tracks[:offAt], "<button") {
+		t.Errorf("the None carrier is not the first element of #subtitle-tracks (first button at %d, carrier at %d)", first, offAt)
 	}
-	if first := strings.Index(langs, "<button"); first < 0 || first != strings.LastIndex(langs[:offAt], "<button") {
-		t.Errorf("the Off chip is not the first button of #subtitle-langs (first button at %d, off at %d)", first, offAt)
-	}
-	if strings.Contains(tracks, `id="subtitle-off"`) {
-		t.Errorf("the Off chip is rendered twice (also inside #subtitle-tracks)")
+	if tag := startTag(`id="subtitle-off"`); !strings.Contains(tag, " hidden") || !strings.Contains(tag, `aria-hidden="true"`) {
+		t.Errorf("the None carrier is not hidden from view and from readers:\n%s", tag)
 	}
 
 	// The "+N" disclosure's whole label lives in .more-count, because
@@ -582,6 +594,123 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 	for _, want := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, `action="/user-subtitle/delete/1"`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("rendered dialog missing %q", want)
+		}
+	}
+}
+
+// TestStreamVideoSubtitlesToggleFollowsTheDefault is the other half of the
+// switch's contract: the fixture above renders it off (the ladder lands on
+// "None"), this one renders it on. Same tracks, one difference — the viewer
+// pays, so the AI translation is activatable and becomes the default.
+//
+// What it pins: the checkbox is checked exactly when something other than
+// "None" is the default, the dialog says so in data-subtitles-off, neither
+// row is muted, and nothing carries data-suggested — with subtitles on,
+// data-default already answers "what is playing" and a second answer would
+// let the picker restore something else.
+func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string { return key }
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return false },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<!--stub-->{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}}
+	]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.srt", Kind: "subtitles"},
+		}},
+		Resource:            &ra.ResourceResponse{},
+		Item:                &ra.ListItem{PathStr: "movie.mkv"},
+		Title:               "Movie",
+		MediaProbe:          &mp,
+		EIURL:               "http://ei.example.com",
+		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: "res", ItemID: "item"},
+		Settings:            &models.StreamSettings{},
+		ExternalData:        &models.ExternalData{},
+		SubtitleOpts:        models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	// Sanity-check the fixture: the point of this test is the "on" state,
+	// and a ladder change that made "None" the default here would leave it
+	// silently asserting the same thing as the test above.
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	def := ""
+	for _, it := range items {
+		if it.Default {
+			def = it.ID
+		}
+	}
+	if def == "" || def == "none" {
+		t.Fatalf("fixture no longer has a track selected (default=%q) -- the test would cover the off state twice", def)
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	for _, want := range []string{
+		`class="toggle toggle-soft" checked`,
+		`data-subtitles-off="false"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("rendered stream_video.html missing %q", want)
+		}
+	}
+	for _, gone := range []string{
+		` picker-off"`,
+		`data-suggested="true"`,
+	} {
+		if strings.Contains(html, gone) {
+			t.Errorf("subtitles are on, but the render still contains %q", gone)
 		}
 	}
 }

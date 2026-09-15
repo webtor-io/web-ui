@@ -15,9 +15,18 @@
 // DOM contract (controller rulings R1-R9 on the track-picker plan):
 //
 //   #subtitle-tracks   role=radiogroup, every subtitle chip, flat.
-//                      .subtitle[data-id] — including the "Off" chip
-//                      (data-id="none"), which is a choice, not a language:
-//                      it is never grouped and never hidden by the filter.
+//                      .subtitle[data-id] — including the "None" item
+//                      (data-id="none"), which is not a chip at all any
+//                      more but a hidden state carrier at the head of the
+//                      row: the player activates it by id, the viewer
+//                      switches it through #subtitles-toggle, and the
+//                      filter never unhides it.
+//   #subtitles-toggle  the on/off switch of the whole subtitle block.
+//                      Off is mirrored on the dialog as
+//                      data-subtitles-off="true", the chip that comes back
+//                      as data-last-subtitle (this session) or
+//                      data-suggested (the server's ladder answer), and
+//                      drawn as .picker-off on both rows.
 //   #subtitle-langs    role=group. Language chips are
 //                      <button class="lang lang-chip" data-lang aria-pressed>
 //                      with .lang-name / .lang-count / .lang-dot / .chip-flag
@@ -33,6 +42,7 @@
 // spelled out here.
 
 import { supportsFlagEmoji } from '../discover/lang.js';
+import { pickDefaultSubtitle } from './subtitle-rules.js';
 
 // Mirrors maxVisibleLangChips in handlers/action/picker.go. Changing one
 // without the other makes the row jump between the server's first paint and
@@ -158,6 +168,31 @@ export function langRowOps(chips, rowChips, expanded, preferred = '') {
     return { updates, missing, overflow };
 }
 
+// toggleDecision is the whole rule behind the subtitles switch: what to
+// activate, and whether the result is the viewer's own choice.
+//
+// Off is always one answer -- the "None" item -- because "off" is a state
+// the viewer asked for and the next page load must reproduce it. On has
+// three candidates in order: what was playing before it was switched off
+// this session (lastId), what the server said it would have picked
+// (suggestedId, ListItem.Suggested), and finally the ladder rule itself.
+//
+// A candidate counts only while it is still in the list and not locked: a
+// deleted upload or an AI track a free viewer cannot open would leave
+// subtitles "on" with nothing on screen. When nothing at all is
+// activatable the answer is to activate nothing and persist nothing --
+// the switch has no track to give and must not claim otherwise.
+export function toggleDecision({ on, lastId = '', suggestedId = '', tracks = [], audioLang = '', preferredLang = '' } = {}) {
+    if (!on) return { activateId: 'none', persist: true };
+    const list = Array.isArray(tracks) ? tracks : [];
+    const usable = (id) => !!id && id !== 'none' && list.some((t) => t && t.id === id && !t.locked);
+    if (usable(lastId)) return { activateId: lastId, persist: true };
+    if (usable(suggestedId)) return { activateId: suggestedId, persist: true };
+    const id = pickDefaultSubtitle(list, audioLang, preferredLang);
+    if (!usable(id)) return { activateId: '', persist: false };
+    return { activateId: id, persist: true };
+}
+
 // ---- DOM half -------------------------------------------------------
 
 function attr(el, name) {
@@ -186,7 +221,31 @@ function chipData(el) {
 export function readChips(container) {
     const box = container && container.querySelector && container.querySelector('#subtitle-tracks');
     if (!box) return [];
-    return Array.from(box.querySelectorAll('.subtitle[data-id]')).map(chipData);
+    const chips = Array.from(box.querySelectorAll('.subtitle[data-id]')).map(chipData);
+    const muted = mutedChoiceID(container, chips);
+    if (!muted) return chips;
+    // With subtitles off, data-default sits on the "None" carrier and the
+    // row would read as "no language playing": no dot, and the filter free
+    // to jump elsewhere on the next refresh. The muted choice is what the
+    // switch gives back, so for the row's purposes it is the active one.
+    for (const c of chips) {
+        if (c.id === muted) c.isDefault = true;
+    }
+    return chips;
+}
+
+// mutedChoiceID is the track the switch would restore, or '' when
+// subtitles are on. Within a session the player remembers the last choice
+// on the dialog (data-last-subtitle); on a page opened with subtitles off
+// there is no such memory and the server's suggestion stands in.
+function mutedChoiceID(container, chips) {
+    if (attr(container, 'data-subtitles-off') !== 'true') return '';
+    const last = attr(container, 'data-last-subtitle');
+    if (last) return last;
+    for (const c of chips) {
+        if (c.id !== 'none' && attr(c.el, 'data-suggested') === 'true') return c.id;
+    }
+    return '';
 }
 
 function langChipEls(container) {
@@ -222,13 +281,15 @@ function setLangChipActive(el, on) {
 }
 
 // applyLangFilter shows the tracks of one language and hides the rest. The
-// "Off" chip is never hidden (R1): it is the way back to no subtitles and
-// has to stay reachable from every language.
+// "None" item is hidden in every language: it is no longer a chip the
+// viewer presses (the toggle on the heading is), only the element the
+// player activates by id, and revealing it would put a nameless button in
+// the row.
 export function applyLangFilter(container, lang) {
     const want = baseLang(lang);
     for (const c of readChips(container)) {
         if (c.id === 'none') {
-            c.el.hidden = false;
+            c.el.hidden = true;
             continue;
         }
         c.el.hidden = c.lang !== want;
@@ -357,6 +418,45 @@ export function applyFlagSupport(container) {
     for (const el of container.querySelectorAll('.chip-flag')) el.hidden = true;
 }
 
+// applyOffState draws the switch's state: the attribute the whole picker
+// reads, the checkbox itself, the muted look on both rows, and
+// aria-disabled on the chips.
+//
+// Muted is not disabled. Every chip stays clickable while subtitles are
+// off -- clicking one is how the viewer turns them back on with that very
+// track (Player.jsx) -- so nothing here sets `disabled`, and the chips
+// keep the classes they had, including the active mark on the choice that
+// comes back. aria-disabled is the honest reading for a screen reader of
+// a row whose selection is not currently playing.
+//
+// Called with no `off` to apply what the DOM already says (the server
+// renders the state; this is what adds the parts only JS can).
+export function applyOffState(container, off) {
+    if (!container || !container.querySelector) return false;
+    const next = off === undefined ? attr(container, 'data-subtitles-off') === 'true' : !!off;
+    if (container.setAttribute) container.setAttribute('data-subtitles-off', next ? 'true' : 'false');
+    const toggle = container.querySelector('#subtitles-toggle');
+    if (toggle) toggle.checked = !next;
+    for (const sel of ['#subtitle-langs', '#subtitle-tracks']) {
+        const box = container.querySelector(sel);
+        if (box && box.classList) box.classList.toggle('picker-off', next);
+    }
+    const chips = readChips(container);
+    // What the switch would give back keeps the active mark: activating
+    // the "None" item runs markTrack, which clears every other chip on its
+    // way through, and a muted block with nothing marked would not say
+    // what comes back.
+    const muted = next ? mutedChoiceID(container, chips) : '';
+    for (const c of chips) {
+        if (next) c.el.setAttribute('aria-disabled', 'true');
+        // A locked chip is disabled for its own reason (no Src, supporters
+        // only) and must stay so when the switch comes back on.
+        else if (!c.locked) c.el.removeAttribute('aria-disabled');
+        if (muted) setChipActive(c.el, c.id === muted);
+    }
+    return next;
+}
+
 // refreshMarks is what a selection needs: the row's counts and dot, and the
 // summaries. It deliberately does NOT re-run the language filter — the
 // viewer's expanded language is their choice and must not jump under them.
@@ -378,6 +478,7 @@ export function refresh(container, { current = '' } = {}) {
     syncLangRow(container, lang);
     applyLangFilter(container, lang);
     applyFlagSupport(container);
+    applyOffState(container);
     syncNow(container);
     return lang;
 }

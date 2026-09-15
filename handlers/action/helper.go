@@ -68,6 +68,17 @@ type ListItem struct {
 	// would come back on the next page load as a choice that switches the
 	// rule off.
 	Saved bool
+	// Suggested marks what the picker's subtitles toggle would turn on
+	// while the viewer has subtitles off (Saved "none"): the item the
+	// ladder -- or, with no preferred language, the Accept-Language
+	// selection -- would have made Default. Rendered as data-suggested.
+	//
+	// It exists only in that state, and never on the "None" item itself:
+	// with subtitles on, Default already answers the question, and two
+	// answers would let the picker restore something other than what is
+	// playing. Nothing is suggested when the ladder's own answer is "no
+	// subtitles" -- there is nothing to turn on.
+	Suggested bool
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -207,13 +218,20 @@ func (s *Helper) selectListItem(lis []ListItem, id string, ud *models.VideoStrea
 		}
 	}
 
+	lis[s.fallbackIndex(lis, ud)].Default = true
+	return lis
+}
+
+// fallbackIndex is the phase-1 answer: the Accept-Language match, or the
+// first item (the "None" entry) when nothing matches. Split out of
+// selectListItem so the same answer can be computed without marking
+// anything -- which is what a suggestion needs.
+func (s *Helper) fallbackIndex(lis []ListItem, ud *models.VideoStreamUserData) int {
 	index, err := s.matchLang(lis, ud)
 	if err != nil {
-		lis[0].Default = true
-		return lis
+		return 0
 	}
-	lis[index].Default = true
-	return lis
+	return index
 }
 
 func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lIndex int, err error) {
@@ -530,6 +548,14 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	if ud.SubtitleID != "" {
 		for i := range lis {
 			if lis[i].ID == ud.SubtitleID && !lis[i].Locked {
+				// "Off" is a state of the picker's toggle, not the absence
+				// of a choice: the toggle still has to know what it would
+				// turn on. Computed before the Defaults are cleared, so an
+				// embed's own track is read the same way the ladder reads
+				// it below.
+				if lis[i].ID == "none" {
+					markSuggested(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx))
+				}
 				for j := range lis {
 					lis[j].Default = false
 				}
@@ -539,42 +565,103 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 			}
 		}
 	}
+	lis[s.ladderPick(lis, ud, audioLang, opts, humanIdx)].Default = true
+	return lis
+}
+
+// ladderPick is the ladder's own answer -- the index applyLadder makes
+// Default when the viewer has saved nothing. It is a pure lookup so the
+// same answer can be marked Suggested instead of Default when the viewer
+// has subtitles off.
+//
+// humanIdx is bestByLadder's verdict for the preferred language, passed in
+// because applyLadder computes it before appending the AI item (appending
+// never shifts an existing index).
+func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts, humanIdx int) int {
 	// An embed that asked for a specific track (ExternalData) has already
 	// marked it Default; that is the caller's explicit choice, and the
 	// ladder neither overrides it nor adds a second default to the list.
-	for _, li := range lis {
-		if li.Default {
-			return lis
+	for i := range lis {
+		if lis[i].Default {
+			return i
 		}
 	}
 	// Subtitles are not needed when the audio is already in the preferred
-	// language. lang is never "" here (GetSubtitles takes the legacy path
-	// then), so an unknown audio language ("") counts as needed.
-	if audioLang == lang {
-		if f := bestByLadder(lis, lang, true); f >= 0 {
-			lis[f].Default = true
-		} else {
-			lis[0].Default = true // "None"
+	// language. opts.PreferredLang is never "" here (GetSubtitles takes the
+	// legacy path then), so an unknown audio language ("") counts as needed.
+	if audioLang == opts.PreferredLang {
+		if f := bestByLadder(lis, opts.PreferredLang, true); f >= 0 {
+			return f
 		}
-		return lis
+		return 0 // "None"
 	}
 	if humanIdx >= 0 {
-		lis[humanIdx].Default = true
-		return lis
+		return humanIdx
 	}
 	for i := range lis {
 		// A locked item cannot be turned on, so it cannot be the default
 		// either: the free viewer would face a player with subtitles
 		// "selected" and nothing on screen.
 		if lis[i].Provider == "Translated" && !lis[i].Locked {
-			lis[i].Default = true
-			return lis
+			return i
 		}
 	}
 	// The preferred language yielded nothing activatable. Falling through
 	// to "None" would take subtitles away from viewers who had them in
 	// phase 1, so the old Accept-Language selection decides instead.
-	return s.selectListItem(lis, "", ud, true)
+	return s.fallbackIndex(lis, ud)
+}
+
+// markSuggested marks the item the picker would turn on. "None" is never
+// suggested: it is the state the viewer is already in.
+func markSuggested(lis []ListItem, i int) {
+	if i < 0 || i >= len(lis) || lis[i].ID == "none" {
+		return
+	}
+	lis[i].Suggested = true
+}
+
+// offSuggestion is what the picker's switch turns on when the list opens
+// with no subtitles -- the state the ladder reaches on its own whenever
+// the audio is already in the viewer's language, not only when the viewer
+// saved it.
+//
+// The order is the ladder's: the best human track in the preferred
+// language, an AI translation when there is none, the Accept-Language
+// pick, and finally the best activatable track on the list whatever its
+// language. That last step is the one the ladder itself would never take
+// -- but the ladder answers "should subtitles be on", and this answers
+// "the viewer just said they should be". A switch that does nothing when
+// pressed is worse than one that gives the best track available.
+//
+// -1 when there is nothing to turn on at all (an empty list, or only a
+// locked AI item): then the switch has no promise to make.
+func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts) int {
+	if opts.PreferredLang != "" {
+		if i := bestByLadder(lis, opts.PreferredLang, false); i >= 0 {
+			return i
+		}
+		// A forced track is what the ladder turns on when the audio is
+		// already in the viewer's language; it is also the only subtitle
+		// that case wants.
+		if i := bestByLadder(lis, opts.PreferredLang, true); i >= 0 {
+			return i
+		}
+	}
+	for i := range lis {
+		if lis[i].Provider == "Translated" && !lis[i].Locked {
+			return i
+		}
+	}
+	if i := s.fallbackIndex(lis, ud); i > 0 {
+		return i
+	}
+	for i := range lis {
+		if lis[i].ID != "none" && !lis[i].Locked {
+			return i
+		}
+	}
+	return -1
 }
 
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {
@@ -669,10 +756,49 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 	for i := range lis {
 		lis[i].Rank = ladderRank(lis[i])
 	}
+	audioLang := s.defaultAudioLang(ud, mp)
 	if opts.PreferredLang == "" {
-		return s.markPreload(s.selectListItem(lis, ud.SubtitleID, ud, true), ud)
+		// Same rule as the ladder's, one phase down: with subtitles off the
+		// picker still needs the item the Accept-Language selection would
+		// have chosen, so its toggle has something to turn on.
+		if ud.SubtitleID == "none" {
+			markSuggested(lis, s.suggestIndex(lis, ud))
+		}
+		lis = s.selectListItem(lis, ud.SubtitleID, ud, true)
+	} else {
+		lis = s.applyLadder(lis, ud, audioLang, opts)
 	}
-	return s.markPreload(s.applyLadder(lis, ud, s.defaultAudioLang(ud, mp), opts), ud)
+	// lis[0] is the "None" item GetSubtitles prepends. Whenever it is the
+	// default -- saved by the viewer or reached by the ladder -- the picker
+	// renders its switch off, and the switch has to name what it would turn
+	// on. The branches above have already answered for the saved case (what
+	// the ladder would have done instead); this fills in every other way of
+	// arriving at "no subtitles".
+	if lis[0].Default && !hasSuggestion(lis) {
+		markSuggested(lis, s.offSuggestion(lis, ud, audioLang, opts))
+	}
+	return s.markPreload(lis, ud)
+}
+
+func hasSuggestion(lis []ListItem) bool {
+	for i := range lis {
+		if lis[i].Suggested {
+			return true
+		}
+	}
+	return false
+}
+
+// suggestIndex is the phase-1 answer without the ladder: a Default the
+// caller already marked (an embed's own track) wins, then the
+// Accept-Language match.
+func (s *Helper) suggestIndex(lis []ListItem, ud *models.VideoStreamUserData) int {
+	for i := range lis {
+		if lis[i].Default {
+			return i
+		}
+	}
+	return s.fallbackIndex(lis, ud)
 }
 
 // markPreload sets Preload on the default track and on side-loaded tracks in

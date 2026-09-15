@@ -905,6 +905,16 @@ input:-webkit-autofill:focus {
   color: #00cec9 !important;
 }
 
+/* The subtitle block while the switch on its heading is off: both rows are
+   dimmed and the chosen track keeps its mark, so the viewer sees what
+   comes back instead of an empty list. Dimming only — every chip stays
+   clickable, and clicking one turns subtitles back on with that track
+   (Player.jsx). The class is written by the server on the first render and
+   by applyOffState afterwards. */
+.picker-off {
+  @apply opacity-50;
+}
+
 .btn-pink {
   background-color: #e84393 !important;
   border-color: #e84393 !important;

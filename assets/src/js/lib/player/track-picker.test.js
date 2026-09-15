@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     MAX_VISIBLE_LANGS,
+    applyOffState,
+    toggleDecision,
     groupByLang,
     activeLang,
     expandedLangFor,
@@ -267,7 +269,7 @@ function langChip(o) {
 // spec: the row is given, not derived, so a test can hand the module a stale
 // row (exactly what an upload or a delete leaves behind) and check what it
 // makes of it.
-function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreExpanded = false } = {}) {
+function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreExpanded = false, off = false, lastId = '' } = {}) {
     const trackEls = tracks.map((t) => trackChip('subtitle', t));
     const rowEls = row.map(langChip);
     const more = el('button', {
@@ -279,14 +281,19 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
     const template = el('template', { id: 'lang-chip-template' });
     template.content = { firstElementChild: langChip({ lang: '', count: 0 }) };
 
+    const toggle = el('input', { type: 'checkbox', id: 'subtitles-toggle', class: 'toggle toggle-soft' });
+    toggle.checked = !off;
     const langs = el('div', { id: 'subtitle-langs', role: 'group' }, rowEls.concat([more, template]));
     const uploads = el('div', { id: 'my-subtitles', class: 'contents' });
     const tracksBox = el('div', { id: 'subtitle-tracks', role: 'radiogroup' }, trackEls.concat([uploads]));
     const audioBox = el('div', { id: 'audio-tracks', role: 'radiogroup' }, audio.map((t) => trackChip('audio', t)));
-    const container = el('div', { class: 'modal', 'data-preferred-lang': preferred }, [
+    const attrs = { class: 'modal', 'data-preferred-lang': preferred, 'data-subtitles-off': off ? 'true' : 'false' };
+    if (lastId) attrs['data-last-subtitle'] = lastId;
+    const container = el('div', attrs, [
         el('span', { id: 'audio-now' }, [span('now-value')]),
         audioBox,
         el('span', { id: 'subtitle-now' }, [span('now-origin'), span('now-value')]),
+        toggle,
         langs,
         tracksBox,
     ]);
@@ -294,25 +301,30 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
     return { container, uploads, more, langs, tracksBox };
 }
 
-const offChip = (def = false) => ({ id: 'none', lang: '', label: 'Off', def });
+// The "None" item: since the toggle replaced the Off chip it is a hidden
+// carrier at the head of the track row, not something the viewer can click.
+const offChip = (def = false) => ({ id: 'none', lang: '', label: '', def, hidden: true });
 const langsOf = (c) => Array.from(c.querySelector('#subtitle-langs').querySelectorAll('.lang[data-lang]'));
 const visibleTracks = (c) => readChips(c).filter((x) => !x.el.hidden).map((x) => x.id);
 const countOf = (chip) => chip.querySelector('.lang-count').textContent;
 
 // ---- the DOM half ---------------------------------------------------
 
-test('the Off chip is never hidden by the language filter', () => {
+// The "None" item is a state carrier, not a control: the toggle on the
+// heading is what turns subtitles off, and the filter must never reveal
+// the carrier as if it were a chip the viewer can press.
+test('the none carrier stays hidden through every language filter', () => {
     const { container } = buildPicker({
         tracks: [offChip(), { id: 'a', lang: 'en', label: 'English' }, { id: 'b', lang: 'ru', label: 'Russian' }],
         row: [{ lang: 'en', count: 1, selected: true }, { lang: 'ru', count: 1 }],
     });
     applyLangFilter(container, 'ru');
-    assert.deepEqual(visibleTracks(container), ['none', 'b']);
+    assert.deepEqual(visibleTracks(container), ['b']);
     applyLangFilter(container, 'en');
-    assert.deepEqual(visibleTracks(container), ['none', 'a']);
+    assert.deepEqual(visibleTracks(container), ['a']);
     // …including a language nothing is tagged with.
     applyLangFilter(container, 'de');
-    assert.deepEqual(visibleTracks(container), ['none']);
+    assert.deepEqual(visibleTracks(container), []);
 });
 
 test('refresh: opens on the active track language and marks the row', () => {
@@ -328,7 +340,7 @@ test('refresh: opens on the active track language and marks the row', () => {
     });
     assert.equal(refresh(container), 'ru');
     assert.equal(expandedLang(container), 'ru');
-    assert.deepEqual(visibleTracks(container), ['none', 'b']);
+    assert.deepEqual(visibleTracks(container), ['b']);
     const [en, ru] = langsOf(container);
     assert.equal(ru.querySelector('.lang-dot').hidden, false, 'the active language carries the dot');
     assert.equal(en.querySelector('.lang-dot').hidden, true);
@@ -340,14 +352,21 @@ test('refresh: opens on the active track language and marks the row', () => {
     assert.equal(container.querySelector('#audio-now').querySelector('.now-value').textContent, '🇬🇧 English');
 });
 
+// syncNow no-ops in the shipped markup (the "Now:" lines were dropped),
+// but the fallback it is built on still has to hold: an audio track the
+// language name does not describe is named by its label. The subtitle side
+// of the same pass is the "None" carrier, which has no label at all — with
+// subtitles off there is nothing to summarize.
 test('syncNow falls back to the chip label when there is no language name', () => {
     const { container } = buildPicker({
         tracks: [offChip(true), { id: 'a', lang: 'en', name: 'English', label: 'English' }],
         row: [{ lang: 'en', count: 1, selected: true }],
+        audio: [{ id: 'au', lang: '', name: '', label: 'Track 4', def: true }],
     });
     syncNow(container);
+    assert.equal(container.querySelector('#audio-now').querySelector('.now-value').textContent, 'Track 4');
     const now = container.querySelector('#subtitle-now');
-    assert.equal(now.querySelector('.now-value').textContent, 'Off');
+    assert.equal(now.querySelector('.now-value').textContent, '');
     assert.equal(now.querySelector('.now-origin').textContent, '');
     assert.equal(now.querySelector('.now-origin').hidden, true);
 });
@@ -375,7 +394,7 @@ test('post-upload: a new language gets a chip cloned from the template, counts f
     assert.equal(chips[1].hidden, false);
     // The viewer was looking at English and stays there.
     assert.equal(expandedLang(container), 'en');
-    assert.deepEqual(visibleTracks(container), ['none', 'a', 'us-2']);
+    assert.deepEqual(visibleTracks(container), ['a', 'us-2']);
     // The clone is inserted before the "+N" button, not after it.
     const kids = container.querySelector('#subtitle-langs').children;
     assert.ok(kids.indexOf(chips[1]) < kids.findIndex((k) => k.getAttribute('id') === 'subtitle-lang-more'));
@@ -402,7 +421,7 @@ test('post-delete: the emptied chip drops to 0, hides, and the row falls back', 
     assert.equal(en.hidden, false);
     assert.equal(pl.hidden, true, 'a language with no tracks left has no chip');
     assert.equal(expandedLang(container), 'en');
-    assert.deepEqual(visibleTracks(container), ['none', 'a']);
+    assert.deepEqual(visibleTracks(container), ['a']);
 });
 
 test('syncLangRow alone rewrites counts without moving the viewer', () => {
@@ -497,7 +516,7 @@ test('collapsing the row keeps the expanded language chip visible and pressed', 
     assert.equal(toggleLangOverflow(container), false);
     assert.equal(chipOf('cs').hidden, false, 'the pressed chip survives the collapse');
     assert.equal(chipOf('cs').getAttribute('aria-pressed'), 'true');
-    assert.deepEqual(visibleTracks(container), ['none', 'x7'], 'its tracks are the ones on screen');
+    assert.deepEqual(visibleTracks(container), ['x7'], 'its tracks are the ones on screen');
     // Only the languages actually put away are counted: "+2" next to a
     // visible chip would be a lie of exactly the kind "+N" must not tell.
     assert.equal(more.querySelector('.more-count').textContent, '+1');
@@ -505,4 +524,143 @@ test('collapsing the row keeps the expanded language chip visible and pressed', 
         langsOf(container).filter((c) => c.hidden).map((c) => c.getAttribute('data-lang')),
         ['nl'],
     );
+});
+
+// ---- the on/off decision --------------------------------------------
+//
+// The toggle's whole rule, as a pure function: what to activate and
+// whether the choice is the viewer's (persist) or the player's.
+
+const T = (id, extra = {}) => ({ id, srclang: 'de', rank: 3, ...extra });
+
+test('toggleDecision: off activates the none item and persists it', () => {
+    assert.deepEqual(
+        toggleDecision({ on: false, lastId: 'a', suggestedId: 'b', tracks: [T('a'), T('b')] }),
+        { activateId: 'none', persist: true },
+    );
+});
+
+test('toggleDecision: on restores what was playing before it was switched off', () => {
+    assert.deepEqual(
+        toggleDecision({ on: true, lastId: 'a', suggestedId: 'b', tracks: [T('a'), T('b')], preferredLang: 'de' }),
+        { activateId: 'a', persist: true },
+    );
+});
+
+test('toggleDecision: on takes the server suggestion when nothing was chosen this session', () => {
+    assert.deepEqual(
+        toggleDecision({ on: true, lastId: '', suggestedId: 'b', tracks: [T('a'), T('b')], preferredLang: 'de' }),
+        { activateId: 'b', persist: true },
+    );
+});
+
+// Negative control for the `usable` guard: without it a stale
+// data-last-subtitle (the upload it named was deleted) or a locked
+// suggestion would be activated and leave subtitles "on" with nothing on
+// screen.
+test('toggleDecision: a vanished last choice and a locked suggestion both fall through to the ladder', () => {
+    assert.deepEqual(
+        toggleDecision({ on: true, lastId: 'gone', suggestedId: 'b', tracks: [T('a'), T('b', { locked: true })], preferredLang: 'de' }),
+        { activateId: 'a', persist: true },
+    );
+});
+
+test('toggleDecision: the ladder decides when there is neither a last choice nor a suggestion', () => {
+    assert.deepEqual(
+        toggleDecision({
+            on: true,
+            tracks: [T('a', { rank: 4 }), T('b', { rank: 1 })],
+            audioLang: 'en',
+            preferredLang: 'de',
+        }),
+        { activateId: 'b', persist: true },
+    );
+});
+
+// A file with nothing activatable in the viewer's language: the toggle has
+// nothing to turn on, so it must not PUT anything and must not claim a
+// track is playing.
+test('toggleDecision: nothing to turn on means nothing is activated', () => {
+    assert.deepEqual(
+        toggleDecision({ on: true, tracks: [T('a', { locked: true })], preferredLang: 'de' }),
+        { activateId: '', persist: false },
+    );
+});
+
+// ---- the muted state ------------------------------------------------
+
+test('applyOffState mutes both rows, marks the chips disabled and leaves them in place', () => {
+    const { container } = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'de', label: 'German' }, { id: 'b', lang: 'de', label: 'AI', locked: true }],
+        row: [{ lang: 'de', count: 2, selected: true }],
+    });
+    applyOffState(container, true);
+    assert.equal(container.getAttribute('data-subtitles-off'), 'true');
+    assert.equal(container.querySelector('#subtitles-toggle').checked, false);
+    for (const id of ['#subtitle-langs', '#subtitle-tracks']) {
+        assert.ok(container.querySelector(id).classList.contains('picker-off'), `${id} is not muted`);
+    }
+    // Muted, not disabled: the chips stay clickable (clicking one switches
+    // subtitles back on), only the ARIA state says they are inert for now.
+    assert.deepEqual(readChips(container).map((c) => c.el.getAttribute('aria-disabled')), ['true', 'true', 'true']);
+    assert.deepEqual(readChips(container).map((c) => c.el.hidden), [true, false, false]);
+});
+
+// Negative control for the locked carve-out: switching subtitles back on
+// must not hand a free viewer an activatable AI chip.
+test('applyOffState(false) clears the muted state but never unlocks a locked chip', () => {
+    const { container } = buildPicker({
+        tracks: [offChip(true), { id: 'a', lang: 'de', label: 'German' }, { id: 'b', lang: 'de', label: 'AI', locked: true }],
+        row: [{ lang: 'de', count: 2, selected: true }],
+        off: true,
+    });
+    applyOffState(container, true);
+    applyOffState(container, false);
+    assert.equal(container.getAttribute('data-subtitles-off'), 'false');
+    assert.equal(container.querySelector('#subtitles-toggle').checked, true);
+    for (const id of ['#subtitle-langs', '#subtitle-tracks']) {
+        assert.equal(container.querySelector(id).classList.contains('picker-off'), false, `${id} is still muted`);
+    }
+    assert.deepEqual(readChips(container).map((c) => c.el.getAttribute('aria-disabled')), [null, null, 'true']);
+});
+
+// With subtitles off the "None" item carries data-default, but the row
+// must keep pointing at the muted choice: the dot is what tells the viewer
+// which language comes back, and the filter must not jump to another one.
+test('the row follows the muted choice while subtitles are off', () => {
+    const { container } = buildPicker({
+        preferred: 'en',
+        off: true,
+        lastId: 'b',
+        tracks: [
+            offChip(true),
+            { id: 'a', lang: 'en', name: 'English', label: 'English' },
+            { id: 'b', lang: 'ru', name: 'Russian', label: 'Russian' },
+        ],
+        row: [{ lang: 'en', count: 1, selected: true }, { lang: 'ru', count: 1 }],
+    });
+    assert.equal(refresh(container), 'ru');
+    const [en, ru] = langsOf(container);
+    assert.equal(en.querySelector('.lang-dot').hidden, true);
+    assert.equal(ru.querySelector('.lang-dot').hidden, false);
+});
+
+// Switching off activates the "None" item, and markTrack clears every
+// other chip's mark on its way through. The block is muted, not emptied:
+// the choice that comes back has to stay visibly the choice.
+test('the muted choice keeps its active mark while subtitles are off', () => {
+    const { container } = buildPicker({
+        tracks: [offChip(true), { id: 'a', lang: 'de', label: 'German' }, { id: 'b', lang: 'de', label: 'Other' }],
+        row: [{ lang: 'de', count: 2, selected: true }],
+        off: true,
+        lastId: 'a',
+    });
+    // As markTrack leaves it: nothing marked but the carrier.
+    for (const c of readChips(container)) setChipActive(c.el, c.id === 'none');
+    applyOffState(container, true);
+    assert.deepEqual(
+        readChips(container).map((c) => c.el.classList.contains('track-chip-active')),
+        [false, true, false],
+    );
+    assert.equal(container.querySelector('[data-id="a"]').querySelector('.chip-check').hidden, false);
 });

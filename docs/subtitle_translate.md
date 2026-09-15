@@ -271,13 +271,14 @@ for the same reason.
 
 | id | element | role |
 |---|---|---|
-| `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang` |
+| `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang`, `data-subtitles-off` (`"true"` while subtitles are off) and, once the viewer has switched them off in this session, `data-last-subtitle` (the id to restore) |
+| `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft">` | the subtitles on/off switch, on the "Subtitles" heading line (`docs/uikit.html` §6). Checked iff the default item is not `none`; labelled by an `sr-only` span |
 | `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
 | `#subtitle-langs` | `<div role="group">` | subtitle **language** row — a filter, not a choice |
 | `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
 | `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
 | `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
-| `#subtitle-off` | first `<button>` of `#subtitle-langs` | the "Off" chip — the switch next to the languages; it **is** the `none` list item (a `.subtitle` radio the player activates by `data-id`), rendered in the language row, never inside `#subtitle-tracks` |
+| `#subtitle-off` | first child of `#subtitle-tracks` | the `none` list item, since 2026-09-15 a **hidden state carrier** and not a control: `hidden`, `aria-hidden="true"`, `tabindex="-1"`, no label and no chip classes. The player still activates it by `data-id="none"` (`findSubtitleItem`, `pickDefaultSubtitle`, `hasSavedDefault`, `dropDeletedTracks`); the act of turning subtitles off belongs to `#subtitles-toggle` |
 | `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
 | `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | upload form + one row per file, each row with its own delete form |
@@ -288,13 +289,15 @@ for the same reason.
 | Kind | Where | Attributes |
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
-| `.subtitle#subtitle-off` | first chip of `#subtitle-langs` | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-lang-name=""`, `data-lang-flag=""`, `data-default`, `data-saved`. No `data-label` — `syncNow` falls back to `textContent`, i.e. the localized "Off" |
-| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved` |
+| `.subtitle#subtitle-off` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
+| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), plus `aria-disabled="true"` on every chip while the block is muted |
 | `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 
 **Classes.** `.track-chip` / `.track-chip-active` on audio and subtitle chips, `.lang-chip` /
-`.lang-chip-active` on language chips, `.chip-locked` on a locked AI chip. They are defined once
+`.lang-chip-active` on language chips, `.chip-locked` on a locked AI chip, `.picker-off` on
+`#subtitle-langs` and `#subtitle-tracks` while the switch is off (`@apply opacity-50` — dimming
+only: every chip stays clickable). They are defined once
 in `assets/src/styles/style.css` and are the only thing JS touches: `setChipActive` toggles
 `track-chip-active` (plus `aria-checked` and the check icon's `hidden`) and never writes a
 Tailwind utility string, never rebuilds a chip's `innerHTML` — which is why `.tr-progress` and
@@ -316,13 +319,15 @@ tab panels and the one real choice (which track plays) lives in the radiogroup u
 **Server-side `hidden`.** The dialog and the uploads partial both render the bare `hidden`
 attribute on every subtitle chip whose `data-lang` differs from the expanded language
 (`LangRow.Expanded`), so a page whose picker JS never loaded still shows one coherent language.
-The Off chip sits in the language row, outside `#subtitle-tracks`, so neither the server filter nor
-`applyLangFilter` (which reads only the track row and skips `data-id="none"` defensively) ever hides it. `ExpandedLang` is empty on the async reload of the uploads partial (it has no language row
+The `none` carrier is the one chip the filter never touches: `applyLangFilter` hides it in every
+language (it is not a control), and it renders `hidden` from the server. `ExpandedLang` is empty on the async reload of the uploads partial (it has no language row
 to consult), so nothing is collapsed for the instant between the swap and the client's `refresh`.
 
 **Refresh order.** `refresh(container)` in `assets/src/js/lib/player/track-picker.js` is
-`syncLangRow` → `applyLangFilter` → `applyFlagSupport` (→ `syncNow`, a no-op since the "Now:" lines were dropped), and returns the language it
-settled on. `Player.jsx` calls it after mount, on dialog open, and after the `#my-subtitles` async
+`syncLangRow` → `applyLangFilter` → `applyFlagSupport` → `applyOffState` (→ `syncNow`, a no-op
+since the "Now:" lines were dropped), and returns the language it settled on. `applyOffState`
+re-derives the muted state from `data-subtitles-off`, which is how an SSR-rendered "off" picks up
+the parts only JS can add (`aria-disabled`). `Player.jsx` calls it after mount, on dialog open, and after the `#my-subtitles` async
 swap (upload **and** delete). A plain selection calls `refreshMarks` (`syncLangRow`)
 instead: picking a track moves the dot without yanking the viewer out of the language they were
 browsing.
@@ -384,10 +389,24 @@ row plus the tracks of the expanded language.
   chips the tail goes behind "+N" — except the expanded language, which is never collapsed
   wherever it sorts, and is not counted into "+N": a pressed but invisible filter leaves its
   tracks on screen with no chip pointing at them.
-- **Off is the first chip of the track row**, not a language chip. It is the real `.subtitle`
-  element for the `none` item, which the player looks up by that id (`findSubtitleItem`,
-  `pickDefaultSubtitle`, `hasSavedDefault`); a second copy in the language row would give the
-  picker two sources of truth.
+- **Subtitles are switched, not chosen off** (owner, 2026-09-15). The "Subtitles" heading carries
+  a `toggle toggle-soft`; there is no "Off" chip in either row. Off does **not** empty the block:
+  both rows go `.picker-off` (dimmed), every chip keeps its classes — including the active mark on
+  the track that comes back — and the language chip of that track keeps its dot. The chips stay
+  clickable, and clicking one is "on, with this track": one activation, one `PUT`.
+  - Switching off remembers what was playing on the dialog (`data-last-subtitle`) and activates
+    the `none` item through the normal path (`persist: true`, so the next page load reproduces it).
+  - Switching on activates, in order: `data-last-subtitle` (this session), the server's
+    `data-suggested`, then the ladder rule (`pickDefaultSubtitle`). A candidate counts only while
+    it is still in the list and not locked. With nothing activatable at all, nothing happens and
+    nothing is persisted — `toggleDecision` (`track-picker.js`) is that whole rule as a pure
+    function.
+  - `ListItem.Suggested` (`data-suggested`) is the server's half: whenever the render's default is
+    `none` — the viewer saved it, or the ladder arrived there because the audio is already in their
+    language — `GetSubtitles` names the track the switch would turn on (`offSuggestion`: best human
+    track in the preferred language, forced track, AI translation, Accept-Language pick, then the
+    best activatable track at all). Never the `none` item, never a locked one, and never while
+    subtitles are on — with a track playing, `data-default` already answers that question.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.
@@ -417,7 +436,10 @@ row plus the tracks of the expanded language.
   would reshuffle every equal-count group on the first refresh after an upload.
 - **Without JS** (picker JS failed, player loaded): every chip renders, the expanded language's
   tracks are visible, the active track carries its check and fill from SSR and the counts are
-  right. Missing are the filter (the language row is inert) and the dot.
+  right, and the muted state is drawn (the server renders `data-subtitles-off`, the toggle's
+  `checked` and `.picker-off`). Missing are the filter (the language row is inert), the dot, the
+  switch itself (a checkbox nothing listens to) and the `aria-disabled` markers, which
+  `applyOffState` adds on the first `refresh`.
   Switching tracks needed JS before the redesign too — the handlers were always client-side.
 
 **Known a11y wart (follow-up).** `#my-uploads-toggle` and `#my-uploads-panel` render *inside*
