@@ -45,8 +45,8 @@
          in-place. Opened from Player.jsx (handleCaptionsClick). */}}
     {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
     {{/* Subtitles are off when the "None" item is the default. That is the
-         one state the toggle on the Subtitles heading shows, and the whole
-         subtitle block is rendered muted for it (.picker-off) with the
+         one state the switch leading the language row shows, and the chip
+         rows are rendered muted for it (.picker-off) with the
          chosen track still marked -- the viewer sees what comes back when
          they switch it on. */}}
     {{ $off := false }}{{ range $subs }}{{ if and .Default (eq .ID "none") }}{{ $off = true }}{{ end }}{{ end }}
@@ -218,16 +218,22 @@
                     {{ end }}
                 </div>
 
-                {{/* What the offer above means, in words: the viewer's
-                     language has no subtitles yet and the translation is
-                     there to be started. It explains the offer, so it stands
-                     exactly while one is pending — marked .Offered and not
-                     the track already playing — whatever the switch could or
-                     could not do. The client reads the same pair off the
-                     chips (offerPending in track-picker.js) and re-applies it
+                {{/* What the offer above means, in words: this language has
+                     no subtitles yet and the translation is there to be
+                     started. All three conditions, because the sentence has
+                     to be true: an item is .Offered, it is not the track
+                     already playing, and its language holds nothing else the
+                     viewer could turn on — one forced sidecar in that
+                     language and "no subtitles yet" is simply false. The
+                     client reads the same three off the chips
+                     (offerNeedsHint in track-picker.js) and re-applies them
                      on every refresh. */}}
                 {{ $offerPending := false }}
-                {{ range $subs }}{{ if and .Offered (not .Default) }}{{ $offerPending = true }}{{ end }}{{ end }}
+                {{ range $offer := $subs }}{{ if and $offer.Offered (not $offer.Default) }}
+                    {{ $rival := false }}
+                    {{ range $subs }}{{ if and (ne .ID $offer.ID) (ne .ID "none") (not .Locked) (eq (langDisplay .SrcLang).Lang (langDisplay $offer.SrcLang).Lang) }}{{ $rival = true }}{{ end }}{{ end }}
+                    {{ if not $rival }}{{ $offerPending = true }}{{ end }}
+                {{ end }}{{ end }}
                 {{ $pd := langDisplay .SubtitleOpts.PreferredLang }}
                 <p id="subtitle-hint" class="text-xs text-w-muted mb-3"{{ if not $offerPending }} hidden{{ end }}>{{ tp $.Lang "action.stream.translate.hint" "Language" $pd.Name }}</p>
 

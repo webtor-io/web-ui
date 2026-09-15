@@ -618,8 +618,8 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 
 // ladderPick is the ladder's own answer -- the index applyLadder makes
 // Default when the viewer has saved nothing. It is a pure lookup so the
-// same answer can be marked Suggested instead of Default when the viewer
-// has subtitles off.
+// same answer can be marked instead of selected: Suggested when the viewer
+// has subtitles off, Offered when the answer is a translation.
 //
 // humanIdx is bestByLadder's verdict for the preferred language, passed in
 // because applyLadder computes it before appending the AI item (appending
@@ -647,7 +647,7 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 	}
 	for i := range lis {
 		// An offer, not a selection: since 2026-09-16 applyLadder turns
-		// this answer into Suggested rather than Default, and the picker
+		// this answer into Offered rather than Default, and the picker
 		// refuses to start a translation without a click. A locked item is
 		// not even offered -- it cannot be turned on, and the lock plus its
 		// CTA already say so.
@@ -666,13 +666,15 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 // back as Default, and an invitation to start what is already on screen is
 // nonsense -- the chip has to read as a track, not as a verb.
 //
-// The Default case cannot reach here today (applyLadder's saved-choice
-// branch returns before either call site), which is why this says the rule
-// rather than enforcing a possibility: it is the one place both call sites
-// pass through, so a reordering that made it reachable would still be
-// caught here rather than in the markup.
+// Locked is the same rule seen from the other side: a free viewer cannot
+// run it, so it is an upsell and not an action. Neither case can reach
+// here today -- applyLadder's saved-choice branch returns before either
+// call site, and ladderPick never answers with a locked item -- which is
+// why this says the rule rather than enforcing a possibility. It is the
+// one place both call sites pass through, so both conditions are written
+// once and read together.
 func markOffered(lis []ListItem, i int) {
-	if i < 0 || i >= len(lis) || lis[i].Default {
+	if i < 0 || i >= len(lis) || lis[i].Default || lis[i].Locked {
 		return
 	}
 	lis[i].Offered = true
@@ -708,12 +710,13 @@ func markSuggested(lis []ListItem, i int) {
 //
 // What is NOT a rung, since 2026-09-16: the AI translation. The switch
 // restores what the viewer had; it never spends tokens on their behalf, so
-// a translation is reached only by clicking its chip -- or through
-// data-last-subtitle, which names one they already ran this session and is
-// therefore cached and free. Where the ladder would have chosen it,
-// applyLadder marks it Suggested and the picker shows that as an offer;
-// since a list carries at most one Suggested item, this function is not
-// even called in that state.
+// a translation is reached only by clicking its chip, through
+// data-last-subtitle (one they already ran this session), or through the
+// mount-time restore of one they saved earlier -- all cached, none of them
+// this function's business. Where the ladder would have chosen a
+// translation, applyLadder marks it Offered, which is a different field
+// from Suggested: this function still runs in that state, and still has to
+// find the switch something real to restore.
 //
 // Rung 4 is the one the ladder itself would never take. The ladder answers
 // "should subtitles be on"; this answers "the viewer just said they should

@@ -238,7 +238,7 @@ trip" / cache-key section).
 |---|---|---|
 | `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
-| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable. |
+| `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
@@ -286,7 +286,7 @@ for the same reason.
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | heading line (`action.stream.mySubtitles` + the close control), upload form, one row per file, each row with its own delete form |
 | `#my-uploads-close` | `<button type="button" class="btn btn-ghost btn-xs">` | the panel's own "×", in its heading line (`aria-label` = `action.stream.close`). Closes the panel exactly as pressing the chip again does — same function in `Player.jsx`, same three writes |
 | `#translate-cta` | `<div hidden>` | the locked-AI card, below the track row |
-| `#subtitle-hint` | `<p class="text-xs text-w-muted">` | why the switch will not turn subtitles on: the only thing in the viewer's language is a translation, and starting one is their call. Between the track row and the CTA card |
+| `#subtitle-hint` | `<p class="text-xs text-w-muted">` | the pending offer in words: this language has no subtitles yet and the translation is there to be started. Visible exactly while some chip is `Offered`, is not the track playing, and its language holds nothing else activatable. Between the track row and the CTA card |
 
 ### Chips
 
@@ -475,24 +475,32 @@ row plus the tracks of the expanded language.
     one list usually needs both, on two different chips. `data-offered` marks the translation the
     ladder would have chosen, and never the one already playing — a translation the viewer saved
     comes back as `Default`, and inviting them to start what is on screen is nonsense;
-    `data-suggested` stays the switch's restore candidate, computed by `offSuggestion`, and is
-    never a translation. A **locked** item is never `Offered`: a free
+    `data-suggested` stays the switch's restore candidate, computed by `offSuggestion` (which
+    still runs when an offer exists — the two fields do not share a slot), and is never a
+    translation. A **locked** item is never `Offered`: a free
     viewer cannot run it, so its chip keeps the old name-plus-lock shape and the upsell CTA.
   - the chip says which it is: offered, it reads as a verb (`✦` + the `AI` badge +
     `action.stream.translate.action`, "Translate to Portuguese") and wears `.chip-offered`, an
     accent outline instead of the cyan fill that means "this is playing"; otherwise it reads as
     before (`Portuguese · from IN` + progress). Two spans, `.ai-action` and `.ai-label`, flipped
     by `setChipActive` — no `innerHTML`, so `.tr-progress` survives. The verb spans are rendered
-    only for an offered item, so nothing hidden lingers on a locked chip.
-  - `#subtitle-hint` under the track row (`action.stream.translate.hint`) explains the one state
-    where the switch refuses to turn anything on: subtitles are off, there is an offer to start,
-    and the switch's own decision comes back empty. The client asks `toggleDecision` itself
-    (`switchWouldRefuse`) rather than re-deriving the condition, so the hint and the switch cannot
-    disagree; the server renders the same answer from `Offered` and the absence of `Suggested`.
-    **Reachability:** with `offSuggestion`'s last rung ("the best activatable track whatever its
-    language") the switch nearly always has something to restore, because a translation only
-    exists when there is a source track to translate *from* — so this hint is close to
-    unreachable today. See the round-4 concerns.
+    only for an offered item, so nothing hidden lingers on a locked chip, and `setChipActive`
+    flips nothing on a chip that has no verb (a locked one, or one whose offer was taken: without
+    that test the clearing pass hid the label and left an empty button — found in review,
+    2026-09-16).
+    **A finished translation reads as the verb again after a reload.** The client drops
+    `data-offered` when the run starts, but the ladder does not know the run happened, so the next
+    render offers it again — "Translate to Portuguese" on a file that is already translated.
+    Harmless, because re-selecting it costs nothing (the VTT is in S3), but it is why the chip's
+    wording cannot be read as "this has never been translated".
+  - `#subtitle-hint` under the track row (`action.stream.translate.hint`) is the **offer in
+    words** — "no subtitles in your language yet, turn on the AI translation" — and says nothing
+    about the switch. Three conditions, all of them needed for the sentence to be true: a chip is
+    `Offered`, it is not the track already playing, and **its language holds nothing else the
+    viewer could turn on** (one forced sidecar in that language and "no subtitles yet" is simply
+    false). The server renders those three; the client reads the same three off the chips
+    (`offerNeedsHint`, `track-picker.js`) and re-applies them in `refresh` and `refreshMarks` —
+    which every activation ends in, so an offer taken stops being explained at once.
   - both sentences are rendered **server-side** with the language name substituted: Go templates
     take `{{.Param}}`, the client's `tf` takes `%v`, and a chip Go renders once has no reason to
     learn the client's formatter. The name comes from `langDisplay` and is the same English name

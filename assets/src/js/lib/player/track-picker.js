@@ -22,7 +22,8 @@
 //                      switches it through #subtitles-toggle, and the
 //                      filter never unhides it.
 //   #subtitle-hint     explains a pending offer (a translation marked
-//                      data-offered that is not the track playing).
+//                      data-offered, not the track playing, in a language
+//                      with nothing else the viewer could turn on).
 //   #subtitles-toggle  the on/off switch of the whole subtitle block, the
 //                      first child of #subtitle-langs (the chips live in
 //                      .lang-row beside it, which is what the muted state
@@ -194,8 +195,8 @@ export function langRowOps(chips, rowChips, expanded, preferred = '') {
 // deleted upload or an AI track a free viewer cannot open would leave
 // subtitles "on" with nothing on screen. When nothing at all is
 // activatable the answer is to activate nothing and persist nothing --
-// the switch has no track to give and must not claim otherwise (the caller
-// puts the switch back and shows #subtitle-hint).
+// the switch has no track to give and must not claim otherwise, so the
+// caller puts it back where it was.
 //
 // A translation is a candidate for lastId ONLY (owner, 2026-09-16):
 // starting one spends tokens, so the switch never picks one up on the
@@ -214,19 +215,29 @@ export function toggleDecision({ on, lastId = '', suggestedId = '', tracks = [],
     return { activateId: id, persist: true };
 }
 
-// offerPending is the translation the picker is inviting the viewer to
-// start: marked Offered by the ladder and not the track already playing.
-// That pair is exactly what #subtitle-hint explains ("no subtitles in your
-// language yet — turn on the AI translation"), which is why the hint is
-// read off the chips rather than off the switch: it describes an offer,
-// not a refusal.
+// offerNeedsHint is the offer #subtitle-hint may speak for: a translation
+// marked Offered, not the track already playing, in a language that has
+// nothing else the viewer could turn on. All three, because the sentence
+// is "no subtitles in <language> yet — turn on the AI translation", and
+// one forced sidecar in that language makes the first half false however
+// pending the offer is.
 //
-// An offer that has been taken is no longer pending on either count — the
-// chip becomes the default, and setChipActive drops data-offered — so the
+// "Something else" means a chip of the same language that is activatable:
+// not this offer, not the hidden "None" carrier, not a locked item. The
+// offer's own language is the test, not the viewer's preference setting --
+// the ladder only ever builds a translation in the preferred language, so
+// the two are the same set and this one cannot drift from the chip it is
+// about.
+//
+// An offer that has been taken is no longer pending on either count -- the
+// chip becomes the default, and setChipActive drops data-offered -- so the
 // hint goes as soon as the run starts and does not come back.
-export function offerPending(chips) {
-    for (const c of Array.isArray(chips) ? chips : []) {
-        if (c && c.offered && !c.isDefault) return c.id;
+export function offerNeedsHint(chips) {
+    const list = Array.isArray(chips) ? chips : [];
+    for (const c of list) {
+        if (!c || !c.offered || c.isDefault) continue;
+        const rival = list.some((o) => o && o !== c && o.id && o.id !== 'none' && !o.locked && o.lang === c.lang);
+        if (!rival) return c.id;
     }
     return null;
 }
@@ -380,11 +391,19 @@ export function setChipActive(el, on) {
         el.removeAttribute('data-offered');
         el.classList.remove('chip-offered');
     }
-    // The AI chip is a verb until it is the track playing: "✦ AI Translate
-    // to German" idle, "German · from IN" plus the progress once it is on.
-    // Both states ship in the markup and are toggled here, so the chip
-    // keeps its origin badge and its .tr-progress span across every flip.
-    if (el.querySelectorAll) {
+    // An offered AI chip is a verb until it is the track playing: "✦ AI
+    // Translate to German" idle, "German · from IN" plus the progress once
+    // it is on. Both states ship in the markup and are toggled here, so the
+    // chip keeps its origin badge and its .tr-progress span across every
+    // flip.
+    //
+    // Only a chip that HAS a verb flips. The verb spans are rendered for an
+    // offered item alone, while .ai-label is on every AI chip -- so without
+    // this test the clearing pass (markTrack, applyOffState) hid the label
+    // of a locked chip, or of one whose offer was taken and then
+    // deselected, and left an empty button behind (found in review,
+    // 2026-09-16).
+    if (el.querySelectorAll && el.querySelector && el.querySelector('.ai-action')) {
         for (const n of el.querySelectorAll('.ai-action')) n.hidden = active;
         for (const n of el.querySelectorAll('.ai-label')) n.hidden = !active;
     }
@@ -398,9 +417,9 @@ function setLangChipActive(el, on) {
 
 // applyLangFilter shows the tracks of one language and hides the rest. The
 // "None" item is hidden in every language: it is no longer a chip the
-// viewer presses (the toggle on the heading is), only the element the
-// player activates by id, and revealing it would put a nameless button in
-// the row.
+// viewer presses (the switch leading the language row is), only the
+// element the player activates by id, and revealing it would put a
+// nameless button in the row.
 export function applyLangFilter(container, lang) {
     const want = baseLang(lang);
     for (const c of readChips(container)) {
@@ -586,7 +605,7 @@ export function applyOffState(container, off) {
 // explained the moment it is taken.
 function syncHint(container) {
     const hint = container && container.querySelector && container.querySelector('#subtitle-hint');
-    if (hint) hint.hidden = !offerPending(readChips(container));
+    if (hint) hint.hidden = !offerNeedsHint(readChips(container));
 }
 
 // refreshMarks is what a selection needs: the row's counts and dot, and the

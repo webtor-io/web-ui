@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     MAX_VISIBLE_LANGS,
     applyOffState,
-    offerPending,
+    offerNeedsHint,
     offStateAfterActivate,
     restoreSavedTranslation,
     toggleDecision,
@@ -906,14 +906,41 @@ test('the hint explains a pending offer, and nothing else', () => {
     assert.equal(c2.querySelector('#subtitle-hint').hidden, true);
 });
 
-test('offerPending: marked, and not the track already playing', () => {
-    const ai = (extra = {}) => ({ id: 'tr-de', offered: true, isDefault: false, ...extra });
-    assert.equal(offerPending([ai()]), 'tr-de');
+test('offerNeedsHint: marked, not playing, and nothing else in that language', () => {
+    const ai = (extra = {}) => ({ id: 'tr-de', lang: 'de', offered: true, isDefault: false, locked: false, ...extra });
+    assert.equal(offerNeedsHint([ai()]), 'tr-de');
     // Negative control, clause by clause: an unmarked chip is not an offer,
-    // and an offer that is playing has been taken.
-    assert.equal(offerPending([ai({ offered: false })]), null);
-    assert.equal(offerPending([ai({ isDefault: true })]), null);
-    assert.equal(offerPending([]), null);
+    // an offer that is playing has been taken, and a chip in another
+    // language says nothing about this one.
+    assert.equal(offerNeedsHint([ai({ offered: false })]), null);
+    assert.equal(offerNeedsHint([ai({ isDefault: true })]), null);
+    assert.equal(offerNeedsHint([ai(), { id: 'x', lang: 'en', locked: false }]), 'tr-de');
+    // ...but a track the viewer could turn on in that very language makes
+    // the sentence false: there ARE subtitles in German.
+    assert.equal(offerNeedsHint([ai(), { id: 'a', lang: 'de', locked: false }]), null);
+    // A locked one is not something they can turn on, and the "None"
+    // carrier is not a track at all.
+    assert.equal(offerNeedsHint([ai(), { id: 'b', lang: 'de', locked: true }]), 'tr-de');
+    assert.equal(offerNeedsHint([ai(), { id: 'none', lang: 'de', locked: false }]), 'tr-de');
+    assert.equal(offerNeedsHint([]), null);
+});
+
+// The sentence says "no subtitles in German yet". With a forced German
+// sidecar one chip away that is simply untrue, whatever the switch would
+// do with it.
+test('the hint keeps quiet when the language does have a track', () => {
+    const { container } = buildPicker({
+        preferred: 'de',
+        off: true,
+        tracks: [
+            offChip(true),
+            { id: 'et-2', lang: 'de', label: 'Movie.de.forced.srt', suggested: true },
+            { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true },
+        ],
+        row: [{ lang: 'de', count: 2, selected: true }],
+    });
+    refreshMarks(container);
+    assert.equal(container.querySelector('#subtitle-hint').hidden, true);
 });
 
 // An offered translation is not "what comes back": the switch refuses it,
@@ -958,26 +985,28 @@ test('restoreSavedTranslation: only a saved, playing, unlocked translation', () 
 // restore, and whether or not subtitles are on — what it says is "your
 // language has no subtitles yet", and that is true in all of those states.
 test('the hint stands while the offer does, whatever the switch could do', () => {
-    // Subtitles on, a human track playing, the offer still pending.
+    // Subtitles on, a track of another language playing, the offer still
+    // pending: German has nothing of its own, so the sentence holds.
     const { container: on } = buildPicker({
         preferred: 'de',
-        tracks: [offChip(), { id: 'a', lang: 'de', label: 'German', def: true }, { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
-        row: [{ lang: 'de', count: 2, selected: true }],
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English', def: true }, { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
+        row: [{ lang: 'en', count: 1, selected: true }, { lang: 'de', count: 1 }],
     });
     refreshMarks(on);
     assert.equal(on.querySelector('#subtitle-hint').hidden, false);
 
-    // Subtitles off with a real track to restore: the switch has an answer,
-    // and the offer is still worth explaining.
+    // Subtitles off, and what the switch would restore is in ANOTHER
+    // language: German still has nothing but the offer, so the sentence
+    // holds.
     const { container: restorable } = buildPicker({
         preferred: 'de',
         off: true,
         tracks: [
             offChip(true),
-            { id: 'a', lang: 'de', label: 'German', suggested: true },
+            { id: 'a', lang: 'en', label: 'English', suggested: true },
             { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true },
         ],
-        row: [{ lang: 'de', count: 2, selected: true }],
+        row: [{ lang: 'en', count: 1 }, { lang: 'de', count: 1, selected: true }],
     });
     refreshMarks(restorable);
     assert.equal(restorable.querySelector('#subtitle-hint').hidden, false);
@@ -1001,4 +1030,31 @@ test('the hint does not come back after the translation has been run', () => {
     container.setAttribute('data-last-subtitle', 'tr-de');
     applyOffState(container, true);
     assert.equal(container.querySelector('#subtitle-hint').hidden, true);
+});
+
+// An AI chip without a verb — the locked one a free viewer sees, or one
+// whose offer has been taken and then deselected — must keep its name.
+// The verb spans exist only on an offered chip, so a flip that assumes
+// both states are present hides the label and leaves an empty chip.
+test('an AI chip with no verb keeps its label through the clearing pass', () => {
+    const { container } = buildPicker({
+        tracks: [
+            offChip(),
+            { id: 'tr-de', lang: 'de', label: 'German', ai: true, locked: true },
+            { id: 'a', lang: 'de', label: 'German', def: true },
+        ],
+        row: [{ lang: 'de', count: 2, selected: true }],
+    });
+    const locked = container.querySelector('[data-id="tr-de"]');
+    const labelShown = () => Array.from(locked.querySelectorAll('.ai-label')).every((n) => !n.hidden);
+
+    assert.equal(labelShown(), true, 'the fixture starts with a visible label');
+    // What markTrack does to every other chip when something is selected.
+    setChipActive(locked, false);
+    assert.equal(labelShown(), true, 'a chip with no verb has nothing to flip to');
+    // ...and the same through the muted-state pass.
+    applyOffState(container, true);
+    assert.equal(labelShown(), true);
+    applyOffState(container, false);
+    assert.equal(labelShown(), true);
 });

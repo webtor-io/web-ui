@@ -1032,10 +1032,10 @@ func TestOffSuggestsAForcedTrackInThePreferredLanguage(t *testing.T) {
 
 // TestLadderNeverDefaultsTheTranslation is the owner's rule of 2026-09-16:
 // a translation costs tokens, so it is never turned on for the viewer. The
-// ladder marks it Suggested -- the picker draws that as an offer, not as a
+// ladder marks it Offered -- the picker draws that as an action, not as a
 // selection -- and the phase-1 selection decides what actually plays.
 //
-// Negative control for the same guard: TestLadderTranslatedIsSuggestedNotDefault
+// Negative control for the same guard: TestLadderTranslatedIsOfferedNotDefault
 // below asserts the item is still offered, so "never Default" cannot be
 // satisfied by dropping the item altogether.
 func TestLadderNeverDefaultsTheTranslation(t *testing.T) {

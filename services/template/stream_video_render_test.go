@@ -1227,7 +1227,8 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 	}
 
 	// Subtitles are off and the forced track is what the switch would
-	// restore; the offer is still pending, so its explanation stands.
+	// restore. The offer stands, but the hint does not: "no subtitles in
+	// Portuguese yet" is false with a Portuguese sidecar one chip away.
 	if !strings.Contains(html, `data-subtitles-off="true"`) {
 		t.Error("the switch must render off")
 	}
@@ -1235,8 +1236,8 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 	if hintAt < 0 {
 		t.Fatal("no #subtitle-hint element")
 	}
-	if strings.Contains(html[hintAt:hintAt+strings.Index(html[hintAt:], ">")], "hidden") {
-		t.Error("the hint must stand while the offer is pending")
+	if !strings.Contains(html[hintAt:hintAt+strings.Index(html[hintAt:], ">")], "hidden") {
+		t.Error("the hint must keep quiet when that language does have a track")
 	}
 }
 
