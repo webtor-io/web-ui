@@ -6,7 +6,7 @@ func li(id, lang, provider string, def bool) ListItem {
 	return ListItem{ID: id, SrcLang: lang, Provider: provider, Default: def, Badge: badgeFor(provider, false)}
 }
 
-func TestSubtitleLangGroupsOrdersActiveThenPreferredThenCount(t *testing.T) {
+func TestSubtitleLangGroupsOrdersPreferredThenActiveThenCount(t *testing.T) {
 	h := NewHelper()
 	lis := []ListItem{
 		{ID: "none", Label: "None"},
@@ -24,20 +24,26 @@ func TestSubtitleLangGroupsOrdersActiveThenPreferredThenCount(t *testing.T) {
 	if got := len(row.Groups); got != 4 {
 		t.Fatalf("got %d groups, want 4: %+v", got, row.Groups)
 	}
-	want := []string{"ru", "de", "en", "und"}
+	// Preferred first, whatever is playing (owner, 2026-09-15): the row
+	// opens where the viewer's own language is, and the track playing keeps
+	// the dot on its chip instead of the front slot.
+	want := []string{"de", "ru", "en", "und"}
 	for i, w := range want {
 		if row.Groups[i].Lang != w {
 			t.Errorf("group %d = %q, want %q (%+v)", i, row.Groups[i].Lang, w, row.Groups)
 		}
 	}
-	if !row.Groups[0].Active {
+	if !row.Groups[1].Active {
 		t.Error("the group holding the default track must be Active")
+	}
+	if row.Groups[0].Active {
+		t.Error("the preferred group holds no default track and must not be Active")
 	}
 	if row.Groups[2].Count != 3 {
 		t.Errorf("en count = %d, want 3", row.Groups[2].Count)
 	}
-	if row.Expanded != "ru" {
-		t.Errorf("Expanded = %q, want %q", row.Expanded, "ru")
+	if row.Expanded != "de" {
+		t.Errorf("Expanded = %q, want %q", row.Expanded, "de")
 	}
 	if row.Overflow != 0 {
 		t.Errorf("Overflow = %d, want 0", row.Overflow)
@@ -133,11 +139,11 @@ func TestSubtitleLangGroupsOverflowNeverHidesActiveOrPreferred(t *testing.T) {
 	lis = append(lis, li("z", "fi", "OpenSubtitles", false))
 
 	row := h.SubtitleLangGroups(lis, "fi")
-	if row.Groups[0].Lang != "cs" || row.Groups[0].Overflow {
-		t.Fatalf("active language must be first and visible, got %+v", row.Groups[0])
+	if row.Groups[0].Lang != "fi" || row.Groups[0].Overflow {
+		t.Fatalf("preferred language must be first and visible, got %+v", row.Groups[0])
 	}
-	if row.Groups[1].Lang != "fi" || row.Groups[1].Overflow {
-		t.Fatalf("preferred language must be visible even though it was pushed by insertion order, got %+v", row.Groups[1])
+	if row.Groups[1].Lang != "cs" || row.Groups[1].Overflow {
+		t.Fatalf("active language must be visible even though it was pushed by insertion order, got %+v", row.Groups[1])
 	}
 	if row.Overflow != 3 {
 		t.Errorf("Overflow = %d, want 3 (9 groups, 6 visible)", row.Overflow)
@@ -199,5 +205,63 @@ func TestAudioSuffixDropsTheLanguageNameItWouldRepeat(t *testing.T) {
 	}
 	if got := h.AudioSuffix(ListItem{SrcLang: "", Label: "Audio #1"}); got != "Audio #1" {
 		t.Errorf("AudioSuffix = %q, want Audio #1", got)
+	}
+}
+
+// TestSubtitleLangGroupsExpandsPreferredOverTheActiveLanguage is the new
+// tie-break on its own: the viewer's language has exactly one track and the
+// playing one has three, so every other rule in the comparator (count,
+// active, insertion order) points the other way. The row still opens on the
+// preferred language, and the active one keeps its dot one slot over.
+func TestSubtitleLangGroupsExpandsPreferredOverTheActiveLanguage(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Label: "None"},
+		li("a", "en", "MediaProbe", false),
+		li("b", "en", "OpenSubtitles", true),
+		li("c", "en", "ExportTag", false),
+		li("d", "pt", "OpenSubtitles", false),
+	}
+	row := h.SubtitleLangGroups(lis, "pt")
+	if row.Expanded != "pt" {
+		t.Errorf("Expanded = %q, want pt", row.Expanded)
+	}
+	if row.Groups[0].Lang != "pt" || row.Groups[1].Lang != "en" {
+		t.Fatalf("order = %+v, want pt then en", row.Groups)
+	}
+	if !row.Groups[1].Active {
+		t.Error("the playing language keeps Active (the dot) where it sorts")
+	}
+}
+
+// ...and an AI-only group counts: the preferred language whose only track
+// is the translation the ladder added still opens the row. That is the
+// whole point of the AI item — the viewer's language is there now.
+func TestSubtitleLangGroupsExpandsPreferredWithOnlyATranslation(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Label: "None"},
+		li("a", "en", "MediaProbe", true),
+		li("tr-pt", "pt", "Translated", false),
+	}
+	row := h.SubtitleLangGroups(lis, "pt")
+	if row.Expanded != "pt" || row.Groups[0].Lang != "pt" {
+		t.Fatalf("Expanded = %q, groups = %+v, want pt first", row.Expanded, row.Groups)
+	}
+}
+
+// The preferred language with no tracks at all changes nothing: the row
+// falls back to the language playing, exactly as before.
+func TestSubtitleLangGroupsFallsBackToActiveWhenPreferredHasNoTracks(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Label: "None"},
+		li("a", "en", "MediaProbe", false),
+		li("b", "en", "OpenSubtitles", false),
+		li("c", "ru", "OpenSubtitles", true),
+	}
+	row := h.SubtitleLangGroups(lis, "pt")
+	if row.Expanded != "ru" || row.Groups[0].Lang != "ru" {
+		t.Fatalf("Expanded = %q, groups = %+v, want ru first", row.Expanded, row.Groups)
 	}
 }

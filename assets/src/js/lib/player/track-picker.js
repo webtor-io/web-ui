@@ -65,8 +65,13 @@ export function baseLang(v) {
 }
 
 // groupByLang collapses chips into language groups, ordered the way the row
-// is drawn: the language playing, then the viewer's preferred one, then by
+// is drawn: the viewer's preferred language, then the one playing, then by
 // how many tracks it has, then by the order the server rendered.
+//
+// Preferred ahead of playing is the owner's call (2026-09-15): the row is
+// where the viewer looks for their own language, and what is playing keeps
+// the dot on its chip wherever that chip sorts — possibly hidden under the
+// filter, which is accepted. Mirrors handlers/action.SubtitleLangGroups.
 //
 // That last tie-break is the order of the input, kept by a stable sort —
 // NOT the language name. Go's SubtitleLangGroups ends its comparator with
@@ -92,9 +97,9 @@ export function groupByLang(chips, preferred = '') {
         if (c.isDefault) g.active = true;
     }
     return order.slice().sort((a, b) => {
-        if (a.active !== b.active) return a.active ? -1 : 1;
         const pa = a.lang === pref, pb = b.lang === pref;
         if (pa !== pb) return pa ? -1 : 1;
+        if (a.active !== b.active) return a.active ? -1 : 1;
         return b.count - a.count;
     });
 }
@@ -108,20 +113,23 @@ export function activeLang(chips) {
     return '';
 }
 
-// expandedLangFor answers which language's tracks the row shows. The active
-// one wins; otherwise the viewer's own last choice, as long as it still has
-// tracks (deleting the last upload of a language must not leave an empty
-// list); otherwise the preferred language; otherwise the first group.
+// expandedLangFor answers which language's tracks the row shows. The
+// viewer's own last choice wins, as long as it still has tracks (deleting
+// the last upload of a language must not leave an empty list); otherwise
+// the first group — which groupByLang has already made the preferred
+// language, then the one playing, then the largest.
+//
+// `current` ahead of everything is what keeps a refresh (an upload, a
+// delete, reopening the dialog) from yanking the viewer out of the
+// language they were browsing. On a first open `current` is the chip the
+// server pressed, i.e. LangRow.Expanded — so the two sides agree without
+// either recomputing the other's answer.
 export function expandedLangFor(chips, { preferred = '', current = '' } = {}) {
     const groups = groupByLang(chips, preferred);
     if (!groups.length) return '';
-    const active = activeLang(chips);
-    if (active) return active;
     const has = (l) => l && groups.some((g) => g.lang === l);
     const cur = current ? baseLang(current) : '';
     if (has(cur)) return cur;
-    const pref = preferred ? baseLang(preferred) : '';
-    if (has(pref)) return pref;
     return groups[0].lang;
 }
 

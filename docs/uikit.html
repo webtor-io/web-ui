@@ -2269,7 +2269,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       locked chip adds <code>.chip-locked</code> &middot;
       all five live in <code>assets/src/styles/style.css</code> and are the only classes JS toggles &mdash; <code>setChipActive</code> writes no utility strings and never rebuilds a chip's innerHTML &middot;
       active = <code>svg.chip-check</code> + cyan fill, exactly one per group &middot;
-      the language chip of the active track carries a 6px cyan <code>.lang-dot</code> so the selection stays visible while another language is expanded
+      the language chip of the active track carries a 6px cyan <code>.lang-dot</code> so the selection stays visible while another language is expanded &middot;
+      row order (owner, 2026-09-15): <strong>preferred language first</strong> (an AI-only group counts), then the language playing, then by count, then the server's order &mdash; the row opens on the first chip, so the dot is often on a collapsed one
     </div>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">"+N" expanded</h3>

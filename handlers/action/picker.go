@@ -10,10 +10,10 @@ import (
 // maxVisibleLangChips is how many language chips the subtitle row shows
 // before the rest collapse behind a "+N" disclosure (controller ruling on
 // the track-picker plan: 6, not the brief's 4 — the design was redrawn
-// wider). The sort below always puts the active language first and the
-// viewer's preferred language right after it, so both are guaranteed a
-// visible slot — the "+N" only ever hides languages the viewer has not
-// expressed any preference for.
+// wider). The sort below always puts the viewer's preferred language first
+// and the active one right after it, so both are guaranteed a visible slot
+// — the "+N" only ever hides languages the viewer has not expressed any
+// preference for.
 const maxVisibleLangChips = 6
 
 // LangGroup is one chip of the subtitle language row: a language, how many
@@ -41,22 +41,33 @@ type LangRow struct {
 // SubtitleLangGroups groups the subtitle list by base language for the
 // picker's language row.
 //
-// Order: the language of the track playing first, then the viewer's
-// preferred language, then by track count, then by the order GetSubtitles
-// produced (a stable sort keeps the ladder as the tie-break rather than a
-// map's iteration). Because Active and Preferred are each true for at most
-// one group, this ordering is also what keeps both languages out of the
-// "+N" overflow (see maxVisibleLangChips): they always land in the first
-// two slots, ahead of every group sorted purely by count. The client
-// recomputes this order in assets/src/js/lib/player/track-picker.js
-// (groupByLang) after an upload changes the counts — the two
-// implementations must stay identical, and the table in
-// TestSubtitleLangGroupsOrdersActiveThenPreferredThenCount is mirrored by
-// the same fixture in track-picker.test.js.
+// Order (owner, 2026-09-15): the viewer's preferred language first
+// whatever is playing — including a group whose only track is the AI
+// translation, which is exactly the case the ladder added it for — then
+// the language of the track playing, then by track count, then by the
+// order GetSubtitles produced (a stable sort keeps the ladder as the
+// tie-break rather than a map's iteration).
 //
-// The "None" item is not a language and gets no chip: it is the "Off" chip
-// at the head of the track row, not the language row, so it never enters
-// grouping here in the first place.
+// Preferred ahead of active is deliberate: the row is where the viewer
+// looks for their own language, and what is playing stays visible through
+// the dot on its chip (LangGroup.Active) wherever it sorts — it may even
+// end up hidden under the filter, which the owner accepted. A preferred
+// language with no tracks at all changes nothing: the active one leads
+// again, as before.
+//
+// Because Active and Preferred are each true for at most one group, this
+// ordering is also what keeps both languages out of the "+N" overflow (see
+// maxVisibleLangChips): they always land in the first two slots, ahead of
+// every group sorted purely by count. The client recomputes this order in
+// assets/src/js/lib/player/track-picker.js (groupByLang) after an upload
+// changes the counts — the two implementations must stay identical, and
+// the table in TestSubtitleLangGroupsOrdersPreferredThenActiveThenCount is
+// mirrored by the same fixture in track-picker.test.js.
+//
+// The "None" item is not a language and gets no chip: it is the hidden
+// carrier at the head of the track row (the switch on the Subtitles
+// heading is what turns subtitles off), so it never enters grouping here
+// in the first place.
 func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRow {
 	// preferred stays "" when preferredLang is unset: NewLangDisplay("")
 	// resolves to "und", which is also the group untagged tracks land in, and
@@ -90,11 +101,11 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 		out = append(out, *byLang[l])
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Active != out[j].Active {
-			return out[i].Active
-		}
 		if pi, pj := out[i].Lang == preferred, out[j].Lang == preferred; pi != pj {
 			return pi
+		}
+		if out[i].Active != out[j].Active {
+			return out[i].Active
 		}
 		if out[i].Count != out[j].Count {
 			return out[i].Count > out[j].Count
@@ -108,6 +119,9 @@ func (s *Helper) SubtitleLangGroups(lis []ListItem, preferredLang string) LangRo
 			row.Overflow++
 		}
 	}
+	// The row opens on its first chip, which the comparator above has
+	// already made the preferred language when it has any tracks, the
+	// active one otherwise, and the largest group when neither applies.
 	if len(row.Groups) > 0 {
 		row.Expanded = row.Groups[0].Lang
 	}

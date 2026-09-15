@@ -26,7 +26,7 @@ import {
 
 const C = (id, lang, extra = {}) => ({ id, lang, isDefault: false, ...extra });
 
-test('groupByLang: active first, then preferred, then count, then server order', () => {
+test('groupByLang: preferred first, then active, then count, then server order', () => {
     const chips = [
         C('none', ''),
         C('a', 'en'), C('b', 'en'), C('c', 'en'),
@@ -35,11 +35,25 @@ test('groupByLang: active first, then preferred, then count, then server order',
         C('g', ''),
     ];
     assert.deepEqual(groupByLang(chips, 'de'), [
-        { lang: 'ru', count: 2, active: true },
         { lang: 'de', count: 1, active: false },
+        { lang: 'ru', count: 2, active: true },
         { lang: 'en', count: 3, active: false },
         { lang: 'und', count: 1, active: false },
     ]);
+});
+
+// The new tie-break on its own (owner, 2026-09-15): the preferred language
+// has one track and the playing one has three, so count, active and the
+// server's order all point the other way. Mirrors
+// TestSubtitleLangGroupsExpandsPreferredOverTheActiveLanguage.
+test('groupByLang: preferred wins over the language that is playing', () => {
+    const chips = [C('a', 'en'), C('b', 'en', { isDefault: true }), C('c', 'en'), C('d', 'pt')];
+    assert.deepEqual(groupByLang(chips, 'pt').map((g) => g.lang), ['pt', 'en']);
+    // ...and the playing language keeps its dot where it sorts.
+    assert.equal(groupByLang(chips, 'pt')[1].active, true);
+    // A preferred language with no tracks of its own changes nothing: the
+    // playing language leads again, as it did before this rule.
+    assert.deepEqual(groupByLang(chips, 'de').map((g) => g.lang), ['en', 'pt']);
 });
 
 test('groupByLang: preferred first when nothing is active', () => {
@@ -75,14 +89,20 @@ test('activeLang is empty when subtitles are off', () => {
     assert.equal(activeLang([C('none', '', { isDefault: true }), C('a', 'en')]), '');
 });
 
-test('expandedLangFor keeps the language the viewer opened when nothing is active', () => {
+test('expandedLangFor keeps the language the viewer opened, then the preferred one', () => {
     const chips = [C('a', 'en'), C('b', 'ru')];
     assert.equal(expandedLangFor(chips, { preferred: 'de', current: 'en' }), 'en');
     // The current language lost its last track (deleted upload) — fall back.
     assert.equal(expandedLangFor(chips, { preferred: 'ru', current: 'pl' }), 'ru');
     assert.equal(expandedLangFor(chips, { preferred: 'pl', current: 'pl' }), 'en');
-    // An active track always wins over both.
-    assert.equal(expandedLangFor([C('a', 'en'), C('b', 'ru', { isDefault: true })], { preferred: 'en', current: 'en' }), 'ru');
+    // The viewer's browsing choice still wins over the preferred language
+    // on a refresh — but with nothing browsed, preferred beats the track
+    // that is playing (owner, 2026-09-15).
+    const playing = [C('a', 'en', { isDefault: true }), C('b', 'ru')];
+    assert.equal(expandedLangFor(playing, { preferred: 'ru', current: 'en' }), 'en');
+    assert.equal(expandedLangFor(playing, { preferred: 'ru' }), 'ru');
+    // ...and with no preference it is the playing language, as before.
+    assert.equal(expandedLangFor(playing, {}), 'en');
     assert.equal(expandedLangFor([], { preferred: 'en', current: 'en' }), '');
 });
 
@@ -138,7 +158,7 @@ test('langRowOps keeps both the active and the preferred language visible at nin
     chips.push(C('y', 'cs', { isDefault: true }));
     chips.push(C('z', 'fi'));
     const row = ['en', 'de', 'fr', 'es', 'it', 'pl', 'nl', 'cs', 'fi'].map((lang) => ({ lang }));
-    const ops = langRowOps(chips, row, 'cs', 'fi');
+    const ops = langRowOps(chips, row, 'fi', 'fi');
     assert.deepEqual(ops.updates.filter((u) => u.hidden).map((u) => u.lang), ['it', 'pl', 'nl']);
     assert.equal(ops.overflow, 3);
     const visible = ops.updates.filter((u) => !u.hidden).map((u) => u.lang);
@@ -327,9 +347,13 @@ test('the none carrier stays hidden through every language filter', () => {
     assert.deepEqual(visibleTracks(container), []);
 });
 
-test('refresh: opens on the active track language and marks the row', () => {
+// A refresh leaves the viewer in the language whose chip is pressed — on a
+// first open that is the one the server expanded (the preferred language),
+// and the track playing keeps its dot one chip over, hidden tracks and all
+// (owner, 2026-09-15).
+test('refresh: stays in the pressed language and marks the row', () => {
     const { container } = buildPicker({
-        preferred: 'de',
+        preferred: 'en',
         tracks: [
             offChip(),
             { id: 'a', lang: 'en', name: 'English', flag: '🇬🇧', label: 'English', origin: 'OS' },
@@ -338,14 +362,21 @@ test('refresh: opens on the active track language and marks the row', () => {
         row: [{ lang: 'en', count: 1, selected: true }, { lang: 'ru', count: 1 }],
         audio: [{ id: 'au', lang: 'en', name: 'English', flag: '🇬🇧', label: 'English', def: true }],
     });
-    assert.equal(refresh(container), 'ru');
-    assert.equal(expandedLang(container), 'ru');
-    assert.deepEqual(visibleTracks(container), ['b']);
+    assert.equal(refresh(container), 'en');
+    assert.equal(expandedLang(container), 'en');
+    assert.deepEqual(visibleTracks(container), ['a']);
     const [en, ru] = langsOf(container);
-    assert.equal(ru.querySelector('.lang-dot').hidden, false, 'the active language carries the dot');
+    assert.equal(ru.querySelector('.lang-dot').hidden, false, 'the playing language keeps the dot');
     assert.equal(en.querySelector('.lang-dot').hidden, true);
-    assert.equal(ru.classList.contains('lang-chip-active'), true);
-    assert.equal(en.classList.contains('lang-chip-active'), false);
+    assert.equal(en.classList.contains('lang-chip-active'), true);
+    assert.equal(ru.classList.contains('lang-chip-active'), false);
+    // …and with nothing pressed yet, the preferred language opens.
+    const fresh = buildPicker({
+        preferred: 'ru',
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English', def: true }, { id: 'b', lang: 'ru', label: 'Russian' }],
+        row: [{ lang: 'en', count: 1 }, { lang: 'ru', count: 1 }],
+    });
+    assert.equal(refresh(fresh.container), 'ru');
     // "Now:" comes off the active chips, strings included.
     assert.equal(container.querySelector('#subtitle-now').querySelector('.now-value').textContent, '🇷🇺 Russian');
     assert.equal(container.querySelector('#subtitle-now').querySelector('.now-origin').textContent, 'EM');
@@ -639,7 +670,9 @@ test('the row follows the muted choice while subtitles are off', () => {
         ],
         row: [{ lang: 'en', count: 1, selected: true }, { lang: 'ru', count: 1 }],
     });
-    assert.equal(refresh(container), 'ru');
+    // The pressed language stays pressed; the muted choice only keeps the
+    // dot, one chip over.
+    assert.equal(refresh(container), 'en');
     const [en, ru] = langsOf(container);
     assert.equal(en.querySelector('.lang-dot').hidden, true);
     assert.equal(ru.querySelector('.lang-dot').hidden, false);

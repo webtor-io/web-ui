@@ -385,7 +385,9 @@ row plus the tracks of the expanded language.
 
 - **The language row filters only.** Pressing a language chip collapses the other languages in the
   track row and changes nothing about playback. The chip of the language currently playing keeps a
-  cyan dot, so the selection stays visible while the viewer browses another language. Past six
+  cyan dot, so the selection stays visible while the viewer browses another language — since
+  2026-09-15 the row opens on the **preferred** language rather than the playing one, so that dot
+  is regularly on a chip whose tracks are collapsed. Past six
   chips the tail goes behind "+N" — except the expanded language, which is never collapsed
   wherever it sorts, and is not counted into "+N": a pressed but invisible filter leaves its
   tracks on screen with no chip pointing at them.
@@ -437,11 +439,19 @@ row plus the tracks of the expanded language.
   hidden but focusable, and a translated one makes a screen reader announce "Close" twice.
 - **Flags fall back.** `supportsFlagEmoji()` (`lib/discover/lang.js`) hides every `.chip-flag`
   where the platform draws bare letter pairs (Windows outside Firefox); the language names stay.
-- **Language-row order**: the active language, then the viewer's preferred language, then by track
-  count, then the order `GetSubtitles` produced. `SubtitleLangGroups` (Go) and `groupByLang` (JS)
-  must stay identical — the client recomputes the row after an upload changes the counts — and the
-  same fixture is in both test suites. There is deliberately **no** alphabetical tie-break: it
-  would reshuffle every equal-count group on the first refresh after an upload.
+- **Language-row order** (owner, 2026-09-15): the viewer's **preferred** language first — including
+  a group whose only track is the AI translation — then the language of the track playing, then by
+  track count, then the order `GetSubtitles` produced. The row opens on that first chip
+  (`LangRow.Expanded`), so a page opens in the viewer's own language whatever is playing; the
+  playing track keeps the cyan dot on its chip wherever it sorts, and may sit hidden under the
+  filter, which is accepted. A preferred language with no tracks at all changes nothing — the
+  playing language leads again, as before.
+  `SubtitleLangGroups` (Go) and `groupByLang` (JS) must stay identical — the client recomputes the
+  row after an upload changes the counts — and the same fixture is in both test suites. On the
+  client the viewer's own browsing choice still comes first: `expandedLangFor` keeps the pressed
+  language whenever it still has tracks, and falls back to this order otherwise (on a first open
+  the pressed chip *is* the server's `Expanded`). There is deliberately **no** alphabetical
+  tie-break: it would reshuffle every equal-count group on the first refresh after an upload.
 - **Without JS** (picker JS failed, player loaded): every chip renders, the expanded language's
   tracks are visible, the active track carries its check and fill from SSR and the counts are
   right, and the muted state is drawn (the server renders `data-subtitles-off`, the toggle's
