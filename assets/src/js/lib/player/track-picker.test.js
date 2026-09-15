@@ -263,17 +263,18 @@ function trackChip(kind, o) {
     if (o.def) a['data-default'] = 'true';
     if (o.suggested) a['data-suggested'] = 'true';
     if (o.ai) a['data-provider'] = 'Translated';
+    if (o.offered) a['data-offered'] = 'true';
     const kids = [el('svg', { class: 'chip-check' })];
     if (o.origin) kids.push(span('chip-origin badge badge-xs font-mono', o.origin));
     // The AI chip carries both of its states in the markup (see
     // stream_video.html): the verb while idle, the track name while playing.
-    if (o.ai) kids.push(span('ai-action', 'Translate to ' + (o.name || o.lang)));
+    if (o.offered) kids.push(span('ai-action', 'Translate to ' + (o.name || o.lang)));
     kids.push(span((o.ai ? 'ai-label ' : '') + 'chip-label', o.label || ''));
     const node = el('button', a, kids);
     node.querySelector('.chip-check').hidden = !o.def;
-    if (o.ai) {
-        node.querySelector('.ai-action').hidden = !!o.def;
-        node.querySelector('.ai-label').hidden = !o.def;
+    if (o.offered) {
+        node.querySelector('.ai-action').hidden = false;
+        node.querySelector('.ai-label').hidden = true;
     }
     node.hidden = !!o.hidden;
     return node;
@@ -854,7 +855,7 @@ test('toggleDecision: the viewer’s own earlier translation does come back', ()
 
 test('the AI chip is a verb until it is playing', () => {
     const { container } = buildPicker({
-        tracks: [offChip(), { id: 'tr-de', lang: 'de', label: 'German', ai: true }],
+        tracks: [offChip(), { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
         row: [{ lang: 'de', count: 1, selected: true }],
     });
     const chip = container.querySelector('[data-id="tr-de"]');
@@ -873,7 +874,7 @@ test('the hint shows exactly when the only offer is a translation', () => {
     const { container } = buildPicker({
         preferred: 'de',
         off: true,
-        tracks: [offChip(true), { id: 'tr-de', lang: 'de', label: 'German', ai: true, suggested: true }],
+        tracks: [offChip(true), { id: 'tr-de', lang: 'de', label: 'German', ai: true, offered: true }],
         row: [{ lang: 'de', count: 1, selected: true }],
     });
     applyOffState(container, true);
@@ -905,7 +906,7 @@ test('the row does not follow an offered translation', () => {
         tracks: [
             offChip(true),
             { id: 'a', lang: 'en', name: 'English', label: 'English' },
-            { id: 'tr-de', lang: 'de', name: 'German', label: 'German', ai: true, suggested: true },
+            { id: 'tr-de', lang: 'de', name: 'German', label: 'German', ai: true, offered: true },
         ],
         row: [{ lang: 'en', count: 1 }, { lang: 'de', count: 1 }],
     });

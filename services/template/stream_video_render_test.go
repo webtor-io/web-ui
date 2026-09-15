@@ -285,6 +285,9 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		`action.stream.translate.locked`,
 		`action.stream.translate.cta`,
 		`action.stream.locked.aria`, // the lock is an icon plus this sr-only text
+		// I3: a locked translation is an upsell, not an action on offer, so
+		// its chip is unchanged — the language name, not the verb.
+		`title="Portuguese · AI">Portuguese · AI<`,
 		// The redesign's own contract: one flat container for the tracks, a
 		// language row above it, and the codes the chips are read by.
 		`id="subtitle-tracks"`,
@@ -325,6 +328,8 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	for _, gone := range []string{
 		`id="embedded"`, `id="opensubtitles"`, `label for="opensubtitles"`, `label for="my-subtitles"`,
 		`aria-owns=`, `role="tab"`, `aria-selected=`, `🔒`,
+		// The locked chip carries neither the offer's outline nor its verb.
+		`chip-offered`, `data-offered`, `action.stream.translate.action`,
 		// The Off chip and its label: the switch on the heading replaced
 		// both, and action.stream.off was dropped from every locale.
 		`action.stream.off`,
@@ -990,7 +995,7 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 
 	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
 	tr, ok := byIDTest(items)["tr-pt"]
-	if !ok || tr.Locked || !tr.Suggested || tr.Default {
+	if !ok || tr.Locked || !tr.Offered || tr.Default || tr.Suggested {
 		t.Fatalf("fixture must offer an unlocked, unselected AI item, got %+v", tr)
 	}
 
@@ -1013,8 +1018,8 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 
 	// An offer: outlined, not filled, and not announced as chosen.
 	for _, want := range []string{
-		"chip-suggested",
-		`data-suggested="true"`,
+		"chip-offered",
+		`data-offered="true"`,
 		`aria-checked="false"`,
 		// The verb state is what shows; the track-name state is hidden.
 		`class="ai-action" aria-hidden="true">✦`,
@@ -1025,8 +1030,8 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 			t.Errorf("the AI chip is missing %q:\n%s", want, chip)
 		}
 	}
-	if strings.Contains(chip, "track-chip-active") {
-		t.Errorf("a translation is never drawn as the chosen track:\n%s", chip)
+	if strings.Contains(chip, "track-chip-active") || strings.Contains(chip, `data-suggested`) {
+		t.Errorf("a translation is never drawn as the chosen track, nor as what the switch restores:\n%s", chip)
 	}
 	// Both .ai-label spans (the name and the "· from IN" suffix) start
 	// hidden, both .ai-action spans visible.
@@ -1046,17 +1051,23 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		}
 	}
 
-	// Subtitles are off, and the hint says why.
+	// Subtitles are off, and the switch has the Japanese sidecar to restore
+	// — so it will not refuse, and the hint (which says the switch has
+	// nothing to give) stays hidden. The hint follows the switch's own
+	// decision, never the mere presence of an offer.
 	if !strings.Contains(html, `data-subtitles-off="true"`) {
-		t.Error("the switch must render off: nothing in the viewer's language is activatable")
+		t.Error("the switch must render off: the ladder's answer was the translation")
+	}
+	if s := suggestedInHTML(html); s == "" {
+		t.Error("the switch must still have something to restore here")
 	}
 	hintAt := strings.Index(html, `id="subtitle-hint"`)
 	if hintAt < 0 {
 		t.Fatal("no #subtitle-hint element")
 	}
 	hint := html[hintAt : hintAt+strings.Index(html[hintAt:], "</p>")]
-	if strings.Contains(hint[:strings.Index(hint, ">")], "hidden") {
-		t.Errorf("the hint must be visible in this state:\n%s", hint)
+	if !strings.Contains(hint[:strings.Index(hint, ">")], "hidden") {
+		t.Errorf("the hint must stay hidden while the switch has a track to restore:\n%s", hint)
 	}
 	if !strings.Contains(hint, "action.stream.translate.hint:Portuguese") {
 		t.Errorf("the hint must name the viewer's language:\n%s", hint)
@@ -1067,6 +1078,22 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 	}
 }
 
+// suggestedInHTML returns the data-id of the chip the switch would restore.
+func suggestedInHTML(html string) string {
+	at := strings.Index(html, `data-suggested="true"`)
+	if at < 0 {
+		return ""
+	}
+	open := strings.LastIndex(html[:at], "<button")
+	tag := html[open : at+strings.Index(html[at:], ">")]
+	idAt := strings.Index(tag, `data-id="`)
+	if idAt < 0 {
+		return ""
+	}
+	rest := tag[idAt+len(`data-id="`):]
+	return rest[:strings.Index(rest, `"`)]
+}
+
 // byIDTest is byID from handlers/action's own tests, which this package
 // cannot import.
 func byIDTest(items []action.ListItem) map[string]action.ListItem {
@@ -1075,4 +1102,138 @@ func byIDTest(items []action.ListItem) map[string]action.ListItem {
 		m[it.ID] = it
 	}
 	return m
+}
+
+// TestStreamVideoOfferAndRestoreAreTwoChips is the split in markup (owner
+// review, 2026-09-16): Japanese audio, a forced Portuguese sidecar and an
+// English one to translate from. The ladder will not turn a forced track on
+// when the audio is foreign, so subtitles are off — and the two questions
+// land on two different chips: the translation is what the viewer may
+// START, the forced track is what the switch would BRING BACK.
+func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string {
+		out := key
+		for i := 1; i < len(args); i += 2 {
+			out += ":" + fmt.Sprint(args[i])
+		}
+		return out
+	}
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":              helper.GetSubtitles,
+		"getAudioTracks":            helper.GetAudioTracks,
+		"hasControls":               helper.HasControls,
+		"getDurationSec":            helper.GetDurationSec,
+		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
+		"userSubtitleView":          helper.UserSubtitleView,
+		"subtitleLangGroups":        helper.SubtitleLangGroups,
+		"originCode":                helper.OriginCode,
+		"originCodeForBadge":        helper.OriginCodeForBadge,
+		"originKey":                 helper.OriginKey,
+		"propertyTags":              helper.PropertyTags,
+		"audioSuffix":               helper.AudioSuffix,
+		"langDisplay":               stremio.NewHelper().LangDisplay,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return false },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<!--stub-->{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+			{Src: "https://x/sc-pt.vtt", SrcLang: "pt", Label: "Movie.pt.forced.srt", Kind: "subtitles"},
+		}},
+		Resource:            &ra.ResourceResponse{},
+		Item:                &ra.ListItem{PathStr: "movie.mkv"},
+		Title:               "Movie",
+		MediaProbe:          &mp,
+		EIURL:               "http://ei.example.com",
+		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: "res", ItemID: "item"},
+		Settings:            &models.StreamSettings{},
+		ExternalData:        &models.ExternalData{},
+		SubtitleOpts:        models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	items := helper.GetSubtitles(data.VideoStreamUserData, data.MediaProbe, data.ExportTag, data.OpenSubtitles, data.ExternalData, data.UserSubtitles, data.SubtitleOpts)
+	by := byIDTest(items)
+	if tr := by["tr-pt"]; !tr.Offered || tr.Suggested {
+		t.Fatalf("fixture: the AI item must be the offer and nothing else, got %+v", tr)
+	}
+	if f := by["et-2"]; !f.Forced || !f.Suggested || f.Offered {
+		t.Fatalf("fixture: the forced pt track must be what the switch restores, got %+v", f)
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data, "Lang": "en", "User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	chipOf := func(id string) string {
+		at := strings.Index(html, `data-id="`+id+`"`)
+		if at < 0 {
+			t.Fatalf("no chip %s:\n%s", id, html)
+		}
+		c := html[strings.LastIndex(html[:at], "<button"):]
+		return c[:strings.Index(c, "</button>")]
+	}
+
+	ai := chipOf("tr-pt")
+	for _, want := range []string{`data-offered="true"`, "chip-offered", "action.stream.translate.action:Portuguese"} {
+		if !strings.Contains(ai, want) {
+			t.Errorf("the AI chip is missing %q:\n%s", want, ai)
+		}
+	}
+	if strings.Contains(ai, "data-suggested") || strings.Contains(ai, "track-chip-active") {
+		t.Errorf("the AI chip must not claim the switch's slot:\n%s", ai)
+	}
+
+	forced := chipOf("et-2")
+	for _, want := range []string{`data-suggested="true"`, "track-chip-active", `aria-checked="true"`} {
+		if !strings.Contains(forced, want) {
+			t.Errorf("the forced chip is missing %q:\n%s", want, forced)
+		}
+	}
+	if strings.Contains(forced, "data-offered") || strings.Contains(forced, "chip-offered") {
+		t.Errorf("only a translation is ever offered:\n%s", forced)
+	}
+
+	// Subtitles are off, the switch has a track to restore, so the hint —
+	// which explains a switch that refuses — stays hidden.
+	if !strings.Contains(html, `data-subtitles-off="true"`) {
+		t.Error("the switch must render off")
+	}
+	hintAt := strings.Index(html, `id="subtitle-hint"`)
+	if hintAt < 0 {
+		t.Fatal("no #subtitle-hint element")
+	}
+	if !strings.Contains(html[hintAt:hintAt+strings.Index(html[hintAt:], ">")], "hidden") {
+		t.Error("the hint must be hidden while the switch has something to restore")
+	}
 }

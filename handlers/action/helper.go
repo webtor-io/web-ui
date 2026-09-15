@@ -68,25 +68,28 @@ type ListItem struct {
 	// would come back on the next page load as a choice that switches the
 	// rule off.
 	Saved bool
-	// Suggested marks the one item the picker offers: rendered as
-	// data-suggested, and at most one per list.
+	// Suggested is the track the picker's subtitles switch restores:
+	// rendered as data-suggested, at most one per list, and computed by
+	// offSuggestion whenever the "None" item is the default. Never the
+	// "None" item, never a locked one, and never a translation -- the
+	// switch does not spend tokens on the viewer's behalf.
 	//
-	// Two shapes of offer, and the picker draws them differently:
-	//
-	//   - while subtitles are off, the track the switch would turn on --
-	//     what the ladder (or, with no preferred language, the
-	//     Accept-Language selection) would have made Default. Drawn with
-	//     the muted "this is what comes back" check and fill.
-	//   - the AI translation, whenever the ladder's answer was a
-	//     translation (2026-09-16): never Default, because starting one
-	//     spends tokens. Drawn as an action ("Translate to <language>")
-	//     with an accent outline, and the switch refuses to start it.
-	//
-	// Never on the "None" item itself, and never on a locked one. With
-	// subtitles on and no translation to offer nothing is suggested at all:
-	// Default already answers what is playing, and two answers would let
-	// the picker restore something other than that.
+	// With subtitles on nothing is Suggested: Default already answers what
+	// is playing, and two answers would let the picker restore something
+	// other than that.
 	Suggested bool
+	// Offered is the AI translation the ladder would have turned on before
+	// 2026-09-16, when running one stopped being something the server does
+	// for the viewer. Rendered as data-offered and drawn as an action
+	// ("Translate to <language>", accent outline) rather than a selection.
+	//
+	// A separate field from Suggested on purpose (owner review): they
+	// answer different questions -- "what would the switch bring back" and
+	// "what can the viewer start here" -- and one list often needs both,
+	// on two different items. Never set on a locked item: a free viewer
+	// cannot run it, so it is not an action on offer but an upsell, and the
+	// chip keeps its old name-plus-lock shape.
+	Offered bool
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -575,7 +578,14 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 				// embed's own track is read the same way the ladder reads
 				// it below.
 				if lis[i].ID == "none" {
-					markSuggested(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx))
+					if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx); p > 0 && lis[p].Provider == "Translated" {
+						// Same split as below: an offer, never the switch's
+						// answer. What the switch restores is decided by
+						// offSuggestion once the defaults are settled.
+						lis[p].Offered = true
+					} else {
+						markSuggested(lis, p)
+					}
 				}
 				for j := range lis {
 					lis[j].Default = false
@@ -589,12 +599,12 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	pick := s.ladderPick(lis, ud, audioLang, opts, humanIdx)
 	// A translation is never turned on for the viewer (owner, 2026-09-16):
 	// starting one spends tokens, so it takes an explicit click. Where the
-	// ladder chose it, the item is marked Suggested instead -- the picker
-	// draws that as an offer ("Translate to Portuguese"), not as a
-	// selection -- and the phase-1 selection decides what actually plays,
-	// which is "None" when it finds nothing.
+	// ladder chose it, the item is marked Offered -- the picker draws that
+	// as an action ("Translate to Portuguese"), not as a selection -- and
+	// the phase-1 selection decides what actually plays, which is "None"
+	// when it finds nothing.
 	if lis[pick].Provider == "Translated" {
-		lis[pick].Suggested = true
+		lis[pick].Offered = true
 		return s.selectListItem(lis, "", ud, true)
 	}
 	lis[pick].Default = true

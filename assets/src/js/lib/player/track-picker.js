@@ -285,11 +285,10 @@ function mutedChoiceID(container, chips) {
     const last = attr(container, 'data-last-subtitle');
     if (last) return last;
     for (const c of chips) {
-        // An offered translation is not "what comes back": the switch
-        // refuses to start one, so the row must not put its dot on it
-        // either. (A translation the viewer already ran does come back --
-        // through data-last-subtitle, one branch up.)
-        if (c.id !== 'none' && attr(c.el, 'data-suggested') === 'true' && attr(c.el, 'data-provider') !== 'Translated') return c.id;
+        // data-suggested is only ever a track the switch can restore: the
+        // translation on offer carries data-offered instead (two questions,
+        // two fields), so no provider test is needed here.
+        if (c.id !== 'none' && attr(c.el, 'data-suggested') === 'true') return c.id;
     }
     return '';
 }
@@ -517,7 +516,7 @@ export function applyOffState(container, off) {
     // viewer's language is a translation, and starting one is their call.
     // Same rule the server renders the hint by.
     const hint = container.querySelector('#subtitle-hint');
-    if (hint) hint.hidden = !(next && translationIsTheOnlyOffer(container));
+    if (hint) hint.hidden = !(next && !!offeredTranslation(container));
     const toggleBox = container.querySelector('#subtitle-langs');
     if (toggleBox && toggleBox.classList && toggleBox !== langRowBox(container)) {
         toggleBox.classList.remove('picker-off');
@@ -538,13 +537,13 @@ export function applyOffState(container, off) {
     return next;
 }
 
-// translationIsTheOnlyOffer reports whether the picker's offer -- the one
-// Suggested chip -- is an AI translation the viewer can start. That is the
-// one state where the switch has nothing to give, because it will not
-// spend tokens on their behalf.
-function translationIsTheOnlyOffer(container) {
-    const el = container.querySelector && container.querySelector('.subtitle[data-suggested="true"][data-provider="Translated"]');
-    return !!el && attr(el, 'data-locked') !== 'true';
+// offeredTranslation is the chip the viewer may start a translation from:
+// the ladder's answer, marked data-offered by the server. Null when there
+// is none (no AI item, or a locked one, which is an upsell rather than an
+// action).
+function offeredTranslation(container) {
+    if (!container || !container.querySelector) return null;
+    return container.querySelector('.subtitle[data-offered="true"]');
 }
 
 // refreshMarks is what a selection needs: the row's counts and dot, and the

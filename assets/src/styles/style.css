@@ -907,9 +907,13 @@ input:-webkit-autofill:focus {
 
 /* The AI chip the ladder offers but never turns on: an accent outline so
    the eye lands on it, without the cyan fill that means "this is playing".
-   A translation costs tokens, so it is an invitation, not a selection. */
-.chip-suggested {
-  @apply border-w-pink/40;
+   A translation costs tokens, so it is an invitation, not a selection.
+   The hover rule repeats the colour because .track-chip's own hover moves
+   the border to cyan, which would read as "selected" on the one chip that
+   is not. */
+.chip-offered,
+.chip-offered:hover {
+  border-color: rgba(232, 67, 147, 0.40) !important;
 }
 
 /* The subtitle block while the switch on its heading is off: both rows are

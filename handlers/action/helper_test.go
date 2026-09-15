@@ -327,8 +327,8 @@ func TestLadderTranslatedIsOfferedWhenNoHumanTrackInPreferredLang(t *testing.T) 
 	if !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
 		t.Fatalf("expected the English sidecar as source, got %q", tr.Src)
 	}
-	if !tr.Suggested || tr.Default {
-		t.Fatalf("the translation is offered, never turned on: suggested=%v default=%v", tr.Suggested, tr.Default)
+	if !tr.Offered || tr.Suggested || tr.Default {
+		t.Fatalf("the translation is offered, never turned on: offered=%v suggested=%v default=%v", tr.Offered, tr.Suggested, tr.Default)
 	}
 }
 
@@ -842,15 +842,20 @@ func TestLadderSavedOffSuggestsWhatItWouldHavePicked(t *testing.T) {
 	}
 }
 
-// TestLadderSavedOffSuggestsTheAIItem is the same rule one rung down the
-// ladder: no human track in the preferred language, so what the toggle
-// would turn on is the AI translation.
-func TestLadderSavedOffSuggestsTheAIItem(t *testing.T) {
+// TestLadderSavedOffOffersTheAIItem: saved off, and the ladder's answer for
+// the viewer's language is the translation. Since 2026-09-16 that answer is
+// an offer, not what the switch restores -- the switch gets its own
+// candidate from offSuggestion, here the embedded English track.
+func TestLadderSavedOffOffersTheAIItem(t *testing.T) {
 	tag, os := humanTracks()
-	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none"}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{SubtitleID: "none", FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
-	if s := suggestedID(t, items); s != "tr-pt" {
-		t.Fatalf("suggested=%s want tr-pt", s)
+	tr := byID(items)["tr-pt"]
+	if !tr.Offered || tr.Suggested {
+		t.Fatalf("the AI item must be offered and never suggested: %+v", tr)
+	}
+	if s := suggestedID(t, items); s != "mp-0" {
+		t.Fatalf("suggested=%s want mp-0: the switch restores a real track", s)
 	}
 }
 
@@ -1037,6 +1042,12 @@ func TestLadderNeverDefaultsTheTranslation(t *testing.T) {
 	tag, os := humanTracks()
 	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	// Fixture guard: with no AI item in the list "never Default" would hold
+	// vacuously, and the test would go on passing after the ladder stopped
+	// producing one at all.
+	if tr, ok := byID(items)["tr-pt"]; !ok || tr.Locked {
+		t.Fatalf("fixture must produce an unlocked AI item, got %+v", tr)
+	}
 	for _, it := range items {
 		if it.Provider == "Translated" && it.Default {
 			t.Fatalf("the AI translation must never be the default: %+v", it)
@@ -1049,18 +1060,15 @@ func TestLadderNeverDefaultsTheTranslation(t *testing.T) {
 	}
 }
 
-// TestLadderTranslatedIsSuggestedNotDefault: where the ladder would have
+// TestLadderTranslatedIsOfferedNotDefault: where the ladder would have
 // turned the translation on, it offers it instead.
-func TestLadderTranslatedIsSuggestedNotDefault(t *testing.T) {
+func TestLadderTranslatedIsOfferedNotDefault(t *testing.T) {
 	tag, os := humanTracks()
 	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
 	tr := byID(items)["tr-pt"]
-	if !tr.Suggested {
-		t.Fatalf("the AI item must be offered: %+v", tr)
-	}
-	if s := suggestedID(t, items); s != "tr-pt" {
-		t.Fatalf("suggested=%s want tr-pt", s)
+	if !tr.Offered || tr.Default {
+		t.Fatalf("the AI item must be offered and never default: %+v", tr)
 	}
 }
 
@@ -1076,8 +1084,9 @@ func TestLadderTranslationOfferSurvivesWithNoOtherTrack(t *testing.T) {
 	if d := defaultID(items); d != "none" {
 		t.Fatalf("default=%s want none", d)
 	}
-	if s := suggestedID(t, items); s != "tr-pt" {
-		t.Fatalf("suggested=%s want tr-pt: the offer is what the picker has to show", s)
+	tr := byID(items)["tr-pt"]
+	if !tr.Offered {
+		t.Fatalf("the offer is what the picker has to show: %+v", tr)
 	}
 }
 
@@ -1100,5 +1109,65 @@ func TestOffSuggestionNeverOffersTheTranslation(t *testing.T) {
 	}
 	if s := suggestedID(t, items); s == "tr-pt" {
 		t.Fatal("the switch must never promise to start a translation")
+	}
+}
+
+// TestOfferedAndSuggestedAreDifferentSlots pins the split (owner review,
+// 2026-09-16): the AI chip the ladder would have chosen is Offered -- an
+// action the viewer may take -- and it must not consume the slot that says
+// what the subtitles switch restores. Both can be true of one list, of two
+// different items, and they are drawn differently.
+//
+// Fixture: Japanese audio, Portuguese viewer, one forced Portuguese
+// sidecar (never a full track, so the ladder does not turn it on) and an
+// English sidecar to translate from.
+func TestOfferedAndSuggestedAreDifferentSlots(t *testing.T) {
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{
+		{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+		{Src: "https://x/sc-pt.vtt", SrcLang: "pt", Label: "Movie.pt.forced.srt", Kind: "subtitles"},
+	}}
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	got := byID(items)
+
+	forced := got["et-2"]
+	if !forced.Forced {
+		t.Fatalf("fixture must produce a forced pt track, got %+v", forced)
+	}
+	tr, ok := got["tr-pt"]
+	if !ok || tr.Locked {
+		t.Fatalf("fixture must produce an unlocked AI item, got %+v", tr)
+	}
+
+	if !tr.Offered || tr.Suggested || tr.Default {
+		t.Errorf("the AI item is an offer and nothing else: offered=%v suggested=%v default=%v", tr.Offered, tr.Suggested, tr.Default)
+	}
+	// Subtitles are off (a forced track is not what the ladder turns on when
+	// the audio is foreign), so the switch needs something to restore -- and
+	// the forced track in the viewer's own language is it.
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none", d)
+	}
+	if s := suggestedID(t, items); s != "et-2" {
+		t.Errorf("suggested=%s want et-2: the switch restores the forced track, not the offer", s)
+	}
+	if forced.Offered {
+		t.Error("only a translation is ever Offered")
+	}
+}
+
+// TestOfferedIsNeverLocked: a free viewer cannot run the translation, so it
+// is not an action on offer -- the chip keeps its old shape (name + lock +
+// CTA), which TestStreamVideoRendersTranslateBadgesAndCTA pins in markup.
+func TestOfferedIsNeverLocked(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	tr := byID(items)["tr-pt"]
+	if !tr.Locked {
+		t.Fatalf("fixture must produce a locked AI item, got %+v", tr)
+	}
+	if tr.Offered {
+		t.Error("a locked translation is not an offer")
 	}
 }
