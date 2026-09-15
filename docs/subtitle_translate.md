@@ -273,13 +273,11 @@ for the same reason.
 |---|---|---|
 | `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang` |
 | `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
-| `#audio-now` | `<span>` | "Now:" line for audio — one `.now-value` child, no `.now-origin` (audio has no origin code) |
 | `#subtitle-langs` | `<div role="group">` | subtitle **language** row — a filter, not a choice |
 | `#subtitle-lang-more` | `<button aria-expanded>` | the "+N" disclosure; its whole visible label lives in the single `.more-count` span |
 | `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
 | `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
-| `#subtitle-off` | first `<button>` of `#subtitle-tracks` | the "Off" chip — it **is** the `none` list item |
-| `#subtitle-now` | `<span>` | "Now:" for subtitles — `.now-origin` badge (hidden when empty) + `.now-value` |
+| `#subtitle-off` | first `<button>` of `#subtitle-langs` | the "Off" chip — the switch next to the languages; it **is** the `none` list item (a `.subtitle` radio the player activates by `data-id`), rendered in the language row, never inside `#subtitle-tracks` |
 | `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
 | `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | upload form + one row per file, each row with its own delete form |
@@ -290,7 +288,7 @@ for the same reason.
 | Kind | Where | Attributes |
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
-| `.subtitle#subtitle-off` | first chip of `#subtitle-tracks` | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-lang-name=""`, `data-lang-flag=""`, `data-default`, `data-saved`. No `data-label` — `syncNow` falls back to `textContent`, i.e. the localized "Off" |
+| `.subtitle#subtitle-off` | first chip of `#subtitle-langs` | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-lang-name=""`, `data-lang-flag=""`, `data-default`, `data-saved`. No `data-label` — `syncNow` falls back to `textContent`, i.e. the localized "Off" |
 | `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved` |
 | `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-autoselect="true"` when just uploaded |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
@@ -318,16 +316,16 @@ tab panels and the one real choice (which track plays) lives in the radiogroup u
 **Server-side `hidden`.** The dialog and the uploads partial both render the bare `hidden`
 attribute on every subtitle chip whose `data-lang` differs from the expanded language
 (`LangRow.Expanded`), so a page whose picker JS never loaded still shows one coherent language.
-The Off chip is never hidden this way, and `applyLangFilter` skips `data-id="none"` for the same
-reason. `ExpandedLang` is empty on the async reload of the uploads partial (it has no language row
+The Off chip sits in the language row, outside `#subtitle-tracks`, so neither the server filter nor
+`applyLangFilter` (which reads only the track row and skips `data-id="none"` defensively) ever hides it. `ExpandedLang` is empty on the async reload of the uploads partial (it has no language row
 to consult), so nothing is collapsed for the instant between the swap and the client's `refresh`.
 
 **Refresh order.** `refresh(container)` in `assets/src/js/lib/player/track-picker.js` is
-`syncLangRow` → `applyLangFilter` → `applyFlagSupport` → `syncNow`, and returns the language it
+`syncLangRow` → `applyLangFilter` → `applyFlagSupport` (→ `syncNow`, a no-op since the "Now:" lines were dropped), and returns the language it
 settled on. `Player.jsx` calls it after mount, on dialog open, and after the `#my-subtitles` async
-swap (upload **and** delete). A plain selection calls `refreshMarks` (`syncLangRow` + `syncNow`)
-instead: picking a track moves the dot and both "Now:" lines without yanking the viewer out of the
-language they were browsing.
+swap (upload **and** delete). A plain selection calls `refreshMarks` (`syncLangRow`)
+instead: picking a track moves the dot without yanking the viewer out of the language they were
+browsing.
 
 **"+N".** `maxVisibleLangChips = 6` (`handlers/action/picker.go`) is mirrored by
 `MAX_VISIBLE_LANGS = 6` (`track-picker.js`). `#subtitle-lang-more` is a toggle, not a one-way
@@ -393,9 +391,9 @@ row plus the tracks of the expanded language.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.
-- **"Now:" line** on both headings (`#audio-now`, `#subtitle-now`): origin badge, then flag and
-  language name, falling back to the chip's `data-label`. Written by JS only, so it is empty
-  without JS.
+- **No "Now:" summary**: the active chip (check + fill) is the only indicator of what is playing;
+  the heading-line summary from the first mockup was dropped as noise (2026-09-15). `#audio-now` /
+  `#subtitle-now` no longer exist; `syncNow` no-ops when they are absent.
 - **Uploads are inline.** The dashed `+ My Subtitles` chip (`action.stream.mySubtitles`, the same key the old tab used) opens `#my-uploads-panel` on its own flex
   line: the upload form and one row per file, each row carrying its own delete form that posts to
   the unchanged `POST /user-subtitle/delete/:id` with `data-async-target="#my-subtitles"`.
@@ -405,7 +403,7 @@ row plus the tracks of the expanded language.
   `#my-subtitles` (the wrapper survives the swap, the toggle and panel inside it do not).
 - **Deleting the upload that is playing lands on Off.** The swap replaces `#my-subtitles`, so the
   chip goes, but the `<track>` lives in `<video>` and would keep the deleted file's subtitles on
-  screen with nothing marked and "Now:" blank. `dropDeletedTracks` (`subtitle-track-reload.js`)
+  screen with nothing marked. `dropDeletedTracks` (`subtitle-track-reload.js`)
   removes every `<track>` no chip claims any more — the test is the id against **all** chips in
   the dialog, since the preloaded OpenSubtitles and sidecar tracks are `<track>` elements too —
   and reports whether one of them was showing; when it was, the player activates `none` with
@@ -419,7 +417,7 @@ row plus the tracks of the expanded language.
   would reshuffle every equal-count group on the first refresh after an upload.
 - **Without JS** (picker JS failed, player loaded): every chip renders, the expanded language's
   tracks are visible, the active track carries its check and fill from SSR and the counts are
-  right. Missing are the filter (the language row is inert), the dot, and both "Now:" lines.
+  right. Missing are the filter (the language row is inert) and the dot.
   Switching tracks needed JS before the redesign too — the handlers were always client-side.
 
 **Known a11y wart (follow-up).** `#my-uploads-toggle` and `#my-uploads-panel` render *inside*

@@ -2149,7 +2149,6 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <div class="mb-6">
         <div class="flex items-baseline justify-between gap-3 mb-2">
           <h3 class="font-bold text-lg">Audio</h3>
-          <span class="text-xs text-w-muted truncate">Now: <span class="text-w-text">🇬🇧 English</span></span>
         </div>
         <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Audio">
           <button type="button" class="audio track-chip track-chip-active" role="radio" aria-checked="true">
@@ -2167,11 +2166,14 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <div>
         <div class="flex items-baseline justify-between gap-3 mb-2">
           <h3 class="font-bold text-lg">Subtitles</h3>
-          <span class="text-xs text-w-muted truncate">Now: <span class="badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub align-middle">OS</span> <span class="text-w-text">🇷🇺 Russian</span></span>
         </div>
 
         <!-- language row: #subtitle-langs — a filter, not a choice: role="group" + aria-pressed -->
         <div class="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Subtitle language">
+          <button type="button" class="subtitle lang-chip" role="radio" aria-checked="false" data-id="none">
+            <svg class="chip-check w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" hidden><polyline points="20 6 9 17 4 12"/></svg>
+            Off
+          </button>
           <button type="button" class="lang lang-chip lang-chip-active" data-lang="ru" aria-pressed="true"><span class="chip-flag">🇷🇺</span> <span class="lang-name">Russian</span> <span class="lang-count text-w-muted" style="font-weight:400">5</span> <span class="lang-dot w-1.5 h-1.5 rounded-full bg-w-cyan" aria-hidden="true"></span></button>
           <button type="button" class="lang lang-chip" data-lang="en" aria-pressed="false"><span class="chip-flag">🇬🇧</span> <span class="lang-name">English</span> <span class="lang-count text-w-muted" style="font-weight:400">3</span></button>
           <button type="button" class="lang lang-chip" data-lang="de" aria-pressed="false"><span class="chip-flag">🇩🇪</span> <span class="lang-name">German</span> <span class="lang-count text-w-muted" style="font-weight:400">2</span></button>
@@ -2181,12 +2183,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
           <button type="button" class="lang-chip text-w-muted" aria-expanded="false" title="More languages" aria-label="More languages"><span class="more-count">+4</span></button>
         </div>
 
-        <!-- track row: #subtitle-tracks — "Off" is its FIRST chip, not a language chip -->
+        <!-- track row: #subtitle-tracks — the tracks of the expanded language; "Off" lives in the language row above (a .subtitle radio the player activates by data-id, never hidden by the filter) -->
         <div class="flex flex-wrap gap-1.5 mb-3" role="radiogroup" aria-label="Subtitles">
-          <button type="button" class="subtitle track-chip" role="radio" aria-checked="false" data-id="none">
-            <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" hidden><polyline points="20 6 9 17 4 12"/></svg>
-            Off
-          </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="Embedded in the video">EM</span>
             <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span>
@@ -2304,14 +2302,14 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Mobile (&lt; 640px)</h3>
     <div class="uikit-note">
-      &bull; Audio and Subtitles stack; both keep the "Now:" summary on the heading line so the current choice is readable without scrolling the chip rows.<br>
+      &bull; Audio and Subtitles stack; the active chip (check + fill) is the only "current" indicator — the "Now:" summary was dropped as noise (owner, 2026-09-15).<br>
       &bull; Chips wrap; touch target is the full <code>btn-sm</code> height (2rem) — do not shrink track chips to <code>btn-xs</code> on mobile, only the language row is <code>xs</code>.<br>
       &bull; Long file names truncate with <code>max-w-[9rem] sm:max-w-[14rem] truncate</code> inside the chip; the full name lives in <code>title</code>.<br>
       &bull; Flags: guarded by <code>supportsFlagEmoji()</code> (Windows renders bare letter pairs) — <code>applyFlagSupport</code> hides every <code>.chip-flag</code> and the language names stay, exactly as Discover does.
     </div>
 
     <div class="uikit-rule">
-      <strong>Rules:</strong> language first, origin second, file name last. Origin codes never localize (they are codes, like ISO tags); their meaning localizes in <code>title</code> and in the legend line, both from <code>action.stream.origin.*</code>. One active chip per group, marked by the check icon — never by underline alone (fails on colour-blind and on touch hover). <strong>"Off" is the first chip of the <em>track</em> row</strong>, not of the language row: it is the real <code>.subtitle</code> element for the <code>none</code> item (<code>data-id="none"</code>), which the player looks up by that id, so a copy in the language row would give the picker two sources of truth. "Off" is not a language, so the filter never hides it (the server skips it, and <code>applyLangFilter</code> skips <code>data-id="none"</code>). A track with no language tag groups under the mono code <strong><code>UND</code></strong> — flag and name are empty, and the code takes their place on both the language chip and the audio chip. The language row is a <strong>filter</strong>: <code>role="group"</code> with <code>aria-pressed</code> buttons, never <code>role="tab"</code>/<code>aria-selected</code> — there are no tab panels, and the one real choice lives in the radiogroup underneath. No sub-views: OpenSubtitles and My uploads are origins inside the same list, not separate screens.
+      <strong>Rules:</strong> language first, origin second, file name last. Origin codes never localize (they are codes, like ISO tags); their meaning localizes in <code>title</code> and in the legend line, both from <code>action.stream.origin.*</code>. One active chip per group, marked by the check icon — never by underline alone (fails on colour-blind and on touch hover). <strong>"Off" is the first chip of the <em>language</em> row</strong> — a switch next to the languages it turns off — but it is still the one real <code>.subtitle</code> element for the <code>none</code> item (<code>data-id="none"</code>), which the player activates by that id; it is never rendered in the track row, and the language filter never touches it (it is outside <code>#subtitle-tracks</code>). A track with no language tag groups under the mono code <strong><code>UND</code></strong> — flag and name are empty, and the code takes their place on both the language chip and the audio chip. The language row is a <strong>filter</strong>: <code>role="group"</code> with <code>aria-pressed</code> buttons, never <code>role="tab"</code>/<code>aria-selected</code> — there are no tab panels, and the one real choice lives in the radiogroup underneath. No sub-views: OpenSubtitles and My uploads are origins inside the same list, not separate screens.
     </div>
     <div class="uikit-note">
       <strong>Uploads row — mockup vs. code.</strong> Drawn here as a row <em>below</em> the track radiogroup, which is where it belongs (ruling R8). <strong>In the shipped markup it is not there yet:</strong> <code>#my-uploads-toggle</code> and <code>#my-uploads-panel</code> are emitted by <code>templates/partials/action/user_subtitles.html</code> together with the <code>MY</code> chips, and that partial renders <em>inside</em> <code>#subtitle-tracks</code> through the <code>#my-subtitles</code> wrapper (<code>class="contents"</code>, i.e. <code>display:contents</code>) — because the partial is a single async swap target that has to emit chips and panel at once. Visually identical (the panel's <code>basis-full</code> pushes it onto its own flex line); the cost is that a <code>role="radiogroup"</code> contains a disclosure button and, when open, two forms. Moving it out is markup-only plus a re-scope of <code>readChips</code> in <code>track-picker.js</code>; tracked as a follow-up.

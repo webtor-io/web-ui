@@ -342,20 +342,26 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	}
 	// ...but "Off" is not a language and must never be collapsed by it:
 	// otherwise a viewer whose expanded language is anything but "und"
-	// cannot turn subtitles off at all without JavaScript.
-	if tag := startTag(`id="subtitle-off"`); strings.Contains(tag, " hidden") {
-		t.Errorf("the Off chip is hidden by the language filter:\n%s", tag)
+	// cannot turn subtitles off at all without JavaScript. It lives in the
+	// language row (first button there, next to the languages it switches
+	// off), so it is looked up in that slice, not in the track row.
+	langsAt := strings.Index(html, `id="subtitle-langs"`)
+	if langsAt < 0 || langsAt > tracksAt {
+		t.Fatalf("no language row before the track row (langs at %d, tracks at %d)", langsAt, tracksAt)
 	}
-	// And it is the FIRST chip of the row (R1): the player looks the "None"
-	// item up by data-id, but a viewer reaching for "off" scans from the
-	// left. Compared against the first `class="subtitle ` in the row, which
-	// is the Off chip's own class attribute when the order is right.
-	off, firstChip := strings.Index(tracks, `id="subtitle-off"`), strings.Index(tracks, `class="subtitle `)
-	if off < 0 || firstChip < 0 {
-		t.Fatal("the track row has no Off chip or no subtitle chips at all")
+	langs := html[langsAt:tracksAt]
+	offAt := strings.Index(langs, `id="subtitle-off"`)
+	if offAt < 0 {
+		t.Fatalf("the Off chip is not in the language row:\n%s", langs)
 	}
-	if off > firstChip {
-		t.Errorf("the Off chip is not the first .subtitle of #subtitle-tracks (off at %d, first chip at %d)", off, firstChip)
+	if open := strings.LastIndex(langs[:offAt], "<button"); open < 0 || strings.Contains(langs[open:offAt+strings.Index(langs[offAt:], ">")], " hidden") {
+		t.Errorf("the Off chip is hidden by the language filter:\n%s", langs)
+	}
+	if first := strings.Index(langs, "<button"); first < 0 || first != strings.LastIndex(langs[:offAt], "<button") {
+		t.Errorf("the Off chip is not the first button of #subtitle-langs (first button at %d, off at %d)", first, offAt)
+	}
+	if strings.Contains(tracks, `id="subtitle-off"`) {
+		t.Errorf("the Off chip is rendered twice (also inside #subtitle-tracks)")
 	}
 
 	// The "+N" disclosure's whole label lives in .more-count, because

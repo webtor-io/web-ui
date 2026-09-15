@@ -62,7 +62,6 @@
             <div class="mb-6">
                 <div class="flex items-baseline justify-between gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.audio" }}</h3>
-                    <span id="audio-now" class="text-xs text-w-muted truncate">{{ t $.Lang "action.stream.now" }} <span class="now-value text-w-text"></span></span>
                 </div>
                 <div id="audio-tracks" class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="{{ t $.Lang "action.stream.audio" }}">
                     {{ range getAudioTracks .VideoStreamUserData .MediaProbe }}
@@ -84,7 +83,6 @@
             <div>
                 <div class="flex items-baseline justify-between gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
-                    <span id="subtitle-now" class="text-xs text-w-muted truncate">{{ t $.Lang "action.stream.now" }} <span class="now-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub align-middle" hidden></span> <span class="now-value text-w-text"></span></span>
                 </div>
 
                 {{/* The language row is a filter, not a choice: pressing a chip
@@ -94,6 +92,25 @@
                      tab panels, and the one real choice (which track plays)
                      lives in the radiogroup underneath. */}}
                 <div id="subtitle-langs" class="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleLanguage" }}">
+                    {{ range $subs }}{{ if eq .ID "none" }}
+                    {{ $d := langDisplay .SrcLang }}
+                    <button type="button" id="subtitle-off" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
+                            data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}"
+                            {{/* "Off" sits in the language row (owner's call:
+                                 it is a switch, next to the languages) but it
+                                 IS the none track — a .subtitle radio the
+                                 player activates by data-id. It carries the
+                                 language triplet like every chip so no reader
+                                 has to special-case its absence; readChips
+                                 (scoped to #subtitle-tracks) never sees it and
+                                 the language filter never hides it. */}}
+                            data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
+                            {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}
+                            class="subtitle lang-chip{{ if .Default }} track-chip-active{{ end }}">
+                        <svg class="chip-check w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ t $.Lang "action.stream.off" }}
+                    </button>
+                    {{ end }}{{ end }}
                     {{ range $row.Groups }}
                     <button type="button" class="lang lang-chip{{ if eq .Lang $row.Expanded }} lang-chip-active{{ end }}"
                             data-lang="{{ .Lang }}" aria-pressed="{{ if eq .Lang $row.Expanded }}true{{ else }}false{{ end }}"{{ if .Overflow }} hidden{{ end }}>
@@ -130,23 +147,6 @@
                      the server skips it below and applyLangFilter skips
                      data-id="none". */}}
                 <div id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3" role="radiogroup" aria-label="{{ t $.Lang "action.stream.subtitles" }}">
-                    {{ range $subs }}{{ if eq .ID "none" }}
-                    {{ $d := langDisplay .SrcLang }}
-                    <button type="button" id="subtitle-off" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"
-                            data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}"
-                            {{/* Every chip carries the language triplet the
-                                 picker groups and labels by. "Off" is not a
-                                 language — it resolves to und and both
-                                 groupByLang and applyLangFilter skip it by
-                                 data-id — but the attributes are there so no
-                                 reader has to special-case their absence. */}}
-                            data-lang="{{ $d.Lang }}" data-lang-name="{{ $d.Name }}" data-lang-flag="{{ $d.Flag }}"
-                            {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}
-                            class="subtitle track-chip{{ if .Default }} track-chip-active{{ end }}">
-                        <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"{{ if not .Default }} hidden{{ end }}><polyline points="20 6 9 17 4 12"/></svg>
-                        {{ t $.Lang "action.stream.off" }}
-                    </button>
-                    {{ end }}{{ end }}
                     {{ range $flat }}{{ if ne .ID "none" }}
                     {{ $d := langDisplay .SrcLang }}{{ $oc := originCode . }}
                     <button type="button" role="radio" aria-checked="{{ if .Default }}true{{ else }}false{{ end }}"

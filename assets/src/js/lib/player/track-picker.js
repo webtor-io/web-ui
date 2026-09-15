@@ -177,10 +177,12 @@ function chipData(el) {
     };
 }
 
-// readChips reads the flat subtitle list, the "Off" chip included: it is the
-// first .subtitle of #subtitle-tracks (R1) and the callers that must ignore
-// it do so by id. Uploads land in #my-subtitles, a display:contents wrapper
-// inside the same container, so they are read here too.
+// readChips reads the flat subtitle list. The "Off" chip is NOT in it: it
+// lives in the language row (#subtitle-langs) as the switch next to the
+// languages, so the filter never sees it and never hides it; the callers
+// that would have to skip it by id keep doing so defensively. Uploads land
+// in #my-subtitles, a display:contents wrapper inside the same container, so
+// they are read here too.
 export function readChips(container) {
     const box = container && container.querySelector && container.querySelector('#subtitle-tracks');
     if (!box) return [];
