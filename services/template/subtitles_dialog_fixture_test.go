@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,12 +19,28 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
-// dialogFixturePath is the file the JS harness renders into jsdom. It is
-// committed, because `npm test` must not need a Go toolchain.
-const dialogFixturePath = "../../assets/src/js/lib/player/__fixtures__/subtitles-dialog.html"
+// The files the JS harness renders into jsdom. They are committed, because
+// `npm test` must not need a Go toolchain.
+const (
+	dialogFixturePath      = "../../assets/src/js/lib/player/__fixtures__/subtitles-dialog.html"
+	uploadsFixturePath     = "../../assets/src/js/lib/player/__fixtures__/user-subtitles-async.html"
+	uploadsEmptyFixturePat = "../../assets/src/js/lib/player/__fixtures__/user-subtitles-async-empty.html"
+)
+
+// regenCmd is the exact, copy-pasteable command that rewrites the fixtures.
+// The -ldflags matter: without them the test binary panics at init on the
+// proto registration conflict between the abuse-store and torrent-store
+// protobufs (see the Makefile's `test` target, which passes the same flag
+// for the same reason). Printed verbatim in the failure below, because that
+// message is what a developer reads at the moment they need it — a doc
+// comment they have to go and find is not the same thing.
+const regenCmd = `UPDATE_FIXTURES=1 go test ` +
+	`-ldflags '-X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore' ` +
+	`./services/template/ -run TestSubtitlesDialogFixture`
 
 // TestSubtitlesDialogFixtureIsCurrent keeps the picker markup the JS wiring
 // tests run against honest.
@@ -36,9 +53,8 @@ const dialogFixturePath = "../../assets/src/js/lib/player/__fixtures__/subtitles
 //
 // How it works. This test renders the dialog from a fixed StreamContent and
 // compares it byte for byte with the committed file. A template change that
-// touches the picker turns it red here, with the instruction to regenerate:
-//
-//	UPDATE_FIXTURES=1 go test -ldflags "$(grep '^PROTO_CONFLICT_LDFLAGS' Makefile | sed 's/^[^=]*:= *//')" ./services/template/ -run TestSubtitlesDialogFixture
+// touches the picker turns it red here, printing `regenCmd` (above) as the
+// instruction to regenerate.
 //
 // Then re-run `npm test`: if the wiring tests go red on the new markup, the
 // template change broke the player, which is exactly what this is for. The
@@ -58,28 +74,72 @@ const dialogFixturePath = "../../assets/src/js/lib/player/__fixtures__/subtitles
 //   - subtitles off (the ladder has nothing in Portuguese but the offer),
 //     so the switch's on/off path has something to restore.
 func TestSubtitlesDialogFixtureIsCurrent(t *testing.T) {
-	got := renderSubtitlesDialog(t)
-
-	if os.Getenv("UPDATE_FIXTURES") != "" {
-		if err := os.MkdirAll(filepath.Dir(dialogFixturePath), 0o755); err != nil {
-			t.Fatalf("failed to create the fixture directory: %v", err)
-		}
-		if err := os.WriteFile(dialogFixturePath, []byte(got), 0o644); err != nil {
-			t.Fatalf("failed to write the fixture: %v", err)
-		}
-		t.Logf("wrote %s (%d bytes)", dialogFixturePath, len(got))
-		return
+	// One upload in the dialog, and the async reload of the uploads partial
+	// that the wiring tests replay: the upload case (the file just added is
+	// Selected, so the response carries data-autoselect) and the delete case
+	// that emptied the list. Hand-writing that response in the JS test was
+	// exactly the drift this machinery exists to stop, applied to the one
+	// shape the whole adoption mechanism turns on.
+	fixtures := map[string]string{
+		dialogFixturePath:      renderSubtitlesDialog(t),
+		uploadsFixturePath:     renderUploadsAsync(t, asyncUploads()),
+		uploadsEmptyFixturePat: renderUploadsAsync(t, nil),
 	}
 
-	want, err := os.ReadFile(dialogFixturePath)
+	for path, got := range fixtures {
+		if os.Getenv("UPDATE_FIXTURES") != "" {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatalf("failed to create the fixture directory: %v", err)
+			}
+			if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+				t.Fatalf("failed to write %s: %v", path, err)
+			}
+			t.Logf("wrote %s (%d bytes)", path, len(got))
+			continue
+		}
+
+		want, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("failed to read %s -- regenerate with:\n\t%s\n%v", path, regenCmd, err)
+		}
+		if string(want) != got {
+			t.Fatalf("the picker markup changed and %s is stale.\n"+
+				"Regenerate it with:\n\t%s\n"+
+				"then re-run `npm test` -- if Player.wiring.test.js goes red on the new markup,\n"+
+				"the template change broke the player wiring.", path, regenCmd)
+		}
+	}
+}
+
+// TestRegenCommandCarriesTheProtoLdflags keeps the printed instruction
+// runnable.
+//
+// The first version of that message omitted -ldflags, so the one command a
+// developer copies at the moment the fixture goes stale died on the proto
+// registration conflict — the exact panic the Makefile target exists to
+// avoid. Asserting against the Makefile rather than against a second copy
+// of the string means a change to the flag reddens this instead of silently
+// making the message wrong again.
+func TestRegenCommandCarriesTheProtoLdflags(t *testing.T) {
+	mk, err := os.ReadFile("../../Makefile")
 	if err != nil {
-		t.Fatalf("failed to read the fixture (regenerate with UPDATE_FIXTURES=1): %v", err)
+		t.Fatalf("Makefile: %v", err)
 	}
-	if string(want) != got {
-		t.Fatalf("the picker markup changed and %s is stale.\n"+
-			"Regenerate it with UPDATE_FIXTURES=1 go test ./services/template/ -run TestSubtitlesDialogFixture,\n"+
-			"then re-run `npm test` -- if Player.wiring.test.js goes red on the new markup,\n"+
-			"the template change broke the player wiring.", dialogFixturePath)
+	var flags string
+	for _, line := range strings.Split(string(mk), "\n") {
+		if after, ok := strings.CutPrefix(line, "PROTO_CONFLICT_LDFLAGS :="); ok {
+			flags = strings.TrimSpace(after)
+			break
+		}
+	}
+	if flags == "" {
+		t.Fatal("PROTO_CONFLICT_LDFLAGS is gone from the Makefile -- if the proto conflict was fixed, drop the flag here too")
+	}
+	if !strings.Contains(regenCmd, "-ldflags '"+flags+"'") {
+		t.Errorf("the regeneration command does not carry the Makefile's ldflags and will panic when run.\nMakefile: %s\ncommand:  %s", flags, regenCmd)
+	}
+	if !strings.Contains(regenCmd, "UPDATE_FIXTURES=1") || !strings.Contains(regenCmd, "-run TestSubtitlesDialogFixture") {
+		t.Errorf("the regeneration command does not regenerate anything: %s", regenCmd)
 	}
 }
 
@@ -114,15 +174,91 @@ func TestSubtitlesDialogFixtureCoversWhatTheWiringTestsNeed(t *testing.T) {
 			t.Errorf("the fixture no longer carries %q, so the wiring test that drives it covers nothing", want)
 		}
 	}
-	// More languages than the row shows, or "+N" is inert.
-	if !strings.Contains(html, `id="subtitle-lang-more"`) || strings.Contains(html, `id="subtitle-lang-more" class="lang-chip text-w-muted"
-                            aria-expanded="false" title="action.stream.moreLanguages" aria-label="action.stream.moreLanguages" hidden>`) {
-		t.Error("the fixture must overflow the language row, or the +N test toggles a hidden button")
+	// More languages than the row shows, or the "+N" test toggles a button
+	// that was never collapsing anything. Counted, not matched against a
+	// whitespace-exact copy of the rendered button: a template reformat plus
+	// a regeneration would quietly turn that into "the id exists".
+	// 6 mirrors maxVisibleLangChips (handlers/action/picker.go), which is
+	// unexported, and MAX_VISIBLE_LANGS (track-picker.js). Three copies of
+	// one number already; a fourth is not worth exporting a constant for.
+	const rowShows = 6
+	langs := strings.Count(html, `class="lang lang-chip`)
+	if langs <= rowShows {
+		t.Errorf("the fixture renders %d language chips and the row shows %d: nothing overflows, so +N is inert",
+			langs, rowShows)
+	}
+	if !strings.Contains(html, `<span class="more-count">+`) {
+		t.Error(`the "+N" button must render a real count`)
 	}
 	// Two audio chips: one to start on, one to switch to.
 	if n := strings.Count(html, `class="audio track-chip`); n < 2 {
 		t.Errorf("expected at least two audio chips, got %d", n)
 	}
+}
+
+// asyncUploads is the list an upload's response carries: the file that was
+// already there, plus the one just added — Selected, which renders as
+// data-autoselect and is what tells the client which chip to switch to.
+// The ids match the dialog fixture's own upload, so replaying this response
+// against that dialog exercises the replace-in-place path and not only the
+// add path.
+func asyncUploads() []models.UserSubtitleTrack {
+	return []models.UserSubtitleTrack{
+		{ID: "us-1", Label: "my.en.srt", OriginalName: "my.en.srt", SrcLang: "en",
+			Src: "https://x.test/my.vtt", Format: "srt", Size: 2048, DeleteURL: "/user-subtitle/delete/1"},
+		{ID: "us-2", Label: "fresh.en.srt", OriginalName: "fresh.en.srt", SrcLang: "en",
+			Src: "https://x.test/fresh.vtt", Format: "srt", Size: 4096, DeleteURL: "/user-subtitle/delete/2",
+			Selected: true},
+	}
+}
+
+// renderUploadsAsync renders the uploads partial the way the async reload
+// does: RenderChips true, no ExpandedLang and no SubtitlesOff — there is no
+// ladder result to read on that path. It mirrors
+// handlers/user_subtitle.buildView, which is unexported and in a package
+// this one cannot import; TestBuildViewMarksTheListAuthoritative over there
+// pins the producer's own half of the agreement.
+func renderUploadsAsync(t *testing.T, subs []models.UserSubtitleTrack) string {
+	t.Helper()
+	helper := i18n.NewHelper(i18n.New(localesFS(t)))
+
+	funcs := template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(interface{}) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		"langDisplay":   stremio.NewHelper().LangDisplay,
+	}
+	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
+		ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse the uploads partial: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+		"Data": &models.UserSubtitleView{
+			ResourceID:    "res",
+			Path:          "movie.mkv",
+			EIURL:         "http://ei.example.com",
+			UserSubtitles: subs,
+			RenderChips:   true,
+		},
+	}); err != nil {
+		t.Fatalf("failed to render the uploads partial: %v", err)
+	}
+	return buf.String()
+}
+
+func localesFS(t *testing.T) fs.FS {
+	t.Helper()
+	root, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	t.Cleanup(func() { _ = root.Close() })
+	return root.FS()
 }
 
 // renderSubtitlesDialog renders stream_video.html with the real partial and

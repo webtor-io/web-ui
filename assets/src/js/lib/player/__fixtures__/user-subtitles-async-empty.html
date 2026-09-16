@@ -1,0 +1,48 @@
+
+
+
+
+
+
+
+<div id="my-upload-chips" class="contents">
+
+    
+
+</div>
+
+<button type="button" id="my-uploads-toggle" class="btn btn-sm btn-ghost border border-dashed border-w-line text-w-muted hover:border-w-purple/40 hover:text-w-purpleL gap-1.5"
+        aria-expanded="false" aria-controls="my-uploads-panel">+ My Subtitles</button>
+<div id="my-uploads-panel" class="basis-full w-full mt-2 p-4 rounded-xl bg-base-200/50 border border-w-line" hidden>
+    
+    <div class="flex items-start justify-between gap-3 mb-3">
+        <h3 class="font-bold text-lg">My Subtitles</h3>
+        <button type="button" id="my-uploads-close" class="btn btn-ghost btn-xs text-w-muted hover:text-base-content" aria-label="Close" aria-controls="my-uploads-panel">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
+    
+    
+        
+        
+            <form method="post"
+                  action="/user-subtitle"
+                  enctype="multipart/form-data"
+                  class="user-subtitle-form"
+                  data-async-target="#my-subtitles"
+                  data-async-push-state="false">
+                <input type="hidden" name="_csrf" value="csrf">
+                <input type="hidden" name="resource_id" value="res">
+                <input type="hidden" name="path" value="movie.mkv">
+                <input type="hidden" name="ei_url" value="http://ei.example.com">
+                <label class="upload-dashed flex flex-col items-center justify-center p-6 cursor-pointer text-center rounded">
+                    <span class="text-w-sub mb-2">Drop a subtitle file here or click to browse</span>
+                    <span class="text-xs text-w-muted">SRT, VTT or ASS, up to 5 MB</span>
+                    <input type="file" name="file" accept=".srt,.vtt,.ass,text/vtt,application/x-subrip" class="hidden user-subtitle-input">
+                </label>
+            </form>
+        
+    
+</div>
