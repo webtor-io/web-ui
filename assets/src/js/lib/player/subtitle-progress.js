@@ -26,9 +26,17 @@ export function parseProgress(header, live = false) {
 }
 
 // POLL_TIMEOUT_MS bounds a single translation run. A job that neither
-// finishes nor fails leaves the player polling for the life of the page;
-// fifteen minutes is well past the longest observed run, so passing it
-// means the job is gone, not slow.
+// finishes nor fails leaves the player polling for the life of the page,
+// so a run that goes this long without a sign of life is treated as gone
+// rather than slow.
+//
+// What "this long" is measured from depends on the source. For a batch
+// source it is the start of the run: fifteen minutes is well past the
+// longest observed one. A live source (X-Subtitle-Live) finishes only
+// when the transcode does, i.e. after the whole film, so against it the
+// same number is an inactivity cap — fifteen minutes with no new
+// translated cue. Answering is not progress: a live job that keeps
+// returning the same count still times out.
 export const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 // A scheme ("https:", "blob:") with an authority. Anything else is
@@ -56,18 +64,35 @@ export function withRev(src, n) {
 // pollProgress HEADs src every intervalMs, reports changes and stops on
 // completion or on a non-200. Returns a stop() function — call it when
 // the viewer selects another track or the player unmounts.
+//
+// stop() also carries suspend() and resume(): the run goes to sleep with
+// the video (pause, hidden tab) and wakes with it. Sleeping is not
+// stopping and not failing — nothing is reported, so the chip keeps its
+// count, and the same run continues afterwards. It matters because the
+// HEAD is what tells the translate service somebody is still watching;
+// for a live source it is also what keeps the transcoder session and its
+// FFmpeg run alive, and nobody should pay for a film nobody is watching.
+// Properties on the returned function rather than an object, so every
+// caller that just calls stop() keeps working.
 export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, onProgress, onDone, onError } = {}) {
     let stopped = false;
+    let suspended = false;
+    let suspendedAt = 0;
     let last = -1;
     let lastLive = null;
     let timer = null;
-    const deadline = Date.now() + timeoutMs;
-    const tick = async () => {
-        if (stopped) return;
+    // Which chain of ticks is the live one. suspend() bumps it, so a
+    // request already in flight when the video paused lands on a dead
+    // generation: it reports nothing and, more importantly, does not
+    // schedule the tick after it.
+    let gen = 0;
+    let deadline = Date.now() + timeoutMs;
+    const tick = async (myGen) => {
+        if (stopped || myGen !== gen) return;
         if (Date.now() >= deadline) {
             // Reported as an error, not silence: the viewer is looking at
-            // a percentage that stopped moving, and a run that outlives
-            // the cap is a failure worth counting.
+            // a count that stopped moving, and a run that outlives the cap
+            // is a failure worth counting.
             if (onError) onError('timeout');
             return;
         }
@@ -75,19 +100,24 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         try {
             res = await fetchImpl(src, { method: 'HEAD', cache: 'no-store' });
         } catch (e) {
-            if (!stopped && onError) onError(0);
+            if (!stopped && myGen === gen && onError) onError(0);
             return;
         }
-        // Checked again after the await: stop() may have landed while the
-        // request was in flight, and a callback firing into an unmounted
-        // player would touch DOM that is no longer there.
-        if (stopped) return;
+        // Checked again after the await: stop() or suspend() may have
+        // landed while the request was in flight, and a callback firing
+        // into an unmounted player would touch DOM that is no longer there.
+        if (stopped || myGen !== gen) return;
         if (res.status !== 200) {
             if (onError) onError(res.status);
             return;
         }
         const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1');
         if (p.done !== last || p.live !== lastLive) {
+            // A cue that was not there before is proof the job is alive,
+            // which is the whole content of the cap. Only a live source
+            // gets the extension: a batch run keeps its absolute deadline,
+            // because its end is minutes away and not film-length.
+            if (p.live && p.done !== last) deadline = Date.now() + timeoutMs;
             last = p.done;
             lastLive = p.live;
             if (onProgress) onProgress(p);
@@ -96,8 +126,30 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             if (onDone) onDone(p);
             return;
         }
-        timer = setTimeout(tick, intervalMs);
+        timer = setTimeout(() => tick(myGen), intervalMs);
     };
-    timer = setTimeout(tick, 0);
-    return () => { stopped = true; if (timer) clearTimeout(timer); };
+    timer = setTimeout(() => tick(gen), 0);
+    const stop = () => {
+        stopped = true;
+        if (timer) clearTimeout(timer);
+        timer = null;
+    };
+    stop.suspend = () => {
+        if (stopped || suspended) return;
+        suspended = true;
+        suspendedAt = Date.now();
+        gen++;
+        if (timer) clearTimeout(timer);
+        timer = null;
+    };
+    stop.resume = () => {
+        if (stopped || !suspended) return;
+        suspended = false;
+        // The cap measures a job that stopped producing, not a viewer who
+        // stopped watching: an hour on pause must not come back as a
+        // timeout the moment playback resumes.
+        deadline += Date.now() - suspendedAt;
+        timer = setTimeout(() => tick(gen), 0);
+    };
+    return stop;
 }

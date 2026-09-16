@@ -88,6 +88,18 @@ Object.defineProperty(dom.window.HTMLMediaElement.prototype, 'textTracks', {
     get() { return Array.from(this.querySelectorAll('track')).map((el) => el.track); },
 });
 
+// jsdom implements no playback: `paused` is a getter that is always true,
+// and play()/pause() do nothing. Made settable here (defaulting to true,
+// the value jsdom reports) so a test can put the element in the state a
+// browser would be in when it fires `play` or `pause` — the events
+// themselves are dispatched by hand for the same reason.
+const pausedState = new WeakMap();
+Object.defineProperty(dom.window.HTMLMediaElement.prototype, 'paused', {
+    configurable: true,
+    get() { return pausedState.has(this) ? pausedState.get(this) : true; },
+    set(v) { pausedState.set(this, !!v); },
+});
+
 const {
     initPlayer,
     destroyPlayer,
@@ -747,8 +759,10 @@ test('a translation saved in an earlier session comes back once, unpersisted', a
     t.after(() => destroyPlayer());
     // The one automatic start left. A translation is not a <track> in the
     // page (markPreload skips it), so unlike every other saved choice it
-    // cannot resume by itself. The run is the viewer's own and already
-    // cached, which is what makes it free to replay.
+    // cannot resume by itself. It is the viewer's own choice coming back,
+    // which is what justifies replaying it — not that it is cached: an
+    // embedded source makes this a live job, and what bounds that is the
+    // poll sleeping with the video.
     const p = await mountPlayer((it) => {
         it.setResponse((url, params) => (params && params.method === 'HEAD'
             ? progressResponse('400/400')
@@ -773,4 +787,90 @@ test('a translation saved in an earlier session comes back once, unpersisted', a
     assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1);
     // The cached file finishes at once, and the run reports itself done.
     assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-done').length, 1);
+});
+
+// The poll interval inside the player is not injectable (pollProgress's
+// 3 s default), so seeing that a tick did NOT happen means outwaiting one
+// whole interval. Everything else here is immediate.
+const POLL_INTERVAL_WINDOW_MS = 3300;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test('the translation poll sleeps with the video and wakes with it', async (t) => {
+    // The HEAD every 3 s is what tells the translate service somebody is
+    // watching, and for a live source it holds the transcoder session (and
+    // its FFmpeg run) open behind it. A paused or hidden viewer is not
+    // watching, so the poll stops — without giving up: no error, no
+    // telemetry, the chip keeps its count, and the same run continues.
+    t.after(() => { destroyPlayer(); delete document.hidden; });
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('3/3')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const setHidden = (v) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+        document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    };
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    p.video.paused = false;
+    click(ai);
+    await settle();
+    assert.equal(heads(), 1, 'the run polls on start');
+
+    p.video.paused = true;
+    p.video.dispatchEvent(new dom.window.Event('pause'));
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(heads(), 1, 'a paused viewer pays for no polls');
+    // Asleep, not dead — which is the whole difference from stopping it.
+    assert.equal(ai.querySelector('.tr-progress').hidden, false);
+    assert.equal(ai.querySelector('.tr-progress').textContent, '· 3', 'the chip keeps its last count');
+    assert.equal(ai.querySelector('.tr-spinner').hidden, false);
+    assert.deepEqual(p.events.filter((e) => e.name === 'subtitle-translate-error'), [],
+        'sleeping is not a failure and must not be counted as one');
+
+    p.video.paused = false;
+    p.video.dispatchEvent(new dom.window.Event('play'));
+    await settle();
+    assert.equal(heads(), 2, 'play wakes the same run at once');
+
+    setHidden(true);
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(heads(), 2, 'a hidden tab pays for no polls either');
+    setHidden(false);
+    await settle();
+    assert.equal(heads(), 3, 'and coming back wakes it');
+
+    // One run throughout: waking is not a new translation, so the start
+    // event (and the tokens behind it) happens once.
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1);
+});
+
+test('coming back to a tab whose video is still paused does not wake the poll', async (t) => {
+    // The negative control for the resume side: `visible` alone is not
+    // "watching". Without the paused check, tabbing back to a paused film
+    // would put the transcoder session back on the clock.
+    t.after(() => { destroyPlayer(); delete document.hidden; });
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('3/3')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const setHidden = (v) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+        document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    };
+
+    p.video.paused = false;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(heads(), 1);
+
+    p.video.paused = true;
+    p.video.dispatchEvent(new dom.window.Event('pause'));
+    setHidden(true);
+    await settle();
+    setHidden(false);
+    await settle();
+    assert.equal(heads(), 1, 'still paused, still asleep');
 });

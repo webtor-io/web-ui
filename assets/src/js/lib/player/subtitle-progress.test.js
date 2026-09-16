@@ -103,3 +103,130 @@ test('pollProgress gives up after the timeout and reports it', async () => {
 test('the default timeout is 15 minutes', () => {
     assert.equal(POLL_TIMEOUT_MS, 15 * 60 * 1000);
 });
+
+// --- the cap against a live source ------------------------------------
+//
+// A live run ends when the transcode does, i.e. after the whole film, so
+// an absolute cap would kill every feature-length translation. The cap is
+// therefore an inactivity cap while live. The two tests below are the
+// pair: the first says a run that keeps producing cues outlives the cap,
+// the second says a run that only keeps *answering* does not.
+
+test('a live run that keeps producing cues outlives the timeout', async () => {
+    let n = 0;
+    const fetchImpl = async () => {
+        n++;
+        const live = n < 40;
+        const header = live ? `${n}/${n}` : '40/40';
+        return { status: 200, headers: { get: (h) => (h === 'X-Subtitle-Live' ? (live ? '1' : null) : header) } };
+    };
+    let err = null;
+    let done = false;
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1, timeoutMs: 25,
+        onError: (c) => { err = c; },
+        onDone: () => { done = true; },
+    });
+    await new Promise((r) => setTimeout(r, 400));
+    stop();
+    // 40 ticks at ~1 ms each span several 25 ms windows; each one moved
+    // the deadline because `done` moved with it.
+    assert.equal(err, null, 'a run that is demonstrably producing cues is not a timeout');
+    assert.equal(done, true, 'and it finishes when the source stops being live');
+    assert.ok(n >= 40, `expected the run to reach the end, got ${n} polls`);
+});
+
+test('a wedged live run still times out', async () => {
+    // Negative control for the rule above: the same live header, forever,
+    // with a count that never moves. Answering is not progress.
+    let calls = 0;
+    const fetchImpl = async () => {
+        calls++;
+        return { status: 200, headers: { get: (h) => (h === 'X-Subtitle-Live' ? '1' : '3/9') } };
+    };
+    let err = null;
+    pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, timeoutMs: 20, onError: (c) => { err = c; } });
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(err, 'timeout');
+    const after = calls;
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'polling must stop at the deadline');
+});
+
+test('a live tick that brings no new cue does not extend the cap', async () => {
+    // The `p.done !== last` half of the rule, on its own. A source that
+    // flips to live at a count that has not moved is a change worth
+    // reporting (the chip swaps a percent for a count) but not progress,
+    // so it must not buy another window. Measured rather than asserted on
+    // a flag: both variants time out, the difference is when.
+    const t0 = Date.now();
+    const fetchImpl = async () => ({
+        status: 200,
+        headers: { get: (h) => (h === 'X-Subtitle-Live' ? (Date.now() - t0 >= 200 ? '1' : null) : '3/9') },
+    });
+    let at = 0;
+    pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 5, timeoutMs: 300,
+        onError: (c) => { if (c === 'timeout' && !at) at = Date.now() - t0; },
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    assert.ok(at > 0, 'the wedged run must still time out');
+    assert.ok(at < 400, `the live flip must not have bought a second window (timed out at ${at}ms)`);
+});
+
+// --- sleeping with the video ------------------------------------------
+
+test('suspend() stops the polling without reporting anything, resume() picks it up', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    const seen = [];
+    let err = null;
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1,
+        onProgress: (p) => seen.push(p.done),
+        onError: (c) => { err = c; },
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(calls > 1, `expected the run to be polling, got ${calls}`);
+    stop.suspend();
+    // Past the in-flight request too: a fetch that lands after suspend()
+    // must not schedule the next tick.
+    await new Promise((r) => setTimeout(r, 20));
+    const asleep = calls;
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, asleep, 'a suspended run polls nothing');
+    assert.equal(err, null, 'suspending is not an error — the chip keeps its count');
+
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(calls > asleep, 'resume() wakes the same run');
+    stop();
+});
+
+test('a suspended run does not spend its deadline asleep', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    let err = null;
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, timeoutMs: 40, onError: (c) => { err = c; } });
+    await new Promise((r) => setTimeout(r, 10));
+    stop.suspend();
+    // Longer than the whole cap: a viewer who pauses for an hour and comes
+    // back must not be told the translation timed out.
+    await new Promise((r) => setTimeout(r, 60));
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(err, null, 'the sleep did not count against the cap');
+    stop();
+});
+
+test('resume() after stop() stays stopped', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    stop();
+    const after = calls;
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'a stopped run is gone, not asleep');
+});

@@ -320,6 +320,47 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         return translationAction(data, translationStatusRef.current);
     }, []);
 
+    // A running poll sleeps with the video. The HEAD every 3 s is what
+    // tells the translate service somebody is still watching, and for a
+    // live (embedded-track) source it is also what holds the transcoder
+    // session and its FFmpeg run open: the job keeps pulling the subtitle
+    // playlist for as long as we keep asking. A viewer who paused or
+    // tabbed away is not watching, and a feature film's worth of transcode
+    // and translation for nobody is real money.
+    //
+    // Suspending is not stopping: no onError, no telemetry, the chip keeps
+    // its count and its spinner, and the same run continues afterwards.
+    // Resuming costs nothing either — the service holds partial progress
+    // for 24 h and re-aligns by cue identity.
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const sleep = () => {
+            const poll = pollStopRef.current;
+            if (poll && poll.suspend) poll.suspend();
+        };
+        const wake = () => {
+            const poll = pollStopRef.current;
+            if (poll && poll.resume) poll.resume();
+        };
+        // The `play` event is the authority on playback — `paused` is not
+        // yet false in every engine when it fires — so it wakes the poll
+        // without a second opinion. Coming back to the tab is not: a
+        // visible tab showing a paused film is still nobody watching.
+        const onVisibility = () => {
+            if (document.hidden) sleep();
+            else if (!video.paused) wake();
+        };
+        video.addEventListener('pause', sleep);
+        video.addEventListener('play', wake);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            video.removeEventListener('pause', sleep);
+            video.removeEventListener('play', wake);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, []);
+
     // Track-list hooks. wireTrackHandlers() runs before this component
     // mounts (initPlayer wires the modals first), so it is handed a plain
     // object that stays empty until this effect fills it in: the refs and
@@ -374,9 +415,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // server rendered; a translation has none (markPreload skips it, or
         // opening the page would start a run for everyone), so it needs this
         // one call -- the same path a click takes, minus the PUT, since
-        // nothing was chosen here that was not already chosen. The run is
-        // the viewer's own and cached, which is why this is the one
-        // automatic start left after the engagement gate went away.
+        // nothing was chosen here that was not already chosen.
+        //
+        // This is the one automatic start left after the engagement gate
+        // went away, and it is no longer free: a saved translation of an
+        // embedded track is a live job, so the mount starts a transcode and
+        // holds a job slot rather than replaying a cached artifact. It
+        // still runs, because the viewer asked for this track and expects
+        // it back; what bounds it is that the poll sleeps with the video
+        // (see the pause/visibility effect above), so a page opened and
+        // left alone stops paying as soon as it is hidden.
         if (modalAtMount && trackContainer && !savedTranslationRef.current) {
             const id = restoreSavedTranslation(readAllTracks(modalAtMount));
             const el = id ? findSubtitleItem(modalAtMount, id) : null;
