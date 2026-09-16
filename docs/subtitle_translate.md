@@ -343,7 +343,9 @@ trip" / cache-key section).
   put hls.js back on it). On `SUBTITLE_TRACKS_UPDATED` after `loadSource` it applies whatever the
   picker says now, and does so once more after `restoreTrackState` on `playing` — the element
   snapshot is there for the *cues* hls.js drops, and its modes are as stale as the hls.js selection
-  was.
+  was. Known cost on native HLS (iOS): a subtitle picked in the fullscreen menu rather than in the
+  picker is switched off at the next session seek, because the chip is the only truth the re-apply
+  reads — accepted, not a bug to refile.
 - **Audio switch re-pick.** `onAudioSelect` calls `pickDefaultSubtitle(readTracks(modal), audioLang,
   preferredLang)` and activates the result, unless the viewer already made a manual subtitle choice
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
