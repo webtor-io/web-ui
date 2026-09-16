@@ -128,6 +128,21 @@ export function withRev(src, n) {
 // HEAD is what tells the translate service somebody is still watching;
 // for a live source it is also what keeps the transcoder session and its
 // FFmpeg run alive, and nobody should pay for a film nobody is watching.
+//
+// stop() carries kick() too: a session seek jumps the video to a new
+// position, and without it the first cues for that position wait out
+// whatever is left of the 3 s poll interval on top of the service's own
+// translation lag, and then the caller's own reload throttle
+// (`TRACK_RELOAD_INTERVAL_MS` in Player.jsx) on top of that. kick() runs a
+// tick right away instead of waiting for the interval, and marks the next
+// changed report with `forceReload: true` so the caller's reload can
+// bypass its throttle for that one swap — "next", not "this one", because
+// the immediate tick usually still finds the pre-seek count: the service
+// needs a moment to catch up, and the mark has to survive until whichever
+// later tick brings the first real change. A no-op once the run is
+// stopped or asleep: kicking a finished run polls nothing, and kicking a
+// suspended one would defeat the reason it is asleep — nobody is
+// watching.
 // Properties on the returned function rather than an object, so every
 // caller that just calls stop() keeps working.
 export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, onProgress, onDone, onError } = {}) {
@@ -143,6 +158,12 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
     // waiting again.
     let queuedSince = 0;
     let queuedReported = false;
+    // Set by kick(), consumed by the next onProgress that reports an
+    // actual change (see the change-detection block below). It survives
+    // ticks that find nothing new: a kicked HEAD landing before the
+    // service has caught up must not lose the mark, or the reload it was
+    // meant to unthrottle goes back to waiting out the 15 s window.
+    let pendingKick = false;
     let timer = null;
     // Which chain of ticks is the live one. suspend() bumps it, so a
     // request already in flight when the video paused lands on a dead
@@ -192,7 +213,14 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             last = p.done;
             lastTotal = p.total;
             lastLive = p.live;
-            if (onProgress) onProgress(p);
+            if (onProgress) {
+                if (pendingKick) {
+                    pendingKick = false;
+                    onProgress({ ...p, forceReload: true });
+                } else {
+                    onProgress(p);
+                }
+            }
         }
         // `0/0` for long enough is a job waiting for a slot, not a job
         // starting. Reported through onProgress like any other change,
@@ -254,6 +282,19 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         const slept = Date.now() - suspendedAt;
         deadline += slept;
         if (queuedSince) queuedSince += slept;
+        timer = setTimeout(() => tick(gen), 0);
+    };
+    // A no-op while stopped (nothing left to kick) or suspended (kicking a
+    // sleeping run would spend the HEAD suspend() exists to save). gen++
+    // discards whatever tick is in flight or scheduled — same trick as
+    // suspend() — so kick() never races a second timer chain onto the run:
+    // the one tick it starts is the only one that gets to schedule the
+    // next.
+    stop.kick = () => {
+        if (stopped || suspended) return;
+        pendingKick = true;
+        gen++;
+        if (timer) clearTimeout(timer);
         timer = setTimeout(() => tick(gen), 0);
     };
     return stop;

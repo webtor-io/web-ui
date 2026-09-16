@@ -1452,3 +1452,74 @@ test('a seek re-applies the picker’s current answer, not the one it started wi
     assert.ok(hls.writes.filter(([k]) => k === 'subtitleTrack').length <= 4,
         'two applies (the player\u2019s and the seeker\u2019s) write once each, not once per nested callback');
 });
+
+// ---- a seek kicks the translation poll ---------------------------------
+//
+// Bug (2026-09-16): with a live AI translation running, a seek jumps the
+// video ahead of what the poll knows about, so the first cues for the new
+// position waited out whatever was left of the 3 s poll interval and then
+// TRACK_RELOAD_INTERVAL_MS (15 s) on top of that \u2014 on top of the service's
+// own lag (fixed separately, server side). The fix is `handleSeek`'s
+// `onSeekOffsetChange` calling `pollStopRef.current.kick()`: an immediate
+// HEAD (subtitle-progress.js's kick()) and a mark on the change it finds
+// that lets `reload()` bypass its own throttle once.
+//
+// Through `initPlayer` and a real keydown, not `createSessionSeeker`
+// directly (see the seek test above): `kick()` lives inside the
+// `onSeekOffsetChange` closure `handleSeek` builds, so only the mounted
+// component's own seek path exercises it.
+test('a session seek kicks the translation poll and unthrottles the next reload', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount({ tracks: [['tr-pt', false]] });
+    p.video.dataset.sessionId = 's1';
+    p.video.dataset.sessionSeekUrl = '/session/seek';
+    p.video.setAttribute('data-duration', '3600');
+    let done = 5;
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse(`${done}/${done}`)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    await initPlayer(p.container);
+    await settle();
+
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    const track = () => p.video.querySelector('#tr-pt');
+
+    p.video.paused = false;
+    click(ai);
+    await settle();
+    assert.equal(heads(), 1, 'the run polls on start');
+    assert.ok(track().getAttribute('src').includes('rev=5'), 'the cold-start reload is unthrottled on its own');
+
+    // The service has more cues ready by the time the seek lands (its own
+    // fix \u2014 translating the current run first \u2014 is separate from this
+    // one).
+    done = 9;
+
+    // ArrowRight reaches the same handleSeek a drag on the timeline does,
+    // well inside both the 3 s poll interval and the 15 s reload throttle
+    // the first reload just started.
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+
+    assert.ok(heads() >= 2, `the seek must kick a HEAD at once, not wait for the next 3 s tick \u2014 got ${heads()} HEADs`);
+    assert.ok(track().getAttribute('src').includes('rev=9'),
+        'the reload for the new count must not wait out the 15 s throttle either');
+});
+
+test('kick() is a no-op with no translation running \u2014 a seek with nothing playing does not throw', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    p.video.dataset.sessionId = 's1';
+    p.video.dataset.sessionSeekUrl = '/session/seek';
+    p.video.setAttribute('data-duration', '3600');
+    p.setResponse(() => ({ ok: true, status: 200, json: async () => ({}) }));
+    await initPlayer(p.container);
+    await settle();
+
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    // Nothing to assert beyond "it didn't throw" \u2014 pollStopRef.current is
+    // null, and kickTranslationPoll's own guard is the whole of the fix
+    // for that case.
+});

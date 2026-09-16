@@ -333,7 +333,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // total === 0 means the job has not counted the cues yet:
                 // the file on the other end is still empty, so a reload
                 // would only replace subtitles with nothing.
-                if (p.total > 0) reload(p.done, false);
+                // p.forceReload is subtitle-progress.js's kick() marking
+                // the first change after a session seek: bypass the 15 s
+                // throttle for this one swap, so the new position's cues
+                // do not wait out both the service's own lag and this
+                // reload throttle on top of it.
+                if (p.total > 0) reload(p.done, p.forceReload === true);
                 // Last, so the chip has already been painted with the
                 // opening count before the run goes to sleep on it.
                 suspendIfNobodyIsWatching(p);
@@ -561,6 +566,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         paused: showResumePrompt,
     });
 
+    // A session seek moves the video to a spot the running translation has
+    // not caught up to yet. Left alone, the first cues for that position
+    // wait out whatever is left of the poll's 3 s interval on top of the
+    // service's own lag, and then the reload throttle
+    // (TRACK_RELOAD_INTERVAL_MS) on top of that. kick() (a no-op when no
+    // poll is running) takes one HEAD tick right away and marks the next
+    // changed report to bypass the reload throttle once — see reload()'s
+    // p.forceReload above and pollProgress's kick() in subtitle-progress.js.
+    const kickTranslationPoll = useCallback(() => {
+        const poll = pollStopRef.current;
+        if (poll && poll.kick) poll.kick();
+    }, []);
+
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
         if (sessionSeekingRef.current) return;
@@ -574,7 +592,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     videoEl,
                     sessionSeekUrl,
                     sourceUrl,
-                    onSeekOffsetChange: setSeekOffset,
+                    onSeekOffsetChange: (offset) => {
+                        setSeekOffset(offset);
+                        kickTranslationPoll();
+                    },
                     onSeekingChange: setSessionSeekingWithRef,
                     trackContainer,
                 });
@@ -589,7 +610,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 video.currentTime = Math.min(time, maxTime);
             }
         }
-    }, [isSession, sessionSeekUrl, sourceUrl]);
+    }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll]);
 
     // Auto-hide controls
     const resetHideTimer = useCallback(() => {

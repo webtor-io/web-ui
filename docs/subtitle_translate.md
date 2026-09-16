@@ -345,7 +345,11 @@ trip" / cache-key section).
   snapshot is there for the *cues* hls.js drops, and its modes are as stale as the hls.js selection
   was. Known cost on native HLS (iOS): a subtitle picked in the fullscreen menu rather than in the
   picker is switched off at the next session seek, because the chip is the only truth the re-apply
-  reads — accepted, not a bug to refile.
+  reads — accepted, not a bug to refile. A seek also kicks the running translation poll
+  (`onSeekOffsetChange` → `pollStopRef.current.kick()`): an immediate HEAD instead of waiting out
+  the 3 s interval, and a one-time bypass of `TRACK_RELOAD_INTERVAL_MS` on the reload the next
+  changed count brings, so the new position's cues do not queue up behind both delays on top of
+  the service's own translation lag.
 - **Audio switch re-pick.** `onAudioSelect` calls `pickDefaultSubtitle(readTracks(modal), audioLang,
   preferredLang)` and activates the result, unless the viewer already made a manual subtitle choice
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player

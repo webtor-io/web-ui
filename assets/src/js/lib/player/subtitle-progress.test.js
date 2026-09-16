@@ -245,6 +245,79 @@ test('resume() after stop() stays stopped', async () => {
     assert.equal(calls, after, 'a stopped run is gone, not asleep');
 });
 
+// ---- kick(): a session seek wants its cues now ------------------------
+//
+// Without it, the first cues for a seeked-to position wait out whatever is
+// left of the 3 s poll interval on top of the service's own translation
+// lag, and then the caller's own reload throttle on top of that. kick()
+// only owns the first half (an immediate tick); the second half is a mark
+// on the report that change lands on, which the caller (Player.jsx) reads
+// as permission to bypass its own throttle for that one reload.
+
+test('kick() ticks at once instead of waiting out the interval, and marks the change it finds', async () => {
+    let header = '3/10';
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => header } }; };
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 200, onProgress: (p) => seen.push(p) });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, 1, 'one tick at start');
+    assert.deepEqual(seen.map((p) => p.done), [3]);
+
+    // The service has produced more by the time the seek lands.
+    header = '7/10';
+    stop.kick();
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+
+    assert.ok(calls >= 2, `kick() must tick at once rather than wait out the 200 ms interval, got ${calls} calls in ~20 ms`);
+    assert.deepEqual(seen.map((p) => p.done), [3, 7], 'the kicked tick reports the new count');
+    assert.equal(seen[0].forceReload, undefined, 'only the report a kick produced is marked');
+    assert.equal(seen[1].forceReload, true, 'so the caller can bypass its own reload throttle once');
+});
+
+test('a kick that finds nothing new yet still marks the change that follows', async () => {
+    // The immediate tick usually lands before the service has caught up —
+    // the mark must survive to whichever later tick brings the first real
+    // change, not just the one kick() itself triggered.
+    let header = '3/10';
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => header } }; };
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 5, onProgress: (p) => seen.push(p) });
+    await new Promise((r) => setTimeout(r, 10));
+    stop.kick();
+    // Several unchanged ticks pass before the count actually moves.
+    await new Promise((r) => setTimeout(r, 15));
+    header = '6/10';
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+
+    assert.deepEqual(seen.map((p) => p.done), [3, 6], 'no report for the unchanged ticks in between');
+    assert.equal(seen[1].forceReload, true, 'the mark waited for an actual change to land on');
+});
+
+test('kick() does nothing once the run is stopped or asleep', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 200 });
+    await new Promise((r) => setTimeout(r, 10));
+
+    stop.suspend();
+    const asleep = calls;
+    stop.kick();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, asleep, 'kick() must not wake a suspended run — that defeats the reason it is asleep');
+
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 10));
+    stop();
+    const after = calls;
+    stop.kick();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'kick() on a stopped run polls nothing');
+});
+
 // The negative control for the module's fourth, implicit state:
 // "finished, not stopped". The three terminal returns used to leave both
 // `stopped` and `suspended` false, so nothing here prevented a later
