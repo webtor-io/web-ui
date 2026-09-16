@@ -73,7 +73,32 @@ type Job struct {
 	storage        Storage
 	main           bool
 	purge          bool
+	// noCache marks a run whose result must not outlive it. The job queue
+	// is also a cache -- a finished run's log is kept in storage and
+	// replayed to every later request with the same id, which for the
+	// stream job is ten minutes of viewers -- and that is wrong for a run
+	// that reached a correct page from an incomplete answer: it would
+	// serve that gap to everyone, and nothing afterwards could tell.
+	//
+	// Written by the script (DoNotCache) and read once Run has returned,
+	// in the goroutine that called it, so the two never overlap.
+	noCache        bool
 	errorFormatter ErrorFormatter
+}
+
+// DoNotCache says this run's result must not be replayed from storage to
+// later requests with the same id. The run itself still succeeds and the
+// viewer in front of it still gets their page: it is the *next* viewer this
+// protects, by making them run the job again rather than inherit a page
+// built from an answer that never arrived.
+//
+// Retiring the entry is enough -- Enqueue already drops storage 60 s after
+// a failed run, which is the same path with the same grace period, so a
+// viewer still replaying the log is unaffected. Returns the job so it can
+// be called in an expression.
+func (s *Job) DoNotCache() *Job {
+	s.noCache = true
+	return s
 }
 
 type LogItemLevel string
@@ -508,28 +533,44 @@ func (s *Jobs) Enqueue(ctx context.Context, cancel context.CancelFunc, id string
 		defer cancel()
 		err := j.Run(ctx)
 		<-time.After(60 * time.Second)
-		s.mux.Lock()
-		defer s.mux.Unlock()
-		// Only cleanup if this job is still the current one (not replaced by a restart)
-		if current, ok := s.jobs[id]; ok && current == j {
-			if err != nil {
-				dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer dCancel()
-				_ = s.storage.Drop(dCtx, s.queue, id)
-				fields := log.Fields{
-					"ID":    id,
-					"Queue": s.queue,
-				}
-				if isStoplistBlock(err) {
-					log.WithError(err).WithFields(fields).Warn("job rejected by stoplist")
-				} else {
-					log.WithError(err).WithFields(fields).Error("got job error")
-				}
-			}
-			delete(s.jobs, id)
-		}
+		s.retire(id, j, err)
 	}()
 	return j
+}
+
+// retire takes a finished job out of the map and decides whether its result
+// survives in storage. Split out of Enqueue's goroutine so the decision is
+// reachable from a test without sleeping out the 60 s grace period, which is
+// there so a viewer still replaying the log is not cut off.
+//
+// Two reasons not to keep a result: the run failed, or the script asked
+// (DoNotCache) because what it produced was correct but built on a missing
+// answer. Both mean the next request with this id should run the job again.
+func (s *Jobs) retire(id string, j *Job, err error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	// Only cleanup if this job is still the current one (not replaced by a restart)
+	current, ok := s.jobs[id]
+	if !ok || current != j {
+		return
+	}
+	if err != nil || j.noCache {
+		dCtx, dCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		_ = s.storage.Drop(dCtx, s.queue, id)
+		dCancel()
+	}
+	if err != nil {
+		fields := log.Fields{
+			"ID":    id,
+			"Queue": s.queue,
+		}
+		if isStoplistBlock(err) {
+			log.WithError(err).WithFields(fields).Warn("job rejected by stoplist")
+		} else {
+			log.WithError(err).WithFields(fields).Error("got job error")
+		}
+	}
+	delete(s.jobs, id)
 }
 
 func (s *Jobs) Log(ctx context.Context, id string) (c chan LogItem, ok bool, err error) {

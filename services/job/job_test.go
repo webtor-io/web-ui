@@ -51,3 +51,74 @@ func TestStatusUpdate_LogsAtDebug(t *testing.T) {
 		}
 	}
 }
+
+// recordingStorage counts Drop so the retirement decision is observable.
+type recordingStorage struct {
+	NilStorage
+	drops int
+}
+
+func (s *recordingStorage) Drop(_ context.Context, _ string, _ string) error {
+	s.drops++
+	return nil
+}
+
+// TestRetireDropsAResultTheScriptRefusedToCache: the job queue is also a
+// cache — a finished run's log is replayed to every later request with the
+// same id, which for the stream job is ten minutes of viewers. A run that
+// reached a correct page from an incomplete answer (OpenSubtitles never
+// answered, so the page has no such tracks) must not be that cache's
+// content: DoNotCache retires it the same way a failure is retired, grace
+// period included.
+func TestRetireDropsAResultTheScriptRefusedToCache(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		err     error
+		noCache bool
+		want    int
+	}{
+		{name: "an ordinary success is kept", want: 0},
+		{name: "a failure is dropped, as before", err: context.Canceled, want: 1},
+		{name: "and so is a success the script refused", noCache: true, want: 1},
+		{name: "both at once drops once", err: context.Canceled, noCache: true, want: 1},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			storage := &recordingStorage{}
+			jobs := newJobs("q", storage)
+			j := New(context.Background(), "id", "q", nil, storage, true, nil)
+			if c.noCache {
+				if got := j.DoNotCache(); got != j {
+					t.Error("DoNotCache must return the job so it can be called in an expression")
+				}
+			}
+			jobs.jobs["id"] = j
+
+			jobs.retire("id", j, c.err)
+			if storage.drops != c.want {
+				t.Errorf("Drop called %d times, want %d", storage.drops, c.want)
+			}
+			if _, ok := jobs.jobs["id"]; ok {
+				t.Error("a retired job must leave the map either way")
+			}
+		})
+	}
+}
+
+// A restart replaces the entry under the same id. The old run retiring
+// afterwards must not drop the new run's storage or take it out of the map —
+// the check predates this change and is easy to lose when the body moves.
+func TestRetireLeavesAReplacementAlone(t *testing.T) {
+	storage := &recordingStorage{}
+	jobs := newJobs("q", storage)
+	old := New(context.Background(), "id", "q", nil, storage, true, nil)
+	replacement := New(context.Background(), "id", "q", nil, storage, true, nil)
+	jobs.jobs["id"] = replacement
+
+	jobs.retire("id", old.DoNotCache(), context.Canceled)
+	if storage.drops != 0 {
+		t.Errorf("Drop called %d times for a job that is no longer current", storage.drops)
+	}
+	if jobs.jobs["id"] != replacement {
+		t.Error("the replacement must stay in the map")
+	}
+}

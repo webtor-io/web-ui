@@ -619,6 +619,14 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				// left is to keep "this file has none" and "we did not get
 				// to look" apart -- in the log, and on subtitle-resolved.
 				sc.SubtitlesNotReady = notReady
+				if notReady {
+					// The page is correct and goes out; it just has no
+					// OpenSubtitles rungs because the lookup never
+					// finished. Keeping it would hand that gap to every
+					// viewer of this file for the rest of the ten-minute
+					// bucket, long after the seeder warmed up.
+					j.DoNotCache()
+				}
 				if err != nil {
 					log.WithError(err).WithField("notReady", notReady).
 						WithField("resource", s.resourceId).Warn("failed to get opensubtitles")

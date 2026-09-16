@@ -42,13 +42,18 @@ job's rendered result is cached for ten minutes, so one early answer takes OpenS
 from every viewer of that file for the rest of the bucket, with the job step marked done.
 `GetOpenSubtitles` answers `api.SubtitlesNotReadyError` (sentinel `api.ErrSubtitlesNotReady`,
 carrying the seconds; a non-delta-seconds header means "not ready, no usable hint" and zero), and
-`fetchOpenSubtitles` (`jobs/scripts/opensubtitles.go`) retries **once** after
-`min(Retry-After, 5 s)`, never past the step's own deadline. Still not ready, and the page renders
-without those tracks — there is no way to keep one job result out of the cache (the queue's key is
-computed before the script runs and the TTL is set at enqueue), so what is left is to say so:
-a `Warn` in the log, `data-subtitles-not-ready` on the picker, and `notReady` on
-`subtitle-resolved`. Without that last one a level of `'none'` counts a file nobody looked at as a
-file with nothing to find.
+`fetchOpenSubtitles` (`jobs/scripts/opensubtitles.go`) retries **once** after the `Retry-After`,
+capped at 5 s — and 5 s when the header is absent or unreadable, since the service did say it
+needed time — never past the step's own deadline.
+
+Still not ready, and the page renders without those tracks. Two things then happen. The run calls
+`job.Job.DoNotCache()`, which retires the result instead of leaving it in storage for every later
+request with the same id: the job queue is also a ten-minute cache, and serving this one page to
+the rest of the bucket would hand the gap to viewers who would have got the tracks. (Retiring is
+the same path a failed run already takes, 60 s after the run ends, so a viewer still replaying the
+log is unaffected.) And the render says so: a `Warn` in the log, `data-subtitles-not-ready` on the
+picker, `notReady` on `subtitle-resolved` — without which a level of `'none'` counts a file nobody
+looked at as a file with nothing to find.
 
 A track marked **forced** (signs-only) always gets badge `forced` regardless of provider
 (`badgeFor`, `action.stream.badge.forced` = "signs only") — the origin is less useful to the
@@ -832,15 +837,6 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
 
 ## Known limitations
 
-- **A not-ready OpenSubtitles answer is still cached for ten minutes.** The retry buys one
-  `min(Retry-After, 5 s)` wait; past that the render goes out without those tracks and is cached
-  like any other, because the job queue has no per-run "do not cache" — the key is computed before
-  the script runs (`jobs/scripts/action.go`, `Action`) and the TTL is set at `Enqueue`. So a viewer
-  who opens a cold file can spend the rest of the bucket without OpenSubtitles rungs even after the
-  seeder warms up. What exists instead is honesty about it: `SubtitlesNotReady` →
-  `data-subtitles-not-ready` → `notReady` on `subtitle-resolved`. A per-run skip (a flag the script
-  can set that suppresses the storage write, or a shorter TTL for that one id) is the real fix and
-  is not in this task.
 - **Job cache key ignores a preferred-language change.** The 10-minute streaming-job cache key
   (`jobs/scripts/action.go`, `Action`) is built from resource/item/action/`c.ApiClaims.Role`/
   settings/audio+subtitle choice/`c.Lang`/session. Tier **is** in it — `Role` is the tier name
