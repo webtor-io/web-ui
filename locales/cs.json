@@ -603,7 +603,7 @@
     "action.stream.translate.locked": "AI titulky ve vašem jazyce jsou součástí podporovatelského plánu.",
     "action.stream.translate.cta": "Odemknout AI titulky",
     "action.stream.translate.from": "z",
-    "action.stream.translate.action": "Přeložit do jazyka {{.Language}}",
+    "action.stream.translate.action": "Zapnout překlad: {{.Language}}",
     "action.stream.translate.hint": "Titulky ({{.Language}}) zatím nejsou k dispozici — zapněte překlad AI.",
     "player.play": "Přehrát",
     "player.pause": "Pauza",

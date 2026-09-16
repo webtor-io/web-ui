@@ -593,7 +593,7 @@
     "action.stream.translate.locked": "Dilinizdeki yapay zekâ altyazıları destekçi planına dahildir.",
     "action.stream.translate.cta": "Yapay zekâ altyazılarını aç",
     "action.stream.translate.from": "kaynak",
-    "action.stream.translate.action": "{{.Language}} diline çevir",
+    "action.stream.translate.action": "{{.Language}} çevirisini aç",
     "action.stream.translate.hint": "{{.Language}} altyazı henüz yok — yapay zekâ çevirisini açın.",
     "player.play": "Oynat",
     "player.pause": "Duraklat",
