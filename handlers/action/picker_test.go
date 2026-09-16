@@ -322,6 +322,11 @@ func TestOriginHintKeyNamesOnlyAnImdbMatch(t *testing.T) {
 		{"hash by enum", ListItem{Provider: "OpenSubtitles", Source: "hash"}, ""},
 		{"hash by bool", ListItem{Provider: "OpenSubtitles", Source: "imdb", MovieHashMatch: boolPtr(true)}, ""},
 		{"origin unknown", ListItem{Provider: "OpenSubtitles"}, ""},
+		// A third enum value is not "matched by title" either. video-info
+		// sends only hash|imdb, but "any non-empty value means imdb" was
+		// a guess, and the fixture's placeholder was already falsifying
+		// it (review I4).
+		{"a third enum value", ListItem{Provider: "OpenSubtitles", Source: "opensubtitles"}, ""},
 		{"not OpenSubtitles", ListItem{Provider: "UserSubtitle", Source: "imdb"}, ""},
 		{"the None carrier", ListItem{ID: "none"}, ""},
 	} {

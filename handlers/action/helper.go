@@ -477,11 +477,20 @@ func hashMatched(li ListItem) bool {
 // which is not the same as "not a hash match": a track whose origin the
 // service never reported is unknown, and telling the viewer it may be out
 // of sync would be a claim nobody made.
+//
+// So the enum is tested for the value that means it, not for being
+// non-empty (review I4). `!= ""` read every third value as imdb --
+// video-info only ever sends "hash" or "imdb", but the fixture's own
+// "opensubtitles" placeholder was enough to put "may be out of sync" on
+// seven chips that had never been matched by anything.
 func imdbMatched(li ListItem) bool {
 	if li.Provider != "OpenSubtitles" || hashMatched(li) {
 		return false
 	}
-	return li.MovieHashMatch != nil || li.Source != ""
+	if li.MovieHashMatch != nil {
+		return true // the bool said false, which is the claim itself
+	}
+	return li.Source == "imdb"
 }
 
 // ladderRank orders subtitle sources from the one the viewer trusts most

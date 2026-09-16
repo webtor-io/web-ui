@@ -524,14 +524,17 @@ translation — the same two letters in every locale. Their meaning is carried b
 and by the legend line under the row, both built from `action.stream.origin.{em,in,os,my,ai}`
 (`Helper.OriginKey`). **`OS` covers two origins**: a moviehash match on this very file and an
 imdb (title) match that may belong to another release. The code and the colour are the same; the
-visible difference is the existing `· hash` / `· imdb` suffix (`ListItem.Source`), and for the
-imdb case the badge's `title` gains a second sentence, `action.stream.origin.osImdbHint`
-("Matched by title, may be out of sync", `Helper.OriginHintKey`). A title rather than a glyph of
-its own: the suffix is already the visible marker, and the chip's label is what truncates.
+imdb case wears a muted `~` **inside** the badge, and the badge's `title` gains a second sentence,
+`action.stream.origin.osImdbHint` ("Matched by title, may be out of sync",
+`Helper.OriginHintKey`). Inside the badge because the badge never truncates — the label span is
+what does — and because a tilde needs no translation: it replaced a `· hash` / `· imdb` suffix
+that printed video-info's raw enum in English in every locale (review M6). `ListItem.Source` is
+still carried as `data-source` for telemetry; it is simply not drawn.
 Which of the two a track is comes from `moviehash_match` when video-info sends it (since
-2026-09-16) and from the `source` enum otherwise (`hashMatched`); `imdbMatched` requires one of
-the two to actually say so, because "the service never reported an origin" is not the same claim
-as "matched by title". The ladder rank is unchanged either way: hash 3, imdb 4. The older `action.stream.badge.*` keys stay in the locale files for
+2026-09-16) and from the `source` enum otherwise (`hashMatched`); `imdbMatched` tests that enum
+for `"imdb"` and not for being non-empty, because "the service reported something else" is not
+the claim "matched by title" — a placeholder value in the test fixture was enough to put the
+warning on seven chips (review I4). The ladder rank is unchanged either way: hash 3, imdb 4. The older `action.stream.badge.*` keys stay in the locale files for
 telemetry and back-compat but are no longer rendered — except `action.stream.badge.forced`, because
 `forced` is a **property tag**, not an origin: a forced embedded track shows `EM` + `forced`
 (`Helper.PropertyTags`). `sdh` is drawn in the uikit and waits for `content-prober` to expose

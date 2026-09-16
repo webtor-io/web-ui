@@ -174,6 +174,24 @@ func TestSubtitlesDialogFixtureCoversWhatTheWiringTestsNeed(t *testing.T) {
 			t.Errorf("the fixture no longer carries %q, so the wiring test that drives it covers nothing", want)
 		}
 	}
+	// The imdb marker, both ways round. The fixture carries hash-matched
+	// and imdb-matched OpenSubtitles tracks (os6 above), and only the
+	// second kind may wear the "~" and the "may be out of sync" title:
+	// the visible half of the answer used to be the raw enum, printed in
+	// English in every locale (review I4/M6).
+	const hintTitle = `title="action.stream.origin.os — action.stream.origin.osImdbHint"`
+	if n := strings.Count(html, hintTitle); n != 4 {
+		t.Errorf("%d chips carry the imdb hint, want 4 (de/fr/es/it)", n)
+	}
+	if n := strings.Count(html, `title="action.stream.origin.os"`); n != 2 {
+		t.Errorf("%d OpenSubtitles chips carry the plain origin title, want 2 (en/ru, hash-matched)", n)
+	}
+	for _, gone := range []string{"· hash", "· imdb", "· opensubtitles"} {
+		if strings.Contains(html, gone) {
+			t.Errorf("the raw source enum is still rendered (%q): it is English in every locale", gone)
+		}
+	}
+
 	// More languages than the row shows, or the "+N" test toggles a button
 	// that was never collapsing anything. Counted, not matched against a
 	// whitespace-exact copy of the rendered button: a template reformat plus
@@ -336,17 +354,23 @@ func renderSubtitlesDialog(t *testing.T) string {
 	}
 
 	os6 := []api.OpenSubtitleTrack{}
-	for _, l := range []struct{ code, label string }{
-		{"en", "Movie.en.srt"},
-		{"ru", "Movie.ru.srt"},
-		{"de", "Movie.de.srt"},
-		{"fr", "Movie.fr.srt"},
-		{"es", "Movie.es.srt"},
-		{"it", "Movie.it.srt"},
+	// source is video-info's enum and holds exactly "hash" or "imdb"
+	// (trackSource): the placeholder that used to be here put the
+	// "matched by title" hint on every one of these chips, which is how
+	// review I4 found imdbMatched testing the enum for non-emptiness.
+	// Both values are represented so the fixture exercises a chip with
+	// the hint and a chip without.
+	for _, l := range []struct{ code, label, source string }{
+		{"en", "Movie.en.srt", "hash"},
+		{"ru", "Movie.ru.srt", "hash"},
+		{"de", "Movie.de.srt", "imdb"},
+		{"fr", "Movie.fr.srt", "imdb"},
+		{"es", "Movie.es.srt", "imdb"},
+		{"it", "Movie.it.srt", "imdb"},
 	} {
 		os6 = append(os6, api.OpenSubtitleTrack{
 			ID:     "os-" + l.code,
-			Source: "opensubtitles",
+			Source: l.source,
 			ExportTrack: &ra.ExportTrack{
 				Src: "https://x.test/os-" + l.code + ".vtt", SrcLang: l.code, Label: l.label, Kind: "subtitles",
 			},

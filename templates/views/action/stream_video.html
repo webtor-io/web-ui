@@ -205,18 +205,20 @@
                              locked chip (an upsell, not an action) keeps
                              exactly the markup it always had. */}}
                         {{ if .Offered }}<span class="ai-action" aria-hidden="true">✦</span>{{ end }}
-                        {{/* The origin badge's title names the origin, and for an
-                             OpenSubtitles track matched by title rather than by
-                             this file's moviehash it also says what that means
-                             ("may be out of sync"). A title, not a second glyph:
-                             the visible marker is already there as the "· imdb"
-                             suffix below, and the chip's label is what truncates,
-                             so width spent here is width taken from the name. */}}
-                        {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}{{ with originHintKey . }} — {{ t $.Lang . }}{{ end }}">{{ $oc }}</span>{{ end }}
+                        {{/* The origin badge carries both halves of "where did
+                             this come from". Its title names the origin and, for
+                             an OpenSubtitles track matched by title rather than
+                             by this file's moviehash, says what that means ("may
+                             be out of sync"). The visible half is a muted "~"
+                             inside the badge: the badge never truncates (the
+                             label span is what does), and a code plus a tilde
+                             costs no width and needs no translation — where the
+                             raw "hash"/"imdb" enum this replaced was English in
+                             every locale. */}}
+                        {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}{{ with originHintKey . }} — {{ t $.Lang . }}{{ end }}">{{ $oc }}{{ if originHintKey . }}<span class="text-w-muted font-normal" aria-hidden="true">~</span>{{ end }}</span>{{ end }}
                         {{ if .Offered }}<span class="ai-action max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ tp $.Lang "action.stream.translate.action" "Language" $dl.Localized }}">{{ tp $.Lang "action.stream.translate.action" "Language" $dl.Localized }}</span>{{ end }}
                         <span class="{{ if $ai }}ai-label {{ end }}max-w-[9rem] sm:max-w-[14rem] truncate"{{ if and $ai .Offered }} hidden{{ end }} title="{{ .Label }}">{{ .Label }}</span>
                         {{ range propertyTags . }}<span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="{{ t $.Lang (printf "action.stream.badge.%s" .) }}">{{ . }}</span>{{ end }}
-                        {{ if .Source }}<span class="text-w-muted font-normal">· {{ .Source }}</span>{{ end }}
                         {{ if .SourceBadge }}<span class="{{ if $ai }}ai-label {{ end }}text-w-muted font-normal"{{ if and $ai .Offered }} hidden{{ end }}>· {{ t $.Lang "action.stream.translate.from" }} {{ originCodeForBadge .SourceBadge }}</span>{{ end }}
                         {{ if eq .Provider "Translated" }}<span class="tr-progress text-w-muted font-normal" hidden></span><span class="tr-spinner loading loading-spinner loading-xs text-w-pinkL" aria-hidden="true" hidden></span>{{ end }}
                         {{ if .Locked }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="sr-only">{{ t $.Lang "action.stream.locked.aria" }}</span>{{ end }}
