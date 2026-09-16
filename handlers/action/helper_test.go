@@ -331,9 +331,14 @@ func TestLadderTranslatedIsOfferedWhenNoHumanTrackInPreferredLang(t *testing.T) 
 	if !strings.Contains(tr.Src, "~tr:pt/") || !strings.Contains(tr.Src, "names=Hildy") {
 		t.Fatalf("src=%q", tr.Src)
 	}
-	// source: audio is English → the English track wins (sidecar comes before OS in list order)
-	if !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
-		t.Fatalf("expected the English sidecar as source, got %q", tr.Src)
+	// Source: audio is English, so an English track wins the language
+	// preference, and between the two English ones the hash-matched
+	// OpenSubtitles track beats the sidecar -- it is a match on this very
+	// file, while a sidecar shipped in the torrent is unverified
+	// (translationSourceRank, owner ruling 2026-09-16). Until then the
+	// answer was the sidecar, because it is appended first.
+	if !strings.HasPrefix(tr.Src, "https://x/os-en.vtt~tr:pt/") {
+		t.Fatalf("expected the hash-matched English OpenSubtitles track as source, got %q", tr.Src)
 	}
 	if !tr.Offered || tr.Suggested || tr.Default {
 		t.Fatalf("the translation is offered, never turned on: offered=%v suggested=%v default=%v", tr.Offered, tr.Suggested, tr.Default)
@@ -566,7 +571,11 @@ func TestLadderRankAndSourceBadge(t *testing.T) {
 		}
 	}
 	tr := got["tr-pt"]
-	if tr.SourceID != "et-1" || tr.SourceBadge != "sidecar" {
+	// os-2 is the hash-matched English track: English audio, and inside
+	// that language a hash match outranks the sidecar for translating
+	// (translationSourceRank) even though the display ladder above puts
+	// the sidecar first. The two orders answer two different questions.
+	if tr.SourceID != "os-2" || tr.SourceBadge != "os" {
 		t.Errorf("AI item must name its source: sourceID=%q badge=%q", tr.SourceID, tr.SourceBadge)
 	}
 	if tr.Source != "" {
@@ -1323,5 +1332,158 @@ func TestGetSubtitlesSurvivesNilExportTagAndExternalData(t *testing.T) {
 	items := NewHelper().GetSubtitles(ud, nil, nil, nil, nil, nil, SubtitleOpts{})
 	if len(items) != 1 || items[0].ID != "none" {
 		t.Fatalf("want just the None entry, got %v", items)
+	}
+}
+
+// srcItem is one translation-source candidate: everything
+// pickTranslationSource reads and nothing else.
+func srcItem(id, provider, lang, src, source string) ListItem {
+	return ListItem{ID: id, Provider: provider, SrcLang: lang, Src: src, Source: source,
+		Kind: "subtitles", Badge: badgeFor(provider, false)}
+}
+
+// TestPickTranslationSourcePrefersAFileOverTheLivePlaylist pins the owner's
+// 2026-09-16 ruling: a file source in the preferred order (audio language,
+// then English, then any) beats the embedded live playlist, which costs a
+// transcoder session for the length of the film and caches a final artifact
+// only for a contiguous run from 0. Before the ruling the winner fell out of
+// the order GetSubtitles appends in, and embedded is appended first.
+func TestPickTranslationSourcePrefersAFileOverTheLivePlaylist(t *testing.T) {
+	embedded := srcItem("mp-0", "MediaProbe", "rus", "https://edge/s0.m3u8", "")
+	for _, c := range []struct {
+		name  string
+		lis   []ListItem
+		audio string
+		want  string
+	}{
+		{
+			// Same language, and the embedded one is appended first: the
+			// case that used to answer "mp-0".
+			name:  "file and embedded in the audio language",
+			lis:   []ListItem{{ID: "none", Kind: "subtitles"}, embedded, srcItem("os-1", "OpenSubtitles", "rus", "https://x/os.vtt", "hash")},
+			audio: "ru",
+			want:  "os-1",
+		},
+		{
+			// The bucket is picked before the language is: a file in ANY
+			// language beats the live playlist even when the playlist is
+			// the one in the audio language. The file is minutes of work
+			// that every later viewer reuses; the playlist is film-length
+			// and private to this session.
+			name:  "file in another language still beats embedded",
+			lis:   []ListItem{{ID: "none", Kind: "subtitles"}, embedded, srcItem("et-1", "ExportTag", "fra", "https://x/fr.vtt", "")},
+			audio: "ru",
+			want:  "et-1",
+		},
+		{
+			name:  "embedded only",
+			lis:   []ListItem{{ID: "none", Kind: "subtitles"}, embedded},
+			audio: "ru",
+			want:  "mp-0",
+		},
+		{
+			// A session-less embedded track has no Src and is no source at
+			// all, so this list has nothing to translate.
+			name:  "embedded without a session src",
+			lis:   []ListItem{{ID: "none", Kind: "subtitles"}, srcItem("mp-0", "MediaProbe", "rus", "", "")},
+			audio: "ru",
+			want:  "",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := pickTranslationSource(c.lis, c.audio)
+			id := ""
+			if got != nil {
+				id = got.ID
+			}
+			if id != c.want {
+				t.Fatalf("source=%q want %q", id, c.want)
+			}
+		})
+	}
+}
+
+// TestPickTranslationSourceOrdersEqualFileSources: within one language the
+// order is the viewer's own upload, then a hash-matched OpenSubtitles track
+// (a match on this very file), then a sidecar from the torrent, then an
+// imdb-matched OpenSubtitles track (same title, possibly another release).
+// Not ladderRank: that one puts the sidecar above both OpenSubtitles rungs,
+// which is the right answer for reading and the wrong one for translating.
+func TestPickTranslationSourceOrdersEqualFileSources(t *testing.T) {
+	// Appended in the order GetSubtitles uses, so a "first wins" rule would
+	// answer et-1 every time.
+	all := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		srcItem("et-1", "ExportTag", "rus", "https://x/sc.vtt", ""),
+		srcItem("os-imdb", "OpenSubtitles", "rus", "https://x/oi.vtt", "imdb"),
+		srcItem("os-hash", "OpenSubtitles", "rus", "https://x/oh.vtt", "hash"),
+		srcItem("us-1", "UserSubtitle", "rus", "https://x/my.vtt", ""),
+	}
+	for i, want := range []string{"us-1", "os-hash", "et-1", "os-imdb"} {
+		// Drop the winners one by one: each remaining list must answer the
+		// next rung down.
+		lis := append([]ListItem{}, all...)
+		for _, gone := range []string{"us-1", "os-hash", "et-1", "os-imdb"}[:i] {
+			for j := range lis {
+				if lis[j].ID == gone {
+					lis = append(lis[:j], lis[j+1:]...)
+					break
+				}
+			}
+		}
+		got := pickTranslationSource(lis, "ru")
+		if got == nil || got.ID != want {
+			t.Fatalf("rung %d: got %+v want %q", i, got, want)
+		}
+	}
+}
+
+// TestPickTranslationSourceKeepsTheLanguagePreference is the negative
+// control for the bucket rule: inside the file bucket the language order is
+// unchanged (audio language, then English, then any), so the new rule can
+// only be seen to reorder buckets and not languages.
+func TestPickTranslationSourceKeepsTheLanguagePreference(t *testing.T) {
+	lis := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		srcItem("os-fr", "OpenSubtitles", "fra", "https://x/fr.vtt", "hash"),
+		srcItem("os-en", "OpenSubtitles", "eng", "https://x/en.vtt", "imdb"),
+		srcItem("et-ru", "ExportTag", "rus", "https://x/ru.vtt", ""),
+	}
+	// Audio language wins even from the worst rung of the file order.
+	if got := pickTranslationSource(lis, "en"); got == nil || got.ID != "os-en" {
+		t.Fatalf("audio language: %+v", got)
+	}
+	// No track in the audio language: English next, whatever its rank.
+	if got := pickTranslationSource(lis, "de"); got == nil || got.ID != "os-en" {
+		t.Fatalf("english fallback: %+v", got)
+	}
+	// Neither the audio language nor English is present: the best-ranked
+	// of what is left, in list order for ties.
+	noEnglish := []ListItem{lis[0], lis[1], lis[3]}
+	if got := pickTranslationSource(noEnglish, "de"); got == nil || got.ID != "os-fr" {
+		t.Fatalf("any: %+v", got)
+	}
+}
+
+// TestLadderTranslationPrefersTheUploadOverTheLivePlaylist is the same rule
+// through applyLadder, where it is visible to the viewer: the AI chip says
+// "· from MY", not "· from EM", and the URL is built on the upload.
+func TestLadderTranslationPrefersTheUploadOverTheLivePlaylist(t *testing.T) {
+	lis := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		srcItem("mp-0", "MediaProbe", "rus", "https://edge/h/a.mkv~hls/session/x/s0.m3u8?token=T", ""),
+		srcItem("us-1", "UserSubtitle", "rus", "https://edge/ext/my.srt~vtt?token=T", ""),
+	}
+	out := NewHelper().applyLadder(lis, &models.VideoStreamUserData{}, "ru",
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr, ok := byID(out)["tr-pt"]
+	if !ok {
+		t.Fatal("no translated item")
+	}
+	if tr.SourceBadge != "user" || tr.SourceID != "us-1" {
+		t.Fatalf("source badge=%q id=%q, want the upload", tr.SourceBadge, tr.SourceID)
+	}
+	if want := "https://edge/ext/my.srt~vtt~tr:pt/my.vtt?token=T"; tr.Src != want {
+		t.Fatalf("src=%q want %q", tr.Src, want)
 	}
 }

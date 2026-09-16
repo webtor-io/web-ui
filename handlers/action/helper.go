@@ -502,20 +502,94 @@ func bestByLadder(lis []ListItem, lang string, forced bool) int {
 	return best
 }
 
+// isEmbeddedSource reports whether the item is an embedded (MediaProbe)
+// track, whose Src -- when it has one at all -- is the live subtitle
+// playlist of the viewer's own transcoder session. Everything else is a
+// finished file: an upload, a sidecar shipped in the torrent, an
+// OpenSubtitles track.
+func isEmbeddedSource(li ListItem) bool {
+	return li.Provider == "MediaProbe"
+}
+
+// translationSourceRank breaks a tie between two file sources of the same
+// language. It is deliberately NOT ladderRank: that order answers "which
+// track does the viewer want to read", this one answers "which text is the
+// machine most likely to translate correctly". The two disagree on one
+// rung -- a hash-matched OpenSubtitles track is a match on this very file,
+// while a sidecar shipped in the torrent is unverified and routinely
+// belongs to another release, so it outranks the sidecar here and not in
+// the ladder (owner ruling, 2026-09-16).
+//
+// Embedded tracks never reach this function: they are a bucket of their
+// own (see pickTranslationSource).
+func translationSourceRank(li ListItem) int {
+	switch li.Provider {
+	case "UserSubtitle":
+		return 0
+	case "OpenSubtitles":
+		if li.Source == "hash" {
+			return 1
+		}
+		return 3
+	case "ExportTag", "External":
+		return 2
+	}
+	return rankUnknown
+}
+
 // pickTranslationSource picks the human track the AI translation is made
 // from: a non-forced, URL-backed track, preferring the audio language (a
 // transcription of what is being said, not a translation of a
-// translation), then English, then anything. Embedded tracks are a source
-// when they carry a playlist Src (transcoder session); a native MP4
-// without a session has none.
+// translation), then English, then anything.
+//
+// A FILE source wins over an embedded one (owner ruling, 2026-09-16), and
+// the embedded bucket is reached only when no file source qualifies at
+// all -- not per language. Both halves of that matter:
+//
+//   - A file is one fetch of seconds-to-minutes and leaves a final
+//     artifact cached under ArtifactKey for every later viewer. The
+//     embedded source is the live playlist of *this* viewer's transcoder
+//     session: it runs at transcode speed, holds one of the service's
+//     --live-max-jobs slots for the length of the film, stops when the
+//     viewer leaves, and caches a final only for a contiguous run from
+//     offset 0.
+//   - Before this ruling the choice fell out of the order GetSubtitles
+//     appends in (embedded first), so a transcoded file translated its
+//     own live playlist even when the viewer's own upload sat in the same
+//     language -- the display ladder ranks that upload above embedded,
+//     and the two orders disagreeing was a bug, not a policy.
+//
+// Embedded tracks remain a source when they carry a playlist Src
+// (transcoder session); a native MP4 without a session has none, and a
+// file-less, session-less list yields no translation at all.
 func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
+	if src := bestTranslationSource(lis, audioLang, false); src != nil {
+		return src
+	}
+	return bestTranslationSource(lis, audioLang, true)
+}
+
+// bestTranslationSource is pickTranslationSource within one bucket: the
+// file sources (embedded=false) or the embedded ones (embedded=true).
+// Language decides first -- audio language, then English, then anything --
+// and translationSourceRank breaks ties inside each of those three.
+func bestTranslationSource(lis []ListItem, audioLang string, embedded bool) *ListItem {
 	var first, en, audio *ListItem
+	// Strictly better, so equal ranks keep the first item seen and the
+	// list order stays the last tie-break (it is the only stable one the
+	// embedded bucket has: every embedded track ranks the same).
+	better := func(cur, cand *ListItem) bool {
+		return cur == nil || translationSourceRank(*cand) < translationSourceRank(*cur)
+	}
 	for i := range lis {
 		li := &lis[i]
 		if !isHumanFull(*li) || li.Src == "" {
 			continue
 		}
-		if first == nil {
+		if isEmbeddedSource(*li) != embedded {
+			continue
+		}
+		if better(first, li) {
 			first = li
 		}
 		// A switch, so the two cases are exclusive: when the audio is
@@ -527,11 +601,11 @@ func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
 		// it as one.
 		switch baseLang(li.SrcLang) {
 		case audioLang:
-			if audio == nil && audioLang != "" {
+			if audioLang != "" && better(audio, li) {
 				audio = li
 			}
 		case "en":
-			if en == nil {
+			if better(en, li) {
 				en = li
 			}
 		}

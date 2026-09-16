@@ -164,31 +164,40 @@ correct rather than an oversight — the locked item is an upsell, not a track; 
 the viewer cannot see. The cost is that such a viewer could upgrade and then find no AI item at
 all, which is the same outcome every unsupported source already gives (see *Known limitations*).
 
-**Translation source selection** (`pickTranslationSource`): a non-forced, URL-backed human track,
-preferring the active audio's language (transcribing what's said, not translating a translation),
-then English, then any. Embedded (`MediaProbe`) tracks are a source when the stream plays through
-the transcoder: `GetSubtitles` gives each visible embedded track `Src = <HLSSessionBase>/s<MPID>.m3u8`
-(the same variant hls.js plays; `SubtitleOpts.HLSSessionBase` is set in `streamContent` once the session
+**Translation source selection** (`pickTranslationSource`): a **file** source — the viewer's own
+upload, an `ExportTag` sidecar, an OpenSubtitles track — in the preferred language order (the
+active audio's language, transcribing what's said rather than translating a translation, then
+English, then any) beats an **embedded** one (`MediaProbe`, the live playlist). The embedded
+bucket is reached only when no file source qualifies **at all** — not per language: a French
+sidecar is picked over a Russian live playlist with Russian audio (owner ruling, 2026-09-16).
+
+The cost of the two is not comparable, which is what the ruling is about. A file is one fetch of
+seconds-to-minutes and leaves a final artifact cached under `ArtifactKey` for every later viewer.
+The live source runs at transcode speed, holds one of the service's `--live-max-jobs` slots for
+the length of the film, stops when the viewer leaves, and caches a final only for a contiguous run
+from offset 0. Until the ruling the winner fell out of the order `GetSubtitles` appends in
+(`MediaProbe` first, then `ExportTag`, `OpenSubtitles`, `External`, `UserSubtitle`), so a
+transcoded file translated its own live playlist even when the viewer's own upload sat in the same
+language — while the display ladder ranks that upload *above* embedded. The two orders disagreeing
+was a bug, not a policy.
+
+**Among file sources of the same language** (`translationSourceRank`): the viewer's own upload,
+then a **hash-matched** OpenSubtitles track, then the sidecar, then an **imdb-matched**
+OpenSubtitles track. This is deliberately **not** `ladderRank`, which puts the sidecar above both
+OpenSubtitles rungs: the ladder answers "which track does the viewer want to read", this order
+answers "which text will the machine translate correctly", and a hash match is a match on this
+very file while a sidecar shipped in the torrent is unverified and routinely belongs to another
+release. Equal ranks keep list order, which is the only stable tie-break the embedded bucket has.
+
+Embedded (`MediaProbe`) tracks are a source when the stream plays through the transcoder:
+`GetSubtitles` gives each visible embedded track `Src = <HLSSessionBase>/s<MPID>.m3u8` (the same
+variant hls.js plays; `SubtitleOpts.HLSSessionBase` is set in `streamContent` once the session
 exists), and `TranslateURL` appends `~tr:<lang>/s<MPID>.vtt` to it. The service then follows the
 live playlist (service README, «Live HLS source»): the translation arrives along with the
 transcode, `X-Subtitle-Live: 1` marks it as still growing, and a final artifact is cached only
 for a contiguous run from the start. A native MP4 played without a session has no base and no
-embedded source, as before.
-
-**Within one language, an embedded track wins on append order.** `pickTranslationSource` prefers
-the audio language, then English, then anything — and inside each of those it takes the *first*
-matching item in the list. It does **not** consult `ladderRank`. The list order is the order
-`GetSubtitles` appends in: `MediaProbe` (embedded) first, then `ExportTag`, `OpenSubtitles`,
-`External` and `UserSubtitle` last (`handlers/action/helper.go:806-859`). So for a transcoded file
-that has both, the translation source is the live playlist rather than a finished VTT in the same
-language — **including when the other candidate is the viewer's own upload**, which the display
-ladder ranks *above* embedded (`ladderRank`: `UserSubtitle` 0 < `MediaProbe` 1). The two orders
-disagree, and translation follows append order; that predates this branch and is worth revisiting,
-but it is what the code does today. The cost of preferring the embedded track is explicit: the
-batch source is one fetch of seconds-to-minutes that leaves a final artifact cached under
-`ArtifactKey` for every later viewer, while the live source runs at transcode speed, holds one of
-the service's `--live-max-jobs` slots for the length of the film, and leaves a cached final only
-for a contiguous run from offset 0.
+embedded source, as before — and a list with neither a file source nor a session offers no
+translation at all.
 
 **Glossary.** `streamprefs.CastNames(ctx, imdbID, 30)` reads up to 30 cast names from TMDB credits
 stored by enrichment, passed as `names=` to the service.
@@ -421,8 +430,10 @@ telemetry and back-compat but are no longer rendered — except `action.stream.b
 `forced` is a **property tag**, not an origin: a forced embedded track shows `EM` + `forced`
 (`Helper.PropertyTags`). `sdh` is drawn in the uikit and waits for `content-prober` to expose
 ffprobe's disposition flags. Since 2026-09-16 an AI chip's `data-source-badge` (the `· from <CODE>`
-suffix) can also read `EM`: `pickTranslationSource` now accepts an embedded track that carries a
-transcoder-session playlist `Src`, where before `embedded` never appeared there.
+suffix) can also read `EM`: `pickTranslationSource` accepts an embedded track that carries a
+transcoder-session playlist `Src`, where before `embedded` never appeared there. It is now the
+*rarest* of the four, not the most common one — the same day's source ruling made a file source
+win over the live playlist, so `EM` appears only on files with nothing else to translate.
 
 `data-lang` is the base language tag the chip groups under, `und` when unknown;
 `data-lang-name`/`data-lang-flag` carry the display strings so the client can clone a new language
@@ -720,7 +731,9 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   `stremio_settings.preferred_language`: a viewer who changes that in their profile may keep
   seeing the old `SubtitleOpts` (ladder run on the old language) until the current 10-minute
   bucket rolls over. Parked as a follow-up, not fixed in this task.
-- **Embedded-track translations follow the viewer's transcode.** The source is the live
+- **Embedded-track translations follow the viewer's transcode.** Since the 2026-09-16 source
+  ruling this is the *last* resort — it is reached only when the file has no upload, no sidecar
+  and no OpenSubtitles track to translate — but where it is reached the source is the live
   subtitle playlist of the current transcoder session, so the translation runs at transcode
   speed and stops when the viewer leaves (`--live-idle` on the service) or seeks far (a new run
   with a non-zero offset). A seeked session never produces a cached final artifact; the partial
