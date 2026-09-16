@@ -1523,3 +1523,195 @@ test('kick() is a no-op with no translation running \u2014 a seek with nothing p
     // null, and kickTranslationPoll's own guard is the whole of the fix
     // for that case.
 });
+
+// ---- the catching-up banner -------------------------------------------
+//
+// A live (embedded-track) translation runs alongside the transcode and can
+// fall behind the playhead: the film plays on and the cues for what is on
+// screen have not been written yet. The service says where its frontier is
+// (X-Subtitle-Pending-From, movie time), the player compares it with the
+// playhead, and the banner offers to wait.
+//
+// The i18n bundle is empty under `node --test` (see jsx-hooks.mjs), so t()
+// answers with the key — which is exactly what makes "which of the two
+// sentences is showing" assertable. The count comes off data-remaining.
+
+// catchUpResponse is a live answer that also carries the frontier.
+// `pendingFrom` null is an older service, or a run with nothing pending
+// ahead — the two cases that must produce no banner at all.
+const catchUpResponse = (header, pendingFrom) => ({
+    ok: true,
+    status: 200,
+    headers: {
+        get: (n) => {
+            if (n === 'X-Subtitle-Progress') return header;
+            if (n === 'X-Subtitle-Live') return '1';
+            if (n === 'X-Subtitle-Pending-From') return pendingFrom;
+            return null;
+        },
+    },
+    json: async () => ({}),
+});
+
+// jsdom implements neither play() nor pause() (they are the "not
+// implemented" stubs, and pause() fires no event). These are what a
+// browser does as far as this feature can tell: the flag flips at once
+// and the event is *queued* — HTML queues a media element task for
+// `pause` and `play` rather than dispatching inside the call.
+//
+// The asynchrony is not decoration. handleWait pauses and then resumes
+// the poll, so a synchronously dispatched `pause` would land before the
+// resume and be undone by it — which hides the one thing the
+// waitingRef guard in sleep() is there for: in a browser the event
+// arrives after the resume, and without the guard it would put the run
+// to sleep for good, leaving the viewer paused on a translation nobody
+// is asking about any more.
+function playback(video) {
+    const log = { play: 0, pause: 0 };
+    const queue = (name) => setTimeout(() => video.dispatchEvent(new dom.window.Event(name)), 0);
+    video.play = () => {
+        log.play++;
+        video.paused = false;
+        queue('play');
+        return Promise.resolve();
+    };
+    video.pause = () => {
+        log.pause++;
+        video.paused = true;
+        queue('pause');
+    };
+    return log;
+}
+
+const catchUpBanner = (p) => p.container.querySelector('.wt-catchup');
+const catchUpText = (p) => catchUpBanner(p).querySelector('.wt-catchup-text').textContent;
+
+test('a translation at the playhead offers to wait; one that gets ahead stops offering', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    // The frontier — where the untranslated part starts — is right where
+    // the viewer is, so the next thing they hear has no subtitle yet.
+    let pending = '100';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+
+    assert.ok(catchUpBanner(p), 'the run is at the playhead, so it is behind it');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp');
+    assert.equal(catchUpBanner(p).dataset.remaining, '388', 'total minus done');
+    assert.ok(catchUpBanner(p).querySelector('.wt-catchup-btn'), 'with the Wait button on it');
+
+    // The service gets comfortably ahead (past the 5 s clear margin).
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(catchUpBanner(p), null, 'nothing to catch up to, nothing to say');
+});
+
+test('a service that sends no frontier shows no banner at all', async (t) => {
+    // The compatibility case, and the one the client cannot get wrong:
+    // every deployment before the header shipped, every batch source, and
+    // every live run with nothing pending ahead. Absence is "no banner",
+    // never "behind".
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('12/400')
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+
+    assert.equal(catchUpBanner(p), null);
+    assert.equal(p.container.querySelector('.tr-progress').hidden, false, 'the chip still reports the run');
+});
+
+test('Wait pauses the film, keeps the poll awake, and plays again once the run is ahead', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    // Eight seconds behind the playhead.
+    let pending = '92';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const log = playback(p.video);
+
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.ok(catchUpBanner(p));
+
+    click(catchUpBanner(p).querySelector('.wt-catchup-btn'));
+    await settle();
+
+    assert.equal(log.pause, 1, 'Wait pauses the film');
+    assert.equal(p.video.paused, true);
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'and the banner says why it is paused');
+    const waits = p.events.filter((e) => e.name === 'subtitle-translate-wait');
+    assert.equal(waits.length, 1, 'one event for one press');
+    assert.equal(waits[0].data.lang, 'pt');
+    assert.equal(waits[0].data.behind, 8, 'how far behind the run was when they pressed it');
+
+    // The whole of the feature: a pause normally suspends the poll, and
+    // this one must not — the HEAD every 3 s is what the viewer is waiting
+    // on, and for a live source it is what keeps the transcoder session
+    // (and the translation reading it) alive.
+    const atPause = heads();
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(heads() > atPause, `the poll must stay awake while waiting: ${heads()} HEADs vs ${atPause} at the pause`);
+    assert.ok(catchUpBanner(p), 'and the banner stands until the run catches up');
+
+    // Comfortably ahead: the film goes back on by itself.
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(log.play >= 1, 'playback resumes on its own');
+    assert.equal(catchUpBanner(p), null);
+    const dones = p.events.filter((e) => e.name === 'subtitle-translate-wait-done');
+    assert.equal(dones.length, 1, 'one event for one wait');
+    assert.equal(dones[0].data.lang, 'pt');
+    assert.ok(typeof dones[0].data.seconds === 'number' && dones[0].data.seconds >= 0,
+        `the wait is measured: ${JSON.stringify(dones[0].data)}`);
+});
+
+test('× takes the banner away and the next trailing tick does not bring it back', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    let pending = '100';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.ok(catchUpBanner(p));
+
+    click(catchUpBanner(p).querySelector('.wt-catchup-close'));
+    await settle();
+    assert.equal(catchUpBanner(p), null, '× hides it');
+
+    // Still behind, still dismissed: a banner that came back three
+    // seconds later would make the × read as broken.
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(catchUpBanner(p), null, 'and it stays hidden while the run is still behind');
+
+    // The dismissal was about a stretch of film the run was behind on.
+    // Once it is no longer behind, that stretch is over...
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(catchUpBanner(p), null, 'caught up: nothing to show either way');
+
+    // ...and the next time it falls behind, it may say so again.
+    pending = '100';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(catchUpBanner(p), 'a fresh stretch of film gets a fresh offer');
+});

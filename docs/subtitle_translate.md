@@ -420,6 +420,63 @@ trip" / cache-key section).
   not move until the viewer pressed play, and pausing the film to open the picker is exactly when
   people start one. A live run clicked while paused now shows the count its first answer brought
   and polls nothing more until play.
+- **`X-Subtitle-Pending-From` (where the run is in the film).** The fourth header on the same
+  `HEAD`/`GET` response, and the only one about the *film* rather than about the job:
+  `X-Subtitle-Pending-From: <seconds>` (decimal, movie time) is the start of the earliest
+  untranslated cue the viewer can still meet in the current run. The counts cannot answer that
+  question — a run 200 cues from the end may be an hour ahead of the playhead or ten seconds
+  behind it. **Absent** when nothing is pending ahead, when the source is not live, and on every
+  service that predates it; `parseProgress(header, live, status, pendingFrom)` reads absence,
+  garbage and a negative alike as `pendingFrom: null`, and the client treats `null` as *no banner*
+  and as *caught up* — never as "behind". It is part of `pollProgress`'s change test, not a
+  passenger on it: after a seek the frontier moves while the counts stand still.
+- **Catching-up banner (`subtitle-catchup.js`, `.wt-catchup`).** A live translation runs alongside
+  the transcode and can fall behind the playhead: the film plays on and the cues for what is on
+  screen are not written yet. When it does, a top-centre pill says
+  `player.subtitleCatchUp` ("AI translation is catching up… ~N cues to go",
+  `N = max(0, total - done)`) and offers **Wait for it**, with a × to dismiss. It is placed at the
+  top because the two things it must not cover are the subtitles it is about (bottom of the
+  picture) and the controls under them.
+  - **The comparison.** Playhead is `video.currentTime + seekOffset` (movie time — a transcoder
+    session that started mid-film exposes a media timeline beginning at zero; the same arithmetic
+    `applyCueOffset` does to cues), mirrored into `seekOffsetRef` so the poll callbacks read the
+    current offset rather than the one the run started with. `trailing(prev, pendingFrom,
+    playhead)` is true at `pendingFrom <= playhead + 2`, false at `pendingFrom >= playhead + 5`,
+    and **keeps the previous answer in between**. The hysteresis is not politeness: a healthy live
+    run hovers a few seconds ahead of the playhead, and a single threshold would show and hide the
+    banner every 3 s. Neither margin can go below 2 s, because the offset a transcoder run reports
+    is the segment boundary it actually started on and shifts by up to ~1.7 s between runs — a
+    tighter threshold would flip on arithmetic rather than on anything that happened. A playhead
+    that is not a finite number (a `<video>` with no timeline yet) reads as *not trailing* and as
+    *caught up*: a film that has not started must never pause itself.
+  - **Evaluated on every tick, not on every change.** `pollProgress` gained `onTick(p)`, called on
+    every successful 200 after the change and queue blocks and before the terminal ones.
+    `onProgress` keeps its only-on-change contract (the chip has nothing to redraw when nothing
+    moved); the banner cannot use it, because the playhead moves while the counts stand still —
+    a translation that stopped producing during a film that keeps playing is exactly the case the
+    banner is there to catch. `setCatchUp` is behind a value comparison so the 3 s tick does not
+    re-render the player for saying the same thing again.
+  - **Wait keeps the poll awake.** `Wait for it` pauses the film and sets `waitingRef`, and
+    `sleep()` — the `pause`/hidden-tab handler that normally suspends the run — returns early
+    while it is set. That inversion is the whole feature: the HEAD every 3 s is what the viewer is
+    waiting *on*, and for a live source it is what keeps the transcoder session and the
+    translation reading it alive. It also calls `resume()` (a no-op unless suspended), which
+    covers the viewer who paused first and pressed Wait afterwards. The banner then reads
+    `player.subtitleCatchUpWaiting`, and the button becomes **Keep watching**.
+  - **What ends a wait.** `caughtUp(pendingFrom, playhead)` — `pendingFrom` null, or
+    `>= playhead + 5` — resumes playback by itself and clears the banner (null included, so a
+    service that stops sending the header can never strand a waiting viewer). So does pressing
+    play (the `play` listener clears `waitingRef`), **Keep watching**, and ×. A run that *dies*
+    while the viewer waits (`onError`, `onDone`, `stopTranslationProgress`) clears the banner and
+    the wait but deliberately does **not** play: the film stays paused with the big play button,
+    and the chip's own title says what happened.
+  - **The ×** is per run and per stretch of film. It is cleared when the run catches up, on a
+    session seek (`kickTranslationPoll`) and when a new run starts — all three mean the thing
+    that was dismissed is over. Dismissing while waiting also cancels the wait; it does not
+    resume playback.
+  - **No tier gate, and none wanted.** A viewer without the entitlement never has a translation
+    running: the AI chip is rendered `Locked` with no `Src` upstream, so there is nothing here to
+    gate. The gate is the dependency (a running translation), not a flag.
 - **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
   through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
@@ -482,6 +539,7 @@ permanently empty rather than wrong:
 | `200` + `Retry-After` → `SubtitlesNotReadyError` | video-info | no retry, `notReady` always `false` |
 | `moviehash_match` | video-info | `MovieHashMatch` always nil, `hashMatched` reads the `source` enum — today's behaviour |
 | `X-Subtitle-Status` | subtitle-translate | the counts decide alone, as before |
+| `X-Subtitle-Pending-From` | subtitle-translate | no catching-up banner: absence is read as "nothing pending ahead" |
 
 So do not read a `notReady` rate or a `source=hash/imdb` split as measurement before video-info
 deploys: they are measuring the deploy, not the traffic.
@@ -495,6 +553,8 @@ deploys: they are measuring the deploy, not the traffic.
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`, `'stopped'` the service reported `X-Subtitle-Status: stopped` (`source_gone`/`too_large`) — the one code that leaves the chip's count on screen. |
+| `subtitle-translate-wait` | `lang`, `behind` | Viewer pressed **Wait for it** on the catching-up banner. `behind` = `round(playhead - pendingFrom)` in seconds at the moment of the press (`0` when the frontier was unknown). |
+| `subtitle-translate-wait-done` | `lang`, `seconds` | The wait ended by itself — the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead and playback resumed. `seconds` = wall time waited, rounded to 0.1. A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited: `wait-done` counts waits that *paid off*. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
 
@@ -1054,9 +1114,20 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   (`≤ 2` `subtitleTrack` writes per selection) mean something. hls.js's *asynchronous* half
   (`onTextTracksChanged`) is still driven by hand in the tests that want the latch.
   Still by hand: fullscreen, and anything about actual playback.
+  The catching-up banner adds four through the same mount: a run at the playhead showing the pill
+  (count off `data-remaining`) and a run that gets ahead taking it away, a service that sends no
+  `X-Subtitle-Pending-From` showing nothing at all, **Wait** pausing the film while the HEADs keep
+  coming and a later caught-up answer resuming it with both events emitted, and × surviving a
+  trailing tick but not a caught-up-then-trailing pair. The harness stubs `play`/`pause` (jsdom
+  implements neither) and **queues their events** the way HTML does rather than dispatching inside
+  the call — synchronous dispatch would land the `pause` before `handleWait`'s `resume()` and undo
+  it, which hides the very guard the test is for (negative control: with the `waitingRef` check
+  removed from `sleep()`, "the poll must stay awake while waiting" fails at 1 HEAD).
   The plain-JS modules keep their own suites: `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
-  `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`),
+  `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`, `onTick`),
+  `subtitle-catchup.test.js` (`trailing`, `caughtUp`, `remaining` — the margins, the hysteresis
+  band in both directions, and a NaN playhead never pausing the film),
   `subtitle-telemetry.test.js` (`readAllTracks`, `readTracks`, `selectEventData`,
   `resolveSubtitleLevel`), `subtitle-track-reload.test.js` (`reloadSubtitleTrack`: listener
   lifetime, latest-snapshot restore, the did-it-reload return value), and `track-picker.test.js`

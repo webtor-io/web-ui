@@ -11,6 +11,7 @@ import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, progressText, withRev } from './subtitle-progress.js';
+import { caughtUp, remaining, trailing } from './subtitle-catchup.js';
 import {
     adoptUploadChips,
     refresh,
@@ -179,8 +180,83 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // running after the poll stops says a translation is still going.
     const progressSpinnerRef = useRef(null);
 
+    // --- the catching-up banner --------------------------------------
+    //
+    // A live (embedded-track) translation runs alongside the transcode and
+    // can fall behind the playhead: the film plays on and the cues for
+    // what is on screen have not been written yet. The service says where
+    // its frontier is (X-Subtitle-Pending-From, movie time); this block
+    // compares it with where the viewer is and offers to wait.
+    //
+    // No tier gate, and none wanted: a viewer without the entitlement
+    // never has a translation running at all — the AI chip is rendered
+    // locked upstream (data-locked, no data-src), so there is nothing here
+    // for them to be gated out of.
+    //
+    // `null` or `{ remaining, waiting }`. `waiting` is the viewer having
+    // pressed Wait: the film is paused on purpose and the poll is kept
+    // awake, which is the one thing a pause normally switches off.
+    const [catchUp, setCatchUp] = useState(null);
+    // The same value as a ref, so a tick three seconds apart can tell
+    // "nothing changed" from "changed back to the same shape" without
+    // re-rendering the player every 3 s to find out.
+    const catchUpRef = useRef(null);
+    const waitingRef = useRef(false);
+    // When Wait was pressed, for the seconds field of wait-done.
+    const waitedSinceRef = useRef(0);
+    // The × is per run and per stretch of film: it comes back on its own
+    // once the translation catches up (below) and on a session seek
+    // (kickTranslationPoll), because both mean the thing that was
+    // dismissed is over.
+    const dismissedRef = useRef(false);
+    // The previous trailing answer, which is what the hysteresis band
+    // between the two margins keeps.
+    const trailingRef = useRef(false);
+    // The running item's language and the last frontier the service
+    // reported, for the two events. The handlers are rendered buttons, so
+    // they are outside startTranslationProgress's closure where both are
+    // in scope.
+    const catchUpLangRef = useRef('');
+    const pendingFromRef = useRef(null);
+    // Movie time is video.currentTime + the session offset (see
+    // applyCueOffset in cue-offset.js for the same arithmetic on cues).
+    // Mirrored into a ref because the poll callbacks are built once and
+    // would otherwise read the offset the run started with.
+    const seekOffsetRef = useRef(0);
+    seekOffsetRef.current = seekOffset;
+
+    // setCatchUp behind a value comparison: a tick arrives every 3 s and
+    // almost all of them say exactly what the last one did. Re-rendering
+    // the player on each would be the banner's whole cost.
+    const showCatchUp = useCallback((next) => {
+        const cur = catchUpRef.current;
+        if (cur === next) return;
+        if (cur && next && cur.remaining === next.remaining && cur.waiting === next.waiting) return;
+        catchUpRef.current = next;
+        setCatchUp(next);
+    }, []);
+
+    // play() is not a promise everywhere (and is not implemented at all
+    // under jsdom), so the rejection guard has to check before it chains.
+    const resumePlayback = useCallback(() => {
+        const video = videoRef.current;
+        if (!video || typeof video.play !== 'function') return;
+        const r = video.play();
+        if (r && typeof r.catch === 'function') r.catch(() => {});
+    }, []);
+
     const stopTranslationProgress = useCallback(() => {
         pollingIdRef.current = '';
+        // The banner belongs to the run: no run, nothing to catch up to.
+        // Deliberately no play() — a run that died while the viewer waited
+        // leaves the film paused with the big play button, and the chip is
+        // what explains why.
+        waitingRef.current = false;
+        trailingRef.current = false;
+        // The dismissal was about this run. The next one is a fresh
+        // decision the viewer just made by picking a track.
+        dismissedRef.current = false;
+        showCatchUp(null);
         // Any event from the run being stopped is now stale.
         runSeqRef.current++;
         if (progressSpanRef.current) {
@@ -195,7 +271,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             pollStopRef.current();
             pollStopRef.current = null;
         }
-    }, []);
+    }, [showCatchUp]);
 
     // startTranslationProgress polls one translation to completion.
     // Callers ask translationAction first; `resume` is its 'resume'
@@ -214,6 +290,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // owns the value it left behind.
         const runID = runSeqRef.current;
         const lang = el.getAttribute('data-srclang') || '';
+        // The banner's buttons are rendered outside this closure and both
+        // of its events name the language.
+        catchUpLangRef.current = lang;
+        pendingFromRef.current = null;
         const span = el.querySelector('.tr-progress');
         const spinner = el.querySelector('.tr-spinner');
         progressSpanRef.current = span;
@@ -234,6 +314,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const fail = (code) => {
             pollStopRef.current = null;
             pollingIdRef.current = '';
+            // A run that is gone cannot catch up with anything. No play():
+            // a viewer who was waiting on it is left with the film paused
+            // and the big play button, and the chip says what happened.
+            waitingRef.current = false;
+            trailingRef.current = false;
+            showCatchUp(null);
             // The run is over, so every event it could still cause belongs
             // to nobody: bumping the counter is what makes onTrackError's
             // identity check fail. A <track> whose src this run set keeps
@@ -343,9 +429,49 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // opening count before the run goes to sleep on it.
                 suspendIfNobodyIsWatching(p);
             },
+            // Every 200, changed or not: the question this answers is
+            // "where is the viewer relative to the translation", and the
+            // viewer keeps moving while the counts stand still.
+            onTick: (p) => {
+                const video = videoRef.current;
+                if (!video) return;
+                pendingFromRef.current = p.pendingFrom;
+                const playhead = (video.currentTime || 0) + seekOffsetRef.current;
+                if (waitingRef.current) {
+                    if (!caughtUp(p.pendingFrom, playhead)) {
+                        showCatchUp({ remaining: remaining(p), waiting: true });
+                        return;
+                    }
+                    // The wait is over on its own terms: the translation is
+                    // comfortably ahead again, so the film goes back on.
+                    waitingRef.current = false;
+                    trailingRef.current = false;
+                    showCatchUp(null);
+                    if (window.umami) window.umami.track('subtitle-translate-wait-done', {
+                        lang,
+                        seconds: Math.round((Date.now() - waitedSinceRef.current) / 100) / 10,
+                    });
+                    resumePlayback();
+                    return;
+                }
+                const isTrailing = trailing(trailingRef.current, p.pendingFrom, playhead);
+                trailingRef.current = isTrailing;
+                if (isTrailing && !dismissedRef.current) {
+                    showCatchUp({ remaining: remaining(p), waiting: false });
+                    return;
+                }
+                showCatchUp(null);
+                // A dismissal is about a stretch of film that the
+                // translation was behind on. Once it is no longer behind,
+                // that stretch is over and the next one gets its own say.
+                if (!isTrailing) dismissedRef.current = false;
+            },
             onDone: (p) => {
                 pollStopRef.current = null;
                 pollingIdRef.current = '';
+                waitingRef.current = false;
+                trailingRef.current = false;
+                showCatchUp(null);
                 if (progressSpanRef.current === span) progressSpanRef.current = null;
                 if (progressSpinnerRef.current === spinner) progressSpinnerRef.current = null;
                 // Final: a later re-selection must neither poll nor
@@ -363,7 +489,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             },
             onError: fail,
         });
-    }, [stopTranslationProgress]);
+    }, [stopTranslationProgress, showCatchUp, resumePlayback]);
 
     // translationActionFor answers translationAction for a list element,
     // with one addition the pure rule cannot know: the item whose poll is
@@ -390,12 +516,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const video = videoRef.current;
         if (!video) return;
         const sleep = () => {
+            // Wait is the exception, and it is the whole of the feature:
+            // the viewer paused *so that* the translation can catch up,
+            // and the HEAD every 3 s is what it catches up against.
+            // Suspending here would pause the film against a run that is
+            // no longer being asked for anything.
+            if (waitingRef.current) return;
             const poll = pollStopRef.current;
             if (poll && poll.suspend) poll.suspend();
         };
         const wake = () => {
             const poll = pollStopRef.current;
             if (poll && poll.resume) poll.resume();
+        };
+        // A viewer who presses play has answered the banner's question
+        // themselves: the wait is over, and the next tick renders the
+        // ordinary trailing banner again if the run is still behind.
+        const onPlay = () => {
+            waitingRef.current = false;
+            wake();
         };
         // The `play` event is the authority on playback — `paused` is not
         // yet false in every engine when it fires — so it wakes the poll
@@ -406,11 +545,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             else if (!video.paused) wake();
         };
         video.addEventListener('pause', sleep);
-        video.addEventListener('play', wake);
+        video.addEventListener('play', onPlay);
         document.addEventListener('visibilitychange', onVisibility);
         return () => {
             video.removeEventListener('pause', sleep);
-            video.removeEventListener('play', wake);
+            video.removeEventListener('play', onPlay);
             document.removeEventListener('visibilitychange', onVisibility);
         };
     }, []);
@@ -575,9 +714,56 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // changed report to bypass the reload throttle once — see reload()'s
     // p.forceReload above and pollProgress's kick() in subtitle-progress.js.
     const kickTranslationPoll = useCallback(() => {
+        // A seek is a new stretch of film, so a banner the viewer
+        // dismissed for the old one is no longer being answered.
+        dismissedRef.current = false;
         const poll = pollStopRef.current;
         if (poll && poll.kick) poll.kick();
     }, []);
+
+    // Wait: pause the film but keep the poll awake. Both halves are
+    // needed — the pause is what the viewer asked for, and the poll is
+    // what the HEAD every 3 s keeps alive on the service (and, for a live
+    // source, the transcoder session the translation is reading).
+    const handleWait = useCallback(() => {
+        const video = videoRef.current;
+        const playhead = ((video && video.currentTime) || 0) + seekOffsetRef.current;
+        const pendingFrom = pendingFromRef.current;
+        // Set before pause(), because the `pause` event is what reaches
+        // sleep() and sleep() reads this to decide not to suspend.
+        waitingRef.current = true;
+        waitedSinceRef.current = Date.now();
+        dismissedRef.current = false;
+        if (video && typeof video.pause === 'function') video.pause();
+        const poll = pollStopRef.current;
+        // A no-op unless the run is suspended, which is exactly the case
+        // it is here for: a viewer who paused first and pressed Wait
+        // afterwards has a sleeping poll to wake.
+        if (poll && poll.resume) poll.resume();
+        showCatchUp({ remaining: catchUpRef.current ? catchUpRef.current.remaining : 0, waiting: true });
+        if (window.umami) window.umami.track('subtitle-translate-wait', {
+            lang: catchUpLangRef.current,
+            behind: pendingFrom === null || pendingFrom === undefined ? 0 : Math.round(playhead - pendingFrom),
+        });
+    }, [showCatchUp]);
+
+    // Keep watching: the viewer overrules the wait. The banner is not
+    // rewritten here — what it should say next is the next tick's answer,
+    // and the run may well still be behind.
+    const handleKeepWatching = useCallback(() => {
+        waitingRef.current = false;
+        resumePlayback();
+    }, [resumePlayback]);
+
+    // ×: stop saying it. The wait goes with it (a dismissed banner that
+    // still pauses the film and restarts it three seconds later would be
+    // the opposite of dismissed), but nothing is played: the film stays
+    // where the viewer left it.
+    const handleDismissCatchUp = useCallback(() => {
+        dismissedRef.current = true;
+        waitingRef.current = false;
+        showCatchUp(null);
+    }, [showCatchUp]);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -900,6 +1086,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (!isVideo || sessionSeekingRef.current || showResumePromptRef.current) return;
         if (e.target.closest('.wt-player-controls')) return;
         if (e.target.closest('.wt-resume-prompt')) return;
+        if (e.target.closest('.wt-catchup')) return;
         state.togglePlay();
         resetHideTimer();
     }, [isVideo, state.togglePlay]);
@@ -959,6 +1146,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                             {t('player.startOver')}
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* The AI translation is behind the playhead — offer to wait
+                for it. A top-centre pill: the subtitles it is about live
+                at the bottom of the picture and the controls under them. */}
+            {catchUp && isVideo && (
+                <div class="wt-catchup" role="status" data-remaining={catchUp.remaining}
+                     onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <LoadingSpinner />
+                    <span class="wt-catchup-text">
+                        {tf(catchUp.waiting ? 'player.subtitleCatchUpWaiting' : 'player.subtitleCatchUp', catchUp.remaining)}
+                    </span>
+                    <button type="button" class="wt-catchup-btn"
+                        onClick={catchUp.waiting ? handleKeepWatching : handleWait}>
+                        {t(catchUp.waiting ? 'player.subtitleCatchUpResume' : 'player.subtitleCatchUpWait')}
+                    </button>
+                    <button type="button" class="wt-catchup-close"
+                        aria-label={t('player.subtitleCatchUpDismiss')} onClick={handleDismissCatchUp}>×</button>
                 </div>
             )}
 
