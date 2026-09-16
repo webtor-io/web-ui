@@ -140,10 +140,6 @@ func castNamesFromMetadata(md map[string]any, limit int) []string {
 			if len(url.QueryEscape(strings.Join(append(out, name), ","))) > castNamesMaxEncodedBytes {
 				continue
 			}
-			// Measured on the joined value, the way TranslateURL sends it,
-			// and the whole candidate list is not abandoned on the first
-			// name that does not fit: a single long entry must not cut the
-			// glossary short for the shorter names behind it.
 			out = append(out, name)
 		}
 		if len(out) == limit {

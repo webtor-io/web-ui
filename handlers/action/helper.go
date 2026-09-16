@@ -945,7 +945,8 @@ func (s *Helper) suggestIndex(lis []ListItem, ud *models.VideoStreamUserData) in
 }
 
 // markPreload sets Preload on the default track and on side-loaded tracks in
-// the viewer's preferred language or English, in list order, up to
+// the viewer's Accept-Language base or English (not PreferredLang — see
+// docs/subtitle_translate.md, Known limitations), in list order, up to
 // maxPreloadTracks.
 func (s *Helper) markPreload(lis []ListItem, ud *models.VideoStreamUserData) []ListItem {
 	wanted := map[string]bool{"en": true}
