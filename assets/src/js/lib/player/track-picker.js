@@ -350,10 +350,32 @@ export function adoptUploadChips(container) {
     const src = container.querySelector('#my-upload-chips');
     if (!box || !src || !src.querySelectorAll) return [];
     const incoming = Array.from(src.querySelectorAll('.subtitle[data-id]'));
-    for (const el of box.querySelectorAll('.subtitle[data-id]')) {
-        if (attr(el, 'data-provider') === UPLOAD_PROVIDER && el.remove) el.remove();
+    // Put the block back where the server had it, rather than at the tail
+    // of the row: the uploads are rank 0 and the dialog renders them ahead
+    // of the AI item, so appending moved them past it on every upload and
+    // delete, and the next page load moved them back. The row must not
+    // reorder itself for reasons unrelated to what the viewer did.
+    //
+    // The reference is the first element after the outgoing MY block —
+    // taken before anything is removed, and skipping the block's own chips
+    // so a reference is never something about to be detached. With no MY
+    // chips in the row (the viewer's very first upload) there is no
+    // position to restore and the block goes to the end, which the next
+    // render puts right.
+    const kids = Array.from(box.children);
+    const mine = (el) => attr(el, 'data-provider') === UPLOAD_PROVIDER && attr(el, 'data-id');
+    const first = kids.findIndex(mine);
+    let ref = null;
+    for (let i = first + 1; first >= 0 && i < kids.length; i++) {
+        if (!mine(kids[i])) { ref = kids[i]; break; }
     }
-    for (const el of incoming) box.append(el);
+    for (const el of kids) {
+        if (mine(el) && el.remove) el.remove();
+    }
+    for (const el of incoming) {
+        if (ref && box.insertBefore) box.insertBefore(el, ref);
+        else box.append(el);
+    }
     if (src.remove) src.remove();
     return incoming;
 }

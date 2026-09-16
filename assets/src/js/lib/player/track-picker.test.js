@@ -569,11 +569,46 @@ test('adoptUploadChips: an upload lands in the row, replacing the chip of the sa
     assert.equal(stale.parent, null, 'the chip the response replaced is detached');
     assert.equal(readChips(container).find((c) => c.id === 'us-1').el, moved[0]);
     assert.ok(moved.every((el) => el.parent === tracksBox), 'the chips are in the radiogroup');
+    // The block goes back where the server had it, not to the tail: the
+    // chip after the outgoing MY block is still the chip after it.
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1', 'us-2']);
     // The marker is consumed, so a later refresh does not read it again as
     // "the viewer has no uploads".
     assert.equal(container.querySelector('#my-upload-chips'), null);
     assert.deepEqual(adoptUploadChips(container), []);
     assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1', 'us-2']);
+});
+
+test('adoptUploadChips: the adopted block keeps the place the server gave it', () => {
+    // An upload is rank 0 and the server renders it ahead of the AI item.
+    // Appending the adopted chips put them after it on every upload and
+    // delete, and the next page load put them back — the row reordering
+    // under the viewer for reasons unrelated to what they did.
+    const { container, uploads } = buildPicker({
+        tracks: [
+            offChip(),
+            { id: 'a', lang: 'en', label: 'English' },
+            { id: 'us-1', lang: 'en', label: 'en.srt', provider: 'UserSubtitle', origin: 'MY' },
+            { id: 'ai', lang: 'pt', label: 'Portuguese', ai: true },
+        ],
+        row: [{ lang: 'en', count: 2, selected: true }, { lang: 'pt', count: 1 }],
+    });
+    deliverUploads(uploads, [
+        { id: 'us-1', lang: 'en', label: 'en.srt' },
+        { id: 'us-2', lang: 'en', label: 'new.srt' },
+    ]);
+    adoptUploadChips(container);
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1', 'us-2', 'ai']);
+
+    // The viewer's first ever upload has no block to restore, so it goes to
+    // the end; the next render is what puts it in rank order.
+    const fresh = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English' }],
+        row: [{ lang: 'en', count: 1, selected: true }],
+    });
+    deliverUploads(fresh.uploads, [{ id: 'us-9', lang: 'en', label: 'first.srt' }]);
+    adoptUploadChips(fresh.container);
+    assert.deepEqual(readChips(fresh.container).map((c) => c.id), ['none', 'a', 'us-9']);
 });
 
 test('adoptUploadChips: a delete takes the chip out of the row', () => {

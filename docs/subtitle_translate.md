@@ -424,12 +424,20 @@ row plus the tracks of the expanded language.
   clickable, and clicking one is "on, with this track": one activation, one `PUT`.
   - Switching off activates the `none` item through the normal path (`persist: true`, so the next
     page load reproduces it), and that activation is what remembers the outgoing track.
-  - **The `PUT` is retried once.** `persistTrackChoice` (`Player.jsx`) resends
-    `PUT /stream-video/{audio,subtitle}` after `PUT_RETRY_DELAY_MS` (1 s) on a rejected fetch or a
-    5xx, and never on a 4xx — a stale CSRF token or a refused id would be refused again. Added
-    2026-09-16 after two of these came back 503 from the edge on stage without reaching the pod
-    and the choice was silently lost; the request is fire-and-forget, so nothing noticed. Still
-    fire-and-forget: one retry, no UI, every failure swallowed.
+  - **The `PUT` is retried once, and only for the latest choice.** `persistTrackChoice`
+    (`Player.jsx`) resends `PUT /stream-video/{audio,subtitle}` after `PUT_RETRY_DELAY_MS` (1 s)
+    on a rejected fetch or a 5xx, and never on a 4xx — a stale CSRF token or a refused id would be
+    refused again. Added 2026-09-16 after two of these came back 503 from the edge on stage
+    without reaching the pod and the choice was silently lost; the request is fire-and-forget, so
+    nothing noticed. Still fire-and-forget: one retry, no UI, every failure swallowed.
+    The body is read eagerly at `markTrack` time, so the retry needs a guard or it becomes a worse
+    bug than the one it fixes: click A (503), click B (200) inside the second, and A's retry lands
+    last and the next page load restores A. A lost write only ever lost itself; an overwriting one
+    corrupts a newer choice. Each call takes the next number for **its kind** (audio and subtitle
+    count separately — two independent choices, neither may cancel the other's retry) and the
+    retry stands down when it is no longer holding it. `destroyPlayer` bumps a generation counter
+    for the same reason: a write queued by a page the viewer has left must not land in the next
+    file's session.
   - **The switch has one writer.** "Subtitles are off" means exactly "the `none` item is the
     active one", and `markTrack` (`Player.jsx`) is the only place that writes it: every
     activation moves the switch with it, including the ones the player performs for the viewer —
@@ -549,6 +557,17 @@ row plus the tracks of the expanded language.
     current list": an empty wrapper is a delete, an absent wrapper is an ordinary page. The
     wrapper is removed once drained, so the next `refresh` does not read a consumed answer as
     "this viewer has no uploads".
+  - **"I do not know" must not render as "there are none."** `buildView` takes `listOK` and sets
+    `RenderChips` from it, so a failed `List` — which returns a nil slice — renders the panel and
+    the error and **no marker**. Without that gate a transient DB blip during an upload would emit
+    an empty authoritative list: every MY chip out of the row, the playing upload's `<track>`
+    dropped by `dropDeletedTracks`, playback on Off, from an error the UI only shows as a toast.
+  - **The adopted block keeps the place the server gave it.** `adoptUploadChips` re-inserts at the
+    position of the outgoing MY block (the first element after it, captured before anything is
+    removed), not at the tail. Uploads are rank 0 and the dialog renders them ahead of the AI
+    item; appending moved them past it on every upload and delete, and the next page load moved
+    them back. On a viewer's very first upload there is no block to restore and the chip goes to
+    the end, which the next render puts right.
   The panel closes from the chip again **or** from the "×" in its heading line
   (`#my-uploads-close`, owner 2026-09-15): the way back should not depend on remembering which
   chip opened it. Both controls go through `setUploadPanel`, so the state left behind is the same
@@ -684,10 +703,20 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   `Player.wiring.test.js` drives the wiring against
   `assets/src/js/lib/player/__fixtures__/subtitles-dialog.html` — the dialog as
   `services/template/subtitles_dialog_fixture_test.go` renders it, committed so `npm test` needs
-  no Go toolchain. **Regenerate it** whenever the picker markup changes:
-  `UPDATE_FIXTURES=1 go test -ldflags "$LD" ./services/template/ -run TestSubtitlesDialogFixture`;
-  that Go test fails with the same instruction when the two drift, so a wiring test cannot go on
-  passing against markup the server stopped producing.
+  no Go toolchain — along with `user-subtitles-async.html` and `user-subtitles-async-empty.html`,
+  the uploads partial rendered with `RenderChips: true` for the upload and the delete case, which
+  is what `asyncSwap()` replays. **Regenerate all three** whenever the picker markup changes:
+
+  ```
+  UPDATE_FIXTURES=1 go test \
+    -ldflags '-X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore' \
+    ./services/template/ -run TestSubtitlesDialogFixture
+  ```
+
+  The `-ldflags` are not optional: without them the test binary panics at init on the
+  abuse-store/torrent-store proto conflict, exactly as `go test ./...` does. That Go test fails
+  with this command in the message when the fixtures drift, so a wiring test cannot go on passing
+  against markup the server stopped producing.
   Covered: a chip click (mark, `<track>` creation, PUT body, telemetry), a click landing on an
   inner span, the switch off/on/off with one PUT each, a chip click while off, the language filter,
   the "+N" toggle, the uploads swap (adoption, autoselect, de-dup, panel state), a delete of the
