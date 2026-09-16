@@ -1,4 +1,5 @@
 import av from '../../lib/av';
+import { waitForElement } from '../../lib/waitForElement';
 import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import '../../lib/share/share';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
@@ -48,11 +49,13 @@ av( async function() {
     const purge = urlParams.get('purge');
     const debug = urlParams.get('debug');
     if (!action) return;
-    let form = document.querySelector('form.' + action);
-    // "stream" is a shorthand — try stream-video first, then stream-audio
-    if (!form && action === 'stream') {
-        form = document.querySelector('form.stream-video') || document.querySelector('form.stream-audio');
-    }
+    // "stream" is a shorthand — try stream-video first, then stream-audio.
+    const findForm = () => document.querySelector('form.' + action)
+        || (action === 'stream' ? (document.querySelector('form.stream-video') || document.querySelector('form.stream-audio')) : null);
+    // The av() queue is drained before the file card (and its form) is in
+    // the DOM, so a one-shot lookup here found nothing and the deep link did
+    // nothing at all. Wait for the form instead (lib/waitForElement.js).
+    const form = await waitForElement(findForm);
     if (!form) return;
     if (purge) {
         const purgeInput = document.createElement('input');
