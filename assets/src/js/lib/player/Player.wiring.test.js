@@ -759,6 +759,41 @@ test('nothing starts a translation on its own', async (t) => {
     assert.equal(p.puts().length, 0, 'and nothing was persisted either');
 });
 
+// ---- the audio switch -------------------------------------------------
+
+test('an audio switch with no preferred language leaves the subtitles alone', async (t) => {
+    // data-preferred-lang is empty in two configurations that are live
+    // today: every embed, and any deployment with
+    // SUBTITLE_TRANSLATE_ENABLED off — subtitleOptsFor
+    // (jobs/scripts/translate_opts.go) returns the zero SubtitleOpts for
+    // both. The rule used to answer 'none' there, and since the
+    // activation is persist:false, a first-time viewer lost their
+    // subtitles to the audio menu with nothing recording why.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => {
+        it.modal.setAttribute('data-preferred-lang', '');
+        // Subtitles on, on a ladder pick rather than a saved choice: the
+        // one state this rule is allowed to re-decide at all.
+        it.modal.setAttribute('data-subtitles-off', 'false');
+        it.chip('none').removeAttribute('data-default');
+        it.chip('os-os-en').setAttribute('data-default', 'true');
+    });
+    const modal = p.container.querySelector('#subtitles');
+    const sub = (id) => modal.querySelector(`.subtitle[data-id="${id}"]`);
+
+    click(modal.querySelector('.audio[data-id="mp-1"]'));
+    await settle();
+
+    assert.equal(sub('os-os-en').getAttribute('data-default'), 'true',
+        'the subtitle that was playing is still playing');
+    assert.equal(sub('none').getAttribute('data-default'), null);
+    assert.equal(modal.getAttribute('data-subtitles-off'), 'false');
+    // The audio choice itself still lands — the rule is inert, not the click.
+    assert.equal(modal.querySelector('.audio[data-id="mp-1"]').getAttribute('data-default'), 'true');
+    assert.deepEqual(p.puts().map((c) => c.url), ['/stream-video/audio'],
+        'the audio write and nothing else: no subtitle was re-decided');
+});
+
 test('a translation saved in an earlier session comes back once, unpersisted', async (t) => {
     t.after(() => destroyPlayer());
     // The one automatic start left. A translation is not a <track> in the

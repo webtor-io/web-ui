@@ -60,19 +60,28 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     const list = Array.isArray(tracks) ? tracks : [];
     const pref = baseLang(preferredLang);
     const audio = baseLang(audioLang);
-    if (!pref) return 'none';
+    // The default the server already chose. Switching to 'none' instead
+    // of this would take subtitles away from a viewer who had them before
+    // touching the audio menu, so every branch that cannot name a better
+    // answer returns it.
+    const current = list.find((t) => t.isDefault && t.id && t.id !== 'none');
+    const keep = () => (current ? current.id : 'none');
+    // No preferred language at all. That is not an exotic state: it is
+    // every embed, and every deployment with SUBTITLE_TRANSLATE_ENABLED
+    // off (subtitleOptsFor returns the zero SubtitleOpts in both cases,
+    // jobs/scripts/translate_opts.go). With nothing to decide *for*, the
+    // rule has no opinion, and an opinionless rule must not act: the
+    // server's own phase-1 pick stands and the audio menu leaves the
+    // subtitles alone.
+    if (!pref) return keep();
     if (audio && audio === pref) {
         const f = best(list, pref, true);
         return f ? f.id : 'none';
     }
     const full = best(list, pref, false);
     if (full) return full.id;
-    // The preferred language yielded nothing activatable. Switching to
-    // 'none' here would take subtitles away from a viewer who had them
-    // before touching the audio menu, so the default the server already
-    // chose stands.
-    const current = list.find((t) => t.isDefault && t.id && t.id !== 'none');
-    return current ? current.id : 'none';
+    // The preferred language yielded nothing activatable.
+    return keep();
 }
 
 // translationAction decides what selecting this item should do, given

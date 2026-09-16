@@ -75,8 +75,20 @@ test('unknown audio language means subtitles are needed', () => {
     assert.equal(pickDefaultSubtitle([T('os-1', 3, 'pt')], '', 'pt'), 'os-1');
 });
 
-test('no preferred language: nothing to pick', () => {
+test('no preferred language: the audio menu leaves the selection alone', () => {
+    // data-preferred-lang is empty in two live configurations -- every
+    // embed, and any deployment with SUBTITLE_TRANSLATE_ENABLED off -- so
+    // this is not an exotic input. Answering 'none' here jumped over the
+    // "keep what the server chose" fallback and turned a first-time
+    // viewer's subtitles off the moment they touched the audio menu.
+    const tracks = [T('os-1', 3, 'pt', { isDefault: true }), T('os-2', 3, 'en')];
+    assert.equal(pickDefaultSubtitle(tracks, 'en', ''), 'os-1');
+    // Nothing was on, so nothing comes on: "keep the selection" is not
+    // "turn something on".
     assert.equal(pickDefaultSubtitle([T('os-1', 3, 'pt')], 'en', ''), 'none');
+    // Not even a forced track in the audio's own language -- with no
+    // preferred language there is no rule to apply, only a state to hold.
+    assert.equal(pickDefaultSubtitle([T('mp-0', 1, 'en', { forced: true })], 'en', ''), 'none');
 });
 
 test('the none entry is never a candidate on its own merits', () => {
