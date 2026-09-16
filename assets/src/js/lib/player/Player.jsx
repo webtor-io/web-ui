@@ -1019,7 +1019,7 @@ function ensureTrackElement(video, trackID, wrappedSrc, label, srclang, kind) {
 // findSubtitleItem locates a list item by data-id without CSS.escape:
 // track ids come from the torrent (file paths, stream indexes) and are
 // not guaranteed to be valid selector literals.
-function findSubtitleItem(modal, id) {
+export function findSubtitleItem(modal, id) {
     for (const el of modal.querySelectorAll('.subtitle')) {
         if (el.getAttribute('data-id') === id) return el;
     }
@@ -1049,7 +1049,7 @@ function trackSubtitleSelect(el) {
 //
 // Returns the element it activated, or null, so the caller can report the
 // choice (telemetry, the manual-choice hook).
-function setSubtitlesOff(container, modal, off) {
+export function setSubtitlesOff(container, modal, off) {
     if (!modal) return null;
     const audioEl = modal.querySelector('.audio[data-default="true"]');
     const decision = toggleDecision({
@@ -1109,7 +1109,7 @@ function itemData(el) {
 // persist:false, so `Saved` keeps meaning
 // exactly "the viewer chose this" and a rule the player applied for them
 // never comes back as a choice the next rule has to respect.
-function activateSubtitle(container, target, { persist = true } = {}) {
+export function activateSubtitle(container, target, { persist = true } = {}) {
     const provider = target.getAttribute('data-provider');
     const id = target.getAttribute('data-id');
     // Side-loaded tracks (OpenSubtitles, sidecar files, embed externals,
@@ -1180,7 +1180,7 @@ function toggleDialog(id) {
 // is written on #my-subtitles, the wrapper the async swap does NOT replace
 // (the toggle and the panel inside it are), so a delete or an upload can
 // put the panel back the way the viewer had it.
-function setUploadPanel(modal, open) {
+export function setUploadPanel(modal, open) {
     const panel = modal.querySelector('#my-uploads-panel');
     if (!panel) return;
     panel.hidden = !open;
@@ -1190,11 +1190,76 @@ function setUploadPanel(modal, open) {
     if (wrap) wrap.setAttribute('data-upload-open', open ? 'true' : 'false');
 }
 
+// isUpload is what "my uploads" means now that the MY chips live in the
+// radiogroup with everything else (adoptUploadChips moves in the ones an
+// async reload delivers). Containment in #my-subtitles used to be the test
+// and no longer can be: that wrapper holds the disclosure and the panel,
+// and — between the swap and the adoption — a fresh chip for one instant.
+// The provider is the honest question anyway: these are the chips the
+// uploads partial re-renders, and therefore the ones whose markers the
+// client owns.
+function isUpload(el) {
+    return el.getAttribute('data-provider') === 'UserSubtitle';
+}
+
+function setUploadMark(el, on) {
+    setChipActive(el, on);
+    if (on) el.setAttribute('data-default', 'true');
+    else el.removeAttribute('data-default');
+}
+
+// syncUploadMarks re-derives the uploads' active marker from what is
+// actually playing. The <track default> in <video> drives playback
+// correctly on reload, but the uploads' chips are re-rendered by the
+// partial and never go through the click path, so they lose the marker;
+// this runs at wiring time and after every async swap.
+//
+// Module scope rather than a closure inside wireTrackHandlers: it is the
+// least-covered piece of this file (the stage checklist carried it as a
+// by-hand item), and a function the tests can call is one they can drive
+// through states a real player takes minutes to reach.
+export function syncUploadMarks(container, subtitlesModal) {
+    const video = container.querySelector('video.player');
+    if (!video) return;
+    const scope = subtitlesModal || container;
+    const mine = Array.from(scope.querySelectorAll('.subtitle')).filter(isUpload);
+    if (!mine.length) return;
+    let activeID = null;
+    for (const t of video.textTracks) {
+        if (t.mode === 'showing' && t.id) { activeID = t.id; break; }
+    }
+    if (!activeID) {
+        // The <track default> attribute answers "what is playing" only
+        // while nothing else claims it. An embedded (MediaProbe) track is
+        // driven by hls.js and has no <track> element at all, so "no
+        // showing textTrack" does not mean "nothing is playing" — and a
+        // stale default left on a side-loaded track would then hand the
+        // marker to an upload as well, leaving two chips with data-default
+        // and two check marks.
+        for (const el of scope.querySelectorAll('.subtitle[data-default="true"]')) {
+            if (!isUpload(el)) return;
+        }
+        const dt = video.querySelector('track[default]');
+        if (dt && dt.id) activeID = dt.id;
+    }
+    if (!activeID) return;
+    const active = mine.find((el) => el.getAttribute('data-id') === activeID) || null;
+    for (const el of mine) setUploadMark(el, el === active);
+    if (!active) return;
+    // Exactly one marker per group, as after a click: markTrack's clearing
+    // loop without the PUT — nothing was chosen here, the DOM is only
+    // catching up with what is already playing.
+    for (const el of scope.querySelectorAll('.subtitle')) {
+        if (el === active || isUpload(el)) continue;
+        setUploadMark(el, false);
+    }
+}
+
 // wireTrackHandlers binds the picker modals. It stays module-scope and
 // ref-free: `hooks` is the object the mounted component fills with
 // onSubtitleSelect/onAudioSelect (see the trackHooks effect), so the
 // session-scoped state those need lives in the component, not here.
-function wireTrackHandlers(container, hooks = {}) {
+export function wireTrackHandlers(container, hooks = {}) {
     // Delegate subtitle clicks on #subtitles so items swapped into
     // #my-subtitles via async still work without re-binding.
     const subtitlesModal = container.querySelector('#subtitles');
@@ -1294,62 +1359,7 @@ function wireTrackHandlers(container, hooks = {}) {
         });
     }
 
-    // The <track default> in <video> drives playback correctly on reload,
-    // but the uploads' chips are re-rendered by the partial and never go
-    // through the click path, so they lose the active marker. Re-derive it
-    // from the live textTracks and re-run on every async swap.
-    const setMark = (el, on) => {
-        setChipActive(el, on);
-        if (on) el.setAttribute('data-default', 'true');
-        else el.removeAttribute('data-default');
-    };
-    // isUpload is what "my uploads" means to this function now that the MY
-    // chips live in the radiogroup with everything else (adoptUploadChips
-    // moves the ones an async reload delivers). Containment in
-    // #my-subtitles used to be the test and no longer can be: that wrapper
-    // holds the disclosure and the panel, and — between the swap and the
-    // adoption — a fresh chip for one instant. The provider is the honest
-    // question anyway: these are the chips the uploads partial re-renders
-    // and therefore the ones whose markers the client owns.
-    const isUpload = (el) => el.getAttribute('data-provider') === 'UserSubtitle';
-    const syncUploadMarks = () => {
-        const video = container.querySelector('video.player');
-        if (!video) return;
-        const scope = subtitlesModal || container;
-        const mine = Array.from(scope.querySelectorAll('.subtitle')).filter(isUpload);
-        if (!mine.length) return;
-        let activeID = null;
-        for (const t of video.textTracks) {
-            if (t.mode === 'showing' && t.id) { activeID = t.id; break; }
-        }
-        if (!activeID) {
-            // The <track default> attribute answers "what is playing" only
-            // while nothing else claims it. An embedded (MediaProbe) track
-            // is driven by hls.js and has no <track> element at all, so
-            // "no showing textTrack" does not mean "nothing is playing" —
-            // and a stale default left on a side-loaded track would then
-            // hand the marker to an upload as well, leaving two chips with
-            // data-default and two check marks.
-            const marked = scope.querySelectorAll('.subtitle[data-default="true"]');
-            for (const el of marked) {
-                if (!isUpload(el)) return;
-            }
-            const dt = video.querySelector('track[default]');
-            if (dt && dt.id) activeID = dt.id;
-        }
-        if (!activeID) return;
-        const active = mine.find((el) => el.getAttribute('data-id') === activeID) || null;
-        for (const el of mine) setMark(el, el === active);
-        if (!active) return;
-        // Exactly one marker per group, as after a click: markTrack's
-        // clearing loop without the PUT — nothing was chosen here, the DOM
-        // is only catching up with what is already playing.
-        for (const el of scope.querySelectorAll('.subtitle')) {
-            if (el === active || isUpload(el)) continue;
-            setMark(el, false);
-        }
-    };
-    syncUploadMarks();
+    syncUploadMarks(container, subtitlesModal);
     // loadAsyncView dispatches an 'async' CustomEvent after swapping a
     // target's innerHTML; re-sync when #my-subtitles content is replaced.
     const mySubsContainer = container.querySelector('#my-subtitles');
@@ -1394,7 +1404,7 @@ function wireTrackHandlers(container, hooks = {}) {
                 const wasShowing = dropDeletedTracks(video, chipIDs);
                 const off = wasShowing && subtitlesModal ? findSubtitleItem(subtitlesModal, 'none') : null;
                 if (off) activateSubtitle(container, off, { persist: false });
-                else syncUploadMarks();
+                else syncUploadMarks(container, subtitlesModal);
             }
             // The set of chips itself changed, so this is the full pass and
             // not refreshMarks: an upload can bring a language the server
@@ -1425,8 +1435,9 @@ function wireTrackHandlers(container, hooks = {}) {
 // `persist` is what separates a choice from a rule the player applied for
 // the viewer: the audio-switch re-pick and the mount-time restore of a
 // saved translation pass false and never PUT, so `Saved` keeps meaning "the viewer
-// chose this".
-function markTrack(container, el, type, persist = true) {
+// chose this". When it does persist, the write in flight is returned (see
+// persistTrackChoice); no call site in the player awaits it.
+export function markTrack(container, el, type, persist = true) {
     if (el.getAttribute('data-default') === 'true') return;
     const s = container.querySelector('#subtitles');
     // Read before anything moves: the switch's memory is the track being
@@ -1466,18 +1477,53 @@ function markTrack(container, el, type, persist = true) {
     refreshMarks(s);
 
     if (!persist) return;
-    fetch(`/stream-video/${type}`, {
+    return persistTrackChoice(type, {
+        id: el.getAttribute('data-id'),
+        resourceID: s.getAttribute('data-resource-id'),
+        itemID: s.getAttribute('data-item-id'),
+    });
+}
+
+// PUT_RETRY_DELAY_MS is how long the one retry below waits. Long enough for
+// an edge that is refusing connections to finish failing over, short enough
+// that a viewer who closes the tab straight after clicking still has a
+// decent chance of the write landing.
+export const PUT_RETRY_DELAY_MS = 1000;
+
+// persistTrackChoice writes the viewer's pick back to the session, and
+// retries it once.
+//
+// Why: on stage two of these came back 503 from the edge without ever
+// reaching the pod, and the choice was silently lost — the request is
+// fire-and-forget, so nothing noticed and nothing told the viewer. A single
+// retry covers the failure this actually is (an edge blip, a dropped
+// connection) without turning a busy backend into a stampede.
+//
+// What is retried and what is not. A rejected fetch is a network error: the
+// request may not have been made at all. A 5xx is the server saying it
+// could not handle it. A 4xx is an answer — a stale CSRF token, a session
+// that ended, an id the server refuses — and repeating it would get the
+// same answer, so it is left alone. Nothing is retried twice: a second
+// failure is not a blip.
+//
+// Still fire-and-forget: no UI, no error surface, and every failure ends
+// swallowed. The returned promise is the write in flight, which is what
+// makes the retry testable without a sleep in the test.
+function persistTrackChoice(type, body) {
+    const send = () => fetch(`/stream-video/${type}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': window._CSRF,
         },
-        body: JSON.stringify({
-            id: el.getAttribute('data-id'),
-            resourceID: s.getAttribute('data-resource-id'),
-            itemID: s.getAttribute('data-item-id'),
-        }),
+        body: JSON.stringify(body),
     });
+    const wait = () => new Promise((resolve) => setTimeout(resolve, PUT_RETRY_DELAY_MS));
+    const retry = () => wait().then(send);
+    return send().then(
+        (res) => (res && res.status >= 500 ? retry() : res),
+        retry,
+    ).catch(() => {});
 }
 
 function wireEmbedCopy(container) {

@@ -424,6 +424,12 @@ row plus the tracks of the expanded language.
   clickable, and clicking one is "on, with this track": one activation, one `PUT`.
   - Switching off activates the `none` item through the normal path (`persist: true`, so the next
     page load reproduces it), and that activation is what remembers the outgoing track.
+  - **The `PUT` is retried once.** `persistTrackChoice` (`Player.jsx`) resends
+    `PUT /stream-video/{audio,subtitle}` after `PUT_RETRY_DELAY_MS` (1 s) on a rejected fetch or a
+    5xx, and never on a 4xx — a stale CSRF token or a refused id would be refused again. Added
+    2026-09-16 after two of these came back 503 from the edge on stage without reaching the pod
+    and the choice was silently lost; the request is fire-and-forget, so nothing noticed. Still
+    fire-and-forget: one retry, no UI, every failure swallowed.
   - **The switch has one writer.** "Subtitles are off" means exactly "the `none` item is the
     active one", and `markTrack` (`Player.jsx`) is the only place that writes it: every
     activation moves the switch with it, including the ones the player performs for the viewer —
@@ -669,8 +675,28 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   and balances `<div>` tags to prove the chip is *inside* the radiogroup and the disclosure, the
   panel and every form are *outside* it — a substring order check cannot tell nesting from
   adjacency, which is how the wart survived the first review.
-- JS: `npm test` (`node --test`, plain-JS modules only — cannot parse JSX, so `Player.jsx` itself
-  isn't covered, only the modules it imports). Covers `subtitle-rules.test.js`
+- JS: `npm test` (`node --test`). **`Player.jsx` is covered now** —
+  `assets/src/js/test/register.mjs` (passed as `--import` by the `test` script) installs the
+  module hooks in `assets/src/js/test/jsx-hooks.mjs`, which transpile `.jsx` with `@babel/core`
+  through the repo's own `babel.config.json`, resolve the extensionless relative imports webpack
+  resolves, and answer the `.css` and `locales/*.json?prefix=` imports with empty modules.
+  `jsdom` (pinned devDependency) supplies the DOM.
+  `Player.wiring.test.js` drives the wiring against
+  `assets/src/js/lib/player/__fixtures__/subtitles-dialog.html` — the dialog as
+  `services/template/subtitles_dialog_fixture_test.go` renders it, committed so `npm test` needs
+  no Go toolchain. **Regenerate it** whenever the picker markup changes:
+  `UPDATE_FIXTURES=1 go test -ldflags "$LD" ./services/template/ -run TestSubtitlesDialogFixture`;
+  that Go test fails with the same instruction when the two drift, so a wiring test cannot go on
+  passing against markup the server stopped producing.
+  Covered: a chip click (mark, `<track>` creation, PUT body, telemetry), a click landing on an
+  inner span, the switch off/on/off with one PUT each, a chip click while off, the language filter,
+  the "+N" toggle, the uploads swap (adoption, autoselect, de-dup, panel state), a delete of the
+  playing upload landing on Off without a PUT, `syncUploadMarks` including the stale-`default`
+  guard, the PUT retry, the offered-AI chip's verb/label flip, the locked chip's CTA, and — through
+  a real `initPlayer` mount — a click starting a translation run, a saved translation restoring
+  once without persisting, and nothing starting a run on its own.
+  Still by hand: fullscreen, and anything about actual playback.
+  The plain-JS modules keep their own suites: `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
   `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`),
   `subtitle-telemetry.test.js` (`readAllTracks`, `readTracks`, `selectEventData`,
