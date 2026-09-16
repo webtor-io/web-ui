@@ -607,7 +607,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			}
 		}
 		if subtitles, ok := exportResponse.ExportItems["subtitles"]; ok {
-			if osEnabled, ok := settings.Features["opensubtitles"]; (ok && osEnabled) || !ok {
+			// debug=no-os (dev-only, see handlers/action): skip the
+			// OpenSubtitles lookup so a file with embedded tracks exercises
+			// the live translation path — with OpenSubtitles present a file
+			// source always wins over the embedded playlist.
+			if osEnabled, ok := settings.Features["opensubtitles"]; ((ok && osEnabled) || !ok) && s.debug != DebugNoOpenSubtitles {
 				j.InProgress(s.t("job.loadingSubtitles"))
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()

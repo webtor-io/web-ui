@@ -41,6 +41,12 @@ func buildSubtitleOpts(c *web.Context, enabled, freeForAll, adult, embed bool, p
 // through in release builds too (the other debug values stay dev-only).
 const DebugTierFree = "tier:free"
 
+// DebugNoOpenSubtitles is the dev-only debug value that skips the
+// OpenSubtitles lookup for one stream start, so the embedded-track (live
+// playlist) translation source can be exercised on a file that also has
+// OpenSubtitles tracks. Never honoured under GIN_MODE=release.
+const DebugNoOpenSubtitles = "no-os"
+
 // previewAsFree applies DebugTierFree to the computed options.
 func previewAsFree(o models.SubtitleOpts, debug string) models.SubtitleOpts {
 	if debug == DebugTierFree {
