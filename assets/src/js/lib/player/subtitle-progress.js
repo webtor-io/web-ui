@@ -6,15 +6,23 @@
 // a timer (HEAD never starts work) and reloads the <track> with a bumped
 // &rev= whenever the count moves, so subtitles appear as they are
 // translated instead of after the whole file is done.
+//
+// A response can also carry `X-Subtitle-Live: 1`, meaning the source
+// playlist is still growing (embedded-track translation): `total` is a
+// snapshot, not a ceiling, so `done == total` only means "caught up for
+// now", not final. When the header disappears the normal rule applies
+// again.
 
-export function parseProgress(header) {
+export function parseProgress(header, live = false) {
+    const isLive = Boolean(live);
     const m = /^(\d+)\/(\d+)$/.exec(String(header || '').trim());
-    if (!m) return { done: 0, total: 0, final: false };
+    if (!m) return { done: 0, total: 0, final: false, live: isLive };
     const done = parseInt(m[1], 10);
     const total = parseInt(m[2], 10);
-    // `0/0` is "the job has not counted the cues yet", not "done":
-    // treating it as final would stop the poll before the first cue.
-    return { done, total, final: total > 0 && done >= total };
+    // `0/0` is "the job has not counted the cues yet", not "done". A live
+    // source (X-Subtitle-Live) is never done either: its total grows with
+    // the playlist, so done == total only means "caught up for now".
+    return { done, total, final: !isLive && total > 0 && done >= total, live: isLive };
 }
 
 // POLL_TIMEOUT_MS bounds a single translation run. A job that neither
@@ -51,6 +59,7 @@ export function withRev(src, n) {
 export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, onProgress, onDone, onError } = {}) {
     let stopped = false;
     let last = -1;
+    let lastLive = null;
     let timer = null;
     const deadline = Date.now() + timeoutMs;
     const tick = async () => {
@@ -77,9 +86,10 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             if (onError) onError(res.status);
             return;
         }
-        const p = parseProgress(res.headers.get('X-Subtitle-Progress'));
-        if (p.done !== last) {
+        const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1');
+        if (p.done !== last || p.live !== lastLive) {
             last = p.done;
+            lastLive = p.live;
             if (onProgress) onProgress(p);
         }
         if (p.final) {

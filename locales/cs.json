@@ -620,6 +620,7 @@
     "player.continueFrom": "Pokračovat od %v",
     "player.startOver": "Spustit od začátku",
     "player.subtitleTranslating": "Překládání… %v%",
+    "player.subtitleTranslatingLive": "Překlad probíhá souběžně s přehráváním…",
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",

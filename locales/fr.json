@@ -610,6 +610,7 @@
     "player.continueFrom": "Reprendre à %v",
     "player.startOver": "Recommencer depuis le début",
     "player.subtitleTranslating": "Traduction… %v%",
+    "player.subtitleTranslatingLive": "Traduction en cours pendant la lecture…",
     "job.retrievingData": "récupération des données de la ressource",
     "job.retrievingStreamUrl": "récupération de l'URL du flux",
     "job.probingMedia": "analyse des infos média du contenu",

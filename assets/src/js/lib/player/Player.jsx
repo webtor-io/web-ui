@@ -271,10 +271,18 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         pollStopRef.current = pollProgress(src, {
             onProgress: (p) => {
                 cues = p.total;
-                const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
                 if (span) {
-                    span.textContent = `· ${pct}%`;
-                    span.title = tf('player.subtitleTranslating', pct);
+                    if (p.live) {
+                        // A live source has no denominator worth a percent:
+                        // the playlist grows with the transcode. Show the
+                        // count and say so in the title.
+                        span.textContent = `· ${p.done}`;
+                        span.title = tf('player.subtitleTranslatingLive');
+                    } else {
+                        const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
+                        span.textContent = `· ${pct}%`;
+                        span.title = tf('player.subtitleTranslating', pct);
+                    }
                 }
                 // total === 0 means the job has not counted the cues yet:
                 // the file on the other end is still empty, so a reload

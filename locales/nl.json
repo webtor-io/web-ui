@@ -610,6 +610,7 @@
     "player.continueFrom": "Doorgaan vanaf %v",
     "player.startOver": "Vanaf het begin starten",
     "player.subtitleTranslating": "Vertalen… %v%",
+    "player.subtitleTranslatingLive": "Vertaling loopt mee met het afspelen…",
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",

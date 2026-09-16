@@ -620,6 +620,7 @@
     "player.continueFrom": "Продолжить с %v",
     "player.startOver": "Смотреть с начала",
     "player.subtitleTranslating": "Перевод… %v%",
+    "player.subtitleTranslatingLive": "Перевод идёт вместе с просмотром…",
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",

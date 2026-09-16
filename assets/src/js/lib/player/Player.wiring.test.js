@@ -667,6 +667,16 @@ const progressResponse = (header) => ({
     json: async () => ({}),
 });
 
+// liveProgressResponse is the same, but for a still-growing embedded-track
+// source: X-Subtitle-Live marks `header`'s total as a snapshot, not a
+// ceiling.
+const liveProgressResponse = (header) => ({
+    ok: true,
+    status: 200,
+    headers: { get: (n) => (n === 'X-Subtitle-Progress' ? header : (n === 'X-Subtitle-Live' ? '1' : null)) },
+    json: async () => ({}),
+});
+
 test('clicking the AI chip starts a run: one start event, a poll, a percentage', async (t) => {
     t.after(() => destroyPlayer());
     const p = await mountPlayer();
@@ -696,6 +706,25 @@ test('clicking the AI chip starts a run: one start event, a poll, a percentage',
     assert.equal(ai.querySelector('.tr-progress').textContent, '· 3%');
     assert.equal(ai.querySelector('.tr-spinner').hidden, false);
     assert.ok(ai.querySelector('.chip-origin'), 'the chip kept its badge');
+});
+
+test('a live source (X-Subtitle-Live) shows a count instead of a percent', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('3/3')
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    click(ai);
+    await settle();
+
+    // done == total does not mean final while the source is still live:
+    // the poll keeps running rather than hiding the chip.
+    const span = ai.querySelector('.tr-progress');
+    assert.equal(span.hidden, false);
+    assert.equal(span.textContent, '· 3', 'a count, not a percentage');
+    assert.equal(span.title, 'player.subtitleTranslatingLive');
 });
 
 test('nothing starts a translation on its own', async (t) => {

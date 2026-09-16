@@ -610,6 +610,7 @@
     "player.continueFrom": "Continuar de %v",
     "player.startOver": "Assistir do início",
     "player.subtitleTranslating": "Traduzindo… %v%",
+    "player.subtitleTranslatingLive": "Traduzindo junto com a reprodução…",
     "job.retrievingData": "buscando dados do recurso",
     "job.retrievingStreamUrl": "buscando URL do stream",
     "job.probingMedia": "analisando informações de mídia",

@@ -3,11 +3,17 @@ import assert from 'node:assert/strict';
 import { parseProgress, withRev, pollProgress, POLL_TIMEOUT_MS } from './subtitle-progress.js';
 
 test('parseProgress', () => {
-    assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false });
-    assert.deepEqual(parseProgress('100/100'), { done: 100, total: 100, final: true });
+    assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false, live: false });
+    assert.deepEqual(parseProgress('100/100'), { done: 100, total: 100, final: true, live: false });
     // 0/0 is "the job has not counted the cues yet", not "done".
-    assert.deepEqual(parseProgress('0/0'), { done: 0, total: 0, final: false });
-    assert.deepEqual(parseProgress(null), { done: 0, total: 0, final: false });
+    assert.deepEqual(parseProgress('0/0'), { done: 0, total: 0, final: false, live: false });
+    assert.deepEqual(parseProgress(null), { done: 0, total: 0, final: false, live: false });
+});
+
+test('parseProgress with live never reports final', () => {
+    assert.deepEqual(parseProgress('7/7', true), { done: 7, total: 7, final: false, live: true });
+    assert.deepEqual(parseProgress('7/7', false), { done: 7, total: 7, final: true, live: false });
+    assert.deepEqual(parseProgress('7/7'), { done: 7, total: 7, final: true, live: false });
 });
 
 test('withRev appends or replaces rev', () => {
@@ -31,6 +37,22 @@ test('pollProgress reports changes and stops when final', async () => {
     await new Promise((r) => setTimeout(r, 30));
     stop();
     assert.deepEqual(seen, [3, 10]);
+    assert.equal(done, true);
+});
+
+test('pollProgress keeps polling while X-Subtitle-Live is set', async () => {
+    const answers = [['1/1', '1'], ['1/1', '1'], ['2/2', null]];
+    let i = 0;
+    const fetchImpl = async () => {
+        const [p, live] = answers[Math.min(i++, answers.length - 1)];
+        return { status: 200, headers: { get: (h) => (h === 'X-Subtitle-Live' ? live : p) } };
+    };
+    const seen = [];
+    let done = false;
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onProgress: (p) => seen.push([p.done, p.live]), onDone: () => { done = true; } });
+    await new Promise((r) => setTimeout(r, 30));
+    stop();
+    assert.deepEqual(seen, [[1, true], [2, false]]);
     assert.equal(done, true);
 });
 
