@@ -2,6 +2,7 @@ package streamprefs
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -66,5 +67,50 @@ func TestCastNamesAreCappedPerName(t *testing.T) {
 	}
 	if got[2] != "Cary Grant" {
 		t.Errorf("an ordinary name is untouched: %q", got[2])
+	}
+}
+
+// TestCastNamesAreCappedInAggregate is the other half of the bound. The
+// per-name cap and the count together still allow 30 x 40 CJK runes = 3600
+// bytes, which url.Values.Encode turns into ~10.8 KB on a URL that is
+// already signed -- past nginx's 8 KB default header-line budget, so the
+// <track> 414s and the viewer gets subtitle-translate-error {code:414} with
+// nothing shorter to fall back to.
+func TestCastNamesAreCappedInAggregate(t *testing.T) {
+	// 40 CJK runes is 120 bytes of UTF-8 and 360 bytes percent-encoded:
+	// the worst case the per-name cap allows.
+	name := strings.Repeat("渡", castNameMaxRunes)
+	var cast []any
+	for i := 0; i < 30; i++ {
+		cast = append(cast, map[string]any{"name": name})
+	}
+	got := castNamesFromMetadata(map[string]any{"credits": map[string]any{"cast": cast}}, 30)
+	if len(got) == 0 {
+		t.Fatal("the glossary must not be emptied, only bounded")
+	}
+	if n := len(url.QueryEscape(strings.Join(got, ","))); n > castNamesMaxEncodedBytes {
+		t.Errorf("encoded glossary is %d bytes, cap is %d (%d names)", n, castNamesMaxEncodedBytes, len(got))
+	}
+	// And it is the aggregate that stopped it, not the count: 30 were on
+	// offer and the cap is what the answer is short of.
+	if len(got) >= 30 {
+		t.Errorf("all %d CJK names fit, so nothing was bounded", len(got))
+	}
+
+	// A short name behind a long one still gets in: the cap skips what does
+	// not fit rather than truncating the list at the first oversized entry.
+	cast = append(cast, map[string]any{"name": "Cary Grant"})
+	got = castNamesFromMetadata(map[string]any{"credits": map[string]any{"cast": cast}}, 31)
+	if len(got) == 0 || got[len(got)-1] != "Cary Grant" {
+		t.Errorf("a short name behind oversized ones must still fit: %v", got)
+	}
+
+	// The ordinary case is untouched: real credits are nowhere near the cap.
+	plain := []any{}
+	for i := 0; i < 30; i++ {
+		plain = append(plain, map[string]any{"name": "Cary Grant"})
+	}
+	if got := castNamesFromMetadata(map[string]any{"credits": map[string]any{"cast": plain}}, 30); len(got) != 30 {
+		t.Errorf("30 ordinary names must all survive, got %d", len(got))
 	}
 }

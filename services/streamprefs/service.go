@@ -2,6 +2,7 @@ package streamprefs
 
 import (
 	"context"
+	"net/url"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -113,6 +114,17 @@ func (s *Service) CastNames(ctx context.Context, videoID string, limit int) []st
 // than be cut mid-character.
 const castNameMaxRunes = 40
 
+// castNamesMaxEncodedBytes bounds the glossary in aggregate, which the
+// per-name cap and the count do not: 30 names of 40 CJK runes each is
+// 3600 bytes of UTF-8, and url.Values.Encode percent-encodes that to about
+// 10.8 KB -- appended to an already-signed proxy URL. Nginx's default
+// large_client_header_buffers line budget is 8 KB, so the AI <track> comes
+// back 414 and the player reports subtitle-translate-error {code:414} with
+// no shorter-glossary fallback. 1 KB encoded leaves the rest of the chain
+// its room; a glossary is a hint, and the names that do not fit are the
+// ones the credits ranked last.
+const castNamesMaxEncodedBytes = 1024
+
 func castNamesFromMetadata(md map[string]any, limit int) []string {
 	credits, _ := md["credits"].(map[string]any)
 	cast, _ := credits["cast"].([]any)
@@ -120,7 +132,19 @@ func castNamesFromMetadata(md map[string]any, limit int) []string {
 	for _, c := range cast {
 		m, _ := c.(map[string]any)
 		if name, _ := m["name"].(string); strings.TrimSpace(name) != "" {
-			out = append(out, capRunes(strings.TrimSpace(name), castNameMaxRunes))
+			name = capRunes(strings.TrimSpace(name), castNameMaxRunes)
+			// Measured on the joined value, the way TranslateURL sends it,
+			// and the whole candidate list is not abandoned on the first
+			// name that does not fit: a single long entry must not cut the
+			// glossary short for the shorter names behind it.
+			if len(url.QueryEscape(strings.Join(append(out, name), ","))) > castNamesMaxEncodedBytes {
+				continue
+			}
+			// Measured on the joined value, the way TranslateURL sends it,
+			// and the whole candidate list is not abandoned on the first
+			// name that does not fit: a single long entry must not cut the
+			// glossary short for the shorter names behind it.
+			out = append(out, name)
 		}
 		if len(out) == limit {
 			break
