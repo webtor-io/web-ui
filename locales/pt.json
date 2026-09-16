@@ -588,6 +588,7 @@
     "action.stream.origin.em": "Embutidas no vídeo",
     "action.stream.origin.in": "Incluídas no torrent",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Encontradas pelo título, podem estar fora de sincronia",
     "action.stream.origin.my": "Minhas legendas",
     "action.stream.origin.ai": "Tradução por IA",
     "action.stream.translate.locked": "As legendas por IA no seu idioma fazem parte do plano de apoiador.",

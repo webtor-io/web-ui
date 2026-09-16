@@ -193,7 +193,26 @@ func (s *Helper) OriginKey(li ListItem) string {
 	return "action.stream.origin." + strings.ToLower(c)
 }
 
-// PropertyTags are what kind of track this is, as opposed to where it came
+// OriginHintKey is a second i18n key for the origin badge's title: what
+// the viewer needs to know about this particular origin beyond its name.
+// Only one exists — an OpenSubtitles track matched by title rather than by
+// the moviehash of this file, which is the same subtitle for a different
+// release often enough to be worth saying, and is exactly the case the
+// ladder already ranks one rung lower (rank 4, unchanged).
+//
+// A title rather than a mark of its own, deliberately: the chip already
+// carries the visible "· imdb" suffix (ListItem.Source, drawn for every
+// OpenSubtitles track since the redesign), so a second glyph would repeat
+// it. What was missing is what the word means, and a title costs no width
+// — which matters on a chip whose label is the part that truncates.
+func (s *Helper) OriginHintKey(li ListItem) string {
+	if imdbMatched(li) {
+		return "action.stream.origin.osImdbHint"
+	}
+	return ""
+}
+
+// PropertyTags are what kind of track this is, as opposed to where it came// PropertyTags are what kind of track this is, as opposed to where it came
 // from: lowercase codes rendered after the file name, secondary to the
 // origin badge. Only "forced" exists today; "sdh" is drawn in the uikit and
 // waits for content-prober to expose ffprobe's disposition flags.

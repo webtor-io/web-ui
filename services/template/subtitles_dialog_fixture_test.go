@@ -295,6 +295,7 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
+		"originHintKey":      helper.OriginHintKey,
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,

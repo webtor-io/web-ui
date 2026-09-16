@@ -1487,3 +1487,73 @@ func TestLadderTranslationPrefersTheUploadOverTheLivePlaylist(t *testing.T) {
 		t.Fatalf("src=%q want %q", tr.Src, want)
 	}
 }
+
+// TestLadderRankReadsTheMovieHashBool: video-info reports moviehash_match
+// alongside the source enum since 2026-09-16, and the bool is the ground
+// truth the enum is derived from. The ladder reads it where it exists and
+// falls back to the enum where it does not -- an older video-info sends only
+// the enum, and a deployment mixing the two must not reshuffle the ladder.
+// Rank 4 for an imdb match is unchanged either way.
+func TestLadderRankReadsTheMovieHashBool(t *testing.T) {
+	yes, no := true, false
+	for _, c := range []struct {
+		name string
+		li   ListItem
+		want int
+	}{
+		{"bool true", ListItem{Provider: "OpenSubtitles", MovieHashMatch: &yes}, 3},
+		{"bool false", ListItem{Provider: "OpenSubtitles", MovieHashMatch: &no}, 4},
+		{"enum only, hash", ListItem{Provider: "OpenSubtitles", Source: "hash"}, 3},
+		{"enum only, imdb", ListItem{Provider: "OpenSubtitles", Source: "imdb"}, 4},
+		{"neither", ListItem{Provider: "OpenSubtitles"}, 4},
+		// The bool wins: a service that disagrees with itself is answered
+		// from the field that is not derived.
+		{"bool false over enum hash", ListItem{Provider: "OpenSubtitles", Source: "hash", MovieHashMatch: &no}, 4},
+		{"bool true over enum imdb", ListItem{Provider: "OpenSubtitles", Source: "imdb", MovieHashMatch: &yes}, 3},
+	} {
+		if got := ladderRank(c.li); got != c.want {
+			t.Errorf("%s: rank=%d want %d", c.name, got, c.want)
+		}
+	}
+
+	// And the same bool decides the translation order, where a hash match
+	// outranks the sidecar (translationSourceRank).
+	lis := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		srcItem("et-1", "ExportTag", "rus", "https://x/sc.vtt", ""),
+		{ID: "os-1", Provider: "OpenSubtitles", SrcLang: "rus", Src: "https://x/os.vtt", Kind: "subtitles", MovieHashMatch: &yes},
+	}
+	if got := pickTranslationSource(lis, "ru"); got == nil || got.ID != "os-1" {
+		t.Fatalf("hash match by bool must beat the sidecar: %+v", got)
+	}
+	lis[2].MovieHashMatch = &no
+	if got := pickTranslationSource(lis, "ru"); got == nil || got.ID != "et-1" {
+		t.Fatalf("an imdb match by bool ranks below the sidecar: %+v", got)
+	}
+}
+
+// TestGetSubtitlesCarriesTheMovieHashBool: the field survives the mapping
+// from the api track to the list item -- without that every OpenSubtitles
+// item would read as "origin unknown" and fall back to the enum forever.
+func TestGetSubtitlesCarriesTheMovieHashBool(t *testing.T) {
+	yes := true
+	os := []api.OpenSubtitleTrack{
+		{ID: "1", Source: "imdb", MovieHashMatch: &yes,
+			ExportTrack: &ra.ExportTrack{Src: "https://x/os.vtt", SrcLang: "en", Label: "English", Kind: "subtitles"}},
+		{ID: "2", Source: "imdb",
+			ExportTrack: &ra.ExportTrack{Src: "https://x/os2.vtt", SrcLang: "de", Label: "German", Kind: "subtitles"}},
+	}
+	got := byID(NewHelper().GetSubtitles(&models.VideoStreamUserData{}, nil, nil, os, &models.ExternalData{}, nil, SubtitleOpts{}))
+	if m := got["os-1"].MovieHashMatch; m == nil || !*m {
+		t.Errorf("os-1 moviehash=%v, want true", m)
+	}
+	if got["os-1"].Rank != 3 {
+		t.Errorf("os-1 rank=%d, want 3: the bool contradicts the enum and wins", got["os-1"].Rank)
+	}
+	if got["os-2"].MovieHashMatch != nil {
+		t.Errorf("os-2 moviehash=%v, want nil: the service said nothing", got["os-2"].MovieHashMatch)
+	}
+	if got["os-2"].Rank != 4 {
+		t.Errorf("os-2 rank=%d, want 4", got["os-2"].Rank)
+	}
+}

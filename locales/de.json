@@ -588,6 +588,7 @@
     "action.stream.origin.em": "Im Video eingebettet",
     "action.stream.origin.in": "Im Torrent enthalten",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Nach Titel gefunden, eventuell nicht synchron",
     "action.stream.origin.my": "Meine Untertitel",
     "action.stream.origin.ai": "KI-Übersetzung",
     "action.stream.translate.locked": "KI-Untertitel in deiner Sprache sind Teil des Unterstützer-Abos.",

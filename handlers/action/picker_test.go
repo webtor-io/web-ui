@@ -297,3 +297,41 @@ func TestSubtitleLangGroupsExpandsTheSuggestedLanguage(t *testing.T) {
 		t.Errorf("Expanded = %q, want pt: the preferred language still comes first", row.Expanded)
 	}
 }
+
+// boolPtr is for MovieHashMatch, where nil ("the service did not say") is a
+// third state and not a synonym for false.
+func boolPtr(b bool) *bool { return &b }
+
+// TestOriginHintKeyNamesOnlyAnImdbMatch: the origin badge's title gains a
+// second sentence for an OpenSubtitles track matched by title rather than
+// by this file's moviehash -- the same subtitle for another release often
+// enough that "may be out of sync" is worth saying. Nothing else has a
+// hint, and an origin the service never reported gets none: telling the
+// viewer a track may be out of sync is a claim, and nobody made it.
+func TestOriginHintKeyNamesOnlyAnImdbMatch(t *testing.T) {
+	h := NewHelper()
+	const hint = "action.stream.origin.osImdbHint"
+	for _, c := range []struct {
+		name string
+		li   ListItem
+		want string
+	}{
+		{"imdb by enum", ListItem{Provider: "OpenSubtitles", Source: "imdb"}, hint},
+		{"imdb by bool", ListItem{Provider: "OpenSubtitles", MovieHashMatch: boolPtr(false)}, hint},
+		{"the bool outranks a stale enum", ListItem{Provider: "OpenSubtitles", Source: "hash", MovieHashMatch: boolPtr(false)}, hint},
+		{"hash by enum", ListItem{Provider: "OpenSubtitles", Source: "hash"}, ""},
+		{"hash by bool", ListItem{Provider: "OpenSubtitles", Source: "imdb", MovieHashMatch: boolPtr(true)}, ""},
+		{"origin unknown", ListItem{Provider: "OpenSubtitles"}, ""},
+		{"not OpenSubtitles", ListItem{Provider: "UserSubtitle", Source: "imdb"}, ""},
+		{"the None carrier", ListItem{ID: "none"}, ""},
+	} {
+		if got := h.OriginHintKey(c.li); got != c.want {
+			t.Errorf("%s: hint=%q want %q", c.name, got, c.want)
+		}
+	}
+	// The code itself is unchanged -- an imdb match is still an OS track,
+	// and the hint is the only thing that distinguishes it.
+	if got := h.OriginCode(ListItem{Provider: "OpenSubtitles", Source: "imdb"}); got != "OS" {
+		t.Errorf("origin code=%q, want OS", got)
+	}
+}

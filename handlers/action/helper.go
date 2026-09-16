@@ -51,6 +51,12 @@ type ListItem struct {
 	// human track the translation is made from, so the picker can say
 	// "AI - from <origin>" without knowing the ladder.
 	SourceBadge string
+	// MovieHashMatch is OpenSubtitles ground truth: true when the track
+	// was found by the moviehash of this very file, false when it was
+	// found by title (imdb) and may belong to another release. nil when
+	// the service did not report it -- every video-info before
+	// 2026-09-16 -- and the Source enum answers instead (hashMatched).
+	MovieHashMatch *bool
 	// SourceID is set on the Translated item alone: the ID of the list
 	// item being translated. Diagnostics only -- it is not rendered and
 	// not reported, unlike Source, which stays the OpenSubtitles
@@ -454,7 +460,31 @@ func (s *Helper) defaultAudioLang(ud *models.VideoStreamUserData, mp *api.MediaP
 // unknown (phase 3 whisper transcription takes 6).
 const rankUnknown = 9
 
-// ladderRank orders subtitle sources from the one the viewer trusts most
+// hashMatched answers whether an OpenSubtitles track was found by the
+// moviehash of this very file rather than by title. The bool is the ground
+// truth and wins where the service sent one; the Source enum is the
+// fallback for a video-info that predates it. Asked of a non-OpenSubtitles
+// item it answers false, which is why every caller tests the provider
+// first.
+func hashMatched(li ListItem) bool {
+	if li.MovieHashMatch != nil {
+		return *li.MovieHashMatch
+	}
+	return li.Source == "hash"
+}
+
+// imdbMatched is "we know this OpenSubtitles track was matched by title",
+// which is not the same as "not a hash match": a track whose origin the
+// service never reported is unknown, and telling the viewer it may be out
+// of sync would be a claim nobody made.
+func imdbMatched(li ListItem) bool {
+	if li.Provider != "OpenSubtitles" || hashMatched(li) {
+		return false
+	}
+	return li.MovieHashMatch != nil || li.Source != ""
+}
+
+// ladderRank orders subtitle sources from the one the viewer trusts most// ladderRank orders subtitle sources from the one the viewer trusts most
 // (what they uploaded themselves) to the one they trust least (a machine
 // translation). Within OpenSubtitles a hash match is a match on this very
 // file, while an imdb match is only the same title, so it can be out of
@@ -470,7 +500,7 @@ func ladderRank(li ListItem) int {
 	case "ExportTag", "External":
 		return 2
 	case "OpenSubtitles":
-		if li.Source == "hash" {
+		if hashMatched(li) {
 			return 3
 		}
 		return 4
@@ -527,7 +557,7 @@ func translationSourceRank(li ListItem) int {
 	case "UserSubtitle":
 		return 0
 	case "OpenSubtitles":
-		if li.Source == "hash" {
+		if hashMatched(li) {
 			return 1
 		}
 		return 3
@@ -936,14 +966,15 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 	}
 	for _, t := range opensubs {
 		res = append(res, ListItem{
-			ID:       "os-" + t.ID,
-			Label:    t.Label,
-			SrcLang:  t.SrcLang,
-			Kind:     string(t.Kind),
-			Src:      t.Src,
-			Provider: "OpenSubtitles",
-			Source:   t.Source,
-			Badge:    badgeFor("OpenSubtitles", false),
+			ID:             "os-" + t.ID,
+			Label:          t.Label,
+			SrcLang:        t.SrcLang,
+			Kind:           string(t.Kind),
+			Src:            t.Src,
+			Provider:       "OpenSubtitles",
+			Source:         t.Source,
+			MovieHashMatch: t.MovieHashMatch,
+			Badge:          badgeFor("OpenSubtitles", false),
 		})
 	}
 	for i, t := range extTracks(ext) {

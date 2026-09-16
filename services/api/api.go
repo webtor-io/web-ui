@@ -140,7 +140,15 @@ type ExtSubtitle struct {
 	Format  string `json:"format"`
 	Id      string `json:"id"`
 	Hash    string `json:"hash"`
-	Source  string `json:"source"`
+	// Source is video-info's enum for which leg found this track: "hash"
+	// (the OpenSubtitles moviehash of this very file) or "imdb" (the same
+	// title, possibly another release, so possibly out of sync).
+	Source string `json:"source"`
+	// MovieHashMatch is the bool Source is derived from, reported since
+	// 2026-09-16. A pointer because absent and false are different
+	// answers: an older video-info sends neither field's ground truth and
+	// nil falls back to the Source enum, the way EventData.Live does.
+	MovieHashMatch *bool `json:"moviehash_match"`
 }
 
 type MediaProbe struct {
@@ -610,6 +618,11 @@ func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end in
 type OpenSubtitleTrack struct {
 	ID     string
 	Source string
+	// MovieHashMatch is ExtSubtitle.MovieHashMatch: the ground truth
+	// behind Source, nil when the service did not send it. Carried
+	// through rather than collapsed into Source so the ladder and phase-4
+	// measurement read the bool where there is one.
+	MovieHashMatch *bool
 	*ra.ExportTrack
 }
 
@@ -725,8 +738,9 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 				SrcLang: esub.Srclang,
 				Label:   esub.Label,
 			},
-			ID:     esub.Id,
-			Source: esub.Source,
+			ID:             esub.Id,
+			Source:         esub.Source,
+			MovieHashMatch: esub.MovieHashMatch,
 		})
 	}
 	return subs, nil

@@ -588,6 +588,7 @@
     "action.stream.origin.em": "Ingesloten in de video",
     "action.stream.origin.in": "Meegeleverd in de torrent",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Gevonden op titel, mogelijk niet synchroon",
     "action.stream.origin.my": "Mijn ondertitels",
     "action.stream.origin.ai": "AI-vertaling",
     "action.stream.translate.locked": "AI-ondertitels in jouw taal maken deel uit van het supporter-abonnement.",

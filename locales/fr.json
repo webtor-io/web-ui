@@ -588,6 +588,7 @@
     "action.stream.origin.em": "Intégrés à la vidéo",
     "action.stream.origin.in": "Inclus dans le torrent",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Trouvés par titre, la synchronisation peut être décalée",
     "action.stream.origin.my": "Mes sous-titres",
     "action.stream.origin.ai": "Traduction par IA",
     "action.stream.translate.locked": "Les sous-titres IA dans votre langue font partie de l'abonnement soutien.",

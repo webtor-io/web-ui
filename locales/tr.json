@@ -588,6 +588,7 @@
     "action.stream.origin.em": "Videoya gömülü",
     "action.stream.origin.in": "Torrent içinde",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Başlığa göre eşleşti, senkron olmayabilir",
     "action.stream.origin.my": "Altyazılarım",
     "action.stream.origin.ai": "Yapay zekâ çevirisi",
     "action.stream.translate.locked": "Dilinizdeki yapay zekâ altyazıları destekçi planına dahildir.",

@@ -598,6 +598,7 @@
     "action.stream.origin.em": "Wbudowane w wideo",
     "action.stream.origin.in": "Dołączone do torrenta",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Dopasowane po tytule, mogą nie być zsynchronizowane",
     "action.stream.origin.my": "Moje napisy",
     "action.stream.origin.ai": "Tłumaczenie AI",
     "action.stream.translate.locked": "Napisy AI w Twoim języku są częścią planu wspierającego.",

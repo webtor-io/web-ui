@@ -598,6 +598,7 @@
     "action.stream.origin.em": "Встроенные в видео",
     "action.stream.origin.in": "В раздаче",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Найдены по названию — тайминг может не совпадать",
     "action.stream.origin.my": "Мои субтитры",
     "action.stream.origin.ai": "AI-перевод",
     "action.stream.translate.locked": "AI-субтитры на вашем языке входят в подписку.",

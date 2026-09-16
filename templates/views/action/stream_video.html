@@ -205,7 +205,14 @@
                              locked chip (an upsell, not an action) keeps
                              exactly the markup it always had. */}}
                         {{ if .Offered }}<span class="ai-action" aria-hidden="true">✦</span>{{ end }}
-                        {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}">{{ $oc }}</span>{{ end }}
+                        {{/* The origin badge's title names the origin, and for an
+                             OpenSubtitles track matched by title rather than by
+                             this file's moviehash it also says what that means
+                             ("may be out of sync"). A title, not a second glyph:
+                             the visible marker is already there as the "· imdb"
+                             suffix below, and the chip's label is what truncates,
+                             so width spent here is width taken from the name. */}}
+                        {{ if $oc }}<span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider {{ if eq $oc "MY" }}bg-w-purple/10 border-w-purple/30 text-w-purpleL{{ else if eq $oc "AI" }}bg-w-pink/10 border-w-pink/30 text-w-pinkL{{ else }}bg-base-300/80 border-w-line/50 text-w-sub{{ end }}" title="{{ t $.Lang (originKey .) }}{{ with originHintKey . }} — {{ t $.Lang . }}{{ end }}">{{ $oc }}</span>{{ end }}
                         {{ if .Offered }}<span class="ai-action max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ tp $.Lang "action.stream.translate.action" "Language" $dl.Localized }}">{{ tp $.Lang "action.stream.translate.action" "Language" $dl.Localized }}</span>{{ end }}
                         <span class="{{ if $ai }}ai-label {{ end }}max-w-[9rem] sm:max-w-[14rem] truncate"{{ if and $ai .Offered }} hidden{{ end }} title="{{ .Label }}">{{ .Label }}</span>
                         {{ range propertyTags . }}<span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider" title="{{ t $.Lang (printf "action.stream.badge.%s" .) }}">{{ . }}</span>{{ end }}

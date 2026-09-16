@@ -2140,7 +2140,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <span class="badge badge-xs border-w-line/50 text-w-muted uppercase tracking-wider opacity-50" title="Subtitles for the deaf and hard of hearing — not shipped">sdh</span>
       <span class="text-w-muted text-xs">&larr; property tags (what kind of track), lowercase, secondary. Only <code>forced</code> ships; <code>sdh</code> waits for <code>content-prober</code> to expose ffprobe dispositions</span>
     </div>
-    <div class="uikit-label mb-6">origin: <code>span.chip-origin.badge.badge-xs.font-mono.font-semibold.tracking-wider</code> &middot; neutral for EM/IN/OS, purple for MY, pink for AI &middot; always carries <code>title</code> = <code>action.stream.origin.{em,in,os,my,ai}</code> &middot; property tag title = <code>action.stream.badge.forced</code></div>
+    <div class="uikit-label mb-6">origin: <code>span.chip-origin.badge.badge-xs.font-mono.font-semibold.tracking-wider</code> &middot; neutral for EM/IN/OS, purple for MY, pink for AI &middot; always carries <code>title</code> = <code>action.stream.origin.{em,in,os,my,ai}</code> &middot; property tag title = <code>action.stream.badge.forced</code><br>
+      <strong>OS has two origins behind one code.</strong> A track found by the moviehash of this very file and one found by title (imdb) are the same <code>OS</code> badge and the same neutral colour, but the second may belong to another release and be out of sync &mdash; which is why the ladder ranks it one rung lower (4, not 3). The chip says which through the existing <code>&middot; hash</code> / <code>&middot; imdb</code> suffix, and the badge's <code>title</code> gains a second sentence for the imdb case: <code>action.stream.origin.os</code> &mdash; <code>action.stream.origin.osImdbHint</code> ("Matched by title, may be out of sync", <code>Helper.OriginHintKey</code>). Deliberately a title and not a second glyph: the visible marker is already the suffix, and the chip's label is the part that truncates, so width spent on the badge is width taken from the name.</div>
 
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Dialog</h3>
     <div class="w-full max-w-5xl rounded-2xl p-6 bg-base-100 border border-w-line mb-4">
@@ -2195,6 +2196,10 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
             <svg class="chip-check w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="OpenSubtitles">OS</span>
             <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="Russian">Russian</span> <span class="text-w-muted" style="font-weight:400">&middot; hash</span>
+          </button>
+          <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
+            <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="OpenSubtitles — Matched by title, may be out of sync">OS</span>
+            <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="French">French</span> <span class="text-w-muted" style="font-weight:400">&middot; imdb</span>
           </button>
           <button type="button" class="subtitle track-chip" role="radio" aria-checked="false">
             <span class="chip-origin badge badge-xs font-mono font-semibold tracking-wider bg-base-300/80 border-w-line/50 text-w-sub" title="Included in the torrent">IN</span>

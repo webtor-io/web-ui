@@ -646,6 +646,7 @@
     "action.stream.origin.em": "Embedded in the video",
     "action.stream.origin.in": "Included in the torrent",
     "action.stream.origin.os": "OpenSubtitles",
+    "action.stream.origin.osImdbHint": "Matched by title, may be out of sync",
     "action.stream.origin.my": "My Subtitles",
     "action.stream.origin.ai": "AI translation",
     "action.stream.translate.locked": "AI subtitles in your language are part of the supporter plan.",
