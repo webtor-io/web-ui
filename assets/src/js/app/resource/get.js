@@ -7,7 +7,14 @@ import '../../lib/share/share';
 // and append a clickable inline "\u2026" that expands the full plot; an
 // inline "\u2191" at the end of the expanded text collapses it back.
 // Mirrors the Preact ExpandableText used in Discover.
-av(function () {
+//
+// ONE av() per script: lib/asyncView.js registers a script's init under its
+// URL (`__async/assets/resource/get_loaded`) and runs only the first
+// registration — a second av() in the same file is silently dropped. That
+// is how the `#action=stream` deep link went dead in June 2026: the plot
+// clamp was added as its own av() above it. Everything this script does
+// on init therefore lives in the single callback at the bottom.
+function initPlotClamp() {
     const plot = document.querySelector('[data-plot-clamp]');
     if (!plot) return;
     const full = plot.textContent;
@@ -34,8 +41,9 @@ av(function () {
         plot.appendChild(toggleBtn('\u2191', renderCollapsed));
     }
     renderCollapsed();
-});
+}
 av( async function() {
+    initPlotClamp();
     if (window._ads !== undefined && window._sessionExpired !== true) {
         const renderAd = (await import('../../lib/ads')).default;
         for (const ad of window._ads) {
