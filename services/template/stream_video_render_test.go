@@ -313,7 +313,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		// The group holds the switch and the language filter, so its name
 		// covers both (M10).
 		`aria-label="action.stream.subtitleControls"`,
-		`class="toggle toggle-soft toggle-sm">`,
+		`class="toggle toggle-soft">`,
 		`data-subtitles-off="true"`,
 		`class="lang-row flex flex-wrap items-center gap-1.5 picker-off"`,
 		`id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
@@ -784,7 +784,7 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 	html := buf.String()
 
 	for _, want := range []string{
-		`class="toggle toggle-soft toggle-sm" checked`,
+		`class="toggle toggle-soft" checked`,
 		`data-subtitles-off="false"`,
 	} {
 		if !strings.Contains(html, want) {

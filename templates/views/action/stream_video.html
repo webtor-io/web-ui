@@ -111,9 +111,12 @@
                          paint nothing: no box, no group to fade.) The "None"
                          item itself stays in #subtitle-tracks as a hidden
                          carrier the player activates by id. */}}
-                    <label class="flex items-center cursor-pointer shrink-0 py-1">
+                    {{/* Default toggle size (1.5rem) matches the btn-xs language chips;
+                         toggle-sm sat 4px lower than the row. No padding on the label so
+                         the switch centres on the chips' own box. */}}
+                    <label class="flex items-center self-center cursor-pointer shrink-0 h-6">
                         <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
-                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft toggle-sm"{{ if not $off }} checked{{ end }}>
+                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft"{{ if not $off }} checked{{ end }}>
                     </label>
                     <div class="lang-row flex flex-wrap items-center gap-1.5{{ if $off }} picker-off{{ end }}">
                     {{ range $row.Groups }}

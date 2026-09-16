@@ -17,6 +17,11 @@ func TestLangFromName(t *testing.T) {
 		{"show.s01e01.pt-BR.vtt", "pt-BR"},
 		// Three-letter codes canonicalise to their two-letter form.
 		{"movie.eng.srt", "en"},
+		// Duplicate-download suffixes a browser appends must not eat the tag.
+		{"Sintel.ru (3).srt", "ru"},
+		{"movie.en-2.srt", "en"},
+		{"movie.pt-BR 2.vtt", "pt-BR"},
+		{"movie (2).srt", "und"},
 
 		// Negative controls: nothing parseable must yield "und" rather than
 		// an empty attribute or a guess.

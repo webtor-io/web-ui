@@ -273,7 +273,7 @@ for the same reason.
 | id | element | role |
 |---|---|---|
 | `#subtitles` | `<dialog class="modal">` | the picker; carries `data-resource-id`, `data-item-id`, `data-preferred-lang`, `data-subtitles-off` (`"true"` while subtitles are off) and, once the viewer has switched them off in this session, `data-last-subtitle` (the id to restore) |
-| `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft toggle-sm">` | the subtitles on/off switch, **first child of `#subtitle-langs`** — where the "Off" chip used to be (owner, 2026-09-16) — in a `<label class="flex items-center">` with an `sr-only` name. Checked iff the default item is not `none` |
+| `#subtitles-toggle` | `<input type="checkbox" class="toggle toggle-soft">` | the subtitles on/off switch, **first child of `#subtitle-langs`** — where the "Off" chip used to be (owner, 2026-09-16) — in a `<label class="flex items-center">` with an `sr-only` name. Checked iff the default item is not `none` |
 | `.lang-row` | `<div>` inside `#subtitle-langs` | the language chips, "+N" and the `<template>`. Exists so the muted state can dim the chips without dimming the switch beside them; `applyOffState` writes `.picker-off` here, never on `#subtitle-langs` |
 | `#audio-tracks` | `<div role="radiogroup">` | audio chip row |
 | `#subtitle-langs` | `<div role="group">` | the switch plus the language row (`aria-label` = `action.stream.subtitleControls`, which names both — the chips alone are a filter, not a choice) |
@@ -407,7 +407,7 @@ row plus the tracks of the expanded language.
   chips the tail goes behind "+N" — except the expanded language, which is never collapsed
   wherever it sorts, and is not counted into "+N": a pressed but invisible filter leaves its
   tracks on screen with no chip pointing at them.
-- **Subtitles are switched, not chosen off** (owner, 2026-09-15). A `toggle toggle-soft toggle-sm`
+- **Subtitles are switched, not chosen off** (owner, 2026-09-15). A `toggle toggle-soft`
   leads the language row — where the "Off" chip used to be (owner, 2026-09-16) — and there is no
   "Off" chip in either row. Off does **not** empty the block:
   the chips go `.picker-off` (dimmed — `.lang-row` and `#subtitle-tracks`, never the switch itself), every chip keeps its classes — including the active mark on
