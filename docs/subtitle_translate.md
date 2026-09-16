@@ -167,6 +167,17 @@ transcode, `X-Subtitle-Live: 1` marks it as still growing, and a final artifact 
 for a contiguous run from the start. A native MP4 played without a session has no base and no
 embedded source, as before.
 
+**An embedded track outranks a complete sidecar or OpenSubtitles track in the same language.**
+`pickTranslationSource` fills `audio`/`en`/`first` by list order, and `GetSubtitles` appends the
+`MediaProbe` items before `ExportTag`, `OpenSubtitles` and `UserSubtitle` — so for a transcoded
+file that has both, the source is the live playlist, not the finished VTT. That is deliberate and
+matches `ladderRank` (embedded 1 < sidecar 2 < OS 4): a transcription of the file being played
+beats a subtitle someone matched to it by name or imdb id. The cost is explicit — the batch source
+is one fetch of seconds-to-minutes that leaves a final artifact cached under `ArtifactKey` for
+every later viewer, while the live source runs at transcode speed, holds one of the service's
+`--live-max-jobs` slots for the length of the film, and leaves a cached final only for a
+contiguous run from offset 0.
+
 **Glossary.** `streamprefs.CastNames(ctx, imdbID, 30)` reads up to 30 cast names from TMDB credits
 stored by enrichment, passed as `names=` to the service.
 
@@ -208,6 +219,20 @@ trip" / cache-key section).
   early. The chip reflects this: `Player.jsx`'s `onProgress` shows a bare count (`· <done>`, no
   denominator worth a percentage) with `title = tf('player.subtitleTranslatingLive')` while live,
   instead of the usual `· <pct>%` / `player.subtitleTranslating`.
+- **The poll sleeps with the video.** On the `<video>`'s `pause` event and on
+  `visibilitychange` → hidden, `Player.jsx` suspends the running poll (`stop.suspend()` on
+  `pollProgress`'s controller); `play`, and a `visibilitychange` back to visible on a video that is
+  not paused, resume it (`stop.resume()`). The HEAD every 3 s is what tells the service somebody is
+  watching (`--live-idle` 90 s), and for a live source it is also what keeps the transcoder session
+  and its FFmpeg run alive — a paused or hidden viewer would otherwise pay for a whole film nobody
+  is watching. **Suspending is not stopping:** no `onError`, no telemetry, no second
+  `subtitle-translate-start` on the way back (the item stays `'running'`, so `translationAction`
+  still answers `'resume'`), and the chip keeps its count and its spinner — unlike
+  `stopTranslationProgress`, which hides both. Time spent asleep does not count against
+  `POLL_TIMEOUT_MS` either: the deadline moves forward by the length of the sleep, so an hour on
+  pause does not come back as a timeout. Resuming is cheap on the service side too — partial
+  progress is held 24 h and re-aligned by cue identity. The listeners are removed on unmount
+  (the effect's cleanup, reached through `destroyPlayer`).
 - **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
   through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
@@ -701,8 +726,15 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   a self-inflicted stop.
 - **After an error, the item stays `'running'`.** Re-selecting it resumes (a silent retry) rather
   than reporting a fresh start; each attempt can still emit its own `subtitle-translate-error`.
-- **Polling gives up after 15 minutes** (`POLL_TIMEOUT_MS`, `subtitle-progress.js`) with
-  `subtitle-translate-error {code:'timeout'}`; a run that outlives the cap is treated as gone.
+- **Polling gives up after 15 minutes without a sign of life** (`POLL_TIMEOUT_MS`,
+  `subtitle-progress.js`) with `subtitle-translate-error {code:'timeout'}`. What the 15 minutes are
+  measured from depends on the source: for a batch source the cap is **absolute** (the deadline is
+  set once, at the start of the run — its end is minutes away, not film-length), while for a live
+  source (`X-Subtitle-Live`) it is an **inactivity** cap — the deadline moves forward on every tick
+  that reports a *new* translated cue. A live run therefore lasts as long as it keeps producing,
+  i.e. the length of the transcode, but a wedged live job that keeps answering the same count still
+  times out after 15 minutes: answering is not progress. Time the poll spends suspended (paused or
+  hidden, see *Client behaviour*) is not counted at all.
 
 ## Testing
 
