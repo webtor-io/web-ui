@@ -2,10 +2,12 @@ package action
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/models"
+	"net/url"
 	"regexp"
 	"strconv"
+
+	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/models"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
@@ -358,6 +360,20 @@ func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHL
 	return true, true, forcedTitleRe.MatchString(title)
 }
 
+// embeddedPlaylistURL is the transcoder's subtitle variant for embedded
+// stream i: the same s<N>.m3u8 hls.js plays, so the translation service
+// follows exactly the track the viewer sees. N is the index among the
+// non-PGS subtitle streams -- the transcoder's numbering (NewHLS in
+// content-transcoder counts the same set).
+func embeddedPlaylistURL(base string, i int) string {
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	u.Path += "/s" + strconv.Itoa(i) + ".m3u8"
+	return u.String()
+}
+
 // sidecarForced reports whether a side-loaded (ExportTag) track is a
 // "forced" (signs-only) track by its label or source URL.
 func sidecarForced(label, src string) bool {
@@ -473,13 +489,14 @@ func bestByLadder(lis []ListItem, lang string, forced bool) int {
 // pickTranslationSource picks the human track the AI translation is made
 // from: a non-forced, URL-backed track, preferring the audio language (a
 // transcription of what is being said, not a translation of a
-// translation), then English, then anything. Embedded tracks have no URL
-// of their own to feed the proxy chain, so they cannot be a source yet.
+// translation), then English, then anything. Embedded tracks are a source
+// when they carry a playlist Src (transcoder session); a native MP4
+// without a session has none.
 func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
 	var first, en, audio *ListItem
 	for i := range lis {
 		li := &lis[i]
-		if !isHumanFull(*li) || li.Src == "" || li.Provider == "MediaProbe" {
+		if !isHumanFull(*li) || li.Src == "" {
 			continue
 		}
 		if first == nil {
@@ -776,6 +793,10 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 				if stream.Tags.Language != "" {
 					srcLang = stream.Tags.Language
 				}
+				src := ""
+				if opts.HLSSessionBase != "" {
+					src = embeddedPlaylistURL(opts.HLSSessionBase, i)
+				}
 				res = append(res, ListItem{
 					ID:       "mp-" + strconv.Itoa(i),
 					MPID:     strconv.Itoa(i),
@@ -783,6 +804,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 					SrcLang:  srcLang,
 					Kind:     "subtitles",
 					Provider: "MediaProbe",
+					Src:      src,
 					Forced:   forced,
 					Badge:    badgeFor("MediaProbe", forced),
 				})

@@ -10,4 +10,9 @@ type SubtitleOpts struct {
 	Paid bool
 	// Names is the glossary passed to the translator (cast names from TMDB credits).
 	Names []string
+	// HLSSessionBase is the transcoder session's URL prefix
+	// (…~hls/session/<id>, query included) while the stream plays through
+	// the transcoder; empty otherwise. Embedded subtitle tracks get their
+	// playlist Src from it, so they can feed the translation chain.
+	HLSSessionBase string
 }

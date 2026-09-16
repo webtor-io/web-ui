@@ -564,6 +564,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			Type: "application/vnd.apple.mpegurl",
 		}}
 		sc.SessionSeekURL = result.SeekURL
+		if base, err := sessionBaseURL(exportResponse.ExportItems["stream"].URL); err == nil {
+			if u, perr := url.Parse(base); perr == nil {
+				u.Path += "/session/" + result.Session.ID
+				sc.SubtitleOpts.HLSSessionBase = u.String()
+			}
+		}
 	}
 	sc.VideoStreamUserData = vsud
 	sc.UserSubtitlesEnabled = s.userSubtitles.Enabled()

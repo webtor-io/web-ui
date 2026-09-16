@@ -1197,3 +1197,65 @@ func TestSavedTranslationIsPlayingNotOffered(t *testing.T) {
 		}
 	}
 }
+
+// TestGetSubtitlesEmbeddedGetsPlaylistSrcInSession: inside a transcoder
+// session, an embedded (MediaProbe) track's Src is the session's own
+// s<N>.m3u8 playlist -- the same variant hls.js plays -- so it can feed
+// pickTranslationSource. Outside a session (native MP4 path,
+// HLSSessionBase empty) it stays Src-less, as before.
+func TestGetSubtitlesEmbeddedGetsPlaylistSrcInSession(t *testing.T) {
+	h := NewHelper()
+	mp := probeWith(`[
+		{"codec_type":"video","codec_name":"h264"},
+		{"codec_type":"subtitle","codec_name":"hdmv_pgs_subtitle"},
+		{"codec_type":"subtitle","codec_name":"dvd_subtitle"},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"rus","title":"Full"}}
+	]`)
+	opts := SubtitleOpts{PreferredLang: "pt", HLSSessionBase: "https://edge.example/h/a.mkv~hls/session/0123456789abcdef0123456789abcdef?api-key=K&token=T"}
+	lis := h.GetSubtitles(&models.VideoStreamUserData{}, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, opts)
+	var emb *ListItem
+	for i := range lis {
+		if lis[i].Provider == "MediaProbe" {
+			emb = &lis[i]
+		}
+	}
+	if emb == nil || emb.MPID != "1" {
+		t.Fatalf("embedded item: %+v", emb)
+	}
+	if want := "https://edge.example/h/a.mkv~hls/session/0123456789abcdef0123456789abcdef/s1.m3u8?api-key=K&token=T"; emb.Src != want {
+		t.Fatalf("src=%q want %q", emb.Src, want)
+	}
+	// Negative control: no session -> no Src (native MP4 path).
+	lis = h.GetSubtitles(&models.VideoStreamUserData{}, mp, &ra.ExportTag{}, nil, &models.ExternalData{}, nil, SubtitleOpts{PreferredLang: "pt"})
+	for _, li := range lis {
+		if li.Provider == "MediaProbe" && li.Src != "" {
+			t.Fatalf("Src without a session: %q", li.Src)
+		}
+	}
+}
+
+// TestLadderTranslationFromEmbeddedTrack: an embedded track carrying a
+// session playlist Src (see above) is a valid translation source -- the
+// pickTranslationSource guard against MediaProbe was only ever about
+// having no URL, not about the provider itself.
+func TestLadderTranslationFromEmbeddedTrack(t *testing.T) {
+	lis := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		{ID: "mp-0", MPID: "0", Provider: "MediaProbe", Kind: "subtitles", SrcLang: "rus", Badge: "embedded",
+			Src: "https://edge.example/h/a.mkv~hls/session/0123456789abcdef0123456789abcdef/s0.m3u8?token=T"},
+	}
+	h := NewHelper()
+	out := h.applyLadder(lis, &models.VideoStreamUserData{}, "rus", SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr, ok := byID(out)["tr-pt"]
+	if !ok || tr.SourceBadge != "embedded" || tr.SourceID != "mp-0" {
+		t.Fatalf("translated item: %+v", tr)
+	}
+	if want := "https://edge.example/h/a.mkv~hls/session/0123456789abcdef0123456789abcdef/s0.m3u8~tr:pt/s0.vtt?token=T"; tr.Src != want {
+		t.Fatalf("src=%q want %q", tr.Src, want)
+	}
+	// Negative control: an embedded track without Src is still no source.
+	lis[1].Src = ""
+	if _, ok := byID(h.applyLadder(lis, &models.VideoStreamUserData{}, "rus", SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true}))["tr-pt"]; ok {
+		t.Fatal("Src-less embedded track became a source")
+	}
+}
