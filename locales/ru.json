@@ -621,6 +621,7 @@
     "player.startOver": "Смотреть с начала",
     "player.subtitleTranslating": "Перевод… %v%",
     "player.subtitleTranslatingLive": "Перевод идёт вместе с просмотром…",
+    "player.subtitleTranslationStopped": "Перевод остановлен — обновите страницу, чтобы повторить",
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",

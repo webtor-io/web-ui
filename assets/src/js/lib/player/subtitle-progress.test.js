@@ -2,6 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseProgress, withRev, pollProgress, POLL_TIMEOUT_MS } from './subtitle-progress.js';
 
+// headers builds the HEAD response the translate service answers with.
+// `status` is X-Subtitle-Status, absent unless a case sets it.
+const answer = (progress, { live = false, status = null } = {}) => ({
+    status: 200,
+    headers: {
+        get: (n) => {
+            if (n === 'X-Subtitle-Progress') return progress;
+            if (n === 'X-Subtitle-Live') return live ? '1' : null;
+            if (n === 'X-Subtitle-Status') return status;
+            return null;
+        },
+    },
+});
+
 test('parseProgress', () => {
     assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false, live: false });
     assert.deepEqual(parseProgress('100/100'), { done: 100, total: 100, final: true, live: false });
@@ -288,4 +302,101 @@ test('a run that reported an error is terminal too, timeout included', async () 
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(calls, after, 'a timed-out run must not poll again');
     assert.deepEqual(errs, ['timeout'], 'and must not emit a second timeout');
+});
+
+// ---- X-Subtitle-Status ------------------------------------------------
+//
+// The service's own verdict on a live run. It answers two questions the
+// counts cannot: a live run that finished (the source ended and everything
+// in it is translated, even with no final artifact to cache) looks exactly
+// like one that is merely between playlist segments, and a run that was
+// stopped incomplete (source_gone, too_large) looks exactly like one that
+// is behind.
+
+test('parseProgress: status done is final even while the source is live', () => {
+    assert.deepEqual(parseProgress('7/9', true, 'done'), { done: 7, total: 9, final: true, live: true });
+    assert.deepEqual(parseProgress('7/9', false, 'done'), { done: 7, total: 9, final: true, live: false });
+    // Without it the live rule stands: done == total is "caught up for now".
+    assert.deepEqual(parseProgress('9/9', true), { done: 9, total: 9, final: false, live: true });
+    // Case and whitespace are the wire's, not ours.
+    assert.equal(parseProgress('7/9', true, ' DONE ').final, true);
+    // A missing or unparseable count with a done verdict is still final:
+    // the run is over, there is simply nothing to show for it.
+    assert.deepEqual(parseProgress(null, true, 'done'), { done: 0, total: 0, final: true, live: true });
+    // Anything else leaves the counts in charge.
+    assert.equal(parseProgress('7/9', true, 'stopped').final, false);
+    assert.equal(parseProgress('7/9', true, 'running').final, false);
+});
+
+test('pollProgress stops a live run on status done, count or no count', async (t) => {
+    // Stopped in t.after, not after the assertions: a poll left running by
+    // a failed assertion keeps the event loop alive and wedges the whole
+    // file instead of reporting the failure. Found by this test's own
+    // negative control.
+    const running = [];
+    t.after(() => running.forEach((s) => s()));
+    for (const [header, want] of [['9/40', 9], ['0/0', 0]]) {
+        let calls = 0;
+        const fetchImpl = async () => { calls++; return answer(header, { live: true, status: 'done' }); };
+        let done = null;
+        const errs = [];
+        running.push(pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onDone: (p) => { done = p; }, onError: (c) => errs.push(c) }));
+        await new Promise((r) => setTimeout(r, 20));
+        assert.ok(done, `${header}: the run must finish`);
+        assert.equal(done.done, want);
+        assert.deepEqual(errs, [], 'finishing is not failing');
+        assert.equal(calls, 1, 'and it polls no further');
+    }
+});
+
+test('pollProgress reports status stopped once, after the last count', async (t) => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return answer('11/40', { live: true, status: 'stopped' }); };
+    const seen = [];
+    const errs = [];
+    let done = 0;
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1,
+        onProgress: (p) => seen.push(p.done),
+        onDone: () => { done++; },
+        onError: (c) => errs.push(c),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 20));
+    // The counts in a stopped response are the last ones there will be, so
+    // the chip is painted with them before the run is reported dead.
+    assert.deepEqual(seen, [11]);
+    assert.deepEqual(errs, ['stopped']);
+    assert.equal(done, 0, 'stopped is not done');
+    const after = calls;
+
+    // Terminal, like every other error path.
+    stop.suspend();
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'a stopped run must not poll again');
+    assert.deepEqual(errs, ['stopped'], 'and must not report twice');
+});
+
+// Negative control for the whole feature: a service that sends no
+// X-Subtitle-Status (every deployment before it shipped, and every batch
+// run) must behave exactly as before — the live rule keeps polling and the
+// batch rule still finishes on the counts.
+test('without the header the counts decide alone', async (t) => {
+    let calls = 0;
+    const live = async () => { calls++; return answer('9/9', { live: true }); };
+    let done = 0;
+    const errs = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl: live, intervalMs: 1, onDone: () => { done++; }, onError: (c) => errs.push(c) });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+    assert.equal(done, 0, 'a live run is never final on its counts');
+    assert.deepEqual(errs, []);
+    assert.ok(calls > 1, `expected repeated polls, got ${calls}`);
+
+    let doneBatch = 0;
+    pollProgress('https://x/a.vtt', { fetchImpl: async () => answer('9/9'), intervalMs: 1, onDone: () => { doneBatch++; } });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(doneBatch, 1, 'a batch run still finishes on done >= total');
 });

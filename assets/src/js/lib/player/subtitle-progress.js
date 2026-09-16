@@ -12,16 +12,36 @@
 // snapshot, not a ceiling, so `done == total` only means "caught up for
 // now", not final. When the header disappears the normal rule applies
 // again.
+//
+// `X-Subtitle-Status` is the service's own verdict on a live run, and it
+// outranks the counts because it knows two things they cannot say:
+//
+//   - `done` — the source ended and everything in it was translated. A
+//     live run can finish without a final artifact (a seeked session
+//     caches nothing), so there is no other way to tell "finished" from
+//     "the playlist has not grown yet in the last three seconds", and
+//     the live rule would otherwise poll such a run until the timeout.
+//   - `stopped` — the run ended incomplete (`source_gone`, `too_large`).
+//     The counts look exactly like a job that is merely behind.
+//
+// Absent (every response before the service shipped it, and every batch
+// run) the counts decide alone, exactly as before.
+export const STATUS_DONE = 'done';
+export const STATUS_STOPPED = 'stopped';
 
-export function parseProgress(header, live = false) {
+export function parseProgress(header, live = false, status = '') {
     const isLive = Boolean(live);
+    const st = String(status || '').trim().toLowerCase();
     const m = /^(\d+)\/(\d+)$/.exec(String(header || '').trim());
-    if (!m) return { done: 0, total: 0, final: false, live: isLive };
+    if (!m) return { done: 0, total: 0, final: st === STATUS_DONE, live: isLive };
     const done = parseInt(m[1], 10);
     const total = parseInt(m[2], 10);
     // `0/0` is "the job has not counted the cues yet", not "done". A live
     // source (X-Subtitle-Live) is never done either: its total grows with
-    // the playlist, so done == total only means "caught up for now".
+    // the playlist, so done == total only means "caught up for now" --
+    // unless the service says the run finished, which is the one thing
+    // the counts cannot report.
+    if (st === STATUS_DONE) return { done, total, final: true, live: isLive };
     return { done, total, final: !isLive && total > 0 && done >= total, live: isLive };
 }
 
@@ -127,7 +147,8 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             if (onError) onError(res.status);
             return;
         }
-        const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1');
+        const status = String(res.headers.get('X-Subtitle-Status') || '').trim().toLowerCase();
+        const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1', status);
         if (p.done !== last || p.live !== lastLive) {
             // A cue that was not there before is proof the job is alive,
             // which is the whole content of the cap. Only a live source
@@ -137,6 +158,21 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             last = p.done;
             lastLive = p.live;
             if (onProgress) onProgress(p);
+        }
+        // After onProgress and before the final check: the counts in a
+        // "stopped" response are the last ones there will ever be, so the
+        // chip is painted with them first and the run is reported dead
+        // second. Terminal like every other onError path -- one report,
+        // and resume() cannot wake it.
+        // After onProgress and before the final check: the counts in a
+        // "stopped" response are the last ones there will ever be, so the
+        // chip is painted with them first and the run is reported dead
+        // second. Terminal like every other onError path -- one report,
+        // and resume() cannot wake it.
+        if (status === STATUS_STOPPED) {
+            stopped = true;
+            if (onError) onError(STATUS_STOPPED);
+            return;
         }
         if (p.final) {
             stopped = true;

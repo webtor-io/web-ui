@@ -242,7 +242,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             runSeqRef.current++;
             if (progressSpanRef.current === span) progressSpanRef.current = null;
             if (progressSpinnerRef.current === spinner) progressSpinnerRef.current = null;
-            if (span) span.hidden = true;
+            // 'stopped' is the service saying this run ended incomplete
+            // (source_gone, too_large) -- the only failure where the count
+            // on the chip is worth keeping: those cues are on screen and
+            // are all there will ever be. Everything else clears the chip,
+            // because a frozen percentage reads as a translation still
+            // going. The spinner goes either way: it is the part that
+            // claims work is happening.
+            if (span) {
+                if (code === 'stopped') {
+                    span.title = tf('player.subtitleTranslationStopped');
+                } else {
+                    span.hidden = true;
+                }
+            }
             if (spinner) spinner.hidden = true;
             if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
         };

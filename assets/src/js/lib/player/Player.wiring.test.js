@@ -743,6 +743,49 @@ test('a live source (X-Subtitle-Live) shows a count instead of a percent', async
     assert.equal(span.title, 'player.subtitleTranslatingLive');
 });
 
+test('a stopped run keeps its count, loses its spinner, and is reported', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    // The service stopped this live run incomplete (source_gone /
+    // too_large). The counts in that answer are the last ones there will
+    // ever be, and those cues are on screen.
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? {
+            ok: true,
+            status: 200,
+            headers: {
+                get: (n) => {
+                    if (n === 'X-Subtitle-Progress') return '11/40';
+                    if (n === 'X-Subtitle-Live') return '1';
+                    if (n === 'X-Subtitle-Status') return 'stopped';
+                    return null;
+                },
+            },
+            json: async () => ({}),
+        }
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    p.video.paused = false;
+    click(ai);
+    await settle();
+
+    const span = ai.querySelector('.tr-progress');
+    // The count stays: it is what the viewer actually got. The spinner is
+    // the part that claims work is still happening, so it goes.
+    assert.equal(span.hidden, false, 'the last count survives a stop');
+    assert.equal(span.textContent, '· 11');
+    assert.equal(span.title, 'player.subtitleTranslationStopped');
+    assert.equal(ai.querySelector('.tr-spinner').hidden, true);
+
+    const errs = p.events.filter((e) => e.name === 'subtitle-translate-error');
+    assert.equal(errs.length, 1, 'one report for one stop');
+    assert.equal(errs[0].data.code, 'stopped');
+    assert.equal(errs[0].data.lang, 'pt');
+    assert.deepEqual(p.events.filter((e) => e.name === 'subtitle-translate-done'), [],
+        'stopped is not done');
+});
+
 test('nothing starts a translation on its own', async (t) => {
     t.after(() => destroyPlayer());
     // The fixture is the 2026-09-16 state: the AI item is Offered and the

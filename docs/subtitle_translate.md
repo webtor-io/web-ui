@@ -249,6 +249,21 @@ trip" / cache-key section).
   early. The chip reflects this: `Player.jsx`'s `onProgress` shows a bare count (`· <done>`, no
   denominator worth a percentage) with `title = tf('player.subtitleTranslatingLive')` while live,
   instead of the usual `· <pct>%` / `player.subtitleTranslating`.
+- **`X-Subtitle-Status` (the service's verdict).** The same `HEAD` response can carry
+  `X-Subtitle-Status: done` or `stopped`, and it outranks the counts because it knows two things
+  they cannot say. `done` means the live source ended and everything in it was translated — a
+  live run can finish with no final artifact to cache (a seeked session caches nothing), and
+  without the header that is indistinguishable from a playlist that simply has not grown in the
+  last three seconds, so the run polled on to the 15-minute cap. `parseProgress(header, live,
+  status)` therefore forces `final: true` on `done` **regardless of `live`**. `stopped` means the
+  run ended incomplete (`source_gone`, `too_large`), which on the counts alone looks exactly like
+  a job that is merely behind: `pollProgress` calls `onError('stopped')` once and stops, after
+  reporting that response's counts — they are the last ones there will be, and those cues are on
+  screen. The player then **keeps the chip's count** and hides only the spinner, with
+  `title = player.subtitleTranslationStopped` ("Translation stopped — reload to retry"), and emits
+  `subtitle-translate-error {code:'stopped'}`. Every other failure clears the count, because a
+  frozen percentage reads as a translation still running. A response without the header behaves
+  exactly as before, which is what every batch run and every pre-2026-09-16 service sends.
 - **The poll sleeps with the video.** On the `<video>`'s `pause` event and on
   `visibilitychange` → hidden, `Player.jsx` suspends the running poll (`stop.suspend()` on
   `pollProgress`'s controller); `play`, and a `visibilitychange` back to visible on a video that is
@@ -320,7 +335,7 @@ trip" / cache-key section).
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
-| `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`. |
+| `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`, `'stopped'` the service reported `X-Subtitle-Status: stopped` (`source_gone`/`too_large`) — the one code that leaves the chip's count on screen. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
 

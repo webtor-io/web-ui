@@ -611,6 +611,7 @@
     "player.startOver": "Empezar desde el principio",
     "player.subtitleTranslating": "Traduciendo… %v%",
     "player.subtitleTranslatingLive": "Traduciendo junto con la reproducción…",
+    "player.subtitleTranslationStopped": "Traducción detenida: recarga la página para reintentar",
     "job.retrievingData": "obteniendo datos del recurso",
     "job.retrievingStreamUrl": "obteniendo URL de reproducción",
     "job.probingMedia": "analizando información multimedia",

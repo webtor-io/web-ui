@@ -669,6 +669,7 @@
     "player.startOver": "Start from beginning",
     "player.subtitleTranslating": "Translating… %v%",
     "player.subtitleTranslatingLive": "Translating along with playback…",
+    "player.subtitleTranslationStopped": "Translation stopped — reload to retry",
     "job.retrievingData": "retrieving resource data",
     "job.retrievingStreamUrl": "retrieving stream url",
     "job.probingMedia": "probing content media info",
