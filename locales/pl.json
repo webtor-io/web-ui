@@ -604,7 +604,7 @@
     "action.stream.translate.cta": "Odblokuj napisy AI",
     "action.stream.translate.from": "z",
     "action.stream.translate.action": "Przetłumacz na {{.Language}}",
-    "action.stream.translate.hint": "Nie ma jeszcze napisów w języku {{.Language}} — włącz tłumaczenie AI.",
+    "action.stream.translate.hint": "Napisy ({{.Language}}) nie są jeszcze dostępne — włącz tłumaczenie AI.",
     "player.play": "Odtwarzaj",
     "player.pause": "Pauza",
     "player.mute": "Wycisz",

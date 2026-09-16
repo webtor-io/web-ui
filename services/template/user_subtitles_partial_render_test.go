@@ -35,6 +35,7 @@ func TestUserSubtitlesPartialMarksSelected(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")
@@ -127,6 +128,7 @@ func TestUserSubtitlesPartialMarksNothingByDefault(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
 	if err != nil {
 		t.Fatalf("failed to parse partial: %v", err)
@@ -176,6 +178,7 @@ func TestUserSubtitlesPartialMarksDefaultAndSaved(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
 	if err != nil {
 		t.Fatalf("failed to parse partial: %v", err)
@@ -240,6 +243,7 @@ func TestUserSubtitlesPartialSavedIsIndependentOfDefault(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
 	if err != nil {
 		t.Fatalf("failed to parse partial: %v", err)
@@ -294,6 +298,7 @@ func TestUserSubtitlesPartialKeepsADeleteControlPerRow(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")
@@ -368,6 +373,7 @@ func TestUserSubtitlesPartialCollapsesChipsOutsideTheExpandedLanguage(t *testing
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}).ParseFiles("../../templates/partials/action/user_subtitles.html")
 	if err != nil {
 		t.Fatalf("failed to parse partial: %v", err)
@@ -442,6 +448,7 @@ func TestUserSubtitlesPartialHasOneCloseControlPerPanel(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")
@@ -514,6 +521,7 @@ func TestUserSubtitlesPartialMarksTheSuggestion(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")
@@ -625,6 +633,7 @@ func TestUserSubtitlesPartialRenderChipsSplitsTheTwoRenders(t *testing.T) {
 		"hasAuth":       func(any) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")

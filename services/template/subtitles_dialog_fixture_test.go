@@ -228,6 +228,7 @@ func renderUploadsAsync(t *testing.T, subs []models.UserSubtitleTrack) string {
 		"hasAuth":       func(interface{}) bool { return true },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
+		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
 	}
 	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
 		ParseFiles("../../templates/partials/action/user_subtitles.html")
@@ -297,6 +298,7 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":        func() string { return "https://example.com" },
 		"langPath":      func(lang, p string) string { return p },

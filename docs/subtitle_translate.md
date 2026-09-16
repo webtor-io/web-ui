@@ -524,8 +524,13 @@ row plus the tracks of the expanded language.
     which every activation ends in, so an offer taken stops being explained at once.
   - both sentences are rendered **server-side** with the language name substituted: Go templates
     take `{{.Param}}`, the client's `tf` takes `%v`, and a chip Go renders once has no reason to
-    learn the client's formatter. The name comes from `langDisplay` and is the same English name
-    every other chip shows.
+    learn the client's formatter. **The name inside these two sentences is localized into the UI
+    language** (`langDisplayIn $.Lang <tag>` → `.Localized`, `golang.org/x/text/language/display`
+    — "немецкий" for German on a Russian UI, falling back to the English name when the UI locale
+    has no CLDR entry or the tag itself is unlisted), added 2026-09-16 (item 9 of the track-picker
+    work) so a Russian viewer reads "Перевести на немецкий", not "Перевести на Russian". Chips
+    keep the plain `langDisplay` → `.Name`, the same **English** name every other chip shows
+    (Discover-style, deliberately not localized) — only the two sentences changed.
 - **The active chip is a check icon plus a cyan fill** (`track-chip-active`), never an underline —
   underline vanished on touch hover and did not read under colour blindness. Exactly one chip is
   active per group, and a locked chip can never take the mark.
@@ -638,7 +643,8 @@ navigation updater.
 
 Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `OriginCodeForBadge`,
 `OriginKey`, `PropertyTags`, `AudioSuffix`) and `services/stremio/lang_display.go`
-(`langDisplay`). Client side: `assets/src/js/lib/player/track-picker.js`, wired in `Player.jsx`.
+(`langDisplay`/`Name` for chips, `langDisplayIn`/`Localized` for the two sentences). Client side:
+`assets/src/js/lib/player/track-picker.js`, wired in `Player.jsx`.
 
 ## Known limitations
 

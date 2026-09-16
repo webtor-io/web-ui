@@ -65,6 +65,7 @@ func TestStreamVideoRenders(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		// Stubs for the web.Helper-bound funcs this view also needs, same
 		// spirit as about_render_test.go / user_subtitles_partial_render_test.go:
@@ -188,6 +189,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -503,6 +505,7 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -628,6 +631,7 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":        func() string { return "https://example.com" },
 		"langPath":      func(lang, p string) string { return p },
@@ -752,6 +756,7 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -873,6 +878,7 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":        func() string { return "https://example.com" },
 		"langPath":      func(lang, p string) string { return p },
@@ -994,6 +1000,7 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -1178,6 +1185,7 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -1312,6 +1320,7 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 		"propertyTags":       helper.PropertyTags,
 		"audioSuffix":        helper.AudioSuffix,
 		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },

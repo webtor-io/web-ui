@@ -604,7 +604,7 @@
     "action.stream.translate.cta": "Открыть AI-субтитры",
     "action.stream.translate.from": "из",
     "action.stream.translate.action": "Перевести на {{.Language}}",
-    "action.stream.translate.hint": "Субтитров на {{.Language}} пока нет — включите AI-перевод.",
+    "action.stream.translate.hint": "Субтитров на этом языке пока нет — включите AI-перевод ({{.Language}}).",
     "player.play": "Воспроизвести",
     "player.pause": "Пауза",
     "player.mute": "Выключить звук",
