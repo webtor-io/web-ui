@@ -613,6 +613,7 @@
     "player.subtitleTranslating": "Vertalen… %v%",
     "player.subtitleTranslatingLive": "Vertaling loopt mee met het afspelen…",
     "player.subtitleTranslationStopped": "Vertaling gestopt — herlaad de pagina om het opnieuw te proberen",
+    "player.subtitleTranslationQueued": "Wachten op een vertaalplek…",
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",

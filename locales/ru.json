@@ -623,6 +623,7 @@
     "player.subtitleTranslating": "Перевод… %v%",
     "player.subtitleTranslatingLive": "Перевод идёт вместе с просмотром…",
     "player.subtitleTranslationStopped": "Перевод остановлен — обновите страницу, чтобы повторить",
+    "player.subtitleTranslationQueued": "Ожидание свободного слота перевода…",
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",

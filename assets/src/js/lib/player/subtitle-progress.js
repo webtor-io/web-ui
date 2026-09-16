@@ -59,6 +59,33 @@ export function parseProgress(header, live = false, status = '') {
 // returning the same count still times out.
 export const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
+// QUEUE_HINT_MS is how long a run may answer `0/0` before the chip stops
+// pretending to be at 0% and says it is waiting instead. `0/0` means "the
+// job has not counted the cues yet", which covers both "starting" and
+// "queued behind every other translation on the service", and thirty
+// seconds is well past the first and only reachable by the second.
+//
+// It is a display rule, not a failure: the poll keeps running, the
+// deadline is untouched, and the first real count clears it.
+export const QUEUE_HINT_MS = 30 * 1000;
+
+// progressText is what the AI chip's `.tr-progress` says for one progress
+// report: the text of the span and the i18n key (plus its argument) for its
+// title. Here rather than in Player.jsx because it is the whole of the
+// chip's vocabulary and the only part of it worth testing on its own --
+// three states that are easy to get into the wrong order.
+export function progressText(p) {
+    // Waiting outranks the count, because the count is what it is
+    // contradicting: `· 0%` on a queued job reads as a translation that
+    // has stalled at the start.
+    if (p.queued) return { text: '· …', key: 'player.subtitleTranslationQueued', args: [] };
+    // A live source has no denominator worth a percent: the playlist grows
+    // with the transcode. Show the count and say so in the title.
+    if (p.live) return { text: `· ${p.done}`, key: 'player.subtitleTranslatingLive', args: [] };
+    const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
+    return { text: `· ${pct}%`, key: 'player.subtitleTranslating', args: [pct] };
+}
+
 // A scheme ("https:", "blob:") with an authority. Anything else is
 // either protocol-relative, root-relative or relative to the page.
 const ABSOLUTE = /^[a-z][a-z0-9+.-]*:\/\//i;
@@ -103,12 +130,19 @@ export function withRev(src, n) {
 // FFmpeg run alive, and nobody should pay for a film nobody is watching.
 // Properties on the returned function rather than an object, so every
 // caller that just calls stop() keeps working.
-export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, onProgress, onDone, onError } = {}) {
+export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, onProgress, onDone, onError } = {}) {
     let stopped = false;
     let suspended = false;
     let suspendedAt = 0;
     let last = -1;
+    let lastTotal = -1;
     let lastLive = null;
+    // When this run started answering `0/0`, and whether the chip has been
+    // told about it. Both reset on the first real count, so a job that goes
+    // back to reporting nothing could say "waiting" again -- it would be
+    // waiting again.
+    let queuedSince = 0;
+    let queuedReported = false;
     let timer = null;
     // Which chain of ticks is the live one. suspend() bumps it, so a
     // request already in flight when the video paused lands on a dead
@@ -149,15 +183,30 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         }
         const status = String(res.headers.get('X-Subtitle-Status') || '').trim().toLowerCase();
         const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1', status);
-        if (p.done !== last || p.live !== lastLive) {
+        if (p.done !== last || p.total !== lastTotal || p.live !== lastLive) {
             // A cue that was not there before is proof the job is alive,
             // which is the whole content of the cap. Only a live source
             // gets the extension: a batch run keeps its absolute deadline,
             // because its end is minutes away and not film-length.
             if (p.live && p.done !== last) deadline = Date.now() + timeoutMs;
             last = p.done;
+            lastTotal = p.total;
             lastLive = p.live;
             if (onProgress) onProgress(p);
+        }
+        // `0/0` for long enough is a job waiting for a slot, not a job
+        // starting. Reported through onProgress like any other change,
+        // once, and cleared by the first count -- which reaches the chip
+        // through the branch above, since either number moving is a change.
+        if (p.done === 0 && p.total === 0) {
+            if (!queuedSince) queuedSince = Date.now();
+            if (!queuedReported && Date.now() - queuedSince >= queuedAfterMs) {
+                queuedReported = true;
+                if (onProgress) onProgress({ ...p, queued: true });
+            }
+        } else {
+            queuedSince = 0;
+            queuedReported = false;
         }
         // After onProgress and before the final check: the counts in a
         // "stopped" response are the last ones there will ever be, so the
@@ -205,8 +254,11 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         suspended = false;
         // The cap measures a job that stopped producing, not a viewer who
         // stopped watching: an hour on pause must not come back as a
-        // timeout the moment playback resumes.
-        deadline += Date.now() - suspendedAt;
+        // timeout the moment playback resumes. The queue hint is measured
+        // the same way -- a run asleep is not a run queued.
+        const slept = Date.now() - suspendedAt;
+        deadline += slept;
+        if (queuedSince) queuedSince += slept;
         timer = setTimeout(() => tick(gen), 0);
     };
     return stop;

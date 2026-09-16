@@ -8,7 +8,7 @@ import { applyCueOffset } from './cue-offset';
 import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.js';
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
-import { pollProgress, withRev } from './subtitle-progress.js';
+import { pollProgress, progressText, withRev } from './subtitle-progress.js';
 import {
     adoptUploadChips,
     refresh,
@@ -316,17 +316,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onProgress: (p) => {
                 cues = p.total;
                 if (span) {
-                    if (p.live) {
-                        // A live source has no denominator worth a percent:
-                        // the playlist grows with the transcode. Show the
-                        // count and say so in the title.
-                        span.textContent = `· ${p.done}`;
-                        span.title = tf('player.subtitleTranslatingLive');
-                    } else {
-                        const pct = p.total > 0 ? Math.round((100 * p.done) / p.total) : 0;
-                        span.textContent = `· ${pct}%`;
-                        span.title = tf('player.subtitleTranslating', pct);
-                    }
+                    // Three states (queued, live, counting) in one place,
+                    // in subtitle-progress.js where they can be tested
+                    // without a player: see progressText.
+                    const chip = progressText(p);
+                    span.textContent = chip.text;
+                    span.title = tf(chip.key, ...chip.args);
                 }
                 // total === 0 means the job has not counted the cues yet:
                 // the file on the other end is still empty, so a reload

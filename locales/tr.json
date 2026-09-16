@@ -613,6 +613,7 @@
     "player.subtitleTranslating": "Çevriliyor… %v%",
     "player.subtitleTranslatingLive": "Çeviri, oynatmayla birlikte devam ediyor…",
     "player.subtitleTranslationStopped": "Çeviri durduruldu — yeniden denemek için sayfayı yenileyin",
+    "player.subtitleTranslationQueued": "Çeviri sırası bekleniyor…",
     "job.retrievingData": "kaynak verisi alınıyor",
     "job.retrievingStreamUrl": "stream URL'si alınıyor",
     "job.probingMedia": "içerik medya bilgisi inceleniyor",

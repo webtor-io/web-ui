@@ -613,6 +613,7 @@
     "player.subtitleTranslating": "Übersetze… %v%",
     "player.subtitleTranslatingLive": "Übersetzung läuft während der Wiedergabe…",
     "player.subtitleTranslationStopped": "Übersetzung gestoppt – zum erneuten Versuch neu laden",
+    "player.subtitleTranslationQueued": "Warten auf einen freien Übersetzungsplatz…",
     "job.retrievingData": "Ressourcendaten werden abgerufen",
     "job.retrievingStreamUrl": "Stream-URL wird abgerufen",
     "job.probingMedia": "Medieninformationen werden analysiert",

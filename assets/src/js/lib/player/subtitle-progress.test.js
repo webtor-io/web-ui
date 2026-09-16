@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseProgress, withRev, pollProgress, POLL_TIMEOUT_MS } from './subtitle-progress.js';
+import { parseProgress, withRev, pollProgress, progressText, POLL_TIMEOUT_MS, QUEUE_HINT_MS } from './subtitle-progress.js';
 
 // headers builds the HEAD response the translate service answers with.
 // `status` is X-Subtitle-Status, absent unless a case sets it.
@@ -399,4 +399,100 @@ test('without the header the counts decide alone', async (t) => {
     pollProgress('https://x/a.vtt', { fetchImpl: async () => answer('9/9'), intervalMs: 1, onDone: () => { doneBatch++; } });
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(doneBatch, 1, 'a batch run still finishes on done >= total');
+});
+
+// ---- the queue hint ---------------------------------------------------
+//
+// `0/0` covers two very different situations: a job that has just started
+// and a job that is waiting behind every other translation on the service.
+// The chip used to show `· 0%` for both, which reads as a translation
+// stalled at the start.
+
+test('progressText: waiting, live and counting, in that order', () => {
+    assert.deepEqual(progressText({ done: 0, total: 0, queued: true }),
+        { text: '· …', key: 'player.subtitleTranslationQueued', args: [] });
+    // Queued outranks live: it is the count that is being contradicted.
+    assert.deepEqual(progressText({ done: 3, total: 3, live: true, queued: true }),
+        { text: '· …', key: 'player.subtitleTranslationQueued', args: [] });
+    assert.deepEqual(progressText({ done: 3, total: 3, live: true }),
+        { text: '· 3', key: 'player.subtitleTranslatingLive', args: [] });
+    assert.deepEqual(progressText({ done: 12, total: 48 }),
+        { text: '· 25%', key: 'player.subtitleTranslating', args: [25] });
+    // No denominator yet, and not waiting long enough to say so.
+    assert.deepEqual(progressText({ done: 0, total: 0 }),
+        { text: '· 0%', key: 'player.subtitleTranslating', args: [0] });
+});
+
+test('pollProgress says "queued" after QUEUE_HINT_MS of 0/0, once', async (t) => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return answer('0/0'); };
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1, queuedAfterMs: 15,
+        onProgress: (p) => seen.push(p.queued === true),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 60));
+    // The first report is the ordinary 0/0; exactly one queued report
+    // follows, however many polls happen after the threshold.
+    assert.deepEqual(seen.slice(0, 2), [false, true], `reports: ${JSON.stringify(seen)}`);
+    assert.equal(seen.filter(Boolean).length, 1, 'one hint, not one per poll');
+    assert.ok(calls > 3, `expected the poll to keep running, got ${calls} calls`);
+});
+
+test('the queue hint clears on the first real count', async (t) => {
+    const answers = ['0/0', '0/0', '0/0', '0/0', '4/100'];
+    let i = 0;
+    const fetchImpl = async () => answer(answers[Math.min(i++, answers.length - 1)]);
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 5, queuedAfterMs: 8,
+        onProgress: (p) => seen.push([p.done, p.total, Boolean(p.queued)]),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 60));
+    assert.deepEqual(seen[0], [0, 0, false]);
+    assert.ok(seen.some((r) => r[2]), 'the hint was shown');
+    const last = seen[seen.length - 1];
+    assert.deepEqual(last, [4, 100, false], 'and the count replaces it');
+});
+
+// A total appearing while done stays 0 is the job registering its cues --
+// "queued" is over even though the number the poll keys on has not moved.
+// The report used to fire on `done` alone, so that transition was silent
+// and the chip kept saying "waiting" at 0/900.
+test('a total appearing is a change worth reporting', async (t) => {
+    const answers = ['0/0', '0/900'];
+    let i = 0;
+    const fetchImpl = async () => answer(answers[Math.min(i++, answers.length - 1)]);
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onProgress: (p) => seen.push([p.done, p.total]) });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(seen, [[0, 0], [0, 900]]);
+});
+
+test('time asleep does not count toward the queue hint', async (t) => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return answer('0/0'); };
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1, queuedAfterMs: 40,
+        onProgress: (p) => seen.push(Boolean(p.queued)),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 10));
+    stop.suspend();
+    await new Promise((r) => setTimeout(r, 50));
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 10));
+    // 20 ms of polling either side of a 50 ms sleep: a run asleep is not a
+    // run queued, so the hint is not due yet.
+    assert.deepEqual(seen.filter(Boolean), [], `reports: ${JSON.stringify(seen)}`);
+    await new Promise((r) => setTimeout(r, 40));
+    assert.deepEqual(seen.filter(Boolean), [true], 'and it still arrives once the waking run has waited');
+});
+
+test('QUEUE_HINT_MS is the shipped default', () => {
+    assert.equal(QUEUE_HINT_MS, 30 * 1000);
 });

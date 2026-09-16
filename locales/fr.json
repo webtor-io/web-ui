@@ -613,6 +613,7 @@
     "player.subtitleTranslating": "Traduction… %v%",
     "player.subtitleTranslatingLive": "Traduction en cours pendant la lecture…",
     "player.subtitleTranslationStopped": "Traduction arrêtée — rechargez la page pour réessayer",
+    "player.subtitleTranslationQueued": "En attente d'un créneau de traduction…",
     "job.retrievingData": "récupération des données de la ressource",
     "job.retrievingStreamUrl": "récupération de l'URL du flux",
     "job.probingMedia": "analyse des infos média du contenu",

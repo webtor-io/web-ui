@@ -623,6 +623,7 @@
     "player.subtitleTranslating": "Překládání… %v%",
     "player.subtitleTranslatingLive": "Překlad probíhá souběžně s přehráváním…",
     "player.subtitleTranslationStopped": "Překlad zastaven — načtěte stránku znovu a zkuste to znovu",
+    "player.subtitleTranslationQueued": "Čekání na volné místo pro překlad…",
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",

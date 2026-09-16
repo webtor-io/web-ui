@@ -334,6 +334,18 @@ trip" / cache-key section).
   goes on, so a failure restores the *latest* snapshot rather than one from several revisions ago.
   `onTrackError` additionally checks the run identity (`runSeqRef`): a `<track>` whose `src` a
   stopped run set can still fail afterwards, and that event must not kill the current run.
+- **Waiting for a slot.** `0/0` means "the job has not counted the cues yet", which covers both a
+  run that has just started and one queued behind every other translation on the service. After
+  `QUEUE_HINT_MS` (30 s) of nothing but `0/0`, `pollProgress` reports once more with
+  `queued: true` and the chip reads `· …` with `title = player.subtitleTranslationQueued`
+  ("Waiting for a translation slot…") instead of `· 0%`, which reads as a translation stalled at
+  the start. It is a display rule and nothing else: the poll keeps running, the timeout deadline
+  is untouched, and the first real count clears it — including a `total` appearing while `done` is
+  still 0, which is why the report now fires on either number moving rather than on `done` alone.
+  Time the poll spends suspended does not count toward the 30 s, the same way it does not count
+  toward the timeout: a run asleep is not a run queued. The three things the chip can say (queued,
+  live, counting — in that order of precedence) are one pure function, `progressText`
+  (`subtitle-progress.js`), so the player holds no chip vocabulary of its own.
 - **Progress text.** The AI chip's `.tr-progress` span shows the bare percentage — `· 0%` on
   start, then `· N%` on every 3 s poll. The localized sentence
   `player.subtitleTranslating` = `"Translating… %v%"` is **not** the span's text any more: it is
