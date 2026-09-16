@@ -344,10 +344,21 @@ var bitmapSubtitleCodecs = map[string]bool{
 	"xsub":              true,
 }
 
-// forcedTitleRe matches "forced" as a whole word. A plain substring
+// forcedTitleRe matches "forced" as a word of its own. A plain substring
 // test also hides "Unforced" and "Reinforced", losing a real subtitle
 // stream from the picker.
-var forcedTitleRe = regexp.MustCompile(`(?i)\bforced\b`)
+//
+// Not \b: `_` is a word character, so \b never fires next to one and
+// "Forced_English", "eng_forced" and "Movie.eng_forced.srt" all read as
+// ordinary tracks. Underscore separators are the norm in scene naming and
+// in mkvmerge track names, and the cost of missing one is more than a
+// missing badge -- an undetected forced track passes isHumanFull, which
+// makes it eligible as the ladder's default AND as a translation source,
+// i.e. a paid AI run over a signs-only file.
+//
+// The class is [^a-z0-9] under (?i), which Go folds to "not a letter and
+// not a digit": separators match, letters on either side do not.
+var forcedTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])forced($|[^a-z0-9])`)
 
 // embeddedSubtitleVisible reports whether an embedded subtitle stream
 // is offered in the picker, whether it occupies an index in the

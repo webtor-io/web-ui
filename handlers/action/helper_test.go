@@ -113,10 +113,18 @@ func TestEmbeddedSubtitleVisible(t *testing.T) {
 		{"subrip", "Forced", true, true, true},
 		{"subrip", "eng forced narrative", true, true, true},
 		{"subrip", "FORCED (English)", true, true, true},
+		// Underscore separators: the norm in scene naming and in mkvmerge
+		// track names, and `_` is a word character, so \b could not see
+		// any of these.
+		{"subrip", "Forced_English", true, true, true},
+		{"subrip", "eng_forced", true, true, true},
+		{"subrip", "Movie.eng_forced.srt", true, true, true},
 		// "forced" as a substring of an ordinary word is not a forced
 		// track -- hiding these loses a real subtitle stream.
 		{"subrip", "Unforced", true, true, false},
 		{"subrip", "Reinforced Steel", true, true, false},
+		{"subrip", "enforced subtitles", true, true, false},
+		{"subrip", "forcedly", true, true, false},
 	}
 	for _, c := range cases {
 		v, n, f := embeddedSubtitleVisible(c.codec, c.title)
