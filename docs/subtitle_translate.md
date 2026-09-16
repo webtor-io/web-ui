@@ -405,6 +405,22 @@ trip" / cache-key section).
   mount-time restore of a translation saved in an earlier session. See "Picker behaviour". The
   spec's old "starts 5 seconds into viewing" is superseded by decision 14.
 
+## Deploy order
+
+Three things dated "2026-09-16" here are **client-side halves of contracts the other services had
+not deployed yet** when this was written. All three degrade to the previous behaviour, so web-ui
+can ship first — but until the other side lands they are inert, and two of them make a field
+permanently empty rather than wrong:
+
+| What | Needs | Until then |
+|---|---|---|
+| `200` + `Retry-After` → `SubtitlesNotReadyError` | video-info | no retry, `notReady` always `false` |
+| `moviehash_match` | video-info | `MovieHashMatch` always nil, `hashMatched` reads the `source` enum — today's behaviour |
+| `X-Subtitle-Status` | subtitle-translate | the counts decide alone, as before |
+
+So do not read a `notReady` rate or a `source=hash/imdb` split as measurement before video-info
+deploys: they are measuring the deploy, not the traffic.
+
 ## Telemetry (Umami)
 
 | Event | Fields | Notes |
