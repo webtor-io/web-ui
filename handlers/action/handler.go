@@ -96,29 +96,53 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.
 		h.post(c, "stream-video")
 	})
 	r.PUT("/stream-video/subtitle", func(c *gin.Context) {
-		a := TrackPutArgs{}
-		if err := c.BindJSON(&a); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		vsud := models.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
-		vsud.SubtitleID = a.ID
-		if err := vsud.UpdateSessionData(c); err != nil {
+		if err := putTrackChoice(c, trackSubtitle); err != nil {
 			_ = c.Error(err)
 		}
 	})
 	r.PUT("/stream-video/audio", func(c *gin.Context) {
-		a := TrackPutArgs{}
-		if err := c.BindJSON(&a); err != nil {
-			_ = c.Error(err)
-			return
-		}
-		vsud := models.NewVideoStreamUserData(a.ResourceID, a.ItemID, nil)
-		vsud.AudioID = a.ID
-		if err := vsud.UpdateSessionData(c); err != nil {
+		if err := putTrackChoice(c, trackAudio); err != nil {
 			_ = c.Error(err)
 		}
 	})
+}
+
+// trackKind names which of the two track choices a PUT carries.
+type trackKind int
+
+const (
+	trackSubtitle trackKind = iota
+	trackAudio
+)
+
+// putTrackChoice writes one track choice into the session and leaves the
+// other one exactly as it was.
+//
+// The reason it has to read before it writes: UpdateSessionData writes both
+// keys and *deletes* the one whose field is empty, so a handler that built a
+// fresh VideoStreamUserData wiped the other choice on every save. The
+// sequence that loses a viewer's subtitle is short and ordinary -- pick a
+// subtitle chip, switch the audio track, reload -- and the damage is not
+// cosmetic any more: ud.SubtitleID is rung 1 of applyLadder, the source of
+// ListItem.Saved, and the seed for the client's manualSubtitleRef, so losing
+// it also re-arms the audio-switch rule against the viewer. The client's own
+// persistTrackChoice already sequences the two kinds apart so neither can
+// cancel the other's retry; this is the same rule on the server side.
+func putTrackChoice(c *gin.Context, kind trackKind) error {
+	a := TrackPutArgs{}
+	if err := c.BindJSON(&a); err != nil {
+		return err
+	}
+	// Settings must be non-nil: FetchSessionData reads UserLang off it.
+	vsud := models.NewVideoStreamUserData(a.ResourceID, a.ItemID, &models.StreamSettings{})
+	vsud.FetchSessionData(c)
+	switch kind {
+	case trackSubtitle:
+		vsud.SubtitleID = a.ID
+	case trackAudio:
+		vsud.AudioID = a.ID
+	}
+	return vsud.UpdateSessionData(c)
 }
 
 func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
