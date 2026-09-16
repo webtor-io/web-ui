@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // testApi is an Api pointed at an httptest server: proxyURL passes the URL
@@ -134,5 +135,60 @@ func TestGetOpenSubtitlesDecodesA200(t *testing.T) {
 	defer bad.Close()
 	if _, err := testApi().GetOpenSubtitles(context.Background(), bad.URL+"/s.json"); err == nil {
 		t.Fatal("a 200 carrying the wrong shape is still an error")
+	}
+}
+
+// TestGetOpenSubtitlesNotReadyIsNotAnEmptyList: video-info answers 200 with
+// an empty list and a Retry-After while one of its search legs is still
+// waiting on the seeder. Read as "this file has no subtitles" that answer is
+// worse than the 404 it replaced: the stream job's rendered result is cached
+// for ten minutes, so one early answer takes OpenSubtitles away from every
+// viewer of the file for the rest of the bucket, with the step marked done.
+func TestGetOpenSubtitlesNotReadyIsNotAnEmptyList(t *testing.T) {
+	for _, c := range []struct {
+		header string
+		want   time.Duration
+		body   string
+	}{
+		{header: "5", want: 5 * time.Second, body: "[]"},
+		{header: "2", want: 2 * time.Second, body: ""},
+		// Anything but delta-seconds is "not ready, no usable hint": an
+		// HTTP-date is legal and unused here, and a skewed clock is a
+		// worse number than none.
+		{header: "Wed, 21 Oct 2026 07:28:00 GMT", want: 0, body: "[]"},
+		{header: "soon", want: 0, body: "[]"},
+	} {
+		t.Run(c.header, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Retry-After", c.header)
+				_, _ = w.Write([]byte(c.body))
+			}))
+			defer srv.Close()
+
+			subs, err := testApi().GetOpenSubtitles(context.Background(), srv.URL+"/s.json")
+			if subs != nil {
+				t.Errorf("tracks=%+v", subs)
+			}
+			if !errors.Is(err, ErrSubtitlesNotReady) {
+				t.Fatalf("err=%v, want the not-ready sentinel", err)
+			}
+			var nr *SubtitlesNotReadyError
+			if !errors.As(err, &nr) {
+				t.Fatalf("err=%v, want *SubtitlesNotReadyError", err)
+			}
+			if nr.RetryAfter != c.want {
+				t.Errorf("retry-after=%v want %v", nr.RetryAfter, c.want)
+			}
+		})
+	}
+
+	// Negative control for the rule's other half: a 200 with no Retry-After
+	// is still an ordinary empty list, not a not-ready answer.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("[]"))
+	}))
+	defer srv.Close()
+	if _, err := testApi().GetOpenSubtitles(context.Background(), srv.URL+"/s.json"); err != nil {
+		t.Fatalf("an empty list without a back-off is an answer: %v", err)
 	}
 }

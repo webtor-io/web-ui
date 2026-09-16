@@ -31,10 +31,24 @@ reimplements the order, it only reads `data-rank`.
 `api.GetOpenSubtitles` checks the HTTP status before it decodes: a non-200 is a typed
 `api.StatusError` naming the status, and the job log shows that instead of the decoder's
 "unexpected end of JSON input", which is what an error page, an empty 502 or a 429 used to
-surface as. A 200 with an empty body is an empty list (the file has no subtitles), not a parse
-failure. A `Retry-After` rides along in the error and is **reported, never obeyed**: this call
-sits inside a 30 s job step with a viewer waiting on it, so sleeping out somebody else's back-off
-would spend the whole budget and still answer nothing — there is no retry loop.
+surface as. A `Retry-After` on a non-200 rides along in that error and is **reported, never
+obeyed** — no retry loop, no sleeping out somebody else's back-off inside a job step a viewer is
+watching. A 200 with an empty body is an empty list: the file has no subtitles.
+
+**A 200 that carries a `Retry-After` is the one answer that is neither.** video-info sends it
+while one of its search legs is still waiting on the seeder — the body is an empty list, but the
+lookup never finished. Reading it as "no subtitles" is worse than the 404 it replaced: the stream
+job's rendered result is cached for ten minutes, so one early answer takes OpenSubtitles away
+from every viewer of that file for the rest of the bucket, with the job step marked done.
+`GetOpenSubtitles` answers `api.SubtitlesNotReadyError` (sentinel `api.ErrSubtitlesNotReady`,
+carrying the seconds; a non-delta-seconds header means "not ready, no usable hint" and zero), and
+`fetchOpenSubtitles` (`jobs/scripts/opensubtitles.go`) retries **once** after
+`min(Retry-After, 5 s)`, never past the step's own deadline. Still not ready, and the page renders
+without those tracks — there is no way to keep one job result out of the cache (the queue's key is
+computed before the script runs and the TTL is set at enqueue), so what is left is to say so:
+a `Warn` in the log, `data-subtitles-not-ready` on the picker, and `notReady` on
+`subtitle-resolved`. Without that last one a level of `'none'` counts a file nobody looked at as a
+file with nothing to find.
 
 A track marked **forced** (signs-only) always gets badge `forced` regardless of provider
 (`badgeFor`, `action.stream.badge.forced` = "signs only") — the origin is less useful to the
@@ -331,7 +345,7 @@ trip" / cache-key section).
 
 | Event | Fields | Notes |
 |---|---|---|
-| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
+| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang`, `notReady` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. `notReady` (`data-subtitles-not-ready`) says the OpenSubtitles lookup never finished on this render — exclude those rows before reading a `'none'` rate as "files with no subtitles". Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
@@ -747,6 +761,15 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
 
 ## Known limitations
 
+- **A not-ready OpenSubtitles answer is still cached for ten minutes.** The retry buys one
+  `min(Retry-After, 5 s)` wait; past that the render goes out without those tracks and is cached
+  like any other, because the job queue has no per-run "do not cache" — the key is computed before
+  the script runs (`jobs/scripts/action.go`, `Action`) and the TTL is set at `Enqueue`. So a viewer
+  who opens a cold file can spend the rest of the bucket without OpenSubtitles rungs even after the
+  seeder warms up. What exists instead is honesty about it: `SubtitlesNotReady` →
+  `data-subtitles-not-ready` → `notReady` on `subtitle-resolved`. A per-run skip (a flag the script
+  can set that suppresses the storage write, or a shorter TTL for that one id) is the real fix and
+  is not in this task.
 - **Job cache key ignores a preferred-language change.** The 10-minute streaming-job cache key
   (`jobs/scripts/action.go`, `Action`) is built from resource/item/action/`c.ApiClaims.Role`/
   settings/audio+subtitle choice/`c.Lang`/session. Tier **is** in it — `Role` is the tier name

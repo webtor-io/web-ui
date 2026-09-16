@@ -56,7 +56,7 @@
          chosen track still marked -- the viewer sees what comes back when
          they switch it on. */}}
     {{ $off := false }}{{ range $subs }}{{ if and .Default (eq .ID "none") }}{{ $off = true }}{{ end }}{{ end }}
-    <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}" data-preferred-lang="{{ .SubtitleOpts.PreferredLang }}" data-subtitles-off="{{ if $off }}true{{ else }}false{{ end }}">
+    <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}" data-preferred-lang="{{ .SubtitleOpts.PreferredLang }}" data-subtitles-off="{{ if $off }}true{{ else }}false{{ end }}"{{ if .SubtitlesNotReady }} data-subtitles-not-ready="true"{{ end }}>
         {{/* Every subtitle item is rendered by the loop below, uploads
              included: they are UserSubtitle entries of this same
              GetSubtitles result, and a MY chip is a radio that belongs

@@ -70,6 +70,17 @@ type StreamContent struct {
 	// Computed in a later task; the zero value keeps template calls to
 	// getSubtitles well-formed in the meantime.
 	SubtitleOpts models.SubtitleOpts
+	// SubtitlesNotReady is "the OpenSubtitles lookup never finished", as
+	// opposed to "it finished and found nothing". video-info answers a 200
+	// with a Retry-After while a search leg is still waiting on the seeder;
+	// the step retries once and then renders without those tracks.
+	//
+	// It is rendered as data-subtitles-not-ready on the picker and reported
+	// on subtitle-resolved, because this render is cached for ten minutes
+	// like any other and nothing else would tell the two apart afterwards.
+	// The job queue has no per-run "do not cache": the key is computed
+	// before the script runs and the TTL is set at enqueue time.
+	SubtitlesNotReady bool
 }
 
 const (
@@ -601,8 +612,16 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
 				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item))
-				subs, err := s.api.GetOpenSubtitles(osCtx, subsURL)
+				subs, notReady, err := fetchOpenSubtitles(osCtx, s.api.GetOpenSubtitles, subsURL)
+				// notReady survives into the render even though err is
+				// set: the page goes out without OpenSubtitles tracks and
+				// is cached for ten minutes either way, so the one thing
+				// left is to keep "this file has none" and "we did not get
+				// to look" apart -- in the log, and on subtitle-resolved.
+				sc.SubtitlesNotReady = notReady
 				if err != nil {
+					log.WithError(err).WithField("notReady", notReady).
+						WithField("resource", s.resourceId).Warn("failed to get opensubtitles")
 					j.Warn(errors.Wrap(err, "failed to get OpenSubtitles"))
 				} else {
 					sc.OpenSubtitles = subs

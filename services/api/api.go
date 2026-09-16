@@ -637,6 +637,45 @@ func (e *StatusError) Error() string {
 	return fmt.Sprintf("unexpected status %v", e.Status)
 }
 
+// ErrSubtitlesNotReady is the sentinel behind SubtitlesNotReadyError, so a
+// caller can ask errors.Is without caring about the seconds.
+var ErrSubtitlesNotReady = errors.New("subtitles not ready")
+
+// SubtitlesNotReadyError is a 200 that carries a Retry-After: video-info
+// answering "the search legs have not finished, ask again" -- the seeder is
+// still warming up, typically. The body is an empty list, and that is
+// exactly why this cannot be read as "this file has no subtitles": the
+// stream job caches its rendered result for ten minutes, so one empty
+// answer would take OpenSubtitles away from every viewer of that file for
+// the rest of the bucket. It is an error, and the seconds ride with it.
+//
+// RetryAfter is zero when the header is not a plain delta-seconds count
+// (an HTTP-date, or garbage): still not ready, just with no usable hint.
+type SubtitlesNotReadyError struct {
+	RetryAfter time.Duration
+}
+
+func (e *SubtitlesNotReadyError) Error() string {
+	if e.RetryAfter > 0 {
+		return fmt.Sprintf("subtitles not ready (retry-after %v)", e.RetryAfter)
+	}
+	return "subtitles not ready"
+}
+
+func (e *SubtitlesNotReadyError) Unwrap() error { return ErrSubtitlesNotReady }
+
+// retryAfterSeconds reads the delta-seconds form of Retry-After. The
+// HTTP-date form is legal and unused here, and a clock-skewed date is a
+// worse answer than none: both come back as 0, which the caller reads as
+// "no hint" rather than "do not wait".
+func retryAfterSeconds(v string) time.Duration {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return time.Duration(n) * time.Second
+}
+
 func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTrack, error) {
 	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
@@ -654,6 +693,13 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 	// and neither is a subtitle list.
 	if res.StatusCode != http.StatusOK {
 		return nil, &StatusError{Status: res.StatusCode, RetryAfter: res.Header.Get("Retry-After")}
+	}
+	// A 200 that still asks for a back-off is "not finished", not "none":
+	// video-info answers that while a search leg is still waiting on the
+	// seeder. Read as an empty list it would be baked into the job's
+	// ten-minute cache for every viewer of the file.
+	if ra := res.Header.Get("Retry-After"); ra != "" {
+		return nil, &SubtitlesNotReadyError{RetryAfter: retryAfterSeconds(ra)}
 	}
 	var esubs []ExtSubtitle
 	var subs []OpenSubtitleTrack

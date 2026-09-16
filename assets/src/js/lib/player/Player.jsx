@@ -594,6 +594,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 ...resolveSubtitleLevel(readTracks(modal), uiLang, { audioLang, preferredLang }),
                 uiLang,
                 audioLang,
+                // "We never got an answer", not "there was none": the
+                // OpenSubtitles lookup was still warming up when this
+                // render was built, and the render is cached for ten
+                // minutes, so without this a level of 'none' would count
+                // as a file with no subtitles.
+                notReady: modal.getAttribute('data-subtitles-not-ready') === 'true',
             });
         }
         // No AI auto-start here any more (owner, 2026-09-16). The player
