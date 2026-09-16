@@ -865,7 +865,7 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   on and grows with each revision. The 15 s throttle bounds the cost (and the blank-cue window) but
   does not remove it: the subtitle text catches up in steps while the percentage moves smoothly.
 - **A translation is reported once per item per page load.** `translationAction(track, status)`
-  (`subtitle-rules.js`) reads a per-item status map (`'running'`/`'done'`) and answers `'start'`,
+  (`subtitle-rules.js`) reads a per-item status map (`'running'`/`'done'`/`'stopped'`) and answers `'start'`,
   `'resume'` or `'none'`. `'start'` emits `subtitle-translate-start`; `'resume'` polls again
   **silently** after the viewer selected another track mid-run and came back (same translation, so
   no second start event — `done` still fires once, with the wall time since the *first* start);
@@ -876,6 +876,10 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   a self-inflicted stop.
 - **After an error, the item stays `'running'`.** Re-selecting it resumes (a silent retry) rather
   than reporting a fresh start; each attempt can still emit its own `subtitle-translate-error`.
+  The one exception is `'stopped'`: the service ended that run for good, so `fail` marks the item
+  `'stopped'` and `translationAction` answers `'none'` — re-selecting the chip neither polls nor
+  reports, which is what its own "reload to retry" title already promised. A reload is a fresh
+  status map, and that is the retry.
 - **Polling gives up after 15 minutes without a sign of life** (`POLL_TIMEOUT_MS`,
   `subtitle-progress.js`) with `subtitle-translate-error {code:'timeout'}`. What the 15 minutes are
   measured from depends on the source: for a batch source the cap is **absolute** (the deadline is

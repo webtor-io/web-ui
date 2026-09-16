@@ -109,6 +109,13 @@ test('translationAction: start once, resume an interrupted run, never a finished
     status.set('tr-ru', 'done');
     assert.equal(translationAction(tr, status), 'none');
 
+    // Stopped by the service (source_gone / too_large) is terminal for
+    // the same reason: another poll gets the same answer and reports it
+    // again. The chip says "reload to retry", and a reload is a fresh
+    // status map.
+    status.set('tr-ru', 'stopped');
+    assert.equal(translationAction(tr, status), 'none');
+
     // Another language is its own translation.
     assert.equal(translationAction({ id: 'tr-de', provider: 'Translated', locked: false }, status), 'start');
 });

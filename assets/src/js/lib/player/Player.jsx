@@ -256,6 +256,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     span.hidden = true;
                 }
             }
+            // Terminal, like 'done': the service ended this run, so
+            // re-selecting the chip must not start another poll that gets
+            // the same answer and reports it again. The title says "reload
+            // to retry", and a reload is a fresh status map.
+            if (code === 'stopped') translationStatusRef.current.set(id, 'stopped');
             if (spinner) spinner.hidden = true;
             if (window.umami) window.umami.track('subtitle-translate-error', { lang, code });
         };

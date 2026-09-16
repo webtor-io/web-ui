@@ -86,8 +86,8 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
 
 // translationAction decides what selecting this item should do, given
 // what already happened to it this page load. `status` is a Map of item
-// id to 'running' (a run was started) or 'done' (a run reached the final
-// progress).
+// id to 'running' (a run was started), 'done' (a run reached the final
+// progress) or 'stopped' (the service ended one incomplete).
 //
 //   'start'  — nothing has run for this item yet.
 //   'resume' — a run was started and interrupted before it finished
@@ -96,7 +96,8 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
 //              it is the same translation, and counting it twice would
 //              inflate the start rate against a flat done rate.
 //   'none'   — not a runnable AI item, or its translation already
-//              finished: re-selecting it must neither poll nor report.
+//              finished, or the service stopped it: re-selecting it must
+//              neither poll nor report.
 //
 // Without the 'done' state a warm cache double-counts — the click runs
 // the translation to completion and a second activation of the same item
@@ -104,13 +105,20 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
 // default with no poll running. Without 'resume' a
 // viewer who switches away mid-translation and comes back is stuck with
 // a frozen partial file for the life of the page.
+//
+// 'stopped' is terminal for the same reason 'done' is, but it took a
+// review to notice (M3): the chip says "reload to retry" and nothing
+// enforced it, so a viewer who re-clicked started another poll, got
+// `stopped` again and emitted another subtitle-translate-error. Per run
+// the telemetry was bounded; per viewer it was not. A page reload is a
+// fresh status map, which is exactly the retry the copy promises.
 export function translationAction(track, status) {
     if (!track || !track.id) return 'none';
     if (track.provider !== 'Translated') return 'none';
     // A locked item has no Src: there is nothing to poll.
     if (track.locked) return 'none';
     const state = status && typeof status.get === 'function' ? status.get(track.id) : undefined;
-    if (state === 'done') return 'none';
+    if (state === 'done' || state === 'stopped') return 'none';
     if (state === 'running') return 'resume';
     return 'start';
 }

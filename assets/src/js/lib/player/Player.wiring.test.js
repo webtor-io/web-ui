@@ -825,6 +825,48 @@ test('a stopped run keeps its count, loses its spinner, and is reported', async 
         'stopped is not done');
 });
 
+test('re-clicking a stopped translation does nothing at all', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? {
+            ok: true,
+            status: 200,
+            headers: {
+                get: (n) => {
+                    if (n === 'X-Subtitle-Progress') return '11/40';
+                    if (n === 'X-Subtitle-Live') return '1';
+                    if (n === 'X-Subtitle-Status') return 'stopped';
+                    return null;
+                },
+            },
+            json: async () => ({}),
+        }
+        : { ok: true, status: 200, json: async () => ({}) }));
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    p.video.paused = false;
+    click(ai);
+    await settle();
+    const headsAfterStop = p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    assert.ok(headsAfterStop >= 1, 'the first click must have polled');
+
+    // Away and back: the run is over, and the chip's own copy says the
+    // way to retry is a reload. Re-selecting must not poll again, and
+    // must not emit a second error for the same dead run.
+    click(p.chip('os-os-en'));
+    await settle();
+    click(ai);
+    await settle();
+
+    assert.equal(p.calls.filter((c) => c.params && c.params.method === 'HEAD').length, headsAfterStop,
+        'a stopped translation must not be polled again');
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-error').length, 1,
+        'nor reported again');
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1,
+        'and it is not a new run either');
+});
+
 test('nothing starts a translation on its own', async (t) => {
     t.after(() => destroyPlayer());
     // The fixture is the 2026-09-16 state: the AI item is Offered and the
