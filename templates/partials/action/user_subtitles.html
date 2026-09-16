@@ -3,17 +3,38 @@
 {{ $data := .Data }}
 {{ $expanded := $data.ExpandedLang }}
 {{ $off := $data.SubtitlesOff }}
-{{/* Rendered inside #subtitle-tracks (the flat chip row) through a
-     display:contents wrapper, so this template emits chips first and only
-     then the "My uploads" disclosure, whose panel `basis-full` pushes onto
-     its own flex line. The same partial serves the initial render and the
-     async reload (handlers/user_subtitle), so both shapes have to come from
-     here — it is the only markup the server can re-send after an upload.
+{{/* Rendered into the #my-subtitles wrapper, which sits AFTER
+     #subtitle-tracks: a role="radiogroup" holds radios and nothing else,
+     and this partial's disclosure button and uploads panel are neither.
+     The MY chips still belong in the radiogroup, grouped by language like
+     every other track — so who renders them depends on which render this
+     is (.RenderChips):
+
+       initial page render  — the dialog's own track loop renders every
+                              upload (they are UserSubtitle items in the
+                              same GetSubtitles result) straight into the
+                              row; this partial renders panel + toggle only,
+                              and a no-JS page is already correct.
+       async reload         — nothing re-runs that loop, this partial is the
+                              whole response, so it renders the chips here,
+                              inside #my-upload-chips, and the client moves
+                              them into the radiogroup (adoptUploadChips in
+                              track-picker.js).
+
+     #my-upload-chips exists only on that second render, and its presence is
+     what tells the client "this is the server's current, complete list of
+     this viewer's uploads". That matters for a delete: the response then
+     holds one chip fewer — or none at all — and the client has to take the
+     deleted one out of the row. Without a marker an empty wrapper would be
+     indistinguishable from the initial render, where the row's MY chips are
+     the only ones there are and clearing them would empty the row.
 
      Selection and deletion are deliberately separate elements: the chip is
      a radio and only switches the track, while deleting a file is only
      possible from its row in the panel below. An accidental tap on a chip
      must never destroy an upload. */}}
+{{ if $data.RenderChips }}
+<div id="my-upload-chips" class="contents">
 {{ if .Ctx.User | hasAuth }}
     {{ range $data.UserSubtitles }}
     {{ $d := langDisplay .SrcLang }}
@@ -42,6 +63,8 @@
         <span class="max-w-[9rem] sm:max-w-[14rem] truncate" title="{{ .OriginalName }}">{{ .OriginalName }}</span>
     </button>
     {{ end }}
+{{ end }}
+</div>
 {{ end }}
 <button type="button" id="my-uploads-toggle" class="btn btn-sm btn-ghost border border-dashed border-w-line text-w-muted hover:border-w-purple/40 hover:text-w-purpleL gap-1.5"
         aria-expanded="false" aria-controls="my-uploads-panel">+ {{ t $lang "action.stream.mySubtitles" }}</button>

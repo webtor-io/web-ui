@@ -244,6 +244,12 @@ func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, sel
 		EIURL:         eiURL,
 		UserSubtitles: tracks,
 		ErrKey:        errKey,
+		// The one render that emits the MY chips. The dialog's own track
+		// loop renders them on a page load, but nothing re-runs it here:
+		// this partial is the whole response, so an upload's chip can only
+		// come from it. It lands in the wrapper that sits after the
+		// radiogroup, and the client moves it in (adoptUploadChips).
+		RenderChips: true,
 	}
 }
 

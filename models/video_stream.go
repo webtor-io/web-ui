@@ -147,4 +147,20 @@ type UserSubtitleView struct {
 	// rather than wait for the client's first refresh. False on the async
 	// reload, which has no ladder result to read.
 	SubtitlesOff bool
+	// RenderChips says whether this render of the partial is the one that
+	// has to emit the MY chips. It is false on the initial page render and
+	// true on the async reload, and the asymmetry is the whole point.
+	//
+	// The chips belong inside #subtitle-tracks (role="radiogroup"), which
+	// holds radios and nothing else since the a11y fix; the disclosure
+	// button and the uploads panel this partial also emits do not, so the
+	// partial now renders into a wrapper that sits AFTER the radiogroup.
+	// On the initial render the dialog's own track loop already renders
+	// every upload (they are UserSubtitle items in the same GetSubtitles
+	// result) in the right place, so the partial must not render them a
+	// second time. On the async reload there is no dialog loop to run --
+	// this partial is the only markup the server can re-send -- so it
+	// renders the chips and the client moves them into the radiogroup
+	// (adoptUploadChips, track-picker.js).
+	RenderChips bool
 }

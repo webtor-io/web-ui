@@ -51,16 +51,15 @@
          they switch it on. */}}
     {{ $off := false }}{{ range $subs }}{{ if and .Default (eq .ID "none") }}{{ $off = true }}{{ end }}{{ end }}
     <dialog class="modal" id="subtitles" data-resource-id="{{ .VideoStreamUserData.ResourceID }}" data-item-id="{{ .VideoStreamUserData.ItemID }}" data-preferred-lang="{{ .SubtitleOpts.PreferredLang }}" data-subtitles-off="{{ if $off }}true{{ else }}false{{ end }}">
-        {{/* Uploads are rendered by the user_subtitles_view partial, which is
-             also the async-reload target (handlers/user_subtitle): it is the
-             only markup the server can re-send after an upload, so the MY
-             chips have to come from there. They are excluded here to avoid
-             rendering each of them twice. Where the partial is not rendered
-             at all (embed layouts carry DomainSettings), the uploads stay in
-             the flat list so they do not disappear. */}}
+        {{/* Every subtitle item is rendered by the loop below, uploads
+             included: they are UserSubtitle entries of this same
+             GetSubtitles result, and a MY chip is a radio that belongs
+             inside the radiogroup with the rest, grouped by its language.
+             The user_subtitles_view partial below the row contributes only
+             the disclosure button and the uploads panel (and, on the async
+             reload, a fresh set of chips the client moves in) — see
+             .RenderChips there. */}}
         {{ $withUploads := and (not .DomainSettings) .UserSubtitlesEnabled }}
-        {{ $flat := $subs }}
-        {{ if $withUploads }}{{ $flat = filterSubtitlesByProvider $subs "UserSubtitle" true }}{{ end }}
         {{ $row := subtitleLangGroups $subs .SubtitleOpts.PreferredLang }}
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
 
@@ -160,7 +159,7 @@
                             data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}" data-lang="und"
                             {{ if .Default }}data-default="true" {{ end }}{{ if .Saved }}data-saved="true" {{ end }}></button>
                     {{ end }}{{ end }}
-                    {{ range $flat }}{{ if ne .ID "none" }}
+                    {{ range $subs }}{{ if ne .ID "none" }}
                     {{ $d := langDisplay .SrcLang }}{{ $oc := originCode . }}
                     {{/* Two different questions, two different fields:
                          .Suggested is what the switch brings back (drawn as
@@ -210,16 +209,31 @@
                         {{ if .Locked }}<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="sr-only">{{ t $.Lang "action.stream.locked.aria" }}</span>{{ end }}
                     </button>
                     {{ end }}{{ end }}
-                    {{ if $withUploads }}
-                    {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs $row.Expanded }}
-                    {{/* display:contents — the partial's chips join this flex
-                         row directly while #my-subtitles stays the element
-                         loadAsyncView swaps innerHTML on. */}}
-                    <div id="my-subtitles" class="contents" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
-                        {{ template "user_subtitles_view" withContext $ $usv }}
-                    </div>
-                    {{ end }}
                 </div>
+
+                {{/* The uploads block is a SIBLING of the radiogroup, not a
+                     child of it (a11y, ruling R8): a role="radiogroup"
+                     contains radios and nothing else, and this block holds a
+                     disclosure button and — when open — a heading, a close
+                     control, an upload form and one delete form per file.
+
+                     #my-subtitles is still the single element the async swap
+                     replaces (data-async-layout, and every form inside posts
+                     with data-async-target="#my-subtitles"), so an upload or
+                     a delete re-renders exactly one container, as before. The
+                     MY chips that come back in that response do not belong
+                     here: adoptUploadChips (track-picker.js) moves them into
+                     #subtitle-tracks and drops the stale chip of the same
+                     data-id. On this render the partial emits no chips at all
+                     (RenderChips is false) — the loop above already did, in
+                     the right place, which is what keeps a no-JS page
+                     correct. */}}
+                {{ if $withUploads }}
+                {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs $row.Expanded }}
+                <div id="my-subtitles" class="flex flex-wrap items-start gap-1.5 mb-3" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
+                    {{ template "user_subtitles_view" withContext $ $usv }}
+                </div>
+                {{ end }}
 
                 {{/* What the offer above means, in words: this language has
                      no subtitles yet and the translation is there to be

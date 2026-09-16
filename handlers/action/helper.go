@@ -158,6 +158,12 @@ func (s *Helper) UserSubtitleView(resourceID, path, eiURL string, subs []models.
 			off = true
 		}
 	}
+	// RenderChips is deliberately left false: this is the initial render,
+	// where the dialog's own track loop already emits every upload as a
+	// chip inside the radiogroup. The partial here contributes only the
+	// disclosure button and the uploads panel, which live outside it. The
+	// async reload (handlers/user_subtitle.buildView) is the render that
+	// sets it.
 	return &models.UserSubtitleView{
 		ResourceID:    resourceID,
 		Path:          path,
@@ -317,18 +323,6 @@ func (s *Helper) canonizeSrcLangs(lis []ListItem) []ListItem {
 		}
 	}
 	return lis
-}
-
-func (s *Helper) FilterSubtitlesByProvider(subs []ListItem, provider string, exclude bool) []ListItem {
-	var res []ListItem
-	for _, s := range subs {
-		if s.Provider == provider && !exclude {
-			res = append(res, s)
-		} else if s.Provider != provider && exclude {
-			res = append(res, s)
-		}
-	}
-	return res
 }
 
 // Bitmap subtitle codecs cannot be rendered by the browser (they need
