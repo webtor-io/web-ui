@@ -4,30 +4,31 @@ import { parseProgress, withRev, pollProgress, progressText, POLL_TIMEOUT_MS, QU
 
 // headers builds the HEAD response the translate service answers with.
 // `status` is X-Subtitle-Status, absent unless a case sets it.
-const answer = (progress, { live = false, status = null } = {}) => ({
+const answer = (progress, { live = false, status = null, pendingFrom = null } = {}) => ({
     status: 200,
     headers: {
         get: (n) => {
             if (n === 'X-Subtitle-Progress') return progress;
             if (n === 'X-Subtitle-Live') return live ? '1' : null;
             if (n === 'X-Subtitle-Status') return status;
+            if (n === 'X-Subtitle-Pending-From') return pendingFrom;
             return null;
         },
     },
 });
 
 test('parseProgress', () => {
-    assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false, live: false });
-    assert.deepEqual(parseProgress('100/100'), { done: 100, total: 100, final: true, live: false });
+    assert.deepEqual(parseProgress('12/48'), { done: 12, total: 48, final: false, live: false, pendingFrom: null });
+    assert.deepEqual(parseProgress('100/100'), { done: 100, total: 100, final: true, live: false, pendingFrom: null });
     // 0/0 is "the job has not counted the cues yet", not "done".
-    assert.deepEqual(parseProgress('0/0'), { done: 0, total: 0, final: false, live: false });
-    assert.deepEqual(parseProgress(null), { done: 0, total: 0, final: false, live: false });
+    assert.deepEqual(parseProgress('0/0'), { done: 0, total: 0, final: false, live: false, pendingFrom: null });
+    assert.deepEqual(parseProgress(null), { done: 0, total: 0, final: false, live: false, pendingFrom: null });
 });
 
 test('parseProgress with live never reports final', () => {
-    assert.deepEqual(parseProgress('7/7', true), { done: 7, total: 7, final: false, live: true });
-    assert.deepEqual(parseProgress('7/7', false), { done: 7, total: 7, final: true, live: false });
-    assert.deepEqual(parseProgress('7/7'), { done: 7, total: 7, final: true, live: false });
+    assert.deepEqual(parseProgress('7/7', true), { done: 7, total: 7, final: false, live: true, pendingFrom: null });
+    assert.deepEqual(parseProgress('7/7', false), { done: 7, total: 7, final: true, live: false, pendingFrom: null });
+    assert.deepEqual(parseProgress('7/7'), { done: 7, total: 7, final: true, live: false, pendingFrom: null });
 });
 
 test('withRev appends or replaces rev', () => {
@@ -387,15 +388,15 @@ test('a run that reported an error is terminal too, timeout included', async () 
 // is behind.
 
 test('parseProgress: status done is final even while the source is live', () => {
-    assert.deepEqual(parseProgress('7/9', true, 'done'), { done: 7, total: 9, final: true, live: true });
-    assert.deepEqual(parseProgress('7/9', false, 'done'), { done: 7, total: 9, final: true, live: false });
+    assert.deepEqual(parseProgress('7/9', true, 'done'), { done: 7, total: 9, final: true, live: true, pendingFrom: null });
+    assert.deepEqual(parseProgress('7/9', false, 'done'), { done: 7, total: 9, final: true, live: false, pendingFrom: null });
     // Without it the live rule stands: done == total is "caught up for now".
-    assert.deepEqual(parseProgress('9/9', true), { done: 9, total: 9, final: false, live: true });
+    assert.deepEqual(parseProgress('9/9', true), { done: 9, total: 9, final: false, live: true, pendingFrom: null });
     // Case and whitespace are the wire's, not ours.
     assert.equal(parseProgress('7/9', true, ' DONE ').final, true);
     // A missing or unparseable count with a done verdict is still final:
     // the run is over, there is simply nothing to show for it.
-    assert.deepEqual(parseProgress(null, true, 'done'), { done: 0, total: 0, final: true, live: true });
+    assert.deepEqual(parseProgress(null, true, 'done'), { done: 0, total: 0, final: true, live: true, pendingFrom: null });
     // Anything else leaves the counts in charge.
     assert.equal(parseProgress('7/9', true, 'stopped').final, false);
     assert.equal(parseProgress('7/9', true, 'running').final, false);
@@ -568,4 +569,103 @@ test('time asleep does not count toward the queue hint', async (t) => {
 
 test('QUEUE_HINT_MS is the shipped default', () => {
     assert.equal(QUEUE_HINT_MS, 30 * 1000);
+});
+
+// ---- X-Subtitle-Pending-From and onTick -------------------------------
+//
+// The header says where in the film the earliest untranslated cue the
+// viewer can still meet begins. It is the only number in this module that
+// is about the film rather than the job, and the catching-up banner is
+// the only reader of it.
+
+test('parseProgress reads X-Subtitle-Pending-From, and only a number', () => {
+    assert.equal(parseProgress('3/10', true, '', '124.5').pendingFrom, 124.5);
+    assert.equal(parseProgress('3/10', true, '', '0').pendingFrom, 0,
+        'zero is a position in the film, not a missing header');
+    // Absent: every response before the service shipped it, every batch
+    // run, and every live run with nothing pending ahead.
+    assert.equal(parseProgress('3/10', true).pendingFrom, null);
+    assert.equal(parseProgress('3/10', true, '', null).pendingFrom, null);
+    // Garbage, in the shapes Number() is happy to swallow.
+    assert.equal(parseProgress('3/10', true, '', '').pendingFrom, null);
+    assert.equal(parseProgress('3/10', true, '', '  ').pendingFrom, null);
+    assert.equal(parseProgress('3/10', true, '', 'soon').pendingFrom, null);
+    assert.equal(parseProgress('3/10', true, '', '12s').pendingFrom, null);
+    // A negative is not a movie time.
+    assert.equal(parseProgress('3/10', true, '', '-4').pendingFrom, null);
+    assert.equal(parseProgress('3/10', true, '', 'Infinity').pendingFrom, null);
+});
+
+test('onTick fires on every 200, onProgress only on a change', async (t) => {
+    // The banner compares the run against the playhead, and the playhead
+    // moves while the counts stand still: a translation that stopped
+    // producing during a film that keeps playing is exactly the case it
+    // exists to catch. onProgress keeps its only-on-change contract.
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return answer('3/10', { live: true, pendingFrom: '60' }); };
+    const ticks = [];
+    const changes = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1,
+        onProgress: (p) => changes.push(p.done),
+        onTick: (p) => ticks.push(p.pendingFrom),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 25));
+    stop();
+    assert.deepEqual(changes, [3], 'the same answer is one change');
+    assert.ok(ticks.length > 2, `every answer is a tick, got ${ticks.length} for ${calls} polls`);
+    assert.equal(ticks.length, calls, 'one tick per successful poll, no more and no fewer');
+    assert.deepEqual([...new Set(ticks)], [60], 'and the tick carries the report');
+});
+
+test('a pendingFrom that moves on its own is a change', async (t) => {
+    // After a seek the run's frontier moves while the counts stand still —
+    // the same cues, a different place in the film. Without pendingFrom in
+    // the change test the banner would keep quoting the pre-seek position.
+    let pending = '60';
+    const fetchImpl = async () => answer('3/10', { live: true, pendingFrom: pending });
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onProgress: (p) => seen.push(p.pendingFrom) });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 15));
+    pending = '900';
+    await new Promise((r) => setTimeout(r, 15));
+    stop();
+    assert.deepEqual(seen, [60, 900]);
+});
+
+test('the header appearing and disappearing are both changes', async (t) => {
+    // Absence is a value: it is what the service says when nothing is
+    // pending ahead any more, and it is what takes the banner down.
+    let pending = null;
+    const fetchImpl = async () => answer('3/10', { live: true, pendingFrom: pending });
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onProgress: (p) => seen.push(p.pendingFrom) });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 15));
+    pending = '90';
+    await new Promise((r) => setTimeout(r, 15));
+    pending = null;
+    await new Promise((r) => setTimeout(r, 15));
+    stop();
+    assert.deepEqual(seen, [null, 90, null]);
+});
+
+test('onTick does not fire for a tick that never got a 200', async (t) => {
+    // The negative control: the banner must not be re-evaluated against a
+    // response that never arrived, or a dead service would read as a run
+    // that is merely behind.
+    const fetchImpl = async () => ({ status: 503, headers: { get: () => null } });
+    const ticks = [];
+    const errs = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl, intervalMs: 1,
+        onTick: (p) => ticks.push(p),
+        onError: (c) => errs.push(c),
+    });
+    t.after(() => stop());
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(ticks, []);
+    assert.deepEqual(errs, [503]);
 });

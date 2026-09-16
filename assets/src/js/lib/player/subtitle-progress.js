@@ -26,14 +26,40 @@
 //
 // Absent (every response before the service shipped it, and every batch
 // run) the counts decide alone, exactly as before.
+//
+// `X-Subtitle-Pending-From: <seconds>` is the last of the four, and the
+// only one about the *film* rather than about the job: the start, in movie
+// time, of the earliest untranslated cue the viewer can still meet in this
+// run. It is what lets the player say "the translation is behind where you
+// are" — the counts cannot, because a run 200 cues from the end may be
+// hours ahead of the playhead or ten seconds behind it. Absent when
+// nothing is pending ahead, when the source is not live, and on every
+// service that predates it; absence is always read as "no banner", never
+// as "behind".
 export const STATUS_DONE = 'done';
 export const STATUS_STOPPED = 'stopped';
 
-export function parseProgress(header, live = false, status = '') {
+// parsePendingFrom is deliberately strict about what counts as a number.
+// Number('') is 0 and Number(' ') is 0 too, and a 0 here means "the
+// earliest untranslated cue starts at the top of the film", which is a
+// claim to pause the viewer on. An empty or unparseable header is no
+// claim at all.
+function parsePendingFrom(header) {
+    if (header === null || header === undefined) return null;
+    const s = String(header).trim();
+    if (!s) return null;
+    const n = Number(s);
+    // Negative is not a movie time, and neither is NaN or Infinity.
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+}
+
+export function parseProgress(header, live = false, status = '', pendingFrom = null) {
     const isLive = Boolean(live);
     const st = String(status || '').trim().toLowerCase();
+    const pending = parsePendingFrom(pendingFrom);
     const m = /^(\d+)\/(\d+)$/.exec(String(header || '').trim());
-    if (!m) return { done: 0, total: 0, final: st === STATUS_DONE, live: isLive };
+    if (!m) return { done: 0, total: 0, final: st === STATUS_DONE, live: isLive, pendingFrom: pending };
     const done = parseInt(m[1], 10);
     const total = parseInt(m[2], 10);
     // `0/0` is "the job has not counted the cues yet", not "done". A live
@@ -41,8 +67,8 @@ export function parseProgress(header, live = false, status = '') {
     // the playlist, so done == total only means "caught up for now" --
     // unless the service says the run finished, which is the one thing
     // the counts cannot report.
-    if (st === STATUS_DONE) return { done, total, final: true, live: isLive };
-    return { done, total, final: !isLive && total > 0 && done >= total, live: isLive };
+    if (st === STATUS_DONE) return { done, total, final: true, live: isLive, pendingFrom: pending };
+    return { done, total, final: !isLive && total > 0 && done >= total, live: isLive, pendingFrom: pending };
 }
 
 // POLL_TIMEOUT_MS bounds a single translation run. A job that neither
@@ -145,13 +171,28 @@ export function withRev(src, n) {
 // watching.
 // Properties on the returned function rather than an object, so every
 // caller that just calls stop() keeps working.
-export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, onProgress, onDone, onError } = {}) {
+//
+// onTick is the other callback, and the difference is the whole reason it
+// exists: onProgress fires only when the report changed, onTick fires on
+// every successful 200. The catching-up banner compares the run against
+// the playhead, and the playhead moves whether or not the counts do — a
+// translation standing still while the film runs on is exactly the case
+// it is there to catch. It runs after the change and queue blocks (so a
+// tick's onProgress is always the earlier call) and before the terminal
+// ones, because a run that is about to be reported done or stopped should
+// not first be reported as trailing.
+export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, onProgress, onTick, onDone, onError } = {}) {
     let stopped = false;
     let suspended = false;
     let suspendedAt = 0;
     let last = -1;
     let lastTotal = -1;
     let lastLive = null;
+    // Undefined rather than null: null is a value this field takes (the
+    // header was absent), so the "nothing seen yet" marker has to be
+    // something else, or the first report of an absent header would not
+    // count as a change.
+    let lastPendingFrom;
     // When this run started answering `0/0`, and whether the chip has been
     // told about it. Both reset on the first real count, so a job that goes
     // back to reporting nothing could say "waiting" again -- it would be
@@ -203,8 +244,17 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             return;
         }
         const status = String(res.headers.get('X-Subtitle-Status') || '').trim().toLowerCase();
-        const p = parseProgress(res.headers.get('X-Subtitle-Progress'), res.headers.get('X-Subtitle-Live') === '1', status);
-        if (p.done !== last || p.total !== lastTotal || p.live !== lastLive) {
+        const p = parseProgress(
+            res.headers.get('X-Subtitle-Progress'),
+            res.headers.get('X-Subtitle-Live') === '1',
+            status,
+            res.headers.get('X-Subtitle-Pending-From'),
+        );
+        // pendingFrom is part of the change test, not just a passenger on
+        // it: after a seek the run's frontier moves while the counts stand
+        // still (the same cues, a different place in the film), and that
+        // move is the one the banner is reading.
+        if (p.done !== last || p.total !== lastTotal || p.live !== lastLive || p.pendingFrom !== lastPendingFrom) {
             // A cue that was not there before is proof the job is alive,
             // which is the whole content of the cap. Only a live source
             // gets the extension: a batch run keeps its absolute deadline,
@@ -213,6 +263,7 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             last = p.done;
             lastTotal = p.total;
             lastLive = p.live;
+            lastPendingFrom = p.pendingFrom;
             if (onProgress) {
                 if (pendingKick) {
                     pendingKick = false;
@@ -236,6 +287,9 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             queuedSince = 0;
             queuedReported = false;
         }
+        // Every 200, changed or not. See the note on the option above: the
+        // banner's question is about the playhead, which moves on its own.
+        if (onTick) onTick(p);
         // After onProgress and before the final check: the counts in a
         // "stopped" response are the last ones there will ever be, so the
         // chip is painted with them first and the run is reported dead
