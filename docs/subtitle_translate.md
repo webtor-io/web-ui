@@ -290,7 +290,9 @@ trip" / cache-key section).
   `data-mp-id`), and the media element's own `<track>`s (everything side-loaded — uploads,
   OpenSubtitles, sidecars, the AI translation). The chip carrying `data-default="true"` is the only
   thing that says which, and `applySubtitleSelection(video, hls, selection)` is the only thing that
-  writes that answer into both. A side-loaded or `none` selection means
+  writes that answer into both. (One exception, and it is bounded: `restoreTrackState`
+  (`cue-offset.js`) writes element modes too, from the snapshot a seek took — which is why the seek
+  applies the chip again right after it, see below.) A side-loaded or `none` selection means
   `hls.subtitleTrack = -1`, `hls.subtitleDisplay = false`, the chosen `<track>` `'showing'` and
   **every other text track — element-backed and hls.js-managed alike — `'disabled'`**.
   `activateSubtitle`, `initDefaultTracks` (`hls-manager.js`) and the session seek all go through it.
@@ -311,10 +313,24 @@ trip" / cache-key section).
   `<track>`s included. So the player subscribes to `SUBTITLE_TRACK_SWITCH` and
   `SUBTITLE_TRACKS_UPDATED` and re-applies the selection whenever what hls.js is doing disagrees
   with the chip (`selectionHolds`). Only side-loaded and `none` selections are guarded — an embedded
-  one is hls.js's own business, and re-asserting it would fight the startup sequence, where
-  `SUBTITLE_TRACKS_UPDATED` fires before `remapTrackIds` has refined `data-mp-id`. The disagreement
-  check is what makes it terminate: an apply writes modes, the modes wake hls.js, hls.js calls back,
-  and the second pass finds nothing to fix. Listeners come off on unmount.
+  one is self-healing: it leaves hls.js's own track `'showing'`, so `onTextTracksChanged` re-adopts
+  the same index and nothing changes. The only transition that loses it is `loadSource`, which the
+  seeker re-applies. Listeners come off on unmount.
+- **Why `applySubtitleSelection` refuses to be re-entered.** `hls.subtitleTrack = -1` is not a value
+  assignment: `setSubtitleTrack` has no "already -1" exit, so every write runs `toggleTrackModes`
+  (disabling the very `<track>` the same call is about to show) and then triggers
+  `SUBTITLE_TRACK_SWITCH` **synchronously** — `Hls.trigger` is eventemitter3 wrapped in a
+  `try/catch` that turns a thrown error into a non-fatal `ERROR` event. The re-assert listener
+  therefore runs *nested inside* the apply, at the one moment the selection is guaranteed not to
+  hold, and applies again. Without a guard that is unbounded recursion: against a line-faithful
+  model of hls.js 1.6.14, 812 frames and a `RangeError` per selection, swallowed by hls.js as ~40
+  `INTERNAL_EXCEPTION` errors and a screenful of `HLS non-fatal error` warnings. A module-level
+  `applying` flag in `subtitle-apply.js` refuses the nested call; the outer apply then finishes
+  writing the element modes, and hls.js's *asynchronous* `onTextTracksChanged` sees the finished
+  state. The flag lives in the writer, not in the listener, because the seeker re-enters through
+  that same listener rather than through its own code. The disagreement check (`selectionHolds`)
+  is what stops the *asynchronous* round trip: an apply writes modes, the modes wake hls.js, hls.js
+  calls back, and the second pass finds nothing to fix.
 - **The mount race.** `activateSubtitle` can run before `window.hlsPlayer` exists — the mount-time
   restore of a saved translation does exactly that — so only the element modes land there.
   `initDefaultTracks`, on the first `canplay`, applies the same selection again with the instance in
@@ -1024,9 +1040,13 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   snapshot. The harness models the two renderers: `mount({hlsTracks})` adds `<track>`s **without an
   id** for the manifest tracks (no id is exactly what marks a track as hls.js's), and `installHls`
   puts a fake with recorded `subtitleTrack`/`subtitleDisplay` writes and an event bus on
-  `window.hlsPlayer`. hls.js's own reactions (`toggleTrackModes`, `onTextTracksChanged`) are driven
-  by hand in the tests that need them — a second implementation of hls.js in the harness would only
-  prove the copy agrees with itself.
+  `window.hlsPlayer`. That fake models the two *synchronous* reactions the fix is defined against —
+  a `subtitleTrack` write runs a `toggleTrackModes` pass and fires `SUBTITLE_TRACK_SWITCH` at once,
+  and a `subtitleDisplay` write toggles modes only while a track is selected. They are the contract,
+  not an implementation: leaving them out is what let a stack-exhausting recursion through the first
+  round of these tests, and putting them in is what makes the bounded-write assertions
+  (`≤ 2` `subtitleTrack` writes per selection) mean something. hls.js's *asynchronous* half
+  (`onTextTracksChanged`) is still driven by hand in the tests that want the latch.
   Still by hand: fullscreen, and anything about actual playback.
   The plain-JS modules keep their own suites: `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),

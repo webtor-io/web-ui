@@ -513,15 +513,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // -1 and `subtitleDisplay` false.
     //
     // Only a side-loaded or "None" selection is guarded, and only when what
-    // hls.js is actually doing disagrees with it. An embedded selection is
-    // hls.js's own business — re-asserting it here would fight the startup
-    // sequence (SUBTITLE_TRACKS_UPDATED fires before remapTrackIds has
-    // refined `data-mp-id`), and the one transition that does lose it, a
-    // session seek's loadSource, is re-applied by the seeker itself.
+    // hls.js is actually doing disagrees with it. An embedded selection
+    // needs no guard because it is self-healing: it leaves hls.js's own
+    // track 'showing', which is exactly what onTextTracksChanged finds and
+    // re-adopts — the same index, so nothing changes. The one transition
+    // that does lose it is loadSource, and the seeker re-applies there.
     //
-    // The disagreement check is what makes this terminate: an apply writes
-    // modes, the modes wake hls.js, hls.js calls back, and the second pass
-    // finds the state already correct and does nothing.
+    // Two things make this terminate. The disagreement check: an apply
+    // writes modes, the modes wake hls.js, hls.js calls back, and the
+    // second pass finds the state already correct. And, for the pass that
+    // does not get that far, applySubtitleSelection's own re-entrancy
+    // guard — hls.js triggers SUBTITLE_TRACK_SWITCH synchronously from
+    // inside the write, so this listener runs nested in the apply that is
+    // still only half-finished.
     useEffect(() => {
         const hls = hlsRef.current || window.hlsPlayer;
         if (!hls || typeof hls.on !== 'function' || !Hls || !Hls.Events) return;

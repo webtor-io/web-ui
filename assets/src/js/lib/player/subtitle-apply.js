@@ -33,7 +33,20 @@
  *
  * Ordering inside apply is load-bearing: the hls.js writes come first,
  * because they toggle modes themselves, and the element modes are written
- * afterwards over the top.
+ * afterwards over the top. Which is also why re-entering this function has
+ * to be refused — see `applying` below.
+ *
+ * One invariant this rests on and does not enforce: the chosen <track> is
+ * left 'showing', so it is what onTextTracksChanged picks up on the next
+ * change event, and the only reason that does not turn into a permanent
+ * async ping-pong is that it maps to -1. findTrackForTextTrack matches a
+ * manifest track to a TextTrack on lang plus a case-insensitive
+ * `label === name` (subtitleTrackMatchesTextTrack), and a side-loaded
+ * data-label — a release name, "Portuguese · AI" — never equals a manifest
+ * track's name ("Full (rus)"). An upload named exactly like an embedded
+ * track, in the same language, would match: hls.js would switch its own
+ * track back on, we would switch it off, and the next change event would
+ * do it again for as long as the page lives.
  */
 
 // The provider of tracks that come out of the transcoder's HLS manifest.
@@ -101,6 +114,27 @@ function wantedTrackID(selection) {
     return id;
 }
 
+// applying is the re-entrancy guard, and it is not an optimisation — it is
+// what stops this function from calling itself until the stack is gone.
+//
+// `hls.subtitleTrack = -1` is not a value assignment: hls.js's
+// setSubtitleTrack has no "already -1" exit, so every write runs
+// toggleTrackModes (which disables the very <track> we are about to show —
+// ours are labeled, and toggleTrackModes disables every labeled track that
+// is not its own current one) and then triggers SUBTITLE_TRACK_SWITCH
+// *synchronously*. The player listens for that event to re-assert the
+// selection, and because the hls.js half is written first and the element
+// modes last, the listener runs at the one instant the selection is
+// guaranteed not to hold: it applies, which writes -1 again, which fires
+// again. Measured against a line-faithful model of hls.js 1.6.14: 812
+// nested frames and a RangeError per selection, swallowed by hls.js's own
+// try/catch as 40 non-fatal ERROR events.
+//
+// The guard belongs here rather than in the listener because the listener
+// is not the only re-entrant path: the session seeker's applies go through
+// the same event into the same listener.
+let applying = false;
+
 /**
  * applySubtitleSelection writes `selection` into the player.
  *
@@ -110,8 +144,16 @@ function wantedTrackID(selection) {
  * written, and the hls.js half is re-applied later by initDefaultTracks.
  */
 export function applySubtitleSelection(video, hls, selection) {
-    if (!selection) return;
+    if (!selection || applying) return;
+    applying = true;
+    try {
+        write(video, hls, selection);
+    } finally {
+        applying = false;
+    }
+}
 
+function write(video, hls, selection) {
     if (isEmbedded(selection)) {
         if (hls) {
             // display before track: setting subtitleDisplay while no track
