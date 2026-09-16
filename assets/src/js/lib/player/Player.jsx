@@ -232,6 +232,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const fail = (code) => {
             pollStopRef.current = null;
             pollingIdRef.current = '';
+            // The run is over, so every event it could still cause belongs
+            // to nobody: bumping the counter is what makes onTrackError's
+            // identity check fail. A <track> whose src this run set keeps
+            // loading after an HTTP error or a timeout and fails a moment
+            // later, and without this that late event landed as a second
+            // subtitle-translate-error for the same run (trackErrorReported
+            // only guards repeats of the track error itself).
+            runSeqRef.current++;
             if (progressSpanRef.current === span) progressSpanRef.current = null;
             if (progressSpinnerRef.current === spinner) progressSpinnerRef.current = null;
             if (span) span.hidden = true;
@@ -268,6 +276,29 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // the viewer's own upload.
             source: el.getAttribute('data-source-badge') || '',
         });
+        // The pause/visibility listeners below see transitions, not state,
+        // and two entry states fire no event at all: a video that has never
+        // played (autoplay blocked, or the mount-time restore of a saved
+        // track) and a tab that was already in the background. Left
+        // unsuspended those runs never sleep, and since a live run's cap is
+        // an inactivity cap they would hold a transcoder session for the
+        // length of the film with nobody watching.
+        //
+        // But only a LIVE source costs that. The check therefore waits for
+        // the first response, which is what reveals X-Subtitle-Live: a
+        // cached OpenSubtitles job is seconds of work with no session
+        // behind it, and pausing the film to open the picker and press
+        // "Translate to Portuguese" is exactly when people start one. Doing
+        // it before the first HEAD left that viewer looking at `· 0%` and a
+        // spinner that never moved until they pressed play.
+        let initialStateChecked = false;
+        const suspendIfNobodyIsWatching = (p) => {
+            if (initialStateChecked) return;
+            initialStateChecked = true;
+            if (!p.live) return;
+            if (!document.hidden && !(videoRef.current && videoRef.current.paused)) return;
+            if (pollStopRef.current) pollStopRef.current.suspend();
+        };
         pollStopRef.current = pollProgress(src, {
             onProgress: (p) => {
                 cues = p.total;
@@ -288,6 +319,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // the file on the other end is still empty, so a reload
                 // would only replace subtitles with nothing.
                 if (p.total > 0) reload(p.done, false);
+                // Last, so the chip has already been painted with the
+                // opening count before the run goes to sleep on it.
+                suspendIfNobodyIsWatching(p);
             },
             onDone: (p) => {
                 pollStopRef.current = null;
@@ -309,17 +343,6 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             },
             onError: fail,
         });
-        // The pause/visibility listeners below see transitions, not state,
-        // and two entry states fire no event at all: a video that has never
-        // played (autoplay blocked, or the mount-time restore of a saved
-        // track) and a tab that was already in the background. Left
-        // unsuspended those runs never sleep, and since a live run's cap is
-        // an inactivity cap they would hold a transcoder session for the
-        // length of the film with nobody watching. So the run reads the
-        // state once, here, and the first HEAD waits for playback.
-        if (document.hidden || (videoRef.current && videoRef.current.paused)) {
-            pollStopRef.current.suspend();
-        }
     }, [stopTranslationProgress]);
 
     // translationActionFor answers translationAction for a list element,
@@ -1322,6 +1345,11 @@ export function syncUploadMarks(container, subtitlesModal) {
     }
 }
 
+// The 'async' listener the picker installs on `window`, kept at module
+// scope so wireTrackHandlers can replace it and destroyPlayer can take it
+// off. See the comment at the addEventListener call below.
+let asyncSwapListener = null;
+
 // wireTrackHandlers binds the picker modals. It stays module-scope and
 // ref-free: `hooks` is the object the mounted component fills with
 // onSubtitleSelect/onAudioSelect (see the trackHooks effect), so the
@@ -1430,8 +1458,17 @@ export function wireTrackHandlers(container, hooks = {}) {
     // loadAsyncView dispatches an 'async' CustomEvent after swapping a
     // target's innerHTML; re-sync when #my-subtitles content is replaced.
     const mySubsContainer = container.querySelector('#my-subtitles');
+    // Taken off again before a new one goes on, and by destroyPlayer.
+    // wireTrackHandlers runs once per async navigation and the listener
+    // closes over that page's #my-subtitles, so one left behind accumulates
+    // and pins a detached node. Identity-guarded, so the old ones were
+    // inert rather than wrong -- which is exactly why nobody noticed.
+    if (asyncSwapListener) {
+        window.removeEventListener('async', asyncSwapListener);
+        asyncSwapListener = null;
+    }
     if (mySubsContainer) {
-        window.addEventListener('async', (e) => {
+        asyncSwapListener = (e) => {
             if (!e.detail || e.detail.target !== mySubsContainer) return;
             // The panel and its toggle are part of the swapped markup; the
             // wrapper is not, so it is what remembers whether the viewer had
@@ -1479,7 +1516,8 @@ export function wireTrackHandlers(container, hooks = {}) {
             // one. `current` keeps the viewer where they were whenever that
             // language survived the swap.
             if (subtitlesModal) refresh(subtitlesModal, { current: expandedLang(subtitlesModal) });
-        });
+        };
+        window.addEventListener('async', asyncSwapListener);
     }
 
     // First pass: hide the tracks of every collapsed language, drop the
@@ -1642,8 +1680,14 @@ function wireLogo(container, playerContainer) {
 export function destroyPlayer() {
     // Before the early return: "this page's player is gone" is true whether
     // or not one was mounted, and it is what stands a queued PUT retry
-    // down (persistTrackChoice).
+    // down (persistTrackChoice). The same goes for the picker's 'async'
+    // listener, which is wired by wireTrackHandlers rather than by the
+    // mount and so outlives it.
     playerGeneration++;
+    if (asyncSwapListener) {
+        window.removeEventListener('async', asyncSwapListener);
+        asyncSwapListener = null;
+    }
     if (!_currentPlayer) return;
     const { mountEl, playerContainer, videoEl } = _currentPlayer;
 

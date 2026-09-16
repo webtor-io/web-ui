@@ -917,7 +917,7 @@ test('coming back to a tab whose video is still paused does not wake the poll', 
     assert.equal(heads(), 1, 'still paused, still asleep');
 });
 
-test('a run started on a paused video does not poll until playback begins', async (t) => {
+test('a live run started on a paused video sleeps after its first answer', async (t) => {
     // The events are only half the state. A media element that has never
     // played fires no `pause`, so nothing would ever put this run to sleep
     // — and since the cap for a live source is now an inactivity cap, that
@@ -925,6 +925,10 @@ test('a run started on a paused video does not poll until playback begins', asyn
     // nobody watching. The two entry states are this one (autoplay blocked,
     // or the mount-time restore of a saved AI track) and the hidden tab
     // below.
+    //
+    // The first HEAD still goes out: it is what says whether the source is
+    // live at all, and that is the only source a sleeping run saves money
+    // on (see the non-live case below).
     t.after(() => destroyPlayer());
     const p = await mountPlayer();
     p.setResponse((url, params) => (params && params.method === 'HEAD'
@@ -937,22 +941,51 @@ test('a run started on a paused video does not poll until playback begins', asyn
     click(ai);
     await settle();
 
-    // The first tick is scheduled at 0 ms, so one settle() is the whole
-    // window: an unsuspended run would already have polled.
-    assert.equal(heads(), 0, 'nothing is watching, so nothing is polled');
+    assert.equal(heads(), 1, 'one HEAD, to learn what the source is');
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(heads(), 1, 'and then nothing: nobody is watching a live run');
     // Asleep, not refused: the run was started and counted, and the chip
-    // shows its opening state rather than nothing.
+    // carries the count that first answer brought.
     assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1);
     assert.equal(ai.querySelector('.tr-progress').hidden, false);
-    assert.equal(ai.querySelector('.tr-progress').textContent, '· 0%');
+    assert.equal(ai.querySelector('.tr-progress').textContent, '· 3');
+    assert.deepEqual(p.events.filter((e) => e.name === 'subtitle-translate-error'), [],
+        'sleeping is not a failure');
 
     p.video.paused = false;
     p.video.dispatchEvent(new dom.window.Event('play'));
     await settle();
-    assert.equal(heads(), 1, 'the first HEAD happens on play');
+    assert.equal(heads(), 2, 'play wakes the same run');
 });
 
-test('a run started in a hidden tab does not poll until the tab is visible', async (t) => {
+test('a cached batch run on a paused video is not suspended at all', async (t) => {
+    // The negative control for the rule above, and the reason it moved:
+    // the guard used to run before the first HEAD, so it could not know the
+    // source. An OpenSubtitles translation is a cached batch job of
+    // seconds with no transcoder session behind it — and pausing the film
+    // to open the picker is exactly when a viewer starts one. Suspending it
+    // left them looking at `· 0%` and a spinner that never moved until they
+    // pressed play.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? progressResponse('12/400')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    assert.equal(p.video.paused, true, 'a video that has never played');
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    click(ai);
+    await settle();
+    assert.equal(ai.querySelector('.tr-progress').textContent, '· 3%');
+
+    // No X-Subtitle-Live in the answer, so the run carries on without a
+    // press of play.
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(heads() > 1, `a batch run keeps polling while paused, got ${heads()} HEADs`);
+});
+
+test('a live run started in a hidden tab sleeps after its first answer', async (t) => {
     t.after(() => { destroyPlayer(); delete document.hidden; });
     const p = await mountPlayer();
     p.setResponse((url, params) => (params && params.method === 'HEAD'
@@ -967,9 +1000,52 @@ test('a run started in a hidden tab does not poll until the tab is visible', asy
     setHidden(true);
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
     await settle();
-    assert.equal(heads(), 0, 'a background tab pays for nothing');
+    assert.equal(heads(), 1, 'one HEAD, to learn what the source is');
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(heads(), 1, 'a background tab pays for nothing after that');
 
     setHidden(false);
     await settle();
-    assert.equal(heads(), 1, 'and the first HEAD happens when the tab comes forward');
+    assert.equal(heads(), 2, 'and it wakes when the tab comes forward');
+});
+
+// ---- one error per run ------------------------------------------------
+
+test('an HTTP error and a late <track> error are one run, and one event', async (t) => {
+    // fail() clears the refs and reports, but it used not to invalidate the
+    // run. A <track> whose src this run set keeps loading after the poll
+    // has already failed, and when it errors a moment later onTrackError's
+    // identity check still passed — so code:'track' landed as a second
+    // subtitle-translate-error for the same translation.
+    // trackErrorReported only guards repeats of the track error itself.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    let headCount = 0;
+    p.setResponse((url, params) => {
+        if (params && params.method === 'HEAD') {
+            headCount++;
+            // The first answer is real, so the run reloads the <track> and
+            // wires its error handler; the next one fails the run.
+            return headCount === 1 ? progressResponse('12/400') : { ok: false, status: 500, headers: { get: () => null } };
+        }
+        return { ok: true, status: 200, json: async () => ({}) };
+    });
+
+    p.video.paused = false;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    const track = p.video.querySelector('track#tr-pt');
+    assert.ok(track, 'the run must have a <track> to fail');
+    assert.match(track.getAttribute('src'), /rev=12/, 'and it must have been pointed at a revision');
+
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    const errors = () => p.events.filter((e) => e.name === 'subtitle-translate-error');
+    assert.deepEqual(errors().map((e) => e.data.code), [500], 'the HTTP error is reported once');
+
+    // The revision the dead run asked for now fails to load. It belongs to
+    // nobody.
+    track.dispatchEvent(new dom.window.Event('error'));
+    await settle();
+    assert.deepEqual(errors().map((e) => e.data.code), [500],
+        'a late track error of a finished run must not be counted again');
 });

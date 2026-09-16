@@ -230,3 +230,62 @@ test('resume() after stop() stays stopped', async () => {
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(calls, after, 'a stopped run is gone, not asleep');
 });
+
+// The negative control for the module's fourth, implicit state:
+// "finished, not stopped". The three terminal returns used to leave both
+// `stopped` and `suspended` false, so nothing here prevented a later
+// suspend()/resume() from re-arming a run that had already reported. The
+// module's own suite drives suspend()/resume() directly, and the player's
+// pause and visibility handlers reach a live stop ref, so this was a
+// caller-side invariant rather than a module guarantee.
+test('a run that reported done is terminal: resume() polls nothing', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '10/10' } }; };
+    let done = 0;
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, onDone: () => { done++; } });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(done, 1);
+    const after = calls;
+
+    stop.suspend();
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'a finished run is gone, not asleep');
+    assert.equal(done, 1, 'and it does not report a second time');
+});
+
+test('a run that reported an error is terminal too, timeout included', async () => {
+    for (const [what, fetchImpl, want] of [
+        ['a non-200', async () => ({ status: 500, headers: { get: () => null } }), 500],
+        ['a throw', async () => { throw new Error('offline'); }, 0],
+    ]) {
+        let calls = 0;
+        const counted = async (...a) => { calls++; return fetchImpl(...a); };
+        const errs = [];
+        const stop = pollProgress('https://x/a.vtt', { fetchImpl: counted, intervalMs: 1, onError: (c) => errs.push(c) });
+        await new Promise((r) => setTimeout(r, 20));
+        assert.deepEqual(errs, [want], what);
+        const after = calls;
+        stop.suspend();
+        stop.resume();
+        await new Promise((r) => setTimeout(r, 20));
+        assert.equal(calls, after, `${what}: resume() must not re-poll a failed run`);
+        assert.deepEqual(errs, [want], `${what}: and must not report twice`);
+    }
+
+    // The timeout path is the one that reported twice: its branch emits
+    // subtitle-translate-error {code:'timeout'} on every tick it is
+    // reached on.
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };
+    const errs = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 1, timeoutMs: 15, onError: (c) => errs.push(c) });
+    await new Promise((r) => setTimeout(r, 40));
+    assert.deepEqual(errs, ['timeout']);
+    const after = calls;
+    stop.suspend();
+    stop.resume();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(calls, after, 'a timed-out run must not poll again');
+    assert.deepEqual(errs, ['timeout'], 'and must not emit a second timeout');
+});

@@ -65,6 +65,15 @@ export function withRev(src, n) {
 // completion or on a non-200. Returns a stop() function — call it when
 // the viewer selects another track or the player unmounts.
 //
+// Reporting `done` or an error is terminal: the run marks itself stopped
+// before the callback, so a later suspend()/resume() pair cannot re-arm a
+// run that already finished or failed. Without that there was a fourth,
+// implicit state — "finished, not stopped" — in which a resume would
+// re-poll a completed job and emit a second error for the timeout path.
+// It was unreachable through Player.jsx only because the player nulls its
+// stop ref first, which is a caller-side invariant this module neither
+// stated nor enforced.
+//
 // stop() also carries suspend() and resume(): the run goes to sleep with
 // the video (pause, hidden tab) and wakes with it. Sleeping is not
 // stopping and not failing — nothing is reported, so the chip keeps its
@@ -93,6 +102,7 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             // Reported as an error, not silence: the viewer is looking at
             // a count that stopped moving, and a run that outlives the cap
             // is a failure worth counting.
+            stopped = true;
             if (onError) onError('timeout');
             return;
         }
@@ -100,7 +110,12 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         try {
             res = await fetchImpl(src, { method: 'HEAD', cache: 'no-store' });
         } catch (e) {
-            if (!stopped && myGen === gen && onError) onError(0);
+            // A throw on a dead generation is a request that was in flight
+            // when the video paused: the run is asleep, not failed, and
+            // resume() must still be able to wake it.
+            if (stopped || myGen !== gen) return;
+            stopped = true;
+            if (onError) onError(0);
             return;
         }
         // Checked again after the await: stop() or suspend() may have
@@ -108,6 +123,7 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         // into an unmounted player would touch DOM that is no longer there.
         if (stopped || myGen !== gen) return;
         if (res.status !== 200) {
+            stopped = true;
             if (onError) onError(res.status);
             return;
         }
@@ -123,9 +139,15 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             if (onProgress) onProgress(p);
         }
         if (p.final) {
+            stopped = true;
             if (onDone) onDone(p);
             return;
         }
+        // Re-checked after onProgress: a callback may suspend the run (the
+        // player does exactly that once it learns from the first response
+        // whether the source is live), and scheduling here regardless would
+        // leave a dead-generation timer behind for resume() to race with.
+        if (stopped || myGen !== gen) return;
         timer = setTimeout(() => tick(myGen), intervalMs);
     };
     timer = setTimeout(() => tick(gen), 0);
