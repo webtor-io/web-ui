@@ -53,19 +53,18 @@ func TestStreamVideoRenders(t *testing.T) {
 	funcs := template.FuncMap{
 		// Real handlers/action.Helper methods -- this is the point of the
 		// test: they must accept exactly the arguments the template passes.
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		// Stubs for the web.Helper-bound funcs this view also needs, same
 		// spirit as about_render_test.go / user_subtitles_partial_render_test.go:
@@ -177,19 +176,18 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -493,19 +491,18 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -574,14 +571,43 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 	}
 }
 
+// elementHTML returns the markup of the element whose opening tag starts at
+// `open`, by balancing <div>…</div> from there. Enough for this file: the
+// containers it is asked about hold buttons and forms, never a stray
+// unclosed div, and it answers the one question a substring search cannot —
+// whether an element is INSIDE another or merely after it.
+func elementHTML(html, open string) string {
+	start := strings.Index(html, open)
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(html); i++ {
+		if strings.HasPrefix(html[i:], "<div") {
+			depth++
+		} else if strings.HasPrefix(html[i:], "</div>") {
+			depth--
+			if depth == 0 {
+				return html[start : i+len("</div>")]
+			}
+		}
+	}
+	return ""
+}
+
 // TestStreamVideoRendersUploadChipsInsideTheTrackRow is the one case that
 // renders the real user_subtitles_view partial inside the dialog instead of
-// stubbing it. The redesign moved the uploads out of their own sub-view and
-// into the flat track row, which puts two things at risk that a stub hides:
-// the chips have to land inside #subtitle-tracks (the picker reads them
-// there), and each upload must be rendered exactly once — the dialog
-// filters UserSubtitle items out of its own loop precisely because the
-// partial renders them.
+// stubbing it. It pins the a11y split (ruling R8):
+//
+//   - the MY chip is a radio and lives INSIDE #subtitle-tracks, grouped by
+//     its language with every other track. On this render it comes from the
+//     dialog's own loop, which is what keeps a page whose JS never ran
+//     correct;
+//   - the uploads disclosure and its panel — a button and, when open, two
+//     kinds of form — live OUTSIDE it, in the #my-subtitles wrapper that
+//     follows the row. A role="radiogroup" contains radios and nothing else;
+//   - each upload is rendered exactly once: the partial emits no chips on
+//     this render (RenderChips is false) precisely because the loop did.
 func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 	helper := action.NewHelper()
 
@@ -590,19 +616,18 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":        func() string { return "https://example.com" },
 		"langPath":      func(lang, p string) string { return p },
@@ -652,30 +677,48 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 	}
 	html := buf.String()
 
-	// Rendered once, by the partial — not once here and once by the
-	// dialog's own loop.
+	// Rendered once, by the dialog's own loop — not once there and once by
+	// the partial.
 	if n := strings.Count(html, `data-id="us-1"`); n != 1 {
 		t.Errorf("the upload must be rendered exactly once, got %d:\n%s", n, html)
 	}
 	if !strings.Contains(html, `data-provider="UserSubtitle"`) {
-		t.Fatal("the partial did not render the upload's chip")
+		t.Fatal("the upload's chip was not rendered at all")
 	}
 
-	tracksAt := strings.Index(html, `id="subtitle-tracks"`)
-	chipAt := strings.Index(html, `data-provider="UserSubtitle"`)
-	ctaAt := strings.Index(html, `id="translate-cta"`)
-	if tracksAt < 0 || ctaAt < 0 {
-		t.Fatal("the dialog is missing its track row or its CTA card")
+	row := elementHTML(html, `<div id="subtitle-tracks"`)
+	wrap := elementHTML(html, `<div id="my-subtitles"`)
+	if row == "" || wrap == "" {
+		t.Fatalf("the dialog is missing its track row or its uploads wrapper:\n%s", html)
 	}
-	if chipAt < tracksAt || chipAt > ctaAt {
-		t.Errorf("the MY chip is outside #subtitle-tracks (row at %d, chip at %d, next block at %d)", tracksAt, chipAt, ctaAt)
+	// The radio belongs to the radiogroup.
+	if !strings.Contains(row, `data-id="us-1"`) || !strings.Contains(row, `data-provider="UserSubtitle"`) {
+		t.Errorf("the MY chip is not inside #subtitle-tracks:\n%s", row)
 	}
-	// The uploads disclosure comes from the same partial, so an upload or a
-	// delete re-sends it together with the chips.
-	for _, want := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, `action="/user-subtitle/delete/1"`} {
-		if !strings.Contains(html, want) {
-			t.Errorf("rendered dialog missing %q", want)
+	// Everything that is not a radio belongs outside it. This is the wart
+	// the fix removes: the radiogroup used to contain the disclosure and,
+	// once open, an upload form and one delete form per file.
+	for _, unwanted := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, "<form", `id="my-upload-chips"`} {
+		if strings.Contains(row, unwanted) {
+			t.Errorf("#subtitle-tracks[role=radiogroup] must hold radios only, found %q:\n%s", unwanted, row)
 		}
+	}
+	// ...and they are in the wrapper that follows it, which is still the
+	// single async swap target every form in it posts to.
+	for _, want := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, `action="/user-subtitle/delete/1"`, `data-async-target="#my-subtitles"`} {
+		if !strings.Contains(wrap, want) {
+			t.Errorf("#my-subtitles is missing %q:\n%s", want, wrap)
+		}
+	}
+	// No second copy of the chips: #my-upload-chips is the async reload's
+	// marker and must not appear on a page render, or the client would read
+	// this render as "the viewer's complete upload list" and reconcile the
+	// row against it.
+	if strings.Contains(html, `id="my-upload-chips"`) {
+		t.Errorf("the initial render must not carry the async chips marker:\n%s", wrap)
+	}
+	if strings.Contains(wrap, `class="subtitle`) {
+		t.Errorf("the partial rendered chips on the initial render too:\n%s", wrap)
 	}
 }
 
@@ -697,19 +740,18 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -819,19 +861,18 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":        func() string { return "https://example.com" },
 		"langPath":      func(lang, p string) string { return p },
@@ -941,19 +982,18 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -1126,19 +1166,18 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },
@@ -1261,19 +1300,18 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
 
 	funcs := template.FuncMap{
-		"getSubtitles":              helper.GetSubtitles,
-		"getAudioTracks":            helper.GetAudioTracks,
-		"hasControls":               helper.HasControls,
-		"getDurationSec":            helper.GetDurationSec,
-		"filterSubtitlesByProvider": helper.FilterSubtitlesByProvider,
-		"userSubtitleView":          helper.UserSubtitleView,
-		"subtitleLangGroups":        helper.SubtitleLangGroups,
-		"originCode":                helper.OriginCode,
-		"originCodeForBadge":        helper.OriginCodeForBadge,
-		"originKey":                 helper.OriginKey,
-		"propertyTags":              helper.PropertyTags,
-		"audioSuffix":               helper.AudioSuffix,
-		"langDisplay":               stremio.NewHelper().LangDisplay,
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
 
 		"domain":      func() string { return "https://example.com" },
 		"langPath":    func(lang, p string) string { return p },

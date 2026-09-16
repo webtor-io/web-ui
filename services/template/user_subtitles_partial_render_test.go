@@ -43,9 +43,14 @@ func TestUserSubtitlesPartialMarksSelected(t *testing.T) {
 	}
 
 	data := &models.UserSubtitleView{
-		ResourceID: "res",
-		Path:       "/movie.mkv",
-		EIURL:      "http://ei",
+		// The chips are the async render's job now: on a page load the
+		// dialog's own track loop emits them inside the radiogroup and this
+		// partial contributes only the disclosure and the panel. Everything
+		// below is about the markup of a reload.
+		RenderChips: true,
+		ResourceID:  "res",
+		Path:        "/movie.mkv",
+		EIURL:       "http://ei",
 		UserSubtitles: []models.UserSubtitleTrack{
 			{ID: "us-old", OriginalName: "old.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "und"},
 			{ID: "us-new", OriginalName: "new.en.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", Selected: true, SrcLang: "en"},
@@ -131,7 +136,12 @@ func TestUserSubtitlesPartialMarksNothingByDefault(t *testing.T) {
 	err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
 		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
 		"Data": &models.UserSubtitleView{
-			ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+			// The chips are the async render's job now: on a page load the
+			// dialog's own track loop emits them inside the radiogroup and this
+			// partial contributes only the disclosure and the panel. Everything
+			// below is about the markup of a reload.
+			RenderChips: true,
+			ResourceID:  "res", Path: "/movie.mkv", EIURL: "http://ei",
 			UserSubtitles: []models.UserSubtitleTrack{
 				{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1"},
 			},
@@ -175,7 +185,12 @@ func TestUserSubtitlesPartialMarksDefaultAndSaved(t *testing.T) {
 	err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
 		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
 		"Data": &models.UserSubtitleView{
-			ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+			// The chips are the async render's job now: on a page load the
+			// dialog's own track loop emits them inside the radiogroup and this
+			// partial contributes only the disclosure and the panel. Everything
+			// below is about the markup of a reload.
+			RenderChips: true,
+			ResourceID:  "res", Path: "/movie.mkv", EIURL: "http://ei",
 			UserSubtitles: []models.UserSubtitleTrack{
 				{ID: "us-other", OriginalName: "other.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1"},
 				{ID: "us-chosen", OriginalName: "chosen.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", Default: true, Saved: true},
@@ -234,7 +249,12 @@ func TestUserSubtitlesPartialSavedIsIndependentOfDefault(t *testing.T) {
 	err = tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
 		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
 		"Data": &models.UserSubtitleView{
-			ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+			// The chips are the async render's job now: on a page load the
+			// dialog's own track loop emits them inside the radiogroup and this
+			// partial contributes only the disclosure and the panel. Everything
+			// below is about the markup of a reload.
+			RenderChips: true,
+			ResourceID:  "res", Path: "/movie.mkv", EIURL: "http://ei",
 			UserSubtitles: []models.UserSubtitleTrack{
 				{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", Default: true},
 			},
@@ -282,9 +302,14 @@ func TestUserSubtitlesPartialKeepsADeleteControlPerRow(t *testing.T) {
 	}
 
 	data := &models.UserSubtitleView{
-		ResourceID: "res",
-		Path:       "/movie.mkv",
-		EIURL:      "http://ei",
+		// The chips are the async render's job now: on a page load the
+		// dialog's own track loop emits them inside the radiogroup and this
+		// partial contributes only the disclosure and the panel. Everything
+		// below is about the markup of a reload.
+		RenderChips: true,
+		ResourceID:  "res",
+		Path:        "/movie.mkv",
+		EIURL:       "http://ei",
 		UserSubtitles: []models.UserSubtitleTrack{
 			{ID: "us-old", OriginalName: "old.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "und"},
 			{ID: "us-new", OriginalName: "new.en.srt", Format: "srt", Size: 20, Src: "http://b", DeleteURL: "/d/2", SrcLang: "en"},
@@ -353,7 +378,12 @@ func TestUserSubtitlesPartialCollapsesChipsOutsideTheExpandedLanguage(t *testing
 		if err := tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
 			"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
 			"Data": &models.UserSubtitleView{
-				ResourceID: "res", Path: "/movie.mkv", EIURL: "http://ei",
+				// The chips are the async render's job now: on a page load the
+				// dialog's own track loop emits them inside the radiogroup and this
+				// partial contributes only the disclosure and the panel. Everything
+				// below is about the markup of a reload.
+				RenderChips: true,
+				ResourceID:  "res", Path: "/movie.mkv", EIURL: "http://ei",
 				ExpandedLang: expanded,
 				UserSubtitles: []models.UserSubtitleTrack{
 					{ID: "us-en", OriginalName: "a.en.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "en"},
@@ -506,7 +536,7 @@ func TestUserSubtitlesPartialMarksTheSuggestion(t *testing.T) {
 		{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "en", Suggested: true},
 		{ID: "us-2", OriginalName: "b.srt", Format: "srt", Size: 10, Src: "http://b", DeleteURL: "/d/2", SrcLang: "en"},
 	}
-	out := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs, SubtitlesOff: true})
+	out := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs, SubtitlesOff: true, RenderChips: true})
 
 	if n := strings.Count(out, `data-suggested="true"`); n != 1 {
 		t.Fatalf("expected exactly one suggested chip, got %d:\n%s", n, out)
@@ -532,11 +562,134 @@ func TestUserSubtitlesPartialMarksTheSuggestion(t *testing.T) {
 	// chosen-looking chip.
 	subs[0].Suggested = false
 	subs[1].Default = true
-	on := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs})
+	on := render(&models.UserSubtitleView{ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", UserSubtitles: subs, RenderChips: true})
 	if strings.Contains(on, `data-suggested="true"`) {
 		t.Errorf("nothing may be suggested while subtitles are on:\n%s", on)
 	}
 	if n := strings.Count(on, "track-chip-active"); n != 1 {
 		t.Errorf("expected exactly one active chip with subtitles on, got %d", n)
+	}
+}
+
+// elementHTML balances <div>…</div> from the opening tag at `open` and
+// returns that element's markup. It answers what a substring search cannot:
+// whether something is INSIDE a container or merely after it. A twin lives
+// in stream_video_render_test.go, which is package template_test — the two
+// files cannot share a helper.
+func elementHTML(html, open string) string {
+	start := strings.Index(html, open)
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(html); i++ {
+		if strings.HasPrefix(html[i:], "<div") {
+			depth++
+		} else if strings.HasPrefix(html[i:], "</div>") {
+			depth--
+			if depth == 0 {
+				return html[start : i+len("</div>")]
+			}
+		}
+	}
+	return ""
+}
+
+// TestUserSubtitlesPartialRenderChipsSplitsTheTwoRenders pins the field the
+// a11y fix turns on (ruling R8). The partial now renders into a wrapper that
+// sits AFTER #subtitle-tracks, because a role="radiogroup" holds radios and
+// nothing else and this partial also emits a disclosure button and a panel
+// with two kinds of form. The chips it emits ARE radios, so who renders them
+// depends on which render this is:
+//
+//   - initial page render (RenderChips false): the dialog's own track loop
+//     already put every upload inside the row. A second copy here would be
+//     the same file twice on screen, and in the wrong container — so this
+//     render must emit the panel and nothing else;
+//   - async reload (RenderChips true): nothing re-runs that loop, so the
+//     chips come from here, wrapped in #my-upload-chips. The wrapper is not
+//     decoration: its presence is what tells the client this response is the
+//     complete current list, which is the only way a delete — a response
+//     with one chip fewer, or none — can take the chip out of the row.
+func TestUserSubtitlesPartialRenderChipsSplitsTheTwoRenders(t *testing.T) {
+	locales, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatalf("locales: %v", err)
+	}
+	defer locales.Close()
+	helper := i18n.NewHelper(i18n.New(locales.FS()))
+
+	funcs := template.FuncMap{
+		"t":             helper.T,
+		"langPath":      func(lang, p string) string { return p },
+		"hasAuth":       func(any) bool { return true },
+		"bitsForHumans": func(int64) string { return "1 KB" },
+		"langDisplay":   stremio.NewHelper().LangDisplay,
+	}
+	tpl, err := template.New("user_subtitles.html").Funcs(funcs).
+		ParseFiles("../../templates/partials/action/user_subtitles.html")
+	if err != nil {
+		t.Fatalf("failed to parse partial: %v", err)
+	}
+
+	subs := []models.UserSubtitleTrack{
+		{ID: "us-1", OriginalName: "a.srt", Format: "srt", Size: 10, Src: "http://a", DeleteURL: "/d/1", SrcLang: "en"},
+	}
+	render := func(chips bool) string {
+		var buf bytes.Buffer
+		if err := tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+			"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+			"Data": &models.UserSubtitleView{
+				ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei",
+				UserSubtitles: subs, RenderChips: chips,
+			},
+		}); err != nil {
+			t.Fatalf("failed to render: %v", err)
+		}
+		return buf.String()
+	}
+
+	initial := render(false)
+	if strings.Contains(initial, `id="my-upload-chips"`) {
+		t.Errorf("the initial render must not carry the async marker:\n%s", initial)
+	}
+	if strings.Contains(initial, `class="subtitle`) || strings.Contains(initial, `data-provider="UserSubtitle"`) {
+		t.Errorf("the initial render must not repeat the chips the dialog already rendered:\n%s", initial)
+	}
+	// What it does still owe: the disclosure, the panel, and the per-file
+	// delete form — the whole reason this partial is in the page at all.
+	for _, want := range []string{`id="my-uploads-toggle"`, `id="my-uploads-panel"`, `action="/d/1"`, `class="user-subtitle-form"`} {
+		if !strings.Contains(initial, want) {
+			t.Errorf("the initial render is missing %q:\n%s", want, initial)
+		}
+	}
+
+	async := render(true)
+	if n := strings.Count(async, `id="my-upload-chips"`); n != 1 {
+		t.Fatalf("expected exactly one async chips marker, got %d:\n%s", n, async)
+	}
+	// The chips are INSIDE the marker: the client moves that element's
+	// contents into the radiogroup and then drops it, so a chip rendered
+	// beside it would be left behind in the uploads block.
+	wrap := elementHTML(async, `<div id="my-upload-chips"`)
+	if !strings.Contains(wrap, `data-id="us-1"`) || !strings.Contains(wrap, `data-provider="UserSubtitle"`) {
+		t.Errorf("the chip is not inside #my-upload-chips:\n%s", async)
+	}
+	if strings.Contains(wrap, `id="my-uploads-toggle"`) || strings.Contains(wrap, "<form") {
+		t.Errorf("only radios belong in the marker the client moves into the radiogroup:\n%s", wrap)
+	}
+	// An empty list still renders the marker: that is the delete case, and
+	// an absent marker would read as "nothing was re-sent".
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "user_subtitles_view", map[string]any{
+		"Ctx": map[string]any{"Lang": "en", "User": struct{}{}, "CSRF": "csrf"},
+		"Data": &models.UserSubtitleView{
+			ResourceID: "res", Path: "/m.mkv", EIURL: "http://ei", RenderChips: true,
+		},
+	}); err != nil {
+		t.Fatalf("failed to render: %v", err)
+	}
+	if !strings.Contains(buf.String(), `id="my-upload-chips"`) {
+		t.Errorf("a delete that emptied the list must still say so:\n%s", buf.String())
 	}
 }

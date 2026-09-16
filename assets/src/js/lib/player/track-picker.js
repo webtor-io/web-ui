@@ -14,7 +14,13 @@
 //
 // DOM contract (controller rulings R1-R9 on the track-picker plan):
 //
-//   #subtitle-tracks   role=radiogroup, every subtitle chip, flat.
+//   #subtitle-tracks   role=radiogroup, every subtitle chip, flat —
+//                      uploads included, moved in by adoptUploadChips when
+//                      an async reload of the uploads partial delivers them
+//                      into #my-subtitles (the wrapper below the row, which
+//                      otherwise holds only the uploads disclosure and its
+//                      panel: a radiogroup contains radios and nothing
+//                      else).
 //                      .subtitle[data-id] — including the "None" item
 //                      (data-id="none"), which is not a chip at all any
 //                      more but a hidden state carrier at the head of the
@@ -306,12 +312,58 @@ function chipData(el) {
     };
 }
 
+// UPLOAD_PROVIDER is what a MY chip is, wherever it sits. The chips live in
+// the radiogroup with every other track; the provider is the only thing
+// that marks them as the set the uploads partial owns.
+const UPLOAD_PROVIDER = 'UserSubtitle';
+
+// adoptUploadChips reconciles the MY chips of #subtitle-tracks with the set
+// an async reload of the uploads partial just delivered, and returns the
+// chips it moved in.
+//
+// Why anything moves. #my-subtitles sits AFTER the radiogroup now: the
+// uploads partial emits a disclosure button and a panel holding two kinds
+// of form, and a role="radiogroup" contains radios and nothing else. The
+// chips it also emits ARE radios and belong in the row.
+//
+// What decides. The partial wraps those chips in #my-upload-chips, and that
+// element is rendered on the async reload only. Its presence says "this is
+// the server's complete current list of this viewer's uploads", which is
+// the one thing the DOM cannot otherwise tell:
+//
+//   absent   — an ordinary page: the dialog's own loop rendered the uploads
+//              into the row, nothing was re-sent, and this is a no-op. That
+//              is what keeps a page whose JS never ran correct.
+//   present  — an upload or a delete: every MY chip in the row is replaced
+//              by what came back. An upload's chip is therefore the fresh
+//              element (carrying data-autoselect, and never the stale
+//              data-default the async response deliberately omits), and a
+//              deleted one is gone rather than orphaned in a row nothing
+//              re-renders.
+//
+// The wrapper is removed once emptied, so the next refresh sees "absent"
+// again and does not read an already-consumed answer as "the viewer has no
+// uploads".
+export function adoptUploadChips(container) {
+    if (!container || !container.querySelector) return [];
+    const box = container.querySelector('#subtitle-tracks');
+    const src = container.querySelector('#my-upload-chips');
+    if (!box || !src || !src.querySelectorAll) return [];
+    const incoming = Array.from(src.querySelectorAll('.subtitle[data-id]'));
+    for (const el of box.querySelectorAll('.subtitle[data-id]')) {
+        if (attr(el, 'data-provider') === UPLOAD_PROVIDER && el.remove) el.remove();
+    }
+    for (const el of incoming) box.append(el);
+    if (src.remove) src.remove();
+    return incoming;
+}
+
 // readChips reads the flat subtitle list. The "Off" chip is NOT in it: it
 // lives in the language row (#subtitle-langs) as the switch next to the
 // languages, so the filter never sees it and never hides it; the callers
-// that would have to skip it by id keep doing so defensively. Uploads land
-// in #my-subtitles, a display:contents wrapper inside the same container, so
-// they are read here too.
+// that would have to skip it by id keep doing so defensively. Uploads are
+// in the row like every other track (adoptUploadChips puts the ones an
+// async reload delivers there), so they are read here too.
 export function readChips(container) {
     const box = container && container.querySelector && container.querySelector('#subtitle-tracks');
     if (!box) return [];
@@ -622,6 +674,11 @@ export function refreshMarks(container) {
 // set of chips itself changed. Returns the language it settled on.
 export function refresh(container, { current = '' } = {}) {
     if (!container) return '';
+    // Before anything reads the row: an async reload leaves the MY chips in
+    // the wrapper below it, and every pass here (counts, filter, muted
+    // state) is scoped to #subtitle-tracks. Idempotent, so the mount-time
+    // call costs nothing.
+    adoptUploadChips(container);
     const preferred = attr(container, 'data-preferred-lang');
     const lang = expandedLangFor(readChips(container), {
         preferred,

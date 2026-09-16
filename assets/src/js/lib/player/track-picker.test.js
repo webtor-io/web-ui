@@ -12,6 +12,7 @@ import {
     expandedLangFor,
     langRowOps,
     readChips,
+    adoptUploadChips,
     applyLangFilter,
     expandedLang,
     syncLangRow,
@@ -206,6 +207,7 @@ function el(tag, attrs = {}, children = []) {
     const setCls = (list) => { a.class = list.join(' '); };
     const node = {
         tag,
+        parent: null,
         children: children.slice(),
         hidden: false,
         textContent: text,
@@ -222,8 +224,24 @@ function el(tag, attrs = {}, children = []) {
         getAttribute: (n) => (n in a ? String(a[n]) : null),
         setAttribute: (n, v) => { a[n] = String(v); },
         removeAttribute: (n) => { delete a[n]; },
-        append(child) { node.children.push(child); return child; },
+        // append MOVES, as the real one does, and remove() detaches: the
+        // uploads adoption relies on both, and a fake that only copied
+        // would leave the chip in two places and double every count.
+        append(child) {
+            if (child.parent) child.remove();
+            child.parent = node;
+            node.children.push(child);
+            return child;
+        },
+        remove() {
+            if (!node.parent) return;
+            const i = node.parent.children.indexOf(node);
+            if (i >= 0) node.parent.children.splice(i, 1);
+            node.parent = null;
+        },
         insertBefore(child, ref) {
+            if (child.parent) child.remove();
+            child.parent = node;
             const i = ref ? node.children.indexOf(ref) : -1;
             if (i < 0) node.children.push(child); else node.children.splice(i, 0, child);
             return child;
@@ -245,6 +263,7 @@ function el(tag, attrs = {}, children = []) {
             return el(tag, { ...a, text: node.textContent }, node.children.map((c) => c.cloneNode(true)));
         },
     };
+    for (const c of node.children) c.parent = node;
     return node;
 }
 
@@ -327,8 +346,14 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
         el('label', { class: 'flex items-center' }, [toggle]),
         langRow,
     ]);
-    const uploads = el('div', { id: 'my-subtitles', class: 'contents' });
-    const tracksBox = el('div', { id: 'subtitle-tracks', role: 'radiogroup' }, trackEls.concat([uploads]));
+    // #my-subtitles is a SIBLING of the radiogroup, not a child of it: it
+    // carries the uploads disclosure and the panel, and a radiogroup holds
+    // radios and nothing else. The MY chips an async reload delivers into
+    // it are moved into the row by adoptUploadChips.
+    const uploads = el('div', { id: 'my-subtitles' }, [
+        el('button', { id: 'my-uploads-toggle', 'aria-expanded': 'false' }),
+    ]);
+    const tracksBox = el('div', { id: 'subtitle-tracks', role: 'radiogroup' }, trackEls);
     const hint = el('p', { id: 'subtitle-hint' });
     hint.hidden = true;
     const audioBox = el('div', { id: 'audio-tracks', role: 'radiogroup' }, audio.map((t) => trackChip('audio', t)));
@@ -340,6 +365,7 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
         el('span', { id: 'subtitle-now' }, [span('now-origin'), span('now-value')]),
         langs,
         tracksBox,
+        uploads,
         hint,
     ]);
     container.querySelector('#subtitle-now').querySelector('.now-origin').hidden = true;
@@ -349,6 +375,20 @@ function buildPicker({ tracks = [], row = [], audio = [], preferred = '', moreEx
 // The "None" item: since the toggle replaced the Off chip it is a hidden
 // carrier at the head of the track row, not something the viewer can click.
 const offChip = (def = false) => ({ id: 'none', lang: '', label: '', def, hidden: true });
+
+// deliverUploads is what an async reload of the uploads partial leaves
+// behind: #my-subtitles re-rendered with a #my-upload-chips wrapper holding
+// the server's current list of this viewer's uploads (empty after the last
+// delete) plus the disclosure the partial always emits. The wrapper is the
+// marker adoptUploadChips keys off, so a test that skips it is testing a
+// page load, not a swap.
+function deliverUploads(uploads, chips = []) {
+    for (const c of uploads.children.slice()) c.remove();
+    uploads.append(el('div', { id: 'my-upload-chips', class: 'contents' },
+        chips.map((c) => trackChip('subtitle', { origin: 'MY', provider: 'UserSubtitle', ...c }))));
+    uploads.append(el('button', { id: 'my-uploads-toggle', 'aria-expanded': 'false' }));
+    return uploads.querySelectorAll('.subtitle[data-id]');
+}
 const langsOf = (c) => Array.from(c.querySelector('#subtitle-langs').querySelectorAll('.lang[data-lang]'));
 const visibleTracks = (c) => readChips(c).filter((x) => !x.el.hidden).map((x) => x.id);
 const countOf = (chip) => chip.querySelector('.lang-count').textContent;
@@ -437,9 +477,12 @@ test('post-upload: a new language gets a chip cloned from the template, counts f
     assert.equal(expandedLang(container), 'en');
 
     // The uploads partial is swapped in with one MY chip in a language the
-    // server never rendered a chip for.
-    uploads.append(trackChip('subtitle', { id: 'us-1', lang: 'pl', name: 'Polish', flag: '🇵🇱', label: 'pl.srt', origin: 'MY' }));
-    uploads.append(trackChip('subtitle', { id: 'us-2', lang: 'en', name: 'English', label: 'en.srt', origin: 'MY' }));
+    // server never rendered a chip for. refresh adopts them into the row on
+    // its way in.
+    deliverUploads(uploads, [
+        { id: 'us-1', lang: 'pl', name: 'Polish', flag: '🇵🇱', label: 'pl.srt' },
+        { id: 'us-2', lang: 'en', name: 'English', label: 'en.srt' },
+    ]);
     refresh(container, { current: expandedLang(container) });
 
     const chips = langsOf(container);
@@ -463,13 +506,15 @@ test('post-delete: the emptied chip drops to 0, hides, and the row falls back', 
         tracks: [offChip(), { id: 'a', lang: 'en', name: 'English', label: 'English' }],
         row: [{ lang: 'en', count: 1 }, { lang: 'pl', count: 1, name: 'Polish', selected: true }],
     });
-    uploads.append(trackChip('subtitle', { id: 'us-1', lang: 'pl', name: 'Polish', label: 'pl.srt', origin: 'MY' }));
+    deliverUploads(uploads, [{ id: 'us-1', lang: 'pl', name: 'Polish', label: 'pl.srt' }]);
     refresh(container, { current: 'pl' });
     assert.deepEqual(langsOf(container).map(countOf), ['1', '1']);
 
-    // The delete comes back as an innerHTML swap of #my-subtitles: the chip
-    // is gone, the language row still carries its count.
-    uploads.children.length = 0;
+    // The delete comes back as an innerHTML swap of #my-subtitles carrying
+    // an EMPTY #my-upload-chips: the chip the adoption moved into the row
+    // has to come back out, or the row keeps a button for a file that no
+    // longer exists.
+    deliverUploads(uploads, []);
     refresh(container, { current: expandedLang(container) });
 
     const [en, pl] = langsOf(container);
@@ -481,12 +526,83 @@ test('post-delete: the emptied chip drops to 0, hides, and the row falls back', 
     assert.deepEqual(visibleTracks(container), ['a']);
 });
 
-test('syncLangRow alone rewrites counts without moving the viewer', () => {
+// ---- the uploads adoption -------------------------------------------
+//
+// #my-subtitles is outside the radiogroup (a11y: a radiogroup contains
+// radios and nothing else), so the chips an async reload delivers into it
+// have to be moved. The three cases below are the whole contract.
+
+test('adoptUploadChips: without the marker nothing moves', () => {
+    // An ordinary page: the dialog's own loop rendered the uploads into the
+    // row, #my-subtitles holds only the disclosure and the panel. Clearing
+    // the row's MY chips here would empty it on every refresh.
+    const { container, tracksBox, uploads } = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English' },
+                 { id: 'us-1', lang: 'en', label: 'en.srt', provider: 'UserSubtitle', origin: 'MY' }],
+        row: [{ lang: 'en', count: 2, selected: true }],
+    });
+    assert.deepEqual(adoptUploadChips(container), []);
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1']);
+    assert.equal(uploads.querySelectorAll('.subtitle[data-id]').length, 0);
+    assert.equal(tracksBox.children.length, 3);
+});
+
+test('adoptUploadChips: an upload lands in the row, replacing the chip of the same id', () => {
+    const { container, tracksBox, uploads } = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English' },
+                 { id: 'us-1', lang: 'en', label: 'en.srt', provider: 'UserSubtitle', origin: 'MY', def: true }],
+        row: [{ lang: 'en', count: 2, selected: true }],
+    });
+    const stale = readChips(container).find((c) => c.id === 'us-1').el;
+
+    // The response re-renders us-1 (no data-default — the async render
+    // deliberately omits it) and adds the freshly uploaded us-2.
+    deliverUploads(uploads, [
+        { id: 'us-1', lang: 'en', label: 'en.srt' },
+        { id: 'us-2', lang: 'en', label: 'new.srt' },
+    ]);
+    const moved = adoptUploadChips(container);
+
+    assert.deepEqual(moved.map((el) => el.getAttribute('data-id')), ['us-1', 'us-2']);
+    // Exactly once each: the stale element is gone, not merged.
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1', 'us-2']);
+    assert.equal(stale.parent, null, 'the chip the response replaced is detached');
+    assert.equal(readChips(container).find((c) => c.id === 'us-1').el, moved[0]);
+    assert.ok(moved.every((el) => el.parent === tracksBox), 'the chips are in the radiogroup');
+    // The marker is consumed, so a later refresh does not read it again as
+    // "the viewer has no uploads".
+    assert.equal(container.querySelector('#my-upload-chips'), null);
+    assert.deepEqual(adoptUploadChips(container), []);
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-1', 'us-2']);
+});
+
+test('adoptUploadChips: a delete takes the chip out of the row', () => {
     const { container, uploads } = buildPicker({
+        tracks: [offChip(), { id: 'a', lang: 'en', label: 'English' },
+                 { id: 'us-1', lang: 'en', label: 'en.srt', provider: 'UserSubtitle', origin: 'MY' },
+                 { id: 'us-2', lang: 'en', label: 'new.srt', provider: 'UserSubtitle', origin: 'MY' }],
+        row: [{ lang: 'en', count: 3, selected: true }],
+    });
+    // The viewer deleted us-1: the response carries the rest.
+    deliverUploads(uploads, [{ id: 'us-2', lang: 'en', label: 'new.srt' }]);
+    adoptUploadChips(container);
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a', 'us-2']);
+
+    // And the last one: an empty marker is an answer, not an absence.
+    deliverUploads(uploads, []);
+    assert.deepEqual(adoptUploadChips(container), []);
+    assert.deepEqual(readChips(container).map((c) => c.id), ['none', 'a']);
+});
+
+test('syncLangRow alone rewrites counts without moving the viewer', () => {
+    const { container, tracksBox } = buildPicker({
         tracks: [offChip(), { id: 'a', lang: 'en', name: 'English', label: 'English' }],
         row: [{ lang: 'en', count: 1, selected: true }, { lang: 'ru', count: 3, name: 'Russian' }],
     });
-    uploads.append(trackChip('subtitle', { id: 'us-1', lang: 'en', label: 'en.srt', origin: 'MY' }));
+    // Straight into the row: this test is about syncLangRow's counts, not
+    // about the swap, and on an ordinary page the dialog's own loop renders
+    // the uploads there.
+    tracksBox.append(trackChip('subtitle', { id: 'us-1', lang: 'en', label: 'en.srt', origin: 'MY', provider: 'UserSubtitle' }));
     syncLangRow(container);
     assert.deepEqual(langsOf(container).map(countOf), ['2', '0']);
     assert.equal(expandedLang(container), 'en');

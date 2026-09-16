@@ -10,6 +10,7 @@ import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, withRev } from './subtitle-progress.js';
 import {
+    adoptUploadChips,
     refresh,
     refreshMarks,
     applyLangFilter,
@@ -1302,10 +1303,21 @@ function wireTrackHandlers(container, hooks = {}) {
         if (on) el.setAttribute('data-default', 'true');
         else el.removeAttribute('data-default');
     };
+    // isUpload is what "my uploads" means to this function now that the MY
+    // chips live in the radiogroup with everything else (adoptUploadChips
+    // moves the ones an async reload delivers). Containment in
+    // #my-subtitles used to be the test and no longer can be: that wrapper
+    // holds the disclosure and the panel, and — between the swap and the
+    // adoption — a fresh chip for one instant. The provider is the honest
+    // question anyway: these are the chips the uploads partial re-renders
+    // and therefore the ones whose markers the client owns.
+    const isUpload = (el) => el.getAttribute('data-provider') === 'UserSubtitle';
     const syncUploadMarks = () => {
         const video = container.querySelector('video.player');
-        const mySubs = container.querySelector('#my-subtitles');
-        if (!video || !mySubs) return;
+        if (!video) return;
+        const scope = subtitlesModal || container;
+        const mine = Array.from(scope.querySelectorAll('.subtitle')).filter(isUpload);
+        if (!mine.length) return;
         let activeID = null;
         for (const t of video.textTracks) {
             if (t.mode === 'showing' && t.id) { activeID = t.id; break; }
@@ -1318,23 +1330,22 @@ function wireTrackHandlers(container, hooks = {}) {
             // and a stale default left on a side-loaded track would then
             // hand the marker to an upload as well, leaving two chips with
             // data-default and two check marks.
-            const marked = (subtitlesModal || container).querySelectorAll('.subtitle[data-default="true"]');
+            const marked = scope.querySelectorAll('.subtitle[data-default="true"]');
             for (const el of marked) {
-                if (!mySubs.contains(el)) return;
+                if (!isUpload(el)) return;
             }
             const dt = video.querySelector('track[default]');
             if (dt && dt.id) activeID = dt.id;
         }
         if (!activeID) return;
-        const mine = Array.from(mySubs.querySelectorAll('.subtitle'));
         const active = mine.find((el) => el.getAttribute('data-id') === activeID) || null;
         for (const el of mine) setMark(el, el === active);
         if (!active) return;
         // Exactly one marker per group, as after a click: markTrack's
         // clearing loop without the PUT — nothing was chosen here, the DOM
         // is only catching up with what is already playing.
-        for (const el of (subtitlesModal || container).querySelectorAll('.subtitle')) {
-            if (el === active || mySubs.contains(el)) continue;
+        for (const el of scope.querySelectorAll('.subtitle')) {
+            if (el === active || isUpload(el)) continue;
             setMark(el, false);
         }
     };
@@ -1353,11 +1364,18 @@ function wireTrackHandlers(container, hooks = {}) {
             if (mySubsContainer.getAttribute('data-upload-open') === 'true') {
                 setUploadPanel(subtitlesModal || container, true);
             }
+            // The response renders the MY chips into this wrapper, which
+            // sits outside the radiogroup — move them in before anything
+            // reads the row. Everything below (the autoselect marker, the
+            // chip ids a delete is measured against, refresh's counts and
+            // filter) looks at #subtitle-tracks, and a chip still sitting
+            // in the wrapper is invisible to all of it.
+            adoptUploadChips(subtitlesModal || container);
             // A freshly uploaded subtitle comes back marked by the server.
             // Switch to it right away: the viewer uploaded a file to watch
             // with, and making them hunt for it in the row afterwards reads
             // as "subtitles don't work".
-            const fresh = mySubsContainer.querySelector('.subtitle[data-autoselect="true"]');
+            const fresh = (subtitlesModal || container).querySelector('.subtitle[data-autoselect="true"]');
             if (fresh) activateSubtitle(container, fresh);
             else {
                 // A delete takes the chip away but not the <track>: that
