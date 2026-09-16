@@ -167,16 +167,20 @@ transcode, `X-Subtitle-Live: 1` marks it as still growing, and a final artifact 
 for a contiguous run from the start. A native MP4 played without a session has no base and no
 embedded source, as before.
 
-**An embedded track outranks a complete sidecar or OpenSubtitles track in the same language.**
-`pickTranslationSource` fills `audio`/`en`/`first` by list order, and `GetSubtitles` appends the
-`MediaProbe` items before `ExportTag`, `OpenSubtitles` and `UserSubtitle` — so for a transcoded
-file that has both, the source is the live playlist, not the finished VTT. That is deliberate and
-matches `ladderRank` (embedded 1 < sidecar 2 < OS 4): a transcription of the file being played
-beats a subtitle someone matched to it by name or imdb id. The cost is explicit — the batch source
-is one fetch of seconds-to-minutes that leaves a final artifact cached under `ArtifactKey` for
-every later viewer, while the live source runs at transcode speed, holds one of the service's
-`--live-max-jobs` slots for the length of the film, and leaves a cached final only for a
-contiguous run from offset 0.
+**Within one language, an embedded track wins on append order.** `pickTranslationSource` prefers
+the audio language, then English, then anything — and inside each of those it takes the *first*
+matching item in the list. It does **not** consult `ladderRank`. The list order is the order
+`GetSubtitles` appends in: `MediaProbe` (embedded) first, then `ExportTag`, `OpenSubtitles`,
+`External` and `UserSubtitle` last (`handlers/action/helper.go:806-859`). So for a transcoded file
+that has both, the translation source is the live playlist rather than a finished VTT in the same
+language — **including when the other candidate is the viewer's own upload**, which the display
+ladder ranks *above* embedded (`ladderRank`: `UserSubtitle` 0 < `MediaProbe` 1). The two orders
+disagree, and translation follows append order; that predates this branch and is worth revisiting,
+but it is what the code does today. The cost of preferring the embedded track is explicit: the
+batch source is one fetch of seconds-to-minutes that leaves a final artifact cached under
+`ArtifactKey` for every later viewer, while the live source runs at transcode speed, holds one of
+the service's `--live-max-jobs` slots for the length of the film, and leaves a cached final only
+for a contiguous run from offset 0.
 
 **Glossary.** `streamprefs.CastNames(ctx, imdbID, 30)` reads up to 30 cast names from TMDB credits
 stored by enrichment, passed as `names=` to the service.
@@ -233,6 +237,12 @@ trip" / cache-key section).
   pause does not come back as a timeout. Resuming is cheap on the service side too — partial
   progress is held 24 h and re-aligned by cue identity. The listeners are removed on unmount
   (the effect's cleanup, reached through `destroyPlayer`).
+  **The initial state is read too**, in `startTranslationProgress` right after the controller is
+  created: a run begun on a video that has never played (autoplay blocked, or the mount-time
+  restore of a saved AI track) or in a tab that was already in the background gets no `pause` and
+  no `visibilitychange` to sleep on, so it suspends at once and its first HEAD waits for playback.
+  A chip clicked while paused therefore shows its opening `· 0%` and spinner and polls nothing
+  until play.
 - **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
   through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
@@ -735,6 +745,14 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   i.e. the length of the transcode, but a wedged live job that keeps answering the same count still
   times out after 15 minutes: answering is not progress. Time the poll spends suspended (paused or
   hidden, see *Client behaviour*) is not counted at all.
+- **A live run is suspended, not finished, when the film ends.** The media spec fires `pause`
+  before `ended`, so a viewer who watches to the end of a file whose translation is still behind
+  the transcode leaves the poll asleep on the last count: the chip keeps its spinner, no
+  `subtitle-translate-done` and no `-error` is emitted, and the remaining cues are never fetched.
+  Consistent with "suspending is not stopping", but it means the `-done` rate for
+  `source=embedded` is lower than the funnel would otherwise suggest — and the cached final
+  artifact for a contiguous run from 0 may be lost exactly for the viewers who watched the whole
+  film. Watch it before reading the funnel as a regression.
 
 ## Testing
 

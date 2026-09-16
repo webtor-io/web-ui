@@ -698,6 +698,9 @@ test('clicking the AI chip starts a run: one start event, a poll, a percentage',
 
     const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
     const src = ai.getAttribute('data-src');
+    // Playing: a run polls only while somebody is watching, and jsdom's
+    // <video> is paused until a test says otherwise.
+    p.video.paused = false;
     click(ai);
     await settle();
 
@@ -728,6 +731,7 @@ test('a live source (X-Subtitle-Live) shows a count instead of a percent', async
         : { ok: true, status: 200, json: async () => ({}) }));
 
     const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    p.video.paused = false;
     click(ai);
     await settle();
 
@@ -767,6 +771,10 @@ test('a translation saved in an earlier session comes back once, unpersisted', a
         it.setResponse((url, params) => (params && params.method === 'HEAD'
             ? progressResponse('400/400')
             : { ok: true, status: 200, json: async () => ({}) }));
+        // Playing by the time the restore runs — autoplay did what the
+        // template asks for. When it does not, the restored run starts
+        // asleep instead; that is its own test.
+        it.video.paused = false;
         const ai = it.chip('tr-pt');
         ai.setAttribute('data-saved', 'true');
         ai.setAttribute('data-default', 'true');
@@ -794,6 +802,13 @@ test('a translation saved in an earlier session comes back once, unpersisted', a
 // whole interval. Everything else here is immediate.
 const POLL_INTERVAL_WINDOW_MS = 3300;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// jsdom has no way to change visibility, and `hidden` is a prototype
+// getter; an own configurable property shadows it, and `delete` in the
+// test's t.after puts jsdom's back.
+const setHidden = (v) => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+    document.dispatchEvent(new dom.window.Event('visibilitychange'));
+};
 
 test('the translation poll sleeps with the video and wakes with it', async (t) => {
     // The HEAD every 3 s is what tells the translate service somebody is
@@ -807,10 +822,6 @@ test('the translation poll sleeps with the video and wakes with it', async (t) =
         ? liveProgressResponse('3/3')
         : { ok: true, status: 200, json: async () => ({}) }));
     const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
-    const setHidden = (v) => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
-        document.dispatchEvent(new dom.window.Event('visibilitychange'));
-    };
 
     const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
     p.video.paused = false;
@@ -856,10 +867,6 @@ test('coming back to a tab whose video is still paused does not wake the poll', 
         ? liveProgressResponse('3/3')
         : { ok: true, status: 200, json: async () => ({}) }));
     const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
-    const setHidden = (v) => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
-        document.dispatchEvent(new dom.window.Event('visibilitychange'));
-    };
 
     p.video.paused = false;
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
@@ -873,4 +880,61 @@ test('coming back to a tab whose video is still paused does not wake the poll', 
     setHidden(false);
     await settle();
     assert.equal(heads(), 1, 'still paused, still asleep');
+});
+
+test('a run started on a paused video does not poll until playback begins', async (t) => {
+    // The events are only half the state. A media element that has never
+    // played fires no `pause`, so nothing would ever put this run to sleep
+    // — and since the cap for a live source is now an inactivity cap, that
+    // run would hold a transcoder session for the length of the film with
+    // nobody watching. The two entry states are this one (autoplay blocked,
+    // or the mount-time restore of a saved AI track) and the hidden tab
+    // below.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('3/3')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    assert.equal(p.video.paused, true, 'a video that has never played');
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    click(ai);
+    await settle();
+
+    // The first tick is scheduled at 0 ms, so one settle() is the whole
+    // window: an unsuspended run would already have polled.
+    assert.equal(heads(), 0, 'nothing is watching, so nothing is polled');
+    // Asleep, not refused: the run was started and counted, and the chip
+    // shows its opening state rather than nothing.
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1);
+    assert.equal(ai.querySelector('.tr-progress').hidden, false);
+    assert.equal(ai.querySelector('.tr-progress').textContent, '· 0%');
+
+    p.video.paused = false;
+    p.video.dispatchEvent(new dom.window.Event('play'));
+    await settle();
+    assert.equal(heads(), 1, 'the first HEAD happens on play');
+});
+
+test('a run started in a hidden tab does not poll until the tab is visible', async (t) => {
+    t.after(() => { destroyPlayer(); delete document.hidden; });
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? liveProgressResponse('3/3')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+
+    // Hidden before the run starts — a background tab fires no
+    // visibilitychange of its own, so again only the initial read can see
+    // it. The video is playing, to isolate this from the paused case.
+    p.video.paused = false;
+    setHidden(true);
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(heads(), 0, 'a background tab pays for nothing');
+
+    setHidden(false);
+    await settle();
+    assert.equal(heads(), 1, 'and the first HEAD happens when the tab comes forward');
 });

@@ -309,6 +309,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             },
             onError: fail,
         });
+        // The pause/visibility listeners below see transitions, not state,
+        // and two entry states fire no event at all: a video that has never
+        // played (autoplay blocked, or the mount-time restore of a saved
+        // track) and a tab that was already in the background. Left
+        // unsuspended those runs never sleep, and since a live run's cap is
+        // an inactivity cap they would hold a transcoder session for the
+        // length of the film with nobody watching. So the run reads the
+        // state once, here, and the first HEAD waits for playback.
+        if (document.hidden || (videoRef.current && videoRef.current.paused)) {
+            pollStopRef.current.suspend();
+        }
     }, [stopTranslationProgress]);
 
     // translationActionFor answers translationAction for a list element,
