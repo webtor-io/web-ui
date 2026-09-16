@@ -22,7 +22,7 @@ type resolveLinkResultTorbox struct {
 
 // Torbox implements Backend interface for Torbox
 type Torbox struct {
-	linkCache lazymap.LazyMap[*resolveLinkResultTorbox]
+	linkCache *lazymap.LazyMap[*resolveLinkResultTorbox]
 	cl        *http.Client
 }
 
@@ -44,7 +44,7 @@ var _ common.Backend = (*Torbox)(nil)
 // NewTorbox creates a new Torbox backend
 func NewTorbox(cl *http.Client) *Torbox {
 	return &Torbox{
-		linkCache: *lazymap.New[*resolveLinkResultTorbox](&lazymap.Config{
+		linkCache: lazymap.New[*resolveLinkResultTorbox](&lazymap.Config{
 			Expire:      15 * time.Minute,
 			ErrorExpire: 30 * time.Second,
 			Concurrency: 5,
