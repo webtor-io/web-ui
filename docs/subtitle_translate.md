@@ -27,6 +27,15 @@ reimplements the order, it only reads `data-rank`.
 | 6–8  | reserved (phase 3 whisper takes 6) | —           | —                            |
 | 9    | anything else / "None"   | —                     | —                            |
 
+**When the OpenSubtitles fetch fails, the page still renders** — without those rungs.
+`api.GetOpenSubtitles` checks the HTTP status before it decodes: a non-200 is a typed
+`api.StatusError` naming the status, and the job log shows that instead of the decoder's
+"unexpected end of JSON input", which is what an error page, an empty 502 or a 429 used to
+surface as. A 200 with an empty body is an empty list (the file has no subtitles), not a parse
+failure. A `Retry-After` rides along in the error and is **reported, never obeyed**: this call
+sits inside a 30 s job step with a viewer waiting on it, so sleeping out somebody else's back-off
+would spend the whole budget and still answer nothing — there is no retry loop.
+
 A track marked **forced** (signs-only) always gets badge `forced` regardless of provider
 (`badgeFor`, `action.stream.badge.forced` = "signs only") — the origin is less useful to the
 viewer than the fact that it's forced. Forced tracks are listed in any language (spec amended

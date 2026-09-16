@@ -613,6 +613,30 @@ type OpenSubtitleTrack struct {
 	*ra.ExportTrack
 }
 
+// StatusError is an upstream answer that was not 200. It exists so the
+// status survives to the caller: the decoder's verdict on an error page,
+// a 429 or an empty 502 body is "unexpected end of JSON input", which
+// names neither the service that refused nor the reason, and that is what
+// the job log used to show a viewer whose subtitles did not load.
+//
+// RetryAfter is the raw Retry-After header when the upstream sent one.
+// It is carried and reported, never obeyed: this call runs inside a 30 s
+// job step with a viewer waiting on it, so sleeping out somebody else's
+// back-off would spend the whole budget and still answer nothing. The
+// page renders without OpenSubtitles instead, which it already knows how
+// to do.
+type StatusError struct {
+	Status     int
+	RetryAfter string
+}
+
+func (e *StatusError) Error() string {
+	if e.RetryAfter != "" {
+		return fmt.Sprintf("unexpected status %v (retry-after %v)", e.Status, e.RetryAfter)
+	}
+	return fmt.Sprintf("unexpected status %v", e.Status)
+}
+
 func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTrack, error) {
 	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
@@ -626,11 +650,22 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 	defer func(b io.ReadCloser) {
 		_ = b.Close()
 	}(b)
+	// Before the body: a non-200 carries an error page, or nothing at all,
+	// and neither is a subtitle list.
+	if res.StatusCode != http.StatusOK {
+		return nil, &StatusError{Status: res.StatusCode, RetryAfter: res.Header.Get("Retry-After")}
+	}
 	var esubs []ExtSubtitle
 	var subs []OpenSubtitleTrack
 	data, err := io.ReadAll(b)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read data")
+	}
+	// A 200 with an empty body is "this file has no subtitles", which is
+	// an ordinary answer and not a failure -- but json.Unmarshal rejects
+	// it, so it used to reach the job log as a parse error.
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil, nil
 	}
 	err = json.Unmarshal(data, &esubs)
 	if err != nil {
