@@ -1362,11 +1362,19 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	// different visitors, which was never safe, is not.
 	userKey := ""
 	userSubsKey := ""
+	prefKey := ""
 	if c != nil && c.ApiClaims != nil {
 		userKey = c.ApiClaims.SessionID
 	}
 	if c != nil && c.User != nil && c.User.HasAuth() {
 		userKey = c.User.ID.String()
+		// The preferred content language shapes the subtitle ladder and the
+		// AI item, and it is a profile setting the viewer can change at any
+		// moment; without it in the key a change waited out the ten-minute
+		// bucket (the owner changed it and got the old picker back).
+		prefCtx, prefCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		prefKey = prefs.PreferredContentLang(prefCtx, c.User, c.Lang)
+		prefCancel()
 		if userSubtitles.Enabled() {
 			// Cache-key lookup intentionally scopes to resource, not
 			// (resource, path): ListItem.ID (itemID) and ListItem.PathStr
@@ -1396,7 +1404,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	// NUL join: no path may alias another selection (or the other key parts)
 	// through plain concatenation.
 	selectedPathsKey := strings.Join(selectedPaths, "\x00")
-	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+forceSlowKey+"/"+debugKey+"/"+archiveFormat+"/"+selectedPathsKey)))
+	id = fmt.Sprintf("%x", sha1.Sum([]byte(resourceID+"/"+itemID+"/"+action+"/"+c.ApiClaims.Role+"/"+settingsID+"/"+vsudID+"/"+cacheKey+"/"+c.Lang+"/"+userKey+"/"+userSubsKey+"/"+prefKey+"/"+forceSlowKey+"/"+debugKey+"/"+archiveFormat+"/"+selectedPathsKey)))
 	return &ErrorWrapperScript{
 		tb:            tb,
 		c:             c,

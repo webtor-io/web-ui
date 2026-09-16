@@ -853,14 +853,12 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
 
 ## Known limitations
 
-- **Job cache key ignores a preferred-language change.** The 10-minute streaming-job cache key
-  (`jobs/scripts/action.go`, `Action`) is built from resource/item/action/`c.ApiClaims.Role`/
-  settings/audio+subtitle choice/`c.Lang`/session. Tier **is** in it — `Role` is the tier name
-  (`services/api/api.go`: `cl.Role = uc.Context.Tier.Name`), so a viewer who upgrades gets a
-  different key and the lock lifts at once. What is not in it is
-  `stremio_settings.preferred_language`: a viewer who changes that in their profile may keep
-  seeing the old `SubtitleOpts` (ladder run on the old language) until the current 10-minute
-  bucket rolls over. Parked as a follow-up, not fixed in this task.
+- **Job cache key and the preferred language.** The 10-minute streaming-job cache key
+  (`jobs/scripts/action.go`, `Action`) includes the tier (`Role`), the audio/subtitle choice, the
+  UI language, the viewer's upload hashes and — since 2026-09-16 — the resolved preferred content
+  language (`streamprefs.PreferredContentLang`), so a profile change is visible on the next stream
+  start rather than after the bucket rolls over. It costs one settings read per stream start for
+  signed-in viewers.
 - **Embedded-track translations follow the viewer's transcode.** Since the 2026-09-16 source
   ruling this is the *last* resort — it is reached only when the file has no upload, no sidecar
   and no OpenSubtitles track to translate — but where it is reached the source is the live
