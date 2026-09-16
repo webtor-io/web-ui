@@ -29,7 +29,7 @@ export function useHls(videoRef, sourceUrl, { onReady } = {}) {
                 const onCanPlay = () => {
                     if (!tracksInitialized.current && hls) {
                         tracksInitialized.current = true;
-                        initDefaultTracks(hls);
+                        initDefaultTracks(hls, video);
                     }
                 };
                 video.addEventListener('canplay', onCanPlay);

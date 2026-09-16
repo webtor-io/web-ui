@@ -283,8 +283,51 @@ is shared by every viewer of that track/language, so **the first requester's glo
 into the cached translation for everyone else too** (service README, "What survives the round
 trip" / cache-key section).
 
-## Client behaviour (`Player.jsx`, `subtitle-rules.js`, `subtitle-progress.js`, `cue-offset.js`)
+## Client behaviour (`Player.jsx`, `subtitle-rules.js`, `subtitle-progress.js`, `cue-offset.js`, `subtitle-apply.js`)
 
+- **One selection, one writer (`subtitle-apply.js`).** Two renderers can draw subtitles on the same
+  element: hls.js, from the transcoder's HLS manifest (embedded tracks, no `<track>` element,
+  `data-mp-id`), and the media element's own `<track>`s (everything side-loaded — uploads,
+  OpenSubtitles, sidecars, the AI translation). The chip carrying `data-default="true"` is the only
+  thing that says which, and `applySubtitleSelection(video, hls, selection)` is the only thing that
+  writes that answer into both. A side-loaded or `none` selection means
+  `hls.subtitleTrack = -1`, `hls.subtitleDisplay = false`, the chosen `<track>` `'showing'` and
+  **every other text track — element-backed and hls.js-managed alike — `'disabled'`**.
+  `activateSubtitle`, `initDefaultTracks` (`hls-manager.js`) and the session seek all go through it.
+- **Why `'disabled'` and not `'hidden'` for hls.js's tracks.** hls.js is not a passive renderer. Its
+  `SubtitleTrackController` listens to the media element's `textTracks` `change` event
+  (`onTextTracksChanged`), scans every labeled subtitle track and adopts one — the *last* in
+  `'hidden'` mode, or the *first* in `'showing'` — then maps it back to a manifest index and calls
+  `setSubtitleTrack`. A manifest track left `'hidden'` is therefore not "off": it is a standing
+  invitation, and our own mode writes are the `change` events that cash it in. Measured on stage
+  2026-09-16: after switching from an embedded Russian track to the AI one, `hls.subtitleTrack` read
+  `-1` and `hls.subtitleDisplay` `false` while the embedded "Full (rus)" TextTrack sat at
+  `'showing'` with 25 cues under the Catalan ones. (Element tracks go to `'disabled'` for a second,
+  older reason: a `'hidden'` `<track>` is still fetched, and 40+ OpenSubtitles tracks per page meant
+  a burst of downloads on every selection.)
+- **Re-asserted, not written once.** The traffic goes both ways: hls.js's `toggleTrackModes` (it
+  runs on every `setSubtitleTrack`, `-1` included, and on a `subtitleDisplay` change while a track is
+  selected) sets every labeled subtitle track that is not its own current one to `'disabled'` — our
+  `<track>`s included. So the player subscribes to `SUBTITLE_TRACK_SWITCH` and
+  `SUBTITLE_TRACKS_UPDATED` and re-applies the selection whenever what hls.js is doing disagrees
+  with the chip (`selectionHolds`). Only side-loaded and `none` selections are guarded — an embedded
+  one is hls.js's own business, and re-asserting it would fight the startup sequence, where
+  `SUBTITLE_TRACKS_UPDATED` fires before `remapTrackIds` has refined `data-mp-id`. The disagreement
+  check is what makes it terminate: an apply writes modes, the modes wake hls.js, hls.js calls back,
+  and the second pass finds nothing to fix. Listeners come off on unmount.
+- **The mount race.** `activateSubtitle` can run before `window.hlsPlayer` exists — the mount-time
+  restore of a saved translation does exactly that — so only the element modes land there.
+  `initDefaultTracks`, on the first `canplay`, applies the same selection again with the instance in
+  hand. It used to read `data-mp-id` and do nothing when there was none, which left a side-loaded
+  default running with hls.js's own default of `subtitleDisplay = true` and no track selected: one
+  `change` event away from the overlap above.
+- **The session seek re-reads the chip.** The subtitles dialog stays open and clickable while a seek
+  is in flight, so `session-seek.js` no longer restores the hls.js selection from the snapshot it
+  took at seek start (that snapshot could name the track the viewer has just switched away from, and
+  put hls.js back on it). On `SUBTITLE_TRACKS_UPDATED` after `loadSource` it applies whatever the
+  picker says now, and does so once more after `restoreTrackState` on `playing` — the element
+  snapshot is there for the *cues* hls.js drops, and its modes are as stale as the hls.js selection
+  was.
 - **Audio switch re-pick.** `onAudioSelect` calls `pickDefaultSubtitle(readTracks(modal), audioLang,
   preferredLang)` and activates the result, unless the viewer already made a manual subtitle choice
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
@@ -974,6 +1017,16 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   guard, the PUT retry, the offered-AI chip's verb/label flip, the locked chip's CTA, and — through
   a real `initPlayer` mount — a click starting a translation run, a saved translation restoring
   once without persisting, and nothing starting a run on its own.
+  The subtitle invariant has its own four: a side-loaded choice disabling hls.js's tracks rather
+  than hiding them, `initDefaultTracks` finishing the selection an activation made before the HLS
+  instance existed, an hls.js track that latches on mid-playback being put back (with a second pass
+  proving the re-assertion terminates), and a seek re-applying the chip rather than its start-of-seek
+  snapshot. The harness models the two renderers: `mount({hlsTracks})` adds `<track>`s **without an
+  id** for the manifest tracks (no id is exactly what marks a track as hls.js's), and `installHls`
+  puts a fake with recorded `subtitleTrack`/`subtitleDisplay` writes and an event bus on
+  `window.hlsPlayer`. hls.js's own reactions (`toggleTrackModes`, `onTextTracksChanged`) are driven
+  by hand in the tests that need them — a second implementation of hls.js in the harness would only
+  prove the copy agrees with itself.
   Still by hand: fullscreen, and anything about actual playback.
   The plain-JS modules keep their own suites: `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
@@ -982,4 +1035,7 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   `resolveSubtitleLevel`), `subtitle-track-reload.test.js` (`reloadSubtitleTrack`: listener
   lifetime, latest-snapshot restore, the did-it-reload return value), and `track-picker.test.js`
   (`adoptUploadChips`: no marker means no move, an upload replaces the chip of its id, a delete —
-  including of the last file — takes the chip out of the row).
+  including of the last file — takes the chip out of the row), and `subtitle-apply.test.js`
+  (`applySubtitleSelection`/`selectionHolds`: every selection shape, the write order, the no-hls
+  guard, and that applying twice is a fixed point) — no DOM needed, a text track there is an id and
+  a mode.

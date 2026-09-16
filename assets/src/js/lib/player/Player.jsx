@@ -4,7 +4,9 @@ import { usePlayerState } from './hooks/usePlayerState';
 import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { createSessionSeeker } from './session-seek';
+import { Hls } from './hls-manager';
 import { applyCueOffset } from './cue-offset';
+import { applySubtitleSelection, isEmbedded, readSelection, selectionFor, selectionHolds } from './subtitle-apply.js';
 import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.js';
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
@@ -500,6 +502,48 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl);
 
+    // Re-assert the picker's answer on hls.js's own transitions.
+    //
+    // hls.js selects subtitle tracks by itself: every textTracks `change`
+    // event makes its SubtitleTrackController re-scan the element's tracks
+    // and adopt one (see subtitle-apply.js). Our own mode writes are change
+    // events, so a selection applied once can be taken away a tick later —
+    // measured on stage as an embedded track loading cues and drawing them
+    // over the AI subtitle the viewer had chosen, while `subtitleTrack` read
+    // -1 and `subtitleDisplay` false.
+    //
+    // Only a side-loaded or "None" selection is guarded, and only when what
+    // hls.js is actually doing disagrees with it. An embedded selection is
+    // hls.js's own business — re-asserting it here would fight the startup
+    // sequence (SUBTITLE_TRACKS_UPDATED fires before remapTrackIds has
+    // refined `data-mp-id`), and the one transition that does lose it, a
+    // session seek's loadSource, is re-applied by the seeker itself.
+    //
+    // The disagreement check is what makes this terminate: an apply writes
+    // modes, the modes wake hls.js, hls.js calls back, and the second pass
+    // finds the state already correct and does nothing.
+    useEffect(() => {
+        const hls = hlsRef.current || window.hlsPlayer;
+        if (!hls || typeof hls.on !== 'function' || !Hls || !Hls.Events) return;
+        const reassert = () => {
+            const selection = readSelection(trackContainer || document);
+            if (!selection || isEmbedded(selection)) return;
+            const video = videoRef.current;
+            if (selectionHolds(video, hls, selection)) return;
+            applySubtitleSelection(video, hls, selection);
+        };
+        const events = [Hls.Events.SUBTITLE_TRACK_SWITCH, Hls.Events.SUBTITLE_TRACKS_UPDATED];
+        for (const e of events) hls.on(e, reassert);
+        return () => {
+            if (typeof hls.off !== 'function') return;
+            for (const e of events) hls.off(e, reassert);
+        };
+        // sourceUrl, because useHls destroys and re-creates the instance
+        // when it changes, and the listeners have to move with it. That
+        // effect is declared above this one, so the new instance is already
+        // in the ref by the time this re-runs.
+    }, [trackContainer, sourceUrl]);
+
     // Resume prompt state — must be declared before useWatchHistory which reads it.
     const [showResumePrompt, setShowResumePrompt] = useState(false);
 
@@ -528,6 +572,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     sourceUrl,
                     onSeekOffsetChange: setSeekOffset,
                     onSeekingChange: setSessionSeekingWithRef,
+                    trackContainer,
                 });
             }
             if (sessionSeekerRef.current) {
@@ -1246,36 +1291,19 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
         }
     }
     markTrack(container, target, 'subtitle', persist);
-    const hls = window.hlsPlayer;
-    const mpId = target.getAttribute('data-mp-id');
-
-    // Side-loaded <track> elements (they carry an id) go to 'disabled', not
-    // 'hidden': a hidden track is still fetched by the browser, so with 40+
-    // OpenSubtitles tracks in the list every selection fired a burst of
-    // downloads that tripped OpenSubtitles' 5 req/s limit and came back as
-    // 404s (87% of track fetches arrived in bursts of 5+ per torrent).
-    // Only the selected track loads. hls.js-managed tracks have no id and
-    // keep the previous handling.
-    if (hls && provider === 'MediaProbe') {
-        hls.subtitleDisplay = true;
-        hls.subtitleTrack = parseInt(mpId);
-        for (const p of document.querySelectorAll('video.player')) {
-            for (const t of p.textTracks) {
-                if (t.id) t.mode = 'disabled';
-            }
-        }
-    } else {
-        if (hls) {
-            hls.subtitleTrack = -1;
-            hls.subtitleDisplay = false;
-        }
-        for (const p of document.querySelectorAll('video.player, audio.player')) {
-            for (const t of p.textTracks) {
-                if (id && id !== 'none' && t.id === id) t.mode = 'showing';
-                else t.mode = t.id ? 'disabled' : 'hidden';
-            }
-        }
-    }
+    // Both halves of "what is on screen" — the hls.js selection and the
+    // element modes — are written by applySubtitleSelection and nowhere
+    // else, so a chip and the player cannot disagree about which of the two
+    // renderers is drawing. See subtitle-apply.js for why hls.js-managed
+    // tracks go to 'disabled' rather than 'hidden'.
+    //
+    // window.hlsPlayer is undefined until useHls creates the instance, and
+    // a mount-time activation (a translation saved in an earlier session
+    // coming back) routinely runs before that: then only the element modes
+    // land here, and initDefaultTracks applies the same selection to hls.js
+    // on the first canplay.
+    const player = container.querySelector('video.player, audio.player');
+    applySubtitleSelection(player, window.hlsPlayer || null, selectionFor(target));
 }
 
 function toggleDialog(id) {

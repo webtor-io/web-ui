@@ -109,6 +109,11 @@ const {
     findSubtitleItem,
     PUT_RETRY_DELAY_MS,
 } = await import('./Player.jsx');
+// Imported the same way and for the same reason as Player.jsx: hls-manager
+// reads navigator at module scope, so it cannot be a static import above
+// the globals.
+const { Hls, initDefaultTracks } = await import('./hls-manager.js');
+const { createSessionSeeker } = await import('./session-seek.js');
 
 // ---- the harness ----------------------------------------------------
 
@@ -119,16 +124,28 @@ const {
 // `tracks` lists those preloads as [id, showing]. They matter to two
 // paths — dropDeletedTracks (a delete has to take the orphan <track> with
 // it) and syncUploadMarks (what is playing is read off them).
-function mount({ tracks = [] } = {}) {
+//
+// `hlsTracks` lists the tracks hls.js makes from the transcoder's manifest,
+// as [label, mode]. In a browser those are created with addTextTrack and
+// have no element behind them; here they are <track>s without an id, which
+// is exactly the property every caller keys on — an id means element-backed
+// and ours, no id means hls.js's.
+function mount({ tracks = [], hlsTracks = [] } = {}) {
     document.body.innerHTML = `
         <div id="page">
             <video class="player" data-resource-id="res" data-path="movie.mkv">
                 ${tracks.map(([id, showing]) => `<track id="${id}" src="https://x.test/${id}.vtt" srclang="en" label="${id}" kind="subtitles"${showing ? ' default="default"' : ''}>`).join('')}
+                ${hlsTracks.map(([label]) => `<track src="https://x.test/manifest.vtt" srclang="ru" label="${label}" kind="subtitles">`).join('')}
             </video>
             ${DIALOG}
         </div>`;
     const container = document.getElementById('page');
     const video = container.querySelector('video.player');
+    const hlsTrackEls = Array.from(video.querySelectorAll('track')).filter((el) => !el.id);
+    hlsTracks.forEach(([, mode], i) => { if (mode) hlsTrackEls[i].track.mode = mode; });
+    // A fake left on window by an earlier test would be picked up by the
+    // next mount's activateSubtitle. Cleared before prepare() installs one.
+    window.hlsPlayer = null;
 
     const calls = [];
     let respond = () => ({ ok: true, status: 200, headers: new dom.window.Headers() });
@@ -158,6 +175,51 @@ function mount({ tracks = [] } = {}) {
         audioChip: (id) => modal.querySelector(`.audio[data-id="${id}"]`),
         lang: (code) => modal.querySelector(`.lang[data-lang="${code}"]`),
         puts: () => calls.filter((c) => String(c.url).startsWith('/stream-video/')),
+        // The two renderers, as the code under test sees them.
+        installHls: (init) => { window.hlsPlayer = makeHls(init); return window.hlsPlayer; },
+        hlsTrack: (i) => hlsTrackEls[i].track,
+        hlsModes: () => hlsTrackEls.map((el) => el.track.mode),
+        mode: (id) => {
+            const t = video.textTracks.find((tt) => tt.id === id);
+            return t ? t.mode : null;
+        },
+    };
+}
+
+// makeHls is hls.js as this code touches it: two properties that decide
+// what it draws, and the event bus it announces its own transitions on.
+// Everything it does to the TextTracks in reaction (toggleTrackModes) is
+// driven by hand in the tests that need it — writing a second
+// implementation of hls.js here would only prove that the copy agrees with
+// itself.
+function makeHls({ subtitleTrack = -1, subtitleDisplay = true } = {}) {
+    const listeners = new Map();
+    const writes = [];
+    let t = subtitleTrack;
+    let d = subtitleDisplay;
+    const add = (ev, fn) => listeners.set(ev, [...(listeners.get(ev) || []), fn]);
+    return {
+        writes,
+        audioTrack: -1,
+        get subtitleTrack() { return t; },
+        set subtitleTrack(v) { t = v; writes.push(['subtitleTrack', v]); },
+        get subtitleDisplay() { return d; },
+        set subtitleDisplay(v) { d = v; writes.push(['subtitleDisplay', v]); },
+        on: add,
+        once: (ev, fn) => {
+            const wrap = (...args) => {
+                listeners.set(ev, (listeners.get(ev) || []).filter((f) => f !== wrap));
+                fn(...args);
+            };
+            wrap.__wrapped = fn;
+            add(ev, wrap);
+        },
+        off: (ev, fn) => listeners.set(ev, (listeners.get(ev) || []).filter((f) => f !== fn && f.__wrapped !== fn)),
+        emit: (ev, data) => { for (const fn of [...(listeners.get(ev) || [])]) fn(ev, data); },
+        listenerCount: (ev) => (listeners.get(ev) || []).length,
+        stopLoad: () => {},
+        loadSource: () => {},
+        destroy: () => {},
     };
 }
 
@@ -659,8 +721,8 @@ test('a locked translation sells instead of switching', async () => {
 // mountPlayer builds the page, then runs initPlayer on it. The DOM is
 // rearranged on the way (the video is wrapped, the Preact controls are
 // rendered), so the handles are re-read afterwards.
-async function mountPlayer(prepare) {
-    const p = mount();
+async function mountPlayer(prepare, opts) {
+    const p = mount(opts);
     if (prepare) prepare(p);
     await initPlayer(p.container);
     // preact defers effects to the next animation frame (jsdom's fires on a
@@ -1172,4 +1234,168 @@ test('an HTTP error and a late <track> error are one run, and one event', async 
     await settle();
     assert.deepEqual(errors().map((e) => e.data.code), [500],
         'a late track error of a finished run must not be counted again');
+});
+
+// ---- the subtitle invariant -------------------------------------------
+//
+// Two renderers can draw subtitles on the same element: hls.js, from the
+// transcoder's manifest, and the element's own <track>s. The picker is the
+// one thing that says which — and hls.js does not know that. It re-scans
+// the element's TextTracks on every `change` event and adopts a track of
+// its own whenever it finds one that is not 'disabled', which is how a
+// stage viewer ended up with an embedded Russian track drawn over the AI
+// Catalan one they had chosen. These four tests are the invariant:
+// side-loaded means hls.js is off and every track of its is disabled, and
+// it is re-asserted after each transition of hls.js rather than written
+// once.
+
+test('choosing a side-loaded track disables hls.js’s own tracks — it never hides them', async () => {
+    const p = mount({ hlsTracks: [['Full (rus)', 'showing'], ['Full (eng)', 'hidden']] });
+    const hls = p.installHls({ subtitleTrack: 0, subtitleDisplay: true });
+    p.wire();
+
+    click(p.chip('os-os-ru'));
+    await flush();
+
+    assert.equal(hls.subtitleTrack, -1, 'hls.js is off the manifest track');
+    assert.equal(hls.subtitleDisplay, false);
+    assert.equal(p.mode('os-os-ru'), 'showing');
+    assert.deepEqual(p.hlsModes(), ['disabled', 'disabled']);
+    // The specific mode is the whole point: 'hidden' is what
+    // onTextTracksChanged remembers and hands back to setSubtitleTrack, so
+    // "off" written as 'hidden' is an instruction to turn it on again.
+    assert.equal(p.hlsModes().includes('hidden'), false);
+});
+
+test('a translation saved in an earlier session survives hls.js arriving after it', async (t) => {
+    // The measured race: activateSubtitle runs inside the mount, before
+    // useHls has created the instance, so the hls.js half of the selection
+    // cannot be written there — window.hlsPlayer is still null. It used to
+    // be skipped entirely, leaving subtitleDisplay at hls.js's own default
+    // of true (measured on the page: hlsDisp true, hlsSub -1, nine seconds
+    // in) with nothing but a mode write needed to make it draw something.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => {
+        it.setResponse((url, params) => (params && params.method === 'HEAD'
+            ? progressResponse('400/400')
+            : { ok: true, status: 200, json: async () => ({}) }));
+        const ai = it.chip('tr-pt');
+        ai.setAttribute('data-saved', 'true');
+        ai.setAttribute('data-default', 'true');
+        ai.removeAttribute('data-offered');
+        it.chip('none').removeAttribute('data-default');
+        it.modal.setAttribute('data-subtitles-off', 'false');
+    }, { hlsTracks: [['Full (rus)', 'showing']] });
+
+    assert.equal(window.hlsPlayer, null, 'the restore ran with no HLS instance to write to');
+    assert.equal(p.mode('tr-pt'), 'showing', 'the element half landed anyway');
+
+    // canplay, and with it the instance.
+    const hls = makeHls({ subtitleTrack: -1, subtitleDisplay: true });
+    initDefaultTracks(hls, p.video);
+
+    assert.equal(hls.subtitleDisplay, false, 'hls.js is told the viewer is not watching its tracks');
+    assert.equal(hls.subtitleTrack, -1);
+    assert.deepEqual(p.hlsModes(), ['disabled']);
+    assert.equal(p.mode('tr-pt'), 'showing');
+});
+
+test('an hls.js track that latches on mid-playback is put back', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => {
+        it.setResponse((url, params) => (params && params.method === 'HEAD'
+            ? progressResponse('400/400')
+            : { ok: true, status: 200, json: async () => ({}) }));
+        it.installHls({ subtitleTrack: -1, subtitleDisplay: true });
+    }, { hlsTracks: [['Full (rus)', 'hidden']] });
+    const hls = window.hlsPlayer;
+
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(p.mode('tr-pt'), 'showing');
+    assert.deepEqual(p.hlsModes(), ['disabled']);
+
+    // Now hls.js does what it does: something wakes onTextTracksChanged, it
+    // adopts a manifest track and starts drawing it. This is the state that
+    // was measured on stage, reproduced by hand — the fake does not
+    // implement hls.js's own reactions.
+    p.hlsTrack(0).mode = 'showing';
+    hls.emit(Hls.Events.SUBTITLE_TRACK_SWITCH, { id: 0 });
+    await flush();
+
+    assert.deepEqual(p.hlsModes(), ['disabled'], 'the manifest track is taken off screen again');
+    assert.equal(hls.subtitleTrack, -1);
+    assert.equal(hls.subtitleDisplay, false);
+    assert.equal(p.mode('tr-pt'), 'showing', 'and the chosen one is still the one playing');
+
+    // Terminating, not looping: the re-assertion's own writes come back as
+    // more hls.js events, and a second pass over a state that already
+    // agrees must write nothing.
+    const writes = hls.writes.length;
+    hls.emit(Hls.Events.SUBTITLE_TRACK_SWITCH, { id: -1 });
+    hls.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    await flush();
+    assert.equal(hls.writes.length, writes);
+});
+
+test('the re-assertion comes off with the player', async () => {
+    const p = await mountPlayer((it) => it.installHls({ subtitleTrack: -1 }));
+    const hls = window.hlsPlayer;
+    assert.equal(hls.listenerCount(Hls.Events.SUBTITLE_TRACK_SWITCH), 1);
+    destroyPlayer();
+    assert.equal(hls.listenerCount(Hls.Events.SUBTITLE_TRACK_SWITCH), 0);
+    assert.equal(hls.listenerCount(Hls.Events.SUBTITLE_TRACKS_UPDATED), 0);
+});
+
+// ---- the session seek --------------------------------------------------
+
+test('a seek re-applies the picker’s current answer, not the one it started with', async () => {
+    // The subtitles dialog stays open and clickable while a seek is in
+    // flight (the POST, the manifest reload and the buffering after it are
+    // seconds), so the selection that was playing when the seek began is
+    // not necessarily the one to come back to. It used to be restored from
+    // a snapshot taken at seek start — which, after a switch to a
+    // side-loaded track, put hls.js back on the embedded track and left
+    // both on screen.
+    const p = mount({ hlsTracks: [['Full (rus)', 'showing']] });
+    const hls = p.installHls({ subtitleTrack: 0, subtitleDisplay: true });
+    p.wire();
+    // Playing at seek time: the embedded Russian track.
+    p.chip('none').removeAttribute('data-default');
+    p.chip('mp-0').setAttribute('data-default', 'true');
+    p.modal.setAttribute('data-subtitles-off', 'false');
+
+    const seeker = createSessionSeeker({
+        hls,
+        videoEl: p.video,
+        sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8',
+        trackContainer: p.container,
+    });
+    const seeking = seeker.seek(120);
+    await flush();
+
+    // Mid-seek, the viewer switches to a side-loaded track.
+    click(p.chip('os-os-ru'));
+    await flush();
+
+    // loadSource: hls.js reprocesses the element, dropping its selection
+    // and disabling the element-backed tracks, then announces the new
+    // track list.
+    p.mode('os-os-ru');
+    p.video.textTracks.find((t) => t.id === 'os-os-ru').mode = 'disabled';
+    hls.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+
+    assert.equal(hls.subtitleTrack, -1, 'the snapshot’s embedded track is not restored');
+    assert.equal(hls.subtitleDisplay, false);
+    assert.equal(p.mode('os-os-ru'), 'showing');
+    assert.deepEqual(p.hlsModes(), ['disabled']);
+
+    // And the cue/mode snapshot restored on `playing` does not undo it
+    // either: it is the cues that have to survive a seek, not the modes.
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+    assert.equal(p.mode('os-os-ru'), 'showing');
+    assert.deepEqual(p.hlsModes(), ['disabled']);
+    assert.equal(hls.subtitleTrack, -1);
 });

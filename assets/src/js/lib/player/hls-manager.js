@@ -3,6 +3,7 @@
  * Extracted from mediaelement.js lines 30-143.
  */
 import Hls from 'hls.js';
+import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
 
 const HLS_CONFIG = {
     autoStartLoad: true,
@@ -157,15 +158,25 @@ export function remapTrackGroup(elements, hlsTracks) {
 
 /**
  * Initialize default audio/subtitle tracks from DOM data-default attributes.
+ *
+ * The subtitle half goes through applySubtitleSelection, which is what makes
+ * a side-loaded default (an upload, an OpenSubtitles track, a translation
+ * restored from an earlier session) turn hls.js's own subtitles OFF here.
+ * Reading `data-mp-id` and stopping when there was none used to leave
+ * `subtitleDisplay` at hls.js's default of `true` with no track selected —
+ * and the first textTracks change event after that handed hls.js a track of
+ * its own choosing, which it then drew over the chosen one. The activation
+ * that ran at mount could not do this itself: it happens before the HLS
+ * instance exists.
  */
-export function initDefaultTracks(hls) {
+export function initDefaultTracks(hls, video) {
     const defaultAudio = document.querySelector('.audio[data-default=true]');
     const defaultSub = document.querySelector('.subtitle[data-default=true]');
     const audioId = defaultAudio ? defaultAudio.getAttribute('data-mp-id') : null;
-    const subId = defaultSub ? defaultSub.getAttribute('data-mp-id') : null;
     if (audioId) hls.audioTrack = parseInt(audioId);
-    if (subId) {
-        hls.subtitleDisplay = true;
-        hls.subtitleTrack = parseInt(subId);
-    }
+    // No picker (a bare embed) means no answer to apply: hls.js keeps
+    // whatever the manifest declared.
+    const selection = selectionFor(defaultSub);
+    if (!selection) return;
+    applySubtitleSelection(video || document.querySelector('video.player, audio.player'), hls, selection);
 }

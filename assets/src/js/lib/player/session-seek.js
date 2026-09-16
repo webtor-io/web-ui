@@ -8,6 +8,7 @@
  */
 import { Hls } from './hls-manager';
 import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
+import { applySubtitleSelection, readSelection } from './subtitle-apply.js';
 
 /**
  * Capture the current video frame onto a canvas positioned over the video.
@@ -32,10 +33,15 @@ function captureFrame(videoEl) {
     }
 }
 
-export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange }) {
+export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange, trackContainer }) {
     let isSeeking = false;
     let seekOffset = 0;
     const isNative = !hls; // native HLS (iOS) — no HLS.js instance
+    // What is playing is the picker's answer, read when it is needed rather
+    // than snapshotted: the subtitles dialog stays open and clickable
+    // during a seek, so a snapshot taken at seek start can name a track the
+    // viewer has already moved off.
+    const pickerScope = () => trackContainer || document;
 
     function getSeekOffset() {
         return seekOffset;
@@ -55,8 +61,6 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             const freezeFrame = captureFrame(videoEl);
 
             const savedAudioTrack = hls ? hls.audioTrack : -1;
-            const savedSubtitleTrack = hls ? hls.subtitleTrack : -1;
-            const savedSubtitleDisplay = hls ? hls.subtitleDisplay : false;
             // hls.js flips element-backed <track>s (user uploads,
             // OpenSubtitles, external) to 'disabled' and clears their cue
             // lists while reprocessing the media element on loadSource() —
@@ -88,13 +92,14 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                     });
                 }
 
-                // Restore subtitle track
-                if (savedSubtitleDisplay && savedSubtitleTrack >= 0) {
-                    hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-                        hls.subtitleDisplay = true;
-                        hls.subtitleTrack = savedSubtitleTrack;
-                    });
-                }
+                // Re-apply the subtitle selection. loadSource makes hls.js
+                // reprocess the media element: it drops its own track
+                // selection and disables our element-backed ones, so
+                // whatever the picker says has to be written again. From
+                // the chip, not from a snapshot — see pickerScope above.
+                hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+                    applySubtitleSelection(videoEl, hls, readSelection(pickerScope()));
+                });
             }
 
             // Unlock seeking and remove freeze frame when playback resumes
@@ -109,6 +114,13 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                     for (const { track } of savedElementTrackState) {
                         applyCueOffset(track, seekOffset);
                     }
+                    // restoreTrackState puts back the modes captured at
+                    // seek start, which are as stale as the hls.js
+                    // selection was: a track chosen mid-seek would be
+                    // switched straight back off. The cues are what the
+                    // snapshot is for; the modes are the picker's answer,
+                    // so they are written last and from the chip.
+                    applySubtitleSelection(videoEl, hls, readSelection(pickerScope()));
                     setIsSeeking(false);
                     resolve();
                 }
