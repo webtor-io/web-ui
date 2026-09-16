@@ -281,7 +281,8 @@ for the same reason.
 | `#lang-chip-template` | `<template>` | one blank `.lang.lang-chip` that `track-picker.js` clones when an upload introduces a language the server rendered no chip for |
 | `#subtitle-tracks` | `<div role="radiogroup">` | subtitle chip row |
 | `#subtitle-none` | first child of `#subtitle-tracks` | the `none` list item, since 2026-09-15 a **hidden state carrier** and not a control (renamed from `#subtitle-off`, which read like the button it no longer is): `hidden`, `aria-hidden="true"`, `tabindex="-1"`, no label and no chip classes. The player still activates it by `data-id="none"` (`findSubtitleItem`, `pickDefaultSubtitle`, `hasSavedDefault`, `dropDeletedTracks`); the act of turning subtitles off belongs to `#subtitles-toggle` |
-| `#my-subtitles` | `<div class="contents">` | `display:contents` wrapper, the async swap target for uploads; last element inside `#subtitle-tracks` |
+| `#my-subtitles` | `<div class="flex flex-wrap …">` | the async swap target for uploads, a **sibling after** `#subtitle-tracks` (a11y, 2026-09-16): it holds the disclosure and the panel, and a radiogroup holds radios and nothing else. Carries `data-upload-open` (the panel state that survives the swap) |
+| `#my-upload-chips` | `<div class="contents">` | rendered **only** on the async reload (`UserSubtitleView.RenderChips`), inside `#my-subtitles`. Wraps that response's MY chips and says "this is the viewer's complete current upload list"; `adoptUploadChips` moves the chips into the radiogroup, reconciles the row's MY set against them and removes the wrapper |
 | `#my-uploads-toggle` | `<button aria-controls="my-uploads-panel">` | the dashed "+ My Subtitles" disclosure (label = `action.stream.mySubtitles`), rendered by the uploads partial |
 | `#my-uploads-panel` | `<div class="basis-full" hidden>` | heading line (`action.stream.mySubtitles` + the close control), upload form, one row per file, each row with its own delete form |
 | `#my-uploads-close` | `<button type="button" class="btn btn-ghost btn-xs">` | the panel's own "×", in its heading line (`aria-label` = `action.stream.close`). Closes the panel exactly as pressing the chip again does — same function in `Player.jsx`, same three writes |
@@ -294,8 +295,8 @@ for the same reason.
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
 | `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
-| `.subtitle` (track) | `#subtitle-tracks` — everything except uploads: embedded, sidecar, OpenSubtitles, embed externals, AI | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), plus `aria-disabled="true"` on every chip while the block is muted |
-| `.subtitle` (MY) | `#my-subtitles`, from `templates/partials/action/user_subtitles.html` | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
+| `.subtitle` (track) | `#subtitle-tracks` — embedded, sidecar, OpenSubtitles, embed externals, AI (and uploads, see below) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), plus `aria-disabled="true"` on every chip while the block is muted |
+| `.subtitle` (MY) | `#subtitle-tracks`, like every other track. On a page load the dialog's own loop renders them (they are `UserSubtitle` items of the same `GetSubtitles` result); on an async reload `templates/partials/action/user_subtitles.html` renders them into `#my-upload-chips` and the client moves them in | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 
 The `none` carrier never takes the active look: `setChipActive` refuses it by `data-id`, the way it
@@ -333,8 +334,11 @@ language (it is not a control), and it renders `hidden` from the server. `Expand
 to consult), so nothing is collapsed for the instant between the swap and the client's `refresh`.
 
 **Refresh order.** `refresh(container)` in `assets/src/js/lib/player/track-picker.js` is
-`syncLangRow` → `applyLangFilter` → `applyFlagSupport` → `applyOffState` (→ `syncNow`, a no-op
-since the "Now:" lines were dropped), and returns the language it settled on. `applyOffState`
+`adoptUploadChips` → `syncLangRow` → `applyLangFilter` → `applyFlagSupport` → `applyOffState`
+(→ `syncNow`, a no-op since the "Now:" lines were dropped), and returns the language it settled
+on. `adoptUploadChips` leads because every pass after it is scoped to `#subtitle-tracks`, and the
+chips of an async reload land outside it; on an ordinary page there is no `#my-upload-chips` and
+it is a no-op. `applyOffState`
 re-derives the muted state from `data-subtitles-off`, which is how an SSR-rendered "off" picks up
 the parts only JS can add (`aria-disabled`). `Player.jsx` calls it after mount, on dialog open, and after the `#my-subtitles` async
 swap (upload **and** delete). A plain selection calls `refreshMarks` (`syncLangRow`)
@@ -383,7 +387,10 @@ and never mark the upload as playing. The client owns both markers after a reloa
 `activateSubtitle` sets and persists the uploaded one, and `syncUploadMarks` in `Player.jsx`
 re-derives `data-default` from the live `textTracks` for every other reload.
 
-`syncUploadMarks` falls back to the `<track default>` attribute when no `textTrack` is showing —
+`syncUploadMarks` reads "the uploads" as `.subtitle[data-provider="UserSubtitle"]` anywhere in
+the dialog — containment in `#my-subtitles` stopped being the test when the chips moved into the
+radiogroup, and for one instant after a swap a fresh chip is in the wrapper anyway. It falls back
+to the `<track default>` attribute when no `textTrack` is showing —
 but only while no chip outside the uploads already carries `data-default`. An embedded
 (`MediaProbe`) track is driven by hls.js and has no `<track>` element, so "nothing showing" is
 also what an embedded track playing looks like; taking a stale `default` as the answer there
@@ -511,13 +518,31 @@ row plus the tracks of the expanded language.
 - **No "Now:" summary**: the active chip (check + fill) is the only indicator of what is playing;
   the heading-line summary from the first mockup was dropped as noise (2026-09-15). `#audio-now` /
   `#subtitle-now` no longer exist; `syncNow` no-ops when they are absent.
-- **Uploads are inline.** The dashed `+ My Subtitles` chip (`action.stream.mySubtitles`, the same key the old tab used) opens `#my-uploads-panel` on its own flex
-  line: the upload form and one row per file, each row carrying its own delete form that posts to
-  the unchanged `POST /user-subtitle/delete/:id` with `data-async-target="#my-subtitles"`.
+- **Uploads are inline, and split across the radiogroup boundary** (a11y, 2026-09-16). The MY
+  chips are radios and sit in `#subtitle-tracks` with every other track, grouped by language. The
+  dashed `+ My Subtitles` disclosure (`action.stream.mySubtitles`, the same key the old tab used)
+  and `#my-uploads-panel` are not radios and sit in `#my-subtitles`, a sibling block **after** the
+  row: the panel holds a heading, a close control, the upload form and one delete form per file,
+  and a `role="radiogroup"` contains radios and nothing else.
+  Each delete form still posts to the unchanged `POST /user-subtitle/delete/:id` with
+  `data-async-target="#my-subtitles"` — one swap target, as before.
   Deletion is deliberately not on the chip — a chip is a radio button, and an accidental tap must
   not destroy a file. After the swap `Player.jsx` re-runs `refresh`, so the chip row, the language
   counts and the expanded language all follow; the panel re-opens from `data-upload-open` on
   `#my-subtitles` (the wrapper survives the swap, the toggle and panel inside it do not).
+  - **Who renders the chips depends on which render it is** (`UserSubtitleView.RenderChips`). On a
+    page load the dialog's own `$subs` loop renders every upload into the row — they are
+    `UserSubtitle` items of the same `GetSubtitles` result — and the partial emits none, so a page
+    whose JS never ran is already correct. On the async reload nothing re-runs that loop (the
+    partial *is* the response), so it renders them into `#my-upload-chips` and
+    `adoptUploadChips` (`track-picker.js`) moves them into the radiogroup.
+  - **The marker is what makes a delete work.** `adoptUploadChips` replaces *every* MY chip in the
+    row with what came back, so an upload's chip is the fresh element (de-dup by `data-id` falls
+    out of that) and a deleted one leaves the row instead of being orphaned in markup nothing
+    re-renders. That is only safe because `#my-upload-chips` says "this response is the complete
+    current list": an empty wrapper is a delete, an absent wrapper is an ordinary page. The
+    wrapper is removed once drained, so the next `refresh` does not read a consumed answer as
+    "this viewer has no uploads".
   The panel closes from the chip again **or** from the "×" in its heading line
   (`#my-uploads-close`, owner 2026-09-15): the way back should not depend on remembering which
   chip opened it. Both controls go through `setUploadPanel`, so the state left behind is the same
@@ -567,12 +592,24 @@ row plus the tracks of the expanded language.
   `applyOffState` adds on the first `refresh`.
   Switching tracks needed JS before the redesign too — the handlers were always client-side.
 
-**Known a11y wart (follow-up).** `#my-uploads-toggle` and `#my-uploads-panel` render *inside*
-`#subtitle-tracks[role="radiogroup"]`, because the uploads partial is a single async swap target
-that must emit both the MY chips and the panel, and its `#my-subtitles` wrapper
-(`display:contents`) sits inside the row. The radiogroup therefore contains a disclosure button
-and, when open, two forms. Ruling R8 asks for them as siblings after the radiogroup; moving them
-is markup-only plus a re-scope of `readChips` in `track-picker.js`.
+**A11y wart — resolved (2026-09-16, ruling R8).** `#my-uploads-toggle` and `#my-uploads-panel`
+used to render *inside* `#subtitle-tracks[role="radiogroup"]`, because the uploads partial is a
+single async swap target that had to emit both the MY chips and the panel, and its `#my-subtitles`
+wrapper (`display:contents`) sat inside the row — so the radiogroup contained a disclosure button
+and, when open, two forms. `#my-subtitles` is now a sibling **after** the row and keeps the panel;
+the chips stay in the radiogroup, rendered by the dialog's own loop on a page load and moved in by
+`adoptUploadChips` after a swap (see "Uploads are inline" above).
+
+What it cost, since the estimate was wrong: not markup plus a re-scope of `readChips`, but a
+render-mode field (`UserSubtitleView.RenderChips`) so one upload is not rendered twice, a marker
+element (`#my-upload-chips`) so a delete is distinguishable from a page load, and a re-scope of
+`syncUploadMarks` (`Player.jsx`) from "inside `#my-subtitles`" to
+`data-provider="UserSubtitle"`. `readChips` itself needed no change — it was already scoped to
+`#subtitle-tracks`, which is where the chips ended up. The two multi-target alternatives were
+rejected: `loadAsyncView` swaps exactly one element, and the `data-async-update-*` slot mechanism
+that could carry a second fragment is a **layout** facility whose key→action map lives in
+`app/layout.js` — adding a picker-specific slot there would put a player detail in the global
+navigation updater.
 
 Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `OriginCodeForBadge`,
 `OriginKey`, `PropertyTags`, `AudioSuffix`) and `services/stremio/lang_display.go`
@@ -626,11 +663,18 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   nil-field panic in `getSubtitles`/`getAudioTracks` template bindings goes red under `make test`
   instead of only surfacing at runtime (the template funcs are bound by reflection; arity is
   checked at `tm.Init()`, not compile time). `services/template/user_subtitles_partial_render_test.go`
-  covers the upload partial.
+  covers the upload partial, including the `RenderChips` split (initial render: panel only; async
+  reload: chips wrapped in `#my-upload-chips`).
+  `TestStreamVideoRendersUploadChipsInsideTheTrackRow` renders the real partial inside the dialog
+  and balances `<div>` tags to prove the chip is *inside* the radiogroup and the disclosure, the
+  panel and every form are *outside* it — a substring order check cannot tell nesting from
+  adjacency, which is how the wart survived the first review.
 - JS: `npm test` (`node --test`, plain-JS modules only — cannot parse JSX, so `Player.jsx` itself
   isn't covered, only the modules it imports). Covers `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
   `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`),
   `subtitle-telemetry.test.js` (`readAllTracks`, `readTracks`, `selectEventData`,
   `resolveSubtitleLevel`), `subtitle-track-reload.test.js` (`reloadSubtitleTrack`: listener
-  lifetime, latest-snapshot restore, the did-it-reload return value).
+  lifetime, latest-snapshot restore, the did-it-reload return value), and `track-picker.test.js`
+  (`adoptUploadChips`: no marker means no move, an upload replaces the chip of its id, a delete —
+  including of the last file — takes the chip out of the row).
