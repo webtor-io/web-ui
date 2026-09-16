@@ -678,6 +678,13 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   with a non-zero offset). A seeked session never produces a cached final artifact; the partial
   progress is kept 24 h and reused by cue identity. Native MP4 without a transcoder session
   still has no embedded source.
+- **After a seek, translated cues can sit up to one GOP off.** Measured on the stand
+  (2026-09-16): the same line lands 1.66 s apart in two runs of one file (seek 600 vs 570) —
+  the transcoder starts each run at the keyframe before the quantized offset, and the player's
+  own timeline carries the same per-run shift, so embedded tracks stay in sync while every
+  side-loaded track (OpenSubtitles, uploads, AI) is off by that shift. The service dedups cues
+  by text within a 3 s window so a seek does not duplicate lines; the timing it keeps is the
+  first run's. A transcoder-side fix (report the real run start) would remove it for all tracks.
 - **Each reload refetches the whole partial VTT.** The `rev` reload swaps the `<track>` `src` and
   lets the browser reparse from scratch — no incremental cue-append; the file is just short early
   on and grows with each revision. The 15 s throttle bounds the cost (and the blank-cue window) but
