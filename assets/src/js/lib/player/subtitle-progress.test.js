@@ -298,6 +298,30 @@ test('a kick that finds nothing new yet still marks the change that follows', as
     assert.equal(seen[1].forceReload, true, 'the mark waited for an actual change to land on');
 });
 
+test('a frontier move after a kick does not spend the mark: the first new count does', async () => {
+    // After a session seek the service's X-Subtitle-Pending-From moves
+    // (same cues, a new run window) before any new cue is translated. That
+    // is a change onProgress reports, but not one that changes the track's
+    // revision — a mark spent on it would leave the seek's first real cues
+    // waiting out the reload throttle after all.
+    let progress = '3/10';
+    let pending = '100.000';
+    const fetchImpl = async () => ({ status: 200, headers: { get: (k) => (k === 'X-Subtitle-Pending-From' ? pending : progress) } });
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', { fetchImpl, intervalMs: 5, onProgress: (p) => seen.push(p) });
+    await new Promise((r) => setTimeout(r, 10));
+    stop.kick();
+    pending = '40.000';
+    await new Promise((r) => setTimeout(r, 15));
+    progress = '6/10';
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+
+    assert.deepEqual(seen.map((p) => [p.done, p.pendingFrom]), [[3, 100], [3, 40], [6, 40]]);
+    assert.equal(seen[1].forceReload, undefined, 'the frontier move alone must not spend the mark');
+    assert.equal(seen[2].forceReload, true, 'the first count change after the kick carries it');
+});
+
 test('kick() does nothing once the run is stopped or asleep', async () => {
     let calls = 0;
     const fetchImpl = async () => { calls++; return { status: 200, headers: { get: () => '1/10' } }; };

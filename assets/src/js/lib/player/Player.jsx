@@ -435,10 +435,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onTick: (p) => {
                 const video = videoRef.current;
                 if (!video) return;
-                pendingFromRef.current = p.pendingFrom;
+                // The frontier only means something against a live run:
+                // a batch (file) source has no playhead relationship, and
+                // the contract says the header never comes with one. Read
+                // as "nothing pending" rather than trusted.
+                pendingFromRef.current = p.live ? p.pendingFrom : null;
                 const playhead = (video.currentTime || 0) + seekOffsetRef.current;
                 if (waitingRef.current) {
-                    if (!caughtUp(p.pendingFrom, playhead)) {
+                    if (!caughtUp(pendingFromRef.current, playhead)) {
                         showCatchUp({ remaining: remaining(p), waiting: true });
                         return;
                     }
@@ -454,7 +458,18 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     resumePlayback();
                     return;
                 }
-                const isTrailing = trailing(trailingRef.current, p.pendingFrom, playhead);
+                // A paused film is not running into anything. The one
+                // tick that reaches here paused is a run started before
+                // the first play (suspendIfNobodyIsWatching sleeps it on
+                // this same answer): at t=0 against a fresh run's
+                // frontier the comparison would say "behind" over a film
+                // that has not started. Nothing else is touched — the
+                // answer will be recomputed by the first tick after play.
+                if (video.paused) {
+                    showCatchUp(null);
+                    return;
+                }
+                const isTrailing = trailing(trailingRef.current, pendingFromRef.current, playhead);
                 trailingRef.current = isTrailing;
                 if (isTrailing && !dismissedRef.current) {
                     showCatchUp({ remaining: remaining(p), waiting: false });

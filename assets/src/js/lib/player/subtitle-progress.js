@@ -259,13 +259,20 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             // which is the whole content of the cap. Only a live source
             // gets the extension: a batch run keeps its absolute deadline,
             // because its end is minutes away and not film-length.
-            if (p.live && p.done !== last) deadline = Date.now() + timeoutMs;
+            const countMoved = p.done !== last;
+            if (p.live && countMoved) deadline = Date.now() + timeoutMs;
             last = p.done;
             lastTotal = p.total;
             lastLive = p.live;
             lastPendingFrom = p.pendingFrom;
             if (onProgress) {
-                if (pendingKick) {
+                // The mark is spent only on a count change: that is the
+                // one that changes the track's revision (withRev) and so
+                // the one whose reload the throttle would otherwise hold.
+                // After a seek the frontier usually moves before any new
+                // cue lands, and spending the mark on that would hand the
+                // seek's first real cues back to the 15 s window.
+                if (pendingKick && countMoved) {
                     pendingKick = false;
                     onProgress({ ...p, forceReload: true });
                 } else {

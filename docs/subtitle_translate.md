@@ -349,7 +349,10 @@ trip" / cache-key section).
   (`onSeekOffsetChange` → `pollStopRef.current.kick()`): an immediate HEAD instead of waiting out
   the 3 s interval, and a one-time bypass of `TRACK_RELOAD_INTERVAL_MS` on the reload the next
   changed count brings, so the new position's cues do not queue up behind both delays on top of
-  the service's own translation lag.
+  the service's own translation lag. The mark is spent only on a *count* change: after a seek the
+  frontier (`X-Subtitle-Pending-From`) moves before any new cue lands, and that is a change
+  `onProgress` reports but not one that changes the track revision, so spending the mark on it
+  would hand the seek's first real cues back to the throttle.
 - **Audio switch re-pick.** `onAudioSelect` calls `pickDefaultSubtitle(readTracks(modal), audioLang,
   preferredLang)` and activates the result, unless the viewer already made a manual subtitle choice
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
@@ -448,7 +451,13 @@ trip" / cache-key section).
     is the segment boundary it actually started on and shifts by up to ~1.7 s between runs — a
     tighter threshold would flip on arithmetic rather than on anything that happened. A playhead
     that is not a finite number (a `<video>` with no timeline yet) reads as *not trailing* and as
-    *caught up*: a film that has not started must never pause itself.
+    *caught up*: a film that has not started must never pause itself. Two more gates sit in
+    front of the comparison: the frontier is read only while the run is live (`p.live`; a batch
+    source has no playhead relationship and the header is not meant to come with one), and a
+    **paused** film is never reported as trailing — the one tick that reaches the banner paused
+    is a run started before the first play, where t=0 against a fresh frontier read as "behind"
+    over a film that had not started. The wait branch is the exception: a waiting viewer *is*
+    paused, and their tick is what ends the wait.
   - **Evaluated on every tick, not on every change.** `pollProgress` gained `onTick(p)`, called on
     every successful 200 after the change and queue blocks and before the terminal ones.
     `onProgress` keeps its only-on-change contract (the chip has nothing to redraw when nothing
