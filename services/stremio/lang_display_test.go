@@ -13,7 +13,9 @@ func TestNewLangDisplay(t *testing.T) {
 		{"EN", "en", "English", "🇬🇧", ""},
 		// Разбираемый, но не входящий в таблицу тег: группировать по нему
 		// можно, показывать — только как код.
-		{"ka", "ka", "", "", "KA"},
+		// "is" (Icelandic) was "ka" until Georgian joined the table on
+		// 2026-09-16; any tag outside Languages does.
+		{"is", "is", "", "", "IS"},
 		{"und", "und", "", "", "UND"},
 		{"", "und", "", "", "UND"},
 		{"  ", "und", "", "", "UND"},
@@ -75,12 +77,12 @@ func TestNewLangDisplayIn(t *testing.T) {
 // A tag NewLangDisplay itself cannot name (und, or a parseable-but-unlisted
 // code) has no English Name to localize either way: Localized must stay ""
 // rather than surface a CLDR translation our own chip never shows (that
-// chip would read the bare Code, e.g. "KA", not a name in any language).
+// chip would read the bare Code, e.g. "IS", not a name in any language).
 func TestNewLangDisplayInUnknownStaysEmpty(t *testing.T) {
 	cases := []struct{ uiLang, tag string }{
 		{"ru", "und"},
 		{"ru", ""},
-		{"ru", "ka"}, // valid ISO code, not in our own Languages table
+		{"ru", "is"}, // valid ISO code, not in our own Languages table
 	}
 	for _, c := range cases {
 		got := NewLangDisplayIn(c.uiLang, c.tag)

@@ -34,6 +34,28 @@ const LANGUAGES = [
     { name: 'Vietnamese', flag: '🇻🇳', aliases: ['vie', 'vietnamese', 'vi'] },
     { name: 'Indonesian', flag: '🇮🇩', aliases: ['ind', 'indonesian', 'id'] },
     { name: 'Malay',      flag: '🇲🇾', aliases: ['may', 'malay', 'ms'] },
+    // Appended 2026-09-16, mirroring services/stremio/lang.go: every code
+    // the subtitle-translate service accepts needs an entry (a Go test
+    // pins the superset). Same order as the Go table, same narrowed
+    // aliases -- the ISO 639-2/B codes 'per', 'arm', 'ben', 'lit' and
+    // 'cat' are ordinary English words and are left out, and 'et'/'ca'
+    // are in LANG_SKIP below for the same reason. Flags are unique
+    // because LANG_MAP is keyed by them too: Tamil takes 🇱🇰 (🇮🇳 is
+    // Hindi's) and Catalan 🇦🇩 (🇪🇸 is Spanish's).
+    { name: 'Slovak',     flag: '🇸🇰', aliases: ['slk', 'slovak', 'sk', 'slovenčina'] },
+    { name: 'Lithuanian', flag: '🇱🇹', aliases: ['lithuanian', 'lt', 'lietuvių'] },
+    { name: 'Latvian',    flag: '🇱🇻', aliases: ['lav', 'latvian', 'lv', 'latviešu'] },
+    { name: 'Estonian',   flag: '🇪🇪', aliases: ['est', 'estonian', 'et', 'eesti'] },
+    { name: 'Persian',    flag: '🇮🇷', aliases: ['fas', 'persian', 'farsi', 'fa', 'فارسی'] },
+    { name: 'Bengali',    flag: '🇧🇩', aliases: ['bengali', 'bn', 'বাংলা'] },
+    { name: 'Tamil',      flag: '🇱🇰', aliases: ['tam', 'tamil', 'ta', 'தமிழ்'] },
+    { name: 'Kazakh',     flag: '🇰🇿', aliases: ['kaz', 'kazakh', 'kk', 'қазақ'] },
+    { name: 'Georgian',   flag: '🇬🇪', aliases: ['kat', 'georgian', 'ka', 'ქართული'] },
+    { name: 'Armenian',   flag: '🇦🇲', aliases: ['hye', 'armenian', 'hy', 'հայերեն'] },
+    { name: 'Azerbaijani', flag: '🇦🇿', aliases: ['aze', 'azerbaijani', 'az', 'azərbaycan'] },
+    { name: 'Catalan',    flag: '🇦🇩', aliases: ['catalan', 'ca', 'català'] },
+    // Latino has no Go counterpart: it is a title tag, not a language of
+    // the settings list, and stays last.
     { name: 'Latino',     flag: '🇪🇸', aliases: ['lat', 'latino'], extraFlags: ['🇲🇽', '🇦🇷'] },
 ];
 
@@ -48,6 +70,8 @@ for (const lang of LANGUAGES) {
 // Words to skip -- they are not languages even though they match short codes
 const LANG_SKIP = new Set([
     'no', // Norwegian conflicts with "no" (e.g. "No torrent")
+    'et', // Estonian conflicts with the French and Latin "et"
+    'ca', // Catalan conflicts with "CA" the region code and "ca." circa
 ]);
 
 // supportsFlagEmoji reports whether the platform actually renders

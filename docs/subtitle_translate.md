@@ -93,6 +93,19 @@ answering `none`. It used to answer `none`, which switched subtitles off behind 
 who touched the audio menu, with `persist:false` so nothing recorded why (fixed 2026-09-16; wiring
 test in `Player.wiring.test.js`).
 
+**The language table is a superset of the service's.** `applyLadder` offers a translation only
+when `stremio.LanguageByCode(lang) != nil` — an item that leads to a rejected request is worse
+than no item — so a code `subtitle-translate` accepts and `stremio.Languages` lacks is a viewer
+whose preferred language silently gets no AI item at all: no chip, no lock, nothing to explain.
+Twelve codes were in exactly that state until 2026-09-16 (`sk lt lv et fa bn ta kk ka hy az ca`).
+`TestLanguagesCoverTheTranslateService` (`services/stremio/lang_superset_test.go`) embeds the
+service's list and says what is missing; the refresh procedure is in the comment above it. The
+table is mirrored in `assets/src/js/lib/discover/lang.js`, and the appended rows carry **narrower
+aliases** than the older ones, because aliases are matched against whitespace-split torrent-title
+tokens: the ISO 639-2/B codes `per`, `arm`, `ben`, `lit` and `cat` are ordinary English words, and
+`et` (French/Latin "et") and `ca` ("CA", "ca." for circa) are listed but in the skip set. Missing
+a tag costs one filter chip; inventing one files a release under a language nobody asked for.
+
 ## Preferred language
 
 `streamprefs.Service.PreferredContentLang(ctx, user, uiLang)`:

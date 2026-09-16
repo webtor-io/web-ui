@@ -49,6 +49,36 @@ var Languages = []Language{
 	{Code: "vi", Name: "Vietnamese", Flag: "🇻🇳", Aliases: []string{"vie", "vietnamese", "vi"}},
 	{Code: "id", Name: "Indonesian", Flag: "🇮🇩", Aliases: []string{"ind", "indonesian", "id"}},
 	{Code: "ms", Name: "Malay", Flag: "🇲🇾", Aliases: []string{"may", "malay", "ms"}},
+	// Appended 2026-09-16 so every code the subtitle-translate service
+	// accepts has an entry here (langSupersetTest pins that). Order of the
+	// entries above is unchanged: the Stremio settings list and the
+	// language row read this order, and reshuffling it would move chips
+	// under people.
+	//
+	// Aliases are chosen more narrowly than the rows above, because every
+	// one of them is matched against whitespace-split tokens of torrent
+	// titles (ExtractLanguages): the ISO 639-2/B codes "per", "arm", "ben",
+	// "lit" and "cat" are ordinary English words or names and are left out,
+	// and "et"/"ca" are listed but skipped below for the same reason.
+	// Missing a language tag costs one filter chip; inventing one puts a
+	// release in a language nobody asked for.
+	{Code: "sk", Name: "Slovak", Flag: "🇸🇰", Aliases: []string{"slk", "slovak", "sk", "slovenčina"}},
+	{Code: "lt", Name: "Lithuanian", Flag: "🇱🇹", Aliases: []string{"lithuanian", "lt", "lietuvių"}},
+	{Code: "lv", Name: "Latvian", Flag: "🇱🇻", Aliases: []string{"lav", "latvian", "lv", "latviešu"}},
+	{Code: "et", Name: "Estonian", Flag: "🇪🇪", Aliases: []string{"est", "estonian", "et", "eesti"}},
+	{Code: "fa", Name: "Persian", Flag: "🇮🇷", Aliases: []string{"fas", "persian", "farsi", "fa", "فارسی"}},
+	{Code: "bn", Name: "Bengali", Flag: "🇧🇩", Aliases: []string{"bengali", "bn", "বাংলা"}},
+	// Sri Lanka, not India: Tamil is official in both, and 🇮🇳 is already
+	// Hindi's. The flag is a map key (langMap), so a duplicate would
+	// silently shadow the entry above it.
+	{Code: "ta", Name: "Tamil", Flag: "🇱🇰", Aliases: []string{"tam", "tamil", "ta", "தமிழ்"}},
+	{Code: "kk", Name: "Kazakh", Flag: "🇰🇿", Aliases: []string{"kaz", "kazakh", "kk", "қазақ"}},
+	{Code: "ka", Name: "Georgian", Flag: "🇬🇪", Aliases: []string{"kat", "georgian", "ka", "ქართული"}},
+	{Code: "hy", Name: "Armenian", Flag: "🇦🇲", Aliases: []string{"hye", "armenian", "hy", "հայերեն"}},
+	{Code: "az", Name: "Azerbaijani", Flag: "🇦🇿", Aliases: []string{"aze", "azerbaijani", "az", "azərbaycan"}},
+	// Andorra: the one state where Catalan is the sole official language,
+	// and 🇪🇸 is already Spanish's.
+	{Code: "ca", Name: "Catalan", Flag: "🇦🇩", Aliases: []string{"catalan", "ca", "català"}},
 }
 
 // langMap resolves an alias / 2-letter code / flag emoji to a Language entry.
@@ -68,6 +98,8 @@ var langMap = func() map[string]*Language {
 // language codes but produce too many false positives.
 var langSkip = map[string]bool{
 	"no": true, // Norwegian conflicts with the English word "no"
+	"et": true, // Estonian conflicts with the French and Latin "et"
+	"ca": true, // Catalan conflicts with "CA" the region code and "ca." circa
 }
 
 // langSplitter mirrors the JS regex /[\s./()[\],|+]+/ used to tokenise

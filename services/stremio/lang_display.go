@@ -64,7 +64,7 @@ func NewLangDisplay(tag string) LangDisplay {
 // /und_uiLang), which reddens (panics) if this guard is removed.
 //
 // A tag NewLangDisplay itself could not name (und, or parseable-but-unlisted
-// like "ka") has no English Name either, and Localized stays "" for it too
+// like "is") has no English Name either, and Localized stays "" for it too
 // — there is nothing to localize, and the chip for the same tag shows only
 // a bare Code, never a name in any language.
 func NewLangDisplayIn(uiLang, tag string) LangDisplay {
