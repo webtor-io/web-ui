@@ -1311,3 +1311,17 @@ func TestMatchLangIsDeterministicAcrossRegionalTies(t *testing.T) {
 		}
 	}
 }
+
+// GetSubtitles is bound into the templates by reflection and called with
+// whatever the export response carried. sc.ExportTag comes straight from
+// exportResponse.ExportItems["stream"].Tag and ExternalData from the embed,
+// so either can be nil -- and a nil dereference inside a template func is
+// re-panicked by text/template rather than wrapped, which surfaces as a 500
+// with no route context.
+func TestGetSubtitlesSurvivesNilExportTagAndExternalData(t *testing.T) {
+	ud := &models.VideoStreamUserData{AcceptLangTags: []language.Tag{language.English}, FallbackLangTag: language.English}
+	items := NewHelper().GetSubtitles(ud, nil, nil, nil, nil, nil, SubtitleOpts{})
+	if len(items) != 1 || items[0].ID != "none" {
+		t.Fatalf("want just the None entry, got %v", items)
+	}
+}

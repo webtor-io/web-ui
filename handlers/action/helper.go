@@ -783,6 +783,20 @@ func (s *Helper) offSuggestion(lis []ListItem, ud *models.VideoStreamUserData, o
 	return -1
 }
 
+func tagTracks(tag *ra.ExportTag) []ra.ExportTrack {
+	if tag == nil {
+		return nil
+	}
+	return tag.Tracks
+}
+
+func extTracks(ext *models.ExternalData) []models.ExternalTrack {
+	if ext == nil {
+		return nil
+	}
+	return ext.Tracks
+}
+
 func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe, tag *ra.ExportTag, opensubs []api.OpenSubtitleTrack, ext *models.ExternalData, userSubs []models.UserSubtitleTrack, opts SubtitleOpts) []ListItem {
 	var res []ListItem
 	res = append(res, ListItem{
@@ -828,7 +842,12 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			i++
 		}
 	}
-	for i, t := range tag.Tracks {
+	// tag and ext come straight off the export response
+	// (exportResponse.ExportItems["stream"].Tag) and the embed's own data;
+	// either can be nil. A nil dereference inside a template func is
+	// re-panicked by text/template rather than wrapped, so it surfaces as a
+	// 500 with no route context.
+	for i, t := range tagTracks(tag) {
 		forced := sidecarForced(t.Label, t.Src)
 		res = append(res, ListItem{
 			ID:       "et-" + strconv.Itoa(i+1),
@@ -853,7 +872,7 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 			Badge:    badgeFor("OpenSubtitles", false),
 		})
 	}
-	for i, t := range ext.Tracks {
+	for i, t := range extTracks(ext) {
 		res = append(res, ListItem{
 			ID:       "ext-" + strconv.Itoa(i+1),
 			Label:    t.Label,
