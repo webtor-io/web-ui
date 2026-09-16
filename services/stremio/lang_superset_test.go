@@ -66,46 +66,100 @@ func TestLanguagesAreWellFormed(t *testing.T) {
 			t.Errorf("%s reuses %s's flag %s: langMap is keyed by flag, so one shadows the other", l.Code, prev, l.Flag)
 		}
 		flags[l.Flag] = l.Code
-		for _, a := range l.Aliases {
+		for _, a := range l.TitleAliases {
 			if prev, ok := aliases[a]; ok {
-				t.Errorf("%s reuses %s's alias %q: langMap is keyed by alias too", l.Code, prev, a)
+				t.Errorf("%s reuses %s's title alias %q: langMap is keyed by alias too", l.Code, prev, a)
 			}
 			aliases[a] = l.Code
 		}
 	}
 	// Deliberately NOT asserted: that every Code is also one of its own
-	// Aliases. Two are not -- "uk" (Ukrainian, aliased "ua") and "cs"
-	// (Czech, aliased "cz") -- and that is right rather than an oversight:
-	// aliases are matched against torrent-title tokens, where "UK" means
-	// the United Kingdom far more often than Ukrainian. LanguageByCode
-	// walks Codes and is unaffected; only title detection is, and there
-	// the omission is the safer answer. Asserted here once so the next
-	// reader does not "fix" it.
+	// TitleAliases. Two of the detectable rows are not -- "uk"
+	// (Ukrainian, aliased "ua") and "cs" (Czech, aliased "cz") -- and
+	// that is right rather than an oversight: title aliases are matched
+	// against torrent-title tokens, where "UK" means the United Kingdom
+	// far more often than Ukrainian. Twelve more rows have no title
+	// aliases at all, which is the same judgement made wholesale. Written
+	// down so the next reader does not "fix" it.
 }
 
-// TestSkippedCodesStayOutOfTitleDetection: "et" and "ca" are listed as
-// aliases (the settings list and LanguageByCode need them) but must never
-// be read out of a torrent title — "et" is the French and Latin
-// conjunction, "ca" a region code and an abbreviation for circa. Missing a
-// tag costs one filter chip; inventing one puts a release in a language
-// nobody asked for.
-func TestSkippedCodesStayOutOfTitleDetection(t *testing.T) {
-	for _, title := range []string{
-		"Le Fabuleux Destin et la Suite 2001 1080p",
-		"Some.Movie.2019.CA.WEB-DL.x264",
+// TestAppendedLanguagesAreNotDetectedFromTitles is the review's C1 table,
+// measured against the first version of this branch: every one of these
+// titles answered with one of the twelve appended languages, and the last
+// row is the damaging one — a false positive pre-empts the Cyrillic
+// fallback (ExtractLanguages runs it only when nothing else matched), and
+// LangFilterStream keeps only matching streams, so a Russian viewer lost
+// that release from their Stremio list without a word.
+//
+// "KAT" is KickassTorrents branding and "[" / "]" are splitter characters;
+// "EST" is the Electronic-Sell-Through release tag. Neither is a language,
+// and neither was measured before being made one.
+func TestAppendedLanguagesAreNotDetectedFromTitles(t *testing.T) {
+	for _, c := range []struct {
+		title string
+		want  []string // language codes, in order
+	}{
+		{"[KAT] Movie 2019 1080p BluRay x264", nil},
+		{"Movie.2019.1080p.WEB-DL.KAT", nil},
+		{"Movie.2019.EST.WEB-DL.x264", nil},
+		{"Movie.2019.LAV.1080p", nil},
+		{"Movie 2019 TAM HDRip", nil},
+		{"Movie.2019.SK.1080p.WEB", nil},
+		{"Movie 2019 AZ 1080p", nil},
+		{"Movie.2019.FA.1080p", nil},
+		{"Фильм 2019 [KAT] 1080p", []string{"ru"}},
+		// The words themselves are not detected either: with no title
+		// aliases at all there is no token that means these languages.
+		{"Movie 2019 Estonian 1080p", nil},
+		{"Movie 2019 Catalan 1080p", nil},
+		// Control: the rows that always had aliases still work, and the
+		// Cyrillic fallback is intact.
+		{"Movie.2019.RUS.1080p", []string{"ru"}},
+		{"Фильм 2019 1080p", []string{"ru"}},
+		{"Фільм 2019 1080p", []string{"uk"}},
+		{"Movie 2019 ITA ENG 1080p", []string{"it", "en"}},
 	} {
-		for _, l := range ExtractLanguages(title) {
-			if l.Code == "et" || l.Code == "ca" {
-				t.Errorf("%q: detected %s from a skipped token", title, l.Name)
+		var got []string
+		for _, l := range ExtractLanguages(c.title) {
+			got = append(got, l.Code)
+		}
+		if len(got) != len(c.want) {
+			t.Errorf("%q: got %v want %v", c.title, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%q: got %v want %v", c.title, got, c.want)
+				break
 			}
 		}
 	}
-	// Negative control: the languages are still reachable by their full
-	// names, so skipping the two-letter form does not remove them.
-	for word, code := range map[string]string{"Estonian": "et", "Catalan": "ca", "Tamil": "ta"} {
-		got := ExtractLanguages("Movie 2019 " + word + " 1080p")
-		if len(got) != 1 || got[0].Code != code {
-			t.Errorf("%s: got %+v, want the %s entry", word, got, code)
+}
+
+// TestDetectableSplitsIdentityFromDetection: the twelve appended rows are
+// nameable and choosable (LanguageByCode, NewLangDisplay, the Stremio
+// dropdown) and invisible to detection — including by their flag, which is
+// a langMap key for every row that has aliases.
+func TestDetectableSplitsIdentityFromDetection(t *testing.T) {
+	for _, code := range []string{"sk", "lt", "lv", "et", "fa", "bn", "ta", "kk", "ka", "hy", "az", "ca"} {
+		l := LanguageByCode(code)
+		if l == nil {
+			t.Fatalf("%s: must stay in the table — it is what the dropdown offers", code)
+		}
+		if l.Detectable() {
+			t.Errorf("%s: appended rows carry no title aliases until someone measures them", code)
+		}
+		if got := ExtractLanguages("Movie 2019 " + l.Flag + " 1080p"); len(got) != 0 {
+			t.Errorf("%s: its flag reached detection anyway: %+v", code, got)
+		}
+		if d := NewLangDisplay(code); d.Name != l.Name || d.Flag != l.Flag {
+			t.Errorf("%s: still has to render as a name and a flag, got %+v", code, d)
+		}
+	}
+	// And the rows that do carry aliases are unchanged.
+	for _, code := range []string{"en", "ru", "pt", "ms"} {
+		if l := LanguageByCode(code); l == nil || !l.Detectable() {
+			t.Errorf("%s: must stay detectable", code)
 		}
 	}
 }

@@ -212,7 +212,7 @@ func (s *Helper) OriginHintKey(li ListItem) string {
 	return ""
 }
 
-// PropertyTags are what kind of track this is, as opposed to where it came// PropertyTags are what kind of track this is, as opposed to where it came
+// PropertyTags are what kind of track this is, as opposed to where it came
 // from: lowercase codes rendered after the file name, secondary to the
 // origin badge. Only "forced" exists today; "sdh" is drawn in the uikit and
 // waits for content-prober to expose ffprobe's disposition flags.

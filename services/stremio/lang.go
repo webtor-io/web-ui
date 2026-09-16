@@ -7,86 +7,125 @@ import "strings"
 // assets/src/js/lib/discover/lang.js so the Stremio addon and the
 // Discover stream modal share the same detection rules.
 type Language struct {
-	Code    string
-	Name    string
-	Flag    string
-	Aliases []string
+	Code string
+	Name string
+	Flag string
+	// TitleAliases are the tokens that mean this language *in a torrent
+	// title*, and nothing else. They are a different question from the
+	// three fields above, which are identity: what the language is called
+	// and how it is drawn. A row may be perfectly nameable -- offered in
+	// the Stremio settings dropdown, resolvable by LanguageByCode, given a
+	// flag and a name on a picker chip -- and still carry no title
+	// aliases at all, which is exactly what the twelve rows appended in
+	// 2026-09 do.
+	//
+	// Empty means "never detected from a title": neither these tokens nor
+	// the flag enter langMap, so ExtractLanguages cannot answer with this
+	// language. That is the safe default for a code nobody has measured
+	// against real release vocabulary, because the cost is asymmetric --
+	// a language not detected loses one filter chip, while a language
+	// detected wrongly *pre-empts* the right answer (ExtractLanguages
+	// runs its Cyrillic fallback only when nothing else matched) and
+	// LangFilterStream then drops the release from the viewer's list
+	// entirely. "KAT" is KickassTorrents, not Georgian; "EST" is
+	// Electronic Sell-Through, not Estonian.
+	TitleAliases []string
+}
+
+// Detectable reports whether ExtractLanguages can ever answer with this
+// language. Callers that filter *by* a language have to ask: keeping only
+// the streams that advertise a language nothing can advertise keeps none,
+// which reads to the viewer as "there is nothing for this film".
+func (l *Language) Detectable() bool {
+	return len(l.TitleAliases) > 0
 }
 
 // Languages is the canonical, ordered list of supported languages. Keep in
 // sync with assets/src/js/lib/discover/lang.js.
 var Languages = []Language{
-	{Code: "en", Name: "English", Flag: "🇬🇧", Aliases: []string{"eng", "english", "en"}},
-	{Code: "ru", Name: "Russian", Flag: "🇷🇺", Aliases: []string{"rus", "russian", "ru", "рус", "русский"}},
-	{Code: "uk", Name: "Ukrainian", Flag: "🇺🇦", Aliases: []string{"ukr", "ukrainian", "ua", "укр", "українська"}},
-	{Code: "it", Name: "Italian", Flag: "🇮🇹", Aliases: []string{"ita", "italian", "it"}},
-	{Code: "fr", Name: "French", Flag: "🇫🇷", Aliases: []string{"fre", "french", "fr"}},
-	{Code: "es", Name: "Spanish", Flag: "🇪🇸", Aliases: []string{"spa", "spanish", "es"}},
-	{Code: "de", Name: "German", Flag: "🇩🇪", Aliases: []string{"ger", "german", "de"}},
-	{Code: "pt", Name: "Portuguese", Flag: "🇧🇷", Aliases: []string{"por", "portuguese", "pt"}},
-	{Code: "cs", Name: "Czech", Flag: "🇨🇿", Aliases: []string{"cze", "czech", "cz"}},
-	{Code: "pl", Name: "Polish", Flag: "🇵🇱", Aliases: []string{"pol", "polish", "pl"}},
-	{Code: "nl", Name: "Dutch", Flag: "🇳🇱", Aliases: []string{"dut", "dutch", "nl"}},
-	{Code: "ja", Name: "Japanese", Flag: "🇯🇵", Aliases: []string{"jpn", "japanese", "ja"}},
-	{Code: "ko", Name: "Korean", Flag: "🇰🇷", Aliases: []string{"kor", "korean", "ko"}},
-	{Code: "zh", Name: "Chinese", Flag: "🇨🇳", Aliases: []string{"chi", "chinese", "zh"}},
-	{Code: "ar", Name: "Arabic", Flag: "🇸🇦", Aliases: []string{"ara", "arabic", "ar"}},
-	{Code: "hi", Name: "Hindi", Flag: "🇮🇳", Aliases: []string{"hin", "hindi", "hi"}},
-	{Code: "tr", Name: "Turkish", Flag: "🇹🇷", Aliases: []string{"tur", "turkish", "tr"}},
-	{Code: "sv", Name: "Swedish", Flag: "🇸🇪", Aliases: []string{"swe", "swedish", "sv"}},
-	{Code: "no", Name: "Norwegian", Flag: "🇳🇴", Aliases: []string{"nor", "norwegian", "no"}},
-	{Code: "da", Name: "Danish", Flag: "🇩🇰", Aliases: []string{"dan", "danish", "da"}},
-	{Code: "fi", Name: "Finnish", Flag: "🇫🇮", Aliases: []string{"fin", "finnish", "fi"}},
-	{Code: "ro", Name: "Romanian", Flag: "🇷🇴", Aliases: []string{"rum", "romanian", "ro"}},
-	{Code: "hu", Name: "Hungarian", Flag: "🇭🇺", Aliases: []string{"hun", "hungarian", "hu"}},
-	{Code: "el", Name: "Greek", Flag: "🇬🇷", Aliases: []string{"gre", "greek", "el"}},
-	{Code: "bg", Name: "Bulgarian", Flag: "🇧🇬", Aliases: []string{"bul", "bulgarian", "bg"}},
-	{Code: "hr", Name: "Croatian", Flag: "🇭🇷", Aliases: []string{"hrv", "croatian", "hr"}},
-	{Code: "sr", Name: "Serbian", Flag: "🇷🇸", Aliases: []string{"srp", "serbian", "sr"}},
-	{Code: "sl", Name: "Slovenian", Flag: "🇸🇮", Aliases: []string{"slv", "slovenian", "sl"}},
-	{Code: "he", Name: "Hebrew", Flag: "🇮🇱", Aliases: []string{"heb", "hebrew", "he"}},
-	{Code: "th", Name: "Thai", Flag: "🇹🇭", Aliases: []string{"tha", "thai", "th"}},
-	{Code: "vi", Name: "Vietnamese", Flag: "🇻🇳", Aliases: []string{"vie", "vietnamese", "vi"}},
-	{Code: "id", Name: "Indonesian", Flag: "🇮🇩", Aliases: []string{"ind", "indonesian", "id"}},
-	{Code: "ms", Name: "Malay", Flag: "🇲🇾", Aliases: []string{"may", "malay", "ms"}},
+	{Code: "en", Name: "English", Flag: "🇬🇧", TitleAliases: []string{"eng", "english", "en"}},
+	{Code: "ru", Name: "Russian", Flag: "🇷🇺", TitleAliases: []string{"rus", "russian", "ru", "рус", "русский"}},
+	{Code: "uk", Name: "Ukrainian", Flag: "🇺🇦", TitleAliases: []string{"ukr", "ukrainian", "ua", "укр", "українська"}},
+	{Code: "it", Name: "Italian", Flag: "🇮🇹", TitleAliases: []string{"ita", "italian", "it"}},
+	{Code: "fr", Name: "French", Flag: "🇫🇷", TitleAliases: []string{"fre", "french", "fr"}},
+	{Code: "es", Name: "Spanish", Flag: "🇪🇸", TitleAliases: []string{"spa", "spanish", "es"}},
+	{Code: "de", Name: "German", Flag: "🇩🇪", TitleAliases: []string{"ger", "german", "de"}},
+	{Code: "pt", Name: "Portuguese", Flag: "🇧🇷", TitleAliases: []string{"por", "portuguese", "pt"}},
+	{Code: "cs", Name: "Czech", Flag: "🇨🇿", TitleAliases: []string{"cze", "czech", "cz"}},
+	{Code: "pl", Name: "Polish", Flag: "🇵🇱", TitleAliases: []string{"pol", "polish", "pl"}},
+	{Code: "nl", Name: "Dutch", Flag: "🇳🇱", TitleAliases: []string{"dut", "dutch", "nl"}},
+	{Code: "ja", Name: "Japanese", Flag: "🇯🇵", TitleAliases: []string{"jpn", "japanese", "ja"}},
+	{Code: "ko", Name: "Korean", Flag: "🇰🇷", TitleAliases: []string{"kor", "korean", "ko"}},
+	{Code: "zh", Name: "Chinese", Flag: "🇨🇳", TitleAliases: []string{"chi", "chinese", "zh"}},
+	{Code: "ar", Name: "Arabic", Flag: "🇸🇦", TitleAliases: []string{"ara", "arabic", "ar"}},
+	{Code: "hi", Name: "Hindi", Flag: "🇮🇳", TitleAliases: []string{"hin", "hindi", "hi"}},
+	{Code: "tr", Name: "Turkish", Flag: "🇹🇷", TitleAliases: []string{"tur", "turkish", "tr"}},
+	{Code: "sv", Name: "Swedish", Flag: "🇸🇪", TitleAliases: []string{"swe", "swedish", "sv"}},
+	{Code: "no", Name: "Norwegian", Flag: "🇳🇴", TitleAliases: []string{"nor", "norwegian", "no"}},
+	{Code: "da", Name: "Danish", Flag: "🇩🇰", TitleAliases: []string{"dan", "danish", "da"}},
+	{Code: "fi", Name: "Finnish", Flag: "🇫🇮", TitleAliases: []string{"fin", "finnish", "fi"}},
+	{Code: "ro", Name: "Romanian", Flag: "🇷🇴", TitleAliases: []string{"rum", "romanian", "ro"}},
+	{Code: "hu", Name: "Hungarian", Flag: "🇭🇺", TitleAliases: []string{"hun", "hungarian", "hu"}},
+	{Code: "el", Name: "Greek", Flag: "🇬🇷", TitleAliases: []string{"gre", "greek", "el"}},
+	{Code: "bg", Name: "Bulgarian", Flag: "🇧🇬", TitleAliases: []string{"bul", "bulgarian", "bg"}},
+	{Code: "hr", Name: "Croatian", Flag: "🇭🇷", TitleAliases: []string{"hrv", "croatian", "hr"}},
+	{Code: "sr", Name: "Serbian", Flag: "🇷🇸", TitleAliases: []string{"srp", "serbian", "sr"}},
+	{Code: "sl", Name: "Slovenian", Flag: "🇸🇮", TitleAliases: []string{"slv", "slovenian", "sl"}},
+	{Code: "he", Name: "Hebrew", Flag: "🇮🇱", TitleAliases: []string{"heb", "hebrew", "he"}},
+	{Code: "th", Name: "Thai", Flag: "🇹🇭", TitleAliases: []string{"tha", "thai", "th"}},
+	{Code: "vi", Name: "Vietnamese", Flag: "🇻🇳", TitleAliases: []string{"vie", "vietnamese", "vi"}},
+	{Code: "id", Name: "Indonesian", Flag: "🇮🇩", TitleAliases: []string{"ind", "indonesian", "id"}},
+	{Code: "ms", Name: "Malay", Flag: "🇲🇾", TitleAliases: []string{"may", "malay", "ms"}},
 	// Appended 2026-09-16 so every code the subtitle-translate service
-	// accepts has an entry here (langSupersetTest pins that). Order of the
-	// entries above is unchanged: the Stremio settings list and the
-	// language row read this order, and reshuffling it would move chips
-	// under people.
+	// accepts has an entry here (TestLanguagesCoverTheTranslateService
+	// pins that). Order of the entries above is unchanged: the Stremio
+	// settings list and the language row read this order, and reshuffling
+	// it would move chips under people.
 	//
-	// Aliases are chosen more narrowly than the rows above, because every
-	// one of them is matched against whitespace-split tokens of torrent
-	// titles (ExtractLanguages): the ISO 639-2/B codes "per", "arm", "ben",
-	// "lit" and "cat" are ordinary English words or names and are left out,
-	// and "et"/"ca" are listed but skipped below for the same reason.
-	// Missing a language tag costs one filter chip; inventing one puts a
-	// release in a language nobody asked for.
-	{Code: "sk", Name: "Slovak", Flag: "🇸🇰", Aliases: []string{"slk", "slovak", "sk", "slovenčina"}},
-	{Code: "lt", Name: "Lithuanian", Flag: "🇱🇹", Aliases: []string{"lithuanian", "lt", "lietuvių"}},
-	{Code: "lv", Name: "Latvian", Flag: "🇱🇻", Aliases: []string{"lav", "latvian", "lv", "latviešu"}},
-	{Code: "et", Name: "Estonian", Flag: "🇪🇪", Aliases: []string{"est", "estonian", "et", "eesti"}},
-	{Code: "fa", Name: "Persian", Flag: "🇮🇷", Aliases: []string{"fas", "persian", "farsi", "fa", "فارسی"}},
-	{Code: "bn", Name: "Bengali", Flag: "🇧🇩", Aliases: []string{"bengali", "bn", "বাংলা"}},
+	// None of them carries TitleAliases, deliberately (review C1, fixed
+	// 2026-09-16 before merge). The first version gave them the obvious
+	// ISO 639-2/B codes and two-letter tags, and measurement said no: KAT
+	// is KickassTorrents branding, EST is the Electronic-Sell-Through
+	// release tag, and "Фильм 2019 [KAT] 1080p" came back Georgian
+	// instead of Russian -- a false positive pre-empts the Cyrillic
+	// fallback, and LangFilterStream is exclusive, so that release
+	// vanished from a Russian viewer's Stremio list. These rows exist to
+	// be named and chosen, not found; a token list can be added later per
+	// language, against real titles.
+	{Code: "sk", Name: "Slovak", Flag: "🇸🇰"},
+	{Code: "lt", Name: "Lithuanian", Flag: "🇱🇹"},
+	{Code: "lv", Name: "Latvian", Flag: "🇱🇻"},
+	{Code: "et", Name: "Estonian", Flag: "🇪🇪"},
+	{Code: "fa", Name: "Persian", Flag: "🇮🇷"},
+	{Code: "bn", Name: "Bengali", Flag: "🇧🇩"},
 	// Sri Lanka, not India: Tamil is official in both, and 🇮🇳 is already
-	// Hindi's. The flag is a map key (langMap), so a duplicate would
-	// silently shadow the entry above it.
-	{Code: "ta", Name: "Tamil", Flag: "🇱🇰", Aliases: []string{"tam", "tamil", "ta", "தமிழ்"}},
-	{Code: "kk", Name: "Kazakh", Flag: "🇰🇿", Aliases: []string{"kaz", "kazakh", "kk", "қазақ"}},
-	{Code: "ka", Name: "Georgian", Flag: "🇬🇪", Aliases: []string{"kat", "georgian", "ka", "ქართული"}},
-	{Code: "hy", Name: "Armenian", Flag: "🇦🇲", Aliases: []string{"hye", "armenian", "hy", "հայերեն"}},
-	{Code: "az", Name: "Azerbaijani", Flag: "🇦🇿", Aliases: []string{"aze", "azerbaijani", "az", "azərbaycan"}},
+	// Hindi's. Flags stay unique across the table even for rows outside
+	// langMap: they are a map key wherever detection does use them, and a
+	// row that gains TitleAliases later must not silently shadow another.
+	{Code: "ta", Name: "Tamil", Flag: "🇱🇰"},
+	{Code: "kk", Name: "Kazakh", Flag: "🇰🇿"},
+	{Code: "ka", Name: "Georgian", Flag: "🇬🇪"},
+	{Code: "hy", Name: "Armenian", Flag: "🇦🇲"},
+	{Code: "az", Name: "Azerbaijani", Flag: "🇦🇿"},
 	// Andorra: the one state where Catalan is the sole official language,
-	// and 🇪🇸 is already Spanish's.
-	{Code: "ca", Name: "Catalan", Flag: "🇦🇩", Aliases: []string{"catalan", "ca", "català"}},
+	// and 🇪🇸 is already Spanish's (see the note on Tamil).
+	{Code: "ca", Name: "Catalan", Flag: "🇦🇩"},
 }
 
 // langMap resolves an alias / 2-letter code / flag emoji to a Language entry.
+// langMap resolves a title token (alias / short code / flag emoji) to a
+// Language. Built from TitleAliases alone, so a row with none is absent
+// from it -- flag included: a language that cannot be read out of a title
+// cannot be read out of one by its flag either, and adding the flag would
+// make exactly the false positives TitleAliases exists to prevent.
 var langMap = func() map[string]*Language {
 	m := make(map[string]*Language, len(Languages)*4)
 	for i := range Languages {
 		l := &Languages[i]
-		for _, a := range l.Aliases {
+		if !l.Detectable() {
+			continue
+		}
+		for _, a := range l.TitleAliases {
 			m[a] = l
 		}
 		m[l.Flag] = l
@@ -98,8 +137,6 @@ var langMap = func() map[string]*Language {
 // language codes but produce too many false positives.
 var langSkip = map[string]bool{
 	"no": true, // Norwegian conflicts with the English word "no"
-	"et": true, // Estonian conflicts with the French and Latin "et"
-	"ca": true, // Catalan conflicts with "CA" the region code and "ca." circa
 }
 
 // langSplitter mirrors the JS regex /[\s./()[\],|+]+/ used to tokenise

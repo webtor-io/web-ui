@@ -484,7 +484,7 @@ func imdbMatched(li ListItem) bool {
 	return li.MovieHashMatch != nil || li.Source != ""
 }
 
-// ladderRank orders subtitle sources from the one the viewer trusts most// ladderRank orders subtitle sources from the one the viewer trusts most
+// ladderRank orders subtitle sources from the one the viewer trusts most
 // (what they uploaded themselves) to the one they trust least (a machine
 // translation). Within OpenSubtitles a hash match is a match on this very
 // file, while an imdb match is only the same title, so it can be out of

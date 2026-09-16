@@ -1016,6 +1016,21 @@ func TestPreferencesFilterWhatIsRecorded(t *testing.T) {
 			},
 			wantHashes: []string{"aa"},
 		},
+		{
+			// Nor must a language that resolves but can never be read out
+			// of a title (stremio.Language.Detectable): Catalan is in the
+			// table so it can be named and chosen, and carries no title
+			// aliases, so filtering by it would refuse every release
+			// forever — the same silence as an unknown code, reached a
+			// different way.
+			name: "resolvable but undetectable language",
+			lang: "ca",
+			streams: []stremio.StreamItem{
+				{InfoHash: "aa", Name: "Torrentio", Title: "The.Boys.S03E05.1080p"},
+				{InfoHash: "bb", Name: "RuTracker.org", Title: "The.Boys.S03E05\n🇷🇺 Русский"},
+			},
+			wantHashes: []string{"aa", "bb"},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			sub := withPrefs(seasonSub(), tt.resolutions, tt.lang)

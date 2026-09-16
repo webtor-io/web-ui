@@ -49,18 +49,33 @@ func (s *LangFilterStream) GetStreams(ctx context.Context, contentType, contentI
 	if wantCode == "" {
 		return resp, nil
 	}
-	want := LanguageByCode(wantCode)
-	if want == nil {
-		return resp, nil
-	}
+	return &StreamsResponse{Streams: filterStreamsByLanguage(resp.Streams, LanguageByCode(wantCode))}, nil
+}
 
-	filtered := make([]StreamItem, 0, len(resp.Streams))
-	for _, st := range resp.Streams {
+// filterStreamsByLanguage is the whole rule, as a function of its inputs so
+// it can be tested without a database: GetStreams above only reads the
+// viewer's setting.
+//
+// Two ways of having no usable language, one answer. `want == nil` is a
+// code the table does not know; `!want.Detectable()` is a code it knows and
+// can never read out of a title (the twelve rows appended in 2026-09 carry
+// no TitleAliases). This filter is exclusive -- it keeps only what matches
+// -- so either one would keep nothing, and the viewer would read an empty
+// list as "there is nothing for this film" rather than "your setting cannot
+// be applied". services/release_subscription/poller.go applies the same
+// rule for the same reason: a setting we cannot read must not silence the
+// list.
+func filterStreamsByLanguage(streams []StreamItem, want *Language) []StreamItem {
+	if want == nil || !want.Detectable() {
+		return streams
+	}
+	filtered := make([]StreamItem, 0, len(streams))
+	for _, st := range streams {
 		if isLibraryStream(&st) || streamMatchesLanguage(&st, want) {
 			filtered = append(filtered, st)
 		}
 	}
-	return &StreamsResponse{Streams: filtered}, nil
+	return filtered
 }
 
 func isLibraryStream(st *StreamItem) bool {

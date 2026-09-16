@@ -93,18 +93,52 @@ answering `none`. It used to answer `none`, which switched subtitles off behind 
 who touched the audio menu, with `persist:false` so nothing recorded why (fixed 2026-09-16; wiring
 test in `Player.wiring.test.js`).
 
-**The language table is a superset of the service's.** `applyLadder` offers a translation only
-when `stremio.LanguageByCode(lang) != nil` — an item that leads to a rejected request is worse
-than no item — so a code `subtitle-translate` accepts and `stremio.Languages` lacks is a viewer
-whose preferred language silently gets no AI item at all: no chip, no lock, nothing to explain.
-Twelve codes were in exactly that state until 2026-09-16 (`sk lt lv et fa bn ta kk ka hy az ca`).
-`TestLanguagesCoverTheTranslateService` (`services/stremio/lang_superset_test.go`) embeds the
-service's list and says what is missing; the refresh procedure is in the comment above it. The
-table is mirrored in `assets/src/js/lib/discover/lang.js`, and the appended rows carry **narrower
-aliases** than the older ones, because aliases are matched against whitespace-split torrent-title
-tokens: the ISO 639-2/B codes `per`, `arm`, `ben`, `lit` and `cat` are ordinary English words, and
-`et` (French/Latin "et") and `ca` ("CA", "ca." for circa) are listed but in the skip set. Missing
-a tag costs one filter chip; inventing one files a release under a language nobody asked for.
+**The language table is a superset of the service's — and identity is not detection.**
+`applyLadder` offers a translation only when `stremio.LanguageByCode(lang) != nil` (an item
+leading to a rejected request is worse than no item), so `stremio.Languages` has to contain every
+code `subtitle-translate` accepts. Twelve did not (`sk lt lv et fa bn ta kk ka hy az ca`) and were
+appended 2026-09-16; `TestLanguagesCoverTheTranslateService`
+(`services/stremio/lang_superset_test.go`) embeds the service's list and says what is missing,
+with the refresh procedure in the comment above it.
+
+**Nobody was locked out before that, though** (review I1): `PreferredLang` comes from
+`stremio_settings.preferred_language`, which the settings handler validates against this very
+table before storing, or from `c.Lang`, one of the eleven shipped UI locales — all of which were
+already here. The twelve rows do not recover a cohort that was being refused; they create the
+possibility of one, starting with twelve new entries in the Stremio settings dropdown. Worth
+knowing before the list grows again.
+
+**The table answers four questions and only two of them wanted the new rows.** *What is this
+language called* (display) and *will the translate service accept it* (the ladder gate) do.
+*What tokens in a title mean it* (detection) does not, and that is where the first version did
+damage: `KAT` is KickassTorrents branding, `EST` is the Electronic-Sell-Through tag, and
+`Фильм 2019 [KAT] 1080p` came back **Georgian** instead of Russian — `ExtractLanguages` runs its
+Cyrillic fallback only when nothing else matched, so a false positive *pre-empts* the right
+answer, and `LangFilterStream` is exclusive, so that release left a Russian viewer's Stremio list
+without a word.
+
+So `Language.TitleAliases` is now the detection half, separate from `Code`/`Name`/`Flag`, and
+`langMap`/`ExtractLanguages` are built from it alone — flag included, since a flag is just
+another token. All twelve appended rows carry **none**: nameable, choosable, never detected, until
+someone measures tokens against real release vocabulary.
+`TestAppendedLanguagesAreNotDetectedFromTitles` is the review's measured table, including the
+Cyrillic row.
+
+Two consumers had to learn the same rule, because filtering *by* an undetectable language keeps
+nothing and reads to the viewer as "there is nothing for this film":
+`filterStreamsByLanguage` (`lang_filter_stream.go`) and `matchesPreferences`
+(`services/release_subscription/poller.go`) both treat "resolvable but not detectable" exactly as
+they already treated "unknown code" — not a filter. The client needs no such guard:
+`matchesPrefs` (`streamPrefs.js`) already keys on a name it could not resolve and answers "not a
+filter", and Discover's chips are built from what the streams themselves advertise.
+
+The table is mirrored in `assets/src/js/lib/discover/lang.js`, and since 2026-09-16 that mirror is
+**enforced**: `TestLangJSMirrorsTheGoTable` parses the JS file and compares `code`, `name`, `flag`
+and `titleAliases` row by row. Excluded: `extraFlags` (client-only) and the single code-less row,
+`Latino`, which is a release-title tag rather than a language anyone can choose — the test asserts
+it is the *only* one. That row also shares Spain's flag, which used to shadow Spanish in
+`LANG_MAP`; registration there is first-wins now, so a bare 🇪🇸 resolves to Spanish and 🇲🇽/🇦🇷
+still reach Latino.
 
 ## Preferred language
 

@@ -213,11 +213,6 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         // chip is painted with them first and the run is reported dead
         // second. Terminal like every other onError path -- one report,
         // and resume() cannot wake it.
-        // After onProgress and before the final check: the counts in a
-        // "stopped" response are the last ones there will ever be, so the
-        // chip is painted with them first and the run is reported dead
-        // second. Terminal like every other onError path -- one report,
-        // and resume() cannot wake it.
         if (status === STATUS_STOPPED) {
             stopped = true;
             if (onError) onError(STATUS_STOPPED);

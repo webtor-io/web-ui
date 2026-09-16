@@ -681,8 +681,11 @@ func matchesPreferences(item stremio.StreamItem, sub *models.ReleaseSubscription
 	if code := sub.GetPreferredLanguage(); code != "" {
 		want := stremio.LanguageByCode(code)
 		// An unknown code is not a filter — refusing everything because a
-		// language cannot be resolved would silence the subscription.
-		if want != nil && !stremio.StreamMatchesLanguage(&item, want) {
+		// language cannot be resolved would silence the subscription. Nor
+		// is a language that cannot be read out of a title at all
+		// (Detectable): resolvable and undetectable refuse everything the
+		// same way.
+		if want != nil && want.Detectable() && !stremio.StreamMatchesLanguage(&item, want) {
 			return false
 		}
 	}

@@ -1,77 +1,96 @@
-// Language detection for stream titles
-
+// Language detection for stream titles.
+//
+// Mirror of services/stremio/lang.go (code, name, flag, titleAliases):
+// TestLangJSMirrorsTheGoTable parses this file and compares the two, so an
+// entry added on one side and not the other is a red test rather than a
+// surface that quietly disagrees with the server.
+//
+// `titleAliases` are the tokens that mean this language IN A TITLE, which
+// is a different question from what the language is called. A row with
+// none is nameable and choosable but never detected -- the safe default
+// for tokens nobody has measured against real release vocabulary, because
+// a wrong detection pre-empts the Cyrillic fallback below and, server
+// side, drops the release out of an exclusive filter.
 const LANGUAGES = [
-    { name: 'English',    flag: '🇬🇧', aliases: ['eng', 'english', 'en'], extraFlags: ['🇺🇸', '🇦🇺'] },
-    { name: 'Russian',    flag: '🇷🇺', aliases: ['rus', 'russian', 'ru', 'рус', 'русский'] },
-    { name: 'Ukrainian',  flag: '🇺🇦', aliases: ['ukr', 'ukrainian', 'ua', 'укр', 'українська'] },
-    { name: 'Italian',    flag: '🇮🇹', aliases: ['ita', 'italian', 'it'] },
-    { name: 'French',     flag: '🇫🇷', aliases: ['fre', 'french', 'fr'] },
-    { name: 'Spanish',    flag: '🇪🇸', aliases: ['spa', 'spanish', 'es'] },
-    { name: 'German',     flag: '🇩🇪', aliases: ['ger', 'german', 'de'] },
-    { name: 'Portuguese', flag: '🇧🇷', aliases: ['por', 'portuguese', 'pt'], extraFlags: ['🇵🇹'] },
-    { name: 'Czech',      flag: '🇨🇿', aliases: ['cze', 'czech', 'cz'] },
-    { name: 'Polish',     flag: '🇵🇱', aliases: ['pol', 'polish', 'pl'] },
-    { name: 'Dutch',      flag: '🇳🇱', aliases: ['dut', 'dutch', 'nl'] },
-    { name: 'Japanese',   flag: '🇯🇵', aliases: ['jpn', 'japanese', 'ja'] },
-    { name: 'Korean',     flag: '🇰🇷', aliases: ['kor', 'korean', 'ko'] },
-    { name: 'Chinese',    flag: '🇨🇳', aliases: ['chi', 'chinese', 'zh'] },
-    { name: 'Arabic',     flag: '🇸🇦', aliases: ['ara', 'arabic', 'ar'] },
-    { name: 'Hindi',      flag: '🇮🇳', aliases: ['hin', 'hindi', 'hi'] },
-    { name: 'Turkish',    flag: '🇹🇷', aliases: ['tur', 'turkish', 'tr'] },
-    { name: 'Swedish',    flag: '🇸🇪', aliases: ['swe', 'swedish', 'sv'] },
-    { name: 'Norwegian',  flag: '🇳🇴', aliases: ['nor', 'norwegian', 'no'] },
-    { name: 'Danish',     flag: '🇩🇰', aliases: ['dan', 'danish', 'da'] },
-    { name: 'Finnish',    flag: '🇫🇮', aliases: ['fin', 'finnish', 'fi'] },
-    { name: 'Romanian',   flag: '🇷🇴', aliases: ['rum', 'romanian', 'ro'] },
-    { name: 'Hungarian',  flag: '🇭🇺', aliases: ['hun', 'hungarian', 'hu'] },
-    { name: 'Greek',      flag: '🇬🇷', aliases: ['gre', 'greek', 'el'] },
-    { name: 'Bulgarian',  flag: '🇧🇬', aliases: ['bul', 'bulgarian', 'bg'] },
-    { name: 'Croatian',   flag: '🇭🇷', aliases: ['hrv', 'croatian', 'hr'] },
-    { name: 'Serbian',    flag: '🇷🇸', aliases: ['srp', 'serbian', 'sr'] },
-    { name: 'Slovenian',  flag: '🇸🇮', aliases: ['slv', 'slovenian', 'sl'] },
-    { name: 'Hebrew',     flag: '🇮🇱', aliases: ['heb', 'hebrew', 'he'] },
-    { name: 'Thai',       flag: '🇹🇭', aliases: ['tha', 'thai', 'th'] },
-    { name: 'Vietnamese', flag: '🇻🇳', aliases: ['vie', 'vietnamese', 'vi'] },
-    { name: 'Indonesian', flag: '🇮🇩', aliases: ['ind', 'indonesian', 'id'] },
-    { name: 'Malay',      flag: '🇲🇾', aliases: ['may', 'malay', 'ms'] },
-    // Appended 2026-09-16, mirroring services/stremio/lang.go: every code
-    // the subtitle-translate service accepts needs an entry (a Go test
-    // pins the superset). Same order as the Go table, same narrowed
-    // aliases -- the ISO 639-2/B codes 'per', 'arm', 'ben', 'lit' and
-    // 'cat' are ordinary English words and are left out, and 'et'/'ca'
-    // are in LANG_SKIP below for the same reason. Flags are unique
-    // because LANG_MAP is keyed by them too: Tamil takes 🇱🇰 (🇮🇳 is
-    // Hindi's) and Catalan 🇦🇩 (🇪🇸 is Spanish's).
-    { name: 'Slovak',     flag: '🇸🇰', aliases: ['slk', 'slovak', 'sk', 'slovenčina'] },
-    { name: 'Lithuanian', flag: '🇱🇹', aliases: ['lithuanian', 'lt', 'lietuvių'] },
-    { name: 'Latvian',    flag: '🇱🇻', aliases: ['lav', 'latvian', 'lv', 'latviešu'] },
-    { name: 'Estonian',   flag: '🇪🇪', aliases: ['est', 'estonian', 'et', 'eesti'] },
-    { name: 'Persian',    flag: '🇮🇷', aliases: ['fas', 'persian', 'farsi', 'fa', 'فارسی'] },
-    { name: 'Bengali',    flag: '🇧🇩', aliases: ['bengali', 'bn', 'বাংলা'] },
-    { name: 'Tamil',      flag: '🇱🇰', aliases: ['tam', 'tamil', 'ta', 'தமிழ்'] },
-    { name: 'Kazakh',     flag: '🇰🇿', aliases: ['kaz', 'kazakh', 'kk', 'қазақ'] },
-    { name: 'Georgian',   flag: '🇬🇪', aliases: ['kat', 'georgian', 'ka', 'ქართული'] },
-    { name: 'Armenian',   flag: '🇦🇲', aliases: ['hye', 'armenian', 'hy', 'հայերեն'] },
-    { name: 'Azerbaijani', flag: '🇦🇿', aliases: ['aze', 'azerbaijani', 'az', 'azərbaycan'] },
-    { name: 'Catalan',    flag: '🇦🇩', aliases: ['catalan', 'ca', 'català'] },
-    // Latino has no Go counterpart: it is a title tag, not a language of
-    // the settings list, and stays last.
-    { name: 'Latino',     flag: '🇪🇸', aliases: ['lat', 'latino'], extraFlags: ['🇲🇽', '🇦🇷'] },
+    { code: 'en', name: 'English',     flag: '🇬🇧', titleAliases: ['eng', 'english', 'en'], extraFlags: ['🇺🇸', '🇦🇺'] },
+    { code: 'ru', name: 'Russian',     flag: '🇷🇺', titleAliases: ['rus', 'russian', 'ru', 'рус', 'русский'] },
+    { code: 'uk', name: 'Ukrainian',   flag: '🇺🇦', titleAliases: ['ukr', 'ukrainian', 'ua', 'укр', 'українська'] },
+    { code: 'it', name: 'Italian',     flag: '🇮🇹', titleAliases: ['ita', 'italian', 'it'] },
+    { code: 'fr', name: 'French',      flag: '🇫🇷', titleAliases: ['fre', 'french', 'fr'] },
+    { code: 'es', name: 'Spanish',     flag: '🇪🇸', titleAliases: ['spa', 'spanish', 'es'] },
+    { code: 'de', name: 'German',      flag: '🇩🇪', titleAliases: ['ger', 'german', 'de'] },
+    { code: 'pt', name: 'Portuguese',  flag: '🇧🇷', titleAliases: ['por', 'portuguese', 'pt'], extraFlags: ['🇵🇹'] },
+    { code: 'cs', name: 'Czech',       flag: '🇨🇿', titleAliases: ['cze', 'czech', 'cz'] },
+    { code: 'pl', name: 'Polish',      flag: '🇵🇱', titleAliases: ['pol', 'polish', 'pl'] },
+    { code: 'nl', name: 'Dutch',       flag: '🇳🇱', titleAliases: ['dut', 'dutch', 'nl'] },
+    { code: 'ja', name: 'Japanese',    flag: '🇯🇵', titleAliases: ['jpn', 'japanese', 'ja'] },
+    { code: 'ko', name: 'Korean',      flag: '🇰🇷', titleAliases: ['kor', 'korean', 'ko'] },
+    { code: 'zh', name: 'Chinese',     flag: '🇨🇳', titleAliases: ['chi', 'chinese', 'zh'] },
+    { code: 'ar', name: 'Arabic',      flag: '🇸🇦', titleAliases: ['ara', 'arabic', 'ar'] },
+    { code: 'hi', name: 'Hindi',       flag: '🇮🇳', titleAliases: ['hin', 'hindi', 'hi'] },
+    { code: 'tr', name: 'Turkish',     flag: '🇹🇷', titleAliases: ['tur', 'turkish', 'tr'] },
+    { code: 'sv', name: 'Swedish',     flag: '🇸🇪', titleAliases: ['swe', 'swedish', 'sv'] },
+    { code: 'no', name: 'Norwegian',   flag: '🇳🇴', titleAliases: ['nor', 'norwegian', 'no'] },
+    { code: 'da', name: 'Danish',      flag: '🇩🇰', titleAliases: ['dan', 'danish', 'da'] },
+    { code: 'fi', name: 'Finnish',     flag: '🇫🇮', titleAliases: ['fin', 'finnish', 'fi'] },
+    { code: 'ro', name: 'Romanian',    flag: '🇷🇴', titleAliases: ['rum', 'romanian', 'ro'] },
+    { code: 'hu', name: 'Hungarian',   flag: '🇭🇺', titleAliases: ['hun', 'hungarian', 'hu'] },
+    { code: 'el', name: 'Greek',       flag: '🇬🇷', titleAliases: ['gre', 'greek', 'el'] },
+    { code: 'bg', name: 'Bulgarian',   flag: '🇧🇬', titleAliases: ['bul', 'bulgarian', 'bg'] },
+    { code: 'hr', name: 'Croatian',    flag: '🇭🇷', titleAliases: ['hrv', 'croatian', 'hr'] },
+    { code: 'sr', name: 'Serbian',     flag: '🇷🇸', titleAliases: ['srp', 'serbian', 'sr'] },
+    { code: 'sl', name: 'Slovenian',   flag: '🇸🇮', titleAliases: ['slv', 'slovenian', 'sl'] },
+    { code: 'he', name: 'Hebrew',      flag: '🇮🇱', titleAliases: ['heb', 'hebrew', 'he'] },
+    { code: 'th', name: 'Thai',        flag: '🇹🇭', titleAliases: ['tha', 'thai', 'th'] },
+    { code: 'vi', name: 'Vietnamese',  flag: '🇻🇳', titleAliases: ['vie', 'vietnamese', 'vi'] },
+    { code: 'id', name: 'Indonesian',  flag: '🇮🇩', titleAliases: ['ind', 'indonesian', 'id'] },
+    { code: 'ms', name: 'Malay',       flag: '🇲🇾', titleAliases: ['may', 'malay', 'ms'] },
+    // Appended 2026-09-16, mirroring services/stremio/lang.go. They carry
+    // NO titleAliases, exactly as the Go rows do: they exist to be named
+    // and chosen, never found in a title (see the note there -- 'KAT' is
+    // KickassTorrents, not Georgian). A Go test compares this list with
+    // the Go one field by field, so the two cannot drift.
+    { code: 'sk', name: 'Slovak',      flag: '🇸🇰', titleAliases: [] },
+    { code: 'lt', name: 'Lithuanian',  flag: '🇱🇹', titleAliases: [] },
+    { code: 'lv', name: 'Latvian',     flag: '🇱🇻', titleAliases: [] },
+    { code: 'et', name: 'Estonian',    flag: '🇪🇪', titleAliases: [] },
+    { code: 'fa', name: 'Persian',     flag: '🇮🇷', titleAliases: [] },
+    { code: 'bn', name: 'Bengali',     flag: '🇧🇩', titleAliases: [] },
+    { code: 'ta', name: 'Tamil',       flag: '🇱🇰', titleAliases: [] },
+    { code: 'kk', name: 'Kazakh',      flag: '🇰🇿', titleAliases: [] },
+    { code: 'ka', name: 'Georgian',    flag: '🇬🇪', titleAliases: [] },
+    { code: 'hy', name: 'Armenian',    flag: '🇦🇲', titleAliases: [] },
+    { code: 'az', name: 'Azerbaijani', flag: '🇦🇿', titleAliases: [] },
+    { code: 'ca', name: 'Catalan',     flag: '🇦🇩', titleAliases: [] },
+    // Latino has no Go counterpart and no code: it is a release-title tag,
+    // not a language of the settings list, so the mirror test skips it by
+    // the empty `code`. Its flag is deliberately Spanish's -- see the
+    // first-wins registration below, which is what keeps a bare 🇪🇸
+    // resolving to Spanish.
+    { code: '', name: 'Latino', flag: '🇪🇸', titleAliases: ['lat', 'latino'], extraFlags: ['🇲🇽', '🇦🇷'] },
 ];
 
+// LANG_MAP resolves a title token (alias / short code / flag emoji) to a
+// language. Built from titleAliases alone, so a row with none is absent
+// from it, flag included -- the Go side does the same.
+//
+// First key wins. Latino and Spanish share 🇪🇸, and last-wins made a bare
+// 🇪🇸 in a title resolve to Latino, shadowing Spanish since the row was
+// added; 🇲🇽 and 🇦🇷 still reach Latino, which is the distinction that
+// tag is for.
 export const LANG_MAP = {};
 for (const lang of LANGUAGES) {
+    if (!lang.titleAliases || lang.titleAliases.length === 0) continue;
     const entry = { flag: lang.flag, name: lang.name };
-    for (const a of lang.aliases) LANG_MAP[a] = entry;
-    LANG_MAP[lang.flag] = entry;
-    if (lang.extraFlags) for (const f of lang.extraFlags) LANG_MAP[f] = entry;
+    const put = (k) => { if (!(k in LANG_MAP)) LANG_MAP[k] = entry; };
+    for (const a of lang.titleAliases) put(a);
+    put(lang.flag);
+    if (lang.extraFlags) for (const f of lang.extraFlags) put(f);
 }
 
 // Words to skip -- they are not languages even though they match short codes
 const LANG_SKIP = new Set([
     'no', // Norwegian conflicts with "no" (e.g. "No torrent")
-    'et', // Estonian conflicts with the French and Latin "et"
-    'ca', // Catalan conflicts with "CA" the region code and "ca." circa
 ]);
 
 // supportsFlagEmoji reports whether the platform actually renders
