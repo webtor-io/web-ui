@@ -112,7 +112,6 @@ var Languages = []Language{
 	{Code: "ca", Name: "Catalan", Flag: "🇦🇩"},
 }
 
-// langMap resolves an alias / 2-letter code / flag emoji to a Language entry.
 // langMap resolves a title token (alias / short code / flag emoji) to a
 // Language. Built from TitleAliases alone, so a row with none is absent
 // from it -- flag included: a language that cannot be read out of a title

@@ -200,11 +200,11 @@ func (s *Helper) OriginKey(li ListItem) string {
 // release often enough to be worth saying, and is exactly the case the
 // ladder already ranks one rung lower (rank 4, unchanged).
 //
-// A title rather than a mark of its own, deliberately: the chip already
-// carries the visible "· imdb" suffix (ListItem.Source, drawn for every
-// OpenSubtitles track since the redesign), so a second glyph would repeat
-// it. What was missing is what the word means, and a title costs no width
-// — which matters on a chip whose label is the part that truncates.
+// The badge shows "OS~" and this key supplies the title that says what the
+// tilde means; the raw video-info enum ("· hash"/"· imdb") is no longer
+// drawn — it was English in every locale and said nothing to the viewer.
+// A title costs no width, which matters on a chip whose label is the part
+// that truncates.
 func (s *Helper) OriginHintKey(li ListItem) string {
 	if imdbMatched(li) {
 		return "action.stream.origin.osImdbHint"

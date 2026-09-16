@@ -136,8 +136,8 @@ export function remapTrackGroup(elements, hlsTracks) {
     for (const el of elements) {
         const lang = (el.getAttribute('data-srclang') || '').toLowerCase();
         // data-label, not textContent: a picker chip's text now includes the
-        // origin code ("EM"), the property tag ("forced") and the source
-        // suffix ("· hash"), so an exact compare against the manifest's
+        // origin code ("EM", "OS~") and the property tag ("forced"), so an
+        // exact compare against the manifest's
         // track name would never match again.
         const label = (el.getAttribute('data-label') || el.textContent || '').trim();
         if (!lang || !label) continue;
