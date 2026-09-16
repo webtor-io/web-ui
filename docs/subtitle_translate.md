@@ -62,6 +62,14 @@ anything. Difference from the server: on a miss, the client keeps the current de
 recomputing an Accept-Language match (no such matcher client-side) — the server's phase-1 fallback
 only applies at page render.
 
+**No preferred language means no re-pick.** `data-preferred-lang` is empty in two live
+configurations — every embed, and any deployment with `SUBTITLE_TRANSLATE_ENABLED` off
+(`subtitleOptsFor`, `jobs/scripts/translate_opts.go`, returns the zero `SubtitleOpts` for both) —
+and there the rule has nothing to decide *for*, so it keeps the current selection rather than
+answering `none`. It used to answer `none`, which switched subtitles off behind a first-time viewer
+who touched the audio menu, with `persist:false` so nothing recorded why (fixed 2026-09-16; wiring
+test in `Player.wiring.test.js`).
+
 ## Preferred language
 
 `streamprefs.Service.PreferredContentLang(ctx, user, uiLang)`:
@@ -237,12 +245,17 @@ trip" / cache-key section).
   pause does not come back as a timeout. Resuming is cheap on the service side too — partial
   progress is held 24 h and re-aligned by cue identity. The listeners are removed on unmount
   (the effect's cleanup, reached through `destroyPlayer`).
-  **The initial state is read too**, in `startTranslationProgress` right after the controller is
-  created: a run begun on a video that has never played (autoplay blocked, or the mount-time
-  restore of a saved AI track) or in a tab that was already in the background gets no `pause` and
-  no `visibilitychange` to sleep on, so it suspends at once and its first HEAD waits for playback.
-  A chip clicked while paused therefore shows its opening `· 0%` and spinner and polls nothing
-  until play.
+  **The initial state is read too**, but on the *first response*, not before it: a run begun on a
+  video that has never played (autoplay blocked, or the mount-time restore of a saved AI track) or
+  in a tab that was already in the background gets no `pause` and no `visibilitychange` to sleep
+  on, so `suspendIfNobodyIsWatching` in the first `onProgress` puts it to sleep. It fires **only
+  for a live source** (`X-Subtitle-Live`), which is the only one that costs anything to keep
+  awake — a transcoder session and its FFmpeg run. The first HEAD is what reveals that, which is
+  why the check waits for it: before 2026-09-16 it ran at once and also froze a cached
+  OpenSubtitles run — seconds of work, no session behind it — at `· 0%` with a spinner that did
+  not move until the viewer pressed play, and pausing the film to open the picker is exactly when
+  people start one. A live run clicked while paused now shows the count its first answer brought
+  and polls nothing more until play.
 - **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
   through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
@@ -745,6 +758,19 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   i.e. the length of the transcode, but a wedged live job that keeps answering the same count still
   times out after 15 minutes: answering is not progress. Time the poll spends suspended (paused or
   hidden, see *Client behaviour*) is not counted at all.
+- **A `rev` can go backwards into a browser cache after a seek.** A session seek starts a new run
+  at a non-zero offset, so `done` drops; `withRev(src, done)` then reuses a `rev` the browser
+  already has, and the `<track>` GET carries no `no-store`, so the viewer can get the previous
+  run's shorter VTT back.
+- **A finished translation reads as the verb again when it is deselected.** The `.ai-action` span
+  is rendered `{{ if .Offered }}` and stays in the DOM after the offer is spent, so
+  `setChipActive(el, false)` (`track-picker.js`) re-shows "Translate to <language>" for a track
+  that is already translated and cached. Harmless; the guard's comment claims to cover this case
+  and only covers the locked one.
+- **`markPreload` follows the browser's languages, not the preferred one.** It reads
+  `ud.AcceptLangTags[0]`, not `opts.PreferredLang`, so a signed-in viewer whose
+  `stremio_settings.preferred_language` differs from their browser gets no preloaded `<track>` in
+  the language the ladder just ran on — and the native iOS menu then offers the wrong two.
 - **A live run is suspended, not finished, when the film ends.** The media spec fires `pause`
   before `ended`, so a viewer who watches to the end of a file whose translation is still behind
   the transcode leaves the poll asleep on the last count: the chip keeps its spinner, no
