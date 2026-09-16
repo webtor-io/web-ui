@@ -1,5 +1,12 @@
 {{ define "main" }}
 {{ with .Data }}
+{{/* One ladder run per render, and one result. getSubtitles used to be
+     called twice on the same data -- once for the <track> loop below and
+     once for the picker -- and the two runs could disagree: the browser
+     started on one track while the picker's check sat on another, and $off
+     could contradict <track default>. It also cost two language.NewMatcher
+     builds and ~120 language.Parse calls with a full OpenSubtitles list. */}}
+{{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
 <div class="relative">
     <video class="player"
            crossorigin="anonymous"
@@ -31,7 +38,7 @@
              rendered so the native iOS menu still offers them; the rest are
              created on selection by activateSubtitle in Player.jsx from the
              list items' data-src/data-label/data-srclang. */}}
-        {{ range getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
+        {{ range $subs }}
         {{ if .Preload }}
         <track src="{{ .Src }}" id="{{ .ID }}" srclang="{{ .SrcLang }}" label="{{ .Label }}" kind="{{ .Kind }}" {{ if .Default }}default="default"{{ end }}>
         {{ end }}
@@ -43,7 +50,6 @@
          the user leaves fullscreen. A modal dialog lives in the top layer
          and stacks above the fullscreen element, so the picker opens
          in-place. Opened from Player.jsx (handleCaptionsClick). */}}
-    {{ $subs := getSubtitles .VideoStreamUserData .MediaProbe .ExportTag .OpenSubtitles .ExternalData .UserSubtitles .SubtitleOpts }}
     {{/* Subtitles are off when the "None" item is the default. That is the
          one state the switch leading the language row shows, and the chip
          rows are rendered muted for it (.picker-off) with the

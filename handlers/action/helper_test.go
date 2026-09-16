@@ -1259,3 +1259,47 @@ func TestLadderTranslationFromEmbeddedTrack(t *testing.T) {
 		t.Fatal("Src-less embedded track became a source")
 	}
 }
+
+// matchLang used to build language.NewMatcher's supported list by ranging a
+// map. The matcher breaks a tie by position in that list, so two candidates
+// equally distant from the request (es-AR / es-CL / es-CO against
+// Accept: es-MX) came back in whatever order the runtime felt like: 74/13/12
+// over 3000 draws on x/text v0.41.0. That is reachable with regional MKV
+// language tags and uploads named movie.es-MX.srt, and the template makes it
+// worse by running the ladder twice per render -- the <track default> and the
+// picker's own check could land on different tracks.
+//
+// 200 iterations rather than one, because a single run of a randomized map
+// passes 74% of the time.
+func TestMatchLangIsDeterministicAcrossRegionalTies(t *testing.T) {
+	h := NewHelper()
+	lis := []ListItem{
+		{ID: "none", Kind: "subtitles"},
+		{ID: "os-ar", SrcLang: "es-AR", Kind: "subtitles"},
+		{ID: "os-cl", SrcLang: "es-CL", Kind: "subtitles"},
+		{ID: "os-co", SrcLang: "es-CO", Kind: "subtitles"},
+	}
+	accept, _, err := language.ParseAcceptLanguage("es-MX")
+	if err != nil {
+		t.Fatalf("ParseAcceptLanguage: %v", err)
+	}
+	ud := &models.VideoStreamUserData{AcceptLangTags: accept, FallbackLangTag: language.English}
+	want, err := h.matchLang(lis, ud)
+	if err != nil {
+		t.Fatalf("matchLang: %v", err)
+	}
+	// The first candidate on the list, i.e. the earliest on the ladder --
+	// the tie-break the rest of this file already uses.
+	if lis[want].ID != "os-ar" {
+		t.Errorf("tie went to %q, want the first listed candidate os-ar", lis[want].ID)
+	}
+	for i := 0; i < 200; i++ {
+		got, err := h.matchLang(lis, ud)
+		if err != nil {
+			t.Fatalf("iteration %d: %v", i, err)
+		}
+		if got != want {
+			t.Fatalf("iteration %d picked %q, first run picked %q", i, lis[got].ID, lis[want].ID)
+		}
+	}
+}
