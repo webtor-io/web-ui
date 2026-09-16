@@ -153,6 +153,29 @@ func TestStreamVideoRenders(t *testing.T) {
 			t.Errorf("dialog %s renders the backdrop before its box", id)
 		}
 	}
+
+	// data-subtitles-not-ready is the whole of what the 2b addendum buys:
+	// the OpenSubtitles lookup never finished, the render is cached for
+	// ten minutes anyway, and this attribute is what lets
+	// subtitle-resolved tell "this file has no subtitles" from "nobody got
+	// to look". It is rendered only when the flag is set, so both
+	// directions are asserted -- an attribute that is always there
+	// measures nothing.
+	if strings.Contains(html, "data-subtitles-not-ready") {
+		t.Error("the attribute must not render for an ordinary lookup")
+	}
+	data.SubtitlesNotReady = true
+	var notReady bytes.Buffer
+	if err := tpl.ExecuteTemplate(&notReady, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	if !strings.Contains(notReady.String(), `data-subtitles-not-ready="true"`) {
+		t.Error(`SubtitlesNotReady must reach the picker as data-subtitles-not-ready="true"`)
+	}
 }
 
 // TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a

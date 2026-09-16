@@ -743,6 +743,45 @@ test('a live source (X-Subtitle-Live) shows a count instead of a percent', async
     assert.equal(span.title, 'player.subtitleTranslatingLive');
 });
 
+// ---- the stream-start measurement ------------------------------------
+
+// playPast drives the rAF loop in usePlayerState past the engagement gate
+// (5 s of playback), which is what emits stream-start and subtitle-resolved.
+async function playPast(p, seconds = 6) {
+    p.video.paused = false;
+    p.video.currentTime = seconds;
+    await settle();
+}
+
+test('subtitle-resolved says when the OpenSubtitles lookup never finished', async (t) => {
+    t.after(() => destroyPlayer());
+    // The server sets this when video-info answered "not ready" twice: the
+    // page renders without those tracks and is cached for ten minutes like
+    // any other, so without the field a level of 'none' would count a file
+    // nobody got to look at as a file with nothing to find.
+    const p = await mountPlayer((page) => {
+        page.modal.setAttribute('data-subtitles-not-ready', 'true');
+    });
+    await playPast(p);
+
+    const ev = p.events.find((e) => e.name === 'subtitle-resolved');
+    assert.ok(ev, 'the engagement gate must emit subtitle-resolved');
+    assert.equal(ev.data.notReady, true);
+});
+
+test('subtitle-resolved reports a finished lookup as such', async (t) => {
+    t.after(() => destroyPlayer());
+    // The negative control: the attribute is absent on an ordinary render,
+    // and the field must then be false rather than missing — a field that
+    // is only ever present in one of the two cases cannot be filtered on.
+    const p = await mountPlayer();
+    await playPast(p);
+
+    const ev = p.events.find((e) => e.name === 'subtitle-resolved');
+    assert.ok(ev, 'the engagement gate must emit subtitle-resolved');
+    assert.equal(ev.data.notReady, false);
+});
+
 test('a stopped run keeps its count, loses its spinner, and is reported', async (t) => {
     t.after(() => destroyPlayer());
     const p = await mountPlayer();
