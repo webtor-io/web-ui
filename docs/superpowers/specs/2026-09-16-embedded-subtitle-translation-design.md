@@ -114,9 +114,10 @@ THP: `extractMod` берёт мод из **последнего** `~`, всё л
 ## Порядок работ
 
 1. ~~Стенд~~ — сделано 16.09, факты в разделе «Как транскодер отдаёт субтитры сегодня».
-2. subtitle-translate: live-источник — план `docs/superpowers/plans/2026-09-16-embedded-subtitle-live-translation.md` (Tasks 1–5) (плейлист, сегменты, дедуп, таймер батча, `X-Subtitle-Live`,
-   `source_gone`, покрытие длительности) + тесты на фейковом плейлисте.
-3. web-ui (там же, Tasks 6–8): `Src` у `MediaProbe` в HLS-режиме, `pickTranslationSource`, `parseProgress`/`Live`,
-   текст прогресса, docs.
+2. ~~subtitle-translate: live-источник — план `docs/superpowers/plans/2026-09-16-embedded-subtitle-live-translation.md` (Tasks 1–5) (плейлист, сегменты, дедуп, таймер батча, `X-Subtitle-Live`,
+   `source_gone`, покрытие длительности) + тесты на фейковом плейлисте.~~ — сделано 16.09, детали в
+   `subtitle-translate/README.md` («Live HLS source»).
+3. ~~web-ui (там же, Tasks 6–8): `Src` у `MediaProbe` в HLS-режиме, `pickTranslationSource`, `parseProgress`/`Live`,
+   текст прогресса, docs.~~ — сделано 16.09, детали в `docs/subtitle_translate.md`.
 4. Стейдж: MKV с встроенными субтитрами, перевод появляется по ходу просмотра; перемотка;
    уход зрителя; повторный вход из кэша.

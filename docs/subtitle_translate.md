@@ -158,8 +158,14 @@ all, which is the same outcome every unsupported source already gives (see *Know
 
 **Translation source selection** (`pickTranslationSource`): a non-forced, URL-backed human track,
 preferring the active audio's language (transcribing what's said, not translating a translation),
-then English, then any. Embedded (`MediaProbe`) tracks are never a source — they have no
-standalone URL for the proxy chain to fetch.
+then English, then any. Embedded (`MediaProbe`) tracks are a source when the stream plays through
+the transcoder: `GetSubtitles` gives each visible embedded track `Src = <HLSSessionBase>/s<MPID>.m3u8`
+(the same variant hls.js plays; `SubtitleOpts.HLSSessionBase` is set in `streamContent` once the session
+exists), and `TranslateURL` appends `~tr:<lang>/s<MPID>.vtt` to it. The service then follows the
+live playlist (service README, «Live HLS source»): the translation arrives along with the
+transcode, `X-Subtitle-Live: 1` marks it as still growing, and a final artifact is cached only
+for a contiguous run from the start. A native MP4 played without a session has no base and no
+embedded source, as before.
 
 **Glossary.** `streamprefs.CastNames(ctx, imdbID, 30)` reads up to 30 cast names from TMDB credits
 stored by enrichment, passed as `names=` to the service.
@@ -194,6 +200,14 @@ trip" / cache-key section).
   starts a job). `X-Subtitle-Progress: done/total`; `0/0` means "not registered yet, keep polling"
   (never final). Done ⇔ `total > 0 && done >= total`. A non-200 response calls `onError` once and
   **stops the poll** — it does not retry.
+- **`X-Subtitle-Live` (embedded sources).** `parseProgress(header, live)` also reads
+  `X-Subtitle-Live: 1` off the same `HEAD` response: while it is set, `total` is a snapshot of the
+  live source playlist, not a ceiling, so `final` is forced `false` even when `done >= total` — only
+  the header's disappearance (the underlying transcoder session ended or went idle) lets the normal
+  `total > 0 && done >= total` rule apply again, and the poll keeps running instead of stopping
+  early. The chip reflects this: `Player.jsx`'s `onProgress` shows a bare count (`· <done>`, no
+  denominator worth a percentage) with `title = tf('player.subtitleTranslatingLive')` while live,
+  instead of the usual `· <pct>%` / `player.subtitleTranslating`.
 - **`rev` reload (throttled).** A reload rewrites the `<track>` `src` via `withRev`
   (adds/replaces `?rev=<done>`, every other query param — including the signed token — passes
   through untouched), forcing a refetch. The browser drops the cue list while it reparses, so the
@@ -358,7 +372,9 @@ and by the legend line under the row, both built from `action.stream.origin.{em,
 telemetry and back-compat but are no longer rendered — except `action.stream.badge.forced`, because
 `forced` is a **property tag**, not an origin: a forced embedded track shows `EM` + `forced`
 (`Helper.PropertyTags`). `sdh` is drawn in the uikit and waits for `content-prober` to expose
-ffprobe's disposition flags.
+ffprobe's disposition flags. Since 2026-09-16 an AI chip's `data-source-badge` (the `· from <CODE>`
+suffix) can also read `EM`: `pickTranslationSource` now accepts an embedded track that carries a
+transcoder-session playlist `Src`, where before `embedded` never appeared there.
 
 `data-lang` is the base language tag the chip groups under, `und` when unknown;
 `data-lang-name`/`data-lang-flag` carry the display strings so the client can clone a new language
@@ -656,12 +672,12 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   `stremio_settings.preferred_language`: a viewer who changes that in their profile may keep
   seeing the old `SubtitleOpts` (ladder run on the old language) until the current 10-minute
   bucket rolls over. Parked as a follow-up, not fixed in this task.
-- **Embedded-only source files get no AI item.** If every text-subtitle candidate is a `MediaProbe`
-  (embedded) stream, `pickTranslationSource` finds no URL-backed source, so no `Translated` item is
-  added regardless of how many embedded tracks exist.
-- **Translations of embedded HLS subtitle tracks are not supported.** Same root cause, from the
-  source side: embedded tracks are served through the transcoder's HLS subtitle group with no
-  independent URL for the `~tr:` mod to attach to. Deferred to phase 3+ in the spec.
+- **Embedded-track translations follow the viewer's transcode.** The source is the live
+  subtitle playlist of the current transcoder session, so the translation runs at transcode
+  speed and stops when the viewer leaves (`--live-idle` on the service) or seeks far (a new run
+  with a non-zero offset). A seeked session never produces a cached final artifact; the partial
+  progress is kept 24 h and reused by cue identity. Native MP4 without a transcoder session
+  still has no embedded source.
 - **Each reload refetches the whole partial VTT.** The `rev` reload swaps the `<track>` `src` and
   lets the browser reparse from scratch — no incremental cue-append; the file is just short early
   on and grows with each revision. The 15 s throttle bounds the cost (and the blank-cue window) but
