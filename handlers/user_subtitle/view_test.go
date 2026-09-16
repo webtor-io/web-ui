@@ -13,7 +13,7 @@ import (
 // comes from the filename when it declares one.
 func TestBuildViewDerivesSrcLang(t *testing.T) {
 	named, plain := sub(t, "Coyote.vs.Acme.en.srt"), sub(t, "subtitles.srt")
-	v := buildView([]*models.UserSubtitle{named, plain}, "res", "/movie.mkv", "http://ei", "", "", nil)
+	v := buildView([]*models.UserSubtitle{named, plain}, "res", "/movie.mkv", "http://ei", "", "", true, nil)
 
 	if got := v.UserSubtitles[0].SrcLang; got != "en" {
 		t.Errorf("named upload: SrcLang = %q, want \"en\"", got)
@@ -45,7 +45,7 @@ func sub(t *testing.T, name string) *models.UserSubtitle {
 // seeing nothing on screen is the whole of support ticket fd718d99.
 func TestBuildViewMarksJustUploaded(t *testing.T) {
 	a, b := sub(t, "old.srt"), sub(t, "new.srt")
-	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", us.TrackID(b.UserSubtitleID), nil)
+	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", us.TrackID(b.UserSubtitleID), true, nil)
 
 	if len(v.UserSubtitles) != 2 {
 		t.Fatalf("expected 2 tracks, got %d", len(v.UserSubtitles))
@@ -63,7 +63,7 @@ func TestBuildViewMarksJustUploaded(t *testing.T) {
 // choice over to an arbitrary track.
 func TestBuildViewSelectsNothingWithoutUpload(t *testing.T) {
 	a, b := sub(t, "one.srt"), sub(t, "two.srt")
-	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", "", nil)
+	v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", "", true, nil)
 
 	for _, tr := range v.UserSubtitles {
 		if tr.Selected {
@@ -87,7 +87,7 @@ func TestBuildViewNeverMarksDefaultOrSaved(t *testing.T) {
 	uploaded := us.TrackID(b.UserSubtitleID)
 
 	for _, selectedID := range []string{uploaded, ""} {
-		v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", selectedID, nil)
+		v := buildView([]*models.UserSubtitle{a, b}, "res", "/movie.mkv", "http://ei", "", selectedID, true, nil)
 		for _, tr := range v.UserSubtitles {
 			if tr.Default || tr.Saved {
 				t.Errorf("selectedID=%q track %q: Default = %v, Saved = %v, want both false",
@@ -101,5 +101,49 @@ func TestBuildViewNeverMarksDefaultOrSaved(t *testing.T) {
 					selectedID, tr.OriginalName, tr.Selected, want)
 			}
 		}
+	}
+}
+
+// TestBuildViewMarksTheListAuthoritative pins what RenderChips promises the
+// client.
+//
+// The partial wraps its chips in #my-upload-chips, and that element's
+// presence is the client's signal that the response is this viewer's
+// complete current upload list — which is how a delete works at all:
+// adoptUploadChips reconciles the row's MY chips against what came back, so
+// a response with one chip fewer takes the deleted chip out of the row, and
+// an empty one takes them all.
+//
+// That makes a failed List dangerous in a way it was not before. List
+// returns nil on error, so a transient failure during an upload or a delete
+// would render an empty marker, and the client would obey it: every MY chip
+// out of the row, the playing upload's <track> dropped by dropDeletedTracks,
+// playback landed on Off — all from an error the UI only shows as a toast.
+// "I do not know" must not render as "there are none".
+func TestBuildViewMarksTheListAuthoritative(t *testing.T) {
+	a := sub(t, "a.en.srt")
+
+	ok := buildView([]*models.UserSubtitle{a}, "res", "/movie.mkv", "http://ei", "", "", true, nil)
+	if !ok.RenderChips {
+		t.Error("a successful list must render its chips, or an upload never reaches the row")
+	}
+
+	// The shape a failed List actually produces: nil list, an error key.
+	failed := buildView(nil, "res", "/movie.mkv", "http://ei", "error.internal", "", false, nil)
+	if failed.RenderChips {
+		t.Error("a failed list must not claim the viewer has no uploads")
+	}
+	if failed.ErrKey != "error.internal" {
+		t.Errorf("the error still has to reach the panel, got %q", failed.ErrKey)
+	}
+
+	// An empty list that IS known stays authoritative — otherwise deleting
+	// the last upload would leave its chip in the row forever.
+	empty := buildView(nil, "res", "/movie.mkv", "http://ei", "", "", true, nil)
+	if !empty.RenderChips {
+		t.Error("deleting the last upload must still be able to say the list is empty")
+	}
+	if len(empty.UserSubtitles) != 0 {
+		t.Errorf("expected no tracks, got %d", len(empty.UserSubtitles))
 	}
 }

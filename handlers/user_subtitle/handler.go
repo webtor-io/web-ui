@@ -215,7 +215,7 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 		}
 	}
 
-	data := buildView(list, resourceID, path, eiURL, errKey, selectedID, wrap)
+	data := buildView(list, resourceID, path, eiURL, errKey, selectedID, listErr == nil, wrap)
 	s.tb.Build("user_subtitle/view").HTML(http.StatusOK, web.NewContext(c).WithData(data))
 }
 
@@ -223,7 +223,15 @@ func (s *Handler) renderView(c *gin.Context, userID uuid.UUID, resourceID, path,
 // the track the player should switch to — set after an upload, empty on every
 // other render. wrap may be nil when there is no export URL to hang the
 // subtitle off (the list still renders, just without playable sources).
-func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, selectedID string, wrap func(*models.UserSubtitle) string) *models.UserSubtitleView {
+//
+// listOK is whether the List that produced `list` succeeded. It decides
+// RenderChips, and that is not bookkeeping: under the contract the marker
+// introduces, an empty #my-upload-chips means "this viewer has no uploads",
+// and the client reconciles the row against it — stripping every MY chip,
+// dropping the playing upload's <track> and landing on Off. A transient
+// List failure must not be able to say that. With listOK false the response
+// renders the panel and the error, and the row is left exactly as it was.
+func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, selectedID string, listOK bool, wrap func(*models.UserSubtitle) string) *models.UserSubtitleView {
 	// us.Tracks is shared with the initial render (jobs/scripts) so the two
 	// shapes cannot drift; only the per-response markers are set here.
 	tracks := us.Tracks(list, wrap)
@@ -249,7 +257,9 @@ func buildView(list []*models.UserSubtitle, resourceID, path, eiURL, errKey, sel
 		// this partial is the whole response, so an upload's chip can only
 		// come from it. It lands in the wrapper that sits after the
 		// radiogroup, and the client moves it in (adoptUploadChips).
-		RenderChips: true,
+		//
+		// Only when the list is actually known: see listOK above.
+		RenderChips: listOK,
 	}
 }
 
