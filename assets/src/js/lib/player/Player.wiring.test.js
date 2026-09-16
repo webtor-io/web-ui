@@ -322,22 +322,30 @@ test('"+N" is a toggle, not a one-way reveal', async () => {
 
 // asyncSwap is what loadAsyncView leaves behind: #my-subtitles' innerHTML
 // replaced by the partial's response, then an 'async' CustomEvent naming
-// that element. The response shape is the partial's: chips inside
-// #my-upload-chips, then the disclosure and the panel.
-function asyncSwap(modal, chips) {
+// that element.
+//
+// The response is a Go-rendered fixture, not markup written here. Writing it
+// by hand was the one place the drift this whole machinery exists to stop
+// was still possible — and the worst place for it, since the chip
+// attributes it carries (data-lang, data-provider, data-rank,
+// data-autoselect) are exactly what adoptUploadChips, the language row and
+// the filter read. A hand-written copy would have stayed green while the
+// partial stopped emitting one of them.
+//
+//   'upload' — two uploads, the second freshly added (Selected, so it
+//              carries data-autoselect). us-1 is also in the dialog
+//              fixture, so replaying this exercises replace-in-place and
+//              not only the add path.
+//   'empty'  — the list after the last file was deleted. An empty
+//              #my-upload-chips is an answer, not an absence.
+const ASYNC = {
+    upload: readFileSync(path.join(HERE, '__fixtures__/user-subtitles-async.html'), 'utf8'),
+    empty: readFileSync(path.join(HERE, '__fixtures__/user-subtitles-async-empty.html'), 'utf8'),
+};
+
+function asyncSwap(modal, which) {
     const wrap = modal.querySelector('#my-subtitles');
-    wrap.innerHTML = `
-        <div id="my-upload-chips" class="contents">
-            ${chips.map((c) => `
-            <button type="button" role="radio" aria-checked="false"
-                    data-id="${c.id}" data-provider="UserSubtitle" data-src="https://x.test/${c.id}.vtt"
-                    data-label="${c.name}" data-srclang="${c.lang}" data-kind="subtitles" data-badge="user"
-                    data-lang="${c.lang}" data-lang-name="${c.lang}" data-rank="0"
-                    ${c.fresh ? 'data-autoselect="true"' : ''}
-                    class="subtitle track-chip"><span class="chip-origin">MY</span><span>${c.name}</span></button>`).join('')}
-        </div>
-        <button type="button" id="my-uploads-toggle" aria-expanded="false" aria-controls="my-uploads-panel">+ My Subtitles</button>
-        <div id="my-uploads-panel" class="basis-full" hidden></div>`;
+    wrap.innerHTML = ASYNC[which];
     window.dispatchEvent(new dom.window.CustomEvent('async', { detail: { target: wrap } }));
 }
 
@@ -346,10 +354,7 @@ test('an upload lands in the radiogroup, selected, exactly once', async () => {
     p.wire();
     assert.ok(p.chip('us-1'), 'the fixture carries one upload already');
 
-    asyncSwap(p.modal, [
-        { id: 'us-1', name: 'my.en.srt', lang: 'en' },
-        { id: 'us-2', name: 'fresh.en.srt', lang: 'en', fresh: true },
-    ]);
+    asyncSwap(p.modal, 'upload');
     await flush();
 
     const row = p.modal.querySelector('#subtitle-tracks');
@@ -372,6 +377,15 @@ test('an upload lands in the radiogroup, selected, exactly once', async () => {
 
     // The row caught up with the new chip: English now counts three.
     assert.equal(p.lang('en').querySelector('.lang-count').textContent, '3');
+
+    // And the MY block is where the server puts it — before the AI item,
+    // since an upload is rank 0. Appending instead would move the uploads
+    // past the AI chip on every upload and delete, and the next page load
+    // would move them back: the row reordering for reasons unrelated to
+    // anything the viewer did.
+    const order = Array.from(p.modal.querySelectorAll('#subtitle-tracks .subtitle[data-id]'))
+        .map((el) => el.getAttribute('data-id'));
+    assert.deepEqual(order.slice(-3), ['us-1', 'us-2', 'tr-pt']);
 });
 
 test('deleting the upload that is playing lands on Off, without a PUT', async () => {
@@ -384,7 +398,7 @@ test('deleting the upload that is playing lands on Off, without a PUT', async ()
     assert.ok(p.video.querySelector('track#us-1'), 'selecting it side-loaded the track');
 
     // The delete response: the list is empty now.
-    asyncSwap(p.modal, []);
+    asyncSwap(p.modal, 'empty');
     await flush();
 
     assert.equal(p.chip('us-1'), null, 'the chip left the row with the file');
@@ -401,7 +415,7 @@ test('deleting an upload that is not playing leaves playback alone', async () =>
     click(p.chip('os-os-en'));
     await flush();
 
-    asyncSwap(p.modal, []);
+    asyncSwap(p.modal, 'empty');
     await flush();
 
     assert.equal(p.chip('us-1'), null);
@@ -421,7 +435,7 @@ test('the uploads panel survives the swap it is replaced by', async () => {
 
     // A delete replaces the toggle and the panel; the wrapper, which is
     // what remembers, is not replaced.
-    asyncSwap(p.modal, [{ id: 'us-1', name: 'my.en.srt', lang: 'en' }]);
+    asyncSwap(p.modal, 'upload');
     await flush();
     assert.equal(p.modal.querySelector('#my-uploads-panel').hidden, false,
         'removing two files in a row must not mean re-opening the panel between them');
@@ -478,22 +492,34 @@ test('a 503 on the PUT is retried once, and the retry lands', async () => {
         ? { ok: false, status: 503 }
         : { ok: true, status: 200 }));
 
-    const done = markTrack(p.container, p.chip('os-os-en'), 'subtitle');
-    await done;
+    const startedAt = Date.now();
+    await markTrack(p.container, p.chip('os-os-en'), 'subtitle');
 
     const puts = p.puts();
     assert.equal(puts.length, 2, 'the choice is not lost to an edge blip');
     assert.deepEqual(puts[1].body, puts[0].body, 'the retry sends the same choice');
+    // Deferred, not immediate: an instant resend arrives at the same edge
+    // that just refused, and is the stampede this deliberately is not.
+    assert.ok(Date.now() - startedAt >= PUT_RETRY_DELAY_MS - 50,
+        `the retry waited ${Date.now() - startedAt} ms, expected about ${PUT_RETRY_DELAY_MS}`);
 });
 
 test('a network error is retried once too, and a second failure gives up', async () => {
     const p = mount();
     p.wire();
     let n = 0;
-    globalThis.fetch = () => { n++; return Promise.reject(new Error('ECONNRESET')); };
-    window.fetch = globalThis.fetch;
-
-    await markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    const rejecting = () => { n++; return Promise.reject(new Error('ECONNRESET')); };
+    const restore = globalThis.fetch;
+    globalThis.fetch = window.fetch = rejecting;
+    try {
+        await markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    } finally {
+        // Put it back rather than leaving a permanently rejecting fetch
+        // installed. Every later test calls mount() first today, so this
+        // is safe either way — which is exactly why it would be missed the
+        // day one does not.
+        globalThis.fetch = window.fetch = restore;
+    }
 
     assert.equal(n, 2, 'one retry, not a stampede');
 });
@@ -508,8 +534,59 @@ test('a 4xx is an answer, not a blip: no retry', async () => {
     assert.equal(p.puts().length, 1, 'repeating a refused request gets it refused again');
 });
 
-test('the retry delay is a whole second, not a busy loop', () => {
-    assert.equal(PUT_RETRY_DELAY_MS, 1000);
+test('a retry stands down when a newer choice has already been written', async () => {
+    // The failure the sequence guard exists for. Click A, it 503s and
+    // queues a retry; click B inside the retry window and it succeeds. If
+    // A's retry still fired, the session would end up holding A and the
+    // next page load would restore the wrong track — a corruption the old
+    // fire-and-forget PUT could not cause, because a lost write only lost
+    // itself.
+    const p = mount();
+    p.wire();
+    p.setResponse((url, params, n) => (n === 1 ? { ok: false, status: 503 } : { ok: true, status: 200 }));
+
+    const first = markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    // Inside the retry window, and it wins.
+    const second = markTrack(p.container, p.chip('os-os-ru'), 'subtitle');
+    // Awaiting both is already past the point A's retry would have fired:
+    // the returned promise resolves after the delay, having decided.
+    await Promise.all([first, second]);
+
+    const puts = p.puts();
+    assert.equal(puts.length, 2, 'two clicks, two writes -- the stale retry was skipped');
+    assert.deepEqual(puts.map((c) => c.body.id), ['os-os-en', 'os-os-ru']);
+    assert.equal(puts[puts.length - 1].body.id, 'os-os-ru', 'the session ends up holding the newer choice');
+});
+
+test('a retry does not outlive the player that queued it', async () => {
+    const p = mount();
+    p.wire();
+    p.setResponse(() => ({ ok: false, status: 503 }));
+
+    const done = markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    destroyPlayer();
+    await done;
+
+    assert.equal(p.puts().length, 1, 'a write queued by a page the viewer left must not land');
+});
+
+test('audio and subtitle are sequenced apart', async () => {
+    // Two independent choices. A subtitle click must not cancel the retry
+    // of an audio write made a moment earlier, or the guard would turn
+    // "pick a track, then pick a language" into a lost audio choice.
+    const p = mount();
+    p.wire();
+    p.setResponse((url, params, n) => (n === 1 ? { ok: false, status: 503 } : { ok: true, status: 200 }));
+
+    const audio = markTrack(p.container, p.audioChip('mp-1'), 'audio');
+    const subtitle = markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    await Promise.all([audio, subtitle]);
+
+    const puts = p.puts();
+    assert.equal(puts.length, 3, 'the audio retry still fires');
+    assert.deepEqual(puts.map((c) => c.url), [
+        '/stream-video/audio', '/stream-video/subtitle', '/stream-video/audio',
+    ]);
 });
 
 // ---- the translation offer ------------------------------------------

@@ -1509,7 +1509,28 @@ export const PUT_RETRY_DELAY_MS = 1000;
 // Still fire-and-forget: no UI, no error surface, and every failure ends
 // swallowed. The returned promise is the write in flight, which is what
 // makes the retry testable without a sleep in the test.
+//
+// A retry only ever resends the LATEST choice of its kind. The body is read
+// eagerly at markTrack time, so a second later it may name a track the
+// viewer has already moved on from: click A (503), click B (200), and A's
+// retry would land last and make the next page load restore A. That is
+// worse than the failure it exists to fix — before the retry a lost PUT
+// only lost that choice; it could not overwrite a newer one. Each call
+// takes the next number for its kind, and the retry stands down when it is
+// no longer holding it. Audio and subtitle count separately: they are two
+// independent choices and one must not cancel the other's retry.
+const putSeq = new Map();
+
+// And a retry does not outlive the player that queued it. destroyPlayer
+// bumps this, so a write scheduled by a page the viewer has navigated away
+// from cannot land — possibly into the next file's session.
+let playerGeneration = 0;
+
 function persistTrackChoice(type, body) {
+    const seq = (putSeq.get(type) || 0) + 1;
+    putSeq.set(type, seq);
+    const generation = playerGeneration;
+    const stillCurrent = () => putSeq.get(type) === seq && playerGeneration === generation;
     const send = () => fetch(`/stream-video/${type}`, {
         method: 'PUT',
         headers: {
@@ -1518,8 +1539,8 @@ function persistTrackChoice(type, body) {
         },
         body: JSON.stringify(body),
     });
-    const wait = () => new Promise((resolve) => setTimeout(resolve, PUT_RETRY_DELAY_MS));
-    const retry = () => wait().then(send);
+    const retry = () => new Promise((resolve) => setTimeout(resolve, PUT_RETRY_DELAY_MS))
+        .then(() => (stillCurrent() ? send() : undefined));
     return send().then(
         (res) => (res && res.status >= 500 ? retry() : res),
         retry,
@@ -1552,6 +1573,10 @@ function wireLogo(container, playerContainer) {
  * Destroy current player instance.
  */
 export function destroyPlayer() {
+    // Before the early return: "this page's player is gone" is true whether
+    // or not one was mounted, and it is what stands a queued PUT retry
+    // down (persistTrackChoice).
+    playerGeneration++;
     if (!_currentPlayer) return;
     const { mountEl, playerContainer, videoEl } = _currentPlayer;
 
