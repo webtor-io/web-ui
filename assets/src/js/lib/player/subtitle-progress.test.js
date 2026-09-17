@@ -4,7 +4,7 @@ import { parseProgress, withRev, pollProgress, progressText, POLL_TIMEOUT_MS, QU
 
 // headers builds the HEAD response the translate service answers with.
 // `status` is X-Subtitle-Status, absent unless a case sets it.
-const answer = (progress, { live = false, status = null, pendingFrom = null } = {}) => ({
+const answer = (progress, { live = false, status = null, pendingFrom = null, sessionOffset = null } = {}) => ({
     status: 200,
     headers: {
         get: (n) => {
@@ -12,6 +12,7 @@ const answer = (progress, { live = false, status = null, pendingFrom = null } = 
             if (n === 'X-Subtitle-Live') return live ? '1' : null;
             if (n === 'X-Subtitle-Status') return status;
             if (n === 'X-Subtitle-Pending-From') return pendingFrom;
+            if (n === 'X-Subtitle-Session-Offset') return sessionOffset;
             return null;
         },
     },
@@ -692,4 +693,51 @@ test('onTick does not fire for a tick that never got a 200', async (t) => {
     await new Promise((r) => setTimeout(r, 20));
     assert.deepEqual(ticks, []);
     assert.deepEqual(errs, [503]);
+});
+
+// ---- which run an answer is about ----------------------------------------
+//
+// After a seek the player needs an answer about the run it is now watching.
+// The service re-reads its playlist sooner when a poll names that run (`sof`)
+// and says which run each answer describes (X-Subtitle-Session-Offset).
+
+test('a live poll names the session offset it watches; a batch one does not', async () => {
+    const urls = [];
+    let live = true;
+    let offset = 0;
+    const fetchImpl = async (url) => { urls.push(url); return answer('3/10', { live }); };
+    const stop = pollProgress('https://x/a.vtt?token=t', { fetchImpl, intervalMs: 5, sessionOffset: () => offset });
+    await new Promise((r) => setTimeout(r, 12));
+    offset = 720;
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+    assert.equal(urls[0], 'https://x/a.vtt?token=t', 'the first poll does not know the source is live yet');
+    assert.ok(urls.some((u) => u === 'https://x/a.vtt?token=t&sof=0'), `the live answer turns it on: ${urls}`);
+    assert.ok(urls.at(-1) === 'https://x/a.vtt?token=t&sof=720', `and it follows a seek: ${urls.at(-1)}`);
+
+    const batch = [];
+    live = false;
+    const stop2 = pollProgress('https://x/b.vtt', { fetchImpl: async (url) => { batch.push(url); return answer('3/10'); }, intervalMs: 5, sessionOffset: () => 720 });
+    await new Promise((r) => setTimeout(r, 25));
+    stop2();
+    assert.ok(batch.length > 1 && batch.every((u) => u === 'https://x/b.vtt'), `a batch source never gets it: ${batch}`);
+});
+
+test('the answer carries the session offset it was computed against, when the service says', async () => {
+    const seen = [];
+    let so = '720.000';
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl: async () => answer('3/10', { live: true, sessionOffset: so }),
+        intervalMs: 5,
+        onTick: (p) => seen.push(p.sessionOffset),
+    });
+    await new Promise((r) => setTimeout(r, 12));
+    so = null;
+    await new Promise((r) => setTimeout(r, 15));
+    so = 'garbage';
+    await new Promise((r) => setTimeout(r, 15));
+    stop();
+    assert.equal(seen[0], 720);
+    assert.ok(seen.includes(null), 'no header is null: an older service');
+    assert.equal(seen.at(-1), null, 'and so is one that does not parse');
 });

@@ -197,7 +197,14 @@ Two client-side mechanisms fix this (`cue-offset.js`):
    revision swap in flight → the `src` gets a `wt-rf=<n>` parameter and
    the file is fetched again (the capturing `load` listener applies the
    current offset). The mark is spent on the first look, so a file that is
-   legitimately empty costs one request, not one per re-assertion. Not
+   legitimately empty costs one request, not one per re-assertion. Marked
+   from the elements present right before `loadSource()`, not at snapshot
+   time: a `<track>` added while the seek POST was in flight is wiped too. A
+   track that was **still loading** when it was wiped lost the cues parsed so
+   far and gets only the rest, so it is refetched regardless of its cue count
+   — at once if it has loaded by the time it is picked, otherwise when its
+   `load` lands. `reloadSubtitleTrack` compares sources without `wt-rf`, so
+   an AI track refetched this way is not swapped again for the same revision. Not
    done by snapshotting disabled tracks too: reading their cues means
    flipping them to `hidden` and back, a `change` event per track for
    hls.js to react to, and a first download for every track never loaded.

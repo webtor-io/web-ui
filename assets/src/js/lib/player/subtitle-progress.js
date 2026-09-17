@@ -39,12 +39,12 @@
 export const STATUS_DONE = 'done';
 export const STATUS_STOPPED = 'stopped';
 
-// parsePendingFrom is deliberately strict about what counts as a number.
+// parseSeconds is deliberately strict about what counts as a number.
 // Number('') is 0 and Number(' ') is 0 too, and a 0 here means "the
 // earliest untranslated cue starts at the top of the film", which is a
 // claim to pause the viewer on. An empty or unparseable header is no
 // claim at all.
-function parsePendingFrom(header) {
+function parseSeconds(header) {
     if (header === null || header === undefined) return null;
     const s = String(header).trim();
     if (!s) return null;
@@ -57,7 +57,7 @@ function parsePendingFrom(header) {
 export function parseProgress(header, live = false, status = '', pendingFrom = null) {
     const isLive = Boolean(live);
     const st = String(status || '').trim().toLowerCase();
-    const pending = parsePendingFrom(pendingFrom);
+    const pending = parseSeconds(pendingFrom);
     const m = /^(\d+)\/(\d+)$/.exec(String(header || '').trim());
     if (!m) return { done: 0, total: 0, final: st === STATUS_DONE, live: isLive, pendingFrom: pending };
     const done = parseInt(m[1], 10);
@@ -124,9 +124,15 @@ const ABSOLUTE = /^[a-z][a-z0-9+.-]*:\/\//i;
 // break on an http page and a relative one rewritten as /path would
 // point at the site root.
 export function withRev(src, n) {
+    return withParam(src, 'rev', n);
+}
+
+// withParam sets one query parameter on a URL that may be absolute,
+// protocol-relative, root-relative or relative, keeping its shape.
+export function withParam(src, name, value) {
     const s = String(src || '');
     const u = new URL(s, 'https://placeholder.invalid');
-    u.searchParams.set('rev', String(n));
+    u.searchParams.set(name, String(value));
     if (ABSOLUTE.test(s)) return u.toString();
     if (s.startsWith('//')) return u.toString().replace(/^https?:/i, '');
     if (s.startsWith('/')) return u.pathname + u.search + u.hash;
@@ -181,7 +187,16 @@ export function withRev(src, n) {
 // tick's onProgress is always the earlier call) and before the terminal
 // ones, because a run that is about to be reported done or stopped should
 // not first be reported as trailing.
-export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, onProgress, onTick, onDone, onError } = {}) {
+//
+// sessionOffset, when given, returns the transcoder session offset the
+// player is watching (seconds). Once the service has said the source is live,
+// every poll carries it as `sof`: a poll naming a run the service has not read
+// yet makes it re-read the playlist now rather than after its own poll
+// interval, which after a seek is the difference between an answer about the
+// new position and one about the old. Each answer then carries
+// `sessionOffset` — the run it was computed against (X-Subtitle-Session-
+// Offset), or null from a service that does not say.
+export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, sessionOffset, onProgress, onTick, onDone, onError } = {}) {
     let stopped = false;
     let suspended = false;
     let suspendedAt = 0;
@@ -193,6 +208,11 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
     // something else, or the first report of an absent header would not
     // count as a change.
     let lastPendingFrom;
+    const pollURL = () => {
+        if (lastLive !== true || typeof sessionOffset !== 'function') return src;
+        const o = sessionOffset();
+        return typeof o === 'number' && Number.isFinite(o) && o >= 0 ? withParam(src, 'sof', o) : src;
+    };
     // When this run started answering `0/0`, and whether the chip has been
     // told about it. Both reset on the first real count, so a job that goes
     // back to reporting nothing could say "waiting" again -- it would be
@@ -224,7 +244,7 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         }
         let res;
         try {
-            res = await fetchImpl(src, { method: 'HEAD', cache: 'no-store' });
+            res = await fetchImpl(pollURL(), { method: 'HEAD', cache: 'no-store' });
         } catch (e) {
             // A throw on a dead generation is a request that was in flight
             // when the video paused: the run is asleep, not failed, and
@@ -250,6 +270,9 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
             status,
             res.headers.get('X-Subtitle-Pending-From'),
         );
+        // A passenger, not part of the change test: it says which run the
+        // other fields describe, and the caller reads it on every tick.
+        p.sessionOffset = parseSeconds(res.headers.get('X-Subtitle-Session-Offset'));
         // pendingFrom is part of the change test, not just a passenger on
         // it: after a seek the run's frontier moves while the counts stand
         // still (the same cues, a different place in the film), and that

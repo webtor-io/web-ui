@@ -89,7 +89,9 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 // wipe, and not at snapshot time: a track picked while the
                 // POST was in flight would otherwise be refetched first and
                 // emptied second.
-                markUnsnapshottedTracksStale(trackEls, savedElementTrackState);
+                // Queried again: a <track> added while the POST was in
+                // flight is wiped too, and is in no snapshot.
+                markUnsnapshottedTracksStale([...videoEl.querySelectorAll('track')], savedElementTrackState);
                 // HLS.js: reload manifest
                 hls.stopLoad();
                 hls.loadSource(sourceUrl);

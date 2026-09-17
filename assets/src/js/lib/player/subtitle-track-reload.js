@@ -36,7 +36,10 @@ export function reloadSubtitleTrack(video, id, nextSrc, onError) {
     for (const t of video.querySelectorAll('track')) {
         if (t.id === id) { el = t; break; }
     }
-    if (!el || el.getAttribute('src') === nextSrc) return false;
+    // Compared without the refresh parameter: a track refetched after a seek
+    // (refreshStaleTrack) is the same revision, and swapping it again would
+    // download the file twice and spend the caller's reload throttle.
+    if (!el || withoutRefresh(el.getAttribute('src')) === withoutRefresh(nextSrc)) return false;
 
     clearPending(el);
     const saved = captureTrackState([el.track]);
@@ -106,11 +109,16 @@ export function dropDeletedTracks(video, chipIDs) {
 // react to, and a first download for every track that was never loaded.
 // Only the track the viewer actually picks is worth a request.
 
-// HTMLTrackElement.LOADED, spelled out: the tests have no DOM.
+// HTMLTrackElement.LOADING / LOADED, spelled out: the tests have no DOM.
+const TRACK_LOADING = 1;
 const TRACK_LOADED = 2;
 const REFRESH_PARAM = 'wt-rf';
 
-const stale = new WeakSet();
+// element -> { loadingAtWipe }. A track that was still loading when
+// loadSource emptied it lost the cues parsed so far and gets only the rest,
+// so it can be short while not empty: it is refetched regardless of its
+// cue count.
+const stale = new WeakMap();
 let refreshSeq = 0;
 
 // markUnsnapshottedTracksStale marks the <track> elements whose cues the
@@ -124,18 +132,29 @@ export function markUnsnapshottedTracksStale(elements, saved) {
     const marked = [];
     for (const el of elements || []) {
         if (!el || covered.has(el.track)) continue;
-        stale.add(el);
+        stale.set(el, { loadingAtWipe: el.readyState === TRACK_LOADING });
         marked.push(el);
     }
     return marked;
 }
 
+function withoutRefresh(src) {
+    if (src === null || src === undefined) return src;
+    const re = new RegExp(`([?&])${REFRESH_PARAM}=\\d+(&|$)`);
+    return String(src).replace(re, (m, lead, tail) => (tail ? lead : '')).replace(/[?&]$/, '');
+}
+
 function withRefresh(src) {
     refreshSeq++;
-    const re = new RegExp(`([?&])${REFRESH_PARAM}=\\d+(&|$)`);
-    let base = src.replace(re, (m, lead, tail) => (tail ? lead : ''));
-    base = base.replace(/[?&]$/, '');
+    const base = withoutRefresh(src);
     return `${base}${base.includes('?') ? '&' : '?'}${REFRESH_PARAM}=${refreshSeq}`;
+}
+
+function refetch(el) {
+    const src = el.getAttribute('src');
+    if (!src) return false;
+    el.setAttribute('src', withRefresh(src));
+    return true;
 }
 
 // refreshStaleTrack refetches a track a seek emptied, and reports whether it
@@ -143,17 +162,33 @@ function withRefresh(src) {
 // look either way, so a file that is legitimately empty costs one request,
 // not one per re-assertion of the selection.
 export function refreshStaleTrack(el) {
-    if (!el || !stale.has(el)) return false;
-    stale.delete(el);
-    // Not loaded yet: switching it on starts its first load, which brings
-    // the cues by itself.
-    if (el.readyState !== TRACK_LOADED) return false;
+    const mark = el ? stale.get(el) : undefined;
+    if (!mark) return false;
     // A revision swap in flight is already the refetch.
-    if (pending.has(el)) return false;
+    if (pending.has(el)) {
+        stale.delete(el);
+        return false;
+    }
+    if (mark.loadingAtWipe && el.readyState === TRACK_LOADING) {
+        // Still on the load the wipe cut into: refetch when it lands. The
+        // mark stays until then, so a second activation does not add a
+        // second listener's worth of work.
+        if (!mark.waiting) {
+            mark.waiting = true;
+            el.addEventListener('load', function onLoad() {
+                el.removeEventListener('load', onLoad);
+                if (stale.get(el) !== mark) return;
+                stale.delete(el);
+                refetch(el);
+            });
+        }
+        return false;
+    }
+    stale.delete(el);
+    // Never loaded: switching it on starts its first load, which brings the
+    // cues by itself.
+    if (el.readyState !== TRACK_LOADED) return false;
     const cues = el.track && el.track.cues;
-    if (cues && cues.length > 0) return false;
-    const src = el.getAttribute('src');
-    if (!src) return false;
-    el.setAttribute('src', withRefresh(src));
-    return true;
+    if (!mark.loadingAtWipe && cues && cues.length > 0) return false;
+    return refetch(el);
 }

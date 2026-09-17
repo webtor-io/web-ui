@@ -222,3 +222,37 @@ test('nothing to refetch: not stale, still has cues, never loaded, or a reload a
 
     assert.equal(refreshStaleTrack(null), false);
 });
+
+test('a refetched track is not reloaded again for the same revision', () => {
+    // Found in review: an AI track refetched after a seek carries wt-rf, the
+    // poll's next swap for the same revision did not, and the file was
+    // downloaded twice back to back (spending the reload throttle too).
+    const el = loadedTrack('tr-pt', { src: 'https://x/tr-pt.vtt?rev=3' });
+    const video = videoWith(el);
+    markUnsnapshottedTracksStale([el], []);
+    refreshStaleTrack(el);
+    assert.match(el.getAttribute('src'), /wt-rf=/);
+    assert.equal(reloadSubtitleTrack(video, 'tr-pt', 'https://x/tr-pt.vtt?rev=3'), false, 'same revision: nothing to do');
+    assert.equal(reloadSubtitleTrack(video, 'tr-pt', 'https://x/tr-pt.vtt?rev=4'), true, 'a new revision still swaps');
+});
+
+test('a track still loading when the seek emptied it is refetched once its load lands', () => {
+    // Found in review: the cues parsed before the wipe are gone, the loader
+    // adds only the rest, so a loaded track with some cues can still be short.
+    const el = loadedTrack('os-ru', { readyState: 1 });
+    markUnsnapshottedTracksStale([el], []);
+    assert.equal(refreshStaleTrack(el), false, 'nothing to refetch while the first load is still running');
+    assert.equal(el.getAttribute('src'), 'https://x/os-ru.vtt?token=t');
+    el.readyState = 2;
+    el.track.cues.push({ startTime: 50, endTime: 51 });
+    el.fire('load');
+    assert.match(el.getAttribute('src'), /wt-rf=\d+$/, 'refetched once loaded, even with some cues');
+    el.fire('load');
+    assert.equal((el.getAttribute('src').match(/wt-rf=/g) || []).length, 1, 'once');
+
+    const loadedSince = loadedTrack('os-en', { readyState: 1 });
+    markUnsnapshottedTracksStale([loadedSince], []);
+    loadedSince.readyState = 2;
+    loadedSince.track.cues.push({ startTime: 1, endTime: 2 });
+    assert.equal(refreshStaleTrack(loadedSince), true, 'loaded by the time it is picked: refetched, cues or not');
+});

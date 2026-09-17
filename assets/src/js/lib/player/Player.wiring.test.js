@@ -1495,6 +1495,43 @@ test('a side-loaded track picked after a seek is fetched again; one left off is 
     assert.equal(en.getAttribute('src'), 'https://x.test/os-os-en.vtt', 'a track nobody picked costs no request');
 });
 
+test('a <track> added while the seek POST is in flight is refetched when picked', async (t) => {
+    // Found in review: the elements to mark were collected before the POST,
+    // so a track that loaded during it was wiped by loadSource and marked by
+    // nobody.
+    t.after(() => destroyPlayer());
+    let releasePost;
+    const p = await mountPlayer((it) => {
+        it.installHls({ subtitleTrack: 0, subtitleDisplay: true });
+        it.chip('none').removeAttribute('data-default');
+        it.chip('mp-0').setAttribute('data-default', 'true');
+        it.modal.setAttribute('data-subtitles-off', 'false');
+    }, { hlsTracks: [['Full (rus)', 'showing']] });
+    p.setResponse((url, params) => (params && params.method === 'POST' && String(url).includes('/session/seek')
+        ? new Promise((resolve) => { releasePost = () => resolve({ ok: true, status: 200, json: async () => ({}) }); })
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const hls = window.hlsPlayer;
+    const seeker = createSessionSeeker({
+        hls, videoEl: p.video, sessionSeekUrl: '/session/seek', sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+    });
+    const seeking = seeker.seek(120);
+    await flush();
+    const el = document.createElement('track');
+    el.id = 'os-os-en';
+    el.setAttribute('src', 'https://x.test/os-os-en.vtt');
+    Object.defineProperty(el, 'readyState', { configurable: true, value: 2 });
+    p.video.appendChild(el);
+    releasePost();
+    await flush();
+    hls.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+
+    click(p.chip('os-os-en'));
+    await flush();
+    assert.match(p.video.querySelector('track#os-os-en').getAttribute('src'), /wt-rf=\d+$/);
+});
+
 // ---- a seek kicks the translation poll ---------------------------------
 //
 // Bug (2026-09-16): with a live AI translation running, a seek jumps the
@@ -1768,15 +1805,17 @@ test('× takes the banner away and the next trailing tick does not bring it back
 
 // mountSessionRun mounts a transcoder-session player with a live AI run on
 // the Portuguese track, playing, and returns what the tests drive.
-async function mountSessionRun(t, respond) {
+async function mountSessionRun(t, respond, { sessionOffset = 0 } = {}) {
     t.after(() => destroyPlayer());
     const p = mount({ tracks: [['tr-pt', false]] });
     p.video.dataset.sessionId = 's1';
     p.video.dataset.sessionSeekUrl = '/session/seek';
     p.video.setAttribute('data-duration', '3600');
+    // The GET of the seek URL at mount is how the player learns the offset
+    // of the session it joined (a resume lands mid-film).
     p.setResponse((url, params) => (params && params.method === 'HEAD'
         ? respond()
-        : { ok: true, status: 200, json: async () => ({}) }));
+        : { ok: true, status: 200, json: async () => ({ offset: sessionOffset }) }));
     await initPlayer(p.container);
     await settle();
     const log = playback(p.video);
@@ -1891,4 +1930,128 @@ test('no hold when the seek happened on a paused film, or the service does not s
         assert.equal(log.pause, pausesBefore);
         assert.equal(events('subtitle-translate-wait').length, 0);
     });
+});
+
+// ---- the seek hold, after review ---------------------------------------
+
+// A live answer that also says which run it describes.
+const runResponse = (header, pendingFrom, sessionOffset) => ({
+    ok: true,
+    status: 200,
+    headers: {
+        get: (n) => {
+            if (n === 'X-Subtitle-Progress') return header;
+            if (n === 'X-Subtitle-Live') return '1';
+            if (n === 'X-Subtitle-Pending-From') return pendingFrom;
+            if (n === 'X-Subtitle-Session-Offset') return sessionOffset;
+            return null;
+        },
+    },
+    json: async () => ({}),
+});
+
+test('a pause while the answer after a seek is in flight cancels the hold for good', async (t) => {
+    // Found in review: the "hold after this seek" flag was only cleared by a
+    // poll answer, a pause dropped that answer, and the next play — seconds
+    // or minutes later — paused the film again.
+    let pending = '400';
+    const delayed = () => new Promise((resolve) => setTimeout(() => resolve(catchUpResponse('12/400', pending)), 200));
+    const { p, log, events } = await mountSessionRun(t, delayed);
+    await wait(300);
+    pending = '0';
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await wait(20);
+    p.video.pause();
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    const pauses = log.pause;
+    p.video.play();
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(events('subtitle-translate-wait').length, 0, 'no hold on the play that came later');
+    assert.equal(log.pause, pauses, 'and nothing paused the film under the viewer');
+});
+
+test('a run that dies during a seek\u2019s hold plays the film it paused', async (t) => {
+    // The Wait button leaves the film paused when its run dies — the viewer
+    // paused on purpose. A hold is a pause the viewer never asked for.
+    let status = 200;
+    let pending = '400';
+    const { p, log, seek } = await mountSessionRun(t, () => (status === 200
+        ? catchUpResponse('12/400', pending)
+        : { ok: false, status, headers: { get: () => null } }));
+    pending = '0';
+    await seek();
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting');
+    const plays = log.play;
+    status = 500;
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(log.play > plays, 'the film plays again');
+    assert.equal(catchUpBanner(p), null);
+});
+
+test('an answer about the run before the seek does not decide the hold; the one about the new run does', async (t) => {
+    // Found in review, then measured on a real session: the transcoder lists
+    // the new run ~200 ms after the seek POST, so the first answers after a
+    // seek can describe the old run — with nothing pending, which read as
+    // "caught up" and spent the decision.
+    // Joined mid-film: the session's run starts at 300 s. ArrowLeft from
+    // ~5:01 lands on the run starting at 270 s.
+    let answer = () => runResponse('12/400', '800', '300.000');
+    const { p, log, events } = await mountSessionRun(t, () => answer(), { sessionOffset: 300 });
+
+    // The old run's answer, still: nothing pending, offset 300.
+    answer = () => runResponse('12/400', null, '300.000');
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await settle();
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.equal(events('subtitle-translate-wait').length, 0, 'not decided on the old run');
+    const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
+    assert.ok(heads.at(-1).includes('sof=270'), `the polls name the run the player watches: ${heads.at(-1)}`);
+
+    // The service reads the new run.
+    answer = () => runResponse('12/400', '270.000', '270.000');
+    await wait(900);
+    assert.equal(events('subtitle-translate-wait').length, 1, 'decided on the answer about the new run');
+    assert.equal(events('subtitle-translate-wait')[0].data.auto, true);
+    assert.ok(log.pause >= 1);
+});
+
+test('during a seek\u2019s hold: another seek plays the film and decides again; \u00d7 plays it too', async (t) => {
+    let pending = '400';
+    const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    pending = '0';
+    await seek();
+    assert.equal(events('subtitle-translate-wait').length, 1);
+
+    const plays = log.play;
+    await seek();
+    assert.ok(log.play > plays, 'a seek during a hold is not left paused behind it');
+    assert.equal(events('subtitle-translate-wait').length, 2, 'and the new position gets its own hold');
+
+    const beforeX = log.play;
+    click(catchUpBanner(p).querySelector('.wt-catchup-close'));
+    await settle();
+    assert.ok(log.play > beforeX, '\u00d7 on a hold plays the film: the viewer never paused it');
+    assert.equal(catchUpBanner(p), null);
+});
+
+test('a hold that runs out while the tab is hidden does not start playback in the background', async (t) => {
+    const cap = catchUpTiming.seekHoldMaxMs;
+    catchUpTiming.seekHoldMaxMs = 300;
+    t.after(() => { catchUpTiming.seekHoldMaxMs = cap; delete document.hidden; });
+    let pending = '400';
+    const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    pending = '0';
+    await seek();
+    assert.equal(events('subtitle-translate-wait').length, 1);
+    setHidden(true);
+    const plays = log.play;
+    await wait(600);
+    assert.equal(log.play, plays, 'no playback in a hidden tab');
+    assert.equal(events('subtitle-translate-wait-done').at(-1).data.capped, true);
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'the banner offers Wait for when the viewer comes back');
 });

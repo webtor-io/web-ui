@@ -490,8 +490,26 @@ trip" / cache-key section).
     so a few more seconds read as part of it, but one slow upstream batch must not turn a seek
     into a hang. Past the cap the film plays and the banner goes back to offering Wait, which
     stays uncapped because the viewer chose it. No hold when the film was paused at the seek or
-    paused before the answer came back, when the source is not live, or when the service sends no
-    `X-Subtitle-Pending-From` (`caughtUp(null)` is true). Once per seek. The service half is what
+    paused before the answer came back (`sleep()` drops the pending decision on any pause outside
+    a seek, so a later play is never held), when the source is not live, or when the service sends
+    no `X-Subtitle-Pending-From` (`caughtUp(null)` is true). Once per seek.
+    **Only an answer about the new run decides.** Measured on a real session: the transcoder lists
+    the new run ~200 ms after the seek POST, the first poll after a seek lands ~100 ms after it,
+    and the service re-read its playlist only once per poll interval (6 s) — so the answer after a
+    seek described the old run, with nothing pending, and read as "caught up". Every live poll now
+    carries `sof=<seekOffset>` (`pollProgress`'s `sessionOffset` option; sent once an answer said
+    the source is live), the service re-reads the playlist at once when it disagrees, and each
+    answer carries `X-Subtitle-Session-Offset`. An answer whose offset is not the player's own
+    (±1 s) neither decides the hold (the decision is put off, re-kicked every
+    `SEEK_HOLD_RETRY_MS` = 600 ms, at most `SEEK_HOLD_RETRIES` = 5 times) nor ends a wait nor
+    moves the banner. A service without the header is taken at its word.
+    **Ending a hold.** A hold is a pause the viewer never made, so every path that ends it for a
+    reason that is not the viewer's plays the film: the run dying (`fail`, `onDone`, another track
+    via `stopTranslationProgress`), ×, and a new seek (the hls.js seek path waits for `playing` and
+    never plays a paused element). `clearWait()` reports whether the wait was a hold for exactly
+    this. The one exception is the player unmounting (`stopTranslationProgress({ resumeHold:
+    false })`). A hold that ends — caught up or capped — while the tab is hidden does not start
+    playback there: the film stays paused under the banner. The service half is what
     makes 10 s meaningful: a new run wakes the live job at once and its first cues skip the batch
     window (subtitle-translate `LiveConfig.FreshRun`); before that the first line at a new
     position took a poll tick, then up to `--live-batch-wait`, then the upstream call.
