@@ -82,7 +82,20 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // does not exist.
             if (res && res.ok === false) throw new Error(`seek POST answered ${res.status}`);
 
-            seekOffset = targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0;
+            // The transcoder answers with the run's real start: for a
+            // copy-mode video that is the keyframe before the quantized
+            // point, up to a GOP earlier than the local guess — the exact
+            // difference every side-loaded cue used to run ahead of the
+            // sound by after a seek. An old transcoder sends no offset,
+            // and the quantized guess stands as before.
+            let answered = null;
+            if (res && typeof res.json === 'function') {
+                const body = await res.json().catch(() => null);
+                if (body && typeof body.offset === 'number' && Number.isFinite(body.offset) && body.offset >= 0) {
+                    answered = body.offset;
+                }
+            }
+            seekOffset = answered !== null ? answered : (targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0);
             if (onSeekOffsetChange) onSeekOffsetChange(seekOffset);
 
             if (isNative) {

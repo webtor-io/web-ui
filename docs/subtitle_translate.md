@@ -461,7 +461,12 @@ trip" / cache-key section).
   picture) and the controls under them.
   - **The comparison.** Playhead is `video.currentTime + seekOffset` (movie time — a transcoder
     session that started mid-film exposes a media timeline beginning at zero; the same arithmetic
-    `applyCueOffset` does to cues), mirrored into `seekOffsetRef` so the poll callbacks read the
+    `applyCueOffset` does to cues). `seekOffset` is what the transcoder answers — the seek POST and
+    the session's offset GET return the run's *real* start, the keyframe a copy-mode seek actually
+    landed on — with the local `floor(t/30)*30` only as the fallback for a transcoder from before
+    it said (`session-seek.js`); the quantized guess ran ahead of the real start by up to a GOP,
+    which was exactly the sync error every side-loaded cue carried after a seek. Mirrored into
+    `seekOffsetRef` so the poll callbacks read the
     current offset rather than the one the run started with. `trailing(prev, pendingFrom,
     playhead)` is true at `pendingFrom <= playhead + 2`, false at `pendingFrom >= playhead + 5`,
     and **keeps the previous answer in between**. The hysteresis is not politeness: a healthy live

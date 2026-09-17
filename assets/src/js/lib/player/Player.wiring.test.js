@@ -1814,10 +1814,14 @@ async function mountSessionRun(t, respond, { sessionOffset = 0 } = {}) {
     p.video.dataset.sessionSeekUrl = '/session/seek';
     p.video.setAttribute('data-duration', '3600');
     // The GET of the seek URL at mount is how the player learns the offset
-    // of the session it joined (a resume lands mid-film).
-    p.setResponse((url, params) => (params && params.method === 'HEAD'
-        ? respond()
-        : { ok: true, status: 200, json: async () => ({ offset: sessionOffset }) }));
+    // of the session it joined (a resume lands mid-film); the seek POST
+    // answers ok without an offset, like a transcoder from before it said
+    // (the fallback quantization is what these tests pin).
+    p.setResponse((url, params) => {
+        if (params && params.method === 'HEAD') return respond();
+        if (params && params.method === 'POST') return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        return { ok: true, status: 200, json: async () => ({ offset: sessionOffset }) };
+    });
     await initPlayer(p.container);
     await settle();
     const log = playback(p.video);
@@ -2289,4 +2293,48 @@ test('a session seek in flight sends no position: the halves disagree mid-seek',
     p.video.dispatchEvent(new dom.window.Event('playing'));
     await settle();
     assert.ok(urls().at(-1).includes('pos='), `settled: the position is back: ${urls().at(-1)}`);
+});
+
+test('the seek uses the offset the transcoder answers, not its own quantized guess', async (t) => {
+    // A copy-mode run starts at the keyframe before the quantized point;
+    // the POST now says where. Cues shifted by the local floor(t/30)*30 ran
+    // ahead of the sound by the difference (the "small desync after a seek"
+    // report, 2026-09-17).
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({ subtitleTrack: -1, subtitleDisplay: false }); });
+    p.setResponse((url, params) => (params && params.method === 'POST'
+        ? { ok: true, status: 200, json: async () => ({ ok: true, offset: 115.633 }) }
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const offsets = [];
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        onSeekOffsetChange: (o) => offsets.push(o),
+    });
+    const seeking = seeker.seek(120);
+    await flush();
+    window.hlsPlayer.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+    assert.deepEqual(offsets, [115.633], 'the answered real start, not 120 quantized to 120');
+});
+
+test('a transcoder that does not answer an offset leaves the quantized guess in place', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({ subtitleTrack: -1, subtitleDisplay: false }); });
+    p.setResponse((url, params) => (params && params.method === 'POST'
+        ? { ok: true, status: 200, json: async () => ({ ok: true }) }
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const offsets = [];
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        onSeekOffsetChange: (o) => offsets.push(o),
+    });
+    const seeking = seeker.seek(125);
+    await flush();
+    window.hlsPlayer.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+    assert.deepEqual(offsets, [120], 'floor(125/30)*30, as before the transcoder said');
 });
