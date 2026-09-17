@@ -131,8 +131,13 @@ export function markUnsnapshottedTracksStale(elements, saved) {
     }
     const marked = [];
     for (const el of elements || []) {
-        if (!el || covered.has(el.track)) continue;
-        stale.set(el, { loadingAtWipe: el.readyState === TRACK_LOADING });
+        if (!el) continue;
+        const loading = el.readyState === TRACK_LOADING;
+        // A track still loading is marked even when the snapshot holds some
+        // of its cues: the loader adds only the rest after the wipe, the
+        // list is then not empty, and the snapshot is never put back.
+        if (covered.has(el.track) && !loading) continue;
+        stale.set(el, { loadingAtWipe: loading });
         marked.push(el);
     }
     return marked;
@@ -175,12 +180,24 @@ export function refreshStaleTrack(el) {
         // second listener's worth of work.
         if (!mark.waiting) {
             mark.waiting = true;
-            el.addEventListener('load', function onLoad() {
+            const done = () => {
                 el.removeEventListener('load', onLoad);
+                el.removeEventListener('error', onError);
+            };
+            const onLoad = () => {
+                done();
                 if (stale.get(el) !== mark) return;
                 stale.delete(el);
                 refetch(el);
-            });
+            };
+            // A load that fails ends the wait too; left attached, the
+            // listener would refetch on some later, unrelated load.
+            const onError = () => {
+                done();
+                if (stale.get(el) === mark) stale.delete(el);
+            };
+            el.addEventListener('load', onLoad);
+            el.addEventListener('error', onError);
         }
         return false;
     }

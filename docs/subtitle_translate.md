@@ -493,6 +493,15 @@ trip" / cache-key section).
     paused before the answer came back (`sleep()` drops the pending decision on any pause outside
     a seek, so a later play is never held), when the source is not live, or when the service sends
     no `X-Subtitle-Pending-From` (`caughtUp(null)` is true). Once per seek.
+    **A window, not the first answer.** For `catchUpTiming.seekWatchMs` (8 s) after the seek settles
+    every answer may start the hold, and the poll is kicked every `seekWatchEveryMs` (1 s) until one
+    does or the window ends. The first answers can predate the new run's cues: the transcoder cuts
+    subtitles with ffmpeg's segment muxer, which closes a segment only on the next cue, and the
+    service reads it a moment later — so "nothing pending" there means "nothing read yet". A silent
+    stretch never shows anything pending and is never held. (Reporting the end of the ingested part
+    of the run as the frontier was considered and rejected for the same muxer behaviour: during a
+    long silence that end stands still while the film plays, and every quiet scene would read as
+    "behind".) No hold in a hidden tab, and a tab hidden even mid-seek drops the decision.
     **Only an answer about the new run decides.** Measured on a real session: the transcoder lists
     the new run ~200 ms after the seek POST, the first poll after a seek lands ~100 ms after it,
     and the service re-read its playlist only once per poll interval (6 s) — so the answer after a
@@ -502,14 +511,21 @@ trip" / cache-key section).
     answer carries `X-Subtitle-Session-Offset`. An answer whose offset is not the player's own
     (±1 s) neither decides the hold (the decision is put off, re-kicked every
     `SEEK_HOLD_RETRY_MS` = 600 ms, at most `SEEK_HOLD_RETRIES` = 5 times) nor ends a wait nor
-    moves the banner. A service without the header is taken at its word.
+    moves the banner. A service without the header is taken at its word, and so is one that has
+    disagreed for `catchUpTiming.runMismatchLimit` (5) consecutive answers outside a seek's window —
+    two sessions on one artifact key, or a failed offset read at mount, would otherwise silence the
+    banner, strand a pressed Wait and force a playlist read per poll for the rest of the film; past
+    the limit the player also stops sending `sof`. A seek whose POST is refused changes nothing:
+    no offset change, no reload (`session-seek.js`).
     **Ending a hold.** A hold is a pause the viewer never made, so every path that ends it for a
     reason that is not the viewer's plays the film: the run dying (`fail`, `onDone`, another track
     via `stopTranslationProgress`), ×, and a new seek (the hls.js seek path waits for `playing` and
     never plays a paused element). `clearWait()` reports whether the wait was a hold for exactly
     this. The one exception is the player unmounting (`stopTranslationProgress({ resumeHold:
-    false })`). A hold that ends — caught up or capped — while the tab is hidden does not start
-    playback there: the film stays paused under the banner. The service half is what
+    false })`). A hold that ends while the tab is hidden (`resumeAfterHold`) does not start
+    playback there: the poll is suspended — an awake poll behind a paused film keeps the transcode
+    and the translation running for nobody — and the film plays when the tab becomes visible
+    again (`resumeOnVisibleRef` in the visibility handler; any play, seek or unmount clears it). The service half is what
     makes 10 s meaningful: a new run wakes the live job at once and its first cues skip the batch
     window (subtitle-translate `LiveConfig.FreshRun`); before that the first line at a new
     position took a poll tick, then up to `--live-batch-wait`, then the upstream call.
@@ -517,8 +533,8 @@ trip" / cache-key section).
     so the hold's timer cannot outlive its wait.
   - **The ×** is per run and per stretch of film. It is cleared when the run catches up, on a
     session seek (`kickTranslationPoll`) and when a new run starts — all three mean the thing
-    that was dismissed is over. Dismissing while waiting also cancels the wait; it does not
-    resume playback.
+    that was dismissed is over. Dismissing while waiting also cancels the wait; after the Wait
+    button it does not resume playback, after a seek's hold it does.
   - **No tier gate, and none wanted.** A viewer without the entitlement never has a translation
     running: the AI chip is rendered `Locked` with no `Src` upstream, so there is nothing here to
     gate. The gate is the dependency (a running translation), not a flag.

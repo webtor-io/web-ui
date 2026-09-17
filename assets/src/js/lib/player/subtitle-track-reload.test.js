@@ -256,3 +256,25 @@ test('a track still loading when the seek emptied it is refetched once its load 
     loadedSince.track.cues.push({ startTime: 1, endTime: 2 });
     assert.equal(refreshStaleTrack(loadedSince), true, 'loaded by the time it is picked: refetched, cues or not');
 });
+
+test('a showing track still loading at the wipe is marked even though the snapshot holds some of its cues', () => {
+    // Found in re-review: counted as covered, it was never marked; the loader
+    // then added the rest after the wipe, the list was not empty, and the
+    // snapshot was never put back.
+    const el = loadedTrack('tr-pt', { readyState: 1, cues: [{ startTime: 1, endTime: 2 }] });
+    const saved = [{ track: el.track, mode: 'showing', cues: [...el.track.cues] }];
+    assert.deepEqual(markUnsnapshottedTracksStale([el], saved).map((x) => x.id), ['tr-pt']);
+});
+
+test('a failed load ends the wait for it: no refetch on some later load', () => {
+    const el = loadedTrack('os-ru', { readyState: 1 });
+    markUnsnapshottedTracksStale([el], []);
+    refreshStaleTrack(el);
+    el.fire('error');
+    const src = el.getAttribute('src');
+    el.readyState = 2;
+    el.fire('load');
+    assert.equal(el.getAttribute('src'), src);
+    assert.equal(el.listeners.load.length, 0);
+    assert.equal(el.listeners.error.length, 0);
+});

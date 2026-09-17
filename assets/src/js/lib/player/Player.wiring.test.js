@@ -2012,9 +2012,9 @@ test('an answer about the run before the seek does not decide the hold; the one 
     const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
     assert.ok(heads.at(-1).includes('sof=270'), `the polls name the run the player watches: ${heads.at(-1)}`);
 
-    // The service reads the new run.
+    // The service reads the new run; the watch asks again within a second.
     answer = () => runResponse('12/400', '270.000', '270.000');
-    await wait(900);
+    await wait(1500);
     assert.equal(events('subtitle-translate-wait').length, 1, 'decided on the answer about the new run');
     assert.equal(events('subtitle-translate-wait')[0].data.auto, true);
     assert.ok(log.pause >= 1);
@@ -2054,4 +2054,110 @@ test('a hold that runs out while the tab is hidden does not start playback in th
     assert.equal(log.play, plays, 'no playback in a hidden tab');
     assert.equal(events('subtitle-translate-wait-done').at(-1).data.capped, true);
     assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'the banner offers Wait for when the viewer comes back');
+
+    // Found in re-review: the poll stayed awake behind the paused film, and
+    // for a live source that keeps the transcode running for nobody.
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const atCap = heads();
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(heads(), atCap, 'the poll sleeps while the tab is hidden');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'and the banner is still there');
+
+    setHidden(false);
+    await settle();
+    assert.ok(log.play > plays, 'the film plays when the viewer is back');
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(heads() > atCap, 'and the poll with it');
+});
+
+test('answers that show nothing pending yet do not spend the hold; the first one that does starts it', async (t) => {
+    // Found in re-review: the first answers after a seek can predate the new
+    // run's cues (the transcoder closes a subtitle segment only on the next
+    // cue). One-shot, "nothing pending" read as caught up and the lines that
+    // followed played bare. A silent stretch never shows anything pending.
+    let pending = null;
+    const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    await seek();
+    await wait(1200);
+    assert.equal(events('subtitle-translate-wait').length, 0, 'nothing pending: no hold, but still watching');
+    const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    assert.ok(heads >= 3, `the window asks about every second, not every 3 s: ${heads} HEADs`);
+
+    pending = '0';
+    await wait(1500);
+    assert.equal(events('subtitle-translate-wait').length, 1, 'the cue that turned up starts the hold');
+    assert.ok(log.pause >= 1);
+});
+
+test('past the watch window a seek is not held, and the banner takes over', async (t) => {
+    const watch = catchUpTiming.seekWatchMs;
+    catchUpTiming.seekWatchMs = 300;
+    t.after(() => { catchUpTiming.seekWatchMs = watch; });
+    let pending = null;
+    const { p, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    await seek();
+    await wait(1300);
+    pending = '0';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(events('subtitle-translate-wait').length, 0, 'the window is over: no hold');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'the ordinary banner says it instead');
+});
+
+test('a tab hidden during the seek gets no hold, then or on the way back', async (t) => {
+    t.after(() => { delete document.hidden; });
+    let pending = '400';
+    const { p, log, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    pending = '0';
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    setHidden(true);
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await wait(1500);
+    setHidden(false);
+    await wait(1500);
+    assert.equal(events('subtitle-translate-wait').length, 0);
+    assert.equal(log.pause, 0);
+});
+
+test('a run mismatch that does not go away stops silencing the banner', async (t) => {
+    // Found in re-review: two sessions on one key, or a failed offset read
+    // at mount, made every answer "about another run" for good: no banner,
+    // a pressed Wait that never ends, a forced playlist read per poll.
+    const limit = catchUpTiming.runMismatchLimit;
+    catchUpTiming.runMismatchLimit = 1;
+    t.after(() => { catchUpTiming.runMismatchLimit = limit; });
+    const { p } = await mountSessionRun(t, () => runResponse('12/400', '100.000', '900.000'), { sessionOffset: 90 });
+    p.video.currentTime = 10;
+    await wait(POLL_INTERVAL_WINDOW_MS * 2);
+    assert.ok(catchUpBanner(p), 'answers are taken at their word again');
+    const last = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url)).at(-1);
+    assert.ok(!last.includes('sof='), `and the player stops naming its run: ${last}`);
+});
+
+// A timeout of its own: without the fix the seek waits for a `playing` that
+// never comes, and the suite would hang instead of failing.
+test('a refused seek POST moves nothing: no offset change, no reload, no frozen frame', { timeout: 5000 }, async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({ subtitleTrack: -1, subtitleDisplay: false }); });
+    p.setResponse((url, params) => (params && params.method === 'POST'
+        ? { ok: false, status: 503, json: async () => ({}) }
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const hls = window.hlsPlayer;
+    let loads = 0;
+    const origLoad = hls.loadSource;
+    hls.loadSource = (...a) => { loads++; return origLoad ? origLoad.apply(hls, a) : undefined; };
+    const offsets = [];
+    const seeking = [];
+    const seeker = createSessionSeeker({
+        hls, videoEl: p.video, sessionSeekUrl: '/session/seek', sourceUrl: 'https://x.test/index.m3u8',
+        trackContainer: p.container, onSeekOffsetChange: (o) => offsets.push(o), onSeekingChange: (v) => seeking.push(v),
+    });
+    const orig = console.error;
+    console.error = () => {};
+    t.after(() => { console.error = orig; });
+    await seeker.seek(120);
+    assert.deepEqual(offsets, [], 'the offset stays with the run the transcoder is still on');
+    assert.equal(loads, 0, 'no reload');
+    assert.deepEqual(seeking, [true, false], 'and the seek is over');
 });

@@ -56,10 +56,11 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
     async function seek(targetTime) {
         if (isSeeking) return;
         setIsSeeking(true);
+        let freezeFrame = null;
 
         try {
             // Freeze current frame as overlay to avoid black flash
-            const freezeFrame = captureFrame(videoEl);
+            freezeFrame = captureFrame(videoEl);
 
             const savedAudioTrack = hls ? hls.audioTrack : -1;
             // hls.js flips element-backed <track>s (user uploads,
@@ -68,9 +69,18 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // snapshot mode and cues so the active selection survives.
             const trackEls = [...videoEl.querySelectorAll('track')];
             const savedElementTrackState = captureTrackState(trackEls.map((el) => el.track));
+            // Tracks that will be fetched again rather than restored from the
+            // snapshot: restoring into one whose refetch is still parsing
+            // would leave every snapshot cue on screen twice.
+            const refetchedTracks = new Set();
 
             const separator = sessionSeekUrl.includes('?') ? '&' : '?';
-            await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
+            const res = await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
+            // A refused seek leaves the transcoder on its old run: moving the
+            // offset (and reloading) anyway would shift every side-loaded cue
+            // and tell the translation service the player watches a run that
+            // does not exist.
+            if (res && res.ok === false) throw new Error(`seek POST answered ${res.status}`);
 
             seekOffset = targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0;
             if (onSeekOffsetChange) onSeekOffsetChange(seekOffset);
@@ -91,7 +101,9 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 // emptied second.
                 // Queried again: a <track> added while the POST was in
                 // flight is wiped too, and is in no snapshot.
-                markUnsnapshottedTracksStale([...videoEl.querySelectorAll('track')], savedElementTrackState);
+                for (const el of markUnsnapshottedTracksStale([...videoEl.querySelectorAll('track')], savedElementTrackState)) {
+                    refetchedTracks.add(el.track);
+                }
                 // HLS.js: reload manifest
                 hls.stopLoad();
                 hls.loadSource(sourceUrl);
@@ -118,11 +130,12 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 function onPlaying() {
                     videoEl.removeEventListener('playing', onPlaying);
                     if (freezeFrame) freezeFrame.remove();
-                    restoreTrackState(savedElementTrackState);
+                    const restorable = savedElementTrackState.filter(({ track }) => !refetchedTracks.has(track));
+                    restoreTrackState(restorable);
                     // The Player's seekOffset effect fired while the cue
                     // lists were still empty, so re-shift the restored cues
                     // onto the new session timeline here.
-                    for (const { track } of savedElementTrackState) {
+                    for (const { track } of restorable) {
                         applyCueOffset(track, seekOffset);
                     }
                     // restoreTrackState puts back the modes captured at
@@ -139,6 +152,7 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             });
         } catch (e) {
             console.error('Session seek failed:', e);
+            if (freezeFrame) freezeFrame.remove();
             setIsSeeking(false);
         }
     }

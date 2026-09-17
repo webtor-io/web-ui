@@ -22,9 +22,27 @@ export const CATCHUP_CLEAR_MARGIN_S = 5;
 // waiting there for the new position's subtitles reads as part of the
 // seek — but only for so long: one slow upstream batch must not turn a seek
 // into a hang. Past it the film plays and the banner goes back to offering
-// Wait, which has no cap because the viewer chose it. An object rather than
-// a constant so the wiring tests can shorten it.
-export const catchUpTiming = { seekHoldMaxMs: 10000 };
+// Wait, which has no cap because the viewer chose it.
+//
+// seekWatchMs is the window after a seek settles in which every answer may
+// start that hold, asked again every seekWatchEveryMs. A window rather than
+// the first answer, because the first ones can predate the new run's cues
+// (the transcoder closes a subtitle segment only on the next cue, and the
+// service reads it a moment later) and "nothing pending" then means
+// "nothing read yet". A silent stretch never shows anything pending, so it
+// is never held.
+//
+// runMismatchLimit: consecutive answers about another run (outside that
+// window) after which the player stops naming its run and takes answers at
+// their word — see Player.jsx runMismatchRef.
+//
+// An object rather than constants so the wiring tests can shorten them.
+export const catchUpTiming = {
+    seekHoldMaxMs: 10000,
+    seekWatchMs: 8000,
+    seekWatchEveryMs: 1000,
+    runMismatchLimit: 5,
+};
 
 // A NaN playhead is a <video> with no timeline yet (no metadata, no
 // source). It is not "at 0": answering the questions against it would make

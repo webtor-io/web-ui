@@ -203,8 +203,13 @@ Two client-side mechanisms fix this (`cue-offset.js`):
    track that was **still loading** when it was wiped lost the cues parsed so
    far and gets only the rest, so it is refetched regardless of its cue count
    — at once if it has loaded by the time it is picked, otherwise when its
-   `load` lands. `reloadSubtitleTrack` compares sources without `wt-rf`, so
-   an AI track refetched this way is not swapped again for the same revision. Not
+   `load` lands (a failed load drops that wait). A track still loading is
+   marked even when the snapshot holds some of its cues, and the seeker does
+   not restore the snapshot into a marked track: the loader adds the rest
+   after the wipe, and restoring into a list that a refetch is filling would
+   show the snapshot's cues twice. `reloadSubtitleTrack` compares sources
+   without `wt-rf`, so an AI track refetched this way is not swapped again for
+   the same revision. Not
    done by snapshotting disabled tracks too: reading their cues means
    flipping them to `hidden` and back, a `change` event per track for
    hls.js to react to, and a first download for every track never loaded.
