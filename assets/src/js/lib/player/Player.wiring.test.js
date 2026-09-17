@@ -114,6 +114,7 @@ const {
 // the globals.
 const { Hls, initDefaultTracks } = await import('./hls-manager.js');
 const { createSessionSeeker } = await import('./session-seek.js');
+const { catchUpTiming } = await import('./subtitle-catchup.js');
 
 // ---- the harness ----------------------------------------------------
 
@@ -1755,4 +1756,139 @@ test('× takes the banner away and the next trailing tick does not bring it back
     pending = '100';
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(catchUpBanner(p), 'a fresh stretch of film gets a fresh offer');
+});
+
+// ---- a seek waits for its subtitles -------------------------------------
+//
+// After a seek into film the live translation has not reached, the first
+// lines play with no subtitles. The seek already costs the viewer a pause
+// (the transcoder restarts), so the wait for those lines is folded into it:
+// the same wait as the Wait button, started by the seek, and bounded — one
+// slow batch must not turn a seek into a hang.
+
+// mountSessionRun mounts a transcoder-session player with a live AI run on
+// the Portuguese track, playing, and returns what the tests drive.
+async function mountSessionRun(t, respond) {
+    t.after(() => destroyPlayer());
+    const p = mount({ tracks: [['tr-pt', false]] });
+    p.video.dataset.sessionId = 's1';
+    p.video.dataset.sessionSeekUrl = '/session/seek';
+    p.video.setAttribute('data-duration', '3600');
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? respond()
+        : { ok: true, status: 200, json: async () => ({}) }));
+    await initPlayer(p.container);
+    await settle();
+    const log = playback(p.video);
+    p.video.paused = false;
+    p.video.currentTime = 1;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    // ArrowRight is the same handleSeek a drag on the timeline reaches.
+    const seek = async () => {
+        document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        await settle();
+        // The new run is playing: what a browser reports once the seek lands.
+        p.video.currentTime = 1;
+        p.video.dispatchEvent(new dom.window.Event('playing'));
+        await settle();
+    };
+    const events = (name) => p.events.filter((e) => e.name === name);
+    return { p, log, seek, events };
+}
+
+test('a seek into untranslated film holds playback until the translation is ahead, then plays', async (t) => {
+    let pending = '400';
+    const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+    assert.equal(catchUpBanner(p), null, 'ahead before the seek: nothing to say');
+
+    // The seek lands on film the run has not translated.
+    pending = '0';
+    const pausesBefore = log.pause;
+    await seek();
+
+    assert.ok(log.pause > pausesBefore, 'the seek holds playback for its subtitles');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'and says why');
+    const waits = events('subtitle-translate-wait');
+    assert.equal(waits.length, 1);
+    assert.equal(waits[0].data.auto, true, 'told apart from a press of Wait');
+
+    pending = '400';
+    const playsBefore = log.play;
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(log.play > playsBefore, 'playback resumes once the run is ahead');
+    assert.equal(catchUpBanner(p), null);
+    const dones = events('subtitle-translate-wait-done');
+    assert.equal(dones.length, 1);
+    assert.equal(dones[0].data.auto, true);
+    assert.equal(dones[0].data.capped, false);
+});
+
+test('the hold after a seek is bounded: past the cap the film plays and the banner offers Wait', async (t) => {
+    const cap = catchUpTiming.seekHoldMaxMs;
+    catchUpTiming.seekHoldMaxMs = 300;
+    t.after(() => { catchUpTiming.seekHoldMaxMs = cap; });
+    let pending = '400';
+    const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
+
+    pending = '0';
+    await seek();
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting');
+
+    const playsBefore = log.play;
+    await wait(600);
+    assert.ok(log.play > playsBefore, 'the cap plays the film even though the run is still behind');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'and the banner goes back to offering Wait');
+    const dones = events('subtitle-translate-wait-done');
+    assert.equal(dones.length, 1);
+    assert.equal(dones[0].data.capped, true);
+
+    // A viewer who then chooses to wait gets an unbounded wait: nothing
+    // plays the film under them after the cap.
+    click(catchUpBanner(p).querySelector('.wt-catchup-btn'));
+    await settle();
+    const playsAtPress = log.play;
+    await wait(600);
+    assert.equal(log.play, playsAtPress, 'a pressed Wait has no cap');
+    assert.equal(events('subtitle-translate-wait').at(-1).data.auto, false);
+});
+
+test('no hold when the seek happened on a paused film, or the service does not say where it is', async (t) => {
+    await t.test('paused at the seek', async (tt) => {
+        let pending = '400';
+        const { p, log, seek, events } = await mountSessionRun(tt, () => catchUpResponse('12/400', pending));
+        p.video.paused = true;
+        pending = '0';
+        const pausesBefore = log.pause;
+        await seek();
+        await wait(POLL_INTERVAL_WINDOW_MS);
+        assert.equal(log.pause, pausesBefore, 'a viewer who was not watching is not paused for subtitles');
+        assert.equal(events('subtitle-translate-wait').length, 0);
+    });
+    await t.test('paused after the seek landed, before the answer came back', async (tt) => {
+        let pending = '400';
+        const { p, log, events } = await mountSessionRun(tt, () => catchUpResponse('12/400', pending));
+        pending = '0';
+        document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        await settle();
+        p.video.currentTime = 1;
+        p.video.dispatchEvent(new dom.window.Event('playing'));
+        // The viewer pauses in the same moment: the settle's request is
+        // still in flight.
+        p.video.pause();
+        const pausesAfterViewer = log.pause;
+        const playsAfterViewer = log.play;
+        await wait(POLL_INTERVAL_WINDOW_MS);
+        assert.equal(events('subtitle-translate-wait').length, 0, 'no hold for a film the viewer paused');
+        assert.equal(log.pause, pausesAfterViewer);
+        assert.equal(log.play, playsAfterViewer, 'and nothing plays it back on under them');
+    });
+    await t.test('older service without the frontier header', async (tt) => {
+        const { log, seek, events } = await mountSessionRun(tt, () => liveProgressResponse('12/400'));
+        const pausesBefore = log.pause;
+        await seek();
+        await settle();
+        assert.equal(log.pause, pausesBefore);
+        assert.equal(events('subtitle-translate-wait').length, 0);
+    });
 });

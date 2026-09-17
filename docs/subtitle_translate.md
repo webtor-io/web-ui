@@ -479,6 +479,24 @@ trip" / cache-key section).
     while the viewer waits (`onError`, `onDone`, `stopTranslationProgress`) clears the banner and
     the wait but deliberately does **not** play: the film stays paused with the big play button,
     and the chip's own title says what happened.
+  - **A seek waits for its subtitles, briefly.** A seek into film the live run has not translated
+    used to play its first lines bare. `kickTranslationPoll` records whether the film was playing
+    when the viewer seeked (`seekHoldPendingRef`); when the seek settles (`onSessionSeekingChange`
+    with `false`, i.e. the new run is `playing`) the poll is kicked again, and the first answer
+    after that decides: if the film is still playing and `caughtUp(pendingFrom, playhead)` is
+    false, the same wait as the button starts (`beginWait(true, …)`), with the banner in its
+    waiting sentence. Unlike the button it is **bounded** by `catchUpTiming.seekHoldMaxMs`
+    (10 s, `subtitle-catchup.js`): the seek already costs a pause while the transcoder restarts,
+    so a few more seconds read as part of it, but one slow upstream batch must not turn a seek
+    into a hang. Past the cap the film plays and the banner goes back to offering Wait, which
+    stays uncapped because the viewer chose it. No hold when the film was paused at the seek or
+    paused before the answer came back, when the source is not live, or when the service sends no
+    `X-Subtitle-Pending-From` (`caughtUp(null)` is true). Once per seek. The service half is what
+    makes 10 s meaningful: a new run wakes the live job at once and its first cues skip the batch
+    window (subtitle-translate `LiveConfig.FreshRun`); before that the first line at a new
+    position took a poll tick, then up to `--live-batch-wait`, then the upstream call.
+    `clearWait` is the one way a wait is dropped (stop, error, done, play, **Keep watching**, ×),
+    so the hold's timer cannot outlive its wait.
   - **The ×** is per run and per stretch of film. It is cleared when the run catches up, on a
     session seek (`kickTranslationPoll`) and when a new run starts — all three mean the thing
     that was dismissed is over. Dismissing while waiting also cancels the wait; it does not
@@ -562,8 +580,8 @@ deploys: they are measuring the deploy, not the traffic.
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`, `'stopped'` the service reported `X-Subtitle-Status: stopped` (`source_gone`/`too_large`) — the one code that leaves the chip's count on screen. |
-| `subtitle-translate-wait` | `lang`, `behind` | Viewer pressed **Wait for it** on the catching-up banner. `behind` = `round(playhead - pendingFrom)` in seconds at the moment of the press (`0` when the frontier was unknown). |
-| `subtitle-translate-wait-done` | `lang`, `seconds` | The wait ended by itself — the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead and playback resumed. `seconds` = wall time waited, rounded to 0.1. A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited: `wait-done` counts waits that *paid off*. |
+| `subtitle-translate-wait` | `lang`, `behind`, `auto` | A wait started: the viewer pressed **Wait for it** (`auto: false`), or a seek landed on untranslated film and held playback (`auto: true`). `behind` = `round(playhead - pendingFrom)` in seconds at that moment (`0` when the frontier was unknown). |
+| `subtitle-translate-wait-done` | `lang`, `seconds`, `auto`, `capped` | The wait ended by itself and playback resumed: the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead (`capped: false`), or a seek's hold hit `catchUpTiming.seekHoldMaxMs` with the run still behind (`capped: true`, only ever with `auto: true`). `seconds` = wall time waited, rounded to 0.1. A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited. The share of `auto` waits that end `capped` is the number to watch: it says whether the service reaches a seek point within the cap. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
 

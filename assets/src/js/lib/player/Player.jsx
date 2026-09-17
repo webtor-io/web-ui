@@ -11,7 +11,7 @@ import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, progressText, withRev } from './subtitle-progress.js';
-import { caughtUp, remaining, trailing } from './subtitle-catchup.js';
+import { catchUpTiming, caughtUp, remaining, trailing } from './subtitle-catchup.js';
 import {
     adoptUploadChips,
     refresh,
@@ -224,6 +224,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // would otherwise read the offset the run started with.
     const seekOffsetRef = useRef(0);
     seekOffsetRef.current = seekOffset;
+    // Whether the current wait was started by a seek rather than by the
+    // Wait button, and the timer that bounds it (catchUpTiming).
+    const autoWaitRef = useRef(false);
+    const holdTimerRef = useRef(null);
+    // A seek happened while a live run was playing: the first tick after the
+    // seek settles decides whether to hold playback for its subtitles.
+    const seekHoldPendingRef = useRef(false);
 
     // setCatchUp behind a value comparison: a tick arrives every 3 s and
     // almost all of them say exactly what the last one did. Re-rendering
@@ -245,13 +252,83 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (r && typeof r.catch === 'function') r.catch(() => {});
     }, []);
 
+    // clearWait drops a wait without deciding anything about playback:
+    // every path that ends one (a run that stopped, play pressed, ×) goes
+    // through it, so the seek hold's timer can never outlive its wait.
+    const clearWait = useCallback(() => {
+        waitingRef.current = false;
+        autoWaitRef.current = false;
+        if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+    }, []);
+
+    // finishWait ends a wait on its own terms and plays the film: the run
+    // got ahead (capped false), or a seek's hold ran out of time (capped
+    // true) — then the run is still behind, so the banner stays and offers
+    // Wait again.
+    const finishWait = useCallback((capped) => {
+        const auto = autoWaitRef.current;
+        const seconds = Math.round((Date.now() - waitedSinceRef.current) / 100) / 10;
+        clearWait();
+        trailingRef.current = capped;
+        if (capped) {
+            showCatchUp({ remaining: catchUpRef.current ? catchUpRef.current.remaining : 0, waiting: false });
+        } else {
+            showCatchUp(null);
+        }
+        if (window.umami) window.umami.track('subtitle-translate-wait-done', {
+            lang: catchUpLangRef.current,
+            seconds,
+            auto,
+            capped,
+        });
+        resumePlayback();
+    }, [clearWait, showCatchUp, resumePlayback]);
+
+    // beginWait pauses the film but keeps the poll awake. Both halves are
+    // needed — the pause is the wait, and the HEAD every 3 s is what the
+    // viewer waits on (for a live source it also keeps the transcoder
+    // session and the translation reading it alive). `auto` is a wait a
+    // seek started: bounded by catchUpTiming.seekHoldMaxMs.
+    const beginWait = useCallback((auto, left) => {
+        const video = videoRef.current;
+        const playhead = ((video && video.currentTime) || 0) + seekOffsetRef.current;
+        const pendingFrom = pendingFromRef.current;
+        clearWait();
+        // Set before pause(), because the `pause` event is what reaches
+        // sleep() and sleep() reads this to decide not to suspend.
+        waitingRef.current = true;
+        autoWaitRef.current = auto;
+        waitedSinceRef.current = Date.now();
+        dismissedRef.current = false;
+        if (auto) {
+            holdTimerRef.current = setTimeout(() => {
+                holdTimerRef.current = null;
+                if (waitingRef.current && autoWaitRef.current) finishWait(true);
+            }, catchUpTiming.seekHoldMaxMs);
+        }
+        if (video && typeof video.pause === 'function') video.pause();
+        const poll = pollStopRef.current;
+        // A no-op unless the run is suspended, which is exactly the case
+        // it is here for: a viewer who paused first and pressed Wait
+        // afterwards has a sleeping poll to wake.
+        if (poll && poll.resume) poll.resume();
+        showCatchUp({ remaining: left, waiting: true });
+        if (window.umami) window.umami.track('subtitle-translate-wait', {
+            lang: catchUpLangRef.current,
+            behind: pendingFrom === null || pendingFrom === undefined ? 0 : Math.round(playhead - pendingFrom),
+            auto,
+        });
+    }, [clearWait, finishWait, showCatchUp]);
+
     const stopTranslationProgress = useCallback(() => {
         pollingIdRef.current = '';
         // The banner belongs to the run: no run, nothing to catch up to.
         // Deliberately no play() — a run that died while the viewer waited
         // leaves the film paused with the big play button, and the chip is
         // what explains why.
-        waitingRef.current = false;
+        clearWait();
+        seekHoldPendingRef.current = false;
         trailingRef.current = false;
         // The dismissal was about this run. The next one is a fresh
         // decision the viewer just made by picking a track.
@@ -271,7 +348,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             pollStopRef.current();
             pollStopRef.current = null;
         }
-    }, [showCatchUp]);
+    }, [showCatchUp, clearWait]);
 
     // startTranslationProgress polls one translation to completion.
     // Callers ask translationAction first; `resume` is its 'resume'
@@ -317,7 +394,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // A run that is gone cannot catch up with anything. No play():
             // a viewer who was waiting on it is left with the film paused
             // and the big play button, and the chip says what happened.
-            waitingRef.current = false;
+            clearWait();
             trailingRef.current = false;
             showCatchUp(null);
             // The run is over, so every event it could still cause belongs
@@ -441,6 +518,18 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // as "nothing pending" rather than trusted.
                 pendingFromRef.current = p.live ? p.pendingFrom : null;
                 const playhead = (video.currentTime || 0) + seekOffsetRef.current;
+                // The first answer after a seek settled: hold playback for
+                // the new position's subtitles if the run is not already
+                // comfortably ahead of it. Once per seek, and only for a
+                // film that was playing when the viewer seeked.
+                if (seekHoldPendingRef.current && !sessionSeekingRef.current) {
+                    seekHoldPendingRef.current = false;
+                    if (!waitingRef.current && !video.paused
+                        && !caughtUp(pendingFromRef.current, playhead)) {
+                        beginWait(true, remaining(p));
+                        return;
+                    }
+                }
                 if (waitingRef.current) {
                     if (!caughtUp(pendingFromRef.current, playhead)) {
                         showCatchUp({ remaining: remaining(p), waiting: true });
@@ -448,14 +537,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     }
                     // The wait is over on its own terms: the translation is
                     // comfortably ahead again, so the film goes back on.
-                    waitingRef.current = false;
-                    trailingRef.current = false;
-                    showCatchUp(null);
-                    if (window.umami) window.umami.track('subtitle-translate-wait-done', {
-                        lang,
-                        seconds: Math.round((Date.now() - waitedSinceRef.current) / 100) / 10,
-                    });
-                    resumePlayback();
+                    finishWait(false);
                     return;
                 }
                 // A paused film is not running into anything. The one
@@ -484,7 +566,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onDone: (p) => {
                 pollStopRef.current = null;
                 pollingIdRef.current = '';
-                waitingRef.current = false;
+                clearWait();
                 trailingRef.current = false;
                 showCatchUp(null);
                 if (progressSpanRef.current === span) progressSpanRef.current = null;
@@ -504,7 +586,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             },
             onError: fail,
         });
-    }, [stopTranslationProgress, showCatchUp, resumePlayback]);
+    }, [stopTranslationProgress, showCatchUp, clearWait, beginWait, finishWait]);
 
     // translationActionFor answers translationAction for a list element,
     // with one addition the pure rule cannot know: the item whose poll is
@@ -548,7 +630,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // themselves: the wait is over, and the next tick renders the
         // ordinary trailing banner again if the run is still behind.
         const onPlay = () => {
-            waitingRef.current = false;
+            clearWait();
             wake();
         };
         // The `play` event is the authority on playback — `paused` is not
@@ -733,42 +815,39 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // dismissed for the old one is no longer being answered.
         dismissedRef.current = false;
         const poll = pollStopRef.current;
+        const video = videoRef.current;
+        // Decided when the seek settles (see onTick), recorded now: by then
+        // the seek itself may have started playback, and what matters is
+        // whether the viewer was watching when they seeked.
+        seekHoldPendingRef.current = !!poll && !!video && !video.paused && !waitingRef.current;
         if (poll && poll.kick) poll.kick();
     }, []);
+
+    // The seek has settled (the new run is playing): ask the service where
+    // the translation is now, rather than on the next 3 s tick, so a hold
+    // for the new position's subtitles starts within one request.
+    const onSessionSeekingChange = useCallback((val) => {
+        setSessionSeekingWithRef(val);
+        if (val || !seekHoldPendingRef.current) return;
+        const poll = pollStopRef.current;
+        if (poll && poll.kick) poll.kick();
+    }, [setSessionSeekingWithRef]);
 
     // Wait: pause the film but keep the poll awake. Both halves are
     // needed — the pause is what the viewer asked for, and the poll is
     // what the HEAD every 3 s keeps alive on the service (and, for a live
     // source, the transcoder session the translation is reading).
     const handleWait = useCallback(() => {
-        const video = videoRef.current;
-        const playhead = ((video && video.currentTime) || 0) + seekOffsetRef.current;
-        const pendingFrom = pendingFromRef.current;
-        // Set before pause(), because the `pause` event is what reaches
-        // sleep() and sleep() reads this to decide not to suspend.
-        waitingRef.current = true;
-        waitedSinceRef.current = Date.now();
-        dismissedRef.current = false;
-        if (video && typeof video.pause === 'function') video.pause();
-        const poll = pollStopRef.current;
-        // A no-op unless the run is suspended, which is exactly the case
-        // it is here for: a viewer who paused first and pressed Wait
-        // afterwards has a sleeping poll to wake.
-        if (poll && poll.resume) poll.resume();
-        showCatchUp({ remaining: catchUpRef.current ? catchUpRef.current.remaining : 0, waiting: true });
-        if (window.umami) window.umami.track('subtitle-translate-wait', {
-            lang: catchUpLangRef.current,
-            behind: pendingFrom === null || pendingFrom === undefined ? 0 : Math.round(playhead - pendingFrom),
-        });
-    }, [showCatchUp]);
+        beginWait(false, catchUpRef.current ? catchUpRef.current.remaining : 0);
+    }, [beginWait]);
 
     // Keep watching: the viewer overrules the wait. The banner is not
     // rewritten here — what it should say next is the next tick's answer,
     // and the run may well still be behind.
     const handleKeepWatching = useCallback(() => {
-        waitingRef.current = false;
+        clearWait();
         resumePlayback();
-    }, [resumePlayback]);
+    }, [clearWait, resumePlayback]);
 
     // ×: stop saying it. The wait goes with it (a dismissed banner that
     // still pauses the film and restarts it three seconds later would be
@@ -776,9 +855,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // where the viewer left it.
     const handleDismissCatchUp = useCallback(() => {
         dismissedRef.current = true;
-        waitingRef.current = false;
+        clearWait();
         showCatchUp(null);
-    }, [showCatchUp]);
+    }, [clearWait, showCatchUp]);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -797,7 +876,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         setSeekOffset(offset);
                         kickTranslationPoll();
                     },
-                    onSeekingChange: setSessionSeekingWithRef,
+                    onSeekingChange: onSessionSeekingChange,
                     trackContainer,
                 });
             }
@@ -811,7 +890,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 video.currentTime = Math.min(time, maxTime);
             }
         }
-    }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll]);
+    }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll, onSessionSeekingChange]);
 
     // Auto-hide controls
     const resetHideTimer = useCallback(() => {

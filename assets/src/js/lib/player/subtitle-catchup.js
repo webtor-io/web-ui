@@ -17,6 +17,15 @@
 export const CATCHUP_TRAIL_MARGIN_S = 2;
 export const CATCHUP_CLEAR_MARGIN_S = 5;
 
+// catchUpTiming.seekHoldMaxMs bounds the wait a seek starts on its own. A
+// seek already costs the viewer a pause while the transcoder restarts, so
+// waiting there for the new position's subtitles reads as part of the
+// seek — but only for so long: one slow upstream batch must not turn a seek
+// into a hang. Past it the film plays and the banner goes back to offering
+// Wait, which has no cap because the viewer chose it. An object rather than
+// a constant so the wiring tests can shorten it.
+export const catchUpTiming = { seekHoldMaxMs: 10000 };
+
 // A NaN playhead is a <video> with no timeline yet (no metadata, no
 // source). It is not "at 0": answering the questions against it would make
 // the player pause a film that has not started, which is the one outcome
