@@ -626,6 +626,8 @@
     "player.subtitleTranslationQueued": "Ожидание свободного слота перевода…",
     "player.subtitleCatchUp": "ИИ-перевод догоняет… осталось ~%v реплик",
     "player.subtitleCatchUpWaiting": "Пауза, пока перевод догонит… осталось ~%v реплик",
+    "player.subtitleCatchUpShort": "ИИ-перевод догоняет…",
+    "player.subtitleCatchUpWaitingShort": "Пауза, пока перевод догонит…",
     "player.subtitleCatchUpWait": "Подождать",
     "player.subtitleCatchUpResume": "Смотреть дальше",
     "player.subtitleCatchUpDismiss": "Скрыть",

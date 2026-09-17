@@ -196,7 +196,13 @@ export function withParam(src, name, value) {
 // new position and one about the old. Each answer then carries
 // `sessionOffset` — the run it was computed against (X-Subtitle-Session-
 // Offset), or null from a service that does not say.
-export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, sessionOffset, onProgress, onTick, onDone, onError } = {}) {
+//
+// position, when given, returns the viewer's playhead in movie time
+// (seconds). Every poll carries it as `pos` — live or not, from the first
+// one: a file-source job orders its batches by it, the way a live job
+// follows the playlist offset, and computes X-Subtitle-Pending-From against
+// it. A live source ignores it (its position comes from the playlist).
+export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeoutMs = POLL_TIMEOUT_MS, queuedAfterMs = QUEUE_HINT_MS, sessionOffset, position, onProgress, onTick, onDone, onError } = {}) {
     let stopped = false;
     let suspended = false;
     let suspendedAt = 0;
@@ -208,10 +214,25 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
     // something else, or the first report of an absent header would not
     // count as a change.
     let lastPendingFrom;
+    const seconds = (fn) => {
+        if (typeof fn !== 'function') return null;
+        const v = fn();
+        return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+    };
     const pollURL = () => {
-        if (lastLive !== true || typeof sessionOffset !== 'function') return src;
-        const o = sessionOffset();
-        return typeof o === 'number' && Number.isFinite(o) && o >= 0 ? withParam(src, 'sof', o) : src;
+        let u = src;
+        // Coarse on purpose: the playhead moves every poll, and a URL that
+        // changes by milliseconds defeats any cache or dedup in the path.
+        const pos = seconds(position);
+        // floor, not round: the service compares Start >= pos and drops
+        // End < pos, and claiming half a second the viewer has not reached
+        // sorts the very next cue into the backlog.
+        if (pos !== null) u = withParam(u, 'pos', Math.floor(pos));
+        if (lastLive === true) {
+            const o = seconds(sessionOffset);
+            if (o !== null) u = withParam(u, 'sof', o);
+        }
+        return u;
     };
     // When this run started answering `0/0`, and whether the chip has been
     // told about it. Both reset on the first real count, so a job that goes
@@ -259,6 +280,15 @@ export function pollProgress(src, { fetchImpl = fetch, intervalMs = 3000, timeou
         // into an unmounted player would touch DOM that is no longer there.
         if (stopped || myGen !== gen) return;
         if (res.status !== 200) {
+            // 429/503 are the path saying "not now", not an answer about
+            // the track: burst limiters sit in front of these polls, and
+            // one throttled HEAD used to end the whole run — chip cleared,
+            // translation gone — until the viewer re-selected the track.
+            // The next tick retries; the deadline still bounds the run.
+            if (res.status === 429 || res.status === 503) {
+                timer = setTimeout(() => tick(myGen), intervalMs);
+                return;
+            }
             stopped = true;
             if (onError) onError(res.status);
             return;

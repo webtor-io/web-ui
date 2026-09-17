@@ -39,6 +39,11 @@ export const CATCHUP_CLEAR_MARGIN_S = 5;
 // An object rather than constants so the wiring tests can shorten them.
 export const catchUpTiming = {
     seekHoldMaxMs: 10000,
+    // A file job retargets only at a batch boundary (seconds of upstream
+    // work in flight) and then owes at least one more upstream call for the
+    // batch at the new position, so a 10 s cap expired with nothing to show
+    // almost every time.
+    seekHoldMaxMsFile: 20000,
     seekWatchMs: 8000,
     seekWatchEveryMs: 1000,
     runMismatchLimit: 5,

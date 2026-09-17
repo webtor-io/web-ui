@@ -48,6 +48,10 @@ const ENGAGEMENT_SECONDS = 5;
 // on every poll; only the text catches up in steps.
 const TRACK_RELOAD_INTERVAL_MS = 15000;
 
+// How often a DIRECT seek may kick the translation poll (a session seek is
+// rationed by its POST). A held arrow key seeks once per key-repeat.
+const DIRECT_SEEK_KICK_MS = 500;
+
 
 // Cast sender SDK loader — module-level so repeated player inits (one per
 // file click) share a single <script> append and a single
@@ -219,6 +223,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // in scope.
     const catchUpLangRef = useRef('');
     const pendingFromRef = useRef(null);
+    // Whether the running source is live (X-Subtitle-Live), off the last
+    // answer: the banner's cue count and the hold cap differ by it.
+    const liveRunRef = useRef(false);
     // Movie time is video.currentTime + the session offset (see
     // applyCueOffset in cue-offset.js for the same arithmetic on cues).
     // Mirrored into a ref because the poll callbacks are built once and
@@ -229,6 +236,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // Wait button, and the timer that bounds it (catchUpTiming).
     const autoWaitRef = useRef(false);
     const holdTimerRef = useRef(null);
+    // The last direct-seek kick, so holding an arrow key (one seek per
+    // key-repeat, ~30/s) costs one immediate HEAD per DIRECT_SEEK_KICK_MS
+    // rather than one per repeat. The hold window is re-opened every time
+    // either way — it is the kick that is rationed, not the decision.
+    const directKickAtRef = useRef(0);
     // A seek happened while a live run was playing: for a short window after
     // the seek settles (catchUpTiming.seekWatchMs) every answer is asked
     // whether to hold playback for the new position's subtitles. A window
@@ -268,6 +280,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const r = video.play();
         if (r && typeof r.catch === 'function') r.catch(() => {});
     }, []);
+
+    // bannerRemaining is the number the banner may honestly say. On a live
+    // source total is the document read so far, so total - done is the real
+    // backlog; on a file source total is the whole film and the difference
+    // is off by orders of magnitude exactly where the viewer decides
+    // whether to wait — so no number at all (the copy drops its tail).
+    const bannerRemaining = (p) => (p.live ? remaining(p) : null);
 
     // resumeAfterHold plays the film a seek's hold paused — unless the tab
     // is hidden: then the poll goes to sleep (nothing would put it there
@@ -343,10 +362,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         waitedSinceRef.current = Date.now();
         dismissedRef.current = false;
         if (auto) {
+            // A file job retargets only at a batch boundary and then owes a
+            // whole upstream call, so its floor is higher than a live run's
+            // (which the transcoder restart already hid part of).
+            const cap = liveRunRef.current ? catchUpTiming.seekHoldMaxMs : catchUpTiming.seekHoldMaxMsFile;
             holdTimerRef.current = setTimeout(() => {
                 holdTimerRef.current = null;
                 if (waitingRef.current && autoWaitRef.current) finishWait(true);
-            }, catchUpTiming.seekHoldMaxMs);
+            }, cap);
         }
         if (video && typeof video.pause === 'function') video.pause();
         const poll = pollStopRef.current;
@@ -536,6 +559,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // service answers about it (see pollProgress).
             sessionOffset: () => (videoRef.current && videoRef.current.dataset.sessionId
                 && runMismatchRef.current < catchUpTiming.runMismatchLimit ? seekOffsetRef.current : null),
+            // The viewer's playhead in movie time, on every poll: a
+            // file-source job orders its batches by it, the way a live one
+            // follows the playlist offset, and answers the frontier
+            // against it.
+            position: () => {
+                // Mid session-seek the two halves disagree: the offset is
+                // already the new run's, currentTime still the old run's.
+                // No position beats a wrong one — the stored one stands,
+                // and the settle kick sends the right value moments later.
+                if (sessionSeekingRef.current) return null;
+                const v = videoRef.current;
+                return v ? (v.currentTime || 0) + seekOffsetRef.current : null;
+            },
             onProgress: (p) => {
                 cues = p.total;
                 if (span) {
@@ -565,11 +601,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onTick: (p) => {
                 const video = videoRef.current;
                 if (!video) return;
-                // The frontier only means something against a live run:
-                // a batch (file) source has no playhead relationship, and
-                // the contract says the header never comes with one. Read
-                // as "nothing pending" rather than trusted.
-                pendingFromRef.current = p.live ? p.pendingFrom : null;
+                // Presence is the gate: the service sends the frontier
+                // only when it can stand behind one — a live run against
+                // its playlist offset, a file job against the playhead
+                // this poll itself carried (`pos`). An old service sends
+                // neither and nothing here fires.
+                pendingFromRef.current = p.pendingFrom;
+                liveRunRef.current = p.live === true;
                 const playhead = (video.currentTime || 0) + seekOffsetRef.current;
                 // Which run this answer describes. A service that does not
                 // say is taken at its word, as before it said, and so is one
@@ -594,7 +632,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         seekHoldPendingRef.current = false;
                     } else if (aboutThisRun && !caughtUp(pendingFromRef.current, playhead)) {
                         seekHoldPendingRef.current = false;
-                        beginWait(true, remaining(p));
+                        beginWait(true, bannerRemaining(p));
                         return;
                     } else if (!holdWatchRef.current) {
                         // Not decided yet: ask again in a moment, rather than
@@ -611,7 +649,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 if (!aboutThisRun) return;
                 if (waitingRef.current) {
                     if (!caughtUp(pendingFromRef.current, playhead)) {
-                        showCatchUp({ remaining: remaining(p), waiting: true });
+                        showCatchUp({ remaining: bannerRemaining(p), waiting: true });
                         return;
                     }
                     // The wait is over on its own terms: the translation is
@@ -633,7 +671,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 const isTrailing = trailing(trailingRef.current, pendingFromRef.current, playhead);
                 trailingRef.current = isTrailing;
                 if (isTrailing && !dismissedRef.current) {
-                    showCatchUp({ remaining: remaining(p), waiting: false });
+                    showCatchUp({ remaining: bannerRemaining(p), waiting: false });
                     return;
                 }
                 showCatchUp(null);
@@ -911,6 +949,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // poll is running) takes one HEAD tick right away and marks the next
     // changed report to bypass the reload throttle once — see reload()'s
     // p.forceReload above and pollProgress's kick() in subtitle-progress.js.
+    //
+    // On the DIRECT seek path this is additionally rationed by
+    // DIRECT_SEEK_KICK_MS (see handleSeek): a session seek is naturally
+    // rationed by its POST, a direct one is not.
     const kickTranslationPoll = useCallback(() => {
         // A seek is a new stretch of film, so a banner the viewer
         // dismissed for the old one is no longer being answered.
@@ -1009,6 +1051,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             if (video) {
                 const maxTime = video.duration && isFinite(video.duration) ? video.duration : time;
                 video.currentTime = Math.min(time, maxTime);
+                // The same seek treatment a session gets, minus the
+                // transcoder round-trip: the poll is kicked with the new
+                // position and the hold window opens now — a direct seek
+                // has no `playing` settle to wait for. Unlike a session
+                // seek, nothing rations this path (no POST, no
+                // sessionSeeking guard), so the kick itself is: a held
+                // arrow key repeats the seek ~30 times a second, and each
+                // kick is an immediate HEAD.
+                const now = Date.now();
+                if (now - directKickAtRef.current >= DIRECT_SEEK_KICK_MS) {
+                    directKickAtRef.current = now;
+                    kickTranslationPoll();
+                }
+                seekSettledAtRef.current = now;
             }
         }
     }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll, onSessionSeekingChange]);
@@ -1372,7 +1428,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                      onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <LoadingSpinner />
                     <span class="wt-catchup-text">
-                        {tf(catchUp.waiting ? 'player.subtitleCatchUpWaiting' : 'player.subtitleCatchUp', catchUp.remaining)}
+                        {catchUp.remaining === null
+                            ? t(catchUp.waiting ? 'player.subtitleCatchUpWaitingShort' : 'player.subtitleCatchUpShort')
+                            : tf(catchUp.waiting ? 'player.subtitleCatchUpWaiting' : 'player.subtitleCatchUp', catchUp.remaining)}
                     </span>
                     <button type="button" class="wt-catchup-btn"
                         onClick={catchUp.waiting ? handleKeepWatching : handleWait}>

@@ -616,6 +616,8 @@
     "player.subtitleTranslationQueued": "Warten auf einen freien Übersetzungsplatz…",
     "player.subtitleCatchUp": "Die KI-Übersetzung holt auf… noch ~%v Zeilen",
     "player.subtitleCatchUpWaiting": "Pausiert, bis die Übersetzung aufgeholt hat… noch ~%v Zeilen",
+    "player.subtitleCatchUpShort": "Die KI-Übersetzung holt auf…",
+    "player.subtitleCatchUpWaitingShort": "Pausiert, bis die Übersetzung aufgeholt hat…",
     "player.subtitleCatchUpWait": "Warten",
     "player.subtitleCatchUpResume": "Weiterschauen",
     "player.subtitleCatchUpDismiss": "Ausblenden",

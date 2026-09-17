@@ -680,8 +680,9 @@ test('the header appearing and disappearing are both changes', async (t) => {
 test('onTick does not fire for a tick that never got a 200', async (t) => {
     // The negative control: the banner must not be re-evaluated against a
     // response that never arrived, or a dead service would read as a run
-    // that is merely behind.
-    const fetchImpl = async () => ({ status: 503, headers: { get: () => null } });
+    // that is merely behind. 404 rather than 503: a throttle answer is
+    // retried, and neither ticks nor errors.
+    const fetchImpl = async () => ({ status: 404, headers: { get: () => null } });
     const ticks = [];
     const errs = [];
     const stop = pollProgress('https://x/a.vtt', {
@@ -692,7 +693,7 @@ test('onTick does not fire for a tick that never got a 200', async (t) => {
     t.after(() => stop());
     await new Promise((r) => setTimeout(r, 20));
     assert.deepEqual(ticks, []);
-    assert.deepEqual(errs, [503]);
+    assert.deepEqual(errs, [404]);
 });
 
 // ---- which run an answer is about ----------------------------------------
@@ -740,4 +741,50 @@ test('the answer carries the session offset it was computed against, when the se
     assert.equal(seen[0], 720);
     assert.ok(seen.includes(null), 'no header is null: an older service');
     assert.equal(seen.at(-1), null, 'and so is one that does not parse');
+});
+
+test('every poll carries the playhead, whole seconds, live or not', async () => {
+    const urls = [];
+    let live = false;
+    let t = 12.34;
+    const fetchImpl = async (url) => { urls.push(url); return answer('3/10', { live }); };
+    const stop = pollProgress('https://x/a.vtt?token=t', { fetchImpl, intervalMs: 5, position: () => t, sessionOffset: () => 30 });
+    await new Promise((r) => setTimeout(r, 12));
+    live = true;
+    t = 640.7;
+    await new Promise((r) => setTimeout(r, 20));
+    stop();
+    assert.equal(urls[0], 'https://x/a.vtt?token=t&pos=12', 'from the very first poll, rounded to a second');
+    assert.ok(urls.at(-1).includes('pos=640'), `and it follows the playhead, floored — half a second the viewer has not reached would sort the next cue into the backlog: ${urls.at(-1)}`);
+    assert.ok(urls.at(-1).includes('sof=30'), 'alongside sof once the source said it is live');
+
+    const bad = [];
+    const stop2 = pollProgress('https://x/b.vtt', { fetchImpl: async (u) => { bad.push(u); return answer('3/10'); }, intervalMs: 5, position: () => NaN });
+    await new Promise((r) => setTimeout(r, 12));
+    stop2();
+    assert.equal(bad[0], 'https://x/b.vtt', 'a playhead that is not a time is not sent');
+});
+
+test('a throttled poll (429/503) is a missed tick, not the end of the run', async () => {
+    // A burst limiter sits in front of these polls; one throttled HEAD used
+    // to clear the chip and kill the translation until re-selected.
+    let status = 200;
+    const errors = [];
+    const seen = [];
+    const stop = pollProgress('https://x/a.vtt', {
+        fetchImpl: async () => (status === 200 ? answer('3/10') : { status, headers: { get: () => null } }),
+        intervalMs: 5,
+        onProgress: (p) => seen.push(p.done),
+        onError: (c) => errors.push(c),
+    });
+    await new Promise((r) => setTimeout(r, 12));
+    status = 429;
+    await new Promise((r) => setTimeout(r, 15));
+    status = 200;
+    await new Promise((r) => setTimeout(r, 15));
+    status = 404;
+    await new Promise((r) => setTimeout(r, 15));
+    stop();
+    assert.deepEqual(errors, [404], 'only a real answer ends the run');
+    assert.deepEqual(seen, [3], 'and the run kept polling through the throttle');
 });

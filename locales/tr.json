@@ -616,6 +616,8 @@
     "player.subtitleTranslationQueued": "Çeviri sırası bekleniyor…",
     "player.subtitleCatchUp": "Yapay zekâ çevirisi yetişiyor… ~%v satır kaldı",
     "player.subtitleCatchUpWaiting": "Çeviri yetişene kadar duraklatıldı… ~%v satır kaldı",
+    "player.subtitleCatchUpShort": "Yapay zekâ çevirisi yetişiyor…",
+    "player.subtitleCatchUpWaitingShort": "Çeviri yetişene kadar duraklatıldı…",
     "player.subtitleCatchUpWait": "Bekle",
     "player.subtitleCatchUpResume": "İzlemeye devam et",
     "player.subtitleCatchUpDismiss": "Kapat",

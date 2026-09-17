@@ -616,6 +616,8 @@
     "player.subtitleTranslationQueued": "En attente d'un créneau de traduction…",
     "player.subtitleCatchUp": "La traduction IA rattrape son retard… encore ~%v lignes",
     "player.subtitleCatchUpWaiting": "En pause le temps que la traduction rattrape son retard… encore ~%v lignes",
+    "player.subtitleCatchUpShort": "La traduction IA rattrape son retard…",
+    "player.subtitleCatchUpWaitingShort": "En pause le temps que la traduction rattrape son retard…",
     "player.subtitleCatchUpWait": "Attendre",
     "player.subtitleCatchUpResume": "Continuer à regarder",
     "player.subtitleCatchUpDismiss": "Masquer",

@@ -626,6 +626,8 @@
     "player.subtitleTranslationQueued": "Oczekiwanie na wolne miejsce w kolejce tłumaczenia…",
     "player.subtitleCatchUp": "Tłumaczenie AI nadrabia zaległości… zostało ~%v linii",
     "player.subtitleCatchUpWaiting": "Wstrzymano, aż tłumaczenie nadrobi zaległości… zostało ~%v linii",
+    "player.subtitleCatchUpShort": "Tłumaczenie AI nadrabia zaległości…",
+    "player.subtitleCatchUpWaitingShort": "Wstrzymano, aż tłumaczenie nadrobi zaległości…",
     "player.subtitleCatchUpWait": "Poczekaj",
     "player.subtitleCatchUpResume": "Oglądaj dalej",
     "player.subtitleCatchUpDismiss": "Ukryj",

@@ -626,6 +626,8 @@
     "player.subtitleTranslationQueued": "Čekání na volné místo pro překlad…",
     "player.subtitleCatchUp": "Překlad AI dohání… zbývá ~%v řádků",
     "player.subtitleCatchUpWaiting": "Pozastaveno, dokud překlad nedožene… zbývá ~%v řádků",
+    "player.subtitleCatchUpShort": "Překlad AI dohání…",
+    "player.subtitleCatchUpWaitingShort": "Pozastaveno, dokud překlad nedožene…",
     "player.subtitleCatchUpWait": "Počkat",
     "player.subtitleCatchUpResume": "Sledovat dál",
     "player.subtitleCatchUpDismiss": "Skrýt",

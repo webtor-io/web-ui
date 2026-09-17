@@ -812,7 +812,9 @@ test('clicking the AI chip starts a run: one start event, a poll, a percentage',
     // The poll is real: a HEAD against the item's own src.
     const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD');
     assert.ok(heads.length >= 1, 'the run polls');
-    assert.equal(heads[0].url, src);
+    // Against the item's own src, plus the playhead every poll carries so
+    // a file job can order its batches by it.
+    assert.equal(heads[0].url, `${src}?pos=0`);
 
     // And the chip says so, without its markup being rebuilt — the
     // progress span was in the template all along.
@@ -2160,4 +2162,131 @@ test('a refused seek POST moves nothing: no offset change, no reload, no frozen 
     assert.deepEqual(offsets, [], 'the offset stays with the run the transcoder is still on');
     assert.equal(loads, 0, 'no reload');
     assert.deepEqual(seeking, [true, false], 'and the seek is over');
+});
+
+// ---- the same logic for a file-source translation -----------------------
+//
+// A translation of a file source (an OpenSubtitles track) now answers the
+// same frontier header, computed against the playhead the poll itself
+// carries — so the banner, Wait and the seek hold work identically, gated
+// on the header's presence rather than on X-Subtitle-Live.
+
+const fileResponse = (header, pendingFrom) => ({
+    ok: true,
+    status: 200,
+    headers: {
+        get: (n) => {
+            if (n === 'X-Subtitle-Progress') return header;
+            if (n === 'X-Subtitle-Pending-From') return pendingFrom;
+            return null;
+        },
+    },
+    json: async () => ({}),
+});
+
+test('a file translation that is behind the playhead offers to wait too', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    let pending = '100';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? fileResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.ok(catchUpBanner(p), 'the banner needs only the frontier, not a live source');
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(catchUpBanner(p), null);
+    const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
+    assert.ok(heads.every((u) => u.includes('pos=')), `every poll says where the viewer is: ${heads[0]}`);
+    assert.ok(!heads.at(-1).includes('sof='), 'and a file source never names a run');
+});
+
+test('a direct seek (no transcoder session) opens the hold window like a session seek', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.video.setAttribute('data-duration', '3600');
+    const log = playback(p.video);
+    let pending = '3600';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? fileResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(catchUpBanner(p), null, 'far ahead: nothing to say');
+
+    // The viewer seeks 15 s forward into film the job has not reached.
+    pending = '0';
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await wait(1200);
+    const waits = p.events.filter((e) => e.name === 'subtitle-translate-wait');
+    assert.equal(waits.length, 1, 'the hold starts without any session settle');
+    assert.equal(waits[0].data.auto, true);
+    assert.ok(log.pause >= 1);
+
+    pending = '3600';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(log.play >= 1, 'and ends when the job is ahead again');
+    assert.equal(catchUpBanner(p), null);
+});
+
+test('holding an arrow key rations the direct-seek kicks', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.video.setAttribute('data-duration', '3600');
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? fileResponse('12/400', '3600')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    const before = heads();
+    // Spaced like a real key repeat: each kick's immediate tick has time to
+    // fire before the next keydown, so an unrationed kick is one HEAD per
+    // repeat rather than thirty collapsed timers.
+    for (let i = 0; i < 20; i++) {
+        document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        await wait(15);
+    }
+    await settle();
+    assert.ok(heads() - before <= 3, `20 spaced repeats must not be 20 HEADs: ${heads() - before}`);
+});
+
+test('the banner on a file source claims no cue count — the whole-film remainder would be a lie', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? fileResponse('60/1200', '100')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'the copy without the count');
+});
+
+test('a session seek in flight sends no position: the halves disagree mid-seek', async (t) => {
+    let pending = '4000';
+    const { p, seek } = await mountSessionRun(t, () => catchUpResponse('12/400', pending), { sessionOffset: 1500 });
+    // Playing 300 s into a run that starts at 1500 s; the poll says 1800.
+    p.video.currentTime = 300;
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    const urls = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
+    assert.ok(urls().at(-1).includes('pos=1800'), `before the seek: ${urls().at(-1)}`);
+    // The seek to ~5:15 kicks a poll while currentTime still belongs to the
+    // old run: that poll must carry no pos at all rather than 300+315.
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    const during = urls().at(-1);
+    assert.ok(!during.includes('pos='), `mid-seek, no position: ${during}`);
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.ok(urls().at(-1).includes('pos='), `settled: the position is back: ${urls().at(-1)}`);
 });

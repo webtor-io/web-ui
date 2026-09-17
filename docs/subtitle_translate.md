@@ -433,9 +433,28 @@ trip" / cache-key section).
   garbage and a negative alike as `pendingFrom: null`, and the client treats `null` as *no banner*
   and as *caught up* — never as "behind". It is part of `pollProgress`'s change test, not a
   passenger on it: after a seek the frontier moves while the counts stand still.
-- **Catching-up banner (`subtitle-catchup.js`, `.wt-catchup`).** A live translation runs alongside
-  the transcode and can fall behind the playhead: the film plays on and the cues for what is on
-  screen are not written yet. When it does, a top-centre pill says
+- **Catching-up banner (`subtitle-catchup.js`, `.wt-catchup`).** A translation can trail the
+  playhead: a live one runs alongside the transcode, and a file one (an OpenSubtitles track, an
+  upload) translates at the viewer's position but needs time to get ahead of it. Both speak the
+  same protocol — every poll carries the playhead (`pos=<seconds>`, whole seconds, movie time;
+  `pollProgress`'s `position` option), the file job orders its batches by it with the same rule
+  the live loop uses, and both answer `X-Subtitle-Pending-From`; the client is gated on that
+  header's *presence*, never on `X-Subtitle-Live`, so everything below applies to both kinds.
+  A direct seek (no transcoder session) opens the same hold window a session seek does, settled
+  immediately since there is no transcoder round-trip to wait for; its poll kick is rationed to
+  one per `DIRECT_SEEK_KICK_MS` (500 ms) — a held arrow key seeks once per key-repeat, and a
+  session seek is naturally rationed by its POST. During a session seek no `pos` is sent at all:
+  the offset is already the new run's while `currentTime` still belongs to the old one, and no
+  position beats a wrong one. The playhead is floored, not rounded — claiming half a second the
+  viewer has not reached would sort the very next cue into the backlog. Differences that remain:
+  the banner on a file source shows no cue count (`player.subtitleCatchUpShort` /
+  `player.subtitleCatchUpWaitingShort`) — its `total` is the whole film, so `total − done` would
+  overstate the wait by orders of magnitude — and a seek's hold cap is
+  `catchUpTiming.seekHoldMaxMsFile` (20 s) there, since a file job retargets only at a batch
+  boundary and then owes at least one more upstream call. A throttled poll (429/503) is a missed
+  tick, not the end of the run: burst limiters sit in front of these polls, and one throttled
+  HEAD used to clear the chip and kill the translation. When the translation trails,
+  a top-centre pill says
   `player.subtitleCatchUp` ("AI translation is catching up… ~N cues to go",
   `N = max(0, total - done)`) and offers **Wait for it**, with a × to dismiss. It is placed at the
   top because the two things it must not cover are the subtitles it is about (bottom of the

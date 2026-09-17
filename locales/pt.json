@@ -616,6 +616,8 @@
     "player.subtitleTranslationQueued": "Aguardando uma vaga de tradução…",
     "player.subtitleCatchUp": "A tradução por IA está alcançando… faltam ~%v linhas",
     "player.subtitleCatchUpWaiting": "Pausado até a tradução alcançar… faltam ~%v linhas",
+    "player.subtitleCatchUpShort": "A tradução por IA está alcançando…",
+    "player.subtitleCatchUpWaitingShort": "Pausado até a tradução alcançar…",
     "player.subtitleCatchUpWait": "Esperar",
     "player.subtitleCatchUpResume": "Continuar assistindo",
     "player.subtitleCatchUpDismiss": "Dispensar",
