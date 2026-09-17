@@ -86,3 +86,74 @@ export function dropDeletedTracks(video, chipIDs) {
     }
     return showing;
 }
+
+// ---- tracks a session seek emptied ------------------------------------
+//
+// A session seek calls hls.loadSource(), and hls.js answers it by clearing
+// the cues of EVERY text track on the media element
+// (TimelineController._cleanTracks on MANIFEST_LOADING) — ours as well as
+// its own. The seeker snapshots cues first and puts them back once playback
+// resumes, but a disabled track reports `cues === null`, so the snapshot
+// only ever holds the track that was on screen. Every other <track> stays
+// loaded, empty, and is never fetched again: the browser does not reload a
+// src it has already loaded. Picking one of them after a seek showed
+// nothing at all (reproduced on stage 2026-09-17: an OpenSubtitles track at
+// readyState 2, mode showing, 0 cues — 353 after a forced reload).
+//
+// Refetching on activation, rather than snapshotting the disabled tracks
+// too, because reading a disabled track's cues means flipping it to
+// 'hidden' and back: a textTracks `change` event per track for hls.js to
+// react to, and a first download for every track that was never loaded.
+// Only the track the viewer actually picks is worth a request.
+
+// HTMLTrackElement.LOADED, spelled out: the tests have no DOM.
+const TRACK_LOADED = 2;
+const REFRESH_PARAM = 'wt-rf';
+
+const stale = new WeakSet();
+let refreshSeq = 0;
+
+// markUnsnapshottedTracksStale marks the <track> elements whose cues the
+// seek snapshot does not hold — the ones loadSource is about to empty for
+// good — and returns them. `saved` is captureTrackState's output.
+export function markUnsnapshottedTracksStale(elements, saved) {
+    const covered = new Set();
+    for (const s of saved || []) {
+        if (s && s.track && s.cues && s.cues.length) covered.add(s.track);
+    }
+    const marked = [];
+    for (const el of elements || []) {
+        if (!el || covered.has(el.track)) continue;
+        stale.add(el);
+        marked.push(el);
+    }
+    return marked;
+}
+
+function withRefresh(src) {
+    refreshSeq++;
+    const re = new RegExp(`([?&])${REFRESH_PARAM}=\\d+(&|$)`);
+    let base = src.replace(re, (m, lead, tail) => (tail ? lead : ''));
+    base = base.replace(/[?&]$/, '');
+    return `${base}${base.includes('?') ? '&' : '?'}${REFRESH_PARAM}=${refreshSeq}`;
+}
+
+// refreshStaleTrack refetches a track a seek emptied, and reports whether it
+// did. Called when the track is switched on; the mark is spent on the first
+// look either way, so a file that is legitimately empty costs one request,
+// not one per re-assertion of the selection.
+export function refreshStaleTrack(el) {
+    if (!el || !stale.has(el)) return false;
+    stale.delete(el);
+    // Not loaded yet: switching it on starts its first load, which brings
+    // the cues by itself.
+    if (el.readyState !== TRACK_LOADED) return false;
+    // A revision swap in flight is already the refetch.
+    if (pending.has(el)) return false;
+    const cues = el.track && el.track.cues;
+    if (cues && cues.length > 0) return false;
+    const src = el.getAttribute('src');
+    if (!src) return false;
+    el.setAttribute('src', withRefresh(src));
+    return true;
+}

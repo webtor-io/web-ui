@@ -49,6 +49,8 @@
  * do it again for as long as the page lives.
  */
 
+import { refreshStaleTrack } from './subtitle-track-reload.js';
+
 // The provider of tracks that come out of the transcoder's HLS manifest.
 // Everything else is side-loaded and exists as a <track> element.
 const EMBEDDED_PROVIDER = 'MediaProbe';
@@ -188,6 +190,18 @@ function write(video, hls, selection) {
         // one mode.
         else t.mode = 'disabled';
     }
+    // A session seek empties every <track> it could not snapshot (see
+    // refreshStaleTrack). The one being switched on is the one worth a
+    // request; after the modes, so its cue list is readable.
+    if (wanted) refreshStaleTrack(trackElement(video, wanted));
+}
+
+function trackElement(video, id) {
+    if (!video || typeof video.querySelectorAll !== 'function') return null;
+    for (const el of video.querySelectorAll('track')) {
+        if (el.id === id) return el;
+    }
+    return null;
 }
 
 /**

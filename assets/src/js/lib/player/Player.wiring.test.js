@@ -1453,6 +1453,47 @@ test('a seek re-applies the picker’s current answer, not the one it started wi
         'two applies (the player\u2019s and the seeker\u2019s) write once each, not once per nested callback');
 });
 
+// ---- a track a seek emptied comes back when it is picked -----------------
+//
+// Bug (2026-09-17, reproduced on stage): hls.js clears the cues of every text
+// track on loadSource, the seek snapshot only holds the track that was on,
+// and the browser never refetches a src it has loaded. An OpenSubtitles
+// track picked after a seek sat at readyState 2, showing, with 0 cues.
+test('a side-loaded track picked after a seek is fetched again; one left off is not', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => {
+        it.installHls({ subtitleTrack: 0, subtitleDisplay: true });
+        it.chip('none').removeAttribute('data-default');
+        it.chip('mp-0').setAttribute('data-default', 'true');
+        it.modal.setAttribute('data-subtitles-off', 'false');
+    }, { tracks: [['os-os-ru', false], ['os-os-en', false]], hlsTracks: [['Full (rus)', 'showing']] });
+    const hls = window.hlsPlayer;
+    const ru = p.video.querySelector('track#os-os-ru');
+    const en = p.video.querySelector('track#os-os-en');
+    // Both were loaded before the seek, as the browser does with <track>s.
+    for (const el of [ru, en]) Object.defineProperty(el, 'readyState', { configurable: true, value: 2 });
+
+    const seeker = createSessionSeeker({
+        hls,
+        videoEl: p.video,
+        sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8',
+        trackContainer: p.container,
+    });
+    const seeking = seeker.seek(120);
+    await flush();
+    hls.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+
+    click(p.chip('os-os-ru'));
+    await flush();
+
+    assert.equal(p.mode('os-os-ru'), 'showing');
+    assert.match(ru.getAttribute('src'), /wt-rf=\d+$/, 'the emptied track the viewer picked is fetched again');
+    assert.equal(en.getAttribute('src'), 'https://x.test/os-os-en.vtt', 'a track nobody picked costs no request');
+});
+
 // ---- a seek kicks the translation poll ---------------------------------
 //
 // Bug (2026-09-16): with a live AI translation running, a seek jumps the

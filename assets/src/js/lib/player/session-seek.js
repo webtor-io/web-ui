@@ -9,6 +9,7 @@
 import { Hls } from './hls-manager';
 import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset';
 import { applySubtitleSelection, readSelection } from './subtitle-apply.js';
+import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
 
 /**
  * Capture the current video frame onto a canvas positioned over the video.
@@ -65,9 +66,8 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // OpenSubtitles, external) to 'disabled' and clears their cue
             // lists while reprocessing the media element on loadSource() —
             // snapshot mode and cues so the active selection survives.
-            const savedElementTrackState = captureTrackState(
-                [...videoEl.querySelectorAll('track')].map((el) => el.track),
-            );
+            const trackEls = [...videoEl.querySelectorAll('track')];
+            const savedElementTrackState = captureTrackState(trackEls.map((el) => el.track));
 
             const separator = sessionSeekUrl.includes('?') ? '&' : '?';
             await fetch(sessionSeekUrl + separator + 't=' + targetTime, { method: 'POST' });
@@ -81,6 +81,15 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 videoEl.load();
                 videoEl.play().catch(() => {});
             } else {
+                // The snapshot only holds cues of tracks that were on: a
+                // disabled track reports none. loadSource empties the rest
+                // for good (the browser never refetches a src it loaded),
+                // so they are marked to be fetched again when the viewer
+                // picks one — see refreshStaleTrack. Here, right before the
+                // wipe, and not at snapshot time: a track picked while the
+                // POST was in flight would otherwise be refetched first and
+                // emptied second.
+                markUnsnapshottedTracksStale(trackEls, savedElementTrackState);
                 // HLS.js: reload manifest
                 hls.stopLoad();
                 hls.loadSource(sourceUrl);

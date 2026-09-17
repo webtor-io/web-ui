@@ -200,3 +200,27 @@ test('selectionFor and readSelection read the marked chip, and nothing when ther
     assert.equal(readSelection({ querySelector: () => null }), null);
     assert.equal(readSelection(null), null);
 });
+
+// ---- a track a seek emptied is refetched when it is picked -------------
+
+test('picking a side-loaded track a seek emptied refetches it; the ones left off are not touched', async () => {
+    const { markUnsnapshottedTracksStale } = await import('./subtitle-track-reload.js');
+    const element = (id) => {
+        const attrs = { src: `https://x/${id}.vtt` };
+        const t = { id, mode: 'disabled', cues: [] };
+        return { id, readyState: 2, track: t, getAttribute: (n) => attrs[n] ?? null, setAttribute: (n, v) => { attrs[n] = v; } };
+    };
+    const picked = element('os-ru');
+    const other = element('os-en');
+    const v = {
+        textTracks: [picked.track, other.track],
+        querySelectorAll: () => [picked, other],
+    };
+    markUnsnapshottedTracksStale([picked, other], []);
+
+    applySubtitleSelection(v, makeHls(), sideLoaded('os-ru'));
+
+    assert.equal(picked.track.mode, 'showing');
+    assert.match(picked.getAttribute('src'), /wt-rf=\d+$/, 'the emptied track the viewer picked is fetched again');
+    assert.equal(other.getAttribute('src'), 'https://x/os-en.vtt', 'a track left off costs no request');
+});

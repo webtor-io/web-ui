@@ -172,11 +172,35 @@ Two client-side mechanisms fix this (`cue-offset.js`):
    Wired in `Player.jsx` as an effect on `seekOffset` plus a capturing
    `load` listener on the `<video>` (covers lazily-loaded tracks and
    tracks added mid-session from the uploads panel).
+   A cue that ends before the session start is **parked at
+   `PARKED_AT` (−1)**, never at `[0,0]`. Every session starts at media
+   time 0 and Chrome's cue interval test is inclusive at both ends, so a
+   zero-length cue at 0 is active on the first frame and stays drawn until
+   the next cue boundary: after any seek, every line from the start of the
+   film up to the seek point sat on screen at once (reproduced on stage
+   2026-09-17, in production since e3d1e7d). A cue straddling the session
+   start is clipped to begin at 0, which is correct.
 2. `captureTrackState` / `restoreTrackState` around a session seek
    (`session-seek.js`) — hls.js flips element-backed tracks to
-   `disabled` **and clears their cue lists** on `loadSource()`, so the
+   `disabled` **and clears their cue lists** on `loadSource()` (all text
+   tracks on the element, `TimelineController._cleanTracks`), so the
    seeker snapshots mode + cue objects before the reload, re-adds them on
    `playing`, then re-applies the new offset.
+3. The snapshot only holds cues of tracks that were **on**: a disabled
+   track reports `cues === null`. Every other `<track>` is left loaded and
+   empty, and the browser never refetches a `src` it already loaded, so a
+   track picked after a seek used to show nothing. The seeker therefore
+   marks those tracks right before `loadSource()`
+   (`markUnsnapshottedTracksStale`, `subtitle-track-reload.js`), and
+   `applySubtitleSelection` calls `refreshStaleTrack` for the track it
+   switches on: stale, loaded (`readyState` 2), still empty, and no
+   revision swap in flight → the `src` gets a `wt-rf=<n>` parameter and
+   the file is fetched again (the capturing `load` listener applies the
+   current offset). The mark is spent on the first look, so a file that is
+   legitimately empty costs one request, not one per re-assertion. Not
+   done by snapshotting disabled tracks too: reading their cues means
+   flipping them to `hidden` and back, a `change` event per track for
+   hls.js to react to, and a first download for every track never loaded.
 
 HLS-manifest tracks (MediaProbe, created by hls.js itself) are already
 session-relative and must never be passed to `applyCueOffset`.

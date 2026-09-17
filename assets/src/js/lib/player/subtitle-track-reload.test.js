@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.js';
+import { reloadSubtitleTrack, dropDeletedTracks, markUnsnapshottedTracksStale, refreshStaleTrack } from './subtitle-track-reload.js';
 
 // A <track> element stand-in with faithful add/removeEventListener
 // semantics — the whole point of the test is which listeners are attached
@@ -145,4 +145,80 @@ test('a deleted upload that was not playing reports no showing track', () => {
 
     assert.equal(dropDeletedTracks(video, ['os-1']), '');
     assert.deepEqual(video.ids(), ['os-1']);
+});
+
+// ---- tracks a session seek emptied ------------------------------------
+//
+// hls.js's loadSource clears the cues of EVERY text track on the element
+// (TimelineController._cleanTracks), ours included. The seeker snapshots
+// cues first, but a disabled track reports `cues === null`, so only the
+// track that was on screen gets its cues back. Every other <track> is left
+// loaded (readyState 2), empty, and never refetched: the browser does not
+// reload a src it already loaded. Picking it after the seek showed nothing
+// (reproduced on stage 2026-09-17: an OpenSubtitles track at readyState 2,
+// mode showing, 0 cues; 353 after a forced reload).
+
+const LOADED = 2;
+
+function loadedTrack(id, { cues = [], readyState = LOADED, src = `https://x/${id}.vtt?token=t` } = {}) {
+    const el = makeTrack(id, cues);
+    el.readyState = readyState;
+    el.setAttribute('src', src);
+    return el;
+}
+
+test('a track the seek snapshot did not cover is marked; the one it restores is not', () => {
+    const playing = loadedTrack('os-ru', { cues: [{ startTime: 1, endTime: 2 }] });
+    const other = loadedTrack('os-en');
+    const saved = [{ track: playing.track, mode: 'showing', cues: [...playing.track.cues] }, { track: other.track, mode: 'disabled', cues: [] }];
+    const marked = markUnsnapshottedTracksStale([playing, other], saved);
+    assert.deepEqual(marked.map((el) => el.id), ['os-en']);
+});
+
+test('activating a stale, loaded, empty track refetches it once, under a new URL', () => {
+    const el = loadedTrack('os-en');
+    markUnsnapshottedTracksStale([el], []);
+    assert.equal(refreshStaleTrack(el), true);
+    const first = el.getAttribute('src');
+    assert.match(first, /^https:\/\/x\/os-en\.vtt\?token=t&wt-rf=\d+$/);
+    // Unmarked by the refetch: a legitimately empty file is fetched once,
+    // not on every re-assertion of the selection.
+    assert.equal(refreshStaleTrack(el), false);
+    assert.equal(el.getAttribute('src'), first);
+});
+
+test('a second refetch replaces the refresh parameter instead of piling them up', () => {
+    const el = loadedTrack('os-en');
+    markUnsnapshottedTracksStale([el], []);
+    refreshStaleTrack(el);
+    markUnsnapshottedTracksStale([el], []);
+    refreshStaleTrack(el);
+    assert.equal((el.getAttribute('src').match(/wt-rf=/g) || []).length, 1);
+});
+
+test('nothing to refetch: not stale, still has cues, never loaded, or a reload already on its way', () => {
+    const fresh = loadedTrack('a');
+    assert.equal(refreshStaleTrack(fresh), false, 'never marked');
+
+    const withCues = loadedTrack('b', { cues: [{ startTime: 1, endTime: 2 }] });
+    markUnsnapshottedTracksStale([withCues], []);
+    assert.equal(refreshStaleTrack(withCues), false, 'cues are there — whatever emptied it did not');
+    withCues.track.cues.length = 0;
+    assert.equal(refreshStaleTrack(withCues), false, 'and the mark is gone with that answer');
+
+    // Not loaded yet: turning it on starts its first load, which brings the
+    // cues on its own.
+    const unloaded = loadedTrack('c', { readyState: 0 });
+    markUnsnapshottedTracksStale([unloaded], []);
+    assert.equal(refreshStaleTrack(unloaded), false);
+
+    // An AI track with a revision swap in flight: that load is the refetch.
+    const video = videoWith(loadedTrack('tr-pt'));
+    const ai = video.querySelectorAll()[0];
+    markUnsnapshottedTracksStale([ai], []);
+    reloadSubtitleTrack(video, 'tr-pt', 'https://x/tr-pt.vtt?rev=3');
+    assert.equal(refreshStaleTrack(ai), false);
+    assert.equal(ai.getAttribute('src'), 'https://x/tr-pt.vtt?rev=3');
+
+    assert.equal(refreshStaleTrack(null), false);
 });
