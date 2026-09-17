@@ -2338,3 +2338,31 @@ test('a transcoder that does not answer an offset leaves the quantized guess in 
     await seeking;
     assert.deepEqual(offsets, [120], 'floor(125/30)*30, as before the transcoder said');
 });
+
+// ---- a saved track survives the initial loadSource ----------------------
+//
+// A saved side-loaded selection is restored before the HLS instance exists,
+// so the initial loadSource wipes its parsed cues exactly as a seek's does —
+// loaded, showing, and empty for the whole session (reproduced on stage
+// 2026-09-17, no seek anywhere). createHls marks the tracks before its
+// loadSource; this test pins the half that follows: initDefaultTracks'
+// apply refetches the marked, wiped track.
+test('the restored default track wiped by the initial loadSource is fetched again', async (t) => {
+    const { markUnsnapshottedTracksStale } = await import('./subtitle-track-reload.js');
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => {
+        it.chip('none').removeAttribute('data-default');
+        it.chip('os-os-ru').setAttribute('data-default', 'true');
+    }, { tracks: [['os-os-ru', true]] });
+    const el = p.video.querySelector('track#os-os-ru');
+    Object.defineProperty(el, 'readyState', { configurable: true, value: 2 });
+
+    // What createHls does around its loadSource: mark, wipe.
+    markUnsnapshottedTracksStale(Array.from(p.video.querySelectorAll('track')), []);
+    // (the track list is already empty under jsdom, which is the wiped state)
+
+    // MANIFEST_PARSED → initDefaultTracks applies the saved selection.
+    initDefaultTracks(window.hlsPlayer || makeHls({ video: p.video }), p.video);
+    assert.match(el.getAttribute('src'), /wt-rf=\d+$/, 'the wiped restored track is fetched again');
+    assert.equal(p.mode('os-os-ru'), 'showing');
+});

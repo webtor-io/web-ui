@@ -189,8 +189,12 @@ Two client-side mechanisms fix this (`cue-offset.js`):
 3. The snapshot only holds cues of tracks that were **on**: a disabled
    track reports `cues === null`. Every other `<track>` is left loaded and
    empty, and the browser never refetches a `src` it already loaded, so a
-   track picked after a seek used to show nothing. The seeker therefore
-   marks those tracks right before `loadSource()`
+   track picked after a seek used to show nothing. The **initial**
+   `loadSource()` wipes the same way (`createHls` in `hls-manager.js`), and
+   a saved side-loaded selection is restored *before* the HLS instance
+   exists — its track could be loaded, showing and empty for the whole
+   session with no seek anywhere. Both call sites therefore
+   mark the tracks right before `loadSource()`
    (`markUnsnapshottedTracksStale`, `subtitle-track-reload.js`), and
    `applySubtitleSelection` calls `refreshStaleTrack` for the track it
    switches on: stale, loaded (`readyState` 2), still empty, and no

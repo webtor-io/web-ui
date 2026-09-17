@@ -4,6 +4,7 @@
  */
 import Hls from 'hls.js';
 import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
+import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
 
 const HLS_CONFIG = {
     autoStartLoad: true,
@@ -42,6 +43,17 @@ export function createHls(videoEl, sourceUrl, onReady) {
     }
 
     const hls = new Hls(HLS_CONFIG);
+    // The initial loadSource wipes the cues of every <track> already on the
+    // element, exactly as a seek's does (TimelineController._cleanTracks on
+    // MANIFEST_LOADING) — and a saved side-loaded selection is restored
+    // *before* the HLS instance exists, so its track can be loaded, showing
+    // and empty for the whole session (reproduced on stage 2026-09-17: a
+    // restored OpenSubtitles track at readyState 2, 353 cues in the file,
+    // 0 in the track, no seek anywhere). Marked here the way the seeker
+    // marks before its loadSource; the re-assert that runs on the manifest
+    // events then refetches the one that is actually showing
+    // (applySubtitleSelection → refreshStaleTrack).
+    markUnsnapshottedTracksStale(Array.from(videoEl.querySelectorAll('track')), []);
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
