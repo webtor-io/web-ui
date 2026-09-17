@@ -332,13 +332,14 @@ func TestLadderTranslatedIsOfferedWhenNoHumanTrackInPreferredLang(t *testing.T) 
 		t.Fatalf("src=%q", tr.Src)
 	}
 	// Source: audio is English, so an English track wins the language
-	// preference, and between the two English ones the hash-matched
-	// OpenSubtitles track beats the sidecar -- it is a match on this very
-	// file, while a sidecar shipped in the torrent is unverified
-	// (translationSourceRank, owner ruling 2026-09-16). Until then the
-	// answer was the sidecar, because it is appended first.
-	if !strings.HasPrefix(tr.Src, "https://x/os-en.vtt~tr:pt/") {
-		t.Fatalf("expected the hash-matched English OpenSubtitles track as source, got %q", tr.Src)
+	// preference, and between the two English ones the sidecar beats the
+	// hash-matched OpenSubtitles track -- the hash match fits the timing
+	// to this file but says nothing about the text, and community uploads
+	// routinely carry injected ads (translationSourceRank, owner ruling
+	// 2026-09-17, reversing 2026-09-16 after Sintel's hash match turned
+	// out to be mostly ads).
+	if !strings.HasPrefix(tr.Src, "https://x/sc-en.vtt~tr:pt/") {
+		t.Fatalf("expected the English sidecar as source, got %q", tr.Src)
 	}
 	if !tr.Offered || tr.Suggested || tr.Default {
 		t.Fatalf("the translation is offered, never turned on: offered=%v suggested=%v default=%v", tr.Offered, tr.Suggested, tr.Default)
@@ -571,11 +572,11 @@ func TestLadderRankAndSourceBadge(t *testing.T) {
 		}
 	}
 	tr := got["tr-pt"]
-	// os-2 is the hash-matched English track: English audio, and inside
-	// that language a hash match outranks the sidecar for translating
-	// (translationSourceRank) even though the display ladder above puts
-	// the sidecar first. The two orders answer two different questions.
-	if tr.SourceID != "os-2" || tr.SourceBadge != "os" {
+	// et-1 is the English sidecar: English audio, and inside that language
+	// the sidecar outranks the hash-matched OpenSubtitles track for
+	// translating (translationSourceRank, 2026-09-17) -- the hash fits the
+	// timing, not the text, and community uploads carry injected ads.
+	if tr.SourceID != "et-1" || tr.SourceBadge != "sidecar" {
 		t.Errorf("AI item must name its source: sourceID=%q badge=%q", tr.SourceID, tr.SourceBadge)
 	}
 	if tr.Source != "" {
@@ -1404,11 +1405,13 @@ func TestPickTranslationSourcePrefersAFileOverTheLivePlaylist(t *testing.T) {
 }
 
 // TestPickTranslationSourceOrdersEqualFileSources: within one language the
-// order is the viewer's own upload, then a hash-matched OpenSubtitles track
-// (a match on this very file), then a sidecar from the torrent, then an
-// imdb-matched OpenSubtitles track (same title, possibly another release).
-// Not ladderRank: that one puts the sidecar above both OpenSubtitles rungs,
-// which is the right answer for reading and the wrong one for translating.
+// order is the viewer's own upload, then a sidecar from the torrent, then a
+// hash-matched OpenSubtitles track, then an imdb-matched one. The hash
+// match fits the timing to this very file but says nothing about the text,
+// and community uploads routinely carry injected ad cues (owner ruling
+// 2026-09-17, after Sintel's hash match turned out to be mostly ads);
+// still not ladderRank, which ranks both OpenSubtitles rungs below the
+// sidecar for reading.
 func TestPickTranslationSourceOrdersEqualFileSources(t *testing.T) {
 	// Appended in the order GetSubtitles uses, so a "first wins" rule would
 	// answer et-1 every time.
@@ -1419,11 +1422,11 @@ func TestPickTranslationSourceOrdersEqualFileSources(t *testing.T) {
 		srcItem("os-hash", "OpenSubtitles", "rus", "https://x/oh.vtt", "hash"),
 		srcItem("us-1", "UserSubtitle", "rus", "https://x/my.vtt", ""),
 	}
-	for i, want := range []string{"us-1", "os-hash", "et-1", "os-imdb"} {
+	for i, want := range []string{"us-1", "et-1", "os-hash", "os-imdb"} {
 		// Drop the winners one by one: each remaining list must answer the
 		// next rung down.
 		lis := append([]ListItem{}, all...)
-		for _, gone := range []string{"us-1", "os-hash", "et-1", "os-imdb"}[:i] {
+		for _, gone := range []string{"us-1", "et-1", "os-hash", "os-imdb"}[:i] {
 			for j := range lis {
 				if lis[j].ID == gone {
 					lis = append(lis[:j], lis[j+1:]...)
@@ -1458,9 +1461,10 @@ func TestPickTranslationSourceKeepsTheLanguagePreference(t *testing.T) {
 		t.Fatalf("english fallback: %+v", got)
 	}
 	// Neither the audio language nor English is present: the best-ranked
-	// of what is left, in list order for ties.
+	// of what is left, in list order for ties — and since 2026-09-17 the
+	// sidecar is the best-ranked file rung after an upload.
 	noEnglish := []ListItem{lis[0], lis[1], lis[3]}
-	if got := pickTranslationSource(noEnglish, "de"); got == nil || got.ID != "os-fr" {
+	if got := pickTranslationSource(noEnglish, "de"); got == nil || got.ID != "et-ru" {
 		t.Fatalf("any: %+v", got)
 	}
 }
@@ -1516,19 +1520,20 @@ func TestLadderRankReadsTheMovieHashBool(t *testing.T) {
 		}
 	}
 
-	// And the same bool decides the translation order, where a hash match
-	// outranks the sidecar (translationSourceRank).
+	// And the same bool decides the translation order: a hash match
+	// outranks an imdb match (translationSourceRank), though since
+	// 2026-09-17 both rank below the sidecar.
 	lis := []ListItem{
 		{ID: "none", Kind: "subtitles"},
-		srcItem("et-1", "ExportTag", "rus", "https://x/sc.vtt", ""),
+		{ID: "os-imdb", Provider: "OpenSubtitles", SrcLang: "rus", Src: "https://x/oi.vtt", Kind: "subtitles", MovieHashMatch: &no},
 		{ID: "os-1", Provider: "OpenSubtitles", SrcLang: "rus", Src: "https://x/os.vtt", Kind: "subtitles", MovieHashMatch: &yes},
 	}
 	if got := pickTranslationSource(lis, "ru"); got == nil || got.ID != "os-1" {
-		t.Fatalf("hash match by bool must beat the sidecar: %+v", got)
+		t.Fatalf("hash match by bool must beat the imdb match: %+v", got)
 	}
 	lis[2].MovieHashMatch = &no
-	if got := pickTranslationSource(lis, "ru"); got == nil || got.ID != "et-1" {
-		t.Fatalf("an imdb match by bool ranks below the sidecar: %+v", got)
+	if got := pickTranslationSource(lis, "ru"); got == nil || got.ID != "os-imdb" {
+		t.Fatalf("both by bool imdb: list order keeps the first: %+v", got)
 	}
 }
 

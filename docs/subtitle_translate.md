@@ -257,12 +257,16 @@ language — while the display ladder ranks that upload *above* embedded. The tw
 was a bug, not a policy.
 
 **Among file sources of the same language** (`translationSourceRank`): the viewer's own upload,
-then a **hash-matched** OpenSubtitles track, then the sidecar, then an **imdb-matched**
-OpenSubtitles track. This is deliberately **not** `ladderRank`, which puts the sidecar above both
-OpenSubtitles rungs: the ladder answers "which track does the viewer want to read", this order
-answers "which text will the machine translate correctly", and a hash match is a match on this
-very file while a sidecar shipped in the torrent is unverified and routinely belongs to another
-release. Equal ranks keep list order, which is the only stable tie-break the embedded bucket has.
+then the sidecar, then a **hash-matched** OpenSubtitles track, then an **imdb-matched** one.
+Still deliberately **not** `ladderRank` — the ladder answers "which track does the viewer want to
+read", this order answers "which text will the machine translate correctly" — but the sidecar
+sits above the hash match (owner ruling 2026-09-17, reversing 2026-09-16): a hash match fits the
+*timing* to this very file and says nothing about the *text*, and community uploads routinely
+carry injected ad cues — Sintel's hash-matched English track turned out to be mostly ads, and the
+machine dutifully translated the ads. A sidecar's timing can belong to another cut, but its text
+is the film's, and a wrongly-timed line is a smaller failure for a translation source than a
+correctly-timed advertisement. Equal ranks keep list order, which is the only stable tie-break
+the embedded bucket has.
 
 Embedded (`MediaProbe`) tracks are a source when the stream plays through the transcoder:
 `GetSubtitles` gives each visible embedded track `Src = <HLSSessionBase>/s<MPID>.m3u8` (the same

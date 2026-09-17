@@ -553,11 +553,17 @@ func isEmbeddedSource(li ListItem) bool {
 // translationSourceRank breaks a tie between two file sources of the same
 // language. It is deliberately NOT ladderRank: that order answers "which
 // track does the viewer want to read", this one answers "which text is the
-// machine most likely to translate correctly". The two disagree on one
-// rung -- a hash-matched OpenSubtitles track is a match on this very file,
-// while a sidecar shipped in the torrent is unverified and routinely
-// belongs to another release, so it outranks the sidecar here and not in
-// the ladder (owner ruling, 2026-09-16).
+// machine most likely to translate correctly".
+//
+// The sidecar sits above the hash-matched OpenSubtitles track (owner
+// ruling, 2026-09-17, reversing 2026-09-16). A hash match guarantees the
+// TIMING fits this very file; it says nothing about the TEXT, and
+// community uploads routinely carry injected ad cues -- Sintel's
+// hash-matched English track turned out to be mostly ads, and the machine
+// translated the ads. A sidecar shipped in the torrent is whatever the
+// release carries: its timing can be off for another cut, but its text is
+// the film's, and a wrongly-timed line is a smaller failure for a
+// translation source than a correctly-timed advertisement.
 //
 // Embedded tracks never reach this function: they are a bucket of their
 // own (see pickTranslationSource).
@@ -565,13 +571,13 @@ func translationSourceRank(li ListItem) int {
 	switch li.Provider {
 	case "UserSubtitle":
 		return 0
+	case "ExportTag", "External":
+		return 1
 	case "OpenSubtitles":
 		if hashMatched(li) {
-			return 1
+			return 2
 		}
 		return 3
-	case "ExportTag", "External":
-		return 2
 	}
 	return rankUnknown
 }
