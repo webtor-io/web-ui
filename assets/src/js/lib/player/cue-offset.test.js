@@ -34,12 +34,26 @@ test('applyCueOffset is idempotent and re-applies from authored times', () => {
 test('applyCueOffset neutralises cues that end before the session start', () => {
     const track = makeTrack([[10, 20], [590, 620]]);
     applyCueOffset(track, 600);
-    // Fully before the session: parked at [0,0], never active.
-    assert.equal(track.cues[0].startTime, 0);
-    assert.equal(track.cues[0].endTime, 0);
+    // Fully before the session: parked below zero, where the playhead of a
+    // session never is. Not at [0,0]: a session always starts at media time
+    // 0, Chrome's cue interval test is inclusive at both ends, and a [0,0]
+    // cue was drawn from the first frame until the next cue boundary —
+    // every line from the start of the film up to the seek point at once
+    // (reproduced on stage 2026-09-17).
+    assert.ok(track.cues[0].endTime < 0, `parked end must be below 0, got ${track.cues[0].endTime}`);
+    assert.ok(track.cues[0].startTime <= track.cues[0].endTime);
     // Straddling the session start: clipped to begin at 0.
     assert.equal(track.cues[1].startTime, 0);
     assert.equal(track.cues[1].endTime, 20);
+});
+
+test('a parked cue comes back when a later seek moves the session before it', () => {
+    const track = makeTrack([[10, 20]]);
+    applyCueOffset(track, 600);
+    assert.ok(track.cues[0].endTime < 0);
+    applyCueOffset(track, 0);
+    assert.equal(track.cues[0].startTime, 10);
+    assert.equal(track.cues[0].endTime, 20);
 });
 
 test('applyCueOffset tolerates tracks without cues', () => {

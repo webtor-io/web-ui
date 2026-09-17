@@ -13,6 +13,12 @@
  * element-backed tracks here.
  */
 
+// Where a cue that ends before the session start is kept. Any negative
+// time works (the playhead is never negative, so neither the interval test
+// nor the "missed cues" rule can reach it); one fixed value keeps the
+// parked cues easy to recognise in a debugger.
+export const PARKED_AT = -1;
+
 export function applyCueOffset(track, offset) {
     if (!track || !track.cues) return;
     for (const cue of track.cues) {
@@ -23,10 +29,17 @@ export function applyCueOffset(track, offset) {
         const start = cue.__absStart - offset;
         const end = cue.__absEnd - offset;
         if (end <= 0) {
-            // Entirely before the session start — park it where it can
-            // never activate (startTime <= t < endTime is always false).
-            cue.startTime = 0;
-            cue.endTime = 0;
+            // Entirely before the session start — park it below zero,
+            // where a session's playhead never is. Not at [0,0]: every
+            // session starts at media time 0, and Chrome's cue interval
+            // test is inclusive at both ends, so a zero-length cue at 0 is
+            // active at the first frame — and stays drawn until the next
+            // cue boundary, because the renderer only re-evaluates at
+            // boundaries and 0 is already behind it. After a seek that put
+            // every line from the start of the film up to the seek point
+            // on screen at once (reproduced on stage 2026-09-17).
+            cue.startTime = PARKED_AT;
+            cue.endTime = PARKED_AT;
         } else {
             cue.startTime = Math.max(0, start);
             cue.endTime = end;
