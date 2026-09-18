@@ -726,16 +726,35 @@ this run** decides: *behind* → the ordinary hold takes the pause over (banner,
   that is keeping up, so such an answer releases the film, and a hold can still arrive after a
   moment of playback. File sources answer against the position the poll carried, and are exact.
 
-### A minute of lead-in for file jobs (`catchUpTiming.leadInS`)
+### Lead-in belongs to the service
 
-The poll's `pos` is `playhead − 60 s` (owner, 2026-09-18). The service orders batches from the
-position it is given and skips cues that began before it, so the line being spoken right now and
-the exchange before it stayed untranslated; a batch is ~50 cues, so the minute rides in the same
-first batch and costs no extra call. The frontier (`X-Subtitle-Pending-From`) is computed from the
-same `pos`, so a hold now also waits for that minute. A live source has nothing to ask for: its
-playlist begins where the run begins. **Not verified against the live service** — the client side
-is tested; how the service's frontier behaves with a `pos` behind the playhead was read from its
-README, not observed.
+For a few hours on 2026-09-18 the client sent `pos = playhead − 60 s` to give file jobs a
+lead-in. Reverted the same day: `pos` means the position, and a lead-in applied on the client
+cannot reach a live job at all. The service applies it (its `--lead-in`, 30 s) to the ORDER of
+batches for both kinds of source, and keeps the frontier on the true position.
+
+### A seek silences the run it leaves (`session-seek.js`)
+
+The frozen frame hid the old run's picture while the seek POST was out, but nothing hid its sound:
+it kept playing the old position for as long as the transcoder took to start the new one (owner,
+2026-09-18). `seek()` now pauses the element before the POST (after `setIsSeeking(true)`, so the
+player's pause listener does not take it for the viewer's) and plays it once the new source is
+loading; a refused POST undoes the pause. A viewer who seeks while paused stays paused, as before.
+`seek(t, { play: true })` is for the resume prompt's answer: the film is held, the seek is what
+ends the hold — and `handleResume` no longer plays *before* seeking, which was audible as the
+film's opening under the frozen frame.
+
+### Play is "Keep watching"
+
+During a wait the big play button and the banner's **Keep watching** do the same thing, so the
+`play` listener now flips the banner to its non-waiting state at once instead of on the next 3 s
+tick.
+
+### The pill on a phone
+
+Under 600 px the catch-up pill drops the cue count (a sibling `.wt-catchup-text-short` carries the
+`…Short` copy; CSS shows exactly one of the two), and shrinks type and paddings. The count made it
+three lines tall over the picture.
 
 ## Deploy order
 

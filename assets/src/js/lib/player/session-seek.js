@@ -53,14 +53,26 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
         if (onSeekingChange) onSeekingChange(val);
     }
 
-    async function seek(targetTime) {
+    // `play: true` is for a caller whose film is paused for a reason that
+    // the seek itself ends (the resume prompt's hold): the new run has to be
+    // started, because the hls.js path below waits for `playing`.
+    async function seek(targetTime, { play = false } = {}) {
         if (isSeeking) return;
         setIsSeeking(true);
         let freezeFrame = null;
+        // The old run is over the moment the viewer seeks. The frozen frame
+        // hides its picture while the POST is out, but nothing hid its
+        // sound: it kept playing the old position -- for as long as the
+        // transcoder needs to start the new one (owner, 2026-09-18). Paused
+        // here, played again once the new source is loading. setIsSeeking
+        // comes first on purpose: the player's pause listener reads it and
+        // does not take this pause for the viewer's.
+        const playAfter = play || !videoEl.paused;
 
         try {
             // Freeze current frame as overlay to avoid black flash
             freezeFrame = captureFrame(videoEl);
+            if (!isNative && !videoEl.paused && typeof videoEl.pause === 'function') videoEl.pause();
 
             const savedAudioTrack = hls ? hls.audioTrack : -1;
             // hls.js flips element-backed <track>s (user uploads,
@@ -144,6 +156,10 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
                     applySubtitleSelection(videoEl, hls, readSelection(pickerScope()));
                 });
+                if (playAfter && typeof videoEl.play === 'function') {
+                    const r = videoEl.play();
+                    if (r && typeof r.catch === 'function') r.catch(() => {});
+                }
             }
 
             // Unlock seeking and remove freeze frame when playback resumes
@@ -175,6 +191,11 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             console.error('Session seek failed:', e);
             if (freezeFrame) freezeFrame.remove();
             setIsSeeking(false);
+            // A refused seek moves nothing, the pause above included.
+            if (playAfter && !isNative && videoEl.paused && typeof videoEl.play === 'function') {
+                const r = videoEl.play();
+                if (r && typeof r.catch === 'function') r.catch(() => {});
+            }
         }
     }
 

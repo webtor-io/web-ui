@@ -2305,9 +2305,7 @@ test('a session seek in flight sends no position: the halves disagree mid-seek',
     p.video.currentTime = 300;
     await wait(POLL_INTERVAL_WINDOW_MS);
     const urls = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
-    // 1800 s, less the minute of lead-in a file job is asked to start from
-    // (catchUpTiming.leadInS).
-    assert.ok(urls().at(-1).includes('pos=1740'), `before the seek: ${urls().at(-1)}`);
+    assert.ok(urls().at(-1).includes('pos=1800'), `before the seek: ${urls().at(-1)}`);
     // The seek to ~5:15 kicks a poll while currentTime still belongs to the
     // old run: that poll must carry no pos at all rather than 300+315.
     document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -2729,4 +2727,86 @@ test('a silent hold nobody answers lets the film go', async (t) => {
     assert.equal(p.video.paused, false, 'the cap is what bounds a service that says nothing');
     assert.ok(log.play > playsBefore);
     assert.equal(events('subtitle-translate-wait').length, 0);
+});
+
+// ---- a seek silences the run it leaves ---------------------------------
+
+// seekerOn builds a seeker over the hls.js fake, with a POST that takes
+// `postMs` and answers `ok`.
+async function seekerOn(t, { postMs = 100, ok = true } = {}) {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({ subtitleTrack: -1, subtitleDisplay: false }); });
+    p.setResponse((url, params) => (params && params.method === 'POST'
+        ? new Promise((resolve) => setTimeout(() => resolve({ ok, status: ok ? 200 : 503, json: async () => ({ offset: 118.5 }) }), postMs))
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const log = playback(p.video);
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek', sourceUrl: 'https://x.test/index.m3u8',
+        trackContainer: p.container, onSeekOffsetChange: () => {}, onSeekingChange: () => {},
+    });
+    return { p, log, seeker };
+}
+
+test('a seek pauses the run it leaves and plays the one it starts', { timeout: 5000 }, async (t) => {
+    // Owner, 2026-09-18: the old position's sound went on under the frozen
+    // frame for as long as the transcoder took to start the new one.
+    const { p, log, seeker } = await seekerOn(t);
+    p.video.paused = false;
+    const done = seeker.seek(120);
+    await wait(20);
+    assert.equal(p.video.paused, true, 'silent while the POST is out');
+    const playsDuringPost = log.play;
+    await wait(150);
+    assert.ok(log.play > playsDuringPost, 'played again once the new source is loading');
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await done;
+    assert.equal(seeker.isSeeking(), false);
+});
+
+test('a seek on a paused film starts nothing, unless the caller says the pause was not the viewer’s', { timeout: 5000 }, async (t) => {
+    const { p, log, seeker } = await seekerOn(t, { postMs: 10 });
+    seeker.seek(120);
+    await wait(60);
+    assert.equal(log.play, 0, 'a viewer who seeks while paused stays paused');
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+
+    // The resume prompt's answer: the film is held, and the seek is what
+    // ends the hold.
+    const done = seeker.seek(240, { play: true });
+    await wait(60);
+    assert.ok(log.play >= 1, 'the new run is started');
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await done;
+});
+
+test('a refused seek gives the film back as it was: playing', { timeout: 5000 }, async (t) => {
+    const { p, log, seeker } = await seekerOn(t, { postMs: 10, ok: false });
+    const orig = console.error;
+    console.error = () => {};
+    t.after(() => { console.error = orig; });
+    p.video.paused = false;
+    await seeker.seek(120);
+    assert.ok(log.pause >= 1);
+    assert.equal(p.video.paused, false, 'the pause the seek made is undone with it');
+});
+
+test('pressing play during a wait is pressing Keep watching: the banner says so at once', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    playback(p.video);
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', '100')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'held: the start hold');
+
+    p.video.play();
+    await settle();
+    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'no longer "paused until…" over a film that is playing');
+    assert.equal(catchUpBanner(p).querySelector('.wt-catchup-btn').textContent, 'player.subtitleCatchUpWait');
 });

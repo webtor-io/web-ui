@@ -639,9 +639,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // and the settle kick sends the right value moments later.
                 if (sessionSeekingRef.current) return null;
                 const v = videoRef.current;
-                if (!v) return null;
-                // A minute behind the viewer: see catchUpTiming.leadInS.
-                return Math.max(0, (v.currentTime || 0) + seekOffsetRef.current - catchUpTiming.leadInS);
+                return v ? (v.currentTime || 0) + seekOffsetRef.current : null;
             },
             onProgress: (p) => {
                 cues = p.total;
@@ -874,6 +872,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             resumeOnVisibleRef.current = false;
             clearWait();
             endPreHold(false);
+            // Play IS "Keep watching": whichever of the two the viewer
+            // presses, the banner must stop saying the film is paused for
+            // them now, not on the next 3 s tick (owner, 2026-09-18).
+            const banner = catchUpRef.current;
+            if (banner && banner.waiting) showCatchUp({ remaining: banner.remaining, waiting: false });
             wake();
         };
         // The `play` event is the authority on playback — `paused` is not
@@ -1222,7 +1225,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     }, [offer, trackOffer]);
 
     // Seek handler (session or direct)
-    const handleSeek = useCallback((time) => {
+    const handleSeek = useCallback((time, { play = false } = {}) => {
         if (sessionSeekingRef.current) return;
         if (isSession && sessionSeekUrl) {
             // Immediately show target position on timeline
@@ -1246,7 +1249,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 });
             }
             if (sessionSeekerRef.current) {
-                sessionSeekerRef.current.seek(time);
+                sessionSeekerRef.current.seek(time, { play });
             }
         } else {
             const video = videoRef.current;
@@ -1499,11 +1502,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setResumeAnswered(true);
         const video = videoRef.current;
         if (!video) return;
-        playAfterPrompt();
         if (isSession && sessionSeekUrl) {
-            handleSeek(resumePosition);
+            // Not play() and then seek: the old run would be heard from the
+            // film's beginning for as long as the new one takes to start.
+            // The seeker starts the new run itself.
+            handleSeek(resumePosition, { play: true });
         } else {
             video.currentTime = resumePosition;
+            playAfterPrompt();
         }
         // Save resumed position immediately
         const dur = duration > 0 ? duration : (video.duration || 0);
@@ -1678,11 +1684,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 <div class="wt-catchup" role="status" data-remaining={catchUp.remaining}
                      onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <LoadingSpinner />
-                    <span class="wt-catchup-text">
+                    <span class={`wt-catchup-text${catchUp.remaining === null ? '' : ' wt-catchup-text--long'}`}>
                         {catchUp.remaining === null
                             ? t(catchUp.waiting ? 'player.subtitleCatchUpWaitingShort' : 'player.subtitleCatchUpShort')
                             : tf(catchUp.waiting ? 'player.subtitleCatchUpWaiting' : 'player.subtitleCatchUp', catchUp.remaining)}
                     </span>
+                    {/* A phone has no room for the cue count: three lines of
+                        pill over the picture (owner, 2026-09-18). The short
+                        copy is a sibling, not a second child of the text
+                        span, and CSS shows exactly one of the two. */}
+                    {catchUp.remaining !== null && (
+                        <span class="wt-catchup-text-short">
+                            {t(catchUp.waiting ? 'player.subtitleCatchUpWaitingShort' : 'player.subtitleCatchUpShort')}
+                        </span>
+                    )}
                     <button type="button" class="wt-catchup-btn"
                         onClick={catchUp.waiting ? handleKeepWatching : handleWait}>
                         {t(catchUp.waiting ? 'player.subtitleCatchUpResume' : 'player.subtitleCatchUpWait')}

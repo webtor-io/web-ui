@@ -51,14 +51,6 @@ export const catchUpTiming = {
     // it (see beginPreHold in Player.jsx): how long the film may stand
     // still with nothing said, before it plays regardless.
     seekPreHoldMaxMs: 1500,
-    // How far behind the playhead a file job is asked to start (owner,
-    // 2026-09-18). The service orders batches from the position it is
-    // given and skips cues that began before it -- so the line being spoken
-    // right now, and the exchange it answers, stayed untranslated. A batch
-    // is ~50 cues, several minutes of dialogue: a minute of lead-in rides
-    // in the same first batch and costs no extra call. A live source has no
-    // such thing to ask for: its playlist begins where the run begins.
-    leadInS: 60,
 };
 
 // A NaN playhead is a <video> with no timeline yet (no metadata, no

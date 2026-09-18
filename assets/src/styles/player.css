@@ -719,6 +719,10 @@ video::cue {
     white-space: normal;
 }
 
+.wt-catchup-text-short {
+    display: none;
+}
+
 .wt-catchup-btn {
     flex: none;
     display: inline-flex;
@@ -757,6 +761,29 @@ video::cue {
 }
 .wt-catchup-close:hover {
     color: rgba(255, 255, 255, 0.8);
+}
+
+/* Phone: one line where it fits, two at most. The count goes, the type and
+   the paddings shrink, and the pill may use the full width. */
+@media (max-width: 600px) {
+    .wt-catchup {
+        top: 8px;
+        gap: 6px;
+        max-width: calc(100% - 16px);
+        padding: 4px 8px;
+        font-size: 12px;
+        line-height: 1.25;
+    }
+    .wt-catchup-text--long {
+        display: none;
+    }
+    .wt-catchup-text-short {
+        display: inline;
+    }
+    .wt-catchup-btn {
+        padding: 3px 8px;
+        font-size: 11px;
+    }
 }
 
 /* The translation offer: the catch-up pill's slot and shape, but the
