@@ -762,14 +762,21 @@ video::cue {
 /* The translation offer: the catch-up pill's slot and shape, but the
    sentence itself is the button. */
 .wt-offer {
-    padding: 0 8px 0 0;
+    gap: 0;
+    padding: 0 6px 0 0;
     border: 1px solid rgba(232, 67, 147, 0.5);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+/* Hover answers on the pill as a whole -- it is one button to the eye. */
+.wt-offer:has(.wt-offer-main:hover) {
+    border-color: rgba(253, 121, 168, 0.9);
+    background: rgba(0, 0, 0, 0.85);
 }
 .wt-offer-main {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 4px 7px 12px;
+    padding: 7px 6px 7px 12px;
     border: none;
     border-radius: 999px;
     background: transparent;
@@ -777,10 +784,6 @@ video::cue {
     font: inherit;
     text-align: left;
     cursor: pointer;
-}
-.wt-offer-main:hover .wt-catchup-text {
-    text-decoration: underline;
-    text-underline-offset: 3px;
 }
 .wt-offer-mark {
     flex: none;
@@ -793,11 +796,30 @@ video::cue {
 .wt-offer svg {
     color: rgba(255, 255, 255, 0.6);
 }
+/* The × is drawn, not typed: a glyph sits on the text baseline and reads
+   as sunk next to a centred sentence. */
+.wt-offer .wt-catchup-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 999px;
+}
+.wt-offer .wt-catchup-close svg {
+    width: 12px;
+    height: 12px;
+    color: currentColor;
+}
+.wt-offer .wt-catchup-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
 /* Touch: the × is the only way out, so it gets a real target. */
 @media (hover: none) {
     .wt-offer .wt-catchup-close {
-        padding: 8px 6px;
-        font-size: 18px;
+        width: 32px;
+        height: 32px;
     }
 }
 
