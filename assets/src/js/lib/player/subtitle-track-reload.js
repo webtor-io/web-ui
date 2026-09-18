@@ -23,7 +23,7 @@
 //
 // Extracted from Player.jsx so the listener lifetime below is testable:
 // Player.jsx is JSX and `node --test` cannot parse it.
-import { captureTrackState } from './cue-offset.js';
+import { captureTrackState, restoreCues } from './cue-offset.js';
 
 // The reload waiting to settle on each <track>, so its listeners can be
 // taken off before the next one goes on. A pair per revision, left to
@@ -38,16 +38,6 @@ function clearPending(el) {
     el.removeEventListener('load', prev.onLoad);
     el.removeEventListener('error', prev.onError);
     pending.delete(el);
-}
-
-// restoreCues puts the snapshot's cues back where the new revision left the
-// list empty: restoreTrackState without the mode -- see the header.
-function restoreCues(saved) {
-    for (const { track, cues } of saved) {
-        if (!track || !cues.length) continue;
-        if (track.cues && track.cues.length > 0) continue;
-        for (const cue of cues) track.addCue(cue);
-    }
 }
 
 // reloadSubtitleTrack swaps in a newer revision of a partially written

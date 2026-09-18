@@ -672,8 +672,6 @@
     "player.subtitleTranslatingLive": "Translating along with playback…",
     "player.subtitleTranslationStopped": "Translation stopped — reload to retry",
     "player.subtitleTranslationQueued": "Waiting for a translation slot…",
-    "player.subtitleCatchUp": "AI translation is catching up… ~%v cues to go",
-    "player.subtitleCatchUpWaiting": "Paused until the translation catches up… ~%v cues to go",
     "player.subtitleCatchUpShort": "AI translation is catching up…",
     "player.subtitleCatchUpWaitingShort": "Paused until the translation catches up…",
     "player.subtitleCatchUpWait": "Wait for it",

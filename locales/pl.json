@@ -624,8 +624,6 @@
     "player.subtitleTranslatingLive": "Tłumaczenie trwa razem z odtwarzaniem…",
     "player.subtitleTranslationStopped": "Tłumaczenie przerwane — odśwież stronę, aby spróbować ponownie",
     "player.subtitleTranslationQueued": "Oczekiwanie na wolne miejsce w kolejce tłumaczenia…",
-    "player.subtitleCatchUp": "Tłumaczenie AI nadrabia zaległości… zostało ~%v linii",
-    "player.subtitleCatchUpWaiting": "Wstrzymano, aż tłumaczenie nadrobi zaległości… zostało ~%v linii",
     "player.subtitleCatchUpShort": "Tłumaczenie AI nadrabia zaległości…",
     "player.subtitleCatchUpWaitingShort": "Wstrzymano, aż tłumaczenie nadrobi zaległości…",
     "player.subtitleCatchUpWait": "Poczekaj",

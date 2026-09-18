@@ -614,8 +614,6 @@
     "player.subtitleTranslatingLive": "Çeviri, oynatmayla birlikte devam ediyor…",
     "player.subtitleTranslationStopped": "Çeviri durduruldu — yeniden denemek için sayfayı yenileyin",
     "player.subtitleTranslationQueued": "Çeviri sırası bekleniyor…",
-    "player.subtitleCatchUp": "Yapay zekâ çevirisi yetişiyor… ~%v satır kaldı",
-    "player.subtitleCatchUpWaiting": "Çeviri yetişene kadar duraklatıldı… ~%v satır kaldı",
     "player.subtitleCatchUpShort": "Yapay zekâ çevirisi yetişiyor…",
     "player.subtitleCatchUpWaitingShort": "Çeviri yetişene kadar duraklatıldı…",
     "player.subtitleCatchUpWait": "Bekle",

@@ -614,8 +614,6 @@
     "player.subtitleTranslatingLive": "Vertaling loopt mee met het afspelen…",
     "player.subtitleTranslationStopped": "Vertaling gestopt — herlaad de pagina om het opnieuw te proberen",
     "player.subtitleTranslationQueued": "Wachten op een vertaalplek…",
-    "player.subtitleCatchUp": "De AI-vertaling loopt bij… nog ~%v regels te gaan",
-    "player.subtitleCatchUpWaiting": "Gepauzeerd tot de vertaling is bijgelopen… nog ~%v regels te gaan",
     "player.subtitleCatchUpShort": "De AI-vertaling loopt bij…",
     "player.subtitleCatchUpWaitingShort": "Gepauzeerd tot de vertaling is bijgelopen…",
     "player.subtitleCatchUpWait": "Wachten",

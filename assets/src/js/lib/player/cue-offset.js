@@ -63,13 +63,20 @@ export function captureTrackState(tracks) {
     return saved;
 }
 
+// restoreCues puts a snapshot's cues back where the list was left empty.
+// The one statement of that rule: a seek restores it together with the
+// mode (restoreTrackState), a revision swap without (subtitle-track-reload).
+export function restoreCues(saved) {
+    for (const { track, cues } of saved) {
+        if (!track || !cues.length) continue;
+        if (track.cues && track.cues.length > 0) continue;
+        for (const cue of cues) track.addCue(cue);
+    }
+}
+
 export function restoreTrackState(saved) {
-    for (const { track, mode, cues } of saved) {
-        track.mode = mode;
-        if (cues.length && (!track.cues || track.cues.length === 0)) {
-            for (const cue of cues) {
-                track.addCue(cue);
-            }
-        }
+    for (const entry of saved) {
+        entry.track.mode = entry.mode;
+        restoreCues([entry]);
     }
 }

@@ -5,7 +5,8 @@ import {
     CATCHUP_CLEAR_MARGIN_S,
     trailing,
     caughtUp,
-    remaining,
+    resumeRewind,
+    shouldBrake,
 } from './subtitle-catchup.js';
 
 test('the margins are the shipped ones, and ordered', () => {
@@ -87,16 +88,6 @@ test('a zero frontier is a position, not a missing answer', () => {
     assert.equal(caughtUp(6, 0), true);
 });
 
-test('remaining is the gap, clamped, and 0 for nothing', () => {
-    assert.equal(remaining({ done: 12, total: 400 }), 388);
-    assert.equal(remaining({ done: 400, total: 400 }), 0);
-    // `total` is a snapshot on a live source and can lag `done`.
-    assert.equal(remaining({ done: 410, total: 400 }), 0);
-    assert.equal(remaining(null), 0);
-    assert.equal(remaining(undefined), 0);
-    assert.equal(remaining({}), 0);
-});
-
 test('nothing counted yet is 0/0 on a run that is not final, and nothing else', async () => {
     const { nothingCountedYet } = await import('./subtitle-catchup.js');
     assert.equal(nothingCountedYet({ done: 0, total: 0, final: false }), true);
@@ -135,4 +126,22 @@ test('a reload is needed when the viewer nears the edge of what is loaded and th
     assert.equal(needsReload({ serviceDone: 40, loaded, frontier: 120, playhead: 119 }), false, 'nothing new to fetch');
     assert.equal(needsReload({ serviceDone: 80, loaded: null, frontier: 120, playhead: 119 }), false);
     assert.equal(needsReload({ serviceDone: 80, loaded, frontier: null, playhead: 119 }), false);
+});
+
+test('shouldBrake: a second before the first untranslated line, never without a frontier', () => {
+    assert.equal(shouldBrake(100, 98.9), false);
+    assert.equal(shouldBrake(100, 99), true);
+    assert.equal(shouldBrake(100, 130), true, 'already past it');
+    assert.equal(shouldBrake(null, 99.5), false, 'no frontier, nothing to stop for');
+    assert.equal(shouldBrake(undefined, 99.5), false);
+    assert.equal(shouldBrake(100, NaN), false, 'a NaN playhead never pauses the film');
+});
+
+test('resumeRewind: back to the missed line plus a lead-in, nothing when nothing was missed', () => {
+    assert.equal(resumeRewind(100, 99), 0, 'stopped before the line: no replay');
+    assert.equal(resumeRewind(100, 100), 0);
+    assert.equal(resumeRewind(100, 101.5), 3.5, 'missed 1.5 s + 2 s lead-in');
+    assert.equal(resumeRewind(100, 140), 10, 'capped');
+    assert.equal(resumeRewind(null, 140), 0);
+    assert.equal(resumeRewind(100, NaN), 0);
 });

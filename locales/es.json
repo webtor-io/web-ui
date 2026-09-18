@@ -614,8 +614,6 @@
     "player.subtitleTranslatingLive": "Traduciendo junto con la reproducción…",
     "player.subtitleTranslationStopped": "Traducción detenida: recarga la página para reintentar",
     "player.subtitleTranslationQueued": "Esperando un turno de traducción…",
-    "player.subtitleCatchUp": "La traducción con IA se está poniendo al día… quedan ~%v líneas",
-    "player.subtitleCatchUpWaiting": "En pausa hasta que la traducción se ponga al día… quedan ~%v líneas",
     "player.subtitleCatchUpShort": "La traducción con IA se está poniendo al día…",
     "player.subtitleCatchUpWaitingShort": "En pausa hasta que la traducción se ponga al día…",
     "player.subtitleCatchUpWait": "Esperar",

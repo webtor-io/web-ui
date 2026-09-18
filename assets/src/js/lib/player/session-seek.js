@@ -115,6 +115,23 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                     answered = body.offset;
                 }
             }
+            // The seek is unlocked by `playing`, and `playing` needs a play()
+            // that went through. One that did not -- the autoplay policy
+            // after the awaits above, or the reload aborting it -- used to be
+            // swallowed, and since the seek pauses the old run itself the
+            // film then stood still with isSeeking latched: spinner up, every
+            // later seek returning at once, for the rest of the session. A
+            // rejected play() is tried once more when the new source can
+            // play (an abort is cured by that; by then hls.js is also done
+            // wiping the tracks, so settling is safe), and if that is
+            // refused too the seek settles paused, with the play button.
+            let onPlayRejected = () => {};
+            const startPlayback = () => {
+                if (typeof videoEl.play !== 'function') return;
+                const r = videoEl.play();
+                if (r && typeof r.catch === 'function') r.catch((err) => onPlayRejected(err));
+            };
+
             seekOffset = answered !== null ? answered : (targetTime > 0 ? Math.floor(targetTime / 30) * 30 : 0);
             if (onSeekOffsetChange) onSeekOffsetChange(seekOffset);
 
@@ -122,7 +139,7 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 // Native HLS (iOS): reload source by resetting src
                 videoEl.src = sourceUrl;
                 videoEl.load();
-                videoEl.play().catch(() => {});
+                startPlayback();
             } else {
                 // The snapshot only holds cues of tracks that were on: a
                 // disabled track reports none. loadSource empties the rest
@@ -156,16 +173,32 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 hls.once(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
                     applySubtitleSelection(videoEl, hls, readSelection(pickerScope()));
                 });
-                if (playAfter && typeof videoEl.play === 'function') {
-                    const r = videoEl.play();
-                    if (r && typeof r.catch === 'function') r.catch(() => {});
-                }
+                if (playAfter) startPlayback();
             }
 
             // Unlock seeking and remove freeze frame when playback resumes
             return new Promise((resolve) => {
+                let settled = false;
+                let retried = false;
+                function onCanPlay() {
+                    videoEl.removeEventListener('canplay', onCanPlay);
+                    if (settled) return;
+                    startPlayback();
+                }
+                onPlayRejected = () => {
+                    if (settled) return;
+                    if (retried) {
+                        onPlaying();
+                        return;
+                    }
+                    retried = true;
+                    videoEl.addEventListener('canplay', onCanPlay);
+                };
                 function onPlaying() {
+                    if (settled) return;
+                    settled = true;
                     videoEl.removeEventListener('playing', onPlaying);
+                    videoEl.removeEventListener('canplay', onCanPlay);
                     if (freezeFrame) freezeFrame.remove();
                     const restorable = savedElementTrackState.filter(({ track }) => !refetchedTracks.has(track));
                     restoreTrackState(restorable);

@@ -32,11 +32,16 @@ over both. The series row for a path is picked path-aware (`pickSeriesRow`, mirr
 side): the show owning an episode at that path, else the lone show, else nothing — a multi-series
 pack must not name the wrong show. Since 2026-09-18 the name parser also reads the word-form
 season folder (`Season 1/`, `Сезон 1/`), the layout that used to lose the season and with it the
-whole hint.
+whole hint. The word forms are anchored to the start of the path segment — mid-name "Season 2"
+is as often a title (`Open Season 2 (2008)`).
 An **adult resource sends no derived hint at all** — the same `resource_metadata.is_adult` bit
 that hides the AI track and blurs the poster also stops the stream page from naming the title to
 OpenSubtitles (the ref lookup is skipped and the md/path fallbacks return empty); only an
-explicit embed/API `imdbId` — the caller's own declaration — still passes through.
+explicit embed/API `imdbId` — the caller's own declaration — still passes through. The bit is read
+for every stream, embeds included (the derived hint is built there too), through
+`streamprefs.AdultResource`, which keeps "not adult" apart from "could not find out": a DB error
+or the 3 s timeout **withholds** the hint, while the AI track keeps reading the same failure as
+not-adult.
 | 5    | `Translated` (AI)        | `ai`                  | `action.stream.badge.ai`       |
 | 6–8  | reserved (phase 3 whisper takes 6) | —           | —                            |
 | 9    | anything else / "None"   | —                     | —                            |
@@ -479,17 +484,24 @@ trip" / cache-key section).
   session seek is naturally rationed by its POST. During a session seek no `pos` is sent at all:
   the offset is already the new run's while `currentTime` still belongs to the old one, and no
   position beats a wrong one. The playhead is floored, not rounded — claiming half a second the
-  viewer has not reached would sort the very next cue into the backlog. Differences that remain:
+  viewer has not reached would sort the very next cue into the backlog. **The first `<track>`
+  request carries `pos` too** (`firstTrackSrc`, `Translated` chips only): that GET is what starts
+  the job, a HEAD never does, and the service orders its first batch by the position it has on
+  record — which is kept per file and language (`tr:pos:<artifact key>@<run offset>`, 30 min), not
+  per viewer. Without `pos` on the GET the first batch was ordered by whatever an earlier viewing
+  had left there (measured 2026-09-18: a film opened at 0:00 got its first ~50 cues from the
+  sixth minute). Movie time = `currentTime` + the run offset the component mirrors onto
+  `video.dataset.runOffset`. Known gap: a saved translation restored at mount in a session that
+  resumed mid-film asks before the run offset is known, sends a position below it, and the
+  service ignores that — the old behaviour, for that one case. Differences that remain:
   the banner on a file source shows no cue count (`player.subtitleCatchUpShort` /
   `player.subtitleCatchUpWaitingShort`) — its `total` is the whole film, so `total − done` would
-  overstate the wait by orders of magnitude — and a seek's hold cap is
-  `catchUpTiming.seekHoldMaxMsFile` (20 s) there, since a file job retargets only at a batch
-  boundary and then owes at least one more upstream call. A throttled poll (429/503) is a missed
+  overstate the wait by orders of magnitude. A throttled poll (429/503) is a missed
   tick, not the end of the run: burst limiters sit in front of these polls, and one throttled
   HEAD used to clear the chip and kill the translation. When the translation trails,
   a top-centre pill says
-  `player.subtitleCatchUp` ("AI translation is catching up… ~N cues to go",
-  `N = max(0, total - done)`) and offers **Wait for it**, with a × to dismiss. It is placed at the
+  `player.subtitleCatchUpShort` ("AI translation is catching up…" — no cue count, see "No cue
+  count on the pill" below) and offers **Wait for it**, with a × to dismiss. It is placed at the
   top because the two things it must not cover are the subtitles it is about (bottom of the
   picture) and the controls under them.
   - **The comparison.** Playhead is `video.currentTime + seekOffset` (movie time — a transcoder
@@ -528,7 +540,7 @@ trip" / cache-key section).
     waiting *on*, and for a live source it is what keeps the transcoder session and the
     translation reading it alive. It also calls `resume()` (a no-op unless suspended), which
     covers the viewer who paused first and pressed Wait afterwards. The banner then reads
-    `player.subtitleCatchUpWaiting`, and the button becomes **Keep watching**.
+    `player.subtitleCatchUpWaitingShort`, and the button becomes **Keep watching**.
   - **What ends a wait.** `caughtUp(pendingFrom, playhead)` — `pendingFrom` null, or
     `>= playhead + 5` — resumes playback by itself and clears the banner (null included, so a
     service that stops sending the header can never strand a waiting viewer). So does pressing
@@ -542,11 +554,10 @@ trip" / cache-key section).
     with `false`, i.e. the new run is `playing`) the poll is kicked again, and the first answer
     after that decides: if the film is still playing and `caughtUp(pendingFrom, playhead)` is
     false, the same wait as the button starts (`beginWait(true, …)`), with the banner in its
-    waiting sentence. Unlike the button it is **bounded** by `catchUpTiming.seekHoldMaxMs`
-    (10 s, `subtitle-catchup.js`): the seek already costs a pause while the transcoder restarts,
-    so a few more seconds read as part of it, but one slow upstream batch must not turn a seek
-    into a hang. Past the cap the film plays and the banner goes back to offering Wait, which
-    stays uncapped because the viewer chose it. No hold when the film was paused at the seek or
+    waiting sentence. It has **no cap** (it had one until 2026-09-18, 10 s and then 20 s: one
+    upstream model call is 10–15 s and a cold start stacks several, so every cap that was tried
+    gave up on real starts and played the film bare — the one outcome the hold exists to
+    prevent). What ends it is the run getting ahead, the run dying, or the viewer. No hold when the film was paused at the seek or
     paused before the answer came back (`sleep()` drops the pending decision on any pause outside
     a seek, so a later play is never held), when the source is not live, or when the service sends
     no `X-Subtitle-Pending-From` (`caughtUp(null)` is true). Once per seek.
@@ -693,8 +704,8 @@ just started, where nothing counted means nothing translated at the spot they ar
   the hold decision, for an ongoing wait, and for the passive banner. The first counted answer
   clears the flag and the frontier speaks for itself. The banner carries no cue count then
   (`bannerRemaining` → the `…Short` copy).
-- Bounds are the seek's: the hold is taken within `seekWatchMs` (8 s) or not at all, and lasts at
-  most `seekHoldMaxMs` / `seekHoldMaxMsFile`; `subtitle-translate-wait {auto: true}` reports it.
+- Bounds are the seek's: the hold is taken within `seekWatchMs` (8 s) or not at all;
+  `subtitle-translate-wait {auto: true}` reports it. Like every hold it has no time cap.
 - Side effect, the same one a seek has: run-mismatch counting is suspended while the window is
   open, so a persistent mismatch is noticed up to 8 s later on a run started over a playing film.
 - The tests about the passive banner, the manual **Wait** and the run mismatch start their run
@@ -791,10 +802,30 @@ model call is (10–15 s). Three consequences, all applied the same day:
 - **No cue count on the pill, on any source.** `total − done` on a live source is everything the
   transcoder has emitted minutes ahead of the viewer ("~300 cues to go" within ten seconds of a
   seek), which reads as "never". The service reports no count of cues between the viewer and the
-  frontier, so none is shown; the `…Short` copies are the only ones used. (`player.subtitleCatchUp`
-  / `player.subtitleCatchUpWaiting`, the `%v` copies, are now unused in every locale.)
-- **`seekHoldMaxMs` 10 → 20 s**, the file source's value: a cap below one model call gave up on
-  almost every start.
+  frontier, so none is shown; the `…Short` copies are the only ones used. The `%v` copies
+  (`player.subtitleCatchUp` / `player.subtitleCatchUpWaiting`), `remaining()` and the banner
+  state's `remaining` field were removed with it: two `: 0` fallbacks could still put "~0 cues to
+  go" on screen.
+- **`seekHoldMaxMs` 10 → 20 s**, and later the same day **removed altogether** (owner): 20 s
+  still gave up on cold starts.
+- **The player holds the film whenever the translation is behind, not only after a seek**
+  (owner, same day). A trailing tick mid-film starts the same automatic wait
+  (`beginWait(true)`); the passive "Wait for it" offer is now what the pill says only after the
+  viewer overruled a hold. Three rules keep it from fighting the viewer: × (`dismissedRef`)
+  and an overruled wait — **Keep watching** or the play button pressed over one
+  (`overruledRef`) — switch the automatic hold off for the rest of that stretch of
+  untranslated film (both reset once the run is ahead again), and nothing is held mid-seek.
+- **The brake.** The 3 s tick can find the frontier 2.5 s ahead and the next one find it a
+  second behind, so the hold is also decided on `timeupdate`: `shouldBrake(pendingFrom,
+  playhead)` pauses `CATCHUP_BRAKE_S` (1 s) before the first untranslated line and kicks the
+  poll. `pendingFrom` is that line's start, so nothing is lost; a stale frontier costs a pause
+  one HEAD long.
+- **The rewind.** A wait that ends on its own puts the film back to the first line the viewer
+  had no subtitle for: `resumeRewind(waitFrom, playhead)` = `missed + 2 s`, at most 10 s, where
+  `waitFrom` is the frontier when the wait began and `missed = playhead − waitFrom`. A wait the
+  brake started missed nothing and rewinds nothing. Done with `video.currentTime` inside the
+  playing playlist — never a session seek, which would restart the transcoder — and clamped at
+  the run's zero. `subtitle-translate-wait-done` carries `rewind` (seconds) instead of `capped`.
 - The first cues of **embedded** subtitles going missing after a seek is therefore a client-side
   matter — hls.js re-selects the subtitle track after `loadSource` and starts loading its
   fragments later than the video starts. **Not fixed, not investigated further.**
@@ -879,7 +910,7 @@ deploys: they are measuring the deploy, not the traffic.
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
 | `subtitle-translate-error` | `lang`, `code` | `code` = HTTP status, `0` network error, `'track'` the reloaded `<track>` failed to parse/load, `'timeout'` the run passed `POLL_TIMEOUT_MS`, `'stopped'` the service reported `X-Subtitle-Status: stopped` (`source_gone`/`too_large`) — the one code that leaves the chip's count on screen. |
 | `subtitle-translate-wait` | `lang`, `behind`, `auto` | A wait started: the viewer pressed **Wait for it** (`auto: false`), or a seek landed on untranslated film and held playback (`auto: true`). `behind` = `round(playhead - pendingFrom)` in seconds at that moment (`0` when the frontier was unknown). |
-| `subtitle-translate-wait-done` | `lang`, `seconds`, `auto`, `capped` | The wait ended by itself and playback resumed: the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead (`capped: false`), or a seek's hold hit `catchUpTiming.seekHoldMaxMs` with the run still behind (`capped: true`, only ever with `auto: true`). `seconds` = wall time waited, rounded to 0.1. A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited. The share of `auto` waits that end `capped` is the number to watch: it says whether the service reaches a seek point within the cap. |
+| `subtitle-translate-wait-done` | `lang`, `seconds`, `auto`, `rewind` | The wait ended by itself and playback resumed: the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead. There is no other automatic ending since the hold cap was removed (2026-09-18; the field used to be `capped`). `seconds` = wall time waited, rounded to 0.1; `rewind` = how far back the film was put (`resumeRewind`, 0 when the wait began before the untranslated line). A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited. `seconds` on `auto` waits is the number to watch: it is what a viewer pays for subtitles at a seek point. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
 | `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`, `data-umami-event-source=player` when clicked in the on-screen card) | CTA inside the lock card, or inside the on-screen upsell card. |
 | `subtitle-offer-shown` | `lang`, `kind` (`start`\|`upsell`) | The on-screen offer was decided and shown, once per page, at first play. `kind` doubles as the tier split: `upsell` is a viewer who cannot run a translation. |
@@ -1443,7 +1474,7 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   (`onTextTracksChanged`) is still driven by hand in the tests that want the latch.
   Still by hand: fullscreen, and anything about actual playback.
   The catching-up banner adds four through the same mount: a run at the playhead showing the pill
-  (count off `data-remaining`) and a run that gets ahead taking it away, a service that sends no
+  (with no cue count on it) and a run that gets ahead taking it away, a service that sends no
   `X-Subtitle-Pending-From` showing nothing at all, **Wait** pausing the film while the HEADs keep
   coming and a later caught-up answer resuming it with both events emitted, and × surviving a
   trailing tick but not a caught-up-then-trailing pair. The harness stubs `play`/`pause` (jsdom
@@ -1454,7 +1485,7 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   The plain-JS modules keep their own suites: `subtitle-rules.test.js`
   (`pickDefaultSubtitle`, `baseLang`, `translationAction`, `hasSavedDefault`),
   `subtitle-progress.test.js` (`parseProgress`, `withRev`, `pollProgress`, `onTick`),
-  `subtitle-catchup.test.js` (`trailing`, `caughtUp`, `remaining` — the margins, the hysteresis
+  `subtitle-catchup.test.js` (`trailing`, `caughtUp` — the margins, the hysteresis
   band in both directions, and a NaN playhead never pausing the film),
   `subtitle-telemetry.test.js` (`readAllTracks`, `readTracks`, `selectEventData`,
   `resolveSubtitleLevel`), `subtitle-track-reload.test.js` (`reloadSubtitleTrack`: listener

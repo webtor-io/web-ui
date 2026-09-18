@@ -624,8 +624,6 @@
     "player.subtitleTranslatingLive": "Перевод идёт вместе с просмотром…",
     "player.subtitleTranslationStopped": "Перевод остановлен — обновите страницу, чтобы повторить",
     "player.subtitleTranslationQueued": "Ожидание свободного слота перевода…",
-    "player.subtitleCatchUp": "ИИ-перевод догоняет… осталось ~%v реплик",
-    "player.subtitleCatchUpWaiting": "Пауза, пока перевод догонит… осталось ~%v реплик",
     "player.subtitleCatchUpShort": "ИИ-перевод догоняет…",
     "player.subtitleCatchUpWaitingShort": "Пауза, пока перевод догонит…",
     "player.subtitleCatchUpWait": "Подождать",

@@ -17,12 +17,12 @@
 export const CATCHUP_TRAIL_MARGIN_S = 2;
 export const CATCHUP_CLEAR_MARGIN_S = 5;
 
-// catchUpTiming.seekHoldMaxMs bounds the wait a seek starts on its own. A
-// seek already costs the viewer a pause while the transcoder restarts, so
-// waiting there for the new position's subtitles reads as part of the
-// seek — but only for so long: one slow upstream batch must not turn a seek
-// into a hang. Past it the film plays and the banner goes back to offering
-// Wait, which has no cap because the viewer chose it.
+// A wait a seek starts on its own has no cap (it had one until 2026-09-18:
+// 10 s, then 20 s). One upstream model call is 10-15 s and a cold start
+// stacks more than one, so every cap that was tried gave up on real starts
+// and played the film without subtitles -- the one outcome the hold exists
+// to prevent. What ends it is the run getting ahead, the run dying, or the
+// viewer: Keep watching, x, or the play button.
 //
 // seekWatchMs is the window after a seek settles in which every answer may
 // start that hold, asked again every seekWatchEveryMs. A window rather than
@@ -38,18 +38,6 @@ export const CATCHUP_CLEAR_MARGIN_S = 5;
 //
 // An object rather than constants so the wiring tests can shorten them.
 export const catchUpTiming = {
-    // 20 s for a live source too (was 10 until 2026-09-18). Measured: the
-    // transcoder's subtitle playlist is seconds ahead of the viewer from the
-    // first second after a seek, so reading it is not what a live run waits
-    // for -- one upstream model call is, and that is 10-15 s. A cap below
-    // that gave up on almost every start and played the film without
-    // subtitles, which is the one outcome the hold exists to prevent.
-    seekHoldMaxMs: 20000,
-    // A file job retargets only at a batch boundary (seconds of upstream
-    // work in flight) and then owes at least one more upstream call for the
-    // batch at the new position, so a 10 s cap expired with nothing to show
-    // almost every time.
-    seekHoldMaxMsFile: 20000,
     seekWatchMs: 8000,
     seekWatchEveryMs: 1000,
     runMismatchLimit: 5,
@@ -101,10 +89,38 @@ export function caughtUp(pendingFrom, playhead) {
     return pendingFrom >= playhead + CATCHUP_CLEAR_MARGIN_S;
 }
 
-// remaining is how many cues the banner says are left. `total` is a
-// snapshot on a live source, so this is an estimate and the copy says
-// "~"; the clamp is what keeps a total that has not caught up with `done`
-// from rendering as a negative count.
+// shouldBrake answers "is the viewer about to reach a line that is not
+// translated yet" (owner, 2026-09-18: better to slow down before the line
+// than to rewind after it). pendingFrom is where the first untranslated
+// cue starts, so stopping CATCHUP_BRAKE_S before it loses nothing. It is
+// asked on `timeupdate` (about four times a second), not on the 3 s tick:
+// a tick can find the frontier 2.5 s ahead and the next one find it a
+// second behind. The cost of a stale frontier is a pause one HEAD long --
+// the caller kicks the poll, and an answer that is ahead ends the wait.
+export const CATCHUP_BRAKE_S = 1;
+export function shouldBrake(pendingFrom, playhead) {
+    if (pendingFrom === null || pendingFrom === undefined) return false;
+    if (!usablePlayhead(playhead)) return false;
+    return playhead >= pendingFrom - CATCHUP_BRAKE_S;
+}
+
+// resumeRewind is how far back a wait that ended puts the film, in seconds.
+// waitFrom is the frontier when the wait began: the start of the first line
+// the viewer had no subtitle for. A wait that began before that line (the
+// brake above) missed nothing and rewinds nothing -- going back would only
+// replay what was heard. One that began past it goes back to the line plus
+// a lead-in: 2 s is enough to enter the phrase and to absorb a seek landing
+// on the keyframe before the target. Capped, because past ten seconds a
+// rewind reads as the player having lost its place.
+export const RESUME_REWIND_LEAD_S = 2;
+export const RESUME_REWIND_MAX_S = 10;
+export function resumeRewind(waitFrom, playhead) {
+    if (waitFrom === null || waitFrom === undefined || !usablePlayhead(playhead)) return 0;
+    const missed = playhead - waitFrom;
+    if (!(missed > 0)) return 0;
+    return Math.min(missed + RESUME_REWIND_LEAD_S, RESUME_REWIND_MAX_S);
+}
+
 // nothingCountedYet: the run has answered, and has not counted a single
 // cue -- `0/0`, the service's "registered nothing yet". No frontier comes
 // with such an answer (there is nothing to stand one on), so trailing()
@@ -156,9 +172,3 @@ export function needsReload({ serviceDone = 0, loaded = null, frontier = null, p
     return frontier <= playhead + CATCHUP_CLEAR_MARGIN_S;
 }
 
-export function remaining(p) {
-    if (!p) return 0;
-    const total = Number(p.total) || 0;
-    const done = Number(p.done) || 0;
-    return Math.max(0, total - done);
-}

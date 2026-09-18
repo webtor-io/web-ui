@@ -719,10 +719,6 @@ video::cue {
     white-space: normal;
 }
 
-.wt-catchup-text-short {
-    display: none;
-}
-
 /* "Caught up": the same pill, said in the other colour, with a check where
    the spinner was. */
 .wt-catchup--done {
@@ -787,12 +783,6 @@ video::cue {
         padding: 4px 8px;
         font-size: 12px;
         line-height: 1.25;
-    }
-    .wt-catchup-text--long {
-        display: none;
-    }
-    .wt-catchup-text-short {
-        display: inline;
     }
     .wt-catchup-btn {
         padding: 3px 8px;
