@@ -33,6 +33,10 @@ side): the show owning an episode at that path, else the lone show, else nothing
 pack must not name the wrong show. Since 2026-09-18 the name parser also reads the word-form
 season folder (`Season 1/`, `Сезон 1/`), the layout that used to lose the season and with it the
 whole hint.
+An **adult resource sends no derived hint at all** — the same `resource_metadata.is_adult` bit
+that hides the AI track and blurs the poster also stops the stream page from naming the title to
+OpenSubtitles (the ref lookup is skipped and the md/path fallbacks return empty); only an
+explicit embed/API `imdbId` — the caller's own declaration — still passes through.
 | 5    | `Translated` (AI)        | `ai`                  | `action.stream.badge.ai`       |
 | 6–8  | reserved (phase 3 whisper takes 6) | —           | —                            |
 | 9    | anything else / "None"   | —                     | —                            |

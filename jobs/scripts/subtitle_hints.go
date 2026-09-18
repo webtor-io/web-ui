@@ -30,7 +30,11 @@ import (
 // path via the same parser enrichment uses otherwise: the row was written
 // by an earlier parse, so a file enriched before the parser learned a
 // form may carry less than a fresh parse does, and vice versa.
-func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.ContentType, item *ra.ListItem, ref *models.VideoRef) api.SubtitleHints {
+// adult suppresses every hint we derived ourselves: the id names what the
+// viewer is watching to a third party, and the same bit already hides the
+// AI track and blurs the poster (owner ruling 2026-09-18). An explicit
+// embed/API id is the caller's own declaration and passes through.
+func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.ContentType, item *ra.ListItem, ref *models.VideoRef, adult bool) api.SubtitleHints {
 	season, episode := 0, 0
 	if ref != nil && ref.Kind == models.VideoRefKindEpisode && ref.Season > 0 && ref.Episode > 0 {
 		season, episode = int(ref.Season), int(ref.Episode)
@@ -46,6 +50,9 @@ func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.Co
 
 	if settingsImdbID != "" {
 		return api.SubtitleHints{ImdbID: settingsImdbID, Season: season, Episode: episode}
+	}
+	if adult {
+		return api.SubtitleHints{}
 	}
 
 	// The identity the ref carries beats the metadata row's: it was

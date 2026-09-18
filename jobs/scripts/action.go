@@ -444,6 +444,18 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	var preferred string
 	var castNames []string
 	var adult bool
+	if !isEmbed {
+		// Read for every site stream, not only when translation is on: the
+		// imdb hint below names what the viewer is watching to a third
+		// party (OpenSubtitles), and an adult resource must not be named
+		// there (owner ruling 2026-09-18) — the same bit that hides the AI
+		// track and blurs the poster. Bounded like CastNames below: a slow
+		// metadata read must not hold up the stream page, and a miss reads
+		// as not-adult anyway.
+		aCtx, aCancel := context.WithTimeout(ctx, 3*time.Second)
+		adult = s.prefs.IsAdultResource(aCtx, resourceID)
+		aCancel()
+	}
 	if translateEnabled && !isEmbed {
 		preferred = s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
 		if enrichedMD != nil {
@@ -451,11 +463,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			castNames = s.prefs.CastNames(nCtx, enrichedMD.VideoID, 30)
 			nCancel()
 		}
-		// Bounded like CastNames above: a slow metadata read must not hold
-		// up the stream page, and a miss reads as not-adult anyway.
-		aCtx, aCancel := context.WithTimeout(ctx, 3*time.Second)
-		adult = s.prefs.IsAdultResource(aCtx, resourceID)
-		aCancel()
 	}
 	sc.SubtitleOpts = previewAsFree(subtitleOptsFor(translateEnabled, isEmbed, c, s.prefs.FreeForAll(), adult, preferred, castNames), s.debug)
 
@@ -616,12 +623,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
 				var videoRef *models.VideoRef
-				if s.enricher != nil {
+				if s.enricher != nil && !adult {
 					refCtx, refCancel := context.WithTimeout(ctx, 5*time.Second)
 					videoRef, _ = s.enricher.ResolveVideoRef(refCtx, resourceID, exportResponse.Source.PathStr)
 					refCancel()
 				}
-				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item, videoRef))
+				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item, videoRef, adult))
 				subs, notReady, err := fetchOpenSubtitles(osCtx, s.api.GetOpenSubtitles, subsURL)
 				// notReady survives into the render even though err is
 				// set: the page goes out without OpenSubtitles tracks and
