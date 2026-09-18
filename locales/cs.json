@@ -631,7 +631,7 @@
     "player.subtitleCatchUpWait": "Počkat",
     "player.subtitleCatchUpResume": "Sledovat dál",
     "player.subtitleCatchUpDismiss": "Skrýt",
-    "player.subtitleCaughtUp": "AI překlad dohnal",
+    "player.subtitleCaughtUp": "Překlad AI dohnal zpoždění",
     "player.subtitleOfferLater": "Teď ne",
     "player.subtitleOfferNever": "Už nenabízet",
     "job.retrievingData": "získávám data zdroje",
