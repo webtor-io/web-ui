@@ -96,3 +96,12 @@ test('remaining is the gap, clamped, and 0 for nothing', () => {
     assert.equal(remaining(undefined), 0);
     assert.equal(remaining({}), 0);
 });
+
+test('nothing counted yet is 0/0 on a run that is not final, and nothing else', async () => {
+    const { nothingCountedYet } = await import('./subtitle-catchup.js');
+    assert.equal(nothingCountedYet({ done: 0, total: 0, final: false }), true);
+    assert.equal(nothingCountedYet({ done: 0, total: 400, final: false }), false, 'counted, none done: the frontier speaks');
+    assert.equal(nothingCountedYet({ done: 12, total: 400, final: false }), false);
+    assert.equal(nothingCountedYet({ done: 0, total: 0, final: true }), false);
+    assert.equal(nothingCountedYet(null), false);
+});

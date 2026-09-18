@@ -11,7 +11,7 @@ import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, progressText, withRev } from './subtitle-progress.js';
-import { catchUpTiming, caughtUp, remaining, trailing } from './subtitle-catchup.js';
+import { catchUpTiming, caughtUp, nothingCountedYet, remaining, trailing } from './subtitle-catchup.js';
 import {
     adoptUploadChips,
     refresh,
@@ -250,6 +250,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // seek, or a document with none of the new run's cues in it yet, and
     // both read as "nothing pending".
     const seekHoldPendingRef = useRef(false);
+    // The viewer has just started this run (owner, 2026-09-18): until it
+    // counts its first cue, "nothing counted" is read as "behind the
+    // playhead" -- see nothingCountedYet. Starting a translation over a
+    // playing film is the same event as a seek landing on untranslated
+    // film, so it opens the same hold window and is bounded by the same cap.
+    const startHoldRef = useRef(false);
     const seekSettledAtRef = useRef(0);
     // The timer that asks the service again while the window lasts.
     const holdWatchRef = useRef(null);
@@ -288,7 +294,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // backlog; on a file source total is the whole film and the difference
     // is off by orders of magnitude exactly where the viewer decides
     // whether to wait — so no number at all (the copy drops its tail).
-    const bannerRemaining = (p) => (p.live ? remaining(p) : null);
+    // No count on a run that has counted nothing: "~0 cues to go" over a
+    // translation that has not begun says the opposite of what is true.
+    const bannerRemaining = (p) => (p.live && !nothingCountedYet(p) ? remaining(p) : null);
 
     // resumeAfterHold plays the film a seek's hold paused — unless the tab
     // is hidden: then the poll goes to sleep (nothing would put it there
@@ -444,6 +452,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // of its events name the language.
         catchUpLangRef.current = lang;
         pendingFromRef.current = null;
+        // Over a film that is playing, in a tab somebody is looking at. A
+        // paused film is not running into anything, and a wait the viewer
+        // is already in is theirs. While a session seek is in flight (the
+        // resume prompt's answer, then the pill) the window opens when the
+        // seek settles -- onSessionSeekingChange stamps it.
+        const startVideo = videoRef.current;
+        startHoldRef.current = !!startVideo && !startVideo.paused && !waitingRef.current
+            && !(typeof document !== 'undefined' && document.hidden);
+        if (startHoldRef.current) {
+            dismissedRef.current = false;
+            seekHoldPendingRef.current = true;
+            seekSettledAtRef.current = sessionSeekingRef.current ? 0 : Date.now();
+        }
         const span = el.querySelector('.tr-progress');
         const spinner = el.querySelector('.tr-spinner');
         progressSpanRef.current = span;
@@ -621,6 +642,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 }
                 const aboutThisRun = !saysRun || matches
                     || runMismatchRef.current >= catchUpTiming.runMismatchLimit;
+                // A run the viewer just started and that has counted nothing
+                // is behind by definition; the first counted answer ends the
+                // special case and the frontier speaks for itself.
+                if (!nothingCountedYet(p)) startHoldRef.current = false;
+                const behind = !caughtUp(pendingFromRef.current, playhead)
+                    || (startHoldRef.current && nothingCountedYet(p));
                 // The window after a seek settled: hold playback for the new
                 // position's subtitles as soon as an answer about the new run
                 // shows the translation is not comfortably ahead of it. An
@@ -632,7 +659,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     const inWindow = Date.now() - seekSettledAtRef.current <= catchUpTiming.seekWatchMs;
                     if (!inWindow || document.hidden || video.paused || waitingRef.current) {
                         seekHoldPendingRef.current = false;
-                    } else if (aboutThisRun && !caughtUp(pendingFromRef.current, playhead)) {
+                    } else if (aboutThisRun && behind) {
                         seekHoldPendingRef.current = false;
                         beginWait(true, bannerRemaining(p));
                         return;
@@ -650,7 +677,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // end of a wait, not the banner.
                 if (!aboutThisRun) return;
                 if (waitingRef.current) {
-                    if (!caughtUp(pendingFromRef.current, playhead)) {
+                    if (behind) {
                         showCatchUp({ remaining: bannerRemaining(p), waiting: true });
                         return;
                     }
@@ -670,7 +697,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     showCatchUp(null);
                     return;
                 }
-                const isTrailing = trailing(trailingRef.current, pendingFromRef.current, playhead);
+                const isTrailing = trailing(trailingRef.current, pendingFromRef.current, playhead)
+                    || (startHoldRef.current && nothingCountedYet(p));
                 trailingRef.current = isTrailing;
                 if (isTrailing && !dismissedRef.current) {
                     showCatchUp({ remaining: bannerRemaining(p), waiting: false });

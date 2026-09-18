@@ -93,6 +93,19 @@ export function caughtUp(pendingFrom, playhead) {
 // snapshot on a live source, so this is an estimate and the copy says
 // "~"; the clamp is what keeps a total that has not caught up with `done`
 // from rendering as a negative count.
+// nothingCountedYet: the run has answered, and has not counted a single
+// cue -- `0/0`, the service's "registered nothing yet". No frontier comes
+// with such an answer (there is nothing to stand one on), so trailing()
+// and caughtUp() both read it as "not behind". That is right for a run the
+// player merely found in that state, and wrong for one the viewer has just
+// started: there, nothing counted means nothing translated, at the very
+// spot they are watching. Only the player knows which it is, so this is a
+// separate question and the caller combines them.
+export function nothingCountedYet(p) {
+    if (!p || p.final) return false;
+    return (Number(p.total) || 0) === 0 && (Number(p.done) || 0) === 0;
+}
+
 export function remaining(p) {
     if (!p) return 0;
     const total = Number(p.total) || 0;

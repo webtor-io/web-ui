@@ -671,8 +671,30 @@ film can be translated. Owner's request of 2026-09-18.
   now** and **Don't offer again**. The × and **Not now** store `{until: now + 30 d}`, **Don't
   offer again** stores `{never: true}`, both under `localStorage['wt-subtitle-offer']` — per
   browser, across all films. Storage that throws reads as "not suppressed".
-- **Not covered by tests:** the 10 s linger timer against real controls auto-hide, fullscreen,
-  and the hand-over to the catch-up pill right after a `start` click (first HEAD is 3 s out).
+- **Not covered by tests:** the 10 s linger timer against real controls auto-hide, and fullscreen.
+
+### Starting a run over a playing film holds it
+
+Owner, 2026-09-18: pressing the offer (or the chip) over a playing film showed nothing — no
+banner, no subtitles — until the first batch landed. A run that has counted nothing answers `0/0`
+with no `X-Subtitle-Pending-From`, and no frontier reads as "not behind" (`trailing`, `caughtUp`).
+That is right for a run the player merely finds in that state and wrong for one the viewer has
+just started, where nothing counted means nothing translated at the spot they are watching.
+
+- `startTranslationProgress` opens the **same hold window a seek opens** (`seekHoldPendingRef`,
+  `seekSettledAtRef`) when the film is playing, the tab is visible and the viewer is not already
+  waiting; during a session seek (the resume prompt's answer, then the pill) the window is stamped
+  when the seek settles. A paused film holds nothing.
+- While `startHoldRef` is set, `nothingCountedYet(p)` (`0/0`, not final) counts as **behind**: for
+  the hold decision, for an ongoing wait, and for the passive banner. The first counted answer
+  clears the flag and the frontier speaks for itself. The banner carries no cue count then
+  (`bannerRemaining` → the `…Short` copy).
+- Bounds are the seek's: the hold is taken within `seekWatchMs` (8 s) or not at all, and lasts at
+  most `seekHoldMaxMs` / `seekHoldMaxMsFile`; `subtitle-translate-wait {auto: true}` reports it.
+- Side effect, the same one a seek has: run-mismatch counting is suspended while the window is
+  open, so a persistent mismatch is noticed up to 8 s later on a run started over a playing film.
+- The tests about the passive banner, the manual **Wait** and the run mismatch start their run
+  with `pickPausedThenPlay` (track chosen before play) — a run that is behind, not one just started.
 
 ## Deploy order
 
