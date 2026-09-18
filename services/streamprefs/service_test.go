@@ -26,6 +26,11 @@ func TestIsAdultResourceNilSafe(t *testing.T) {
 	if (&Service{}).IsAdultResource(context.Background(), "abc") {
 		t.Fatal("no DB → not adult")
 	}
+	// No metadata store configured is an answer ("nothing to know"), not
+	// a failed lookup: the hint gate must not read it as unknown.
+	if adult, known := (&Service{}).AdultResource(context.Background(), "abc"); adult || !known {
+		t.Fatalf("no store configured: want not adult and known, got adult=%v known=%v", adult, known)
+	}
 }
 
 func TestCastNamesFromCredits(t *testing.T) {

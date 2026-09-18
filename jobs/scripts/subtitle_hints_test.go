@@ -1,6 +1,7 @@
 package scripts
 
 import (
+	"context"
 	"testing"
 
 	ra "github.com/webtor-io/rest-api/services"
@@ -140,5 +141,30 @@ func TestSubtitleHintsAdultSendsNothingDerived(t *testing.T) {
 	h = subtitleHints("tt3333333", nil, "", &ra.ListItem{PathStr: "/Show/S01E03.mkv"}, nil, true)
 	if h.ImdbID != "tt3333333" || h.Season != 1 || h.Episode != 3 {
 		t.Fatalf("an explicit caller id is the caller's business: %+v", h)
+	}
+}
+
+type fakeAdultReader struct{ adult, known bool }
+
+func (f fakeAdultReader) AdultResource(context.Context, string) (bool, bool) {
+	return f.adult, f.known
+}
+
+// The two consumers of the adult bit read a failed lookup differently: the
+// AI track as not adult, the OpenSubtitles hint as a reason to stay silent.
+func TestReadAdultBitWithholdsHintWhenUnknown(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		r                       fakeAdultReader
+		wantAdult, wantWithheld bool
+	}{
+		{"clean and known", fakeAdultReader{false, true}, false, false},
+		{"adult", fakeAdultReader{true, true}, true, true},
+		{"lookup failed", fakeAdultReader{false, false}, false, true},
+	} {
+		adult, withheld := readAdultBit(context.Background(), tc.r, "abc")
+		if adult != tc.wantAdult || withheld != tc.wantWithheld {
+			t.Fatalf("%s: adult=%v withheld=%v", tc.name, adult, withheld)
+		}
 	}
 }

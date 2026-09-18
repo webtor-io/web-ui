@@ -1,13 +1,34 @@
 package scripts
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/enrich"
 )
+
+// adultReader is the one question readAdultBit asks of streamprefs.
+type adultReader interface {
+	AdultResource(ctx context.Context, resourceID string) (adult bool, known bool)
+}
+
+// readAdultBit reads the resource's adult bit once for its two consumers,
+// which take a failed lookup differently. adult is the AI track's answer:
+// a DB error reads as not adult (spec decision 13 -- the flag only removes
+// a capability). hintWithheld is the OpenSubtitles hint's: adult, or not
+// known -- the hint names the title to a third party, and a lookup that
+// timed out is not permission to. Bounded: a slow metadata read must not
+// hold up the stream page.
+func readAdultBit(ctx context.Context, r adultReader, resourceID string) (adult bool, hintWithheld bool) {
+	aCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	adult, known := r.AdultResource(aCtx, resourceID)
+	return adult, adult || !known
+}
 
 // subtitleHints decides what to tell video-info about the file. An
 // explicit imdb id from embed settings wins (the embedding site knows

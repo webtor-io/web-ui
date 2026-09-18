@@ -1,0 +1,10 @@
+{
+  "input": "Open.Season.2.2008.1080p.BluRay.x264",
+  "want": {
+    "title": "Open Season 2",
+    "year": 2008,
+    "resolution": "1080p",
+    "quality": "BluRay",
+    "codec": "x264"
+  }
+}

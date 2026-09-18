@@ -1,0 +1,6 @@
+{
+  "input": "Season 1",
+  "want": {
+    "season": 1
+  }
+}

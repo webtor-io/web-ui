@@ -356,14 +356,18 @@ var fieldParsers = FieldParsers{
 	// suppressed for the whole layout. "Season 1 Episode 3" inline already
 	// worked by luck: the `\se` arm read the "1 E" seam. The Cyrillic arm
 	// has no \b — Go's \b is ASCII, and а word boundary before "С"
-	// never fires; digits after the word keep it from eating prose.
+	// never fires; digits after the word keep it from eating prose, and
+	// the trailing non-digit keeps "сезон 2024" from reading as season 20.
+	// Both word forms are anchored to the start of the segment: the gap
+	// they close is the folder, and mid-name the word is as often a title
+	// ("Open Season 2 (2008)" parsed as the show "Open", season 2).
 	{FieldTypeSeason, NewRegexpMatcher(
 		`(?i)\b(s(\d{1,2})\s*[-–—]\s*s\d{1,2})\b`,
 		`(?i)(s?([0-9]{1,2}))[ex]`,
 		`(?i)(s?([0-9]{1,2}))\se`,
 		`(?i)\b(s([0-9]{1,2}))\b`,
-		`(?i)\b(season[\s._-]*([0-9]{1,2}))\b`,
-		`(?i)(сезон[\s._-]*([0-9]{1,2}))`,
+		`(?i)^\s*(season[\s._-]*([0-9]{1,2}))\b`,
+		`(?i)^\s*(сезон[\s._-]*([0-9]{1,2}))(?:[^0-9]|$)`,
 	), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
 	// Anime release-segment kind tag — runs BEFORE Episode so the Kind

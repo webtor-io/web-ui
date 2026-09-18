@@ -446,25 +446,24 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// Subtitle-ladder inputs. The feature flag and the embed widget are the
 	// master switch (subtitleOptsFor): with either in force the render must
 	// be byte-for-byte phase 1, so none of the reads that feed the ladder
-	// happen at all -- no profile language, no resource_metadata, no TMDB
-	// credits. On a deployment with the flag off this is three DB round
-	// trips per stream page that never run.
+	// happen at all -- no profile language, no TMDB credits. On a
+	// deployment with the flag off this is two DB round trips per stream
+	// page that never run. (The adult bit is not one of them: see below.)
 	translateEnabled, isEmbed := s.prefs.TranslateEnabled(), dsd != nil
 	var preferred string
 	var castNames []string
-	var adult bool
-	if !isEmbed {
-		// Read for every site stream, not only when translation is on: the
-		// imdb hint below names what the viewer is watching to a third
-		// party (OpenSubtitles), and an adult resource must not be named
-		// there (owner ruling 2026-09-18) — the same bit that hides the AI
-		// track and blurs the poster. Bounded like CastNames below: a slow
-		// metadata read must not hold up the stream page, and a miss reads
-		// as not-adult anyway.
-		aCtx, aCancel := context.WithTimeout(ctx, 3*time.Second)
-		adult = s.prefs.IsAdultResource(aCtx, resourceID)
-		aCancel()
-	}
+	// Read for every stream, embeds and flag-off deployments included: the
+	// imdb hint below names what the viewer is watching to a third party
+	// (OpenSubtitles), and an adult resource must not be named there (owner
+	// ruling 2026-09-18) — the same bit that hides the AI track and blurs
+	// the poster. The derived hint is built for embeds too, so the embed
+	// switch does not cover this read. Bounded like CastNames below: a
+	// slow metadata read must not hold up the stream page. The two
+	// consumers read a failed lookup differently: the AI track treats it
+	// as not adult (spec decision 13), the hint as adult — not naming a
+	// film costs a worse subtitle match, naming the wrong one is not
+	// undoable.
+	adult, hintWithheld := readAdultBit(ctx, s.prefs, resourceID)
 	if translateEnabled && !isEmbed {
 		preferred = s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
 		if enrichedMD != nil {
@@ -652,12 +651,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
 				var videoRef *models.VideoRef
-				if s.enricher != nil && !adult {
+				if s.enricher != nil && !hintWithheld {
 					refCtx, refCancel := context.WithTimeout(ctx, 5*time.Second)
 					videoRef, _ = s.enricher.ResolveVideoRef(refCtx, resourceID, exportResponse.Source.PathStr)
 					refCancel()
 				}
-				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item, videoRef, adult))
+				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item, videoRef, hintWithheld))
 				subs, notReady, err := fetchOpenSubtitles(osCtx, s.api.GetOpenSubtitles, subsURL)
 				// notReady survives into the render even though err is
 				// set: the page goes out without OpenSubtitles tracks and

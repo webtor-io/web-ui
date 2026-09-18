@@ -1,0 +1,8 @@
+{
+  "input": "Open Season 3 (2010) 720p",
+  "want": {
+    "title": "Open Season 3",
+    "year": 2010,
+    "resolution": "720p"
+  }
+}

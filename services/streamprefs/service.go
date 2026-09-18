@@ -73,19 +73,30 @@ func (s *Service) PreferredContentLang(ctx context.Context, user *auth.User, uiL
 // metadata row yet) and DB errors read as not adult — the flag only
 // ever removes the track, it never grants anything.
 func (s *Service) IsAdultResource(ctx context.Context, resourceID string) bool {
+	adult, _ := s.AdultResource(ctx, resourceID)
+	return adult
+}
+
+// AdultResource is IsAdultResource that keeps "not adult" and "could not
+// find out" apart. The AI track can afford to read a failed lookup as not
+// adult; a caller about to name the resource to a third party cannot.
+// known is true when the answer is the stored one, a missing row and a
+// deployment with no metadata store included; false on a DB error or
+// timeout.
+func (s *Service) AdultResource(ctx context.Context, resourceID string) (adult bool, known bool) {
 	if s == nil || s.pg == nil || resourceID == "" {
-		return false
+		return false, true
 	}
 	db := s.pg.Get()
 	if db == nil {
-		return false
+		return false, false
 	}
 	rm, err := models.GetResourceMetadataByResourceID(ctx, db, resourceID)
 	if err != nil {
 		log.WithError(err).WithField("resource", resourceID).Warn("failed to read resource metadata for subtitle gate")
-		return false
+		return false, false
 	}
-	return rm != nil && rm.IsAdult
+	return rm != nil && rm.IsAdult, true
 }
 
 // CastNames returns up to limit cast names from the TMDB credits stored
