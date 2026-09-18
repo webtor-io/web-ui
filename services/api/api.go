@@ -759,6 +759,13 @@ func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) 
 	defer func(b io.ReadCloser) {
 		_ = b.Close()
 	}(b)
+	// A non-2xx answer is the probe's outcome, not JSON to parse: reading
+	// it as JSON turned every 404/429/502 into "failed to unmarshal
+	// data=404 page not found" and hid the status the caller needed.
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		body, _ := io.ReadAll(io.LimitReader(b, 256))
+		return nil, errors.Errorf("media probe status=%v body=%q", res.StatusCode, strings.TrimSpace(string(body)))
+	}
 	mb := MediaProbe{}
 	data, err := io.ReadAll(b)
 	if err != nil {

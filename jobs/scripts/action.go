@@ -273,6 +273,15 @@ func checkCachedRateLimit(c *web.Context, bitrate int64) (SlowDownloadData, bool
 	return buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate), true
 }
 
+// exportMeta returns an export item's meta, or a zero meta when the item is
+// absent or carries none, so callers never dereference a nil Meta.
+func exportMeta(it ra.ExportItem) ra.ExportMeta {
+	if it.Meta == nil {
+		return ra.ExportMeta{}
+	}
+	return *it.Meta
+}
+
 func contentProbeURL(downloadURL string) string {
 	if i := strings.IndexByte(downloadURL, '?'); i >= 0 {
 		return downloadURL[:i] + "~cp" + downloadURL[i:]
@@ -466,7 +475,14 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	sc.SubtitleOpts = previewAsFree(subtitleOptsFor(translateEnabled, isEmbed, c, s.prefs.FreeForAll(), adult, preferred, castNames), s.debug)
 
-	se := exportResponse.ExportItems["stream"]
+	se, ok := exportResponse.ExportItems["stream"]
+	if !ok {
+		// rest-api omits the stream item for files it cannot stream (no
+		// media format, .vtt). Dereferencing the zero item's Meta was the
+		// nil-pointer panic seen 5-7 times a day through 09.2026.
+		return errors.New("resource has no stream export")
+	}
+	seMeta := exportMeta(se)
 
 	var downloadSpeed float64
 	fileSize := int(exportResponse.Source.Size)
@@ -489,7 +505,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// downloadSpeed.
 	const tailWarmupBytes = 500 * 1024
 	statsURL := exportResponse.ExportItems["torrent_client_stat"].URL
-	effectiveCache := se.Meta.Cache
+	effectiveCache := seMeta.Cache
 	if !effectiveCache {
 		if s.forceSlow {
 			j.Skip(s.t("job.warmingUp"))
@@ -516,11 +532,24 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	mp, probeErr := s.api.GetMediaProbe(mpCtx, probeURL)
 	if probeErr != nil {
 		if mpItem, ok := exportResponse.ExportItems["media_probe"]; ok {
-			mp, probeErr = s.api.GetMediaProbe(mpCtx, mpItem.URL)
+			// Second chance through rest-api's media_probe URL, on its own
+			// deadline (the shared one may be spent by the first try). The
+			// first error is the real cause and is kept: letting the
+			// fallback overwrite it meant every probe failure was logged as
+			// the fallback's own text — "404 page not found" for the six
+			// months that route was dead.
+			fbCtx, fbCancel := context.WithTimeout(ctx, 30*time.Second)
+			fbMp, fbErr := s.api.GetMediaProbe(fbCtx, mpItem.URL)
+			fbCancel()
+			if fbErr == nil {
+				mp, probeErr = fbMp, nil
+			} else {
+				probeErr = errors.Wrapf(probeErr, "media_probe fallback also failed (%v)", fbErr)
+			}
 		}
 	}
 	if probeErr != nil {
-		if se.Meta.Transcode {
+		if seMeta.Transcode {
 			return errors.Wrap(probeErr, "failed to get probe data")
 		}
 		log.WithError(probeErr).Warn("failed to get content probe")
@@ -571,7 +600,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 
 	// Step 4: Session transcoder (after bandwidth check)
-	if se.Meta.Transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
+	if seMeta.Transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
 		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second)
 		if serr != nil {
 			return errors.Wrap(serr, "failed to buffer session HLS")
@@ -779,7 +808,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	j.Done()
 	de := resp.ExportItems["download"]
 	//url := de.URL
-	if !de.ExportMetaItem.Meta.Cache {
+	if !exportMeta(de).Cache {
 		const downloadHeadWarmup = 1024 * 1024
 		statsURL := resp.ExportItems["torrent_client_stat"].URL
 		fileSize := int(resp.Source.Size)
