@@ -348,11 +348,22 @@ var fieldParsers = FieldParsers{
 	// codec tags like "x264-S0E5" mid-word; the rule lives LAST so the
 	// existing S01E01 / 01x05 forms still win when an episode marker
 	// is present.
+	// The word forms close the "season folder" gap: a pack laid out as
+	// /Show/Season 1/Episode 03.mkv parses the folder as its own segment,
+	// and "Season 1" matched nothing here — the season stayed 0, the
+	// media-type classifier saw an episode with no season, and the
+	// OpenSubtitles hint (which refuses an episode without a season) was
+	// suppressed for the whole layout. "Season 1 Episode 3" inline already
+	// worked by luck: the `\se` arm read the "1 E" seam. The Cyrillic arm
+	// has no \b — Go's \b is ASCII, and а word boundary before "С"
+	// never fires; digits after the word keep it from eating prose.
 	{FieldTypeSeason, NewRegexpMatcher(
 		`(?i)\b(s(\d{1,2})\s*[-–—]\s*s\d{1,2})\b`,
 		`(?i)(s?([0-9]{1,2}))[ex]`,
 		`(?i)(s?([0-9]{1,2}))\se`,
 		`(?i)\b(s([0-9]{1,2}))\b`,
+		`(?i)\b(season[\s._-]*([0-9]{1,2}))\b`,
+		`(?i)(сезон[\s._-]*([0-9]{1,2}))`,
 	), nil},
 	{FieldTypeScene, NewRegexpMatcher(`(?i)(^S([0-9]{2}))`, `(?i)(Scene([0-9]{2}))`), nil},
 	// Anime release-segment kind tag — runs BEFORE Episode so the Kind

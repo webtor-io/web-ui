@@ -1048,8 +1048,8 @@ func (s *Enricher) GetEnrichedResource(ctx context.Context, resourceID string) (
 }
 
 // GetEnrichedResourceForPath is GetEnrichedResource with the content
-// type and, for multi-movie packs, the movie row that belongs to the
-// given file path. ct is "" when nothing is enriched.
+// type and, for multi-movie and multi-series packs, the row that belongs
+// to the given file path. ct is "" when nothing is enriched.
 //
 // Callers that key behaviour to the kind of content (a series' stored
 // tt id is the SHOW's, so it only addresses an episode together with
@@ -1066,12 +1066,25 @@ func (s *Enricher) GetEnrichedResourceForPath(ctx context.Context, resourceID st
 			return md, models.ContentTypeMovie, nil
 		}
 	}
-	if series, err := models.GetSeriesWithMetadataByResourceID(ctx, db, resourceID); err == nil && series != nil {
+	if series, err := models.GetSeriesWithMetadataByResourceIDAndPath(ctx, db, resourceID, pathStr); err == nil && series != nil {
 		if md := series.GetMetadata(); md != nil {
 			return md, models.ContentTypeSeries, nil
 		}
 	}
 	return nil, "", nil
+}
+
+// ResolveVideoRef is the persisted answer to "which show/movie, which
+// season, which episode is this file": models.ResolveVideoFromResourcePath
+// against this enricher's DB. The subtitle hint prefers it to re-parsing
+// the file name — it is the same identity watch history uses, and the
+// episode row carries the season a filename may not.
+func (s *Enricher) ResolveVideoRef(ctx context.Context, resourceID string, pathStr string) (*models.VideoRef, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+	return models.ResolveVideoFromResourcePath(ctx, db, resourceID, pathStr)
 }
 
 // LookupByTitleYear iterates through configured metadata mappers (TMDB, OMDB,

@@ -25,11 +25,16 @@ import (
 //     happens to carry an SxxEyy (release-group quirk, "S01E01" in a
 //     bonus-feature name) must not turn into an episode lookup.
 //
-// Season and episode come from the file path via the same parser
-// enrichment uses.
-func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.ContentType, item *ra.ListItem) api.SubtitleHints {
+// Season and episode come from the persisted enrichment when it has them
+// (ref — the episode row watch history also keys on), and from the file
+// path via the same parser enrichment uses otherwise: the row was written
+// by an earlier parse, so a file enriched before the parser learned a
+// form may carry less than a fresh parse does, and vice versa.
+func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.ContentType, item *ra.ListItem, ref *models.VideoRef) api.SubtitleHints {
 	season, episode := 0, 0
-	if item != nil {
+	if ref != nil && ref.Kind == models.VideoRefKindEpisode && ref.Season > 0 && ref.Episode > 0 {
+		season, episode = int(ref.Season), int(ref.Episode)
+	} else if item != nil {
 		if ti, err := enrich.MakeTorrentInfo(item); err == nil && ti != nil && ti.TorrentInfo != nil {
 			// Both or neither: a lone episode number with no season is
 			// not addressable at OpenSubtitles.
@@ -41,6 +46,21 @@ func subtitleHints(settingsImdbID string, md *models.VideoMetadata, ct models.Co
 
 	if settingsImdbID != "" {
 		return api.SubtitleHints{ImdbID: settingsImdbID, Season: season, Episode: episode}
+	}
+
+	// The identity the ref carries beats the metadata row's: it was
+	// resolved for exactly this file path, while md can be the pack-level
+	// answer.
+	if ref != nil && strings.HasPrefix(ref.VideoID, "tt") {
+		switch ref.Kind {
+		case models.VideoRefKindEpisode:
+			if season == 0 || episode == 0 {
+				return api.SubtitleHints{}
+			}
+			return api.SubtitleHints{ImdbID: ref.VideoID, Season: season, Episode: episode}
+		case models.VideoRefKindMovie:
+			return api.SubtitleHints{ImdbID: ref.VideoID}
+		}
 	}
 
 	if md == nil || !strings.HasPrefix(md.VideoID, "tt") {

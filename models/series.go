@@ -210,6 +210,43 @@ func GetSeriesWithMetadataByResourceID(ctx context.Context, db *pg.DB, resourceI
 	return &s, nil
 }
 
+// GetSeriesWithMetadataByResourceIDAndPath resolves the series that owns
+// the file at pathStr: the one holding an episode row with that path, or
+// the resource's lone series, or nil — never an arbitrary pick. The movie
+// side has worked this way since the multi-movie packs bug
+// (pickMovieRow): one resource can hold several shows, and "no hint beats
+// naming the wrong show" applies to series the same way.
+func GetSeriesWithMetadataByResourceIDAndPath(ctx context.Context, db *pg.DB, resourceID string, pathStr string) (*Series, error) {
+	var all []*Series
+	err := db.Model(&all).
+		Context(ctx).
+		Where("series.resource_id = ?", resourceID).
+		Relation("SeriesMetadata").
+		Relation("Episodes.EpisodeMetadata").
+		Select()
+	if err != nil && !errors.Is(err, pg.ErrNoRows) {
+		return nil, err
+	}
+	return pickSeriesRow(all, pathStr), nil
+}
+
+// pickSeriesRow implements the resolution order documented on
+// GetSeriesWithMetadataByResourceIDAndPath: the series owning an episode
+// at the path, else the lone series, else nil.
+func pickSeriesRow(all []*Series, pathStr string) *Series {
+	for _, s := range all {
+		for _, e := range s.Episodes {
+			if e.Path != nil && *e.Path == pathStr {
+				return s
+			}
+		}
+	}
+	if len(all) == 1 {
+		return all[0]
+	}
+	return nil
+}
+
 func GetSeriesWithEpisodes(ctx context.Context, db *pg.DB, sID uuid.UUID) (*Series, error) {
 	var s Series
 	err := db.Model(&s).

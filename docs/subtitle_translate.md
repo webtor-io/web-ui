@@ -23,6 +23,16 @@ reimplements the order, it only reads `data-rank`.
 | 2    | `ExportTag` / `External` | `sidecar`             | `action.stream.badge.sidecar`  |
 | 3    | `OpenSubtitles`, hash match | `os`               | `action.stream.badge.os`       |
 | 4    | `OpenSubtitles`, imdb match | `os` + hint        | `action.stream.badge.os`       |
+
+The imdb hint sent to video-info (`jobs/scripts/subtitle_hints.go`) prefers the **persisted video
+ref** — `models.ResolveVideoFromResourcePath`, the same episode row watch history keys on: the
+show's tt id with the stored season/episode for exactly this file — and falls back to the
+enrichment metadata row plus a fresh parse of the file path. The embed/API `imdbId` still wins
+over both. The series row for a path is picked path-aware (`pickSeriesRow`, mirroring the movie
+side): the show owning an episode at that path, else the lone show, else nothing — a multi-series
+pack must not name the wrong show. Since 2026-09-18 the name parser also reads the word-form
+season folder (`Season 1/`, `Сезон 1/`), the layout that used to lose the season and with it the
+whole hint.
 | 5    | `Translated` (AI)        | `ai`                  | `action.stream.badge.ai`       |
 | 6–8  | reserved (phase 3 whisper takes 6) | —           | —                            |
 | 9    | anything else / "None"   | —                     | —                            |

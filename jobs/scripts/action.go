@@ -615,7 +615,13 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				j.InProgress(s.t("job.loadingSubtitles"))
 				osCtx, osCancel := context.WithTimeout(ctx, 30*time.Second)
 				defer osCancel()
-				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item))
+				var videoRef *models.VideoRef
+				if s.enricher != nil {
+					refCtx, refCancel := context.WithTimeout(ctx, 5*time.Second)
+					videoRef, _ = s.enricher.ResolveVideoRef(refCtx, resourceID, exportResponse.Source.PathStr)
+					refCancel()
+				}
+				subsURL := api.WithSubtitleHints(subtitles.URL, subtitleHints(settings.ImdbID, enrichedMD, enrichedCT, sc.Item, videoRef))
 				subs, notReady, err := fetchOpenSubtitles(osCtx, s.api.GetOpenSubtitles, subsURL)
 				// notReady survives into the render even though err is
 				// set: the page goes out without OpenSubtitles tracks and

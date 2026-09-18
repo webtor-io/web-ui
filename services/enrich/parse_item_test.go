@@ -206,7 +206,10 @@ func TestParseItem_MultiSegmentPath(t *testing.T) {
 			wantTitle:      "Freaks and Geeks",
 			wantEpisode:    18,
 			wantContainer:  "mkv",
-			wantPathTitles: []string{"Freaks and Geeks", "Season 1", "Discos and Dragons"},
+			// "Season 1" used to survive here as a garbage search
+			// candidate; since the parser learned the word form it is a
+			// season (1), not a title.
+			wantPathTitles: []string{"Freaks and Geeks", "Discos and Dragons"},
 		},
 		{
 			// Movie at filesystem root — no parent folder. Title comes
