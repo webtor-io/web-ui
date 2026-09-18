@@ -621,6 +621,8 @@
     "player.subtitleCatchUpWait": "Wachten",
     "player.subtitleCatchUpResume": "Verder kijken",
     "player.subtitleCatchUpDismiss": "Sluiten",
+    "player.subtitleOfferLater": "Niet nu",
+    "player.subtitleOfferNever": "Niet meer aanbieden",
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",

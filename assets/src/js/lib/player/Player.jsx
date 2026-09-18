@@ -25,7 +25,9 @@ import {
     setChipActive,
     expandedLang,
     toggleLangOverflow,
+    readChips,
 } from './track-picker.js';
+import { offerTiming, offerVisible, pickOffer, suppressUpsell, upsellSuppressed } from './subtitle-offer.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { init as initI18n, t, tf } from './i18n';
@@ -811,6 +813,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
         trackHooks.onSubtitleSelect = (el) => {
             manualSubtitleRef.current = true;
+            // The viewer has dealt with subtitles themselves -- in the
+            // picker, or through the pill, which lands here too.
+            setOffer(null);
+            setOfferCard(false);
             // Decided before stopping anything: stopTranslationProgress
             // clears pollingIdRef, which is part of the answer.
             const action = translationActionFor(el);
@@ -1018,6 +1024,68 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (clearWait()) resumePlayback();
         showCatchUp(null);
     }, [clearWait, showCatchUp, resumePlayback]);
+
+    // ---- the on-screen translation offer (subtitle-offer.js) ----------
+    //
+    // Decided once, on the first play: the pill is about "this film has no
+    // subtitles in your language", and that is a property of the page the
+    // server rendered, not something to re-ask on every resume. Reading it
+    // at first play rather than at mount keeps it off a page that never
+    // plays (autoplay blocked, resume prompt up) and gives the mount-time
+    // restore of a saved translation time to make the chip the default --
+    // which withdraws the offer by pickOffer's own rule.
+    const [offer, setOffer] = useState(null);
+    const [offerLingering, setOfferLingering] = useState(false);
+    const [offerCard, setOfferCard] = useState(false);
+    const offerArmedRef = useRef(false);
+    const offerTimerRef = useRef(null);
+
+    const trackOffer = useCallback((name, o, extra) => {
+        if (window.umami) window.umami.track(name, { lang: o.lang, kind: o.kind, ...(extra || {}) });
+    }, []);
+
+    useEffect(() => {
+        if (!isVideo || !state.playing || offerArmedRef.current) return;
+        offerArmedRef.current = true;
+        const modal = findSubtitlesModal(trackContainer);
+        if (!modal) return;
+        const next = pickOffer(readChips(modal));
+        if (!next || !next.label) return;
+        if (next.kind === 'upsell' && upsellSuppressed(offerStorage(), Date.now())) return;
+        setOffer(next);
+        setOfferLingering(true);
+        offerTimerRef.current = setTimeout(() => setOfferLingering(false), offerTiming.lingerMs);
+        trackOffer('subtitle-offer-shown', next);
+    }, [state.playing, isVideo, trackContainer, trackOffer]);
+
+    useEffect(() => () => { if (offerTimerRef.current) clearTimeout(offerTimerRef.current); }, []);
+
+    const handleOfferClick = useCallback(() => {
+        if (!offer) return;
+        trackOffer('subtitle-offer-click', offer);
+        if (offer.kind === 'upsell') {
+            setOfferCard((open) => !open);
+            return;
+        }
+        // Taking the offer IS pressing the chip: the same delegated handler,
+        // so the same PUT, the same marks, the same poll. The chip is asked
+        // again whether it is still on offer -- an audio switch or a manual
+        // pick may have spent it since the pill was decided.
+        const modal = findSubtitlesModal(trackContainer);
+        const el = modal ? findSubtitleItem(modal, offer.id) : null;
+        setOffer(null);
+        if (el && el.getAttribute('data-offered') === 'true') el.click();
+    }, [offer, trackContainer, trackOffer]);
+
+    // how: 'close' (the ×), 'later' (Not now), 'never' (Don't offer).
+    // Only the upsell is remembered; see subtitle-offer.js.
+    const handleOfferDismiss = useCallback((how) => {
+        if (!offer) return;
+        if (offer.kind === 'upsell') suppressUpsell(offerStorage(), Date.now(), { never: how === 'never' });
+        trackOffer('subtitle-offer-dismiss', offer, { how });
+        setOffer(null);
+        setOfferCard(false);
+    }, [offer, trackOffer]);
 
     // Seek handler (session or direct)
     const handleSeek = useCallback((time) => {
@@ -1358,6 +1426,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (e.target.closest('.wt-player-controls')) return;
         if (e.target.closest('.wt-resume-prompt')) return;
         if (e.target.closest('.wt-catchup')) return;
+        if (e.target.closest('.wt-offer-card')) return;
         state.togglePlay();
         resetHideTimer();
     }, [isVideo, state.togglePlay]);
@@ -1440,6 +1509,43 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         aria-label={t('player.subtitleCatchUpDismiss')} onClick={handleDismissCatchUp}>×</button>
                 </div>
             )}
+
+            {/* No subtitles in the viewer's language: the picker's offer,
+                brought to the picture. Same slot as the catch-up pill, which
+                wins it (offerVisible). */}
+            {isVideo && offerVisible({ offer, lingering: offerLingering, controlsVisible, cardOpen: offerCard, catchUp }) && (
+                <div class="wt-catchup wt-offer" data-kind={offer.kind}
+                     onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <button type="button" class="wt-offer-main" onClick={handleOfferClick}
+                        aria-expanded={offer.kind === 'upsell' ? String(offerCard) : undefined}>
+                        <span class="wt-offer-mark" aria-hidden="true">✦ AI</span>
+                        <span class="wt-catchup-text">{offer.label}</span>
+                        {offer.kind === 'upsell' && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        )}
+                    </button>
+                    <button type="button" class="wt-catchup-close"
+                        aria-label={t('player.subtitleCatchUpDismiss')} onClick={() => handleOfferDismiss('close')}>×</button>
+                </div>
+            )}
+            {isVideo && offer && offer.kind === 'upsell' && offerCard && !catchUp && (() => {
+                const card = readUpsellCard(findSubtitlesModal(trackContainer));
+                return (
+                    <div class="wt-offer-card" role="dialog" aria-label={offer.label}
+                         onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                        <p class="wt-offer-card-text">{card.text}</p>
+                        {card.href && (
+                            <a class="wt-offer-card-cta" href={card.href} target="_blank" rel="noopener"
+                               data-umami-event="donate-subtitle-translate" data-umami-event-tier={card.tier}
+                               data-umami-event-source="player">{card.cta}</a>
+                        )}
+                        <div class="wt-offer-card-row">
+                            <button type="button" class="wt-offer-card-link" onClick={() => handleOfferDismiss('later')}>{t('player.subtitleOfferLater')}</button>
+                            <button type="button" class="wt-offer-card-link" onClick={() => handleOfferDismiss('never')}>{t('player.subtitleOfferNever')}</button>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Loading spinner (only when playing + buffering, or seeking) */}
             {showControls && isVideo && (sessionSeeking || (state.playing && state.loading)) && (
@@ -1738,6 +1844,29 @@ export function setSubtitlesOff(container, modal, off) {
 function suggestedSubtitleID(modal) {
     const el = modal && modal.querySelector('.subtitle[data-suggested="true"]');
     return el ? (el.getAttribute('data-id') || '') : '';
+}
+
+// offerStorage: merely touching window.localStorage throws in a sandboxed
+// frame or with site data blocked; subtitle-offer.js treats null as "no
+// memory".
+function offerStorage() {
+    try { return window.localStorage; } catch (e) { return null; }
+}
+
+// readUpsellCard takes the upsell's words from the picker's own card
+// (#translate-cta): one sentence, one CTA, one /donate link with the
+// language prefix, all rendered by the server -- so the pill's card and the
+// picker's can never disagree, and no locale carries the sentence twice.
+function readUpsellCard(modal) {
+    const box = modal ? modal.querySelector('#translate-cta') : null;
+    const a = box ? box.querySelector('a[href]') : null;
+    const text = box ? box.querySelector('div') : null;
+    return {
+        text: text ? text.textContent.trim() : '',
+        cta: a ? a.textContent.trim() : '',
+        href: a ? a.getAttribute('href') : '',
+        tier: a ? a.getAttribute('data-umami-event-tier') || '' : '',
+    };
 }
 
 function findSubtitlesModal(container) {

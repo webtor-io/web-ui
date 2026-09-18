@@ -103,6 +103,14 @@ type ListItem struct {
 	// cannot run it, so it is not an action on offer but an upsell, and the
 	// chip keeps its old name-plus-lock shape.
 	Offered bool
+	// Upsell is Offered seen from a free account: the locked translation the
+	// ladder would have offered had the viewer been able to run it. Locked
+	// alone does not say that -- the locked item is appended whenever the
+	// preferred language has no human track, including when the audio is
+	// already in that language and nobody needs subtitles. Rendered as
+	// data-upsell; the player's on-screen offer reads it, the picker does
+	// not (the chip keeps its name-plus-lock shape either way).
+	Upsell bool
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -729,7 +737,8 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 				// embed's own track is read the same way the ladder reads
 				// it below.
 				if lis[i].ID == "none" {
-					if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx); p > 0 && lis[p].Provider == "Translated" {
+					markUpsell(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx, true))
+					if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false); p > 0 && lis[p].Provider == "Translated" {
 						// Same split as below: an offer, never the switch's
 						// answer. What the switch restores is decided by
 						// offSuggestion once the defaults are settled.
@@ -747,7 +756,8 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 			}
 		}
 	}
-	pick := s.ladderPick(lis, ud, audioLang, opts, humanIdx)
+	markUpsell(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx, true))
+	pick := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false)
 	// A translation is never turned on for the viewer (owner, 2026-09-16):
 	// starting one spends tokens, so it takes an explicit click. Where the
 	// ladder chose it, the item is marked Offered -- the picker draws that
@@ -770,7 +780,11 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 // humanIdx is bestByLadder's verdict for the preferred language, passed in
 // because applyLadder computes it before appending the AI item (appending
 // never shifts an existing index).
-func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts, humanIdx int) int {
+//
+// admitLocked asks the same question for a viewer who could run the
+// translation: a locked item answers too. Only markUpsell reads that answer;
+// nothing is ever selected or offered from it.
+func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audioLang string, opts SubtitleOpts, humanIdx int, admitLocked bool) int {
 	// An embed that asked for a specific track (ExternalData) has already
 	// marked it Default; that is the caller's explicit choice, and the
 	// ladder neither overrides it nor adds a second default to the list.
@@ -797,7 +811,7 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 		// refuses to start a translation without a click. A locked item is
 		// not even offered -- it cannot be turned on, and the lock plus its
 		// CTA already say so.
-		if lis[i].Provider == "Translated" && !lis[i].Locked {
+		if lis[i].Provider == "Translated" && (admitLocked || !lis[i].Locked) {
 			return i
 		}
 	}
@@ -824,6 +838,15 @@ func markOffered(lis []ListItem, i int) {
 		return
 	}
 	lis[i].Offered = true
+}
+
+// markUpsell marks the locked translation the ladder would have offered.
+// An unlocked one is Offered instead, never both.
+func markUpsell(lis []ListItem, i int) {
+	if i < 0 || i >= len(lis) || lis[i].Provider != "Translated" || !lis[i].Locked {
+		return
+	}
+	lis[i].Upsell = true
 }
 
 // markSuggested marks the item the picker would turn on. "None" is never

@@ -2390,3 +2390,133 @@ test('a seek answer whose body never completes does not lock seeking', { timeout
     assert.deepEqual(offsets, [120], 'the stalled body is abandoned and the quantized fallback applies');
     assert.equal(seeker.isSeeking(), false, 'and the seek completes');
 });
+
+// ---- the on-screen translation offer -----------------------------------
+//
+// The pill is the picker's offer brought to the picture (subtitle-offer.js).
+// These mount the real component: what is under test is the chain from
+// "playback started" to a pill, and from a click on it to the same run a
+// click on the chip starts.
+
+const offerPill = (p) => p.container.querySelector('.wt-offer');
+const offerCard = (p) => p.container.querySelector('.wt-offer-card');
+const startPlayback = async (p) => {
+    p.video.paused = false;
+    p.video.dispatchEvent(new dom.window.Event('play'));
+    await settle();
+};
+// The free-viewer render of the AI chip, as helper.go marks it.
+const lockChip = (p, { upsell = true } = {}) => {
+    const ai = p.chip('tr-pt');
+    ai.setAttribute('data-locked', 'true');
+    ai.removeAttribute('data-src');
+    ai.removeAttribute('data-offered');
+    if (upsell) ai.setAttribute('data-upsell', 'true');
+};
+const clearOfferMemory = () => { try { window.localStorage.clear(); } catch (e) { /* none */ } };
+
+test('the offer appears when playback starts, and taking it is pressing the chip', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? progressResponse('0/0')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    assert.equal(offerPill(p), null, 'nothing is offered on a page that has not played');
+
+    await startPlayback(p);
+    const pill = offerPill(p);
+    assert.ok(pill, 'the fixture offers a translation, so the pill is up');
+    assert.equal(pill.dataset.kind, 'start');
+    assert.ok(p.events.some((e) => e.name === 'subtitle-offer-shown' && e.data.kind === 'start'));
+
+    click(pill.querySelector('.wt-offer-main'));
+    await settle();
+
+    const ai = p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]');
+    assert.ok(active(ai), 'the chip took the mark');
+    assert.equal(p.puts().length, 1, 'and the choice was saved, as a chip click saves it');
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 1, 'one run started');
+    assert.equal(offerPill(p), null, 'an offer taken is an offer spent');
+});
+
+test('picking a track in the picker withdraws the offer', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    await startPlayback(p);
+    assert.ok(offerPill(p));
+    const other = Array.from(p.container.querySelectorAll('#subtitle-tracks .subtitle[data-id]'))
+        .find((el) => el.getAttribute('data-id') !== 'none' && el.getAttribute('data-provider') !== 'Translated');
+    assert.ok(other, 'the fixture must carry a human track');
+    click(other);
+    await settle();
+    assert.equal(offerPill(p), null);
+});
+
+test('the × on a start offer is for this page only', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    await startPlayback(p);
+    click(offerPill(p).querySelector('.wt-catchup-close'));
+    await settle();
+    assert.equal(offerPill(p), null);
+    assert.equal(window.localStorage.getItem('wt-subtitle-offer'), null, 'nothing is remembered about an action the viewer can take');
+});
+
+test('a free viewer gets the upsell: a card, a CTA, and a way to never see it again', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer((page) => lockChip(page));
+    await startPlayback(p);
+    const pill = offerPill(p);
+    assert.ok(pill);
+    assert.equal(pill.dataset.kind, 'upsell');
+    assert.equal(offerCard(p), null, 'the card waits for a click');
+
+    click(pill.querySelector('.wt-offer-main'));
+    await settle();
+    const card = offerCard(p);
+    assert.ok(card);
+    const cta = card.querySelector('a.wt-offer-card-cta');
+    assert.ok(cta.getAttribute('href').endsWith('/donate'), 'the picker’s own link');
+    assert.equal(cta.getAttribute('target'), '_blank', 'paying must not cost the viewer the film');
+    assert.equal(p.puts().length, 0, 'nothing was selected');
+    assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-start').length, 0, 'and no run starts');
+
+    const never = Array.from(card.querySelectorAll('.wt-offer-card-link')).find((b) => b.textContent === 'player.subtitleOfferNever');
+    click(never);
+    await settle();
+    assert.equal(offerPill(p), null);
+    assert.equal(offerCard(p), null);
+    assert.deepEqual(JSON.parse(window.localStorage.getItem('wt-subtitle-offer')), { never: true });
+
+    // The next film: same viewer, same state of the list.
+    destroyPlayer();
+    const again = await mountPlayer((page) => lockChip(page));
+    await startPlayback(again);
+    assert.equal(offerPill(again), null, 'asked not to be offered, not offered');
+});
+
+test('the × on the upsell is thirty days, not forever', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer((page) => lockChip(page));
+    await startPlayback(p);
+    const before = Date.now();
+    click(offerPill(p).querySelector('.wt-catchup-close'));
+    await settle();
+    const saved = JSON.parse(window.localStorage.getItem('wt-subtitle-offer'));
+    assert.equal(saved.never, undefined);
+    const days = (saved.until - before) / 86400000;
+    assert.ok(days > 29.9 && days < 30.1, `until is ${days} days out`);
+});
+
+test('a locked translation the ladder did not want is not pitched on screen', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer((page) => lockChip(page, { upsell: false }));
+    await startPlayback(p);
+    assert.equal(offerPill(p), null);
+});

@@ -313,6 +313,11 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		// I3: a locked translation is an upsell, not an action on offer, so
 		// its chip is unchanged — the language name, not the verb.
 		`title="Portuguese · AI">Portuguese · AI<`,
+		// ...and the ladder would have offered it (foreign audio, nothing in
+		// Portuguese), so the player may pitch it on screen: the mark, and
+		// the sentence the pill shows.
+		`data-upsell="true"`,
+		`data-offer-label="action.stream.translate.action`,
 		// The redesign's own contract: one flat container for the tracks, a
 		// language row above it, and the codes the chips are read by.
 		`id="subtitle-tracks"`,
@@ -356,8 +361,11 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	for _, gone := range []string{
 		`id="embedded"`, `id="opensubtitles"`, `label for="opensubtitles"`, `label for="my-subtitles"`,
 		`aria-owns=`, `role="tab"`, `aria-selected=`, `🔒`,
-		// The locked chip carries neither the offer's outline nor its verb.
-		`chip-offered`, `data-offered`, `action.stream.translate.action`,
+		// The locked chip carries neither the offer's outline nor its verb
+		// as something drawn: the verb spans are not rendered. The sentence
+		// itself does travel, in data-offer-label, for the player's
+		// on-screen upsell (asserted above).
+		`chip-offered`, `data-offered`, `class="ai-action`,
 		// The Off chip and its label: the switch on the heading replaced
 		// both, and action.stream.off was dropped from every locale.
 		`action.stream.off`,

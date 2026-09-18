@@ -759,6 +759,100 @@ video::cue {
     color: rgba(255, 255, 255, 0.8);
 }
 
+/* The translation offer: the catch-up pill's slot and shape, but the
+   sentence itself is the button. */
+.wt-offer {
+    padding: 0 8px 0 0;
+    border: 1px solid rgba(232, 67, 147, 0.5);
+}
+.wt-offer-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 4px 7px 12px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.wt-offer-main:hover .wt-catchup-text {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.wt-offer-mark {
+    flex: none;
+    color: #fd79a8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.wt-offer svg {
+    color: rgba(255, 255, 255, 0.6);
+}
+/* Touch: the × is the only way out, so it gets a real target. */
+@media (hover: none) {
+    .wt-offer .wt-catchup-close {
+        padding: 8px 6px;
+        font-size: 18px;
+    }
+}
+
+.wt-offer-card {
+    position: absolute;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 41;
+    width: min(320px, calc(100% - 24px));
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: rgba(15, 15, 25, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.wt-offer-card-text {
+    margin: 0 0 10px;
+}
+.wt-offer-card-cta {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #e84393, #6c5ce7);
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+}
+.wt-offer-card-cta:hover {
+    filter: brightness(1.1);
+}
+.wt-offer-card-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+}
+.wt-offer-card-link {
+    padding: 4px 0;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.6);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+.wt-offer-card-link:hover {
+    color: #fff;
+}
+
 /* Logo/download overlay (ads) */
 .wt-player-logo {
     position: absolute;

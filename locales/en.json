@@ -679,6 +679,8 @@
     "player.subtitleCatchUpWait": "Wait for it",
     "player.subtitleCatchUpResume": "Keep watching",
     "player.subtitleCatchUpDismiss": "Dismiss",
+    "player.subtitleOfferLater": "Not now",
+    "player.subtitleOfferNever": "Don’t offer again",
     "job.retrievingData": "retrieving resource data",
     "job.retrievingStreamUrl": "retrieving stream url",
     "job.probingMedia": "probing content media info",

@@ -90,8 +90,10 @@ feature is on and this is not an embed — see *Gating and flags*):
    forced track in the preferred language turns on by default (labeled "signs only"), else "None".
    Unknown audio language counts as "needed".
 4. **Ladder for the preferred language.** Otherwise, the best human track (ranks 0–4) in the
-   preferred language wins; failing that, if translation is offered (`Translate=true`,
-   `Paid=true`), the `Translated` item becomes default instead — never a `Locked` one.
+   preferred language wins. Failing that, the `Translated` item is the ladder's answer — but
+   **it is never turned on for the viewer** (owner, 2026-09-16: a run spends tokens, so it takes
+   an explicit click). An unlocked item is marked `Offered`, a locked one `Upsell` (see *The
+   on-screen offer*), and the phase-1 selection decides what actually plays.
 5. **Phase-1 fallback on a ladder miss.** If the preferred language yields nothing activatable
    (NSFW, free viewer facing a locked item, or the language is outside
    `stremio.LanguageByCode`), `applyLadder` falls back to the old phase-1 selection
@@ -630,6 +632,39 @@ trip" / cache-key section).
   mount-time restore of a translation saved in an earlier session. See "Picker behaviour". The
   spec's old "starts 5 seconds into viewing" is superseded by decision 14.
 
+## The on-screen offer (`subtitle-offer.js`)
+
+The picker's offer brought to the picture: a pill in the catch-up pill's slot (top centre,
+`.wt-catchup.wt-offer`), so a viewer who never opens the subtitles dialog still learns that the
+film can be translated. Owner's request of 2026-09-18.
+
+- **The server decides whether there is an offer; the pill only reads it.** `pickOffer(readChips())`
+  returns `start` for a chip marked `Offered`, `upsell` for a `Locked` chip marked `Upsell`. Both
+  go through `offerNeedsHint`'s rival rule (nothing else activatable in that language). Every
+  existing gate is inherited through those two marks: the audio-language rule, NSFW, embeds
+  (no preferred language, no ladder), a language the service does not know, the master flag,
+  `SUBTITLE_TRANSLATE_FREE`. No tier is read on the client.
+- **`Upsell` (helper.go) is `Offered` seen from a free account.** `Locked` alone is not enough:
+  the locked item is appended whenever the preferred language has no human track, including when
+  the audio is already in that language. `ladderPick(..., admitLocked=true)` asks the ladder the
+  same question as if the viewer could run the translation; only `markUpsell` reads that answer.
+  Rendered as `data-upsell`. The sentence the pill shows ("Translate to Portuguese", localized)
+  travels as `data-offer-label` on any chip that is `Offered` or `Upsell`.
+- **When.** Decided once, on the first `play`. Up for `offerTiming.lingerMs` (10 s), afterwards
+  only together with the controls. The catch-up pill wins the slot (`offerVisible`). A subtitle
+  choice made anywhere (`onSubtitleSelect`) withdraws the offer.
+- **`start`.** A click on the pill is `el.click()` on the chip: the same delegated handler, PUT,
+  marks and poll. The × hides it for this page only — it is an action the viewer can take, so
+  nothing is remembered.
+- **`upsell`.** A click opens `.wt-offer-card` without pausing the film: the sentence and the
+  `/donate` link are read from the picker's own `#translate-cta` (`readUpsellCard`; the link
+  opens in a new tab and reports `donate-subtitle-translate` with `source=player`), plus **Not
+  now** and **Don't offer again**. The × and **Not now** store `{until: now + 30 d}`, **Don't
+  offer again** stores `{never: true}`, both under `localStorage['wt-subtitle-offer']` — per
+  browser, across all films. Storage that throws reads as "not suppressed".
+- **Not covered by tests:** the 10 s linger timer against real controls auto-hide, fullscreen,
+  and the hand-over to the catch-up pill right after a `start` click (first HEAD is 3 s out).
+
 ## Deploy order
 
 Three things dated "2026-09-16" here are **client-side halves of contracts the other services had
@@ -659,7 +694,10 @@ deploys: they are measuring the deploy, not the traffic.
 | `subtitle-translate-wait` | `lang`, `behind`, `auto` | A wait started: the viewer pressed **Wait for it** (`auto: false`), or a seek landed on untranslated film and held playback (`auto: true`). `behind` = `round(playhead - pendingFrom)` in seconds at that moment (`0` when the frontier was unknown). |
 | `subtitle-translate-wait-done` | `lang`, `seconds`, `auto`, `capped` | The wait ended by itself and playback resumed: the run got `CATCHUP_CLEAR_MARGIN_S` (5 s) ahead of the playhead (`capped: false`), or a seek's hold hit `catchUpTiming.seekHoldMaxMs` with the run still behind (`capped: true`, only ever with `auto: true`). `seconds` = wall time waited, rounded to 0.1. A wait the viewer ended themselves (play, **Keep watching**, ×) emits nothing, and neither does a run that died while they waited. The share of `auto` waits that end `capped` is the number to watch: it says whether the service reaches a seek point within the cap. |
 | `subtitle-translate-lock-click` | `lang` | Free viewer clicked the locked AI item. |
-| `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`) | CTA inside the lock card. |
+| `donate-subtitle-translate` | (button attrs: `data-umami-event-tier=free\|anon`, `data-umami-event-source=player` when clicked in the on-screen card) | CTA inside the lock card, or inside the on-screen upsell card. |
+| `subtitle-offer-shown` | `lang`, `kind` (`start`\|`upsell`) | The on-screen offer was decided and shown, once per page, at first play. `kind` doubles as the tier split: `upsell` is a viewer who cannot run a translation. |
+| `subtitle-offer-click` | `lang`, `kind` | The pill was clicked: a run starts (`start`), or the card opens (`upsell`; fires again if toggled). |
+| `subtitle-offer-dismiss` | `lang`, `kind`, `how` (`close`\|`later`\|`never`) | The viewer closed the offer. For `upsell`, `close`/`later` snooze 30 days and `never` is for good. |
 
 **Telemetry: not comparable across this release.** Do not read a day-over-day or week-over-week
 line through the deploy date. `subtitle-resolved.count` grows for reasons that are not "more
@@ -712,7 +750,7 @@ for the same reason.
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
 | `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
-| `.subtitle` (track) | `#subtitle-tracks` — embedded, sidecar, OpenSubtitles, embed externals, AI (and uploads, see below) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), plus `aria-disabled="true"` on every chip while the block is muted |
+| `.subtitle` (track) | `#subtitle-tracks` — embedded, sidecar, OpenSubtitles, embed externals, AI (and uploads, see below) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), `data-upsell` (`ListItem.Upsell` — the locked translation the ladder would have offered) and `data-offer-label` (the localized "Translate to …" sentence, on an Offered or Upsell chip; read by the on-screen offer), plus `aria-disabled="true"` on every chip while the block is muted |
 | `.subtitle` (MY) | `#subtitle-tracks`, like every other track. On a page load the dialog's own loop renders them (they are `UserSubtitle` items of the same `GetSubtitles` result); on an async reload `templates/partials/action/user_subtitles.html` renders them into `#my-upload-chips` and the client moves them in | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 

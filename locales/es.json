@@ -621,6 +621,8 @@
     "player.subtitleCatchUpWait": "Esperar",
     "player.subtitleCatchUpResume": "Seguir viendo",
     "player.subtitleCatchUpDismiss": "Descartar",
+    "player.subtitleOfferLater": "Ahora no",
+    "player.subtitleOfferNever": "No volver a ofrecer",
     "job.retrievingData": "obteniendo datos del recurso",
     "job.retrievingStreamUrl": "obteniendo URL de reproducción",
     "job.probingMedia": "analizando información multimedia",

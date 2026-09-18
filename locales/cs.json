@@ -631,6 +631,8 @@
     "player.subtitleCatchUpWait": "Počkat",
     "player.subtitleCatchUpResume": "Sledovat dál",
     "player.subtitleCatchUpDismiss": "Skrýt",
+    "player.subtitleOfferLater": "Teď ne",
+    "player.subtitleOfferNever": "Už nenabízet",
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",

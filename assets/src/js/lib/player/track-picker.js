@@ -308,6 +308,8 @@ function chipData(el) {
         isDefault: attr(el, 'data-default') === 'true',
         locked: attr(el, 'data-locked') === 'true',
         offered: attr(el, 'data-offered') === 'true',
+        upsell: attr(el, 'data-upsell') === 'true',
+        offerLabel: attr(el, 'data-offer-label'),
         el,
     };
 }

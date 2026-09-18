@@ -621,6 +621,8 @@
     "player.subtitleCatchUpWait": "Attendre",
     "player.subtitleCatchUpResume": "Continuer à regarder",
     "player.subtitleCatchUpDismiss": "Masquer",
+    "player.subtitleOfferLater": "Pas maintenant",
+    "player.subtitleOfferNever": "Ne plus proposer",
     "job.retrievingData": "récupération des données de la ressource",
     "job.retrievingStreamUrl": "récupération de l'URL du flux",
     "job.probingMedia": "analyse des infos média du contenu",

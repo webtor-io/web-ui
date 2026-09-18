@@ -1562,3 +1562,51 @@ func TestGetSubtitlesCarriesTheMovieHashBool(t *testing.T) {
 		t.Errorf("os-2 rank=%d, want 4", got["os-2"].Rank)
 	}
 }
+
+// TestUpsellMarksTheLockedTranslationTheLadderWouldOffer: the free account's
+// side of Offered. Same fixture as TestOfferedIsNeverLocked -- English audio,
+// Portuguese viewer, no Portuguese track -- so the ladder's answer for a
+// paying viewer is the translation, and the locked item says so.
+func TestUpsellMarksTheLockedTranslationTheLadderWouldOffer(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	tr := byID(items)["tr-pt"]
+	if !tr.Locked {
+		t.Fatalf("fixture must produce a locked AI item, got %+v", tr)
+	}
+	if !tr.Upsell || tr.Offered {
+		t.Fatalf("locked and wanted is an upsell, never an offer: upsell=%v offered=%v", tr.Upsell, tr.Offered)
+	}
+	// The phase-1 selection still decides what plays.
+	if d := defaultID(items); d != "mp-0" {
+		t.Fatalf("default=%s want mp-0", d)
+	}
+}
+
+// TestUpsellNotMarkedWhenAudioIsInThePreferredLanguage: the locked item is
+// still in the list (Locked does not know about the audio), but nobody needs
+// subtitles here, so nothing is pitched on screen.
+func TestUpsellNotMarkedWhenAudioIsInThePreferredLanguage(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("por"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	tr, ok := byID(items)["tr-pt"]
+	if !ok || !tr.Locked {
+		t.Fatalf("fixture must still produce the locked AI item, got %+v", tr)
+	}
+	if tr.Upsell {
+		t.Fatal("audio already in the viewer's language: no upsell")
+	}
+}
+
+// TestUpsellIsNeverSetOnAnUnlockedTranslation: a paying viewer gets Offered.
+func TestUpsellIsNeverSetOnAnUnlockedTranslation(t *testing.T) {
+	tag, os := humanTracks()
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audioProbe("eng"), tag, os, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
+	tr := byID(items)["tr-pt"]
+	if !tr.Offered || tr.Upsell {
+		t.Fatalf("offered=%v upsell=%v", tr.Offered, tr.Upsell)
+	}
+}
