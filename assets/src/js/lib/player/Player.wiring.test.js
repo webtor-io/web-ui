@@ -69,6 +69,14 @@ globalThis.__SUPPORTED_LOCALES__ = ['en'];
 // per-element store here, so a mode written through either is seen through
 // both. `default` seeds "showing", as a browser does.
 const trackModes = new WeakMap();
+// Cues, per element, for the tests that are about cue times (the session
+// offset). Empty unless a test puts some in; `addCue` is what the reload's
+// cue restore calls.
+const trackCues = new WeakMap();
+const cuesOf = (el) => {
+    if (!trackCues.has(el)) trackCues.set(el, []);
+    return trackCues.get(el);
+};
 Object.defineProperty(dom.window.HTMLTrackElement.prototype, 'track', {
     configurable: true,
     get() {
@@ -80,6 +88,8 @@ Object.defineProperty(dom.window.HTMLTrackElement.prototype, 'track', {
                 return el.hasAttribute('default') ? 'showing' : 'disabled';
             },
             set mode(v) { trackModes.set(el, v); },
+            get cues() { return cuesOf(el); },
+            addCue(c) { cuesOf(el).push(c); },
         };
     },
 });
@@ -1699,8 +1709,12 @@ test('a translation at the playhead offers to wait; one that gets ahead stops of
     await pickPausedThenPlay(p, 100);
 
     assert.ok(catchUpBanner(p), 'the run is at the playhead, so it is behind it');
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp');
-    assert.equal(catchUpBanner(p).dataset.remaining, '388', 'total minus done');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort');
+    // No number, on any source (2026-09-18): on a live one `total - done` is
+    // everything the transcoder has emitted minutes ahead of the viewer --
+    // 388 here, ~300 on the owner's screen -- and reads as "never".
+    assert.equal(catchUpBanner(p).dataset.remaining, undefined, 'no cue count on the pill');
+    assert.equal(catchUpBanner(p).querySelector('.wt-catchup-text-short'), null, 'one copy, not a long and a short one');
     assert.ok(catchUpBanner(p).querySelector('.wt-catchup-btn'), 'with the Wait button on it');
 
     // The service gets comfortably ahead (past the 5 s clear margin).
@@ -1748,7 +1762,7 @@ test('Wait pauses the film, keeps the poll awake, and plays again once the run i
 
     assert.equal(log.pause, 1, 'Wait pauses the film');
     assert.equal(p.video.paused, true);
-    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'and the banner says why it is paused');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort', 'and the banner says why it is paused');
     const waits = p.events.filter((e) => e.name === 'subtitle-translate-wait');
     assert.equal(waits.length, 1, 'one event for one press');
     assert.equal(waits[0].data.lang, 'pt');
@@ -1870,7 +1884,7 @@ test('a seek into untranslated film holds playback until the translation is ahea
     await seek();
 
     assert.ok(log.pause > pausesBefore, 'the seek holds playback for its subtitles');
-    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'and says why');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort', 'and says why');
     const waits = events('subtitle-translate-wait');
     assert.equal(waits.length, 1);
     assert.equal(waits[0].data.auto, true, 'told apart from a press of Wait');
@@ -1895,12 +1909,12 @@ test('the hold after a seek is bounded: past the cap the film plays and the bann
 
     pending = '0';
     await seek();
-    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort');
 
     const playsBefore = log.play;
     await wait(600);
     assert.ok(log.play > playsBefore, 'the cap plays the film even though the run is still behind');
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'and the banner goes back to offering Wait');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'and the banner goes back to offering Wait');
     const dones = events('subtitle-translate-wait-done');
     assert.equal(dones.length, 1);
     assert.equal(dones[0].data.capped, true);
@@ -2017,7 +2031,7 @@ test('a run that dies during a seek\u2019s hold plays the film it paused', async
         : { ok: false, status, headers: { get: () => null } }));
     pending = '0';
     await seek();
-    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort');
     const plays = log.play;
     status = 500;
     await wait(POLL_INTERVAL_WINDOW_MS);
@@ -2087,7 +2101,7 @@ test('a hold that runs out while the tab is hidden does not start playback in th
     await wait(600);
     assert.equal(log.play, plays, 'no playback in a hidden tab');
     assert.equal(events('subtitle-translate-wait-done').at(-1).data.capped, true);
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'the banner offers Wait for when the viewer comes back');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'the banner offers Wait for when the viewer comes back');
 
     // Found in re-review: the poll stayed awake behind the paused film, and
     // for a live source that keeps the transcode running for nobody.
@@ -2095,7 +2109,7 @@ test('a hold that runs out while the tab is hidden does not start playback in th
     const atCap = heads();
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.equal(heads(), atCap, 'the poll sleeps while the tab is hidden');
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'and the banner is still there');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'and the banner is still there');
 
     setHidden(false);
     await settle();
@@ -2134,7 +2148,7 @@ test('past the watch window a seek is not held, and the banner takes over', asyn
     pending = '0';
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.equal(events('subtitle-translate-wait').length, 0, 'the window is over: no hold');
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'the ordinary banner says it instead');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'the ordinary banner says it instead');
 });
 
 test('a tab hidden during the seek gets no hold, then or on the way back', async (t) => {
@@ -2808,11 +2822,11 @@ test('pressing play during a wait is pressing Keep watching: the banner says so 
     p.video.currentTime = 100;
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
     await settle();
-    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaiting', 'held: the start hold');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort', 'held: the start hold');
 
     p.video.play();
     await settle();
-    assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'no longer "paused until…" over a film that is playing');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'no longer "paused until…" over a film that is playing');
     assert.equal(catchUpBanner(p).querySelector('.wt-catchup-btn').textContent, 'player.subtitleCatchUpWait');
 });
 
@@ -2910,4 +2924,33 @@ test('a track switched off while its revision loads is switched back on when it 
     el.dispatchEvent(new dom.window.Event('load'));
     await settle();
     assert.equal(p.mode('tr-pt'), 'showing', 'the settle writes the picker’s answer again');
+});
+
+// ---- restored cues carry the CURRENT run's offset -------------------------
+
+test('cues a reload puts back are shifted by the run that is playing now', async (t) => {
+    // The hole behind "the subtitles do not match the dialogue at all" after
+    // a seek (owner, 2026-09-18): an empty revision makes the reload restore
+    // the cue objects it had snapshotted, and those still carry the shift of
+    // the run they were loaded in. The capture 'load' listener cannot help --
+    // it runs BEFORE the restore, over an empty list.
+    // Nothing translated yet, so nothing is swapped in during the mount:
+    // the snapshot under test has to be taken with the stale cue in it.
+    let progress = '0/400';
+    const { p } = await mountSessionRun(t, () => catchUpResponse(progress, '400'), { sessionOffset: 90, startPaused: true });
+    const el = p.video.querySelector('track#tr-pt');
+    // Loaded while the run started at 0: movie time 100 s sat at 100 s.
+    const stale = { startTime: 100, endTime: 103, __absStart: 100, __absEnd: 103 };
+    el.track.cues.length = 0;
+    el.track.addCue(stale);
+    progress = '5/400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=5\b/.test(el.getAttribute('src') || ''), 'fixture: a revision swap is pending');
+
+    // The browser dropped the list while reparsing, and the revision is empty.
+    el.track.cues.length = 0;
+    el.dispatchEvent(new dom.window.Event('load'));
+    await settle();
+    assert.equal(el.track.cues.length, 1, 'the viewer keeps the line they had');
+    assert.equal(el.track.cues[0].startTime, 10, 'at 100 - 90 s: the run that is playing starts at 90');
 });

@@ -139,9 +139,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             }
         };
         applyAll();
+        // The ref, not the closure's `seekOffset`: a seek sets the ref at
+        // once (onSeekOffsetChange) while this effect re-subscribes a render
+        // later, and a <track> that loads in between was shifted by the OLD
+        // run's offset -- minutes off, on a resume from 0.
         const onTrackLoad = (e) => {
             if (e.target.tagName === 'TRACK' && e.target.track) {
-                applyCueOffset(e.target.track, seekOffset);
+                applyCueOffset(e.target.track, seekOffsetRef.current);
             }
         };
         video.addEventListener('load', onTrackLoad, true);
@@ -338,7 +342,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // whether to wait — so no number at all (the copy drops its tail).
     // No count on a run that has counted nothing: "~0 cues to go" over a
     // translation that has not begun says the opposite of what is true.
-    const bannerRemaining = (p) => (p.live && !nothingCountedYet(p) ? remaining(p) : null);
+    //
+    // 2026-09-18: no number on a live source either. Measured on a cold
+    // seek: the transcoder's subtitle playlist grows by 20-25 s of film per
+    // second of wall time, so within ten seconds `total` is hundreds of cues
+    // that lie minutes ahead of the viewer. "~300 cues to go" is true of the
+    // document and says nothing about when THEIR next line arrives -- it
+    // read as "this will never catch up" (owner). The service reports no
+    // count of cues between the viewer and the frontier, so none is shown.
+    // eslint-disable-next-line no-unused-vars
+    const bannerRemaining = (p) => null;
 
     // resumeAfterHold plays the film a seek's hold paused — unless the tab
     // is hidden: then the poll goes to sleep (nothing would put it there
@@ -633,6 +646,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // events the re-assertion effect listens to.
         const reassertSelection = () => {
             if (runID !== runSeqRef.current) return;
+            // Cues put back by the reload (an empty or failed revision
+            // restores the old objects) carry the shift of the run they were
+            // loaded in. After a seek that is another run's offset.
+            if (videoRef.current && videoRef.current.dataset.sessionId) {
+                const el = Array.from(videoRef.current.querySelectorAll('track')).find((t) => t.id === id);
+                if (el && el.track) applyCueOffset(el.track, seekOffsetRef.current);
+            }
             const selection = readSelection(trackContainer || document);
             if (!selection) return;
             const video = videoRef.current;

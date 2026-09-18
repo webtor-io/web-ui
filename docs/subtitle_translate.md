@@ -778,6 +778,42 @@ session seek, which is why it showed up right after resuming.
 - **Not observed in a browser.** The chain was derived from the code and reproduced under jsdom;
   hls.js does not run in the automation's hidden tab, so the real `loadSource` wipe was not seen.
 
+### What a cold seek looks like on the wire (measured 2026-09-18)
+
+Silo S01E09, seek to 433 s on a position nobody had used: the transcoder answered in 837 ms with
+the run's real start, 418.002 s (the keyframe, 15 s before the request), and the subtitle playlist
+of the new run covered the film up to 425 s at 0.8 s of wall time, 452 s at 2.5 s, 505 s at 5 s,
+666 s at 12 s and 1067 s at 25 s — **20–25 s of film per second**. A seek onto a position that
+already has a run (shared FFmpeg runs) lists every segment to the end of the film in the first
+answer. So the transcoder is not what a live translation waits for after a seek; one upstream
+model call is (10–15 s). Three consequences, all applied the same day:
+
+- **No cue count on the pill, on any source.** `total − done` on a live source is everything the
+  transcoder has emitted minutes ahead of the viewer ("~300 cues to go" within ten seconds of a
+  seek), which reads as "never". The service reports no count of cues between the viewer and the
+  frontier, so none is shown; the `…Short` copies are the only ones used. (`player.subtitleCatchUp`
+  / `player.subtitleCatchUpWaiting`, the `%v` copies, are now unused in every locale.)
+- **`seekHoldMaxMs` 10 → 20 s**, the file source's value: a cap below one model call gave up on
+  almost every start.
+- The first cues of **embedded** subtitles going missing after a seek is therefore a client-side
+  matter — hls.js re-selects the subtitle track after `loadSource` and starts loading its
+  fragments later than the video starts. **Not fixed, not investigated further.**
+
+### Cue offsets follow the run that is playing
+
+Two holes, both "the subtitles do not match the dialogue at all" after a seek or a resume:
+
+- The capture `load` listener shifted a freshly loaded `<track>` by the `seekOffset` its effect
+  closure had seen. A seek sets `seekOffsetRef` at once, but the effect re-subscribes a render
+  later; a track that loaded in between was shifted by the OLD run's offset (0 on a resume — cues
+  from the film's opening at the resume point). It now reads the ref.
+- An empty or failed revision makes `reloadSubtitleTrack` put back the cue objects it had
+  snapshotted, and those carry the shift of the run they were loaded in. The capture listener
+  cannot help (it runs before the restore, over an empty list), so `reassertSelection` re-applies
+  `applyCueOffset` to the track after every settle. Pinned by a wiring test (the harness's fake
+  `TextTrack` has cues since this change); the closure race is **not** pinned — it is a
+  render-timing race that jsdom does not reproduce.
+
 ### The viewer's frontier, not the service's (`viewerFrontier`, `needsReload`)
 
 Owner, 2026-09-18: "the subtitles do not keep up", with no pill to say why. The banner was decided

@@ -38,7 +38,13 @@ export const CATCHUP_CLEAR_MARGIN_S = 5;
 //
 // An object rather than constants so the wiring tests can shorten them.
 export const catchUpTiming = {
-    seekHoldMaxMs: 10000,
+    // 20 s for a live source too (was 10 until 2026-09-18). Measured: the
+    // transcoder's subtitle playlist is seconds ahead of the viewer from the
+    // first second after a seek, so reading it is not what a live run waits
+    // for -- one upstream model call is, and that is 10-15 s. A cap below
+    // that gave up on almost every start and played the film without
+    // subtitles, which is the one outcome the hold exists to prevent.
+    seekHoldMaxMs: 20000,
     // A file job retargets only at a batch boundary (seconds of upstream
     // work in flight) and then owes at least one more upstream call for the
     // batch at the new position, so a 10 s cap expired with nothing to show
