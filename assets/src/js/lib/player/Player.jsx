@@ -936,6 +936,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // Resume prompt state — must be declared before useWatchHistory which reads it.
     const [showResumePrompt, setShowResumePrompt] = useState(false);
+    // The viewer has answered the resume prompt (either way). Until then a
+    // film with a saved position is held: see the hold effect below.
+    const [resumeAnswered, setResumeAnswered] = useState(false);
+    // The same fact for the hold's 'play' listener: the answer calls play()
+    // at once, and that event lands before the effect cleanup that would
+    // take the listener off -- state alone would pause the film the viewer
+    // just started.
+    const resumeAnsweredRef = useRef(false);
 
     // Watch history hook (position tracking + resume).
     // `paused` prevents overwriting saved position while resume prompt is open.
@@ -1046,6 +1054,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     useEffect(() => {
         if (!isVideo || !state.playing || offerArmedRef.current) return;
+        // Not under the resume prompt: <video autoplay> can get a moment of
+        // playback in before the saved position arrives, and a pill decided
+        // then would spend its ten seconds behind the prompt's overlay.
+        if (!resumeReady || (resumePosition > 0 && !resumeAnswered)) return;
         offerArmedRef.current = true;
         const modal = findSubtitlesModal(trackContainer);
         if (!modal) return;
@@ -1056,7 +1068,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setOfferLingering(true);
         offerTimerRef.current = setTimeout(() => setOfferLingering(false), offerTiming.lingerMs);
         trackOffer('subtitle-offer-shown', next);
-    }, [state.playing, isVideo, trackContainer, trackOffer]);
+    }, [state.playing, isVideo, trackContainer, trackOffer, resumeReady, resumePosition, resumeAnswered]);
 
     useEffect(() => () => { if (offerTimerRef.current) clearTimeout(offerTimerRef.current); }, []);
 
@@ -1335,11 +1347,36 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
     }, [resumeReady]);
 
+    // A film with a saved position does not start by itself (owner,
+    // 2026-09-18): <video autoplay> would play it from the beginning behind
+    // the prompt, sound included, while the viewer is still choosing. Held
+    // from the moment the saved position is known until the prompt is
+    // answered; 'play' is listened for because autoplay may fire after the
+    // prompt is already up (canplay arrives when the stream is ready, not
+    // when the page is). Either answer starts playback.
+    useEffect(() => {
+        if (!resumeReady || !(resumePosition > 0) || resumeAnswered) return;
+        const video = videoRef.current;
+        if (!video) return;
+        const hold = () => { if (!resumeAnsweredRef.current && !video.paused) video.pause(); };
+        hold();
+        video.addEventListener('play', hold);
+        return () => video.removeEventListener('play', hold);
+    }, [resumeReady, resumePosition, resumeAnswered]);
+
+    const playAfterPrompt = useCallback(() => {
+        const r = videoRef.current ? videoRef.current.play() : null;
+        if (r && r.catch) r.catch(() => {});
+    }, []);
+
     // Handle resume choice
     const handleResume = useCallback(() => {
         setShowResumePrompt(false);
+        resumeAnsweredRef.current = true;
+        setResumeAnswered(true);
         const video = videoRef.current;
         if (!video) return;
+        playAfterPrompt();
         if (isSession && sessionSeekUrl) {
             handleSeek(resumePosition);
         } else {
@@ -1348,15 +1385,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // Save resumed position immediately
         const dur = duration > 0 ? duration : (video.duration || 0);
         if (dur > 0) forceSendPosition(resumePosition, dur);
-    }, [resumePosition, isSession, sessionSeekUrl, handleSeek, duration, forceSendPosition]);
+    }, [resumePosition, isSession, sessionSeekUrl, handleSeek, duration, forceSendPosition, playAfterPrompt]);
 
     const handleStartOver = useCallback(() => {
         setShowResumePrompt(false);
+        resumeAnsweredRef.current = true;
+        setResumeAnswered(true);
+        // Whatever autoplay got through before the hold is not "the
+        // beginning". Session playback has no direct seek, and its head
+        // start is a fraction of a second.
+        if (!isSession && videoRef.current && videoRef.current.currentTime > 0) videoRef.current.currentTime = 0;
+        playAfterPrompt();
         // Save position 0 immediately
         const video = videoRef.current;
         const dur = duration > 0 ? duration : (video?.duration || 0);
         if (dur > 0) forceSendPosition(0, dur);
-    }, [duration, forceSendPosition]);
+    }, [duration, forceSendPosition, isSession, playAfterPrompt]);
 
     // Chromecast integration
     useEffect(() => {

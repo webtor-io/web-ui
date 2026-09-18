@@ -2520,3 +2520,46 @@ test('a locked translation the ladder did not want is not pitched on screen', as
     await startPlayback(p);
     assert.equal(offerPill(p), null);
 });
+
+// ---- the resume prompt holds the film ----------------------------------
+
+const savedPosition = (p) => p.setResponse((url) => (String(url).startsWith('/watch/position')
+    ? { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ position: 600, duration: 3000 }) }
+    : { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({}) }));
+const resumePrompt = (p) => p.container.querySelector('.wt-resume-prompt');
+
+test('a film with a saved position does not start by itself, and is not pitched under the prompt', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer((page) => savedPosition(page));
+    const log = playback(p.video);
+    assert.ok(resumePrompt(p), 'the fixture must put the prompt up');
+
+    // <video autoplay> firing after the prompt is already up.
+    p.video.play();
+    await settle();
+    assert.equal(p.video.paused, true, 'autoplay is put back to sleep');
+    assert.ok(log.pause >= 1);
+    assert.equal(offerPill(p), null, 'no offer behind the overlay');
+
+    // Start over: the answer is what starts the film, and the offer follows.
+    const playsBefore = log.play;
+    click(resumePrompt(p).querySelector('.wt-resume-btn--ghost'));
+    await settle();
+    assert.equal(resumePrompt(p), null);
+    assert.ok(log.play > playsBefore, 'the answer starts playback');
+    assert.equal(p.video.paused, false, 'and nothing pauses it again');
+    assert.ok(offerPill(p), 'now the offer is decided');
+});
+
+test('a film with no saved position still starts by itself', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    const log = playback(p.video);
+    p.video.play();
+    await settle();
+    assert.equal(resumePrompt(p), null);
+    assert.equal(log.pause, 0, 'nobody holds a film that has nothing to resume');
+    assert.equal(p.video.paused, false);
+});
