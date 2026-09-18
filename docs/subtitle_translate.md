@@ -255,18 +255,27 @@ correct rather than an oversight — the locked item is an upsell, not a track; 
 the viewer cannot see. The cost is that such a viewer could upgrade and then find no AI item at
 all, which is the same outcome every unsupported source already gives (see *Known limitations*).
 
-**Translation source selection** (`pickTranslationSource`): a **file** source — the viewer's own
-upload, an `ExportTag` sidecar, an OpenSubtitles track — in the preferred language order (the
-active audio's language, transcribing what's said rather than translating a translation, then
-English, then any) beats an **embedded** one (`MediaProbe`, the live playlist). The embedded
-bucket is reached only when no file source qualifies **at all** — not per language: a French
-sidecar is picked over a Russian live playlist with Russian audio (owner ruling, 2026-09-16).
+**Translation source selection** (`pickTranslationSource`): the **language** of the source decides
+first — the active audio's language (transcribing what's said rather than translating a
+translation), then English, then any. **Within one language tier** a **file** source — the
+viewer's own upload, an `ExportTag` sidecar, an OpenSubtitles track — beats an **embedded** one
+(`MediaProbe`, the live playlist) (owner ruling, 2026-09-16, narrowed 2026-09-18). The full order
+is: file/audio, embedded/audio, file/English, embedded/English, file/any, embedded/any.
+
+Until 2026-09-18 the bucket was picked before the language — any file beat every embedded track,
+"not per language". What that cost showed up on a release with thirty-seven embedded tracks,
+English among them, and three hash-matched OpenSubtitles files in Croatian, Czech and Romanian:
+the Georgian translation was made from the Croatian. A translation of a translation, through a
+pair the model is weak in, with the original sitting in the file. The cost argument below still
+decides wherever it costs nothing in quality (the same tier), and the live playlist is now paid
+for only when no file is in the audio language or in English. How many stream starts that is
+has **not been measured**; `subtitle-resolved` by source language is where to count it.
 
 The cost of the two is not comparable, which is what the ruling is about. A file is one fetch of
 seconds-to-minutes and leaves a final artifact cached under `ArtifactKey` for every later viewer.
 The live source runs at transcode speed, holds one of the service's `--live-max-jobs` slots for
 the length of the film, stops when the viewer leaves, and caches a final only for a contiguous run
-from offset 0. Until the ruling the winner fell out of the order `GetSubtitles` appends in
+from offset 0. Until the 2026-09-16 ruling the winner fell out of the order `GetSubtitles` appends in
 (`MediaProbe` first, then `ExportTag`, `OpenSubtitles`, `External`, `UserSubtitle`), so a
 transcoded file translated its own live playlist even when the viewer's own upload sat in the same
 language — while the display ladder ranks that upload *above* embedded. The two orders disagreeing

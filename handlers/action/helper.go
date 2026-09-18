@@ -591,13 +591,12 @@ func translationSourceRank(li ListItem) int {
 }
 
 // pickTranslationSource picks the human track the AI translation is made
-// from: a non-forced, URL-backed track, preferring the audio language (a
-// transcription of what is being said, not a translation of a
-// translation), then English, then anything.
+// from: a non-forced, URL-backed track.
 //
-// A FILE source wins over an embedded one (owner ruling, 2026-09-16), and
-// the embedded bucket is reached only when no file source qualifies at
-// all -- not per language. Both halves of that matter:
+// The LANGUAGE of the source decides first: the audio language (a
+// transcription of what is being said, not a translation of a translation),
+// then English, then anything. Within one language tier a FILE source wins
+// over an embedded one (owner ruling, 2026-09-16), for cost:
 //
 //   - A file is one fetch of seconds-to-minutes and leaves a final
 //     artifact cached under ArtifactKey for every later viewer. The
@@ -606,31 +605,52 @@ func translationSourceRank(li ListItem) int {
 //     --live-max-jobs slots for the length of the film, stops when the
 //     viewer leaves, and caches a final only for a contiguous run from
 //     offset 0.
-//   - Before this ruling the choice fell out of the order GetSubtitles
-//     appends in (embedded first), so a transcoded file translated its
-//     own live playlist even when the viewer's own upload sat in the same
-//     language -- the display ladder ranks that upload above embedded,
-//     and the two orders disagreeing was a bug, not a policy.
+//
+// Until 2026-09-18 the bucket was picked before the language: any file beat
+// every embedded track. A release with thirty-seven embedded tracks, English
+// among them, and three hash-matched OpenSubtitles files in Croatian, Czech
+// and Romanian was therefore translated into Georgian from the Croatian --
+// a translation of a translation, through a pair the model is weak in,
+// with the original sitting in the file. The cost argument still holds
+// where it costs nothing in quality (same tier), and the live playlist is
+// now paid for only when no file is in the audio language or in English.
 //
 // Embedded tracks remain a source when they carry a playlist Src
 // (transcoder session); a native MP4 without a session has none, and a
 // file-less, session-less list yields no translation at all.
 func pickTranslationSource(lis []ListItem, audioLang string) *ListItem {
-	if src := bestTranslationSource(lis, audioLang, false); src != nil {
-		return src
+	file := translationCandidates(lis, audioLang, false)
+	embedded := translationCandidates(lis, audioLang, true)
+	for _, c := range []*ListItem{
+		file.audio, embedded.audio,
+		file.en, embedded.en,
+		file.any, embedded.any,
+	} {
+		if c != nil {
+			return c
+		}
 	}
-	return bestTranslationSource(lis, audioLang, true)
+	return nil
 }
 
-// bestTranslationSource is pickTranslationSource within one bucket: the
-// file sources (embedded=false) or the embedded ones (embedded=true).
-// Language decides first -- audio language, then English, then anything --
-// and translationSourceRank breaks ties inside each of those three.
-func bestTranslationSource(lis []ListItem, audioLang string, embedded bool) *ListItem {
-	var first, en, audio *ListItem
-	// Strictly better, so equal ranks keep the first item seen and the
-	// list order stays the last tie-break (it is the only stable one the
-	// embedded bucket has: every embedded track ranks the same).
+// sourceCandidates is one bucket's best track per language tier.
+//
+// When the audio is English the audio tier takes every English track and
+// en stays nil: the two preferences want the same track there, and audio
+// is read first anyway. So en is not a running "best English track", and
+// nothing may read it as one.
+type sourceCandidates struct {
+	audio, en, any *ListItem
+}
+
+// translationCandidates fills the tiers for one bucket: the file sources
+// (embedded=false) or the embedded ones (embedded=true).
+// translationSourceRank breaks ties inside a tier; strictly better, so
+// equal ranks keep the first item seen and the list order stays the last
+// tie-break (it is the only stable one the embedded bucket has: every
+// embedded track ranks the same).
+func translationCandidates(lis []ListItem, audioLang string, embedded bool) sourceCandidates {
+	var c sourceCandidates
 	better := func(cur, cand *ListItem) bool {
 		return cur == nil || translationSourceRank(*cand) < translationSourceRank(*cur)
 	}
@@ -642,34 +662,21 @@ func bestTranslationSource(lis []ListItem, audioLang string, embedded bool) *Lis
 		if isEmbeddedSource(*li) != embedded {
 			continue
 		}
-		if better(first, li) {
-			first = li
+		if better(c.any, li) {
+			c.any = li
 		}
-		// A switch, so the two cases are exclusive: when the audio is
-		// English the `audioLang` case shadows `"en"` and `en` stays nil.
-		// That is the intended outcome, not an oversight -- the two
-		// preferences want the same track there, and `audio` is returned
-		// first anyway. It does mean `en` is not a running "best English
-		// track": with English audio it is always nil, so nothing may read
-		// it as one.
 		switch baseLang(li.SrcLang) {
 		case audioLang:
-			if audioLang != "" && better(audio, li) {
-				audio = li
+			if audioLang != "" && better(c.audio, li) {
+				c.audio = li
 			}
 		case "en":
-			if better(en, li) {
-				en = li
+			if better(c.en, li) {
+				c.en = li
 			}
 		}
 	}
-	if audio != nil {
-		return audio
-	}
-	if en != nil {
-		return en
-	}
-	return first
+	return c
 }
 
 // applyLadder decides what the viewer gets selected when they have a

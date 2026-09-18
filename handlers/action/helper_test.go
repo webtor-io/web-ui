@@ -1344,11 +1344,12 @@ func srcItem(id, provider, lang, src, source string) ListItem {
 }
 
 // TestPickTranslationSourcePrefersAFileOverTheLivePlaylist pins the owner's
-// 2026-09-16 ruling: a file source in the preferred order (audio language,
-// then English, then any) beats the embedded live playlist, which costs a
-// transcoder session for the length of the film and caches a final artifact
-// only for a contiguous run from 0. Before the ruling the winner fell out of
-// the order GetSubtitles appends in, and embedded is appended first.
+// 2026-09-16 ruling as narrowed on 2026-09-18: WITHIN one language tier
+// (audio language, then English, then any) a file source beats the embedded
+// live playlist, which costs a transcoder session for the length of the film
+// and caches a final artifact only for a contiguous run from 0. The tier
+// itself is decided first: an embedded track in the audio language or in
+// English beats a file in some third language.
 func TestPickTranslationSourcePrefersAFileOverTheLivePlaylist(t *testing.T) {
 	embedded := srcItem("mp-0", "MediaProbe", "rus", "https://edge/s0.m3u8", "")
 	for _, c := range []struct {
@@ -1366,15 +1367,52 @@ func TestPickTranslationSourcePrefersAFileOverTheLivePlaylist(t *testing.T) {
 			want:  "os-1",
 		},
 		{
-			// The bucket is picked before the language is: a file in ANY
-			// language beats the live playlist even when the playlist is
-			// the one in the audio language. The file is minutes of work
-			// that every later viewer reuses; the playlist is film-length
-			// and private to this session.
-			name:  "file in another language still beats embedded",
+			// The language is picked before the bucket is: the original
+			// in the file beats a translation beside it, live playlist or
+			// not. (Until 2026-09-18 this answered "et-1".)
+			name:  "embedded in the audio language beats a file in another",
 			lis:   []ListItem{{ID: "none", Kind: "subtitles"}, embedded, srcItem("et-1", "ExportTag", "fra", "https://x/fr.vtt", "")},
 			audio: "ru",
-			want:  "et-1",
+			want:  "mp-0",
+		},
+		{
+			// The case that prompted the change: English audio, English
+			// embedded, and only Croatian/Czech/Romanian hash matches.
+			name: "embedded English beats third-language hash matches",
+			lis: []ListItem{{ID: "none", Kind: "subtitles"},
+				srcItem("mp-0", "MediaProbe", "eng", "https://edge/s0.m3u8", ""),
+				srcItem("os-hr", "OpenSubtitles", "hrv", "https://x/hr.vtt", "hash"),
+				srcItem("os-cs", "OpenSubtitles", "cze", "https://x/cs.vtt", "hash")},
+			audio: "en",
+			want:  "mp-0",
+		},
+		{
+			// Unknown audio, English embedded: the English tier, same answer.
+			name: "embedded English beats a third-language file with unknown audio",
+			lis: []ListItem{{ID: "none", Kind: "subtitles"},
+				srcItem("mp-0", "MediaProbe", "eng", "https://edge/s0.m3u8", ""),
+				srcItem("os-hr", "OpenSubtitles", "hrv", "https://x/hr.vtt", "hash")},
+			audio: "",
+			want:  "mp-0",
+		},
+		{
+			// A file in English against an embedded track in the audio
+			// language: the audio tier comes first, so the embedded wins.
+			name: "embedded audio language beats an English file",
+			lis: []ListItem{{ID: "none", Kind: "subtitles"}, embedded,
+				srcItem("os-en", "OpenSubtitles", "eng", "https://x/en.vtt", "hash")},
+			audio: "ru",
+			want:  "mp-0",
+		},
+		{
+			// Neither side is in the audio language or in English: the
+			// tier is a tie, and there the cost argument decides -- file.
+			name: "third language on both sides: the file",
+			lis: []ListItem{{ID: "none", Kind: "subtitles"},
+				srcItem("mp-0", "MediaProbe", "ger", "https://edge/s0.m3u8", ""),
+				srcItem("os-hr", "OpenSubtitles", "hrv", "https://x/hr.vtt", "hash")},
+			audio: "ja",
+			want:  "os-hr",
 		},
 		{
 			name:  "embedded only",
