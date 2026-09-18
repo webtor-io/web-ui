@@ -613,7 +613,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // throttle for this one swap, so the new position's cues
                 // do not wait out both the service's own lag and this
                 // reload throttle on top of it.
-                if (p.total > 0) reload(p.done, p.forceReload === true);
+                // done === 0 is the same argument one step later: counted,
+                // nothing translated. The body carries no cue the viewer
+                // can read, and the swap would spend the 15 s throttle
+                // window on it -- so the first real batch, seconds away,
+                // would sit unloaded behind that window.
+                if (p.total > 0 && p.done > 0) reload(p.done, p.forceReload === true);
                 // Last, so the chip has already been painted with the
                 // opening count before the run goes to sleep on it.
                 suspendIfNobodyIsWatching(p);
@@ -682,7 +687,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         return;
                     }
                     // The wait is over on its own terms: the translation is
-                    // comfortably ahead again, so the film goes back on.
+                    // comfortably ahead again, so the film goes back on --
+                    // with those subtitles loaded. The wait's promise is
+                    // "there will be subtitles when it plays", and the
+                    // service being ahead is only half of it: the <track>
+                    // still holds whatever revision the throttle last let
+                    // in. (Found by the owner, 2026-09-18: subtitles showed
+                    // up only after pause -> play, whose kick bypasses the
+                    // throttle.)
+                    if (p.done > 0) reload(p.done, true);
                     finishWait(false);
                     return;
                 }
@@ -697,6 +710,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     showCatchUp(null);
                     return;
                 }
+                const wasTrailing = trailingRef.current;
                 const isTrailing = trailing(trailingRef.current, pendingFromRef.current, playhead)
                     || (startHoldRef.current && nothingCountedYet(p));
                 trailingRef.current = isTrailing;
@@ -705,6 +719,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     return;
                 }
                 showCatchUp(null);
+                // The same promise without a wait: the banner going away
+                // says "the translation is ahead of you now", which is only
+                // true on screen once the track has the cues that made it so.
+                if (wasTrailing && !isTrailing && p.done > 0) reload(p.done, true);
                 // A dismissal is about a stretch of film that the
                 // translation was behind on. Once it is no longer behind,
                 // that stretch is over and the next one gets its own say.

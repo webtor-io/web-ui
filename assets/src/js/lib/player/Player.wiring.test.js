@@ -2628,3 +2628,40 @@ test('starting a translation over a paused film holds nothing', async (t) => {
     assert.equal(catchUpBanner(p), null, 'a paused film is not running into anything');
     assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-wait').length, 0);
 });
+
+test('the film a hold releases has its subtitles: the reload does not wait out the throttle', async (t) => {
+    // Owner, 2026-09-18: after the start hold the film went on with no
+    // subtitles, and they appeared only after pause -> play (which kicks the
+    // poll, and a kick bypasses the throttle). The first counted answer had
+    // spent the 15 s reload window on a near-empty revision.
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer(null, { tracks: [['tr-pt', false]] });
+    const log = playback(p.video);
+    let answer = () => catchUpResponse('0/400', '100');
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? answer()
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const trackSrc = () => p.video.querySelector('track#tr-pt').getAttribute('src') || '';
+
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
+    await settle();
+    assert.equal(p.video.paused, true, 'held: counted, nothing done, frontier at the playhead');
+    assert.ok(!/rev=0\b/.test(trackSrc()), `a revision with nothing translated is not worth a swap: ${trackSrc()}`);
+
+    // A few cues land, still behind: an ordinary reload, which starts the
+    // 15 s throttle window.
+    answer = () => catchUpResponse('5/400', '101');
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=5\b/.test(trackSrc()), `the first translated cues are loaded: ${trackSrc()}`);
+    assert.equal(p.video.paused, true, 'still held');
+
+    // Comfortably ahead, well inside the throttle window.
+    answer = () => catchUpResponse('40/400', '400');
+    const playsBefore = log.play;
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(log.play > playsBefore, 'the hold lets the film go');
+    assert.ok(/rev=40\b/.test(trackSrc()), `and the track it goes on with is the current one: ${trackSrc()}`);
+});
