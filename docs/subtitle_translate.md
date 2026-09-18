@@ -696,6 +696,47 @@ just started, where nothing counted means nothing translated at the spot they ar
 - The tests about the passive banner, the manual **Wait** and the run mismatch start their run
   with `pickPausedThenPlay` (track chosen before play) — a run that is behind, not one just started.
 
+### The film a hold releases has its subtitles
+
+The `<track>` reload is throttled to one swap per 15 s. The first counted answer used to spend
+that window on a revision with nothing translated (`done = 0`), so when a hold ended — the
+service comfortably ahead — the track still held that revision and the film played without
+subtitles until the window ran out; pause → play made them appear, because its `kick()` bypasses
+the throttle (owner, 2026-09-18). Now a `done = 0` revision is never worth a swap, and the end of
+a wait that was caught up, or of a trailing stretch, forces one.
+
+### The silent hold (`beginPreHold`)
+
+A seek's hold used to be decided by an answer that arrives *after* the seek settles, so the film
+played for a moment and was paused again. Now the film is paused the instant the seek settles
+(session: `onSessionSeekingChange(false)`; direct: `handleSeek`), with nothing on screen but the
+seek's own spinner (`preHolding` keeps the big play button away), and the first answer **about
+this run** decides: *behind* → the ordinary hold takes the pause over (banner, cap), *not behind*
+→ the film goes on. An answer about another run decides nothing. Bounded by
+`catchUpTiming.seekPreHoldMaxMs` (1.5 s) for a service that says nothing.
+
+- Only for a seek that may yet be held: the film was playing, a translation is being polled, the
+  tab is visible. `sleep()` leaves the poll awake and keeps the hold question while it lasts.
+- **A toggle during the silent hold means "pause".** The element is paused by the player while the
+  viewer is looking at an unfinished seek, so `togglePlay` (one wrapper for click, space, the big
+  button and the bar) ends the hold without playing and withdraws the hold question.
+- **Live sources keep a residue of the old behaviour.** A live run that names no frontier may
+  simply not have read the new run's cues yet (the transcoder closes a subtitle segment only with
+  the next cue, seconds later). Holding blind for that would stall every seek on a translation
+  that is keeping up, so such an answer releases the film, and a hold can still arrive after a
+  moment of playback. File sources answer against the position the poll carried, and are exact.
+
+### A minute of lead-in for file jobs (`catchUpTiming.leadInS`)
+
+The poll's `pos` is `playhead − 60 s` (owner, 2026-09-18). The service orders batches from the
+position it is given and skips cues that began before it, so the line being spoken right now and
+the exchange before it stayed untranslated; a batch is ~50 cues, so the minute rides in the same
+first batch and costs no extra call. The frontier (`X-Subtitle-Pending-From`) is computed from the
+same `pos`, so a hold now also waits for that minute. A live source has nothing to ask for: its
+playlist begins where the run begins. **Not verified against the live service** — the client side
+is tested; how the service's frontier behaves with a `pos` behind the playhead was read from its
+README, not observed.
+
 ## Deploy order
 
 Three things dated "2026-09-16" here are **client-side halves of contracts the other services had

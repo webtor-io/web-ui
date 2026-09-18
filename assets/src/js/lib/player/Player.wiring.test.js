@@ -1931,8 +1931,12 @@ test('no hold when the seek happened on a paused film, or the service does not s
         p.video.currentTime = 1;
         p.video.dispatchEvent(new dom.window.Event('playing'));
         // The viewer pauses in the same moment: the settle's request is
-        // still in flight.
-        p.video.pause();
+        // still in flight. Since 2026-09-18 the element is already paused
+        // by then (the silent hold), so their pause arrives as a toggle --
+        // which must mean "pause", not "play".
+        click(p.video);
+        await settle();
+        assert.equal(p.video.paused, true, 'the toggle during the silent hold pauses');
         const pausesAfterViewer = log.pause;
         const playsAfterViewer = log.play;
         await wait(POLL_INTERVAL_WINDOW_MS);
@@ -1941,12 +1945,16 @@ test('no hold when the seek happened on a paused film, or the service does not s
         assert.equal(log.play, playsAfterViewer, 'and nothing plays it back on under them');
     });
     await t.test('older service without the frontier header', async (tt) => {
-        const { log, seek, events } = await mountSessionRun(tt, () => liveProgressResponse('12/400'));
-        const pausesBefore = log.pause;
+        const { p, log, seek, events } = await mountSessionRun(tt, () => liveProgressResponse('12/400'));
+        const playsBefore = log.play;
         await seek();
         await settle();
-        assert.equal(log.pause, pausesBefore);
+        // The silent hold pauses for one answer and lets go on it: no wait,
+        // no banner, and the film is playing again.
         assert.equal(events('subtitle-translate-wait').length, 0);
+        assert.equal(catchUpBanner(p), null);
+        assert.equal(p.video.paused, false, 'the first answer releases the film');
+        assert.ok(log.play > playsBefore);
     });
 });
 
@@ -1982,8 +1990,11 @@ test('a pause while the answer after a seek is in flight cancels the hold for go
     p.video.currentTime = 1;
     p.video.dispatchEvent(new dom.window.Event('playing'));
     await wait(20);
-    p.video.pause();
+    // Through the UI, as a viewer does: the element is already paused by the
+    // silent hold, and the toggle is what reads that as "pause".
+    click(p.video);
     await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(p.video.paused, true, 'nothing played it back on under them');
     const pauses = log.pause;
     p.video.play();
     await wait(POLL_INTERVAL_WINDOW_MS);
@@ -2294,7 +2305,9 @@ test('a session seek in flight sends no position: the halves disagree mid-seek',
     p.video.currentTime = 300;
     await wait(POLL_INTERVAL_WINDOW_MS);
     const urls = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
-    assert.ok(urls().at(-1).includes('pos=1800'), `before the seek: ${urls().at(-1)}`);
+    // 1800 s, less the minute of lead-in a file job is asked to start from
+    // (catchUpTiming.leadInS).
+    assert.ok(urls().at(-1).includes('pos=1740'), `before the seek: ${urls().at(-1)}`);
     // The seek to ~5:15 kicks a poll while currentTime still belongs to the
     // old run: that poll must carry no pos at all rather than 300+315.
     document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -2664,4 +2677,56 @@ test('the film a hold releases has its subtitles: the reload does not wait out t
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play > playsBefore, 'the hold lets the film go');
     assert.ok(/rev=40\b/.test(trackSrc()), `and the track it goes on with is the current one: ${trackSrc()}`);
+});
+
+// ---- the silent hold ----------------------------------------------------
+
+test('a seek onto untranslated film never plays before it is held', async (t) => {
+    // Owner, 2026-09-18: the film started after a seek and was paused a
+    // moment later, once the answer arrived. The pause now comes with the
+    // seek settling; the answer only decides what it turns into.
+    let pending = '400';
+    const delayed = () => new Promise((resolve) => setTimeout(() => resolve(catchUpResponse('12/400', pending)), 200));
+    const { p, log, events } = await mountSessionRun(t, delayed);
+    await wait(300);
+    pending = '0';
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await wait(20);
+
+    // The answer is still 180 ms out.
+    assert.equal(p.video.paused, true, 'held the moment the seek settled');
+    assert.equal(catchUpBanner(p), null, 'with nothing said yet');
+    assert.equal(events('subtitle-translate-wait').length, 0);
+    const playsWhileSilent = log.play;
+
+    await wait(400);
+    assert.equal(events('subtitle-translate-wait').length, 1, 'the answer turns it into the ordinary hold');
+    assert.ok(catchUpBanner(p), 'which has a banner');
+    assert.equal(log.play, playsWhileSilent, 'and the film never played in between');
+    assert.equal(p.video.paused, true);
+});
+
+test('a silent hold nobody answers lets the film go', async (t) => {
+    const cap = catchUpTiming.seekPreHoldMaxMs;
+    catchUpTiming.seekPreHoldMaxMs = 300;
+    t.after(() => { catchUpTiming.seekPreHoldMaxMs = cap; });
+    let hang = false;
+    const { p, log, events } = await mountSessionRun(t, () => (hang
+        ? new Promise(() => {})
+        : catchUpResponse('12/400', '400')));
+    hang = true;
+    const playsBefore = log.play;
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    p.video.currentTime = 1;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await wait(20);
+    assert.equal(p.video.paused, true);
+    await wait(500);
+    assert.equal(p.video.paused, false, 'the cap is what bounds a service that says nothing');
+    assert.ok(log.play > playsBefore);
+    assert.equal(events('subtitle-translate-wait').length, 0);
 });

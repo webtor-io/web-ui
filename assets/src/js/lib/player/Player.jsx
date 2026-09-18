@@ -256,6 +256,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // playing film is the same event as a seek landing on untranslated
     // film, so it opens the same hold window and is bounded by the same cap.
     const startHoldRef = useRef(false);
+    // The silent hold (owner, 2026-09-18): a seek's hold was decided by an
+    // answer that arrives after the seek has settled, so the film played
+    // for a moment and was paused again. Now the film is paused the instant
+    // the seek settles, with nothing on screen, and the first answer about
+    // the new run either turns that into the ordinary hold (banner, cap) or
+    // lets the film go. Bounded by catchUpTiming.seekPreHoldMaxMs.
+    const preHoldRef = useRef(false);
+    const preHoldTimerRef = useRef(null);
+    // The same fact for the render: while it lasts the picture is a seek
+    // that has not finished (spinner), not a paused film (big play button).
+    const [preHolding, setPreHolding] = useState(false);
+    // The keyboard handler is declared before the toggle wrapper it must
+    // call (see togglePlay below), so it goes through this.
+    const togglePlayRef = useRef(() => {});
     const seekSettledAtRef = useRef(0);
     // The timer that asks the service again while the window lasts.
     const holdWatchRef = useRef(null);
@@ -328,6 +342,36 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         holdTimerRef.current = null;
         return wasAuto;
     }, []);
+
+    // endPreHold drops the silent hold and reports whether there was one.
+    // `play` is for the endings that are not a wait taking over.
+    const endPreHold = useCallback((play) => {
+        if (!preHoldRef.current) return false;
+        preHoldRef.current = false;
+        setPreHolding(false);
+        if (preHoldTimerRef.current) clearTimeout(preHoldTimerRef.current);
+        preHoldTimerRef.current = null;
+        if (play) resumeAfterHold();
+        return true;
+    }, [resumeAfterHold]);
+
+    // beginPreHold: only for a seek that may yet be held (the film was
+    // playing, a translation is being polled), in a tab somebody is looking
+    // at. pause() here reaches sleep(), which leaves the poll awake while
+    // preHoldRef is set -- the answer is what this is waiting for.
+    const beginPreHold = useCallback(() => {
+        const video = videoRef.current;
+        if (!video || video.paused || preHoldRef.current) return;
+        if (!seekHoldPendingRef.current || !pollStopRef.current) return;
+        if (typeof document !== 'undefined' && document.hidden) return;
+        preHoldRef.current = true;
+        setPreHolding(true);
+        if (typeof video.pause === 'function') video.pause();
+        preHoldTimerRef.current = setTimeout(() => {
+            preHoldTimerRef.current = null;
+            endPreHold(true);
+        }, catchUpTiming.seekPreHoldMaxMs);
+    }, [endPreHold]);
 
     // finishWait ends a wait on its own terms and plays the film: the run
     // got ahead (capped false), or a seek's hold ran out of time (capped
@@ -404,7 +448,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // viewer waited leaves the film paused with the big play button, and
         // the chip is what explains why. A seek's hold is different: the
         // viewer never paused, so the film goes back on.
-        const heldBySeek = clearWait();
+        const waitHeld = clearWait();
+        const preHeld = endPreHold(false);
+        const heldBySeek = waitHeld || preHeld;
         seekHoldPendingRef.current = false;
         if (holdWatchRef.current) clearTimeout(holdWatchRef.current);
         holdWatchRef.current = null;
@@ -429,7 +475,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             pollStopRef.current = null;
         }
         if (heldBySeek && resumeHold) resumeAfterHold();
-    }, [showCatchUp, clearWait, resumeAfterHold]);
+    }, [showCatchUp, clearWait, endPreHold, resumeAfterHold]);
 
     // startTranslationProgress polls one translation to completion.
     // Callers ask translationAction first; `resume` is its 'resume'
@@ -593,7 +639,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // and the settle kick sends the right value moments later.
                 if (sessionSeekingRef.current) return null;
                 const v = videoRef.current;
-                return v ? (v.currentTime || 0) + seekOffsetRef.current : null;
+                if (!v) return null;
+                // A minute behind the viewer: see catchUpTiming.leadInS.
+                return Math.max(0, (v.currentTime || 0) + seekOffsetRef.current - catchUpTiming.leadInS);
             },
             onProgress: (p) => {
                 cues = p.total;
@@ -662,20 +710,39 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // in a hidden tab.
                 if (seekHoldPendingRef.current && !sessionSeekingRef.current) {
                     const inWindow = Date.now() - seekSettledAtRef.current <= catchUpTiming.seekWatchMs;
-                    if (!inWindow || document.hidden || video.paused || waitingRef.current) {
+                    // The silent hold's own pause is not the viewer's.
+                    const viewerPaused = video.paused && !preHoldRef.current;
+                    if (!inWindow || document.hidden || viewerPaused || waitingRef.current) {
                         seekHoldPendingRef.current = false;
+                        endPreHold(true);
                     } else if (aboutThisRun && behind) {
                         seekHoldPendingRef.current = false;
+                        // The wait takes the pause over: no play in between.
+                        endPreHold(false);
                         beginWait(true, bannerRemaining(p));
                         return;
-                    } else if (!holdWatchRef.current) {
-                        // Not decided yet: ask again in a moment, rather than
-                        // on the next 3 s tick.
-                        holdWatchRef.current = setTimeout(() => {
-                            holdWatchRef.current = null;
-                            const poll = pollStopRef.current;
-                            if (seekHoldPendingRef.current && poll && poll.kick) poll.kick();
-                        }, catchUpTiming.seekWatchEveryMs);
+                    } else {
+                        // "Not behind", said about this run: the silent hold
+                        // has its answer and the film goes on. (An answer
+                        // about another run decides nothing; the hold waits
+                        // for the next one under its own cap.) A live run
+                        // that names no frontier may simply not have read
+                        // the new run's cues yet -- its subtitle segments
+                        // close seconds later -- and holding blind for that
+                        // would stall every seek on a translation that is
+                        // keeping up. So on a live source a hold can still
+                        // arrive after a moment of playback; the window
+                        // keeps watching for it.
+                        if (aboutThisRun) endPreHold(true);
+                        if (!holdWatchRef.current) {
+                            // Not decided yet: ask again in a moment, rather
+                            // than on the next 3 s tick.
+                            holdWatchRef.current = setTimeout(() => {
+                                holdWatchRef.current = null;
+                                const poll = pollStopRef.current;
+                                if (seekHoldPendingRef.current && poll && poll.kick) poll.kick();
+                            }, catchUpTiming.seekWatchEveryMs);
+                        }
                     }
                 }
                 // Nothing below acts on an answer about another run: not the
@@ -785,13 +852,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // play paused the film again.
             // A hidden tab counts even mid-seek: the decision would otherwise
             // be made in the background, or minutes later on the way back.
-            if ((!sessionSeekingRef.current || document.hidden) && !waitingRef.current) seekHoldPendingRef.current = false;
+            if ((!sessionSeekingRef.current || document.hidden) && !waitingRef.current && !preHoldRef.current) seekHoldPendingRef.current = false;
             // Wait is the exception, and it is the whole of the feature:
             // the viewer paused *so that* the translation can catch up,
             // and the HEAD every 3 s is what it catches up against.
             // Suspending here would pause the film against a run that is
             // no longer being asked for anything.
-            if (waitingRef.current) return;
+            // The silent hold likewise: it paused in order to be answered.
+            if (waitingRef.current || preHoldRef.current) return;
             const poll = pollStopRef.current;
             if (poll && poll.suspend) poll.suspend();
         };
@@ -805,6 +873,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const onPlay = () => {
             resumeOnVisibleRef.current = false;
             clearWait();
+            endPreHold(false);
             wake();
         };
         // The `play` event is the authority on playback — `paused` is not
@@ -1024,7 +1093,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // (the hls.js seek path waits for `playing` and never calls play()
         // itself). Not covered by the wiring tests: under jsdom there is no
         // hls.js, and the native path the harness takes plays on its own.
-        const heldBySeek = clearWait();
+        // The silent hold counts the same: both are pauses the viewer never
+        // made, over a film they were watching.
+        const waitHeld = clearWait();
+        const preHeld = endPreHold(false);
+        const heldBySeek = waitHeld || preHeld;
         if (heldBySeek) resumePlayback();
         resumeOnVisibleRef.current = false;
         // Decided when the seek settles (see onTick), recorded now: by then
@@ -1038,7 +1111,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (holdWatchRef.current) clearTimeout(holdWatchRef.current);
         holdWatchRef.current = null;
         if (poll && poll.kick) poll.kick();
-    }, [clearWait, resumePlayback]);
+    }, [clearWait, endPreHold, resumePlayback]);
 
     // The seek has settled (the new run is playing): ask the service where
     // the translation is now, rather than on the next 3 s tick, so a hold
@@ -1046,11 +1119,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const onSessionSeekingChange = useCallback((val) => {
         setSessionSeekingWithRef(val);
         if (val || !seekHoldPendingRef.current) return;
-        // The hold window starts here, with the new run playing.
+        // The hold window starts here, with the new run playing -- and the
+        // film stands still until the first answer about it (beginPreHold),
+        // so a hold never has to interrupt a film that has just started.
         seekSettledAtRef.current = Date.now();
+        beginPreHold();
         const poll = pollStopRef.current;
         if (poll && poll.kick) poll.kick();
-    }, [setSessionSeekingWithRef]);
+    }, [setSessionSeekingWithRef, beginPreHold]);
 
     // Wait: pause the film but keep the poll awake. Both halves are
     // needed — the pause is what the viewer asked for, and the poll is
@@ -1191,9 +1267,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     kickTranslationPoll();
                 }
                 seekSettledAtRef.current = now;
+                beginPreHold();
             }
         }
-    }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll, onSessionSeekingChange]);
+    }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll, onSessionSeekingChange, beginPreHold]);
 
     // Auto-hide controls
     const resetHideTimer = useCallback(() => {
@@ -1301,7 +1378,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 case ' ':
                 case 'k':
                     e.preventDefault();
-                    state.togglePlay();
+                    togglePlayRef.current();
                     resetHideTimer();
                     break;
                 case 'ArrowLeft':
@@ -1506,6 +1583,21 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         });
     }, []);
 
+    // One toggle for every control (click, space, the big button, the
+    // bar). During the silent hold the element is paused by the player
+    // while the viewer is looking at a seek that has not finished: their
+    // toggle means "pause", not "play". It ends the hold without playing
+    // and withdraws the hold question for this seek.
+    const togglePlay = useCallback(() => {
+        if (preHoldRef.current) {
+            endPreHold(false);
+            seekHoldPendingRef.current = false;
+            return;
+        }
+        state.togglePlay();
+    }, [endPreHold, state.togglePlay]);
+    togglePlayRef.current = togglePlay;
+
     // Click on video to toggle play (video only).
     // Use ref for showResumePrompt to avoid re-registering native DOM listeners.
     const showResumePromptRef = useRef(false);
@@ -1517,9 +1609,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (e.target.closest('.wt-resume-prompt')) return;
         if (e.target.closest('.wt-catchup')) return;
         if (e.target.closest('.wt-offer-card')) return;
-        state.togglePlay();
+        togglePlayRef.current();
         resetHideTimer();
-    }, [isVideo, state.togglePlay]);
+    }, [isVideo]);
 
     // Double-click for fullscreen
     const handleDoubleClick = useCallback((e) => {
@@ -1640,16 +1732,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             })()}
 
             {/* Loading spinner (only when playing + buffering, or seeking) */}
-            {showControls && isVideo && (sessionSeeking || (state.playing && state.loading)) && (
+            {showControls && isVideo && (sessionSeeking || preHolding || (state.playing && state.loading)) && (
                 <div class="wt-player-overlay wt-player-overlay--loading">
                     <LoadingSpinner />
                 </div>
             )}
 
             {/* Big play button — shown when paused, regardless of loading state */}
-            {showControls && isVideo && !state.playing && !sessionSeeking && !showResumePrompt && (
+            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
-                    <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); state.togglePlay(); }} aria-label={t('player.play')}>
+                    <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label={t('player.play')}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
                             <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
                         </svg>
@@ -1668,7 +1760,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     fullscreen={state.fullscreen}
                     buffered={state.buffered}
                     seeking={sessionSeeking}
-                    onTogglePlay={state.togglePlay}
+                    onTogglePlay={togglePlay}
                     onSeek={handleSeek}
                     onVolumeChange={state.setVolume}
                     onToggleMute={state.toggleMute}
