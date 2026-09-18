@@ -621,6 +621,7 @@
     "player.subtitleCatchUpWait": "Attendre",
     "player.subtitleCatchUpResume": "Continuer à regarder",
     "player.subtitleCatchUpDismiss": "Masquer",
+    "player.subtitleCaughtUp": "La traduction IA a rattrapé",
     "player.subtitleOfferLater": "Pas maintenant",
     "player.subtitleOfferNever": "Ne plus proposer",
     "job.retrievingData": "récupération des données de la ressource",

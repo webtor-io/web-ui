@@ -631,6 +631,7 @@
     "player.subtitleCatchUpWait": "Poczekaj",
     "player.subtitleCatchUpResume": "Oglądaj dalej",
     "player.subtitleCatchUpDismiss": "Ukryj",
+    "player.subtitleCaughtUp": "Tłumaczenie AI nadgoniło",
     "player.subtitleOfferLater": "Nie teraz",
     "player.subtitleOfferNever": "Nie proponuj więcej",
     "job.retrievingData": "pobieranie danych zasobu",

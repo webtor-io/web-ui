@@ -51,6 +51,8 @@ export const catchUpTiming = {
     // it (see beginPreHold in Player.jsx): how long the film may stand
     // still with nothing said, before it plays regardless.
     seekPreHoldMaxMs: 1500,
+    // How long the pill says "caught up" before it goes.
+    caughtUpFlashMs: 3000,
 };
 
 // A NaN playhead is a <video> with no timeline yet (no metadata, no
@@ -108,6 +110,44 @@ export function caughtUp(pendingFrom, playhead) {
 export function nothingCountedYet(p) {
     if (!p || p.final) return false;
     return (Number(p.total) || 0) === 0 && (Number(p.done) || 0) === 0;
+}
+
+// viewerFrontier is the frontier as the VIEWER has it, which is not the
+// service's (owner, 2026-09-18: "subtitles do not keep up", with no banner
+// to say why). The service answers "the next untranslated cue is at F";
+// what is on screen is whatever revision the <track> last loaded, and that
+// swap is throttled. On a live source the translation runs only a little
+// ahead of the viewer, so the usual state was: the service is ahead, the
+// banner is silent, and the cues are not in the track.
+//
+//   loaded       what the last swap brought in: { done, frontier } -- the
+//                service's count and frontier at that moment. null before
+//                the first swap.
+//   coverageEnd  where the cues actually in the <track> end (movie time),
+//                or null when that cannot be read. It stands in for
+//                loaded.frontier when the swap happened with nothing
+//                pending: everything known then was loaded, and whatever
+//                the service translated since lies after it.
+//
+// While the service has nothing the track lacks, the two frontiers are the
+// same thing and the service's answer stands.
+export function viewerFrontier({ serviceFrontier = null, serviceDone = 0, loaded = null, coverageEnd = null } = {}) {
+    const service = serviceFrontier === undefined ? null : serviceFrontier;
+    if (!loaded || !((Number(serviceDone) || 0) > (Number(loaded.done) || 0))) return service;
+    let mine = loaded.frontier;
+    if (mine === null || mine === undefined) mine = coverageEnd;
+    if (mine === null || mine === undefined) return service;
+    return service === null ? mine : Math.min(service, mine);
+}
+
+// needsReload: the service has cues the track lacks, and the viewer is
+// about to run out of the ones it has. This is what bypasses the swap
+// throttle -- the throttle is there to spare the viewer a flicker, and a
+// flicker beats no subtitles.
+export function needsReload({ serviceDone = 0, loaded = null, frontier = null, playhead } = {}) {
+    if (!loaded || !((Number(serviceDone) || 0) > (Number(loaded.done) || 0))) return false;
+    if (frontier === null || frontier === undefined || !usablePlayhead(playhead)) return false;
+    return frontier <= playhead + CATCHUP_CLEAR_MARGIN_S;
 }
 
 export function remaining(p) {

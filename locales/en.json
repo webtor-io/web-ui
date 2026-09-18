@@ -679,6 +679,7 @@
     "player.subtitleCatchUpWait": "Wait for it",
     "player.subtitleCatchUpResume": "Keep watching",
     "player.subtitleCatchUpDismiss": "Dismiss",
+    "player.subtitleCaughtUp": "AI translation caught up",
     "player.subtitleOfferLater": "Not now",
     "player.subtitleOfferNever": "Don’t offer again",
     "job.retrievingData": "retrieving resource data",

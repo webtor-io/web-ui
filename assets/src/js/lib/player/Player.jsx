@@ -11,7 +11,7 @@ import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, progressText, withRev } from './subtitle-progress.js';
-import { catchUpTiming, caughtUp, nothingCountedYet, remaining, trailing } from './subtitle-catchup.js';
+import { catchUpTiming, caughtUp, needsReload, nothingCountedYet, remaining, trailing, viewerFrontier } from './subtitle-catchup.js';
 import {
     adoptUploadChips,
     refresh,
@@ -286,13 +286,41 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // setCatchUp behind a value comparison: a tick arrives every 3 s and
     // almost all of them say exactly what the last one did. Re-rendering
     // the player on each would be the banner's whole cost.
+    const caughtUpTimerRef = useRef(null);
     const showCatchUp = useCallback((next) => {
         const cur = catchUpRef.current;
         if (cur === next) return;
-        if (cur && next && cur.remaining === next.remaining && cur.waiting === next.waiting) return;
+        // The "caught up" flash owns the slot for its few seconds: the tick
+        // that follows it says "nothing to show", and must not cut it short.
+        // Anything that has something to say does.
+        if (cur && cur.caughtUp && !next) return;
+        if (cur && next && cur.remaining === next.remaining && cur.waiting === next.waiting
+            && !!cur.caughtUp === !!next.caughtUp) return;
+        if (caughtUpTimerRef.current) {
+            clearTimeout(caughtUpTimerRef.current);
+            caughtUpTimerRef.current = null;
+        }
         catchUpRef.current = next;
         setCatchUp(next);
     }, []);
+
+    // flashCaughtUp: the pill does not just vanish when the subtitles are
+    // back (owner, 2026-09-18) -- a viewer who was told "behind" is told
+    // "caught up", and then the pill goes. Never over a dismissed banner.
+    const flashCaughtUp = useCallback(() => {
+        if (dismissedRef.current) {
+            showCatchUp(null);
+            return;
+        }
+        showCatchUp({ remaining: null, waiting: false, caughtUp: true });
+        caughtUpTimerRef.current = setTimeout(() => {
+            caughtUpTimerRef.current = null;
+            if (catchUpRef.current && catchUpRef.current.caughtUp) {
+                catchUpRef.current = null;
+                setCatchUp(null);
+            }
+        }, catchUpTiming.caughtUpFlashMs);
+    }, [showCatchUp]);
 
     // play() is not a promise everywhere (and is not implemented at all
     // under jsdom), so the rejection guard has to check before it chains.
@@ -582,7 +610,24 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             stopTranslationProgress();
             fail('track');
         };
-        const reload = (done, force) => {
+        // What the last swap brought into the <track>: the service's count
+        // and frontier at that moment (see viewerFrontier).
+        let loaded = null;
+        // Where the cues actually in the track end, in movie time: the
+        // stand-in for a frontier when the swap happened with nothing
+        // pending. Cues are in time order; a shifted cue keeps its movie
+        // time in __absEnd (cue-offset.js), an unshifted one is in movie
+        // time already.
+        const coverageEnd = () => {
+            const video = videoRef.current;
+            const el = video ? Array.from(video.querySelectorAll('track')).find((t) => t.id === id) : null;
+            const cues = el && el.track ? el.track.cues : null;
+            if (!cues || !cues.length) return null;
+            const last = cues[cues.length - 1];
+            if (!last) return null;
+            return last.__absEnd !== undefined ? last.__absEnd : (last.endTime || 0) + seekOffsetRef.current;
+        };
+        const reload = (done, force, frontier = null) => {
             const now = Date.now();
             if (!force && now - lastReloadAt < TRACK_RELOAD_INTERVAL_MS) return;
             // Only a reload that actually swapped the src spends the
@@ -591,6 +636,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // another 15 s.
             if (reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError)) {
                 lastReloadAt = now;
+                loaded = { done, frontier: frontier === undefined ? null : frontier };
             }
         };
         if (!resume && window.umami) window.umami.track('subtitle-translate-start', {
@@ -664,7 +710,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // can read, and the swap would spend the 15 s throttle
                 // window on it -- so the first real batch, seconds away,
                 // would sit unloaded behind that window.
-                if (p.total > 0 && p.done > 0) reload(p.done, p.forceReload === true);
+                if (p.total > 0 && p.done > 0) reload(p.done, p.forceReload === true, p.pendingFrom);
                 // Last, so the chip has already been painted with the
                 // opening count before the run goes to sleep on it.
                 suspendIfNobodyIsWatching(p);
@@ -680,9 +726,29 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // its playlist offset, a file job against the playhead
                 // this poll itself carried (`pos`). An old service sends
                 // neither and nothing here fires.
-                pendingFromRef.current = p.pendingFrom;
                 liveRunRef.current = p.live === true;
                 const playhead = (video.currentTime || 0) + seekOffsetRef.current;
+                // The frontier everything below is decided by is the
+                // VIEWER's: the service may be ahead of what the throttled
+                // <track> has loaded, and then the honest answer to "are
+                // there subtitles where I am" is the track's edge.
+                pendingFromRef.current = viewerFrontier({
+                    serviceFrontier: p.pendingFrom,
+                    serviceDone: p.done,
+                    loaded,
+                    coverageEnd: coverageEnd(),
+                });
+                // ...and the cure for that state is a swap now, not when
+                // the throttle allows: the viewer is about to run out of
+                // loaded cues and the service has the next ones.
+                // Not for a film the viewer paused -- nobody is running out
+                // of anything -- but a WAIT is a pause too, and it is exactly
+                // the state this has to end: without the swap the track's
+                // edge never moves and the wait never finishes.
+                if ((!video.paused || waitingRef.current) && needsReload({ serviceDone: p.done, loaded, frontier: pendingFromRef.current, playhead })) {
+                    reload(p.done, true, p.pendingFrom);
+                    pendingFromRef.current = p.pendingFrom;
+                }
                 // Which run this answer describes. A service that does not
                 // say is taken at its word, as before it said, and so is one
                 // that has disagreed for too long (runMismatchRef).
@@ -760,8 +826,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     // in. (Found by the owner, 2026-09-18: subtitles showed
                     // up only after pause -> play, whose kick bypasses the
                     // throttle.)
-                    if (p.done > 0) reload(p.done, true);
+                    if (p.done > 0) reload(p.done, true, p.pendingFrom);
                     finishWait(false);
+                    flashCaughtUp();
                     return;
                 }
                 // A paused film is not running into anything. The one
@@ -783,11 +850,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     showCatchUp({ remaining: bannerRemaining(p), waiting: false });
                     return;
                 }
-                showCatchUp(null);
                 // The same promise without a wait: the banner going away
                 // says "the translation is ahead of you now", which is only
                 // true on screen once the track has the cues that made it so.
-                if (wasTrailing && !isTrailing && p.done > 0) reload(p.done, true);
+                if (wasTrailing && !isTrailing) {
+                    if (p.done > 0) reload(p.done, true, p.pendingFrom);
+                    flashCaughtUp();
+                } else {
+                    showCatchUp(null);
+                }
                 // A dismissal is about a stretch of film that the
                 // translation was behind on. Once it is no longer behind,
                 // that stretch is over and the next one gets its own say.
@@ -805,7 +876,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 // report this translation again.
                 translationStatusRef.current.set(id, 'done');
                 cues = p.total || cues;
-                reload(p.done, true);
+                reload(p.done, true, null);
                 if (span) span.hidden = true;
                 if (spinner) spinner.hidden = true;
                 if (window.umami) window.umami.track('subtitle-translate-done', {
@@ -1680,7 +1751,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             {/* The AI translation is behind the playhead — offer to wait
                 for it. A top-centre pill: the subtitles it is about live
                 at the bottom of the picture and the controls under them. */}
-            {catchUp && isVideo && (
+            {/* The subtitles are back: said once, for a few seconds, so the
+                pill that explained their absence does not just vanish. */}
+            {catchUp && catchUp.caughtUp && isVideo && (
+                <div class="wt-catchup wt-catchup--done" role="status"
+                     onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span class="wt-catchup-text">{t('player.subtitleCaughtUp')}</span>
+                </div>
+            )}
+            {catchUp && !catchUp.caughtUp && isVideo && (
                 <div class="wt-catchup" role="status" data-remaining={catchUp.remaining}
                      onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <LoadingSpinner />

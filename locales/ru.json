@@ -631,6 +631,7 @@
     "player.subtitleCatchUpWait": "Подождать",
     "player.subtitleCatchUpResume": "Смотреть дальше",
     "player.subtitleCatchUpDismiss": "Скрыть",
+    "player.subtitleCaughtUp": "ИИ-перевод догнал",
     "player.subtitleOfferLater": "Не сейчас",
     "player.subtitleOfferNever": "Не предлагать",
     "job.retrievingData": "получение данных ресурса",

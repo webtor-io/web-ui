@@ -105,3 +105,34 @@ test('nothing counted yet is 0/0 on a run that is not final, and nothing else', 
     assert.equal(nothingCountedYet({ done: 0, total: 0, final: true }), false);
     assert.equal(nothingCountedYet(null), false);
 });
+
+test('the viewer’s frontier is the service’s while the track has everything the service has', async () => {
+    const { viewerFrontier } = await import('./subtitle-catchup.js');
+    assert.equal(viewerFrontier({ serviceFrontier: 400, serviceDone: 40, loaded: { done: 40, frontier: 120 } }), 400);
+    assert.equal(viewerFrontier({ serviceFrontier: null, serviceDone: 40, loaded: { done: 40, frontier: 120 } }), null);
+    assert.equal(viewerFrontier({ serviceFrontier: 400, serviceDone: 40, loaded: null }), 400, 'before the first swap there is nothing to compare');
+});
+
+test('once the service is ahead of the track, the track’s edge is the frontier', async () => {
+    const { viewerFrontier } = await import('./subtitle-catchup.js');
+    // Swapped in while the service was pending from 120; it has since moved to 400.
+    assert.equal(viewerFrontier({ serviceFrontier: 400, serviceDone: 80, loaded: { done: 40, frontier: 120 } }), 120);
+    // The service says nothing is pending at all -- the viewer still only has up to 120.
+    assert.equal(viewerFrontier({ serviceFrontier: null, serviceDone: 80, loaded: { done: 40, frontier: 120 } }), 120);
+    // Swapped in with nothing pending: the edge is where the loaded cues end.
+    assert.equal(viewerFrontier({ serviceFrontier: 400, serviceDone: 80, loaded: { done: 40, frontier: null }, coverageEnd: 150 }), 150);
+    // ...and when that cannot be read, the service's word is all there is.
+    assert.equal(viewerFrontier({ serviceFrontier: 400, serviceDone: 80, loaded: { done: 40, frontier: null }, coverageEnd: null }), 400);
+    // The service can also be the nearer of the two.
+    assert.equal(viewerFrontier({ serviceFrontier: 100, serviceDone: 80, loaded: { done: 40, frontier: 120 } }), 100);
+});
+
+test('a reload is needed when the viewer nears the edge of what is loaded and there is more', async () => {
+    const { needsReload } = await import('./subtitle-catchup.js');
+    const loaded = { done: 40, frontier: 120 };
+    assert.equal(needsReload({ serviceDone: 80, loaded, frontier: 120, playhead: 116 }), true, 'within 5 s of the edge');
+    assert.equal(needsReload({ serviceDone: 80, loaded, frontier: 120, playhead: 100 }), false, 'plenty loaded ahead');
+    assert.equal(needsReload({ serviceDone: 40, loaded, frontier: 120, playhead: 119 }), false, 'nothing new to fetch');
+    assert.equal(needsReload({ serviceDone: 80, loaded: null, frontier: 120, playhead: 119 }), false);
+    assert.equal(needsReload({ serviceDone: 80, loaded, frontier: null, playhead: 119 }), false);
+});

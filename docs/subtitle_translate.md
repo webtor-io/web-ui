@@ -750,6 +750,38 @@ During a wait the big play button and the banner's **Keep watching** do the same
 `play` listener now flips the banner to its non-waiting state at once instead of on the next 3 s
 tick.
 
+### The viewer's frontier, not the service's (`viewerFrontier`, `needsReload`)
+
+Owner, 2026-09-18: "the subtitles do not keep up", with no pill to say why. The banner was decided
+by `X-Subtitle-Pending-From` — where the SERVICE is — while what is on screen is whatever revision
+the `<track>` last loaded, and that swap is throttled to one per 15 s. On a live source the
+translation runs only a little ahead of the viewer, so the usual state was: service ahead, banner
+silent, cues not in the track.
+
+- Every swap records `loaded = { done, frontier }` (the service's count and frontier at that
+  moment). While the service has more than the track (`p.done > loaded.done`), the frontier used
+  for everything — the hold, a wait, the passive pill — is the nearer of the service's and the
+  track's edge: `loaded.frontier`, or, when the swap happened with nothing pending, the end of the
+  last cue actually in the `<track>` (`coverageEnd`, read from `track.cues`, movie time via
+  `__absEnd`). When neither can be read the service's word stands, as before.
+- `needsReload`: the service has cues the track lacks and the viewer is within
+  `CATCHUP_CLEAR_MARGIN_S` (5 s) of that edge → swap **now**, bypassing the throttle. Also during a
+  wait (the film is paused then, and without the swap the edge never moves and the wait never
+  ends — caught by the tests). Not for a film the viewer paused. At worst this is a swap per poll
+  tick (3 s) on a translation that is barely ahead; the throttle exists to spare the viewer a
+  flicker, and a flicker beats no subtitles.
+- Consequence for the pill: it stays up for as long as the viewer really has no subtitles —
+  after **Keep watching**, after a hold that ran into its cap — not for as long as the service
+  says so.
+
+### "Caught up" is said
+
+When a wait ends caught up, or a trailing stretch ends, the pill turns into
+`.wt-catchup--done` — a check, `player.subtitleCaughtUp`, cyan border, no buttons — for
+`catchUpTiming.caughtUpFlashMs` (3 s) and then goes. `showCatchUp(null)` from the following tick
+does not cut it short; anything with something to say does. Never after a × (the viewer asked not
+to hear about it). Tests address the two states separately: `behindBanner` / `doneBanner`.
+
 ### The pill on a phone
 
 Under 600 px the catch-up pill drops the cue count (a sibling `.wt-catchup-text-short` carries the

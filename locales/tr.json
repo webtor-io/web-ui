@@ -621,6 +621,7 @@
     "player.subtitleCatchUpWait": "Bekle",
     "player.subtitleCatchUpResume": "İzlemeye devam et",
     "player.subtitleCatchUpDismiss": "Kapat",
+    "player.subtitleCaughtUp": "Yapay zekâ çevirisi yetişti",
     "player.subtitleOfferLater": "Şimdi değil",
     "player.subtitleOfferNever": "Bir daha önerme",
     "job.retrievingData": "kaynak verisi alınıyor",

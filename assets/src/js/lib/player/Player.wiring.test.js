@@ -1665,6 +1665,11 @@ function playback(video) {
 }
 
 const catchUpBanner = (p) => p.container.querySelector('.wt-catchup');
+// The pill that says "behind" -- as opposed to the few seconds of "caught up"
+// that follow it since 2026-09-18 (doneBanner). "Nothing says behind" is what
+// the assertions below mean by null.
+const behindBanner = (p) => p.container.querySelector('.wt-catchup:not(.wt-catchup--done)');
+const doneBanner = (p) => p.container.querySelector('.wt-catchup--done');
 
 // pickPausedThenPlay starts the run the way a viewer does who chooses the
 // track before pressing play. Since 2026-09-18 a run started over a PLAYING
@@ -1701,7 +1706,7 @@ test('a translation at the playhead offers to wait; one that gets ahead stops of
     // The service gets comfortably ahead (past the 5 s clear margin).
     pending = '400';
     await wait(POLL_INTERVAL_WINDOW_MS);
-    assert.equal(catchUpBanner(p), null, 'nothing to catch up to, nothing to say');
+    assert.equal(behindBanner(p), null, 'nothing to catch up to, nothing to say');
 });
 
 test('a service that sends no frontier shows no banner at all', async (t) => {
@@ -1720,7 +1725,7 @@ test('a service that sends no frontier shows no banner at all', async (t) => {
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
     await settle();
 
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
     assert.equal(p.container.querySelector('.tr-progress').hidden, false, 'the chip still reports the run');
 });
 
@@ -1762,7 +1767,7 @@ test('Wait pauses the film, keeps the poll awake, and plays again once the run i
     pending = '400';
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play >= 1, 'playback resumes on its own');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
     const dones = p.events.filter((e) => e.name === 'subtitle-translate-wait-done');
     assert.equal(dones.length, 1, 'one event for one wait');
     assert.equal(dones[0].data.lang, 'pt');
@@ -1786,18 +1791,18 @@ test('× takes the banner away and the next trailing tick does not bring it back
 
     click(catchUpBanner(p).querySelector('.wt-catchup-close'));
     await settle();
-    assert.equal(catchUpBanner(p), null, '× hides it');
+    assert.equal(behindBanner(p), null, '× hides it');
 
     // Still behind, still dismissed: a banner that came back three
     // seconds later would make the × read as broken.
     await wait(POLL_INTERVAL_WINDOW_MS);
-    assert.equal(catchUpBanner(p), null, 'and it stays hidden while the run is still behind');
+    assert.equal(behindBanner(p), null, 'and it stays hidden while the run is still behind');
 
     // The dismissal was about a stretch of film the run was behind on.
     // Once it is no longer behind, that stretch is over...
     pending = '400';
     await wait(POLL_INTERVAL_WINDOW_MS);
-    assert.equal(catchUpBanner(p), null, 'caught up: nothing to show either way');
+    assert.equal(behindBanner(p), null, 'caught up: nothing to show either way');
 
     // ...and the next time it falls behind, it may say so again.
     pending = '100';
@@ -1857,7 +1862,7 @@ async function mountSessionRun(t, respond, { sessionOffset = 0, startPaused = fa
 test('a seek into untranslated film holds playback until the translation is ahead, then plays', async (t) => {
     let pending = '400';
     const { p, log, seek, events } = await mountSessionRun(t, () => catchUpResponse('12/400', pending));
-    assert.equal(catchUpBanner(p), null, 'ahead before the seek: nothing to say');
+    assert.equal(behindBanner(p), null, 'ahead before the seek: nothing to say');
 
     // The seek lands on film the run has not translated.
     pending = '0';
@@ -1874,7 +1879,7 @@ test('a seek into untranslated film holds playback until the translation is ahea
     const playsBefore = log.play;
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play > playsBefore, 'playback resumes once the run is ahead');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
     const dones = events('subtitle-translate-wait-done');
     assert.equal(dones.length, 1);
     assert.equal(dones[0].data.auto, true);
@@ -1952,7 +1957,7 @@ test('no hold when the seek happened on a paused film, or the service does not s
         // The silent hold pauses for one answer and lets go on it: no wait,
         // no banner, and the film is playing again.
         assert.equal(events('subtitle-translate-wait').length, 0);
-        assert.equal(catchUpBanner(p), null);
+        assert.equal(behindBanner(p), null);
         assert.equal(p.video.paused, false, 'the first answer releases the film');
         assert.ok(log.play > playsBefore);
     });
@@ -2017,7 +2022,7 @@ test('a run that dies during a seek\u2019s hold plays the film it paused', async
     status = 500;
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play > plays, 'the film plays again');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
 });
 
 test('an answer about the run before the seek does not decide the hold; the one about the new run does', async (t) => {
@@ -2065,7 +2070,7 @@ test('during a seek\u2019s hold: another seek plays the film and decides again; 
     click(catchUpBanner(p).querySelector('.wt-catchup-close'));
     await settle();
     assert.ok(log.play > beforeX, '\u00d7 on a hold plays the film: the viewer never paused it');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
 });
 
 test('a hold that runs out while the tab is hidden does not start playback in the background', async (t) => {
@@ -2225,7 +2230,7 @@ test('a file translation that is behind the playhead offers to wait too', async 
     assert.ok(catchUpBanner(p), 'the banner needs only the frontier, not a live source');
     pending = '400';
     await wait(POLL_INTERVAL_WINDOW_MS);
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
     const heads = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url));
     assert.ok(heads.every((u) => u.includes('pos=')), `every poll says where the viewer is: ${heads[0]}`);
     assert.ok(!heads.at(-1).includes('sof='), 'and a file source never names a run');
@@ -2244,7 +2249,7 @@ test('a direct seek (no transcoder session) opens the hold window like a session
     p.video.currentTime = 100;
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
     await settle();
-    assert.equal(catchUpBanner(p), null, 'far ahead: nothing to say');
+    assert.equal(behindBanner(p), null, 'far ahead: nothing to say');
 
     // The viewer seeks 15 s forward into film the job has not reached.
     pending = '0';
@@ -2258,7 +2263,7 @@ test('a direct seek (no transcoder session) opens the hold window like a session
     pending = '3600';
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play >= 1, 'and ends when the job is ahead again');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
 });
 
 test('holding an arrow key rations the direct-seek kicks', async (t) => {
@@ -2621,7 +2626,7 @@ test('starting a translation over a playing film holds it until the run is ahead
     const playsBefore = log.play;
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(log.play > playsBefore, 'the film goes back on by itself');
-    assert.equal(catchUpBanner(p), null);
+    assert.equal(behindBanner(p), null);
 });
 
 test('starting a translation over a paused film holds nothing', async (t) => {
@@ -2636,7 +2641,7 @@ test('starting a translation over a paused film holds nothing', async (t) => {
     click(p.container.querySelector('#subtitles .subtitle[data-id="tr-pt"]'));
     await settle();
     assert.equal(log.pause, 0);
-    assert.equal(catchUpBanner(p), null, 'a paused film is not running into anything');
+    assert.equal(behindBanner(p), null, 'a paused film is not running into anything');
     assert.equal(p.events.filter((e) => e.name === 'subtitle-translate-wait').length, 0);
 });
 
@@ -2696,7 +2701,7 @@ test('a seek onto untranslated film never plays before it is held', async (t) =>
 
     // The answer is still 180 ms out.
     assert.equal(p.video.paused, true, 'held the moment the seek settled');
-    assert.equal(catchUpBanner(p), null, 'with nothing said yet');
+    assert.equal(behindBanner(p), null, 'with nothing said yet');
     assert.equal(events('subtitle-translate-wait').length, 0);
     const playsWhileSilent = log.play;
 
@@ -2809,4 +2814,73 @@ test('pressing play during a wait is pressing Keep watching: the banner says so 
     await settle();
     assert.equal(catchUpText(p), 'player.subtitleCatchUp', 'no longer "paused until…" over a film that is playing');
     assert.equal(catchUpBanner(p).querySelector('.wt-catchup-btn').textContent, 'player.subtitleCatchUpWait');
+});
+
+// ---- "caught up" is said, not implied -----------------------------------
+
+test('the pill says "caught up" when the subtitles are back, and then goes', async (t) => {
+    const flash = catchUpTiming.caughtUpFlashMs;
+    catchUpTiming.caughtUpFlashMs = 400;
+    t.after(() => { catchUpTiming.caughtUpFlashMs = flash; destroyPlayer(); });
+    clearOfferMemory();
+    const p = await mountPlayer();
+    let pending = '100';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    await pickPausedThenPlay(p, 100);
+    assert.ok(behindBanner(p), 'behind first');
+
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(behindBanner(p), null);
+    assert.ok(doneBanner(p), 'the pill does not just vanish');
+    assert.equal(doneBanner(p).querySelector('.wt-catchup-text').textContent, 'player.subtitleCaughtUp');
+    assert.equal(doneBanner(p).querySelector('button'), null, 'nothing to press on good news');
+
+    await wait(600);
+    assert.equal(catchUpBanner(p), null, 'and then it goes');
+});
+
+test('a dismissed banner is not followed by "caught up"', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    let pending = '100';
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('12/400', pending)
+        : { ok: true, status: 200, json: async () => ({}) }));
+    await pickPausedThenPlay(p, 100);
+    click(behindBanner(p).querySelector('.wt-catchup-close'));
+    await settle();
+    pending = '400';
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.equal(catchUpBanner(p), null, 'the viewer asked not to hear about it');
+});
+
+test('the viewer is behind when the TRACK is, whatever the service says', async (t) => {
+    // Owner, 2026-09-18: "the subtitles do not keep up", with no banner to
+    // say why. The service was ahead; the throttled <track> was not.
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer(null, { tracks: [['tr-pt', false]] });
+    let answer = () => catchUpResponse('5/400', '130');
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? answer()
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const trackSrc = () => p.video.querySelector('track#tr-pt').getAttribute('src') || '';
+    await pickPausedThenPlay(p, 100);
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=5\b/.test(trackSrc()), `loaded up to 130 s: ${trackSrc()}`);
+
+    // The service races ahead to 400 s; nothing reloads (15 s throttle, and
+    // the viewer is 30 s short of the edge of what they have).
+    answer = () => catchUpResponse('40/400', '400');
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=5\b/.test(trackSrc()), 'plenty loaded ahead: no swap yet');
+
+    // The viewer reaches the edge of the loaded cues: that is a swap NOW.
+    p.video.currentTime = 127;
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=40\b/.test(trackSrc()), `the throttle yields to a viewer running out of cues: ${trackSrc()}`);
 });
