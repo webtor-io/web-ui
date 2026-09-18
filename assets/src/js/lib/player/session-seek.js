@@ -90,7 +90,15 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // and the quantized guess stands as before.
             let answered = null;
             if (res && typeof res.json === 'function') {
-                const body = await res.json().catch(() => null);
+                // Under a timer: a body that never completes (a proxy
+                // holding the connection open) would otherwise park the
+                // seek inside this await with isSeeking latched, and every
+                // later seek would return immediately — for the rest of
+                // the session. The offset is a nicety; the seek is not.
+                const body = await Promise.race([
+                    res.json().catch(() => null),
+                    new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+                ]);
                 if (body && typeof body.offset === 'number' && Number.isFinite(body.offset) && body.offset >= 0) {
                     answered = body.offset;
                 }

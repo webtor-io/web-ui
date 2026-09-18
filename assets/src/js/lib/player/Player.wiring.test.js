@@ -2366,3 +2366,27 @@ test('the restored default track wiped by the initial loadSource is fetched agai
     assert.match(el.getAttribute('src'), /wt-rf=\d+$/, 'the wiped restored track is fetched again');
     assert.equal(p.mode('os-os-ru'), 'showing');
 });
+
+test('a seek answer whose body never completes does not lock seeking', { timeout: 8000 }, async (t) => {
+    // Found in review: isSeeking is cleared only in catch or on `playing`,
+    // and an unbounded res.json() sat before both — one stalled body and
+    // every later seek returned immediately for the rest of the session.
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({ subtitleTrack: -1, subtitleDisplay: false }); });
+    p.setResponse((url, params) => (params && params.method === 'POST'
+        ? { ok: true, status: 200, json: () => new Promise(() => {}) }
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const offsets = [];
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        onSeekOffsetChange: (o) => offsets.push(o),
+    });
+    const seeking = seeker.seek(125);
+    await wait(3500);
+    window.hlsPlayer.emit(Hls.Events.SUBTITLE_TRACKS_UPDATED, {});
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await seeking;
+    assert.deepEqual(offsets, [120], 'the stalled body is abandoned and the quantized fallback applies');
+    assert.equal(seeker.isSeeking(), false, 'and the seek completes');
+});
