@@ -278,3 +278,48 @@ test('a failed load ends the wait for it: no refetch on some later load', () => 
     assert.equal(el.listeners.load.length, 0);
     assert.equal(el.listeners.error.length, 0);
 });
+
+// ---- the mode on load is the mode NOW, not the mode at the swap ----------
+
+test('a revision that loads does not switch off a track that was enabled after the swap began', () => {
+    // Owner, 2026-09-18, on both kinds of source: after "Continue from…" the
+    // translation was running, the hold said "caught up", and there were no
+    // subtitles until pause -> play. A session seek's hls.loadSource()
+    // disables every element-backed track; a progress tick in that window
+    // swapped the revision and snapshotted mode = 'disabled'; the seek then
+    // settled and the picker's selection put the track back to 'showing';
+    // and the new revision's `load` "restored" the snapshot -- switching the
+    // track off with its fresh cues in it.
+    const el = makeTrack('tr-pt', [{ id: 'old' }]);
+    const video = videoWith(el);
+    el.track.mode = 'disabled';                       // the seek's wipe
+    assert.equal(reloadSubtitleTrack(video, 'tr-pt', 'https://x/a.vtt?rev=5'), true);
+    el.track.mode = 'showing';                        // applySubtitleSelection, once the seek settled
+    el.track.cues = [{ id: 'new' }];                  // the browser parsed the new revision
+    el.fire('load');
+    assert.equal(el.track.mode, 'showing', 'the load must not undo the selection');
+});
+
+test('a revision that fails to load still gets its cues back, and keeps the mode it has now', () => {
+    const old = [{ id: 'a' }, { id: 'b' }];
+    const el = makeTrack('tr-pt', old.slice());
+    const video = videoWith(el);
+    reloadSubtitleTrack(video, 'tr-pt', 'https://x/a.vtt?rev=6');
+    el.track.cues = [];                               // dropped while reparsing
+    el.track.mode = 'hidden';                         // whatever it is by then
+    el.fire('error');
+    assert.deepEqual(el.track.cues, old, 'the viewer keeps the lines they had');
+    assert.equal(el.track.mode, 'hidden');
+});
+
+test('settling tells the caller, so the selection can be written again', () => {
+    const el = makeTrack('tr-pt');
+    const video = videoWith(el);
+    let settled = 0;
+    reloadSubtitleTrack(video, 'tr-pt', 'https://x/a.vtt?rev=7', null, () => { settled++; });
+    el.fire('load');
+    assert.equal(settled, 1);
+    reloadSubtitleTrack(video, 'tr-pt', 'https://x/a.vtt?rev=8', null, () => { settled++; });
+    el.fire('error');
+    assert.equal(settled, 2);
+});

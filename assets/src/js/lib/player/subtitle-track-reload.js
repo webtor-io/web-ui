@@ -2,15 +2,28 @@
 //
 // An AI translation is produced cue by cue, so the player refetches the
 // partial .vtt as lines arrive (withRev bumps ?rev=). Re-parsing drops the
-// cue list and flips the track mode, so both are snapshotted before the
-// swap and put back once the new revision has loaded, or if it fails to
-// load at all (cue-offset.js). The session cue-offset (mid-movie resume)
-// re-applies through the capture 'load' listener the player installs
-// separately.
+// cue list, so the cues are snapshotted before the swap and put back if the
+// new revision comes up empty or fails to load at all. The session
+// cue-offset (mid-movie resume) re-applies through the capture 'load'
+// listener the player installs separately.
+//
+// The track MODE is deliberately not part of that snapshot any more
+// (2026-09-18). It used to be, and the snapshot could be taken at the worst
+// moment: a session seek's hls.loadSource() disables every element-backed
+// track, a progress tick inside that window swapped the revision with
+// mode = 'disabled' on record, the seek settled and the picker's selection
+// switched the track back on -- and then the revision's `load` "restored"
+// the snapshot, switching the track off with its fresh cues in it. Nothing
+// re-asserts after a <track> load (the player's re-assertion listens to
+// hls.js events only), so the viewer had a running translation, a banner
+// saying it had caught up, and no subtitles until something re-applied the
+// selection -- pause -> play, as it happened. The mode that is right after
+// a load is the picker's answer NOW, which this module does not know:
+// `onSettled` hands the moment to the caller, who does.
 //
 // Extracted from Player.jsx so the listener lifetime below is testable:
 // Player.jsx is JSX and `node --test` cannot parse it.
-import { captureTrackState, restoreTrackState } from './cue-offset.js';
+import { captureTrackState } from './cue-offset.js';
 
 // The reload waiting to settle on each <track>, so its listeners can be
 // taken off before the next one goes on. A pair per revision, left to
@@ -27,10 +40,20 @@ function clearPending(el) {
     pending.delete(el);
 }
 
+// restoreCues puts the snapshot's cues back where the new revision left the
+// list empty: restoreTrackState without the mode -- see the header.
+function restoreCues(saved) {
+    for (const { track, cues } of saved) {
+        if (!track || !cues.length) continue;
+        if (track.cues && track.cues.length > 0) continue;
+        for (const cue of cues) track.addCue(cue);
+    }
+}
+
 // reloadSubtitleTrack swaps in a newer revision of a partially written
 // VTT and reports whether it actually did anything — the caller throttles
 // reloads, and a no-op must not spend the throttle window.
-export function reloadSubtitleTrack(video, id, nextSrc, onError) {
+export function reloadSubtitleTrack(video, id, nextSrc, onError, onSettled) {
     if (!video || !id || !nextSrc) return false;
     let el = null;
     for (const t of video.querySelectorAll('track')) {
@@ -45,15 +68,17 @@ export function reloadSubtitleTrack(video, id, nextSrc, onError) {
     const saved = captureTrackState([el.track]);
     const handlers = {
         onLoad: () => {
-            restoreTrackState(saved);
+            restoreCues(saved);
             clearPending(el);
+            if (onSettled) onSettled();
         },
         onError: () => {
             // Put back the cues the viewer already had before saying
             // anything: a broken revision must not leave a blank screen.
-            restoreTrackState(saved);
+            restoreCues(saved);
             clearPending(el);
             if (onError) onError();
+            if (onSettled) onSettled();
         },
     };
     pending.set(el, handlers);

@@ -750,6 +750,30 @@ During a wait the big play button and the banner's **Keep watching** do the same
 `play` listener now flips the banner to its non-waiting state at once instead of on the next 3 s
 tick.
 
+### A revision's load must not switch the track off (`subtitle-track-reload.js`)
+
+**The bug behind "no subtitles until pause → play", on file and live sources alike** (owner,
+2026-09-18). `reloadSubtitleTrack` snapshotted the track before swapping `src` — cues *and mode* —
+and put both back on `load`. The snapshot could be taken at the worst moment: a session seek's
+`hls.loadSource()` disables every element-backed track; a progress tick inside that window swapped
+the revision with `mode = 'disabled'` on record; the seek settled and the picker's selection
+switched the track back on; and then the revision's `load` "restored" the snapshot — switching the
+track off with its fresh cues in it. Nothing re-asserted: the player's re-assertion listens to
+hls.js events (`SUBTITLE_TRACK_SWITCH`, `SUBTITLE_TRACKS_UPDATED`), and a `<track>` load is
+neither. So: a running translation, a banner saying it had caught up, no subtitles — until
+something re-applied the selection, which pause → play happened to do. "Continue from…" is a
+session seek, which is why it showed up right after resuming.
+
+- The module now restores **cues only** (when the new revision is empty or failed). The mode that
+  is right after a load is the picker's answer *now*, which the module cannot know.
+- `reloadSubtitleTrack(video, id, src, onError, onSettled)`: `onSettled` fires after `load` and
+  after `error`. `Player.jsx` passes `reassertSelection` — `readSelection` →
+  `selectionHolds` → `applySubtitleSelection`, the one writer of modes — guarded by the run id.
+- Pinned at both levels: the module test reproduces the switch-off (red before the fix), the
+  wiring test disables the track, fires `load`, and expects `showing` (red without `onSettled`).
+- **Not observed in a browser.** The chain was derived from the code and reproduced under jsdom;
+  hls.js does not run in the automation's hidden tab, so the real `loadSource` wipe was not seen.
+
 ### The viewer's frontier, not the service's (`viewerFrontier`, `needsReload`)
 
 Owner, 2026-09-18: "the subtitles do not keep up", with no pill to say why. The banner was decided

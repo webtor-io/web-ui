@@ -627,6 +627,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             if (!last) return null;
             return last.__absEnd !== undefined ? last.__absEnd : (last.endTime || 0) + seekOffsetRef.current;
         };
+        // Once a revision has settled, the picker's current answer is
+        // written again: the module no longer restores a mode of its own
+        // (see its header), and a <track> load wakes none of the hls.js
+        // events the re-assertion effect listens to.
+        const reassertSelection = () => {
+            if (runID !== runSeqRef.current) return;
+            const selection = readSelection(trackContainer || document);
+            if (!selection) return;
+            const video = videoRef.current;
+            const hls = hlsRef.current || window.hlsPlayer || null;
+            if (selectionHolds(video, hls, selection)) return;
+            applySubtitleSelection(video, hls, selection);
+        };
         const reload = (done, force, frontier = null) => {
             const now = Date.now();
             if (!force && now - lastReloadAt < TRACK_RELOAD_INTERVAL_MS) return;
@@ -634,7 +647,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // throttle window: stamping on a no-op (same revision, or no
             // <track> element yet) would hold off the next real one for
             // another 15 s.
-            if (reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError)) {
+            if (reloadSubtitleTrack(videoRef.current, id, withRev(src, done), onTrackError, reassertSelection)) {
                 lastReloadAt = now;
                 loaded = { done, frontier: frontier === undefined ? null : frontier };
             }

@@ -2884,3 +2884,30 @@ test('the viewer is behind when the TRACK is, whatever the service says', async 
     await wait(POLL_INTERVAL_WINDOW_MS);
     assert.ok(/rev=40\b/.test(trackSrc()), `the throttle yields to a viewer running out of cues: ${trackSrc()}`);
 });
+
+// ---- a revision's load does not switch the translation off ---------------
+
+test('a track switched off while its revision loads is switched back on when it settles', async (t) => {
+    // The whole chain behind "no subtitles until pause -> play" (owner,
+    // 2026-09-18, on OpenSubtitles and embedded sources alike): something
+    // disables the element-backed track -- a session seek's loadSource does
+    // -- and nothing re-asserts the picker's selection after a <track> load,
+    // because the re-assertion listens to hls.js events only.
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer(null, { tracks: [['tr-pt', false]] });
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? catchUpResponse('5/400', '400')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    const el = p.video.querySelector('track#tr-pt');
+    await pickPausedThenPlay(p, 100);
+    await wait(POLL_INTERVAL_WINDOW_MS);
+    assert.ok(/rev=5\b/.test(el.getAttribute('src') || ''), 'a revision is loading');
+    assert.equal(p.mode('tr-pt'), 'showing', 'fixture: the picked translation is on');
+
+    // What hls.loadSource() does to every element-backed track.
+    el.track.mode = 'disabled';
+    el.dispatchEvent(new dom.window.Event('load'));
+    await settle();
+    assert.equal(p.mode('tr-pt'), 'showing', 'the settle writes the picker’s answer again');
+});
