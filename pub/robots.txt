@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /assets/
 
 User-agent: GPTBot
 Allow: /
