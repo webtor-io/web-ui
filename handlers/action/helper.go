@@ -773,7 +773,18 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	// when it finds nothing.
 	if lis[pick].Provider == "Translated" {
 		markOffered(lis, pick)
-		return s.selectListItem(lis, "", ud, true)
+		// Offered means the viewer can have their language in one click, so
+		// nothing else is switched on for them (owner, 2026-09-18). Until
+		// then the phase-1 selection decided here too, and it knows only
+		// the browser's Accept-Language: a viewer who asked for Serbian got
+		// the Russian track their browser implied, which read as the
+		// setting being ignored. The explicit preference outranks the
+		// implicit header. The phase-1 fallback stays for every case where
+		// the preferred language cannot be served at all -- a locked item,
+		// NSFW, a language the service does not know -- and ladderPick
+		// answers those itself (fallbackIndex), never reaching here.
+		lis[0].Default = true
+		return lis
 	}
 	lis[pick].Default = true
 	return lis

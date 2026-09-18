@@ -92,9 +92,13 @@ feature is on and this is not an embed — see *Gating and flags*):
 4. **Ladder for the preferred language.** Otherwise, the best human track (ranks 0–4) in the
    preferred language wins. Failing that, the `Translated` item is the ladder's answer — but
    **it is never turned on for the viewer** (owner, 2026-09-16: a run spends tokens, so it takes
-   an explicit click). An unlocked item is marked `Offered`, a locked one `Upsell` (see *The
-   on-screen offer*), and the phase-1 selection decides what actually plays.
-5. **Phase-1 fallback on a ladder miss.** If the preferred language yields nothing activatable
+   an explicit click). An unlocked item is marked `Offered` and **subtitles stay off**
+   (owner, 2026-09-18): the viewer can have their language in one click, so the explicit
+   preference outranks the browser's `Accept-Language`. Until then the phase-1 selection decided
+   here too, and a viewer who had set Serbian got the Russian track their browser implied. A
+   locked item is marked `Upsell` (see *The on-screen offer*) and rule 5 applies.
+5. **Phase-1 fallback when the preferred language cannot be served at all.** Not when a
+   translation is `Offered` (rule 4). If the preferred language yields nothing activatable
    (NSFW, free viewer facing a locked item, or the language is outside
    `stremio.LanguageByCode`), `applyLadder` falls back to the old phase-1 selection
    (`selectListItem`/`matchLang`: Accept-Language, then English) instead of "None" — the ladder

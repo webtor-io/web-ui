@@ -1071,10 +1071,16 @@ func TestLadderNeverDefaultsTheTranslation(t *testing.T) {
 			t.Fatalf("the AI translation must never be the default: %+v", it)
 		}
 	}
-	// The phase-1 fallback decides instead: the English sidecar matches
-	// Accept-Language.
-	if d := defaultID(items); d != "mp-0" {
-		t.Fatalf("default=%s want mp-0 (the Accept-Language pick)", d)
+	// ...and nothing else is switched on in its place (owner, 2026-09-18):
+	// the viewer asked for Portuguese and can have it in one click, so the
+	// English sidecar their Accept-Language implies stays off. Until then
+	// the phase-1 fallback decided here, and a viewer who had set Serbian got
+	// the Russian track their browser implied.
+	//
+	// The other side of the rule is TestUpsellMarksTheLockedTranslation...:
+	// a viewer who CANNOT run the translation keeps the phase-1 pick.
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none: an offer leaves subtitles off", d)
 	}
 }
 
