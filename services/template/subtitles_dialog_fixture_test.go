@@ -169,6 +169,12 @@ func TestSubtitlesDialogFixtureCoversWhatTheWiringTestsNeed(t *testing.T) {
 		`data-offered="true"`,
 		"chip-offered",
 		"tr-progress",
+		// The preferred-language select, with the language in force
+		// selected -- it rendered with none selected (so the browser showed
+		// the first option, English) while `$` was taken for this view's
+		// data inside the range.
+		`id="preferred-lang" data-current="pt"`,
+		`<option value="pt" selected>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("the fixture no longer carries %q, so the wiring test that drives it covers nothing", want)
@@ -310,6 +316,7 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,

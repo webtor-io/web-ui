@@ -92,6 +92,9 @@ function renderWarm() {
             // and moving it kills it — render a live one where the person
             // looks, inside the step block of the form being submitted.
             if (!pending) return;
+            // A start nobody pressed a button for (silentToken) has nowhere
+            // to show a checkbox and nobody waiting to click it.
+            if (pending.silentOnly) { pending.finish('', 'needs-interaction'); return; }
             dropWarm();
             renderLive(pending.slot);
         }));
@@ -204,6 +207,41 @@ function getToken(form) {
             turnstile.execute(warmId);
         } catch (e) {
             finish('', 'execute-failed');
+        }
+    });
+}
+
+// silentToken is a token for a job start the page makes on the viewer's
+// behalf, with no form being submitted and nothing on screen to host a
+// checkbox (the player re-rendering its subtitles dialog for another
+// preferred language). Only the silent path: when Cloudflare wants a click
+// the answer is "", and the caller falls back to a start the viewer can see.
+// "" as well when the widget is not configured or a check is already
+// running.
+const BACKGROUND_TIMEOUT_MS = 8000;
+export function silentToken() {
+    return new Promise((resolve) => {
+        if (!hasTurnstile() || !container() || pending) { resolve(''); return; }
+        let done = false;
+        let timer = null;
+        const finish = (t) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            pending = null;
+            if (t && warmId !== null) { try { turnstile.reset(warmId); } catch (e) { dropWarm(); } }
+            else dropWarm();
+            if (warmId === null) renderWarm();
+            resolve(t || '');
+        };
+        pending = { finish, interactive: () => finish(''), slot: null, silentOnly: true };
+        timer = setTimeout(() => finish(''), BACKGROUND_TIMEOUT_MS);
+        if (warmId === null) renderWarm();
+        if (warmId === null) { finish(''); return; }
+        try {
+            turnstile.execute(warmId);
+        } catch (e) {
+            finish('');
         }
     });
 }

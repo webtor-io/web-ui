@@ -1654,3 +1654,36 @@ func TestUpsellIsNeverSetOnAnUnlockedTranslation(t *testing.T) {
 		t.Fatalf("offered=%v upsell=%v", tr.Offered, tr.Upsell)
 	}
 }
+
+// One language for audio and subtitles (owner, 2026-09-19): the default
+// audio track follows the viewer's preferred language, and only then the
+// browser's Accept-Language list.
+func TestAudioDefaultFollowsThePreferredLanguage(t *testing.T) {
+	mp := probeWith(`[
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"rus"}},
+		{"codec_type":"audio","codec_name":"aac","tags":{"language":"por"}}
+	]`)
+	accept, _, _ := language.ParseAcceptLanguage("pt-BR,pt;q=0.9,en;q=0.8")
+	ud := func(resolved string) *models.VideoStreamUserData {
+		return &models.VideoStreamUserData{AcceptLangTags: accept, FallbackLangTag: language.English, ResolvedLang: resolved}
+	}
+	// Nothing resolved (an embed, the feature off): the browser, as before.
+	if got := defaultID(NewHelper().GetAudioTracks(ud(""), mp)); got != "mp-2" {
+		t.Fatalf("no preferred language: want the browser's Portuguese (mp-2), got %s", got)
+	}
+	// The profile says Russian under a Portuguese browser.
+	if got := defaultID(NewHelper().GetAudioTracks(ud("ru"), mp)); got != "mp-1" {
+		t.Fatalf("preferred ru: want the Russian track (mp-1), got %s", got)
+	}
+	// No track in the preferred language: the browser's list decides next.
+	if got := defaultID(NewHelper().GetAudioTracks(ud("kk"), mp)); got != "mp-2" {
+		t.Fatalf("preferred kk, no such audio: want the browser's Portuguese (mp-2), got %s", got)
+	}
+	// The viewer's saved choice still outranks all of it.
+	saved := ud("ru")
+	saved.AudioID = "mp-0"
+	if got := defaultID(NewHelper().GetAudioTracks(saved, mp)); got != "mp-0" {
+		t.Fatalf("a saved audio choice wins: got %s", got)
+	}
+}

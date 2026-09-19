@@ -172,15 +172,79 @@ still reach Latino.
 
 ## Preferred language
 
-`streamprefs.Service.PreferredContentLang(ctx, user, uiLang)`:
+`streamprefs.Service.PreferredContentLang(ctx, user, picked, accept, uiLang)`, first match wins:
 
-- Signed-in user with `stremio_settings.preferred_language` set to a language `stremio.LanguageByCode`
-  recognizes → that language.
-- Otherwise the UI language (`c.Lang`), reduced to its base tag (`ResolvePreferred`).
-- Anonymous viewers always get the UI-language path (no DB lookup).
+1. **The profile.** Signed-in user with `stremio_settings.preferred_language` set to a language
+   `stremio.LanguageByCode` recognizes. For a viewer without an account, `picked` — what they
+   chose in the player, kept in the session (`models.PreferredLangSessionKey`) — stands in its
+   place.
+2. **The browser.** The first `Accept-Language` tag, reduced to its base, when the platform knows
+   the language.
+3. The UI language (`c.Lang`), only when the browser sent nothing usable (an API-started job).
 
-The same function is meant to back audio-track defaulting and the Stremio addon later (phase 5) —
-not implemented yet.
+The browser outranks the UI language since 2026-09-19 (owner). Measured over 523 streaming
+sessions (Umami, 18–19.09): in 46 % the two differ, almost always an English UI — the default an
+unprefixed URL gets — under a zh/pt/es/fr/ru browser. The ladder then found an English track,
+called the viewer served and never offered a translation: 7 offers against 531 streaming sessions,
+with 11 sessions (2 %) addressable at all. The same data put ~11 % of sessions in "needs subtitles,
+has a source track, browser ≠ UI".
+
+**One language for audio and subtitles** (owner, 2026-09-19). The job writes the resolved language
+to `vsud.ResolvedLang`, and `wantedLangs` (`handlers/action/helper.go`) puts it in front of the
+`Accept-Language` list wherever a list is matched by language: the default audio track
+(`GetAudioTracks` → `selectListItem` → `matchLang`) and the subtitle fallback. A saved audio choice
+still wins; with no track in the preferred language the browser's list decides, then English, then
+the first track. Where the job resolves no language (an embed, the feature off) `ResolvedLang` is ""
+and `Accept-Language` alone decides, as before. For most viewers nothing changes — the preferred
+language already is the browser's first tag — and for the rest it removes the split where Kazakh
+subtitles were offered over audio chosen for a Russian browser.
+
+**Shown and changeable in the picker.** The dialog's footer, beside Close, carries a select with
+the language in force — it is the viewer's setting, not the subtitles section's, so it does not sit
+under that heading (`#preferred-lang`, `stream_video.html`; absent in an embed and with the feature
+off, where `PreferredLang` is ""). It is the profile's setting itself, not a player setting of its
+own — the one the Stremio addon and the release subscriptions read — so changing it here changes it
+there. `PUT /stream-video/preferred-lang {lang}` (`handlers/action`): an account →
+`streamprefs.SetPreferredLang` → `models.SetUserPreferredLanguage`, which rewrites that one field of
+the JSONB document (the profile form replaces the whole document and would reset the resolution
+order); no account → the session. Unknown codes are refused (400); "" clears.
+
+The ladder and the AI chip are rendered by the server with the player, so after the PUT a new
+render is needed — but only the dialog's, not the film's (owner, 2026-09-19: the first version
+re-rendered the whole player, and a second of nothing is long in the middle of a film).
+
+- **The quiet path** (`background-render.js`, `swapSubtitlesDialog` in `Player.jsx`). The stream
+  action is started again *off the page*: the form's POST by `fetch`, then the job log's SSE until
+  its `rendertemplate` message, whose body is parsed and never inserted. From it only `#subtitles`
+  is taken: the live dialog element stays (it is open, and every listener is delegated to it — the
+  switch, the audio chips and this select were moved to delegation for that), its `data-*`
+  attributes and its `.modal-box` are replaced, the `<track>`s of chips that are gone are dropped,
+  and the server's new defaults are applied the way a mount applies them — the subtitle through
+  `activateSubtitle(persist: false)` and `trackHooks.onDialogSwapped` (the translation poll follows
+  it, "manual" is what the new render says was saved, the on-screen offer is decided again for the
+  new language), the audio default by setting `hls.audioTrack` when it differs. `<video>` is never
+  touched.
+- **Turnstile.** An anonymous start needs a token, the token is taken on a real `submit`, and tokens
+  are single-use — the one the page got for its first start cannot be sent again. `silentToken()`
+  (`turnstileAction.js`) takes a fresh one from the warm widget, silent path only (~1 s); a signed-in
+  viewer and a deployment with no widget need none.
+- **The visible restart** is what is left when the quiet path cannot be had: Cloudflare wants a
+  click, or the job answered with something that is not a player (an error card, the cap modal).
+  `requestSubmit()` on the form that posts to `/stream-video` (`findStreamForm` — by endpoint: the
+  form's class is the button's action name, `stream`, and a lookup by `form.stream-video` found
+  nothing and fell back to a reload that closed the player) — **not** the async library's
+  `form.reload()`, which skips the `submit` event Turnstile listens to. The job key carries the
+  language (`prefKey` for an account, `vsud.PreferredLang` in `vsudID` otherwise), and the player
+  that comes back continues without the "continue from" prompt: `trackHooks.beforeRestart`
+  force-saves the position and leaves a one-shot, one-minute note in `sessionStorage`
+  (`wt-auto-resume`) that the next player of the same file spends (`takeAutoResume`).
+
+`background-render.js` is deliberately not about languages: starting a stream action off the page
+and taking what is needed from its render is what switching to the next episode will need too.
+Telemetry: `subtitle-preferred-lang {from, to}`.
+
+The same function backs audio-track defaulting (above); the Stremio addon (phase 5) is not
+implemented yet.
 
 ## Gating and flags
 
@@ -904,7 +968,7 @@ deploys: they are measuring the deploy, not the traffic.
 
 | Event | Fields | Notes |
 |---|---|---|
-| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang`, `notReady` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang`, falling back to the UI language when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. `notReady` (`data-subtitles-not-ready`) says the OpenSubtitles lookup never finished on this render — exclude those rows before reading a `'none'` rate as "files with no subtitles". Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
+| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang`, `notReady` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang` — profile, then browser, see "Preferred language"; the UI language only when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. `notReady` (`data-subtitles-not-ready`) says the OpenSubtitles lookup never finished on this render — exclude those rows before reading a `'none'` rate as "files with no subtitles". Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
@@ -916,6 +980,7 @@ deploys: they are measuring the deploy, not the traffic.
 | `subtitle-offer-shown` | `lang`, `kind` (`start`\|`upsell`) | The on-screen offer was decided and shown, once per page, at first play. `kind` doubles as the tier split: `upsell` is a viewer who cannot run a translation. |
 | `subtitle-offer-click` | `lang`, `kind` | The pill was clicked: a run starts (`start`), or the card opens (`upsell`; fires again if toggled). |
 | `subtitle-offer-dismiss` | `lang`, `kind`, `how` (`close`\|`later`\|`never`) | The viewer closed the offer. For `upsell`, `close`/`later` snooze 30 days and `never` is for good. |
+| `subtitle-preferred-lang` | `from`, `to` | The viewer changed the preferred language in the subtitles dialog; fires after the PUT succeeded, before the player is re-rendered. |
 
 **Telemetry: not comparable across this release.** Do not read a day-over-day or week-over-week
 line through the deploy date. `subtitle-resolved.count` grows for reasons that are not "more

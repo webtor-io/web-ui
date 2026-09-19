@@ -8,11 +8,22 @@ import (
 )
 
 type VideoStreamUserData struct {
-	ResourceID      string
-	ItemID          string
-	SubtitleID      string
-	AudioID         string
-	AcceptLangTags  []language.Tag
+	ResourceID     string
+	ItemID         string
+	SubtitleID     string
+	AudioID        string
+	AcceptLangTags []language.Tag
+	// PreferredLang is the language a viewer without an account picked in
+	// the player. Site-wide, not per resource; an account keeps its own in
+	// the profile (see streamprefs).
+	PreferredLang string
+	// ResolvedLang is the viewer's preferred language as the stream job
+	// resolved it (profile or session, then browser -- streamprefs). The
+	// audio default and every language fallback match it before the raw
+	// Accept-Language list, so audio and subtitles answer to one language.
+	// "" where the job resolves none (an embed, the feature off): the
+	// Accept-Language list alone decides, as it always did.
+	ResolvedLang    string
 	FallbackLangTag language.Tag
 	Settings        *StreamSettings
 }
@@ -45,10 +56,16 @@ func (s *VideoStreamUserData) FetchSessionData(c *gin.Context) {
 	if err != nil {
 		tags = []language.Tag{language.English}
 	}
+	if v, ok := session.Get(PreferredLangSessionKey).(string); ok {
+		s.PreferredLang = v
+	}
 	s.AudioID = audioID
 	s.SubtitleID = subtitleID
 	s.AcceptLangTags = tags
 }
+
+// PreferredLangSessionKey holds VideoStreamUserData.PreferredLang.
+const PreferredLangSessionKey = "preferred_lang"
 
 func (s *VideoStreamUserData) makeKey(resourceID string, itemID string, name string) string {
 	return fmt.Sprintf("%v_%v_%v_id", resourceID, itemID, name)

@@ -2,6 +2,7 @@ package streamprefs
 
 import (
 	"context"
+	"github.com/pkg/errors"
 	"net/url"
 	"strings"
 
@@ -40,11 +41,24 @@ func New(c *cli.Context, pg *cs.PG) *Service {
 func (s *Service) TranslateEnabled() bool { return s != nil && s.enabled }
 func (s *Service) FreeForAll() bool       { return s != nil && s.free }
 
-// ResolvePreferred: the profile setting wins when it names a known
-// language; otherwise the UI language, reduced to its base.
-func ResolvePreferred(setting, uiLang string) string {
+// ResolvePreferred is the language the viewer reads subtitles in: the
+// profile setting when it names a known language, otherwise the browser's
+// first Accept-Language, otherwise the UI language.
+//
+// The browser outranks the UI language since 2026-09-19 (owner). Measured
+// over 523 streaming sessions: in 46% the two differ, almost always an
+// English UI -- the default an unprefixed URL gets -- under a zh/pt/es/fr/ru
+// browser. The ladder then found an English track, called the viewer served,
+// and never offered a translation: 7 offers against 531 streaming sessions.
+// The UI language is only what is left when the browser sent nothing usable.
+func ResolvePreferred(setting string, accept []language.Tag, uiLang string) string {
 	if code := strings.TrimSpace(setting); code != "" && stremio.LanguageByCode(code) != nil {
 		return code
+	}
+	if len(accept) > 0 {
+		if b, conf := accept[0].Base(); conf != language.No && stremio.LanguageByCode(b.String()) != nil {
+			return b.String()
+		}
 	}
 	t, err := language.Parse(uiLang)
 	if err != nil {
@@ -56,7 +70,10 @@ func ResolvePreferred(setting, uiLang string) string {
 	return ""
 }
 
-func (s *Service) PreferredContentLang(ctx context.Context, user *auth.User, uiLang string) string {
+// PreferredContentLang resolves the viewer's language. picked is what a
+// viewer without an account chose in the player (the session); an account's
+// own choice lives in the profile and outranks it.
+func (s *Service) PreferredContentLang(ctx context.Context, user *auth.User, picked string, accept []language.Tag, uiLang string) string {
 	setting := ""
 	if s != nil && s.pg != nil && user != nil && user.HasAuth() {
 		if db := s.pg.Get(); db != nil {
@@ -65,7 +82,31 @@ func (s *Service) PreferredContentLang(ctx context.Context, user *auth.User, uiL
 			}
 		}
 	}
-	return ResolvePreferred(setting, uiLang)
+	if strings.TrimSpace(setting) == "" {
+		setting = picked
+	}
+	return ResolvePreferred(setting, accept, uiLang)
+}
+
+// ErrUnknownLanguage is SetPreferredLang refusing a code the platform has
+// no language for.
+var ErrUnknownLanguage = errors.New("unknown language")
+
+// SetPreferredLang stores an account's preferred language -- the profile's
+// own setting, the one Stremio and the release subscriptions read too, not
+// a second one for the player. "" clears it (the browser decides again).
+func (s *Service) SetPreferredLang(ctx context.Context, user *auth.User, code string) error {
+	if code != "" && stremio.LanguageByCode(code) == nil {
+		return ErrUnknownLanguage
+	}
+	if s == nil || s.pg == nil || user == nil || !user.HasAuth() {
+		return errors.New("no account to store the language in")
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("no database connection available")
+	}
+	return models.SetUserPreferredLanguage(ctx, db, user.ID, code)
 }
 
 // IsAdultResource answers "may this resource get an AI subtitle track":

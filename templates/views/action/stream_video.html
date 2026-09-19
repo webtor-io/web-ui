@@ -70,7 +70,7 @@
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
 
             {{/* ===== AUDIO ===== */}}
-            <div class="mb-6">
+            <div class="mb-5">
                 <div class="flex items-baseline justify-between gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.audio" }}</h3>
                 </div>
@@ -91,9 +91,25 @@
             </div>
 
             {{/* ===== SUBTITLES ===== */}}
-            <div>
-                <div class="flex items-baseline justify-between gap-3 mb-2">
+            {{/* A hairline between the sections, the same one that sets the
+                 footer apart (owner, 2026-09-19): three blocks, three jobs. */}}
+            <div class="pt-5 border-t border-w-line">
+                {{/* The switch sits by the heading it switches (owner,
+                     2026-09-19; it led the language row since 2026-09-16,
+                     where the "Off" chip used to be). Beside three wrapped
+                     rows of chips on a phone it floated mid-height with
+                     nothing to read it against; here it reads as "Subtitles:
+                     on/off". It must stay legible while subtitles are off,
+                     so the dimming still lives on .lang-row and
+                     #subtitle-tracks, never on a box that contains it. The
+                     "None" item itself stays in #subtitle-tracks as a hidden
+                     carrier the player activates by id. */}}
+                <div class="flex items-center gap-3 mb-2">
                     <h3 class="font-bold text-lg">{{ t $.Lang "action.stream.subtitles" }}</h3>
+                    <label class="flex items-center cursor-pointer shrink-0">
+                        <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
+                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft"{{ if not $off }} checked{{ end }}>
+                    </label>
                 </div>
 
                 {{/* The language row is a filter, not a choice: pressing a chip
@@ -102,27 +118,7 @@
                      aria-pressed buttons rather than a tablist — there are no
                      tab panels, and the one real choice (which track plays)
                      lives in the radiogroup underneath. */}}
-                {{/* The group holds the switch AND the language filter now, so its name
-                     has to cover both — "Subtitle language" would misname the
-                     first control in it. */}}
                 <div id="subtitle-langs" class="flex items-start gap-2 mb-3" role="group" aria-label="{{ t $.Lang "action.stream.subtitleControls" }}">
-                    {{/* The switch leads the language row, where the "Off"
-                         chip used to be (owner, 2026-09-16): the same place
-                         the eye already looks for "no subtitles". It is not a
-                         language, and — unlike the chips — it must stay
-                         legible while subtitles are off, so the dimming lives
-                         on .lang-row beside it rather than on this container.
-                         (An `opacity` on a display:contents wrapper would
-                         paint nothing: no box, no group to fade.) The "None"
-                         item itself stays in #subtitle-tracks as a hidden
-                         carrier the player activates by id. */}}
-                    {{/* Default toggle size (1.5rem) matches the btn-xs language chips;
-                         toggle-sm sat 4px lower than the row. No padding on the label so
-                         the switch centres on the chips' own box. */}}
-                    <label class="flex items-center self-center cursor-pointer shrink-0 h-6">
-                        <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
-                        <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft"{{ if not $off }} checked{{ end }}>
-                    </label>
                     <div class="lang-row flex flex-wrap items-center gap-1.5{{ if $off }} picker-off{{ end }}">
                     {{ range $row.Groups }}
                     <button type="button" class="lang lang-chip{{ if eq .Lang $row.Expanded }} lang-chip-active{{ end }}"
@@ -159,7 +155,20 @@
                      state carrier: first child of the row, hidden and
                      aria-hidden, never unhidden by the language filter. One
                      element for the state, one control for the act. */}}
-                <div id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3{{ if $off }} picker-off{{ end }}" role="radiogroup" aria-label="{{ t $.Lang "action.stream.subtitles" }}">
+                {{/* The tracks and the uploads button share a line from `sm`
+                     up (owner, 2026-09-19): the button is one more way to
+                     get a track, not a section of its own, and a line to
+                     itself under a single AI chip read as one. On a phone
+                     they stack as before -- the chips need the width. The
+                     radiogroup keeps its own box (it carries picker-off, and
+                     an opacity on display:contents paints nothing);
+                     #my-subtitles is the one that dissolves, so its button
+                     follows the last chip -- next to it, not pushed to the
+                     far edge, where it read as unrelated -- and its panel,
+                     basis-full, opens under both. A row of chips that wraps
+                     fills the line, and the button starts the next one. */}}
+                <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-start gap-x-1.5 gap-y-3 mb-3">
+                <div id="subtitle-tracks" class="flex flex-wrap gap-1.5 sm:min-w-0 sm:max-w-full{{ if $off }} picker-off{{ end }}" role="radiogroup" aria-label="{{ t $.Lang "action.stream.subtitles" }}">
                     {{ range $subs }}{{ if eq .ID "none" }}
                     <button type="button" id="subtitle-none" class="subtitle" hidden aria-hidden="true" tabindex="-1"
                             data-id="none" data-provider="{{ .Provider }}" data-srclang="" data-kind="{{ .Kind }}" data-rank="{{ .Rank }}" data-lang="und"
@@ -245,10 +254,11 @@
                      correct. */}}
                 {{ if $withUploads }}
                 {{ $usv := userSubtitleView .VideoStreamUserData.ResourceID .Item.PathStr .EIURL .UserSubtitles $subs $row.Expanded }}
-                <div id="my-subtitles" class="flex flex-wrap items-start gap-1.5 mb-3" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
+                <div id="my-subtitles" class="flex flex-wrap items-start gap-1.5 sm:contents" data-async-layout='{{`{{ template "user_subtitles_view" (withContext $ .Data) }}`}}'>
                     {{ template "user_subtitles_view" withContext $ $usv }}
                 </div>
                 {{ end }}
+                </div>
 
                 {{/* What the offer above means, in words: this language has
                      no subtitles yet and the translation is there to be
@@ -283,8 +293,38 @@
                 </p>
             </div>
 
-            <div class="modal-action">
-                <form method="dialog" class="w-full sm:w-auto"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</button></form>
+            {{/* The viewer's preferred language, said out loud and changeable
+                 in place (owner, 2026-09-19). A setting of the viewer, not of
+                 the subtitles section, so it sits in the dialog's footer,
+                 beside Close, the way the embed dialog keeps its note there:
+                 it decides which track the ladder turns on and whether a
+                 translation is offered, and until now the only way to learn
+                 it was to guess from the result. It is the profile's
+                 preferred language itself, not a player setting of its own;
+                 a viewer without an account keeps it in the session. Absent
+                 in an embed and with the feature off -- PreferredLang is ""
+                 there, and the footer is Close alone. A hairline sets the
+                 footer apart from the tracks above it: what is in it is
+                 about the viewer, not about this file. On a phone the two
+                 stack: the select, then the button. */}}
+            <div class="modal-action flex-col items-stretch gap-3 sm:flex-row sm:items-center mt-5 pt-4 border-t border-w-line">
+                {{ if .SubtitleOpts.PreferredLang }}
+                {{/* Bound here: inside the range the dot is a language, and
+                     `$` is the page wrapper, not this view's data. */}}
+                {{ $preferred := .SubtitleOpts.PreferredLang }}
+                <label class="flex-grow flex items-center gap-2 min-w-0 text-sm text-w-sub" title="{{ t $.Lang "action.stream.preferredLangHint" }}">
+                    <span class="whitespace-nowrap">{{ t $.Lang "profile.settings.preferredLanguage" }}</span>
+                    <select id="preferred-lang" data-current="{{ $preferred }}" aria-describedby="preferred-lang-hint"
+                            class="select select-sm bg-base-300 border-w-line focus:border-w-cyan focus:outline-none min-w-0 flex-1 sm:flex-none sm:w-auto sm:min-w-[11rem]">
+                        {{ range stremioLanguages }}
+                        <option value="{{ .Code }}"{{ if eq $preferred .Code }} selected{{ end }}>{{ .Flag }} {{ .Name }}</option>
+                        {{ end }}
+                    </select>
+                    <span id="preferred-lang-busy" class="loading loading-spinner loading-xs text-w-cyan shrink-0" aria-hidden="true" hidden></span>
+                    <span id="preferred-lang-hint" class="sr-only">{{ t $.Lang "action.stream.preferredLangHint" }}</span>
+                </label>
+                {{ end }}
+                <form method="dialog" class="w-full sm:w-auto sm:ml-auto"><button class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content w-full sm:w-auto">{{ t $.Lang "action.stream.close" }}</button></form>
             </div>
         </div>
         {{/* Click outside the box closes the dialog (owner, 2026-09-15).

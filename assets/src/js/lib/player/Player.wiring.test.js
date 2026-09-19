@@ -118,6 +118,7 @@ const {
     markTrack,
     findSubtitleItem,
     PUT_RETRY_DELAY_MS,
+    swapSubtitlesDialog,
 } = await import('./Player.jsx');
 // Imported the same way and for the same reason as Player.jsx: hls-manager
 // reads navigator at module scope, so it cannot be a static import above
@@ -2702,6 +2703,106 @@ test('a film with a saved position does not start by itself, and is not pitched 
     assert.ok(log.play > playsBefore, 'the answer starts playback');
     assert.equal(p.video.paused, false, 'and nothing pauses it again');
     assert.ok(offerPill(p), 'now the offer is decided');
+});
+
+// ---- the dialog is re-rendered, the player is not -------------------------
+//
+// Owner, 2026-09-19: changing the preferred language re-rendered the whole
+// player, and a second of nothing is long in the middle of a film. The new
+// dialog is rendered off the page (background-render.js) and put in place of
+// the old one; these pin what "in place" has to mean.
+
+// freshDialog is the dialog a render for another language would bring: the
+// fixture again, with the language changed and the AI chip renamed.
+function freshDialog(lang) {
+    const doc = new dom.window.DOMParser().parseFromString(DIALOG, 'text/html');
+    const dialog = doc.querySelector('#subtitles');
+    dialog.setAttribute('data-preferred-lang', lang);
+    const ai = dialog.querySelector('.subtitle[data-provider="Translated"]');
+    ai.setAttribute('data-id', `tr-${lang}`);
+    ai.setAttribute('data-srclang', lang);
+    ai.setAttribute('data-src', (ai.getAttribute('data-src') || '').replace(/~tr:[a-z]+/, `~tr:${lang}`));
+    const select = dialog.querySelector('#preferred-lang');
+    if (select) select.setAttribute('data-current', lang);
+    return dialog;
+}
+
+test('a dialog swap leaves the player alone and the new dialog works', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    const video = p.video;
+    const liveDialog = p.modal;
+    const oldBox = liveDialog.querySelector('.modal-box');
+    p.video.paused = false;
+
+    assert.equal(swapSubtitlesDialog(p.container, freshDialog('kk'), {}), true);
+
+    assert.equal(p.container.querySelector('video.player'), video, 'the same <video>');
+    assert.equal(p.container.querySelector('#subtitles'), liveDialog, 'the same dialog element: it is open, and the listeners hang on it');
+    assert.notEqual(liveDialog.querySelector('.modal-box'), oldBox, 'with a new box in it');
+    assert.equal(liveDialog.getAttribute('data-preferred-lang'), 'kk');
+    assert.ok(findSubtitleItem(liveDialog, 'tr-kk'), 'the new language\u2019s AI chip');
+    assert.equal(findSubtitleItem(liveDialog, 'tr-pt'), null, 'and not the old one');
+
+    // The chips of the new box answer to the listeners of the old dialog.
+    const chip = Array.from(liveDialog.querySelectorAll('.subtitle'))
+        .find((el) => el.getAttribute('data-provider') === 'OpenSubtitles');
+    click(chip);
+    await settle();
+    assert.equal(chip.getAttribute('data-default'), 'true', 'a chip in the new box can be picked');
+    // ...and so does the switch, which is a new element too.
+    const toggle = liveDialog.querySelector('#subtitles-toggle');
+    toggle.checked = false;
+    toggle.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    await settle();
+    assert.equal(liveDialog.getAttribute('data-subtitles-off'), 'true', 'the new switch switches');
+});
+
+test('a dialog swap takes the <track> of the language that was left', async (t) => {
+    t.after(() => destroyPlayer());
+    clearOfferMemory();
+    const p = await mountPlayer();
+    p.setResponse((url, params) => (params && params.method === 'HEAD'
+        ? progressResponse('12/400')
+        : { ok: true, status: 200, json: async () => ({}) }));
+    p.video.paused = false;
+    click(p.chip('tr-pt'));
+    await settle();
+    const heads = () => p.calls.filter((c) => c.params && c.params.method === 'HEAD').length;
+    assert.ok(heads() >= 1, 'fixture: a Portuguese run is polling');
+    assert.ok(p.video.querySelector('track#tr-pt'), 'fixture: with its <track>');
+
+    assert.equal(swapSubtitlesDialog(p.container, freshDialog('kk'), {}), true);
+    await settle();
+    assert.equal(p.video.querySelector('track#tr-pt'), null, 'the old language\u2019s <track> goes with its chip');
+});
+
+test('a player that comes back from a settings change continues without asking', async (t) => {
+    // The preferred-language select re-renders the player (preferred-lang.js):
+    // the viewer changed a setting, they did not leave, so the "continue
+    // from" prompt is answered for them. Once, for this file, for a minute.
+    t.after(() => { destroyPlayer(); window.sessionStorage.clear(); });
+    clearOfferMemory();
+    window.sessionStorage.setItem('wt-auto-resume', JSON.stringify({ resourceID: 'res', path: 'movie.mkv', until: Date.now() + 60000 }));
+    const p = mount();
+    savedPosition(p);
+    const log = playback(p.video);
+    await initPlayer(p.container);
+    await settle();
+    await settle();
+    assert.equal(resumePrompt(p), null, 'nothing to answer');
+    assert.equal(p.video.currentTime, 600, 'at the saved position');
+    assert.ok(log.play >= 1 && !p.video.paused, 'and playing');
+    assert.equal(window.sessionStorage.getItem('wt-auto-resume'), null, 'the note is spent');
+});
+
+test('without that note the prompt is asked as before', async (t) => {
+    t.after(() => { destroyPlayer(); window.sessionStorage.clear(); });
+    clearOfferMemory();
+    window.sessionStorage.setItem('wt-auto-resume', JSON.stringify({ resourceID: 'another', path: 'movie.mkv', until: Date.now() + 60000 }));
+    const p = await mountPlayer((page) => savedPosition(page));
+    assert.ok(resumePrompt(p), 'a note for another file answers nothing here');
 });
 
 test('an audio file with a saved position is not held: it has no prompt to answer', async (t) => {

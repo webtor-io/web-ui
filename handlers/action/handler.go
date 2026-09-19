@@ -1,6 +1,7 @@
 package action
 
 import (
+	"context"
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/services/auth"
 	"net/http"
@@ -17,8 +18,10 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/api"
@@ -64,6 +67,13 @@ type Handler struct {
 	tb       template.Builder[*web.Context]
 	api      *api.Api
 	verifier ActionVerifier
+	prefs    PreferredLangStore
+}
+
+// PreferredLangStore keeps an account's preferred language. Satisfied by
+// *streamprefs.Service.
+type PreferredLangStore interface {
+	SetPreferredLang(ctx context.Context, user *auth.User, code string) error
 }
 
 // ActionVerifier checks the Turnstile token a job start carries. Satisfied
@@ -73,12 +83,13 @@ type ActionVerifier interface {
 	Validate(token string, remoteIP string) error
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, apiSvc *api.Api, verifier ActionVerifier) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.Jobs, apiSvc *api.Api, verifier ActionVerifier, prefs PreferredLangStore) {
 	h := &Handler{
 		tb:       tm.MustRegisterViews("action/**/*").WithHelper(NewHelper()),
 		jobs:     jobs,
 		api:      apiSvc,
 		verifier: verifier,
+		prefs:    prefs,
 	}
 	r.POST("/download-file", func(c *gin.Context) {
 		h.post(c, "download")
@@ -100,11 +111,67 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.
 			_ = c.Error(err)
 		}
 	})
+	r.PUT("/stream-video/preferred-lang", h.putPreferredLang)
 	r.PUT("/stream-video/audio", func(c *gin.Context) {
 		if err := putTrackChoice(c, trackAudio); err != nil {
 			_ = c.Error(err)
 		}
 	})
+}
+
+// PreferredLangPutArgs is the body of PUT /stream-video/preferred-lang.
+// An empty lang clears the choice: the browser decides again.
+type PreferredLangPutArgs struct {
+	Lang string `json:"lang"`
+}
+
+// putPreferredLang stores the language the viewer picked in the player's
+// subtitles dialog. For an account that is the profile's preferred
+// language itself -- one setting, shown in two places -- and for a viewer
+// without one it is kept in the session, where the stream job reads it
+// (VideoStreamUserData.PreferredLang).
+func (s *Handler) putPreferredLang(c *gin.Context) {
+	a := PreferredLangPutArgs{}
+	if err := c.BindJSON(&a); err != nil {
+		return
+	}
+	code, err := preferredLangCode(a.Lang)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	if u := auth.GetUserFromContext(c); u != nil && u.HasAuth() {
+		if err := s.prefs.SetPreferredLang(c.Request.Context(), u, code); err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to store the preferred language"))
+			return
+		}
+		c.Status(http.StatusNoContent)
+		return
+	}
+	session := sessions.Default(c)
+	if code == "" {
+		session.Delete(models.PreferredLangSessionKey)
+	} else {
+		session.Set(models.PreferredLangSessionKey, code)
+	}
+	if err := session.Save(); err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to save the session"))
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// preferredLangCode validates what the picker sent: "" (clear) or the code
+// of a language the platform knows.
+func preferredLangCode(v string) (string, error) {
+	code := strings.TrimSpace(v)
+	if code == "" {
+		return "", nil
+	}
+	if stremio.LanguageByCode(code) == nil {
+		return "", errors.Errorf("unknown language %q", code)
+	}
+	return code, nil
 }
 
 // trackKind names which of the two track choices a PUT carries.

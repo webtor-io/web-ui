@@ -11,6 +11,8 @@ import { reloadSubtitleTrack, dropDeletedTracks } from './subtitle-track-reload.
 import { readAllTracks, readTracks, resolveSubtitleLevel, selectEventData } from './subtitle-telemetry.js';
 import { pickDefaultSubtitle, translationAction, hasSavedDefault } from './subtitle-rules.js';
 import { pollProgress, progressText, withParam, withRev } from './subtitle-progress.js';
+import { markAutoResume, takeAutoResume, wirePreferredLang } from './preferred-lang.js';
+import { rebindAsync } from '../async';
 import { catchUpTiming, caughtUp, needsReload, nothingCountedYet, resumeRewind, shouldBrake, trailing, viewerFrontier } from './subtitle-catchup.js';
 import {
     adoptUploadChips,
@@ -1111,6 +1113,23 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             activateSubtitle(trackContainer, item, { persist: false });
             if (action !== 'none') startTranslationProgress(item, action === 'resume');
         };
+        // The dialog was re-rendered for another preferred language
+        // (swapSubtitlesDialog). What plays now is the server's default, not
+        // a press of the viewer's: the translation poll follows it, "manual"
+        // is whatever the new render says was saved, and the on-screen offer
+        // is decided again -- for the language the viewer has just asked
+        // for, which is the moment it is most likely wanted.
+        trackHooks.onDialogSwapped = (el) => {
+            const modal = findSubtitlesModal(trackContainer);
+            manualSubtitleRef.current = !!modal && hasSavedDefault(readAllTracks(modal));
+            setOffer(null);
+            setOfferCard(false);
+            const action = translationActionFor(el);
+            if (itemData(el).id !== pollingIdRef.current) stopTranslationProgress();
+            if (action !== 'none') startTranslationProgress(el, action === 'resume');
+            offerArmedRef.current = false;
+            setDialogVersion((v) => v + 1);
+        };
         // A translation the viewer chose in an earlier session comes back on
         // its own. Every other saved choice resumes from the <track> the
         // server rendered; a translation has none (markPreload skips it, or
@@ -1138,6 +1157,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         return () => {
             trackHooks.onSubtitleSelect = null;
             trackHooks.onAudioSelect = null;
+            trackHooks.onDialogSwapped = null;
             stopTranslationProgress({ resumeHold: false });
         };
     }, [trackHooks, trackContainer, startTranslationProgress, stopTranslationProgress, translationActionFor]);
@@ -1210,6 +1230,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // take the listener off -- state alone would pause the film the viewer
     // just started.
     const resumeAnsweredRef = useRef(false);
+    const autoResumeRef = useRef(false);
 
     // Watch history hook (position tracking + resume).
     // `paused` prevents overwriting saved position while resume prompt is open.
@@ -1220,6 +1241,24 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         playing: state.playing,
         paused: showResumePrompt,
     });
+
+    // A settings change that re-renders the player (the preferred language,
+    // preferred-lang.js) calls this first: the position is saved now, not at
+    // the next periodic write, and the player that comes back is told to
+    // continue from it without asking.
+    useEffect(() => {
+        if (!trackHooks) return undefined;
+        trackHooks.beforeRestart = () => {
+            const video = videoRef.current;
+            if (!video) return;
+            const at = (video.currentTime || 0) + seekOffsetRef.current;
+            const dur = duration > 0 ? duration : (video.duration || 0);
+            if (!(at > 0) || !(dur > 0)) return;
+            forceSendPosition(at, dur);
+            markAutoResume(resourceID, path);
+        };
+        return () => { trackHooks.beforeRestart = null; };
+    }, [trackHooks, duration, forceSendPosition, resourceID, path]);
 
     // A session seek moves the video to a spot the running translation has
     // not caught up to yet. Left alone, the first cues for that position
@@ -1329,6 +1368,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [offerLingering, setOfferLingering] = useState(false);
     const [offerCard, setOfferCard] = useState(false);
     const offerArmedRef = useRef(false);
+    // Bumped when the dialog is re-rendered for another language, so the
+    // offer below is decided again.
+    const [dialogVersion, setDialogVersion] = useState(0);
     const offerTimerRef = useRef(null);
 
     const trackOffer = useCallback((name, o, extra) => {
@@ -1351,7 +1393,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setOfferLingering(true);
         offerTimerRef.current = setTimeout(() => setOfferLingering(false), offerTiming.lingerMs);
         trackOffer('subtitle-offer-shown', next);
-    }, [state.playing, isVideo, trackContainer, trackOffer, resumeReady, resumePosition, resumeAnswered]);
+    }, [state.playing, isVideo, trackContainer, trackOffer, resumeReady, resumePosition, resumeAnswered, dialogVersion]);
 
     useEffect(() => () => { if (offerTimerRef.current) clearTimeout(offerTimerRef.current); }, []);
 
@@ -1631,6 +1673,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // <audio> with a saved position has no prompt to answer, and a
         // prompt that is "open" and invisible kept position saving paused.
         if (isVideo && resumePosition && resumePosition > 0) {
+            // A player that came back from a settings change (the preferred
+            // language, preferred-lang.js) continues without asking: the
+            // viewer never left.
+            autoResumeRef.current = takeAutoResume(resourceID, path);
             setShowResumePrompt(true);
         }
     }, [resumeReady]);
@@ -1683,6 +1729,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const dur = duration > 0 ? duration : (video.duration || 0);
         if (dur > 0) forceSendPosition(resumePosition, dur);
     }, [resumePosition, isSession, sessionSeekUrl, handleSeek, duration, forceSendPosition, playAfterPrompt]);
+
+    // The prompt is answered for the viewer when the note says so. Through
+    // the prompt's own state rather than around it: handleResume is the one
+    // place that knows how to resume a session and a direct source.
+    useEffect(() => {
+        if (!showResumePrompt || !autoResumeRef.current) return;
+        autoResumeRef.current = false;
+        handleResume();
+    }, [showResumePrompt, handleResume]);
 
     const handleStartOver = useCallback(() => {
         setShowResumePrompt(false);
@@ -2417,7 +2472,58 @@ let asyncSwapListener = null;
 // ref-free: `hooks` is the object the mounted component fills with
 // onSubtitleSelect/onAudioSelect (see the trackHooks effect), so the
 // session-scoped state those need lives in the component, not here.
+// swapSubtitlesDialog puts a freshly rendered subtitles dialog in place of
+// the one on screen without touching the player (owner, 2026-09-19: a
+// preferred-language change used to re-render the whole player, and a second
+// of nothing is a long time in the middle of a film). The dialog ELEMENT
+// stays -- it is open, and every delegated listener hangs on it; its
+// attributes and its box are what the language decides, so those are what
+// is replaced. Then the server's new defaults are applied the way a mount
+// applies them: the subtitle the ladder chose, the audio track the language
+// chose. Reports whether it swapped.
+export function swapSubtitlesDialog(container, fresh, hooks = {}) {
+    const live = container.querySelector('#subtitles');
+    const liveBox = live && live.querySelector('.modal-box');
+    const freshBox = fresh && fresh.querySelector && fresh.querySelector('.modal-box');
+    if (!live || !liveBox || !freshBox) return false;
+    for (const name of fresh.getAttributeNames()) {
+        if (name.startsWith('data-')) live.setAttribute(name, fresh.getAttribute(name));
+    }
+    liveBox.replaceWith(document.importNode(freshBox, true));
+    // The upload forms inside are async forms; the library binds what it is
+    // told about.
+    rebindAsync(live);
+
+    const video = container.querySelector('video.player, audio.player');
+    // <track>s of chips that are gone (the AI item of the old language).
+    const chipIDs = [];
+    for (const el of live.querySelectorAll('.subtitle')) {
+        const cid = el.getAttribute('data-id');
+        if (cid) chipIDs.push(cid);
+    }
+    dropDeletedTracks(video, chipIDs);
+
+    const subtitle = live.querySelector('.subtitle[data-default="true"]');
+    if (subtitle) {
+        activateSubtitle(container, subtitle, { persist: false });
+        if (hooks.onDialogSwapped) hooks.onDialogSwapped(subtitle);
+    }
+    const audio = live.querySelector('.audio[data-default="true"]');
+    if (audio && window.hlsPlayer && audio.getAttribute('data-provider') === 'MediaProbe') {
+        const idx = parseInt(audio.getAttribute('data-mp-id'));
+        if (Number.isFinite(idx) && window.hlsPlayer.audioTrack !== idx) window.hlsPlayer.audioTrack = idx;
+    }
+    syncUploadMarks(container, live);
+    applyFlagSupport(live);
+    refresh(live);
+    return true;
+}
+
 export function wireTrackHandlers(container, hooks = {}) {
+    wirePreferredLang(container, {
+        beforeRestart: () => { if (hooks.beforeRestart) hooks.beforeRestart(); },
+        swap: (fresh) => swapSubtitlesDialog(container, fresh, hooks),
+    });
     // Delegate subtitle clicks on #subtitles so items swapped into
     // #my-subtitles via async still work without re-binding.
     const subtitlesModal = container.querySelector('#subtitles');
@@ -2449,9 +2555,14 @@ export function wireTrackHandlers(container, hooks = {}) {
         // The subtitles switch. It is a real checkbox (DaisyUI toggle), so
         // the browser owns the pressed state and this only reacts to it —
         // change, not click, so keyboard and label clicks arrive too.
-        const toggleEl = subtitlesModal.querySelector('#subtitles-toggle');
-        if (toggleEl) {
-            toggleEl.addEventListener('change', () => {
+        //
+        // Delegated, like the chips: the dialog's box is replaced when the
+        // preferred language changes (swapSubtitlesDialog), and a listener
+        // on the checkbox itself would stay behind on the old one.
+        {
+            subtitlesModal.addEventListener('change', (e) => {
+                const toggleEl = e.target;
+                if (!toggleEl || toggleEl.id !== 'subtitles-toggle') return;
                 const item = setSubtitlesOff(container, subtitlesModal, !toggleEl.checked);
                 // Flipping the switch is as manual as pressing a chip, and
                 // the component has to hear about it: onSubtitleSelect is
@@ -2505,22 +2616,24 @@ export function wireTrackHandlers(container, hooks = {}) {
     // e.target.closest, not e.target: a chip's click lands on the flag
     // <span> or the check <svg> as often as on the button itself, and
     // markTrack would then mark a <span> and read data-mp-id as null.
-    for (const audio of container.querySelectorAll('.audio')) {
-        audio.addEventListener('click', (e) => {
-            const target = e.target.closest('.audio');
-            if (!target) return;
-            markTrack(container, target, 'audio');
-            if (window.hlsPlayer && target.getAttribute('data-provider') === 'MediaProbe') {
-                window.hlsPlayer.audioTrack = parseInt(target.getAttribute('data-mp-id'));
-            }
-            if (hooks.onAudioSelect) hooks.onAudioSelect(target);
-        });
-    }
+    // Delegated for the same reason as the switch above: the chips are part
+    // of what a preferred-language change replaces.
+    container.addEventListener('click', (e) => {
+        const target = e.target.closest('.audio');
+        if (!target || !container.contains(target)) return;
+        markTrack(container, target, 'audio');
+        if (window.hlsPlayer && target.getAttribute('data-provider') === 'MediaProbe') {
+            window.hlsPlayer.audioTrack = parseInt(target.getAttribute('data-mp-id'));
+        }
+        if (hooks.onAudioSelect) hooks.onAudioSelect(target);
+    });
 
     syncUploadMarks(container, subtitlesModal);
     // loadAsyncView dispatches an 'async' CustomEvent after swapping a
     // target's innerHTML; re-sync when #my-subtitles content is replaced.
-    const mySubsContainer = container.querySelector('#my-subtitles');
+    // Looked up on every event, not captured: swapSubtitlesDialog replaces
+    // the dialog's box, #my-subtitles with it.
+    const mySubs = () => container.querySelector('#my-subtitles');
     // Taken off again before a new one goes on, and by destroyPlayer.
     // wireTrackHandlers runs once per async navigation and the listener
     // closes over that page's #my-subtitles, so one left behind accumulates
@@ -2530,9 +2643,10 @@ export function wireTrackHandlers(container, hooks = {}) {
         window.removeEventListener('async', asyncSwapListener);
         asyncSwapListener = null;
     }
-    if (mySubsContainer) {
+    if (mySubs()) {
         asyncSwapListener = (e) => {
-            if (!e.detail || e.detail.target !== mySubsContainer) return;
+            const mySubsContainer = mySubs();
+            if (!mySubsContainer || !e.detail || e.detail.target !== mySubsContainer) return;
             // The panel and its toggle are part of the swapped markup; the
             // wrapper is not, so it is what remembers whether the viewer had
             // the upload form open. After a delete the viewer is still

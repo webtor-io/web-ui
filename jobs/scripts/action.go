@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"golang.org/x/text/language"
 	"net/url"
 	"path/filepath"
 	"sort"
@@ -465,7 +466,12 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// undoable.
 	adult, hintWithheld := readAdultBit(ctx, s.prefs, resourceID)
 	if translateEnabled && !isEmbed {
-		preferred = s.prefs.PreferredContentLang(ctx, c.User, c.Lang)
+		preferred = s.prefs.PreferredContentLang(ctx, c.User, pickedLang(vsud), acceptLangTags(vsud), c.Lang)
+		// The same language decides the audio default: the template's
+		// getAudioTracks and the ladder's fallbacks read it off vsud.
+		if vsud != nil {
+			vsud.ResolvedLang = preferred
+		}
 		if enrichedMD != nil {
 			nCtx, nCancel := context.WithTimeout(ctx, 3*time.Second)
 			castNames = s.prefs.CastNames(nCtx, enrichedMD.VideoID, 30)
@@ -1381,7 +1387,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
-	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
+	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
 	// Cache key includes the authenticated user's id so two users on the
@@ -1418,7 +1424,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 		// moment; without it in the key a change waited out the ten-minute
 		// bucket (the owner changed it and got the old picker back).
 		prefCtx, prefCancel := context.WithTimeout(context.Background(), 3*time.Second)
-		prefKey = prefs.PreferredContentLang(prefCtx, c.User, c.Lang)
+		prefKey = prefs.PreferredContentLang(prefCtx, c.User, pickedLang(vsud), acceptLangTags(vsud), c.Lang)
 		prefCancel()
 		if userSubtitles.Enabled() {
 			// Cache-key lookup intentionally scopes to resource, not
@@ -1504,4 +1510,21 @@ func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int6
 		pct = 100
 	}
 	return fmt.Sprintf("%.0f%%", pct)
+}
+
+// acceptLangTags is the browser's Accept-Language as the stream request
+// carried it; nil when there is no request data (an API-started job).
+func acceptLangTags(vsud *models.VideoStreamUserData) []language.Tag {
+	if vsud == nil {
+		return nil
+	}
+	return vsud.AcceptLangTags
+}
+
+// pickedLang is the language a viewer without an account chose in the player.
+func pickedLang(vsud *models.VideoStreamUserData) string {
+	if vsud == nil {
+		return ""
+	}
+	return vsud.PreferredLang
 }

@@ -5,15 +5,38 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/language"
 )
 
 func TestResolvePreferred(t *testing.T) {
-	cases := []struct{ setting, ui, want string }{
-		{"pt", "en", "pt"}, {"", "ru", "ru"}, {"xx", "de", "de"}, {" uk ", "en", "uk"}, {"", "pt-BR", "pt"}, {"", "", ""},
+	tags := func(v string) []language.Tag {
+		if v == "" {
+			return nil
+		}
+		out, _, err := language.ParseAcceptLanguage(v)
+		if err != nil {
+			t.Fatalf("bad fixture %q: %v", v, err)
+		}
+		return out
+	}
+	cases := []struct{ setting, accept, ui, want string }{
+		// The profile setting wins over everything, when it names a language.
+		{"pt", "ru-RU,ru;q=0.9", "en", "pt"}, {" uk ", "", "en", "uk"}, {"xx", "", "de", "de"},
+		// Then the browser -- the case the change is for: an English UI
+		// (the default an unprefixed URL gets) under a Portuguese browser.
+		{"", "pt-BR,pt;q=0.9,en;q=0.8", "en", "pt"}, {"", "kk", "ru", "kk"},
+		// Only the first tag: the rest is what the viewer tolerates, not
+		// what they read.
+		{"", "zh-CN,en;q=0.9", "en", "zh"},
+		// A browser language the platform does not know falls to the UI.
+		{"", "tlh", "de", "de"},
+		// No Accept-Language at all (an API-started job): the UI language.
+		{"", "", "ru", "ru"}, {"", "", "pt-BR", "pt"}, {"", "", "", ""},
 	}
 	for _, c := range cases {
-		if got := ResolvePreferred(c.setting, c.ui); got != c.want {
-			t.Errorf("ResolvePreferred(%q,%q)=%q want %q", c.setting, c.ui, got, c.want)
+		if got := ResolvePreferred(c.setting, tags(c.accept), c.ui); got != c.want {
+			t.Errorf("ResolvePreferred(%q,%q,%q)=%q want %q", c.setting, c.accept, c.ui, got, c.want)
 		}
 	}
 }
@@ -117,5 +140,21 @@ func TestCastNamesAreCappedInAggregate(t *testing.T) {
 	}
 	if got := castNamesFromMetadata(map[string]any{"credits": map[string]any{"cast": plain}}, 30); len(got) != 30 {
 		t.Errorf("30 ordinary names must all survive, got %d", len(got))
+	}
+}
+
+// A viewer without an account has no profile to keep the language in: what
+// they picked in the player (the session) stands where the setting would.
+func TestPickedLangStandsInForTheProfileSetting(t *testing.T) {
+	accept, _, _ := language.ParseAcceptLanguage("pt-BR,pt;q=0.9")
+	var s *Service
+	if got := s.PreferredContentLang(context.Background(), nil, "kk", accept, "en"); got != "kk" {
+		t.Fatalf("picked kk under a pt browser: got %q", got)
+	}
+	if got := s.PreferredContentLang(context.Background(), nil, "", accept, "en"); got != "pt" {
+		t.Fatalf("nothing picked: the browser decides, got %q", got)
+	}
+	if got := s.PreferredContentLang(context.Background(), nil, "tlh", accept, "en"); got != "pt" {
+		t.Fatalf("a picked code nobody knows is not a language: got %q", got)
 	}
 }

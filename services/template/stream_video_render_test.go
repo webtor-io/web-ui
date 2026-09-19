@@ -59,6 +59,7 @@ func TestStreamVideoRenders(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -207,6 +208,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -346,7 +348,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		`class="toggle toggle-soft">`,
 		`data-subtitles-off="true"`,
 		`class="lang-row flex flex-wrap items-center gap-1.5 picker-off"`,
-		`id="subtitle-tracks" class="flex flex-wrap gap-1.5 mb-3 picker-off"`,
+		`id="subtitle-tracks" class="flex flex-wrap gap-1.5 sm:min-w-0 sm:max-w-full picker-off"`,
 		`data-suggested="true"`,
 	} {
 		if !strings.Contains(html, want) {
@@ -436,25 +438,24 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 	if strings.Contains(langs, `data-id="none"`) {
 		t.Errorf("the None item is back in the language row:\n%s", langs)
 	}
-	// The switch leads the language row (owner, 2026-09-16) — where the Off
-	// chip used to be — and the heading line above carries nothing but the
-	// title.
-	toggleAt := strings.Index(langs, `id="subtitles-toggle"`)
-	if toggleAt < 0 {
-		t.Fatalf("the switch is not in the language row:\n%s", langs)
+	// The switch sits by the heading it switches (owner, 2026-09-19; it led
+	// the language row since 2026-09-16). Two things must hold wherever it
+	// lives: it comes before the language row, and it is outside everything
+	// that dims -- a control at half opacity is the one thing that must stay
+	// legible while subtitles are off.
+	if strings.Contains(langs, `id="subtitles-toggle"`) {
+		t.Errorf("the switch is still in the language row:\n%s", langs)
 	}
-	if firstLang := strings.Index(langs, `class="lang lang-chip`); firstLang >= 0 && toggleAt > firstLang {
-		t.Errorf("the switch must come before the first language chip (toggle at %d, first chip at %d)", toggleAt, firstLang)
+	toggleAt := strings.Index(html, `id="subtitles-toggle"`)
+	if toggleAt < 0 || toggleAt > langsAt {
+		t.Fatalf("the switch must come before the language row (toggle at %d, langs at %d)", toggleAt, langsAt)
 	}
-	// ...and it is outside the part that dims: a control at half opacity is
-	// the one thing that must stay legible while subtitles are off.
-	rowAt := strings.Index(langs, `class="lang-row`)
-	if rowAt < 0 || toggleAt > rowAt {
-		t.Errorf("the switch must sit beside .lang-row, not inside it (toggle at %d, row at %d)", toggleAt, rowAt)
+	heading := html[strings.LastIndex(html[:toggleAt], `<h3`):langsAt]
+	if !strings.Contains(heading, "action.stream.subtitles") {
+		t.Errorf("the switch is not on the Subtitles heading line:\n%s", heading)
 	}
-	heading := html[strings.LastIndex(html[:langsAt], `<div class="flex items-baseline`):langsAt]
-	if strings.Contains(heading, "subtitles-toggle") {
-		t.Errorf("the heading line still carries the switch:\n%s", heading)
+	if strings.Contains(heading, "picker-off") {
+		t.Errorf("the heading line must not dim: the switch lives on it:\n%s", heading)
 	}
 	offAt := strings.Index(tracks, `id="subtitle-none"`)
 	if offAt < 0 {
@@ -532,6 +533,7 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -659,6 +661,7 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -785,6 +788,7 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -908,6 +912,7 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -1031,6 +1036,7 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -1217,6 +1223,7 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,
@@ -1353,6 +1360,7 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 		"getDurationSec":     helper.GetDurationSec,
 		"userSubtitleView":   helper.UserSubtitleView,
 		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
 		"originCode":         helper.OriginCode,
 		"originCodeForBadge": helper.OriginCodeForBadge,
 		"originKey":          helper.OriginKey,

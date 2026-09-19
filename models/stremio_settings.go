@@ -100,6 +100,20 @@ func CreateOrUpdateStremioSettings(ctx context.Context, db *pg.DB, userID uuid.U
 	return UpdateStremioSettings(ctx, db, userID, settings)
 }
 
+// SetUserPreferredLanguage writes the preferred language and nothing else.
+// The settings live in one JSONB document together with the resolution
+// order and discover_only; the profile form replaces the whole document,
+// and a caller that knows only the language (the player's picker) must not
+// reset the rest. "" clears the preference.
+func SetUserPreferredLanguage(ctx context.Context, db *pg.DB, userID uuid.UUID, code string) error {
+	data, err := GetUserStremioSettingsData(ctx, db, userID)
+	if err != nil {
+		return errors.Wrap(err, "failed to load stremio settings")
+	}
+	data.PreferredLanguage = code
+	return CreateOrUpdateStremioSettings(ctx, db, userID, data)
+}
+
 // GetDefaultStremioSettings returns the default Stremio settings
 func GetDefaultStremioSettings() *StremioSettingsData {
 	return &StremioSettingsData{

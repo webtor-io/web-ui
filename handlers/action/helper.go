@@ -322,7 +322,7 @@ func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lInd
 		}
 	}
 	matcher := language.NewMatcher(langs)
-	_, index, confidence := matcher.Match(ud.AcceptLangTags...)
+	_, index, confidence := matcher.Match(wantedLangs(ud)...)
 	if confidence > language.No {
 		lIndex = lx[langs[index]]
 		return
@@ -334,6 +334,25 @@ func (s *Helper) matchLang(lis []ListItem, ud *models.VideoStreamUserData) (lInd
 	}
 	err = errors.New("no accept lang")
 	return
+}
+
+// wantedLangs is what a list is matched against: the viewer's preferred
+// language first, then the browser's Accept-Language list. One order for the
+// audio default and for the subtitle fallback (owner, 2026-09-19): a viewer
+// who set Kazakh was offered Kazakh subtitles over whatever audio their
+// browser's language implied. The preferred language already IS the
+// browser's first tag unless the profile or the player's select says
+// otherwise, so for most viewers this changes nothing.
+func wantedLangs(ud *models.VideoStreamUserData) []language.Tag {
+	if ud == nil {
+		return nil
+	}
+	if ud.ResolvedLang != "" {
+		if t, err := language.Parse(ud.ResolvedLang); err == nil {
+			return append([]language.Tag{t}, ud.AcceptLangTags...)
+		}
+	}
+	return ud.AcceptLangTags
 }
 
 func (s *Helper) canonizeSrcLangs(lis []ListItem) []ListItem {

@@ -424,7 +424,8 @@ func serve(c *cli.Context) error {
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc, streamprefs.New(c, pg))
+	streamPrefs := streamprefs.New(c, pg)
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc, streamPrefs)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)
@@ -485,7 +486,7 @@ func serve(c *cli.Context) error {
 	sitemap.RegisterHandler(c, r)
 
 	// Setting ActionHandler
-	wa.RegisterHandler(r, tm, jobs, sapi, actionTS)
+	wa.RegisterHandler(r, tm, jobs, sapi, actionTS, streamPrefs)
 
 	// Setting Payments client (shared by profile and donate)
 	payClient := npg.New(c)
