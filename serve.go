@@ -192,7 +192,8 @@ func serve(c *cli.Context) error {
 		defer pprof.Close()
 	}
 	// Setting Gin
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Logger(), gin.CustomRecovery(w.RecoverToLog))
 	r.Use(w.ErrorHandler(tm.MustRegisterViews("error/*").WithLayout("main")))
 	s3Hosts := s3svc.Hosts(c)
 	apiHosts := libapi.Hosts(c)
