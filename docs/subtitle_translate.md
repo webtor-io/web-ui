@@ -894,6 +894,23 @@ model call is (10–15 s). Three consequences, all applied the same day:
   matter — hls.js re-selects the subtitle track after `loadSource` and starts loading its
   fragments later than the video starts. **Not fixed, not investigated further.**
 
+### A revision swap never interrupts a load
+
+Production, 18–19.09: both `subtitle-translate-error {code: track}` events came 0.2–0.4 s after a
+`subtitle-translate-done`, on a page load of a **finished** translation — and the viewer saw a
+selected chip with no subtitles until they pressed it again. The mount restores the saved
+translation (the `<track>` starts its first GET), the first HEAD answers "done" and
+`reload()` swaps in the final revision while that GET is still in flight. Chrome (checked
+2026-09-19) then fires `error` for the load that was cut short — at once, on the same element,
+with the src already swapped — and loads the new src fine a few milliseconds later. The error was
+taken for the new revision's: the run was reported dead, both listeners came off, and the load
+that followed had nobody to re-assert the selection hls.js had switched off.
+
+`reloadSubtitleTrack` therefore waits for a load in flight (`readyState === LOADING`) to settle,
+whichever way, before it swaps; the newest revision wins the wait and an overtaken one is never
+requested; `loadSettle.maxMs` (5 s) bounds a load that never settles. A swap that has to wait
+still reports `true` — it will happen — so the caller's throttle is spent.
+
 ### Cue offsets follow the run that is playing
 
 Two holes, both "the subtitles do not match the dialogue at all" after a seek or a resume:

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reloadSubtitleTrack, dropDeletedTracks, markUnsnapshottedTracksStale, refreshStaleTrack } from './subtitle-track-reload.js';
+import { reloadSubtitleTrack, dropDeletedTracks, markUnsnapshottedTracksStale, refreshStaleTrack, loadSettle } from './subtitle-track-reload.js';
 
 // A <track> element stand-in with faithful add/removeEventListener
 // semantics — the whole point of the test is which listeners are attached
@@ -322,4 +322,76 @@ test('settling tells the caller, so the selection can be written again', () => {
     reloadSubtitleTrack(video, 'tr-pt', 'https://x/a.vtt?rev=8', null, () => { settled++; });
     el.fire('error');
     assert.equal(settled, 2);
+});
+
+// ---- a swap never interrupts a load ---------------------------------------
+//
+// Chrome, 2026-09-19: changing src mid-load fires `error` for the load that
+// was cut short and then loads the new src fine. The error was taken for the
+// new revision's: the run was reported dead and the load that followed had
+// no listener. Production showed it on every page load of a finished
+// translation (`subtitle-translate-error code=track` 0.2 s after `done`).
+
+const LOADING = 1;
+
+test('a swap waits for the load in flight, and that load\u2019s outcome is nobody\u2019s error', () => {
+    const el = makeTrack('tr-kk');
+    el.setAttribute('src', 'https://x/a.vtt?pos=0');
+    el.readyState = LOADING;
+    let errors = 0;
+    let settled = 0;
+    assert.equal(reloadSubtitleTrack(videoWith(el), 'tr-kk', 'https://x/a.vtt?rev=252', () => errors++, () => settled++), true,
+        'it will happen, so the throttle is spent');
+    assert.equal(el.getAttribute('src'), 'https://x/a.vtt?pos=0', 'not while the first request is out');
+
+    // The first load fails (or lands): either way it is over.
+    el.readyState = 3;
+    el.fire('error');
+    assert.equal(el.getAttribute('src'), 'https://x/a.vtt?rev=252', 'now');
+    assert.equal(errors, 0, 'and its failure is not the new revision\u2019s');
+    assert.equal(settled, 0);
+
+    // The new revision's own outcome is heard.
+    el.fire('load');
+    assert.equal(settled, 1);
+    assert.deepEqual([el.listeners.load.length, el.listeners.error.length], [0, 0], 'nothing left behind');
+});
+
+test('the newest revision wins the wait; the one it overtook is never requested', () => {
+    const el = makeTrack('tr-kk');
+    el.setAttribute('src', 'https://x/a.vtt');
+    el.readyState = LOADING;
+    const video = videoWith(el);
+    reloadSubtitleTrack(video, 'tr-kk', 'https://x/a.vtt?rev=5');
+    reloadSubtitleTrack(video, 'tr-kk', 'https://x/a.vtt?rev=9');
+    assert.deepEqual([el.listeners.load.length, el.listeners.error.length], [1, 1], 'one wait, not two');
+    const seen = [];
+    const set = el.setAttribute;
+    el.setAttribute = (n, v) => { if (n === 'src') seen.push(v); set(n, v); };
+    el.readyState = 2;
+    el.fire('load');
+    assert.deepEqual(seen, ['https://x/a.vtt?rev=9']);
+});
+
+test('a load that never settles does not hold the swap for ever', async () => {
+    const max = loadSettle.maxMs;
+    loadSettle.maxMs = 30;
+    try {
+        const el = makeTrack('tr-kk');
+        el.setAttribute('src', 'https://x/a.vtt');
+        el.readyState = LOADING;
+        reloadSubtitleTrack(videoWith(el), 'tr-kk', 'https://x/a.vtt?rev=5');
+        await new Promise((r) => setTimeout(r, 60));
+        assert.equal(el.getAttribute('src'), 'https://x/a.vtt?rev=5');
+    } finally {
+        loadSettle.maxMs = max;
+    }
+});
+
+test('a track that is not loading is swapped at once, as before', () => {
+    const el = makeTrack('tr-kk');
+    el.setAttribute('src', 'https://x/a.vtt');
+    el.readyState = 2;
+    reloadSubtitleTrack(videoWith(el), 'tr-kk', 'https://x/a.vtt?rev=5');
+    assert.equal(el.getAttribute('src'), 'https://x/a.vtt?rev=5');
 });

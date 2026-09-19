@@ -40,9 +40,38 @@ function clearPending(el) {
     pending.delete(el);
 }
 
+// A <track> whose src changes while it is still loading fires `error` for
+// the load that was cut short, at once, and then loads the new src fine
+// (checked in Chrome, 2026-09-19: error@201 ms, load@207 ms). That error is
+// indistinguishable from the new revision's own -- same element, src already
+// swapped, readyState ERROR -- and it used to be taken for it: the run was
+// reported dead (`subtitle-translate-error code=track`), both listeners came
+// off, and the load that followed had nobody to tell. The picked track then
+// stayed as hls.js had left it, and the viewer saw a selected chip and no
+// subtitles until they pressed it again. It hit every page load of a
+// FINISHED translation: the first HEAD answers "done" in ~0.3 s and swaps in
+// the final revision while the first GET is still in flight.
+//
+// So a swap never interrupts a load: it waits for the one in flight to
+// settle, whichever way, and then goes in. The newest request wins; one that
+// was overtaken while waiting is simply never made. LOAD_SETTLE_MAX_MS is for
+// a load that never settles -- a swap late beats no swap.
+export const loadSettle = { maxMs: 5000 };
+const waiting = new WeakMap();
+
+function clearWaiting(el) {
+    const w = waiting.get(el);
+    if (!w) return;
+    el.removeEventListener('load', w.go);
+    el.removeEventListener('error', w.go);
+    clearTimeout(w.timer);
+    waiting.delete(el);
+}
+
 // reloadSubtitleTrack swaps in a newer revision of a partially written
 // VTT and reports whether it actually did anything — the caller throttles
-// reloads, and a no-op must not spend the throttle window.
+// reloads, and a no-op must not spend the throttle window. A swap that has
+// to wait for a load in flight counts as done: it will happen.
 export function reloadSubtitleTrack(video, id, nextSrc, onError, onSettled) {
     if (!video || !id || !nextSrc) return false;
     let el = null;
@@ -54,6 +83,24 @@ export function reloadSubtitleTrack(video, id, nextSrc, onError, onSettled) {
     // download the file twice and spend the caller's reload throttle.
     if (!el || withoutRefresh(el.getAttribute('src')) === withoutRefresh(nextSrc)) return false;
 
+    clearWaiting(el);
+    if (el.readyState === TRACK_LOADING) {
+        const go = () => {
+            clearWaiting(el);
+            swapTrackSrc(el, nextSrc, onError, onSettled);
+        };
+        waiting.set(el, { go, timer: setTimeout(go, loadSettle.maxMs) });
+        el.addEventListener('load', go);
+        el.addEventListener('error', go);
+        return true;
+    }
+    swapTrackSrc(el, nextSrc, onError, onSettled);
+    return true;
+}
+
+function swapTrackSrc(el, nextSrc, onError, onSettled) {
+    // Overtaken while it waited: the src is already this revision.
+    if (withoutRefresh(el.getAttribute('src')) === withoutRefresh(nextSrc)) return;
     clearPending(el);
     const saved = captureTrackState([el.track]);
     const handlers = {
@@ -75,7 +122,6 @@ export function reloadSubtitleTrack(video, id, nextSrc, onError, onSettled) {
     el.addEventListener('load', handlers.onLoad);
     el.addEventListener('error', handlers.onError);
     el.setAttribute('src', nextSrc);
-    return true;
 }
 
 // dropDeletedTracks removes the <track> elements the picker has no chip for
@@ -100,6 +146,7 @@ export function dropDeletedTracks(video, chipIDs) {
         if (!el.id || chips.has(el.id)) continue;
         if (el.track && el.track.mode === 'showing') showing = el.id;
         clearPending(el);
+        clearWaiting(el);
         if (el.remove) el.remove();
     }
     return showing;
