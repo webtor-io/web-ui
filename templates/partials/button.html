@@ -1,5 +1,10 @@
 {{ define "button" }}
-<form class="{{ .Data.Action }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .Data.ID }}" data-async-push-state="false">
+{{/* data-busy-text is what the button says while its job runs (actionBusy.js):
+     the wait is the torrent swarm -- a cold file is a median 21 s of warm-up
+     plus buffering -- and a live button through all of it had 59% of viewers
+     pressing it again. Rendered here rather than translated in JS: the
+     server already knows the language. */}}
+<form class="{{ .Data.Action }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .Data.ID }}" data-async-push-state="false" data-busy-text="{{ t .Ctx.Lang "job.preparing" }}">
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
     <button type="submit" class="btn btn-soft whitespace-nowrap" data-umami-event="{{ .Data.Action }}">

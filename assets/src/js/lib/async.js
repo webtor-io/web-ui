@@ -1,4 +1,5 @@
 import loadAsyncView from "./loadAsyncView";
+import { isActionForm, isBusy, markBusy, clearBusy } from "./actionBusy";
 
 if (!window.__popstateFilters) window.__popstateFilters = [];
 export function addPopstateFilter(fn) {
@@ -124,6 +125,16 @@ async function async(selector, params = {}, scope = null) {
         el.addEventListener(params.event, async function(e) {
             e.preventDefault();
             e.stopPropagation();
+            // A job-start button that is already working swallows the second
+            // press (actionBusy.js). This runs HERE, where the request
+            // actually begins, and not on the submit event: Turnstile
+            // intercepts the first submit, fetches a token and re-submits the
+            // form itself, and a button disabled on that first pass would
+            // break its second one.
+            if (isActionForm(this)) {
+                if (isBusy(this)) return false;
+                markBusy(this);
+            }
             let history = true;
             if (el.getAttribute('data-async-push-state') && el.getAttribute('data-async-push-state') === 'false') {
                 history = false;
@@ -149,7 +160,13 @@ async function async(selector, params = {}, scope = null) {
             }
             const self = this;
             const fetch = function() {
-                return asyncFetch.call(self, url, targetSelector, fetchParams, params, options);
+                return asyncFetch.call(self, url, targetSelector, fetchParams, params, options)
+                    .catch((err) => {
+                        // The job never started, so nothing will ever release
+                        // the button: the request itself is the ending here.
+                        if (isActionForm(self)) clearBusy(self);
+                        throw err;
+                    });
             }
             params.history.wrap(fetch, push, url, fetchParams);
             return false;

@@ -60,6 +60,7 @@ class SDK {
     }
 }
 import { rebindAsync } from './async';
+import { clearBusyFor } from './actionBusy';
 
 export function initProgressLog(el, func) {
     const r = new Renderer(el, func);
@@ -209,6 +210,13 @@ class Renderer {
         }
         if (data.level === 'close') {
             this.showClose();
+        }
+        // The job is over, whichever way it went: the button that started it
+        // goes back to being a button (actionBusy.js). `error` is an ending
+        // too -- no peers, the cap modal -- and the viewer may well want to
+        // press it again.
+        if (data.level === 'close' || data.level === 'error') {
+            clearBusyFor(this.el);
         }
         if (data.level === 'redirect') {
             this.addSummary(data);

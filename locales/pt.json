@@ -623,6 +623,7 @@
     "player.subtitleCaughtUp": "A tradução por IA já está em dia",
     "player.subtitleOfferLater": "Agora não",
     "player.subtitleOfferNever": "Não oferecer mais",
+    "job.preparing": "preparando…",
     "job.retrievingData": "buscando dados do recurso",
     "job.retrievingStreamUrl": "buscando URL do stream",
     "job.probingMedia": "analisando informações de mídia",
