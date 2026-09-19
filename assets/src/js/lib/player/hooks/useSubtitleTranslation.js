@@ -166,10 +166,17 @@ export function useSubtitleTranslation({ videoRef, videoEl, trackContainer, trac
     // when the viewer comes back, not in the background.
     const resumeOnVisibleRef = useRef(false);
     // Consecutive answers about another run, outside a seek's window. Past
-    // catchUpTiming.runMismatchLimit the player stops naming its run and
-    // takes answers at their word again: a mismatch that does not go away
-    // (two sessions on one key, a failed offset read at mount) must not
-    // silence the banner and strand a pressed Wait for the rest of the film.
+    // catchUpTiming.runMismatchLimit the player stops waiting for the
+    // service to come round: a mismatch that does not go away (two sessions
+    // on one key, a failed offset read at mount) must not silence the banner
+    // and strand a hold for the rest of the film. What it does then depends
+    // on what the viewer actually has -- see the tick. It keeps NAMING its
+    // run (`sof`) all the same: until 2026-09-19 it stopped, and that made
+    // things worse twice over -- the service lost the hint that makes it
+    // re-read the playlist, and it filed the viewer's position under the run
+    // it was still on. Measured on a seek to 44:27: the old run's document
+    // has no cue past there, so "nothing pending" came back, the hold ended
+    // and the pill said "caught up" over a film with no subtitles.
     const runMismatchRef = useRef(0);
 
     // setCatchUp behind a value comparison: a tick arrives every 3 s and
@@ -585,7 +592,7 @@ export function useSubtitleTranslation({ videoRef, videoEl, trackContainer, trac
             // The run a transcoder-session player is watching, so the
             // service answers about it (see pollProgress).
             sessionOffset: () => (videoRef.current && videoRef.current.dataset.sessionId
-                && runMismatchRef.current < catchUpTiming.runMismatchLimit ? seekOffsetRef.current : null),
+                ? seekOffsetRef.current : null),
             // The viewer's playhead in movie time, on every poll: a
             // file-source job orders its batches by it, the way a live one
             // follows the playlist offset, and answers the frontier
@@ -674,6 +681,46 @@ export function useSubtitleTranslation({ videoRef, videoEl, trackContainer, trac
                 }
                 const aboutThisRun = !saysRun || matches
                     || runMismatchRef.current >= catchUpTiming.runMismatchLimit;
+                // Given up on the service coming round, and the answer is
+                // still about another run: its frontier says nothing about
+                // where the viewer is. What does is the <track> itself. With
+                // cues still ahead of the playhead the answer is taken at
+                // its word, as before (the permanent-mismatch cases: the
+                // translation works, only the run labels disagree). With the
+                // viewer PAST everything loaded there are no subtitles to
+                // show, and that is the state the hold exists for: the film
+                // waits (owner, 2026-09-19 -- the first version let it play
+                // under a "catching up" pill, which is the outcome the
+                // uncapped hold was meant to end). Never "caught up". The
+                // way out is the viewer's -- Keep watching, x, play -- and
+                // after it the pill only offers. A match, or cues arriving
+                // past the playhead, puts everything back to normal.
+                if (saysRun && !matches && runMismatchRef.current >= catchUpTiming.runMismatchLimit) {
+                    const edge = coverageEnd();
+                    if (edge === null || edge < playhead) {
+                        seekHoldPendingRef.current = false;
+                        trailingRef.current = true;
+                        if (waitingRef.current) {
+                            showCatchUp({ waiting: true });
+                            return;
+                        }
+                        // The silent pre-hold's pause is the player's own;
+                        // any other pause is the viewer's, and a film they
+                        // paused is not held for anything.
+                        const viewerPaused = video.paused && !preHoldRef.current;
+                        if (dismissedRef.current || overruledRef.current || viewerPaused) {
+                            // No hold: give back a pause that was ours, and
+                            // keep offering to a viewer who only overruled.
+                            endPreHold(true);
+                            if (overruledRef.current && !dismissedRef.current && !viewerPaused) showCatchUp({ waiting: false });
+                            return;
+                        }
+                        // The wait takes the pause over: no play in between.
+                        endPreHold(false);
+                        beginWait(true);
+                        return;
+                    }
+                }
                 // A run the viewer just started and that has counted nothing
                 // is behind by definition; the first counted answer ends the
                 // special case and the frontier speaks for itself.

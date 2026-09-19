@@ -2282,16 +2282,88 @@ test('a tab hidden during the seek gets no hold while nobody is looking', async 
 test('a run mismatch that does not go away stops silencing the banner', async (t) => {
     // Found in re-review: two sessions on one key, or a failed offset read
     // at mount, made every answer "about another run" for good: no banner,
-    // a pressed Wait that never ends, a forced playlist read per poll.
+    // a pressed Wait that never ends.
     const limit = catchUpTiming.runMismatchLimit;
     catchUpTiming.runMismatchLimit = 1;
     t.after(() => { catchUpTiming.runMismatchLimit = limit; });
     const { p } = await mountSessionRun(t, () => runResponse('12/400', '100.000', '900.000'), { sessionOffset: 90, startPaused: true });
     p.video.currentTime = 10;
     await wait(POLL_INTERVAL_WINDOW_MS * 2);
-    assert.ok(catchUpBanner(p), 'answers are taken at their word again');
+    assert.ok(catchUpBanner(p), 'the banner is back');
+    // The player keeps naming its run (2026-09-19): dropping `sof` took the
+    // re-read hint away from the service and made it file the viewer's
+    // position under the run it was still on.
     const last = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url)).at(-1);
-    assert.ok(!last.includes('sof='), `and the player stops naming its run: ${last}`);
+    assert.ok(last.includes('sof=90'), `still named: ${last}`);
+});
+
+test('a service that stays on another run: the film waits, and never hears "caught up"', async (t) => {
+    // Owner, 2026-09-19: seek to 44:27, the service kept answering about the
+    // run before the seek. Its document had no cue past 38:16, so "nothing
+    // pending" came back, the hold ended and the pill flashed "caught up"
+    // over a film with no subtitles. What the viewer has is what decides:
+    // past every loaded cue there is nothing to show, so the film is held.
+    const limit = catchUpTiming.runMismatchLimit;
+    catchUpTiming.runMismatchLimit = 2;
+    t.after(() => { catchUpTiming.runMismatchLimit = limit; });
+    // The answer is always about the run at 0 s, with nothing pending.
+    const { p, log, events } = await mountSessionRun(t, () => runResponse('375/420', null, '0.000'), { sessionOffset: 2667, startPaused: true });
+    const el = p.video.querySelector('track#tr-pt');
+    el.track.cues.length = 0;
+    el.track.addCue({ startTime: -1, endTime: -1, __absStart: 2290, __absEnd: 2296 }); // 38:16, the old run's last line
+    p.video.currentTime = 5; // 44:32 of the film
+    await wait(POLL_INTERVAL_WINDOW_MS * 3);
+
+    assert.equal(doneBanner(p), null, 'never "caught up"');
+    assert.equal(p.video.paused, true, 'no subtitles where the viewer is: the film waits');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpWaitingShort');
+    const waits = events('subtitle-translate-wait');
+    assert.equal(waits.length, 1, 'one hold, not one per tick');
+    assert.equal(waits[0].data.auto, true);
+    const last = p.calls.filter((c) => c.params && c.params.method === 'HEAD').map((c) => String(c.url)).at(-1);
+    assert.ok(last.includes('sof=2667'), `and the run is still named, so the service can come round: ${last}`);
+
+    // The way out is the viewer's, and it holds: no second pause.
+    click(catchUpBanner(p).querySelector('.wt-catchup-btn'));
+    await settle();
+    const pauses = log.pause;
+    await wait(POLL_INTERVAL_WINDOW_MS * 2);
+    assert.equal(p.video.paused, false, 'Keep watching plays the film');
+    assert.equal(log.pause, pauses, 'and it is not held again');
+    assert.equal(catchUpText(p), 'player.subtitleCatchUpShort', 'the pill goes on offering');
+    assert.equal(doneBanner(p), null);
+});
+
+test('a service that comes round ends that wait the ordinary way', async (t) => {
+    const limit = catchUpTiming.runMismatchLimit;
+    catchUpTiming.runMismatchLimit = 2;
+    t.after(() => { catchUpTiming.runMismatchLimit = limit; });
+    let answer = () => runResponse('375/420', null, '0.000');
+    const { p, log, events } = await mountSessionRun(t, () => answer(), { sessionOffset: 2667, startPaused: true });
+    p.video.currentTime = 5;
+    await wait(POLL_INTERVAL_WINDOW_MS * 3);
+    assert.equal(p.video.paused, true, 'fixture: held');
+
+    // The service reads the new run and is well ahead of the viewer.
+    answer = () => runResponse('40/80', '2900.000', '2667.000');
+    const plays = log.play;
+    await wait(POLL_INTERVAL_WINDOW_MS * 2);
+    assert.ok(log.play > plays, 'the film goes on');
+    assert.equal(behindBanner(p), null);
+    assert.equal(events('subtitle-translate-wait-done').length, 1);
+});
+
+test('with cues still ahead, a permanent run mismatch is taken at its word as before', async (t) => {
+    const limit = catchUpTiming.runMismatchLimit;
+    catchUpTiming.runMismatchLimit = 2;
+    t.after(() => { catchUpTiming.runMismatchLimit = limit; });
+    const { p } = await mountSessionRun(t, () => runResponse('375/420', null, '0.000'), { sessionOffset: 600, startPaused: true });
+    const el = p.video.querySelector('track#tr-pt');
+    el.track.cues.length = 0;
+    el.track.addCue({ startTime: 100, endTime: 103, __absStart: 700, __absEnd: 703 });
+    p.video.currentTime = 5; // 10:05, a minute and a half short of the loaded edge
+    await wait(POLL_INTERVAL_WINDOW_MS * 3);
+    assert.equal(catchUpBanner(p), null, 'nothing pending, cues ahead: nothing to say');
 });
 
 // A timeout of its own: without the fix the seek waits for a `playing` that

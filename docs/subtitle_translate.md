@@ -894,6 +894,32 @@ model call is (10–15 s). Three consequences, all applied the same day:
   matter — hls.js re-selects the subtitle track after `loadSource` and starts loading its
   fragments later than the video starts. **Not fixed, not investigated further.**
 
+### A service that answers about another run
+
+After a seek the player names its run on every poll (`sof`, the run's start in movie time) and the
+service names the one it is reading (`X-Subtitle-Session-Offset`). Answers about another run decide
+nothing; `runMismatchRef` counts them outside a seek's window, and past
+`catchUpTiming.runMismatchLimit` (5) the player stops waiting for the service to come round.
+
+Until 2026-09-19 "stops waiting" meant: drop `sof` and take answers at their word. Measured on a
+seek to 44:27 that the service never followed: without `sof` the service lost the hint that makes it
+re-read the playlist *and* filed the viewer's position under the run it was still on; that run's
+document has no cue past 38:16, so "nothing pending" came back, the hold ended and the pill said
+"caught up" over a film with no subtitles. Now:
+
+- `sof` is sent on every poll of a session, whatever the count.
+- Past the limit, with the answer still about another run, what the viewer has decides
+  (`coverageEnd()`, the last cue actually in the `<track>`): cues still ahead of the playhead → the
+  answer is taken at its word, as before (the permanent-mismatch cases — two sessions on one key, a
+  failed offset read at mount — where the translation works and only the labels disagree); the
+  viewer **past** everything loaded → the film is held (owner: no subtitles where the viewer is is
+  what the hold exists for), never "caught up". Keep watching / × / play end it, and after that the
+  pill only offers. A matching answer, or cues arriving past the playhead, puts everything back.
+
+Why the service stays on another run is the transcoder's subtitle playlist: until the new run's
+first subtitle segment closes (a slow source can take minutes) it serves a stub with no
+`#EXT-X-SESSION-OFFSET`, which reads as offset 0 — see content-transcoder.
+
 ### A revision swap never interrupts a load
 
 Production, 18–19.09: both `subtitle-translate-error {code: track}` events came 0.2–0.4 s after a
