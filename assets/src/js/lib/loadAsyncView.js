@@ -3,9 +3,14 @@ import executeScriptElements from "./executeScriptElements";
 // automatic scroll-to-top that `data-async-scroll-top` targets normally
 // trigger. Used by small in-place toggles (e.g. watched mark/unmark buttons)
 // that reload a big target but shouldn't jump the user back to the top.
-function loadAsyncView(target, body, options) {
+// destroyViews / activateViews are the two halves of a swap, for a caller that
+// cannot hand its HTML to loadAsyncView because part of the target is live and
+// must survive (the playing player, lib/player/next-item-go.js syncPage).
+// `skip` is that part: its views are neither destroyed nor re-initialised.
+export function destroyViews(target, skip = null) {
     const els = target.querySelectorAll('[data-async-view]');
     for (const el of els) {
+        if (skip && skip.contains(el)) continue;
         const view = el.getAttribute('data-async-view');
         const detail = {
             target: el,
@@ -13,6 +18,22 @@ function loadAsyncView(target, body, options) {
         const event = new CustomEvent(`async:${view}_destroy`, { detail });
         window.dispatchEvent(event);
     }
+}
+
+export function activateViews(target, skip = null) {
+    executeScriptElements(target, skip);
+    // Update async elements
+    window.dispatchEvent(new CustomEvent('async', { detail: { target } }));
+    for (const script of target.getElementsByTagName('script')) {
+        if (script.src === "" || (skip && skip.contains(script))) continue;
+        const url = new URL(script.src);
+        const name = url.pathname.replace(/\.js$/, '');
+        window.dispatchEvent(new CustomEvent('async:' + name, { detail: { target: script.parentElement } }));
+    }
+}
+
+function loadAsyncView(target, body, options) {
+    destroyViews(target);
     renderBody(target, body, options);
 }
 function renderBody(target, body, options) {
@@ -22,25 +43,7 @@ function renderBody(target, body, options) {
     // same-origin SSE messages (progressLog.js). No external or user-supplied
     // HTML reaches here.
     target.innerHTML = body;
-    executeScriptElements(target);
-    const detail = {
-        target,
-    };
-    // Update async elements
-    const event = new CustomEvent('async', { detail });
-    window.dispatchEvent(event);
-
-    const scripts = target.getElementsByTagName('script');
-    for (const script of scripts) {
-        if (script.src === "") continue;
-        const url = new URL(script.src);
-        const name = url.pathname.replace(/\.js$/, '');
-        const scriptDetail = {
-            target: script.parentElement,
-        };
-        const event = new CustomEvent('async:' + name, { detail: scriptDetail });
-        window.dispatchEvent(event);
-    }
+    activateViews(target);
 
     if (target.hasAttribute('data-async-scroll-top') && !(options && options.noScroll)) {
         window.scrollTo({ top: 0 });

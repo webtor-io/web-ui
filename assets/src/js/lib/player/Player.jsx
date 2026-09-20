@@ -11,7 +11,7 @@ import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, s
 import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
-import { createNextItemGo } from './next-item-go';
+import { createNextItemGo, canMoveOn } from './next-item-go';
 import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL } from './credits';
 import { track, settled } from './player-telemetry';
@@ -953,7 +953,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // Next episode / next track (next-item.js decides, next-item-go.js moves).
     // `next` is the server's answer on the player element; without it none of
     // this exists -- a film, the last file, an embed.
-    const next = useRef(readNext(videoEl)).current;
+    // ...or a page the move cannot happen on (canMoveOn).
+    const next = useRef(canMoveOn(document) ? readNext(videoEl) : null).current;
     const [autoplayNext, setAutoplayNext] = useState(() => loadPrefs().autoplayNext);
     const [nextCard, setNextCard] = useState(null); // null | 'soon' | 'offer' | 'ask'
     const nextCancelledRef = useRef(false);
@@ -1027,10 +1028,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             creditsAtRef.current = at;
             track('next-item-credits', { source, found: at !== null, lead_s: at !== null ? Math.round(duration - at) : 0, next: !!next });
         };
+        // Loaded cues are free, so they are asked first -- but they may be a
+        // track that cannot answer (an AI translation still being produced
+        // has no last line yet): then a whole-file track is fetched after all.
         const loaded = cuesOfLoadedTracks(videoRef.current);
-        if (loaded.length) { settle(loaded, 'loaded'); return; }
+        if (loaded.length && creditsStart(loaded, duration) !== null) { settle(loaded, 'loaded'); return; }
         const src = timingSourceURL(document.getElementById('subtitles'));
-        if (!src) { track('next-item-credits', { source: 'none', found: false, lead_s: 0 }); return; }
+        if (!src) {
+            if (loaded.length) settle(loaded, 'loaded');
+            else track('next-item-credits', { source: 'none', found: false, lead_s: 0, next: !!next });
+            return;
+        }
         fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => settle(parseVttTimings(text), 'fetched')).catch(() => {});
     }, [state.currentTime, state.duration]);
 

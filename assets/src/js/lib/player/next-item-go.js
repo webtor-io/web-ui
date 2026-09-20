@@ -13,6 +13,8 @@
 
 import { backgroundToken, fetchStreamRender } from './background-render.js';
 import { readCarry } from './next-item.js';
+import { persistTrackChoice } from './track-dialog.js';
+import { destroyViews, activateViews } from '../loadAsyncView';
 
 // A prepared render older than this is not used: its transcoder session and
 // the job's cached render both live about ten minutes.
@@ -51,6 +53,14 @@ export function nextStartForm(next, carry, root = document) {
         form.appendChild(input);
     }
     return form;
+}
+
+// canMoveOn: is this a page the move can happen on? It needs the start form of
+// the current file (to re-address) and the #content section (to bring up to
+// date). Only the resource page has them; a player anywhere else simply has
+// no "next", rather than a button that ends in a reload of the wrong page.
+export function canMoveOn(root = document) {
+    return !!(root.querySelector(START_FORM) && root.getElementById && root.getElementById('content'));
 }
 
 // nextURL: this page, pointed at the next file. `file` is how a file is
@@ -123,8 +133,16 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
             return;
         }
         const fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        mountOnStage(doc);
         const url = nextURL(window.location.href, next.path);
+        try {
+            await mountOnStage(doc);
+        } catch (e) {
+            // The old player is already gone at this point: a half-built
+            // page is the one outcome worse than a reload.
+            onEvent('go', { how, prewarmed, fallback: true, failed: true, wait_ms: now() - startedAt });
+            visibleFallback();
+            return;
+        }
         const title = doc.querySelector('.player').getAttribute('data-resource-title');
         if (title) document.title = `${title} | Webtor.io`;
         const main = document.querySelector('main[data-async-layout]');
@@ -133,18 +151,7 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
             layout: main ? main.getAttribute('data-async-layout') : 'main',
         }, '', url);
         onEvent('go', { how, prewarmed, fallback: false, fullscreen, wait_ms: now() - startedAt });
-        if (!fullscreen) {
-            syncPage(url);
-        } else {
-            const onChange = () => {
-                if (document.fullscreenElement || document.webkitFullscreenElement) return;
-                document.removeEventListener('fullscreenchange', onChange);
-                document.removeEventListener('webkitfullscreenchange', onChange);
-                syncPage(url);
-            };
-            document.addEventListener('fullscreenchange', onChange);
-            document.addEventListener('webkitfullscreenchange', onChange);
-        }
+        scheduleSync(url);
     };
 
     // mountOnStage: the old player goes, its stage stays; everything else the
@@ -191,11 +198,55 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         // it shows a spinner, not the big Play button of a paused film.
         return Promise.resolve(initPlayer(host, { stage, aspectRatio, awaitStart: true })).then(() => {
             if (stage) stage.classList.remove('wt-player-stage--empty');
+            persistDefaults(host, resourceID, next.itemId);
             window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
         });
     }
 
     return { prepare, go, isPrepared: () => !!freshPrepared() };
+}
+
+// The carried choice arrives as this render's DEFAULT chips, and a default is
+// not a saved choice: the next plain start of this file -- a settings restart,
+// a reload -- would ask the ladder again and could flip the very thing the
+// viewer carried over (subtitles they had switched off coming back on). So
+// what the render chose is saved as theirs, the way a click on the chip is.
+function persistDefaults(scope, resourceID, itemID) {
+    for (const [type, sel] of [['audio', '.audio[data-default="true"]'], ['subtitle', '.subtitle[data-default="true"]']]) {
+        const chip = scope.querySelector(sel);
+        const id = chip && chip.getAttribute('data-id');
+        if (id) persistTrackChoice(type, { id, resourceID, itemID });
+    }
+}
+
+// The page is synced with the file that is playing NOW, once: several moves
+// can happen in one fullscreen sitting, and each used to leave its own
+// "sync when fullscreen ends" behind -- on exit they all ran, raced, and the
+// slowest won, which could leave episode 2's card and start form under
+// episode 3's picture. One pending URL, one listener, and a generation that
+// lets a newer sync overtake an older one in flight.
+let pendingSyncURL = null;
+let syncListening = false;
+let syncGeneration = 0;
+
+function inFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function scheduleSync(url) {
+    pendingSyncURL = url;
+    const run = () => {
+        if (inFullscreen() || pendingSyncURL === null) return;
+        const target = pendingSyncURL;
+        pendingSyncURL = null;
+        syncPage(target);
+    };
+    if (!syncListening) {
+        syncListening = true;
+        document.addEventListener('fullscreenchange', run);
+        document.addEventListener('webkitfullscreenchange', run);
+    }
+    run();
 }
 
 // A carried AI translation is the default of the prepared render, but a
@@ -214,6 +265,7 @@ function kickTranslation(doc) {
 // way -- the fresh content is fetched aside, the live player is moved into
 // ITS log container, and only then does it replace the old one.
 export async function syncPage(url, { fetchImpl = fetch } = {}) {
+    const generation = ++syncGeneration;
     const content = document.getElementById('content');
     const stageHost = document.querySelector('.wt-player-stage');
     if (!content || !stageHost) return false;
@@ -232,6 +284,7 @@ export async function syncPage(url, { fetchImpl = fetch } = {}) {
     } catch (e) {
         return false;
     }
+    if (generation !== syncGeneration) return false; // a newer move has its own sync under way
     const parsed = new DOMParser().parseFromString(text, 'text/html');
     const tpl = parsed.querySelector('template[data-async-fragment="main"]');
     const fresh = document.createElement('div');
@@ -243,10 +296,16 @@ export async function syncPage(url, { fetchImpl = fetch } = {}) {
     if (!log || !live) return false;
     const video = stageHost.querySelector('video, audio');
     const wasPlaying = !!video && !video.paused;
+    // The same two halves loadAsyncView performs around a swap, minus the
+    // live player: the views of the old card and list are told they are
+    // going, and the new ones are started -- without the second half the file
+    // list came back with its scripts never run (resource/select.js: no
+    // multi-select, no archive) until the next navigation.
+    destroyViews(content, live);
     log.appendChild(live);
     content.replaceChildren(...fresh.childNodes);
     // A media element pauses when it leaves the document, even for a moment.
     if (wasPlaying && video.paused) video.play().catch(() => {});
-    window.dispatchEvent(new CustomEvent('async', { detail: { target: content } }));
+    activateViews(content, live);
     return true;
 }

@@ -194,6 +194,21 @@ one subtitle file.
   the viewer waited half a minute and then watched the page restart. The job's own deadlines decide
   when a start has failed. The fallback remains for what cannot be quiet: an error card, a cap
   modal, a Turnstile checkbox.
+- **One sync, the latest.** Several moves can happen in one fullscreen sitting; each used to leave
+  its own "sync when fullscreen ends" behind, and on exit they raced — the slowest won, which could
+  put episode 2's card and start form under episode 3's picture. `scheduleSync` keeps one pending
+  URL and one listener, and a generation lets a newer `syncPage` overtake an older one in flight.
+- **`syncPage` runs the view lifecycle** around the live player (`destroyViews` / `activateViews`,
+  split out of `lib/loadAsyncView.js` with a `skip` subtree): without it the new file list came back
+  with its scripts never run (`resource/select.js`: no multi-select, no archive).
+- **The carried choice is saved** once the new player is up (`persistDefaults` → the same PUT a chip
+  click makes): a default is not a saved choice, and the next plain start of that file — a settings
+  restart, a reload — would have asked the ladder again and could flip what the viewer carried over.
+- A failed mount falls back to the visible way in: the old player is already gone by then, and a
+  half-built page is the one outcome worse than a reload. A page without the start form or
+  `#content` has no "next" at all (`canMoveOn`).
+- **Music prewarms from the middle** (`PREWARM_AT_TRACK` 0.5): 10% of a three-minute song is
+  eighteen seconds, less than a cold start, and the album would stutter between tracks.
 - **The card is a top-layer popover** docked to the player's bottom-right corner, above the control
   bar (`useDockedPopover`): inside the frame (`overflow: hidden`) a phone-width player cut its top
   off. It is re-placed on scroll / resize / a change of its height, and re-shown on a fullscreen

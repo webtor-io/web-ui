@@ -48,6 +48,7 @@ export function readCarry(scope) {
 // session live about ten minutes, and 10% of a long episode is more than
 // that. Only while the film is actually being watched.
 export const PREWARM_AT = 0.9;
+export const PREWARM_AT_TRACK = 0.5;
 export const PREWARM_MAX_LEAD_S = 300;
 // One countdown, whatever brought the card up: ten seconds. With known credits
 // it runs from the credits; without them the card comes up ten seconds before
@@ -76,7 +77,12 @@ export function advancePlan({ currentTime, duration, playing, hidden, prewarmed,
     const plan = { prewarm: false, card: false };
     if (!(duration > 0) || !(currentTime >= 0)) return plan;
     const remaining = duration - currentTime;
-    let threshold = Math.max(duration * PREWARM_AT, duration - PREWARM_MAX_LEAD_S);
+    // A song is three minutes: 10% of it is eighteen seconds, less than a cold
+    // start takes, and the album would stutter between tracks. Music gets its
+    // next file ready from the middle (still never more than five minutes
+    // early, which is what an audiobook chapter runs into).
+    const at = kind === 'track' ? PREWARM_AT_TRACK : PREWARM_AT;
+    let threshold = Math.max(duration * at, duration - PREWARM_MAX_LEAD_S);
     const credits = typeof creditsAt === 'number' && creditsAt > 0 && creditsAt < duration ? creditsAt : null;
     if (credits !== null) {
         threshold = Math.min(threshold, Math.max(credits - PREWARM_BEFORE_CREDITS_S, duration - PREWARM_EARLIEST_S));

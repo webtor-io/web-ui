@@ -131,3 +131,14 @@ test('a viewer who seeks into the credits still gets their ten seconds', () => {
     // Seven seconds from the end there are only seven to give.
     assert.equal(countdown({ currentTime: 2693, duration: 2700, creditsAt: 2400, shownAt: 2693 }).left, 7);
 });
+
+test('music gets its next track ready from the middle, not from the last seconds', () => {
+    const song = { duration: 180, playing: true, hidden: false, prewarmed: false, kind: 'track' };
+    assert.equal(advancePlan({ ...song, currentTime: 80 }).prewarm, false);
+    assert.equal(advancePlan({ ...song, currentTime: 95 }).prewarm, true, 'half way: eighty-five seconds for a cold start');
+    assert.equal(advancePlan({ ...song, currentTime: 95, kind: 'episode' }).prewarm, false, 'an episode still waits for 90%');
+    // An audiobook chapter: five minutes before the end, not thirty.
+    const chapter = { ...song, duration: 3600 };
+    assert.equal(advancePlan({ ...chapter, currentTime: 1900 }).prewarm, false);
+    assert.equal(advancePlan({ ...chapter, currentTime: 3305 }).prewarm, true);
+});

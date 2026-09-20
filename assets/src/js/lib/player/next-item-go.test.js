@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 // it loads: a document first, the module after.
 const boot = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/' });
 global.window = boot.window; global.document = boot.window.document;
-const { nextStartForm, nextURL, createNextItemGo, PREPARED_MAX_AGE_MS, NEXT_RENDER_TIMEOUT_MS } = await import('./next-item-go.js');
+const { nextStartForm, nextURL, createNextItemGo, syncPage, canMoveOn, PREPARED_MAX_AGE_MS, NEXT_RENDER_TIMEOUT_MS } = await import('./next-item-go.js');
 
 function page() {
     const dom = new JSDOM(`<!doctype html><body>
@@ -91,4 +91,53 @@ test('a cold start is given minutes, not the thirty seconds of a settings restar
     assert.equal(opts.timeoutMs, NEXT_RENDER_TIMEOUT_MS);
     assert.ok(NEXT_RENDER_TIMEOUT_MS >= 5 * 60 * 1000, 'longer than a warm-up on a thin swarm');
     assert.equal(typeof opts.onProgress, 'function', 'and the wait is narrated');
+});
+
+// The page around a playing film, and a fresh #content for episode `n`.
+function playingPage() {
+    const w = page();
+    global.DOMParser = w.DOMParser;
+    w.document.body.innerHTML = `
+        <div id="content" data-async-layout="L">
+          <div id="file"><h2>e01</h2><div id="log-i1"><div class="live"><div class="wt-player-stage"><video></video></div><dialog id="subtitles"></dialog></div></div></div>
+          <div id="list" data-async-view="resource/select">list of e01</div>
+        </div>`;
+    return w;
+}
+const freshContent = (n) => `<template data-async-fragment="main"><div id="file"><h2>e0${n}</h2><div id="log-i${n}"></div></div><div id="list">list of e0${n}<script src="https://webtor.io/assets/resource/select.js"></script></div></template>`;
+
+test('syncing the page moves the live player into the new card, and runs the view lifecycle around it', async () => {
+    const w = playingPage();
+    const stage = w.document.querySelector('.wt-player-stage');
+    const seen = [];
+    w.addEventListener('async:resource/select_destroy', () => seen.push('destroy'));
+    w.addEventListener('async:/assets/resource/select', (e) => seen.push('init:' + e.detail.target.id));
+    const ok = await syncPage('/ru/res?file=e02', { fetchImpl: async () => ({ ok: true, text: async () => freshContent(2) }) });
+    assert.equal(ok, true);
+    assert.equal(w.document.querySelector('#file h2').textContent, 'e02');
+    assert.equal(w.document.querySelector('.wt-player-stage'), stage, 'the very same stage: the player was moved, not rebuilt');
+    assert.equal(stage.closest('[id^="log-"]').id, 'log-i2', 'into the new card\'s log');
+    assert.equal(w.document.querySelectorAll('#subtitles').length, 1);
+    assert.deepEqual(seen, ['destroy', 'init:list'], 'the old list was told it was going; the new one had its script started');
+});
+
+test('two syncs in flight: the newer one wins whatever order the answers come in', async () => {
+    const w = playingPage();
+    let releaseOld;
+    const oldAnswer = new Promise((r) => { releaseOld = r; });
+    const first = syncPage('/ru/res?file=e02', { fetchImpl: async () => { await oldAnswer; return { ok: true, text: async () => freshContent(2) }; } });
+    const second = syncPage('/ru/res?file=e03', { fetchImpl: async () => ({ ok: true, text: async () => freshContent(3) }) });
+    assert.equal(await second, true);
+    releaseOld();
+    assert.equal(await first, false, 'overtaken: it must not put episode 2\'s card under episode 3\'s picture');
+    assert.equal(w.document.querySelector('#file h2').textContent, 'e03');
+});
+
+test('a page without the start form or #content has no "next"', () => {
+    const w = page();
+    assert.equal(canMoveOn(w.document), false, 'no #content');
+    w.document.body.insertAdjacentHTML('beforeend', '<div id="content"></div>');
+    assert.equal(canMoveOn(w.document), true);
+    w.document.querySelector('form').remove();
+    assert.equal(canMoveOn(w.document), false, 'no start form');
 });
