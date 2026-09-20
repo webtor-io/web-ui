@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 // it loads: a document first, the module after.
 const boot = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/' });
 global.window = boot.window; global.document = boot.window.document;
-const { nextStartForm, nextURL, createNextItemGo, syncPage, canMoveOn, PREPARED_MAX_AGE_MS, NEXT_RENDER_TIMEOUT_MS } = await import('./next-item-go.js');
+const { nextStartForm, nextURL, createNextItemGo, syncPage, canMoveOn, takeFallbackNote, PREPARED_MAX_AGE_MS, NEXT_RENDER_TIMEOUT_MS } = await import('./next-item-go.js');
 
 function page() {
     const dom = new JSDOM(`<!doctype html><body>
@@ -140,4 +140,46 @@ test('a page without the start form or #content has no "next"', () => {
     assert.equal(canMoveOn(w.document), true);
     w.document.querySelector('form').remove();
     assert.equal(canMoveOn(w.document), false, 'no start form');
+});
+
+test('a player that is up is not a failed mount, whatever the housekeeping after it does', async () => {
+    const w = page();
+    w.document.body.insertAdjacentHTML('beforeend', '<div id="content"></div><div class="host"><div class="wt-player-stage"></div></div>');
+    const stage = w.document.querySelector('.wt-player-stage');
+    const docWith = () => new w.DOMParser().parseFromString('<video class="player" data-resource-title="T"></video>', 'text/html');
+    let navigated = null; const events = [];
+    // The housekeeping throws: a listener of player_replaced that blows up is
+    // the realistic case, simulated here through dispatchEvent itself.
+    const realDispatch = w.dispatchEvent.bind(w);
+    w.dispatchEvent = (e) => { if (e.type === 'player_replaced') throw new Error('boom'); return realDispatch(e); };
+    const go = createNextItemGo({
+        next: { itemId: 'i2', path: 'S01/e02.mkv' }, resourceID: 'res', root: w.document.body,
+        getStage: () => stage, initPlayer: async () => {}, destroyPlayer: () => {},
+        onEvent: (n, d) => events.push([n, d]), fetchRender: async () => docWith(), getToken: async () => '',
+        navigate: (u) => { navigated = u; },
+    });
+    await go.go('auto');
+    w.dispatchEvent = realDispatch;
+    assert.equal(navigated, null, 'no reload: the player mounted');
+    assert.equal(events.filter(([n]) => n === 'go').at(-1)[1].fallback, false);
+});
+
+test('a real failure to mount reloads, and leaves the reason for the next page', async () => {
+    const w = page();
+    w.document.body.insertAdjacentHTML('beforeend', '<div class="host"><div class="wt-player-stage"></div></div>');
+    const stage = w.document.querySelector('.wt-player-stage');
+    const docWith = () => new w.DOMParser().parseFromString('<video class="player"></video>', 'text/html');
+    let navigated = null;
+    const go = createNextItemGo({
+        next: { itemId: 'i2', path: 'S01/e02.mkv' }, resourceID: 'res', root: w.document.body,
+        getStage: () => stage, initPlayer: async () => { throw new Error('hls exploded'); }, destroyPlayer: () => {},
+        fetchRender: async () => docWith(), getToken: async () => '', navigate: (u) => { navigated = u; },
+    });
+    const err = console.error; console.error = () => {};
+    await go.go('auto');
+    console.error = err;
+    assert.ok(navigated, 'the old player is gone: a reload is the lesser evil');
+    const note = takeFallbackNote(w.sessionStorage);
+    assert.match(note.reason, /mount-failed: hls exploded/);
+    assert.equal(takeFallbackNote(w.sessionStorage), null, 'reported once');
 });

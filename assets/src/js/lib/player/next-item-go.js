@@ -55,6 +55,22 @@ export function nextStartForm(next, carry, root = document) {
     return form;
 }
 
+const FALLBACK_NOTE = 'wt-next-fallback';
+
+// takeFallbackNote: the reason the PREVIOUS page gave up on a quiet move and
+// reloaded, once, if it is recent. Reported by the player that comes up after.
+export function takeFallbackNote(storage, nowMs = Date.now()) {
+    try {
+        const raw = storage.getItem(FALLBACK_NOTE);
+        if (!raw) return null;
+        storage.removeItem(FALLBACK_NOTE);
+        const note = JSON.parse(raw);
+        return note && nowMs - note.at < 5 * 60 * 1000 ? note : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 // canMoveOn: is this a page the move can happen on? It needs the start form of
 // the current file (to re-address) and the #content section (to bring up to
 // date). Only the resource page has them; a player anywhere else simply has
@@ -79,13 +95,14 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
     let prepared = null;   // { doc, at }
     let preparing = null;  // Promise
     let going = false;
+    let whyNot = ''; // why the last quiet attempt produced no player
 
     const fetchNext = async () => {
         const modal = document.getElementById('subtitles');
         const form = nextStartForm(next, readCarry(modal || document));
-        if (!form) return null;
+        if (!form) { whyNot = 'no-start-form'; return null; }
         const token = await getToken();
-        if (token === null) return null; // needs a visible checkbox: not quietly
+        if (token === null) { whyNot = 'turnstile-needs-a-click'; return null; } // not quietly
         // The log of the next file's start, for the viewer who is waiting on
         // it (Player.jsx shows the latest line on the card).
         return fetchRender(form, { token, timeoutMs: NEXT_RENDER_TIMEOUT_MS, onProgress: (text) => onEvent('progress', { text }) });
@@ -108,7 +125,14 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
     const freshPrepared = () => (prepared && now() - prepared.at <= PREPARED_MAX_AGE_MS ? prepared.doc : null);
 
     // The ordinary way in, for everything that cannot be done quietly.
-    const visibleFallback = () => {
+    //
+    // A fallback is a page load, and a page load wipes the console: the reason
+    // is left in sessionStorage for the next page to report (takeFallbackNote),
+    // so "it reloads instead of moving on" comes with a why.
+    const visibleFallback = (reason) => {
+        try {
+            window.sessionStorage.setItem(FALLBACK_NOTE, JSON.stringify({ reason, path: next.path, at: now() }));
+        } catch (e) { /* no storage: the reload still happens */ }
         navigate(nextURL(window.location.href, next.path) + '#action=stream');
     };
 
@@ -127,9 +151,10 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
             onEvent('loading', { on: false });
         }
         if (!doc || !doc.querySelector('.player')) {
-            onEvent('go', { how, prewarmed, fallback: true, wait_ms: now() - startedAt });
+            const reason = doc ? 'render-is-not-a-player' : (whyNot || 'no-render');
+            onEvent('go', { how, prewarmed, fallback: true, reason, wait_ms: now() - startedAt });
             onEvent('loading', { on: true }); // until the navigation takes over
-            visibleFallback();
+            visibleFallback(reason);
             return;
         }
         const fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -139,8 +164,10 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         } catch (e) {
             // The old player is already gone at this point: a half-built
             // page is the one outcome worse than a reload.
-            onEvent('go', { how, prewarmed, fallback: true, failed: true, wait_ms: now() - startedAt });
-            visibleFallback();
+            const reason = `mount-failed: ${e && e.message ? e.message : e}`;
+            console.error('next item:', reason, e);
+            onEvent('go', { how, prewarmed, fallback: true, reason, wait_ms: now() - startedAt });
+            visibleFallback(reason);
             return;
         }
         const title = doc.querySelector('.player').getAttribute('data-resource-title');
@@ -197,9 +224,18 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         // awaitStart: the new player is about to play by itself; until it does
         // it shows a spinner, not the big Play button of a paused film.
         return Promise.resolve(initPlayer(host, { stage, aspectRatio, awaitStart: true })).then(() => {
-            if (stage) stage.classList.remove('wt-player-stage--empty');
-            persistDefaults(host, resourceID, next.itemId);
-            window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
+            // From here on the player is up. What follows is housekeeping, and
+            // a throw in it must NOT read as "the mount failed": that sends
+            // the viewer into a page reload with a working player on screen
+            // (2026-09-20 -- the review's try/catch was drawn around all of
+            // this, and automatic moves turned into reloads).
+            try {
+                if (stage) stage.classList.remove('wt-player-stage--empty');
+                persistDefaults(host, resourceID, next.itemId);
+                window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
+            } catch (e) {
+                console.error('next item: after-mount step failed', e);
+            }
         });
     }
 

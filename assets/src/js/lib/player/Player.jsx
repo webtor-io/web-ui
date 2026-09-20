@@ -11,7 +11,7 @@ import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, s
 import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
-import { createNextItemGo, canMoveOn } from './next-item-go';
+import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
 import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL } from './credits';
 import { track, settled } from './player-telemetry';
@@ -955,6 +955,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // this exists -- a film, the last file, an embed.
     // ...or a page the move cannot happen on (canMoveOn).
     const next = useRef(canMoveOn(document) ? readNext(videoEl) : null).current;
+    // The page before this one gave up on a quiet move and reloaded: say why,
+    // here, where the console survived -- and count it.
+    useEffect(() => {
+        let store = null;
+        try { store = window.sessionStorage; } catch (e) { return; }
+        const note = takeFallbackNote(store);
+        if (!note) return;
+        console.warn('next item: the previous page fell back to a reload --', note.reason, note);
+        track('next-item-fallback', { reason: String(note.reason).slice(0, 120) });
+    }, []);
     const [autoplayNext, setAutoplayNext] = useState(() => loadPrefs().autoplayNext);
     const [nextCard, setNextCard] = useState(null); // null | 'soon' | 'offer' | 'ask'
     const nextCancelledRef = useRef(false);
