@@ -673,6 +673,7 @@
     "player.speed": "Playback speed",
     "player.next": "Next",
     "player.nextUp": "Up next",
+    "player.nextLoading": "Loading the next one…",
     "player.nextUpAuto": "Up next — starts automatically",
     "player.playNow": "Play now",
     "player.nextCancel": "Cancel",

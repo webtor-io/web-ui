@@ -12,7 +12,6 @@
 // falls back to opening the next file the ordinary, visible way.
 
 import { backgroundToken, fetchStreamRender } from './background-render.js';
-import { markAutoResume } from './preferred-lang.js';
 import { readCarry } from './next-item.js';
 
 // A prepared render older than this is not used: its transcoder session and
@@ -99,10 +98,15 @@ export function createNextItemGo({ next, resourceID, root, getStage, initPlayer,
         let doc = freshPrepared();
         if (!doc) {
             prepared = null;
+            // Not ready: this is a stream start like any other and can take
+            // its minute. The player shows it (Player.jsx nextLoading).
+            onEvent('loading', { on: true });
             doc = await (preparing || prepare());
+            onEvent('loading', { on: false });
         }
         if (!doc || !doc.querySelector('.player')) {
             onEvent('go', { how, prewarmed, fallback: true, wait_ms: now() - startedAt });
+            onEvent('loading', { on: true }); // until the navigation takes over
             visibleFallback();
             return;
         }
@@ -136,6 +140,22 @@ export function createNextItemGo({ next, resourceID, root, getStage, initPlayer,
     // or the new render's #subtitles would be the second one in the document.
     function mountOnStage(doc) {
         const stage = getStage();
+        // The stage is empty between the two players, and an empty block has
+        // no height: the page below jumped up and back (owner). Hold the
+        // height it has now until the new player is ready, and say "loading"
+        // inside it meanwhile.
+        if (stage) {
+            stage.style.minHeight = `${stage.offsetHeight}px`;
+            stage.classList.add('wt-player-stage--switching');
+            const release = () => {
+                window.removeEventListener('player_ready', release);
+                clearTimeout(timer);
+                stage.style.minHeight = '';
+                stage.classList.remove('wt-player-stage--switching');
+            };
+            const timer = setTimeout(release, 15000);
+            window.addEventListener('player_ready', release);
+        }
         destroyPlayer({ keepStage: true });
         const host = stage ? stage.parentNode : root;
         for (const child of [...host.children]) {
@@ -147,9 +167,11 @@ export function createNextItemGo({ next, resourceID, root, getStage, initPlayer,
             if (node.nodeType === 1 && node.tagName === 'SCRIPT') continue;
             host.appendChild(document.importNode(node, true));
         }
-        // The next player does not stop to ask "continue from ...?" -- the
-        // same one-shot note a settings restart leaves (preferred-lang.js).
-        markAutoResume(resourceID, next.path);
+        // No auto-resume note here (there was one in the first version): a
+        // next episode the viewer had already started asks "continue from
+        // ... / start over" like any other file -- it is their question, and
+        // answering it for them read as the position being ignored (owner,
+        // 2026-09-20).
         return Promise.resolve(initPlayer(host, { stage })).then(() => {
             window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
         });

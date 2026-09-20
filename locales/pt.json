@@ -615,6 +615,7 @@
     "player.speed": "Velocidade de reprodução",
     "player.next": "Próximo",
     "player.nextUp": "A seguir",
+    "player.nextLoading": "Carregando o próximo…",
     "player.nextUpAuto": "A seguir — começa automaticamente",
     "player.playNow": "Assistir agora",
     "player.nextCancel": "Cancelar",

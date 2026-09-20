@@ -19,11 +19,15 @@ export function PauseIcon() {
     );
 }
 
-// Skip-next: a play triangle with a bar on its right (owner, 2026-09-20).
+// Skip-next: the Play triangle itself -- same path, same size -- with a bar
+// after it (owner, 2026-09-20). The first version squeezed both into Play's
+// 24x24 box and had to cut the triangle short; here the box is simply wider
+// (30x24) and the button grows with it (.wt-player-btn--next).
 export function NextIcon() {
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full">
-            <path d="M5.25 5.653c0-1.427 1.529-2.33 2.779-1.643l9.04 4.972V5.25a.75.75 0 0 1 .75-.75h1.125a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H17.82a.75.75 0 0 1-.75-.75v-3.732l-9.04 4.972c-1.25.687-2.779-.217-2.779-1.643V5.653Z" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 24" fill="currentColor" class="h-full w-auto">
+            <path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" />
+            <rect x="22.5" y="4" width="3" height="16" rx="1.25" />
         </svg>
     );
 }

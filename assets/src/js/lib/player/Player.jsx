@@ -929,6 +929,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [autoplayNext, setAutoplayNext] = useState(() => loadPrefs().autoplayNext);
     const [nextCard, setNextCard] = useState(null); // null | 'soon' | 'offer' | 'ask'
     const nextCancelledRef = useRef(false);
+    const [nextLoading, setNextLoading] = useState(false);
     const nextGoRef = useRef(null);
     if (next && !nextGoRef.current) {
         nextGoRef.current = createNextItemGo({
@@ -937,6 +938,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onEvent: (name, data) => {
                 if (name === 'go') track('next-item-go', { kind: next.kind, ...data });
                 if (name === 'prepared') track('next-item-prepared', { kind: next.kind, ...data });
+                if (name === 'loading') setNextLoading(!!data.on);
             },
         });
     }
@@ -947,7 +949,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // themselves ends it (see the listener below).
         if (how === 'auto') writeStreak(safeSession(), readStreak(safeSession()) + 1);
         else writeStreak(safeSession(), 0);
-        setNextCard(null);
+        // The card stays (or comes up) while the next file loads: it is what
+        // names the thing the spinner is for.
+        setNextCard((c) => c || 'offer');
         nextGoRef.current.go(how);
     }, []);
     // Any sign of a viewer ends the "is anyone there" streak.
@@ -1178,7 +1182,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             })()}
 
             {/* Loading spinner (only when playing + buffering, or seeking) */}
-            {showControls && isVideo && (sessionSeeking || preHolding || (state.playing && state.loading)) && (
+            {showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (state.playing && state.loading)) && (
                 <div class="wt-player-overlay wt-player-overlay--loading">
                     <LoadingSpinner />
                 </div>
@@ -1202,11 +1206,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             {next && nextCard && (
                 <div class="wt-next-card" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <div class="wt-next-card-kicker">
-                        {nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? t('player.nextUpAuto') : t('player.nextUp'))}
+                        {nextLoading ? t('player.nextLoading') : (nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? t('player.nextUpAuto') : t('player.nextUp')))}
                     </div>
                     <div class="wt-next-card-label" title={next.label}>{next.label}</div>
                     <div class="wt-next-card-actions">
-                        <button type="button" class="wt-next-card-go" onClick={() => goNext('card')}>
+                        <button type="button" class="wt-next-card-go" onClick={() => goNext('card')} disabled={nextLoading}>
                             {nextCard === 'ask' ? t('player.continueWatching') : t('player.playNow')}
                         </button>
                         {nextCard === 'soon' && (
@@ -1255,6 +1259,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onCaptionsClick={handleCaptionsClick}
                     onEmbedClick={handleEmbedClick}
                     onNext={next ? () => goNext('button') : null}
+                    nextBusy={nextLoading}
                     nextLabel={next ? next.label : ''}
                     isVideo={isVideo}
                     features={features}

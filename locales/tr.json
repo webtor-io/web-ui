@@ -615,6 +615,7 @@
     "player.speed": "Oynatma hızı",
     "player.next": "Sonraki",
     "player.nextUp": "Sıradaki",
+    "player.nextLoading": "Sonraki yükleniyor…",
     "player.nextUpAuto": "Sıradaki — otomatik başlayacak",
     "player.playNow": "Şimdi izle",
     "player.nextCancel": "İptal",

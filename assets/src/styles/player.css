@@ -1112,9 +1112,72 @@ video::cue {
     .wt-player-toast { animation: none; }
 }
 
-/* Next episode / track (next-item.js). The card sits bottom-right, above the
-   controls and clear of the subtitles' line; it is small on purpose -- the
-   last seconds of an episode still belong to the episode. */
+/* The Next button: Play's own height, and wider by exactly what the bar adds
+   (the icon's box is 30x24 to Play's 24x24), so the triangle is the same size
+   as the one beside it. */
+.wt-player-btn--next {
+    width: auto;
+    height: 2.25rem;
+    padding: 0.375rem 0.25rem;
+}
+
+.wt-player-btn--next svg {
+    height: 100%;
+    width: auto;
+}
+
+@media (max-width: 640px) and (pointer: coarse) {
+    .wt-player-btn--next {
+        height: 2.75rem;
+        padding: 0.5rem 0.25rem;
+    }
+}
+
+.wt-player-btn-spinner {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0 0.375rem;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: wt-spin 0.8s linear infinite;
+}
+
+@keyframes wt-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Between two players the stage is empty (next-item-go.js holds its height):
+   black, with a spinner, so the page neither jumps nor goes blank. */
+.wt-player-stage--switching {
+    position: relative;
+    background: #000;
+    border-radius: var(--rounded-btn, 0.5rem);
+}
+
+.wt-player-stage--switching::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: -1.25rem 0 0 -1.25rem;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: wt-spin 0.8s linear infinite;
+}
+
+/* Next episode / track (next-item.js). Bottom-right, above the controls and
+   clear of the subtitles' line; small on purpose -- the last seconds of an
+   episode still belong to the episode.
+
+   In the player's own vocabulary, not the site's: the glass buttons of the
+   resume prompt (.wt-resume-btn). The first version had a pink button, which
+   in this design system means a homepage CTA -- "buy", not "play" (owner,
+   2026-09-20). */
 .wt-next-card {
     position: absolute;
     right: 0.75rem;
@@ -1124,7 +1187,7 @@ video::cue {
     padding: 0.75rem;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 0.875rem;
-    background: rgba(15, 15, 25, 0.9);
+    background: rgba(0, 0, 0, 0.72);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     color: #fff;
@@ -1136,7 +1199,7 @@ video::cue {
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.55);
 }
 
 .wt-next-card-label {
@@ -1158,31 +1221,39 @@ video::cue {
 }
 
 .wt-next-card-go {
-    padding: 0.375rem 0.75rem;
-    border: none;
-    border-radius: 0.5rem;
-    background: #e84393;
+    padding: 0.4375rem 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
     color: #fff;
+    font: inherit;
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .wt-next-card-go:hover {
-    background: #fd79a8;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.wt-next-card-go:disabled {
+    opacity: 0.5;
+    cursor: progress;
 }
 
 .wt-next-card-link {
     padding: 0.25rem 0;
     border: none;
     background: none;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.5);
+    font: inherit;
     font-size: 0.8125rem;
     cursor: pointer;
 }
 
 .wt-next-card-link:hover {
-    color: #fff;
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .wt-next-card-auto {
@@ -1190,13 +1261,15 @@ video::cue {
     align-items: center;
     gap: 0.5rem;
     margin-top: 0.625rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.55);
     cursor: pointer;
 }
 
 .wt-next-card-auto input {
-    accent-color: #e84393;
+    accent-color: #fff;
 }
 
 /* The audio player is one row tall: the card would cover all of it. Music

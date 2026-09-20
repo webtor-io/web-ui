@@ -68,7 +68,9 @@ test('prepare once; a stale render is not used; what cannot be quiet falls back'
     const b = make(async () => { throw new Error('must not be asked'); }, async () => null);
     await b.go('auto');
     assert.equal(assigned, '/ru/res?file=S01%2Fe02.mkv#action=stream', 'the ordinary way in');
-    assert.deepEqual(events.at(-1)[1].fallback, true);
+    assert.equal(events.filter(([n]) => n === 'go').at(-1)[1].fallback, true);
+    assert.deepEqual(events.filter(([n]) => n === 'loading').map(([, d]) => d.on), [true, false, true],
+        'the wait is shown: while fetching, and again until the navigation takes over');
 
     // An error card instead of a player: the render resolves to null.
     assigned = null;

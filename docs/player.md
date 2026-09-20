@@ -158,9 +158,17 @@ one subtitle file.
   player into its new log container, then swaps. A carried AI translation is kicked with one HEAD
   to the track so its first lines are ready. What cannot be done quietly (an error card, a cap
   modal, a Turnstile checkbox) falls back to opening the next file the visible way.
-- The next player does not show "continue from…": it leaves the same one-shot note a settings
-  restart does (`markAutoResume`), and `resumeAt()` starts a file the viewer had ≥90% finished from
-  the top, so an automatic move cannot land at 98% and chain on.
+- A next file the viewer had already started asks "continue from … / start over" like any other
+  file. The first version answered it silently (the settings-restart note, `markAutoResume`); that
+  read as the saved position being ignored, and the question is the viewer's to answer.
+  `resumeAt()` remains for the settings restart: a file ≥90% finished restarts from the top.
+- While the next file loads (not prewarmed: a stream start like any other, up to a minute) the
+  player says so: spinner overlay, a spinner in the Next button, the card's kicker reads "Loading
+  the next one…". Between the two players the stage keeps its height
+  (`.wt-player-stage--switching`) — an empty block has none, and the page jumped.
+- Look: the player's own vocabulary (the glass buttons of the resume prompt), not the site's —
+  a pink button here means a homepage CTA. `NextIcon` is Play's exact triangle plus a bar, in a
+  30×24 box; the button is wider by what the bar adds, so the two triangles match.
 
 **The stage.** Fullscreen is requested on `.wt-player-stage`, a wrapper that outlives the player it
 holds (`initPlayer(target, { stage })`, `destroyPlayer({ keepStage })`): a fullscreen element stays

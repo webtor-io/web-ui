@@ -615,6 +615,7 @@
     "player.speed": "Afspeelsnelheid",
     "player.next": "Volgende",
     "player.nextUp": "Hierna",
+    "player.nextLoading": "Volgende wordt geladen…",
     "player.nextUpAuto": "Hierna — start automatisch",
     "player.playNow": "Nu kijken",
     "player.nextCancel": "Annuleren",
