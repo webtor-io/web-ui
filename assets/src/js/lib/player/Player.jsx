@@ -12,6 +12,7 @@ import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
 import { createNextItemGo } from './next-item-go';
+import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL } from './credits';
 import { track, settled } from './player-telemetry';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
@@ -954,6 +955,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [nextCard, setNextCard] = useState(null); // null | 'soon' | 'offer' | 'ask'
     const nextCancelledRef = useRef(false);
     const [nextLoading, setNextLoading] = useState(false);
+    // The latest line of the next file's start log. Kept from the silent
+    // prewarm too, so a viewer who presses Next midway sees where it is.
+    const [nextProgress, setNextProgress] = useState('');
     const nextGoRef = useRef(null);
     const earlyGoneRef = useRef(false); // the credits countdown fires once
     const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
@@ -965,6 +969,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 if (name === 'go') track('next-item-go', { kind: next.kind, ...data });
                 if (name === 'prepared') track('next-item-prepared', { kind: next.kind, ...data });
                 if (name === 'loading') setNextLoading(!!data.on);
+                if (name === 'progress') setNextProgress(data.text || '');
             },
         });
     }
@@ -1059,6 +1064,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         video.addEventListener('ended', onEnded);
         return () => video.removeEventListener('ended', onEnded);
     }, [autoplayNext, goNext]);
+    // The card lives in the top layer, docked to the player's corner: inside
+    // the frame a narrow player cut its top off (useDockedPopover).
+    const nextCardRef = useRef(null);
+    const nextCardVisible = !!(next && next.kind !== 'track' && nextCard);
+    useDockedPopover(nextCardVisible, containerEl, nextCardRef, `${nextLoading}|${nextProgress ? 1 : 0}|${nextCard}`);
+
     const cancelNext = useCallback(() => {
         nextCancelledRef.current = true;
         setNextCard(null);
@@ -1267,12 +1278,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 one starts by itself at the end unless cancelled. 'offer':
                 autoplay is off, the file has ended. 'ask': several files went
                 by with no sign of a viewer. */}
-            {next && next.kind !== 'track' && nextCard && (
-                <div class="wt-next-card" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+            {nextCardVisible && (
+                <div ref={nextCardRef} popover={HAS_POPOVER ? 'manual' : undefined} class="wt-next-card" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <div class="wt-next-card-kicker">
                         {nextLoading ? t('player.nextLoading') : (nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? tf('player.nextIn', countdown({ currentTime: state.currentTime, duration: state.duration, creditsAt: creditsAtRef.current, shownAt: cardShownAtRef.current }).left) : t('player.nextUp')))}
                     </div>
                     <div class="wt-next-card-label" title={next.label}>{next.label}</div>
+                    {/* What the wait is made of: the running step of the next
+                        file's start, as the ordinary job log would say it. */}
+                    {nextLoading && nextProgress && (
+                        <div class="wt-next-card-progress" aria-live="off" title={nextProgress}>{nextProgress}</div>
+                    )}
                     <div class="wt-next-card-actions">
                         <button type="button" class="wt-next-card-go" onClick={() => goNext('card')} disabled={nextLoading}>
                             {nextCard === 'ask' ? t('player.continueWatching') : t('player.playNow')}

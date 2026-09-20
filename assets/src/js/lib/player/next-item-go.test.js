@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 // it loads: a document first, the module after.
 const boot = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/' });
 global.window = boot.window; global.document = boot.window.document;
-const { nextStartForm, nextURL, createNextItemGo, PREPARED_MAX_AGE_MS } = await import('./next-item-go.js');
+const { nextStartForm, nextURL, createNextItemGo, PREPARED_MAX_AGE_MS, NEXT_RENDER_TIMEOUT_MS } = await import('./next-item-go.js');
 
 function page() {
     const dom = new JSDOM(`<!doctype html><body>
@@ -77,4 +77,18 @@ test('prepare once; a stale render is not used; what cannot be quiet falls back'
     const c = make(async () => null);
     await c.go('button');
     assert.ok(assigned, 'a render that is not a player is shown the visible way');
+});
+
+test('a cold start is given minutes, not the thirty seconds of a settings restart', async () => {
+    const w = page();
+    let opts = null;
+    const go = createNextItemGo({
+        next: { itemId: 'i2', path: 'S01/e02.mkv' }, resourceID: 'res', root: w.document.body,
+        getStage: () => null, initPlayer: async () => {}, destroyPlayer: () => {},
+        fetchRender: async (form, o) => { opts = o; return null; }, getToken: async () => '', navigate: () => {},
+    });
+    await go.prepare();
+    assert.equal(opts.timeoutMs, NEXT_RENDER_TIMEOUT_MS);
+    assert.ok(NEXT_RENDER_TIMEOUT_MS >= 5 * 60 * 1000, 'longer than a warm-up on a thin swarm');
+    assert.equal(typeof opts.onProgress, 'function', 'and the wait is narrated');
 });

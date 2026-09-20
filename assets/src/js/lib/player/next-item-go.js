@@ -18,6 +18,16 @@ import { readCarry } from './next-item.js';
 // the job's cached render both live about ten minutes.
 export const PREPARED_MAX_AGE_MS = 8 * 60 * 1000;
 
+// How long the next file's start may take before it is given up on. NOT the
+// 30 s a settings restart allows (background-render.js): that one re-renders a
+// file that is already playing, this one is a cold stream start -- a warm-up
+// alone may run for minutes on a thin swarm. With 30 s every slow start "timed
+// out" into the visible fallback, which is a full page load: the viewer waited
+// half a minute and then watched the page restart (owner, 2026-09-20). The
+// job's own deadlines decide when a start has failed; this only has to be
+// longer than they are. The card shows the log meanwhile.
+export const NEXT_RENDER_TIMEOUT_MS = 10 * 60 * 1000;
+
 const START_FORM = 'form[action$="/stream-video"], form[action$="/stream-audio"]';
 
 // nextStartForm: the form that started THIS file, re-addressed to the next
@@ -66,7 +76,9 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         if (!form) return null;
         const token = await getToken();
         if (token === null) return null; // needs a visible checkbox: not quietly
-        return fetchRender(form, { token });
+        // The log of the next file's start, for the viewer who is waiting on
+        // it (Player.jsx shows the latest line on the card).
+        return fetchRender(form, { token, timeoutMs: NEXT_RENDER_TIMEOUT_MS, onProgress: (text) => onEvent('progress', { text }) });
     };
 
     const prepare = () => {

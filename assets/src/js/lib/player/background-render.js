@@ -30,7 +30,19 @@ const FRESH_RENDER_TIMEOUT_MS = 30000;
 // is for a visible start to show). Two steps, the same two the
 // page itself takes: the POST answers with a job log, and the job's last
 // message (`rendertemplate`) carries the player's HTML.
-export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, token = '', timeoutMs = FRESH_RENDER_TIMEOUT_MS } = {}) {
+//
+// `onProgress(text)`: the job's log as it happens, one line at a time -- the
+// step that is running ("warming up torrent client, downloading 10 MB") and
+// its status under it ("37%", "12 s until we give up on this swarm"). For a
+// caller whose viewer is WAITING for this render (the move to the next
+// episode): the visible start shows its log, and a wait with nothing on
+// screen but a spinner reads as a hang. A silent restart simply passes none.
+export function progressText(step, status) {
+    if (step && status) return `${step} \u2014 ${status}`;
+    return step || status || '';
+}
+
+export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, token = '', timeoutMs = FRESH_RENDER_TIMEOUT_MS, onProgress = null } = {}) {
     const doFetch = fetchImpl || fetch;
     const ES = EventSourceImpl || window.EventSource;
     if (!form || !ES) return null;
@@ -68,6 +80,7 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
 
     return new Promise((resolve) => {
         const src = new ES(url, { withCredentials: true });
+        let step = '';
         const finish = (value) => {
             clearTimeout(timer);
             src.close();
@@ -78,6 +91,17 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
         src.onmessage = (ev) => {
             let data = null;
             try { data = JSON.parse(ev.data); } catch (e) { return; }
+            if (onProgress) {
+                // A step line names itself in `message`; a status update
+                // belongs to the step above it. `done` closes a step, and the
+                // next one is about to say what it is.
+                if ((data.level === 'inprogress' || data.level === 'info') && data.message) {
+                    step = data.message;
+                    onProgress(progressText(step, ''));
+                } else if (data.level === 'statusupdate' && data.status) {
+                    onProgress(progressText(step, data.status));
+                }
+            }
             if (data.level === 'rendertemplate') {
                 finish(new DOMParser().parseFromString(String(data.body || ''), 'text/html'));
             } else if (data.level === 'close' || data.level === 'custom' || data.level === 'error') {

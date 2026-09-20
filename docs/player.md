@@ -151,10 +151,12 @@ one subtitle file.
   pointer or key event — a sleeper must not warm up and transcode a season) / `stay` (cancelled).
 - Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on) behind a switch
   (the design system's `toggle toggle-soft`, the same as the subtitles switch — a home-made solid-pink
-  one was tried and looked like neither). It lives in the **gear menu** (`SettingsControl.jsx`), with
+  one was tried and looked like neither). It lives in the **"more" menu** (three dots, always the last control on the right; `SettingsControl.jsx`), with
   its name next to it and reachable at any time, for video and audio alike, and on the card as well.
-  A bare switch in the audio bar was tried first: it said nothing about what it switched. The gear
-  shows only where there is a next file. Its menu and the speed menu share `useAnchoredPopover`
+  A bare switch in the audio bar was tried first: it said nothing about what it switched; then a
+  gear, which read as bold beside the outline icons and promised more than a menu of one switch. The
+  button is as narrow as its glyph (a square one left the dots stranded in empty space) and shows
+  only where there is a next file. Its menu and the speed menu share `useAnchoredPopover`
   (top-layer popover placed from the button's rect, outside press / Escape / scroll close it) and
   the `.wt-player-menu` styles.
 - **Music has no card at all** (owner): tracks follow one another like an album, or do not, by the
@@ -180,6 +182,19 @@ one subtitle file.
   with the resume prompt (a question only the viewer can answer), or after 10 s (autoplay refused:
   Play is what they need). The empty stage shows the player's own spinner (`--empty`, the same SVG
   as `LoadingSpinner`), removed as soon as a player is in it.
+- **The wait is narrated.** `fetchStreamRender({ onProgress })` reports the job's log as it
+  happens — the running step, and its status under it ("warming up torrent client, downloading
+  10 MB — 37%") — and the card shows the latest line while the viewer waits. Kept from the silent
+  prewarm too, so pressing Next midway shows where it is.
+- **A cold start gets minutes** (`NEXT_RENDER_TIMEOUT_MS`, 10 min), not the 30 s a settings restart
+  allows: with 30 s every slow start timed out into the visible fallback — a full page load — and
+  the viewer waited half a minute and then watched the page restart. The job's own deadlines decide
+  when a start has failed. The fallback remains for what cannot be quiet: an error card, a cap
+  modal, a Turnstile checkbox.
+- **The card is a top-layer popover** docked to the player's bottom-right corner, above the control
+  bar (`useDockedPopover`): inside the frame (`overflow: hidden`) a phone-width player cut its top
+  off. It is re-placed on scroll / resize / a change of its height, and re-shown on a fullscreen
+  change (the top layer is ordered by arrival).
 - Look: the player's own vocabulary (the glass buttons of the resume prompt), not the site's —
   a pink button here means a homepage CTA. `NextIcon` is Play's exact triangle plus a bar, in a
   30×24 box; the button is wider by what the bar adds, so the two triangles match.

@@ -53,7 +53,7 @@ export function Controls({
                     )}
                 </div>
 
-                {/* Right group: volume, speed, captions, embed, fullscreen */}
+                {/* Right group: volume, speed, captions, embed, fullscreen, more */}
                 <div class="wt-player-controls-right">
                     {features.volume && (
                         <VolumeControl
@@ -66,13 +66,6 @@ export function Controls({
 
                     {features.speed && (
                         <SpeedControl rate={rate} onRateChange={onRateChange} menu={isVideo} />
-                    )}
-
-                    {/* The gear: autoplay of the next file, at any time and with
-                        its name on it. Only where there is a next file to
-                        speak of. */}
-                    {onNext && onToggleAutoplayNext && (
-                        <SettingsControl autoplayNext={autoplayNext} onToggleAutoplayNext={onToggleAutoplayNext} />
                     )}
 
                     {features.advancedtracks && (
@@ -91,6 +84,14 @@ export function Controls({
                         <button type="button" class="wt-player-btn" onClick={onToggleFullscreen} aria-label={fullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}>
                             {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                         </button>
+                    )}
+
+                    {/* "More" (three dots): autoplay of the next file, at any time
+                        and with its name on it. Always the LAST thing on the
+                        right (owner) -- after fullscreen, where a menu is
+                        looked for. Only where there is a next file. */}
+                    {onNext && onToggleAutoplayNext && (
+                        <SettingsControl autoplayNext={autoplayNext} onToggleAutoplayNext={onToggleAutoplayNext} />
                     )}
                 </div>
             </div>
