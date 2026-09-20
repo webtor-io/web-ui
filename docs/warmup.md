@@ -18,7 +18,7 @@ same file.
 |---|---|---|
 | **Long-term cache** | `se.Meta.Cache=true` (rest-api S3 promotion) | Skip `warmUp` entirely. Bandwidth check runs cap-modal branch (plan-cap vs bitrate). |
 | **Seeder fast-path** | `se.Meta.Cache=false` AND (stats first event shows head+tail pieces complete OR seeder vault/cache short-circuits `?warmup` with an empty SSE) | Silent skip — no `j.Skip` line, the job log goes straight to probe/render. Bandwidth check joins the cap-modal branch (same rationale: bottleneck has moved to plan-cap, not peers). |
-| **Full warmup** | Everything else | Open `?warmup` SSE for the head range (`bandwidthTestSize` for stream, 1MB for download) and tail range (500KB on stream only) in parallel. Seeder bumps `PiecePriorityHigh` on covered pieces and streams a cumulative downloaded counter; web-ui derives throughput from that. Bandwidth check runs BT-slow branch against the measured speed. |
+| **Full warmup** | Everything else | Open `?warmup` SSE for the head range (`bandwidthTestSize` — 10MB since 2026-09-19, see below — for stream, 1MB for download) and tail range (500KB on stream only) in parallel. Seeder bumps `PiecePriorityHigh` on covered pieces and streams a cumulative downloaded counter; web-ui derives throughput from that. Bandwidth check runs BT-slow branch against the measured speed. |
 
 ## Fast-path probe — inlined in `warmUp`
 
@@ -215,3 +215,55 @@ line with `debug=swarm_demo` (see CLAUDE.md, Debugging).
   cache signal — 404 means `findFile` couldn't resolve the path on this
   pod, not "content is cached". `api.Warmup` therefore treats all non-200
   responses as a single transient error.
+
+## Why the stream warm-up is 10MB
+
+It was 50MB until 2026-09-19. Measured over six hours of production stream jobs (the
+`live batch` / stage timings in the web-ui job log): the warm-up stage is a median 21 s
+and p90 81 s, a third of all the time a viewer spends waiting, and the whole wait from
+the click to the first frame has a median of 58 s with only 4.8% of viewers playing
+within 10 s. On a cold swarm at ~2MB/s, 50MB *is* those 25 seconds.
+
+Playback does not need 50MB: it needs the first segment, and the rest arrives while the
+film plays.
+
+### The bandwidth gate still measures over 50MB — but only when it has to
+
+The size also bought the speed estimate behind the BT-slow modal, and that estimate
+cannot shrink with the warm-up. The seeder's warm-up counter (`torrent-web-seeder`
+`warmupBytes`) moves only when a **whole piece is verified**, once a second, and counts
+only the bytes **inside the requested range**. Over a 10MB range:
+
+| piece size | what the counter shows | effect on the gate |
+|---|---|---|
+| 4MB | 4 → 8 → 10MB | usable, last step under-counted |
+| 8MB | 8 → 10MB: "2MB" in the time 8MB took | **4× too slow → false slow-download modal** |
+| 16MB | 0 → 10MB in one step, nothing measured | speed 0 → **gate silently off** |
+
+The gate is not noise: 1362 BT-slow firings in 7 days (3.5% of stream starts,
+2026-09-20), 99% of them under 5 Mbit/s, a quarter within 2× of the bitrate.
+
+So the warm-up is two-phase (`streamContent`, helpers `lowerBoundSpeed` /
+`needsFullMeasure`):
+
+1. **Quick warm-up, 10MB** (`streamWarmupSize`). Its speed is a *lower bound*: the range
+   over everything the call took, peer discovery included. Piece granularity cannot
+   inflate it. If even that clears the bitrate, the film plays — this is the saving.
+2. **Full measure, 50MB / skip 10MB** (`bandwidthTestSize`, `bandwidthSkipSize`), only
+   when the lower bound does not clear the bitrate. "Slow swarm" and "fast swarm that took
+   15 s to find peers" look the same at that point, so it is measured the way it always
+   was. Runs under the "checking bandwidth" line, on what is left of `WARMUP_TIMEOUT_MIN`
+   (at least 30 s), so a crawl does not get the deadline twice. These viewers wait what
+   everyone waited before 2026-09-19.
+
+The quick phase passes its whole range as `skipBytes`: there it is only warmUp's "hard
+timeout with less than this = dead torrent → `no_peers`" threshold, the same 10MB that
+rule has always used. If the pod turns out to hold the full range when phase 2 starts
+(someone else's stream filled it), the verdict falls back to the plan-cap check of the
+cached branch.
+
+A real fix for the granularity is a chunk-level counter from the seeder; until then do
+not shrink the measuring constants (`TestWarmupSizes` guards it).
+
+The head/tail piece prioritisation, the other half of warm-up, is unaffected: it is the
+range that matters there, not its length.

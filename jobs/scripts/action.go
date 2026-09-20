@@ -85,9 +85,58 @@ type StreamContent struct {
 }
 
 const (
+	// How much of the head a stream warms up before playback. 10MB since
+	// 2026-09-19 (was 50MB): measured over six hours of production jobs, the
+	// warm-up is a median 21 s and p90 81 s of a wait whose median from the
+	// click to the first frame is 58 s -- a third of all the waiting, and on
+	// a cold swarm 50MB at 2MB/s is exactly the 25 s we saw. Playback needs
+	// the first segment, not fifty megabytes; the rest of the file arrives
+	// while it plays.
+	streamWarmupSize = 10 * 1024 * 1024 // 10MB
+	// What the bandwidth gate needs when it has to MEASURE, which is only
+	// when the quick warm-up above was not evidently fast enough (see
+	// needsFullMeasure). These two did not shrink with the warm-up, and
+	// cannot: the seeder's counter moves only when a whole piece is verified
+	// and counts only the bytes inside the requested range, so over 10MB a
+	// torrent with 8MB pieces reads "2MB in the time 8MB took" -- four times
+	// too slow, a false slow-download modal -- and one with 16MB pieces reads
+	// nothing at all and the gate silently switched off. The gate fires on
+	// 3.5% of stream starts (1362 in 7 days, 2026-09-20) and a quarter of
+	// those are within 2x of the bitrate, so it has to be right.
 	bandwidthTestSize = 50 * 1024 * 1024 // 50MB
 	bandwidthSkipSize = 10 * 1024 * 1024 // 10MB — skip for speed measurement
 )
+
+// lowerBoundSpeed is the slowest the swarm can have been, in bytes per
+// second: the whole warm-up range over everything the warm-up took -- finding
+// peers, the slow start, the lot. Piece granularity cannot inflate it (the
+// range did arrive in that time), so when even this clears the bitrate there
+// is nothing left to measure.
+func lowerBoundSpeed(bytes int, elapsed time.Duration) float64 {
+	if bytes <= 0 || elapsed <= 0 {
+		return 0
+	}
+	return float64(bytes) / elapsed.Seconds()
+}
+
+// needsFullMeasure says whether the quick warm-up left the bandwidth question
+// open: the lower bound does not cover the bitrate, and there is more of the
+// file to measure on than the quick warm-up already took.
+func needsFullMeasure(lowerBound float64, bitrate int64, quickSize int, fullSize int) bool {
+	if bitrate <= 0 || fullSize <= quickSize {
+		return false
+	}
+	return lowerBound*8 < float64(bitrate)
+}
+
+// halfCapped keeps a warm-up range within half the file, so a small file is
+// not "warmed up" in its entirety before it plays.
+func halfCapped(size int, fileSize int) int {
+	if half := fileSize / 2; half > 0 && size > half {
+		return half
+	}
+	return size
+}
 
 // WarmupSettings groups all torrent warmup tuning knobs so call-sites pass a
 // single value rather than three loose ints. Wired from CLI/env flags in
@@ -490,11 +539,10 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	seMeta := exportMeta(se)
 
 	var downloadSpeed float64
+	var quickElapsed time.Duration
 	fileSize := int(exportResponse.Source.Size)
-	warmupSize := bandwidthTestSize
-	if half := fileSize / 2; half > 0 && warmupSize > half {
-		warmupSize = half
-	}
+	warmupSize := halfCapped(streamWarmupSize, fileSize)
+	fullMeasureSize := halfCapped(bandwidthTestSize, fileSize)
 	downloadURL := exportResponse.ExportItems["download"].URL
 
 	// Step 1: Torrent warmup (skip for cached/vault content; also skipped on
@@ -515,16 +563,21 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		if s.forceSlow {
 			j.Skip(s.t("job.warmingUp"))
 		} else {
-			skipBytes := bandwidthSkipSize
-			if warmupSize <= skipBytes {
-				skipBytes = 0
-			}
+			// The quick warm-up. Its skipBytes is the whole range: here it
+			// is only warmUp's "a hard timeout with less than this is a dead
+			// torrent" threshold -- the same 10MB that rule has always used
+			// -- and the speed warmUp returns is not read. The speed that
+			// counts is the lower bound over the whole call.
 			var hit bool
-			if downloadSpeed, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, warmupSize, tailWarmupBytes, skipBytes, true); err != nil {
+			quickStart := time.Now()
+			if _, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, warmupSize, tailWarmupBytes, warmupSize, true); err != nil {
 				return
 			}
+			quickElapsed = time.Since(quickStart)
 			if hit {
 				effectiveCache = true
+			} else {
+				downloadSpeed = lowerBoundSpeed(warmupSize, quickElapsed)
 			}
 		}
 	}
@@ -595,11 +648,59 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				}
 				j.Done()
 			} else if !effectiveCache && downloadSpeed > 0 {
-				j.InProgress(s.t("job.checkingBandwidth"))
-				if downloadSpeed*8 < float64(bitrate) {
-					return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+				// The quick warm-up gave a lower bound. A swarm that clears
+				// the bitrate even on that plays at once -- that is the
+				// whole saving. One that does not is either slow or merely
+				// took a while to find peers, and the two look the same from
+				// here: measure it the way this gate always has, over the
+				// full range. Those viewers wait what everyone waited before
+				// 2026-09-19, and no longer. The budget is what is left of
+				// the warm-up deadline, so a crawl is not given it twice.
+				if needsFullMeasure(downloadSpeed, int64(bitrate), warmupSize, fullMeasureSize) {
+					left := time.Duration(s.warmup.TimeoutMin)*time.Minute - quickElapsed
+					if left < 30*time.Second {
+						left = 30 * time.Second
+					}
+					fullCtx, fullCancel := context.WithTimeout(ctx, left)
+					skipBytes := bandwidthSkipSize
+					if fullMeasureSize <= skipBytes {
+						skipBytes = 0
+					}
+					measured, hit, werr := s.warmUp(fullCtx, j, s.t("job.checkingBandwidth"), statsURL, fileSize, fullMeasureSize, tailWarmupBytes, skipBytes, true)
+					fullCancel()
+					if werr != nil {
+						return werr
+					}
+					if hit {
+						// The pod turned out to hold the whole range (someone
+						// else's stream filled it in meanwhile): there is no
+						// swarm speed to judge, only the plan cap -- the
+						// cached branch above, arrived at late.
+						if !graceMode {
+							if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
+								return &SlowDownloadError{Data: sdd}
+							}
+						}
+						downloadSpeed = 0
+					} else if measured > downloadSpeed {
+						// A lower bound stays a lower bound: a measurement
+						// below it (or empty -- one huge piece) is the
+						// counter's granularity, not the swarm. Both fail
+						// the gate either way; this only picks the truer
+						// number for the modal.
+						downloadSpeed = measured
+					}
+					// warmUp wrote and closed the "checking bandwidth" line.
+					if downloadSpeed > 0 && downloadSpeed*8 < float64(bitrate) {
+						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+					}
+				} else {
+					j.InProgress(s.t("job.checkingBandwidth"))
+					if downloadSpeed*8 < float64(bitrate) {
+						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+					}
+					j.Done()
 				}
-				j.Done()
 			}
 		}
 	}
