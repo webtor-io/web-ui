@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadPrefs, savePrefs, stepRate, rateLabel, RATES, DEFAULTS } from './player-prefs.js';
+import { loadPrefs, savePrefs, stepRate, rateLabel, RATES, DEFAULTS, loadSubtitleDelay, saveSubtitleDelay } from './player-prefs.js';
 
 function mem(initial) {
     const m = new Map(Object.entries(initial || {}));
@@ -40,4 +40,23 @@ test('speed steps along the scale and stops at the ends', () => {
     assert.equal(stepRate(1.1, +1), 1.25, 'off-scale snaps to the nearest notch first');
     assert.equal(rateLabel(1.25), '1.25×');
     assert.equal(RATES.includes(1), true);
+});
+
+test('the subtitle delay is remembered per file, zero is forgotten, and the map stays small', () => {
+    const s = mem();
+    assert.equal(loadSubtitleDelay('res:a.mkv', s), 0);
+    saveSubtitleDelay('res:a.mkv', 1.5, s);
+    saveSubtitleDelay('res:b.mkv', -0.75, s);
+    assert.equal(loadSubtitleDelay('res:a.mkv', s), 1.5);
+    assert.equal(loadSubtitleDelay('res:b.mkv', s), -0.75);
+    saveSubtitleDelay('res:a.mkv', 0, s);
+    assert.equal(loadSubtitleDelay('res:a.mkv', s), 0);
+    assert.equal(JSON.parse(s.getItem('wt-sub-delay'))['res:a.mkv'], undefined, 'a reset leaves no entry behind');
+    for (let i = 0; i < 60; i++) saveSubtitleDelay('f' + i, 1, s);
+    const kept = Object.keys(JSON.parse(s.getItem('wt-sub-delay')));
+    assert.equal(kept.length, 50);
+    assert.equal(kept.includes('res:b.mkv'), false, 'the oldest go first');
+    assert.equal(kept.includes('f59'), true);
+    assert.equal(loadSubtitleDelay('x', null), 0);
+    assert.equal(loadSubtitleDelay('res:a.mkv', mem({ 'wt-sub-delay': '"junk"' })), 0);
 });

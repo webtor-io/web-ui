@@ -110,6 +110,27 @@
                         <span class="sr-only">{{ t $.Lang "action.stream.subtitles" }}</span>
                         <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft"{{ if not $off }} checked{{ end }}>
                     </label>
+                    {{/* The viewer's correction for a subtitle file that runs early
+                         or late (docs/player.md, "Subtitle delay"). Markup only:
+                         the player paints the value, enables the buttons and owns
+                         the clicks ([data-sub-delay], Player.jsx) -- the number is
+                         per file and lives in the browser. Pushed to the right of
+                         the header so it costs no row of its own on a phone. */}}
+                    <div id="subtitle-delay" class="ml-auto flex items-center gap-1.5 text-xs text-w-sub"
+                         data-embedded-hint="{{ t $.Lang "action.stream.subtitleDelayEmbedded" }}">
+                        <span class="hidden sm:inline">{{ t $.Lang "action.stream.subtitleDelay" }}</span>
+                        <button type="button" class="btn btn-xs btn-ghost border border-w-line px-2" data-sub-delay="earlier"
+                                aria-label="{{ t $.Lang "action.stream.subtitleDelayEarlier" }}" title="{{ t $.Lang "action.stream.subtitleDelayEarlier" }} (g)">&minus;</button>
+                        <output id="subtitle-delay-value" class="min-w-[4.25rem] text-center tabular-nums text-base-content" aria-live="polite"></output>
+                        <button type="button" class="btn btn-xs btn-ghost border border-w-line px-2" data-sub-delay="later"
+                                aria-label="{{ t $.Lang "action.stream.subtitleDelayLater" }}" title="{{ t $.Lang "action.stream.subtitleDelayLater" }} (h)">+</button>
+                        {{/* Always there, disabled at zero (owner, 2026-09-20). It
+                             used to appear on the first press: the row is
+                             right-aligned, so it pushed the others left and landed
+                             under the finger that had just pressed "+". */}}
+                        <button type="button" class="btn btn-xs btn-ghost px-1.5 text-w-muted" disabled data-sub-delay="reset"
+                                aria-label="{{ t $.Lang "action.stream.subtitleDelayReset" }}" title="{{ t $.Lang "action.stream.subtitleDelayReset" }}">&times;</button>
+                    </div>
                 </div>
 
                 {{/* The language row is a filter, not a choice: pressing a chip

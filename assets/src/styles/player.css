@@ -1050,3 +1050,33 @@ video::cue {
     /* Shown plainly; Player.jsx removes it after 650 ms either way. */
     .wt-tap-seek { animation: none; }
 }
+
+/* What a key just changed (speed, subtitle delay). Above the controls,
+   centred; pointer-events off so it never takes a tap. */
+.wt-player-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 4.75rem;
+    z-index: 25;
+    padding: 0.375rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translateX(-50%);
+    animation: wt-player-toast 1.2s ease-out forwards;
+}
+
+@keyframes wt-player-toast {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    75% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wt-player-toast { animation: none; }
+}

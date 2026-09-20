@@ -52,7 +52,9 @@ waiting single that turns out not to be half of a double is delivered late, not 
 
 ## Keys
 
-space / `k` play-pause · ←/→ ∓15 s · ↑/↓ volume · `f` fullscreen · `m` mute · `<`/`>` speed.
+space / `k` play-pause · ←/→ ∓15 s · ↑/↓ volume · `f` fullscreen · `m` mute · `<`/`>` speed ·
+`g`/`h` subtitles earlier/later. Speed and delay keys answer with a toast (`.wt-player-toast`) —
+they have no other face.
 
 ## Loading spinner — `stall-watch.js`
 
@@ -70,3 +72,34 @@ double tap). `usePlayerState` samples the element every animation frame:
   and stands. Without one (audio, old browsers): the clock advancing on every sample for
   `RECOVER_MS` (250 ms).
 - While the watchdog says "stalled", `canplay` / `playing` do not take the spinner down.
+
+## Subtitle delay — `cue-offset.js`, `player-prefs.js`
+
+The viewer's correction for a subtitle file that runs early or late: ±0.25 s steps, ±60 s,
+positive = later. Buttons in the `#subtitles` dialog header (`#subtitle-delay`, server markup in
+`stream_video.html`; painted and driven from `Player.jsx` by delegation on `[data-sub-delay]`,
+because the dialog is swapped whole on a preferred-language change), keys `g` / `h`. The reset
+button is always in the row and disabled at zero: one that appeared on the first press pushed the
+right-aligned row left and landed under the finger that had just pressed `+`.
+
+- The delay lives **on the TextTrack** (`setTrackDelay` → `track.__wtDelay`), and
+  `applyCueOffset` reads it there. Cues are re-shifted from five places (a seek, a late
+  `<track>` load, a translation reload, …); an argument would have to reach every one of them,
+  and the one that was missed would silently drop the correction on the next seek.
+- Same arithmetic as the session offset, from the authored times: `abs + delay − offset`, so
+  repeated changes never drift. The cue effect in `Player.jsx` therefore runs for direct
+  (non-session) streams too, with offset 0.
+- **Element-backed tracks only** (OpenSubtitles, uploads, sidecar, AI translation). Subtitles
+  muxed into the film are timed by the film and hls.js owns their cues: with such a track
+  selected the row is disabled and explains itself.
+- Remembered per file (`wt-sub-delay`, `resourceID:path`, capped at 50, zero leaves no entry).
+  Per file, not per track: a known simplification — the reset button is next to the value.
+
+## Media Session — `media-session.js`
+
+Lock screen, notification shade, headset and media keys. Title from `data-resource-title`,
+artwork from the element's `poster` (already blurred server-side where it must be). Two things
+are ours to get right: **position state is reported in film time** (a transcoder run starts at
+`seekOffset`; the element's own clock describes the run), and **seeks go through `handleSeek`**
+(a session seek is a POST, not a `currentTime` write). `navigator.mediaSession` and
+`MediaMetadata` are injected — testable, and a browser without them is a no-op.

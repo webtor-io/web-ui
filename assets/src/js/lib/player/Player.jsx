@@ -6,9 +6,10 @@ import { useWatchHistory } from './hooks/useWatchHistory';
 import { useSubtitleTranslation } from './hooks/useSubtitleTranslation';
 import { createSessionSeeker } from './session-seek';
 import { Hls } from './hls-manager';
-import { applyCueOffset } from './cue-offset';
-import { stepRate } from './player-prefs';
+import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } from './cue-offset';
+import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay } from './player-prefs';
 import { createTapSeek } from './tap-seek';
+import { bindMediaSession } from './media-session';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -98,6 +99,31 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const resourceID = videoEl.dataset.resourceId;
     const path = videoEl.dataset.path;
 
+    // The viewer's subtitle delay (cue-offset.js setTrackDelay): seconds,
+    // positive = later, remembered per file. Element-backed tracks only --
+    // subtitles muxed into the film are timed by the film and hls.js owns
+    // their cues.
+    const delayKey = resourceID && path ? `${resourceID}:${path}` : '';
+    const [subDelay, setSubDelayState] = useState(() => normalizeDelay(loadSubtitleDelay(delayKey)));
+    const subDelayRef = useRef(subDelay);
+    subDelayRef.current = subDelay;
+    const [toast, setToast] = useState(null); // { text, n }
+    const toastTimerRef = useRef(null);
+    const showToast = useCallback((text) => {
+        setToast({ text, n: Date.now() });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 1200);
+    }, []);
+    useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+    const formatDelay = (d) => `${d > 0 ? '+' : d < 0 ? '\u2212' : ''}${Math.abs(d).toFixed(2)}`;
+    const changeSubDelay = useCallback((next, { announce = true } = {}) => {
+        const d = normalizeDelay(next);
+        subDelayRef.current = d;
+        setSubDelayState(d);
+        saveSubtitleDelay(delayKey, d);
+        if (announce) showToast(tf('player.subtitleDelayToast', formatDelay(d)));
+    }, [delayKey, showToast]);
+
     // Source URL from first <source> element
     const sourceEl = videoEl.querySelector('source');
     const sourceUrl = sourceEl ? sourceEl.getAttribute('src') : videoEl.src;
@@ -122,12 +148,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // zero. Shift the cues by the session offset — and re-shift tracks that
     // finish loading later ('load' doesn't bubble, so listen in capture;
     // this also covers tracks added mid-session from the My Subtitles tab).
+    // Not only for sessions since 2026-09-20: the viewer's subtitle delay
+    // (below) shifts the same cues, and a direct stream has offset 0.
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !isSession) return;
+        if (!video) return;
         const applyAll = () => {
             for (const el of video.querySelectorAll('track')) {
-                if (el.track) applyCueOffset(el.track, seekOffset);
+                if (!el.track) continue;
+                setTrackDelay(el.track, subDelayRef.current);
+                applyCueOffset(el.track, seekOffset);
             }
         };
         applyAll();
@@ -137,12 +167,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // run's offset -- minutes off, on a resume from 0.
         const onTrackLoad = (e) => {
             if (e.target.tagName === 'TRACK' && e.target.track) {
+                setTrackDelay(e.target.track, subDelayRef.current);
                 applyCueOffset(e.target.track, seekOffsetRef.current);
             }
         };
         video.addEventListener('load', onTrackLoad, true);
         return () => video.removeEventListener('load', onTrackLoad, true);
-    }, [seekOffset, isSession]);
+    }, [seekOffset, isSession, subDelay]);
 
     // Movie time is video.currentTime + the session offset (see
     // applyCueOffset in cue-offset.js for the same arithmetic on cues).
@@ -550,11 +581,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     break;
                 // The keys every player uses for speed (Shift+, / Shift+.);
                 // e.key is the produced character, so layouts agree.
+                // Subtitle delay, VLC's keys: g earlier, h later.
+                case 'g':
+                case 'h':
+                    e.preventDefault();
+                    changeSubDelay(subDelayRef.current + (e.key === 'h' ? SUBTITLE_DELAY_STEP : -SUBTITLE_DELAY_STEP));
+                    resetHideTimer();
+                    break;
                 case '<':
                 case '>':
                     if (!features.speed) break;
                     e.preventDefault();
-                    state.setRate(stepRate(state.rate, e.key === '>' ? +1 : -1));
+                    {
+                        const next = stepRate(state.rate, e.key === '>' ? +1 : -1);
+                        state.setRate(next);
+                        showToast(rateLabel(next));
+                    }
                     resetHideTimer();
                     break;
             }
@@ -725,6 +767,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // dialog joins the top layer above the fullscreen element instead.
     const handleCaptionsClick = useCallback(() => {
         toggleDialog('subtitles');
+        paintSubDelay();
         // Opening the picker is the one moment the viewer is guaranteed to
         // be looking at it, and plenty can have moved while it was closed:
         // an audio switch re-picking the subtitle, an upload, a translation
@@ -798,6 +841,83 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => () => {
         if (tapSeekRef.current) tapSeekRef.current.cancel();
         if (tapFxTimerRef.current) clearTimeout(tapFxTimerRef.current);
+    }, []);
+
+    // The subtitle-delay row in the #subtitles dialog (stream_video.html):
+    // server markup, painted and driven from here. Delegated on the document
+    // because the dialog is swapped whole on a preferred-language change, and
+    // repainted after ANY click inside it -- a track pick or the on/off switch
+    // changes whether there is anything to shift.
+    const paintSubDelay = useCallback(() => {
+        const modal = document.getElementById('subtitles');
+        const row = modal && modal.querySelector('#subtitle-delay');
+        if (!row) return;
+        const d = subDelayRef.current;
+        const value = row.querySelector('#subtitle-delay-value');
+        if (value) value.textContent = tf('player.subtitleDelayValue', formatDelay(d));
+        const reset = row.querySelector('[data-sub-delay="reset"]');
+        // Always in the row, disabled at zero (see the template). `hidden` and
+        // `invisible` are lifted for renders cached with the earlier markup.
+        if (reset) {
+            reset.hidden = false;
+            reset.classList.remove('invisible');
+            reset.removeAttribute('tabindex');
+        }
+        // The switch is the one live statement of on/off (markTrack moves it).
+        const toggle = modal.querySelector('#subtitles-toggle');
+        const off = toggle ? !toggle.checked : false;
+        const embedded = isEmbedded(readSelection(modal));
+        for (const b of row.querySelectorAll('button[data-sub-delay]')) {
+            b.disabled = off || embedded || (b.dataset.subDelay === 'reset' && d === 0);
+        }
+        row.classList.toggle('opacity-50', off || embedded);
+        row.title = embedded && !off ? (row.dataset.embeddedHint || '') : '';
+    }, []);
+    useEffect(() => { paintSubDelay(); }, [subDelay, paintSubDelay]);
+    useEffect(() => {
+        const onClick = (e) => {
+            const modal = e.target.closest && e.target.closest('#subtitles');
+            if (!modal) return;
+            const btn = e.target.closest('[data-sub-delay]');
+            if (btn && !btn.disabled) {
+                const op = btn.dataset.subDelay;
+                const cur = subDelayRef.current;
+                changeSubDelay(op === 'reset' ? 0 : cur + (op === 'later' ? SUBTITLE_DELAY_STEP : -SUBTITLE_DELAY_STEP), { announce: false });
+                return;
+            }
+            // After the dialog's own handlers have settled the selection.
+            setTimeout(paintSubDelay, 0);
+        };
+        document.addEventListener('click', onClick);
+        return () => document.removeEventListener('click', onClick);
+    }, [changeSubDelay, paintSubDelay]);
+
+    // Media Session (media-session.js): lock screen, headset, media keys.
+    // Bound once; position is reported in film time on the events that change
+    // the timeline, and seeks go through handleSeek like every other seek.
+    const mediaSessionRef = useRef(null);
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || typeof navigator === 'undefined') return undefined;
+        const ms = bindMediaSession({
+            session: navigator.mediaSession,
+            Metadata: typeof window.MediaMetadata === 'function' ? window.MediaMetadata : null,
+            title: getResourceTitle(videoEl),
+            artwork: video.poster || '',
+            onPlay: () => { if (video.paused) togglePlayRef.current(); },
+            onPause: () => { if (!video.paused) togglePlayRef.current(); },
+            onSeekTo: (t) => handleSeekRef.current(t),
+            getPosition: () => ({ ...seekPosRef.current, rate: video.playbackRate }),
+        });
+        mediaSessionRef.current = ms;
+        const evs = ['play', 'pause', 'seeked', 'ratechange', 'loadedmetadata'];
+        const onEv = () => ms.update();
+        evs.forEach((n) => video.addEventListener(n, onEv));
+        return () => {
+            evs.forEach((n) => video.removeEventListener(n, onEv));
+            ms.destroy();
+            mediaSessionRef.current = null;
+        };
     }, []);
 
     const handleVideoClick = useCallback((e) => {
@@ -957,6 +1077,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         </svg>
                     </button>
                 </div>
+            )}
+
+            {/* What a key just changed (speed, subtitle delay): the keys
+                have no other face. */}
+            {toast && (
+                <div key={toast.n} class="wt-player-toast" role="status">{toast.text}</div>
             )}
 
             {/* Double-tap seek feedback: which way, and how far the streak

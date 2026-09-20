@@ -19,15 +19,35 @@
 // parked cues easy to recognise in a debugger.
 export const PARKED_AT = -1;
 
+// The viewer's own correction for a subtitle file that runs early or late
+// (setTrackDelay). It lives ON the track, not in an argument: cues are
+// re-shifted from five places (a seek, a late <track> load, a translation
+// reload, ...) and every one of them would have to be handed the number --
+// the one that was not would silently drop the viewer's correction on the
+// next seek. Positive = subtitles later.
+export const MAX_SUBTITLE_DELAY = 60;
+export const SUBTITLE_DELAY_STEP = 0.25;
+
+export function normalizeDelay(d) {
+    if (typeof d !== 'number' || !isFinite(d)) return 0;
+    const stepped = Math.round(d / SUBTITLE_DELAY_STEP) * SUBTITLE_DELAY_STEP;
+    return Math.max(-MAX_SUBTITLE_DELAY, Math.min(MAX_SUBTITLE_DELAY, stepped));
+}
+
+export function setTrackDelay(track, delay) {
+    if (track) track.__wtDelay = normalizeDelay(delay);
+}
+
 export function applyCueOffset(track, offset) {
     if (!track || !track.cues) return;
+    const delay = track.__wtDelay || 0;
     for (const cue of track.cues) {
         if (cue.__absStart === undefined) {
             cue.__absStart = cue.startTime;
             cue.__absEnd = cue.endTime;
         }
-        const start = cue.__absStart - offset;
-        const end = cue.__absEnd - offset;
+        const start = cue.__absStart + delay - offset;
+        const end = cue.__absEnd + delay - offset;
         if (end <= 0) {
             // Entirely before the session start — park it below zero,
             // where a session's playhead never is. Not at [0,0]: every

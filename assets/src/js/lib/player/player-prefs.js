@@ -55,3 +55,34 @@ export function stepRate(rate, dir) {
 export function rateLabel(rate) {
     return `${rate}×`;
 }
+
+// The subtitle delay is a fact about one file and its subtitles, not about
+// the browser: a small capped map, newest last. Keyed by the file, not by the
+// track -- two subtitle files for one film rarely need different corrections
+// by more than the viewer will fix with one more press, and the reset button
+// is right there.
+const DELAY_KEY = 'wt-sub-delay';
+const DELAY_CAP = 50;
+
+function readDelays(storage) {
+    try {
+        const raw = JSON.parse(storage.getItem(DELAY_KEY) || 'null');
+        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (e) { return {}; }
+}
+
+export function loadSubtitleDelay(fileKey, storage = safeStorage()) {
+    if (!storage || !fileKey) return 0;
+    const v = readDelays(storage)[fileKey];
+    return typeof v === 'number' && isFinite(v) ? v : 0;
+}
+
+export function saveSubtitleDelay(fileKey, delay, storage = safeStorage()) {
+    if (!storage || !fileKey) return false;
+    const map = readDelays(storage);
+    delete map[fileKey]; // re-inserted last: insertion order is the age
+    if (delay !== 0) map[fileKey] = delay;
+    const keys = Object.keys(map);
+    for (const k of keys.slice(0, Math.max(0, keys.length - DELAY_CAP))) delete map[k];
+    try { storage.setItem(DELAY_KEY, JSON.stringify(map)); return true; } catch (e) { return false; }
+}

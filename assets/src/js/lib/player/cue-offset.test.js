@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCueOffset, captureTrackState, restoreTrackState } from './cue-offset.js';
+import { applyCueOffset, captureTrackState, restoreTrackState, setTrackDelay, normalizeDelay } from './cue-offset.js';
 
 function makeTrack(ranges, mode = 'showing') {
     return {
@@ -117,4 +117,41 @@ test('captureTrackState skips null entries and cue-less tracks', () => {
     restoreTrackState(saved);
     assert.equal(a.mode, 'showing');
     assert.equal(bare.mode, 'hidden');
+});
+
+test("the viewer's delay rides on the track and survives every later re-shift", () => {
+    const track = makeTrack([[600, 605], [630, 640]]);
+    setTrackDelay(track, 1.5);
+    applyCueOffset(track, 600);
+    assert.equal(track.cues[0].startTime, 1.5, 'later by the delay');
+    assert.equal(track.cues[0].endTime, 6.5);
+    // A seek re-shifts from the authored times with nobody passing the
+    // delay along -- that is the point of keeping it on the track.
+    applyCueOffset(track, 630);
+    assert.equal(track.cues[1].startTime, 1.5);
+    assert.equal(track.cues[0].startTime, -1, 'the first line is behind the new run: parked');
+    // Earlier, and back to none: always from the authored times, no drift.
+    setTrackDelay(track, -2);
+    applyCueOffset(track, 600);
+    assert.equal(track.cues[1].startTime, 28);
+    setTrackDelay(track, 0);
+    applyCueOffset(track, 600);
+    assert.equal(track.cues[1].startTime, 30);
+});
+
+test('a delay works without a session too (offset 0)', () => {
+    const track = makeTrack([[1, 3]]);
+    setTrackDelay(track, -2);
+    applyCueOffset(track, 0);
+    assert.equal(track.cues[0].startTime, 0, 'clamped at the start of the film');
+    assert.equal(track.cues[0].endTime, 1);
+});
+
+test('normalizeDelay: quarter-second steps, a sane range, nothing that is not a number', () => {
+    assert.equal(normalizeDelay(0.3), 0.25);
+    assert.equal(normalizeDelay(-0.4), -0.5);
+    assert.equal(normalizeDelay(1e9), 60);
+    assert.equal(normalizeDelay(-1e9), -60);
+    assert.equal(normalizeDelay('2'), 0);
+    assert.equal(normalizeDelay(NaN), 0);
 });

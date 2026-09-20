@@ -46,6 +46,19 @@
                         <span class="sr-only">action.stream.subtitles</span>
                         <input type="checkbox" id="subtitles-toggle" class="toggle toggle-soft">
                     </label>
+                    
+                    <div id="subtitle-delay" class="ml-auto flex items-center gap-1.5 text-xs text-w-sub"
+                         data-embedded-hint="action.stream.subtitleDelayEmbedded">
+                        <span class="hidden sm:inline">action.stream.subtitleDelay</span>
+                        <button type="button" class="btn btn-xs btn-ghost border border-w-line px-2" data-sub-delay="earlier"
+                                aria-label="action.stream.subtitleDelayEarlier" title="action.stream.subtitleDelayEarlier (g)">&minus;</button>
+                        <output id="subtitle-delay-value" class="min-w-[4.25rem] text-center tabular-nums text-base-content" aria-live="polite"></output>
+                        <button type="button" class="btn btn-xs btn-ghost border border-w-line px-2" data-sub-delay="later"
+                                aria-label="action.stream.subtitleDelayLater" title="action.stream.subtitleDelayLater (h)">+</button>
+                        
+                        <button type="button" class="btn btn-xs btn-ghost px-1.5 text-w-muted" disabled data-sub-delay="reset"
+                                aria-label="action.stream.subtitleDelayReset" title="action.stream.subtitleDelayReset">&times;</button>
+                    </div>
                 </div>
 
                 
