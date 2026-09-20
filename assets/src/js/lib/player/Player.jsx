@@ -7,6 +7,8 @@ import { useSubtitleTranslation } from './hooks/useSubtitleTranslation';
 import { createSessionSeeker } from './session-seek';
 import { Hls } from './hls-manager';
 import { applyCueOffset } from './cue-offset';
+import { stepRate } from './player-prefs';
+import { createTapSeek } from './tap-seek';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -546,11 +548,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     state.toggleMute();
                     resetHideTimer();
                     break;
+                // The keys every player uses for speed (Shift+, / Shift+.);
+                // e.key is the produced character, so layouts agree.
+                case '<':
+                case '>':
+                    if (!features.speed) break;
+                    e.preventDefault();
+                    state.setRate(stepRate(state.rate, e.key === '>' ? +1 : -1));
+                    resetHideTimer();
+                    break;
             }
         }
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, [state.currentTime, state.duration, state.volume, state.playing, sessionSeeking]);
+    }, [state.currentTime, state.duration, state.volume, state.rate, state.playing, sessionSeeking]);
 
     // player_play / player_paused custom events
     useEffect(() => {
@@ -759,19 +770,55 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const showResumePromptRef = useRef(false);
     showResumePromptRef.current = showResumePrompt;
 
+    // Double-tap to seek (tap-seek.js). Touch only: with a mouse a double
+    // click is fullscreen and there are arrow keys. A click counts as a tap
+    // when a touchstart came just before it -- the one signal every mobile
+    // browser gives (iOS Safari's click is a plain MouseEvent).
+    const TAP_SEEK_STEP = 10;
+    const lastTouchAtRef = useRef(0);
+    const fromTouch = () => Date.now() - lastTouchAtRef.current < 800;
+    const seekPosRef = useRef({ currentTime: 0, duration: 0 });
+    seekPosRef.current = { currentTime: state.currentTime, duration: state.duration };
+    const [tapFx, setTapFx] = useState(null); // { dir, total, n }
+    const tapFxTimerRef = useRef(null);
+    const tapSeekRef = useRef(null);
+    if (!tapSeekRef.current) {
+        tapSeekRef.current = createTapSeek({
+            onSingle: () => togglePlayRef.current(),
+            onSeek: (dir, streak) => {
+                const { currentTime, duration } = seekPosRef.current;
+                const to = Math.max(0, Math.min(duration || Infinity, currentTime + dir * TAP_SEEK_STEP));
+                handleSeekRef.current(to);
+                setTapFx({ dir, total: streak * TAP_SEEK_STEP, n: Date.now() });
+                if (tapFxTimerRef.current) clearTimeout(tapFxTimerRef.current);
+                tapFxTimerRef.current = setTimeout(() => setTapFx(null), 650);
+            },
+        });
+    }
+    useEffect(() => () => {
+        if (tapSeekRef.current) tapSeekRef.current.cancel();
+        if (tapFxTimerRef.current) clearTimeout(tapFxTimerRef.current);
+    }, []);
+
     const handleVideoClick = useCallback((e) => {
         if (!isVideo || sessionSeekingRef.current || showResumePromptRef.current) return;
         if (e.target.closest('.wt-player-controls')) return;
         if (e.target.closest('.wt-resume-prompt')) return;
         if (e.target.closest('.wt-catchup')) return;
         if (e.target.closest('.wt-offer-card')) return;
-        togglePlayRef.current();
         resetHideTimer();
-    }, [isVideo]);
+        if (fromTouch() && containerEl) {
+            const r = containerEl.getBoundingClientRect();
+            tapSeekRef.current.tap(e.clientX - r.left, r.width, performance.now());
+            return;
+        }
+        togglePlayRef.current();
+    }, [isVideo, containerEl]);
 
-    // Double-click for fullscreen
+    // Double-click for fullscreen. Not for taps: Android fires dblclick on a
+    // double tap, and that gesture now means "seek".
     const handleDoubleClick = useCallback((e) => {
-        if (!isVideo) return;
+        if (!isVideo || fromTouch()) return;
         if (e.target.closest('.wt-player-controls')) return;
         state.toggleFullscreen();
     }, [isVideo, state.toggleFullscreen]);
@@ -783,7 +830,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         el.className = `wt-player ${isVideo ? 'wt-player--video' : 'wt-player--audio'}${fixedSize ? ' wt-player--fixed' : ''}`;
 
         const onMove = () => resetHideTimer();
-        const onTouch = () => resetHideTimer();
+        const onTouch = () => { lastTouchAtRef.current = Date.now(); resetHideTimer(); };
         const onClick = (e) => handleVideoClick(e);
         const onDblClick = (e) => handleDoubleClick(e);
         el.addEventListener('mousemove', onMove);
@@ -912,6 +959,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 </div>
             )}
 
+            {/* Double-tap seek feedback: which way, and how far the streak
+                has gone. Keyed so each tap restarts the animation. */}
+            {tapFx && (
+                <div key={tapFx.n} class={`wt-tap-seek wt-tap-seek--${tapFx.dir > 0 ? 'right' : 'left'}`} aria-hidden="true">
+                    {tapFx.dir > 0 ? '+' : '\u2212'}{tapFx.total}
+                </div>
+            )}
+
             {/* Controls */}
             {showControls && (
                 <Controls
@@ -920,12 +975,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     duration={state.duration}
                     volume={state.volume}
                     muted={state.muted}
+                    rate={state.rate}
                     fullscreen={state.fullscreen}
                     buffered={state.buffered}
                     seeking={sessionSeeking}
                     onTogglePlay={togglePlay}
                     onSeek={handleSeek}
                     onVolumeChange={state.setVolume}
+                    onRateChange={state.setRate}
                     onToggleMute={state.toggleMute}
                     onToggleFullscreen={state.toggleFullscreen}
                     onCaptionsClick={handleCaptionsClick}
@@ -1008,6 +1065,7 @@ function parseFeatures(settings, isVideo, duration, isSession) {
         progress: true,
         duration: true,
         volume: true,
+        speed: true,
         advancedtracks: isVideo,
         fullscreen: isVideo,
         chromecast: isVideo,

@@ -665,6 +665,7 @@
     "player.exitFullscreen": "Exit Fullscreen",
     "player.subtitlesAndAudio": "Subtitles & Audio",
     "player.embed": "Embed",
+    "player.speed": "Playback speed",
     "player.share": "Share",
     "player.copied": "Copied!",
     "player.continueFrom": "Continue from %v",

@@ -617,6 +617,7 @@
     "player.exitFullscreen": "Выйти из полноэкранного режима",
     "player.subtitlesAndAudio": "Субтитры и аудио",
     "player.embed": "Встроить",
+    "player.speed": "Скорость воспроизведения",
     "player.share": "Поделиться",
     "player.copied": "Скопировано!",
     "player.continueFrom": "Продолжить с %v",

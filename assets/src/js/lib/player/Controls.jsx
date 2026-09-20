@@ -2,6 +2,7 @@ import { PlayIcon, PauseIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, 
 import { ProgressBar } from './ProgressBar';
 import { TimeDisplay } from './TimeDisplay';
 import { VolumeControl } from './VolumeControl';
+import { SpeedControl } from './SpeedControl';
 import { t } from './i18n';
 
 /**
@@ -9,8 +10,8 @@ import { t } from './i18n';
  * Assembled from sub-components. Features are toggled via props.
  */
 export function Controls({
-    playing, currentTime, duration, volume, muted, fullscreen, buffered, seeking,
-    onTogglePlay, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen,
+    playing, currentTime, duration, volume, muted, rate, fullscreen, buffered, seeking,
+    onTogglePlay, onSeek, onVolumeChange, onRateChange, onToggleMute, onToggleFullscreen,
     onCaptionsClick, onEmbedClick,
     isVideo, features,
 }) {
@@ -42,7 +43,7 @@ export function Controls({
                     )}
                 </div>
 
-                {/* Right group: volume, captions, embed, fullscreen */}
+                {/* Right group: volume, speed, captions, embed, fullscreen */}
                 <div class="wt-player-controls-right">
                     {features.volume && (
                         <VolumeControl
@@ -51,6 +52,10 @@ export function Controls({
                             onVolumeChange={onVolumeChange}
                             onToggleMute={onToggleMute}
                         />
+                    )}
+
+                    {features.speed && (
+                        <SpeedControl rate={rate} onRateChange={onRateChange} menu={isVideo} />
                     )}
 
                     {features.advancedtracks && (

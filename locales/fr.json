@@ -607,6 +607,7 @@
     "player.exitFullscreen": "Quitter le plein écran",
     "player.subtitlesAndAudio": "Sous-titres et audio",
     "player.embed": "Intégrer",
+    "player.speed": "Vitesse de lecture",
     "player.share": "Partager",
     "player.copied": "Copié !",
     "player.continueFrom": "Reprendre à %v",

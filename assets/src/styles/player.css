@@ -927,3 +927,126 @@ video::cue {
 .wt-player-mount:has(.wt-player--controls-visible) .wt-player-logo {
     opacity: 1;
 }
+
+/* Playback speed (SpeedControl.jsx). The button's face is the rate itself,
+   so it is text-sized rather than icon-sized; it lights up when the film is
+   not at 1x, because a forgotten 1.5x is otherwise invisible. */
+.wt-player-speed {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.wt-player-btn--speed {
+    width: auto;
+    min-width: 2rem;
+    padding: 0.375rem 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.wt-player-btn--speed-on {
+    color: #fd79a8;
+}
+
+/* In-flow fallback (no Popover API): above the button, clipped by the
+   player's frame if the picture is short. Shown by the --open class. */
+.wt-player-speed-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.5rem);
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    min-width: 4.5rem;
+    padding: 0.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.625rem;
+    background: rgba(15, 15, 25, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.wt-player-speed-menu--open {
+    display: flex;
+}
+
+/* The real thing: a popover lives in the top layer, so neither the player's
+   overflow:hidden nor fullscreen can cut it. SpeedControl.jsx sets top/left;
+   the UA's centring (inset:0 + margin:auto) is undone here. */
+.wt-player-speed-menu[popover] {
+    position: fixed;
+    inset: auto;
+    right: auto;
+    bottom: auto;
+    margin: 0;
+    color: inherit;
+    display: none;
+}
+
+.wt-player-speed-menu[popover]:popover-open {
+    display: flex;
+}
+
+.wt-player-speed-item {
+    padding: 0.375rem 0.625rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    cursor: pointer;
+}
+
+.wt-player-speed-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.wt-player-speed-item--active {
+    color: #fd79a8;
+    font-weight: 600;
+}
+
+@media (hover: none) {
+    .wt-player-speed-item {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+/* Double-tap seek feedback (tap-seek.js): a number on the side that was
+   tapped, gone in well under a second. pointer-events off -- it must never
+   catch the next tap of the streak. */
+.wt-tap-seek {
+    position: absolute;
+    top: 50%;
+    z-index: 15;
+    padding: 0.5rem 0.875rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    transform: translateY(-50%);
+    animation: wt-tap-seek 0.65s ease-out forwards;
+}
+
+.wt-tap-seek--left { left: 12%; }
+.wt-tap-seek--right { right: 12%; }
+
+@keyframes wt-tap-seek {
+    0% { opacity: 0; transform: translateY(-50%) scale(0.85); }
+    20% { opacity: 1; transform: translateY(-50%) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Shown plainly; Player.jsx removes it after 650 ms either way. */
+    .wt-tap-seek { animation: none; }
+}
