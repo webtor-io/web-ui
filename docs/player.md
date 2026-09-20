@@ -182,6 +182,9 @@ one subtitle file.
   with the resume prompt (a question only the viewer can answer), or after 10 s (autoplay refused:
   Play is what they need). The empty stage shows the player's own spinner (`--empty`, the same SVG
   as `LoadingSpinner`), removed as soon as a player is in it.
+- The file being left is **paused** the moment the move starts (button, key, card, the countdown): it
+  used to play on under the spinner for as long as the next one took to start, and its saved position
+  moved with it.
 - **The wait is narrated.** `fetchStreamRender({ onProgress })` reports the job's log as it
   happens — the running step, and its status under it ("warming up torrent client, downloading
   10 MB — 37%") — and the card shows the latest line while the viewer waits. Kept from the silent

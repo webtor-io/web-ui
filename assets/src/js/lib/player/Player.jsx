@@ -837,6 +837,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // toggle means "pause", not "play". It ends the hold without playing
     // and withdraws the hold question for this seek.
     const togglePlay = useCallback(() => {
+        // Leaving for the next file: the film was paused on purpose
+        // (goNext), and a stray space or tap must not start it again.
+        if (nextLoadingRef.current) return;
         if (cancelPreHold()) return;
         state.togglePlay();
     }, [cancelPreHold, state.togglePlay]);
@@ -958,6 +961,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // The latest line of the next file's start log. Kept from the silent
     // prewarm too, so a viewer who presses Next midway sees where it is.
     const [nextProgress, setNextProgress] = useState('');
+    const nextLoadingRef = useRef(false);
+    nextLoadingRef.current = nextLoading;
     const nextGoRef = useRef(null);
     const earlyGoneRef = useRef(false); // the credits countdown fires once
     const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
@@ -983,6 +988,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // The card stays (or comes up) while the next file loads: it is what
         // names the thing the spinner is for.
         setNextCard((c) => c || 'offer');
+        // The film the viewer is leaving stops here (owner, 2026-09-20). A
+        // next file that was not prewarmed takes its minute to start, and the
+        // old one kept playing under the spinner meanwhile: the viewer had
+        // said "next" and was shown more of "this" -- and its position kept
+        // moving, so coming back to it later resumed past what they saw.
+        // The pause also saves that position (useWatchHistory).
+        const video = videoRef.current;
+        if (video && !video.paused) video.pause();
         nextGoRef.current.go(how);
     }, []);
     // Any sign of a viewer ends the "is anyone there" streak.
