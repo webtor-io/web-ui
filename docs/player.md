@@ -198,6 +198,13 @@ one subtitle file.
   its own "sync when fullscreen ends" behind, and on exit they raced — the slowest won, which could
   put episode 2's card and start form under episode 3's picture. `scheduleSync` keeps one pending
   URL and one listener, and a generation lets a newer `syncPage` overtake an older one in flight.
+- **The live subtree is the whole action view** (`liveRoot`: the direct child of the log container),
+  not `stage.parentNode`. The stream template wraps the video in a `<div class="relative">`, so the
+  parent was an inner element and the view's marker (`data-async-view`, whose destroy handler is
+  `destroyPlayer()`) sat on its ancestor: the sync told it that it was going, and the player that had
+  just mounted was destroyed — "the new episode appears, then only the file list". For the same
+  reason `mountOnStage` adopts the *content* of the render's wrapper rather than the wrapper, which
+  nested one level deeper on every move.
 - **`syncPage` runs the view lifecycle** around the live player (`destroyViews` / `activateViews`,
   split out of `lib/loadAsyncView.js` with a `skip` subtree): without it the new file list came back
   with its scripts never run (`resource/select.js`: no multi-select, no archive).
@@ -270,3 +277,22 @@ A position under `MIN_SAVED_POSITION` (30 s) is neither saved nor offered: it is
 in and left, and "Continue from 0:12?" is a question about nothing. Exactly 0 still goes through —
 that is "Start over" resetting a real position. A file the server calls `watched` (90%, or past the
 credits — `models.IsWatched`) is not offered for resume either.
+
+## Seeking inside a transcoder run — `local-seek.js`
+
+A session plays a **run**: FFmpeg started at `seekOffset` (film time) and writes segments as fast as
+the torrent feeds it — no `-re`, no list size — so the playlist holds everything from the start of
+the run to wherever FFmpeg has got to. Every point in between is a plain `video.currentTime =`.
+Until 2026-09-20 *every* seek in a session was a POST to the transcoder: a new FFmpeg, a frozen
+frame, a second or more of nothing — including the ten seconds of a double tap and the fifteen of an
+arrow key, which almost always land inside what is already there.
+
+`handleSeek` asks `localSeekTarget(filmTime, seekOffset, producedEnd)` first. `producedEnd` is the
+playlist's `totalduration` (hls.js) or the element's `seekable` end (native HLS). Local when
+`0 ≤ filmTime − seekOffset ≤ producedEnd − EDGE_S` (8 s = two segments: the edge of a growing
+playlist is no place to aim for); otherwise the session seek as before — back before the run began,
+or forward past what has been produced. The offset does not change on a local seek, so cue shifts
+and the translation's timeline stay put; the rest is what a direct seek does (`onDirectSeek`).
+
+Event `player-seek {local, session}` — counts, sent once the seeking stops (a held arrow key is
+thirty seeks a second).

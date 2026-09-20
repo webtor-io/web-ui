@@ -99,7 +99,7 @@ function playingPage() {
     global.DOMParser = w.DOMParser;
     w.document.body.innerHTML = `
         <div id="content" data-async-layout="L">
-          <div id="file"><h2>e01</h2><div id="log-i1"><div class="live"><div class="wt-player-stage"><video></video></div><dialog id="subtitles"></dialog></div></div></div>
+          <div id="file"><h2>e01</h2><div id="log-i1"><div class="progress-alert hidden"></div><div class="live" data-async-view="/assets/action/stream"><div class="relative"><div class="wt-player-stage"><video></video></div><dialog id="subtitles"></dialog></div></div></div></div>
           <div id="list" data-async-view="resource/select">list of e01</div>
         </div>`;
     return w;
@@ -111,12 +111,16 @@ test('syncing the page moves the live player into the new card, and runs the vie
     const stage = w.document.querySelector('.wt-player-stage');
     const seen = [];
     w.addEventListener('async:resource/select_destroy', () => seen.push('destroy'));
+    // The stream view's destroy handler is destroyPlayer(): it must NOT be
+    // told it is going -- it is the one thing that stays.
+    w.addEventListener('async:/assets/action/stream_destroy', () => seen.push('PLAYER DESTROYED'));
     w.addEventListener('async:/assets/resource/select', (e) => seen.push('init:' + e.detail.target.id));
     const ok = await syncPage('/ru/res?file=e02', { fetchImpl: async () => ({ ok: true, text: async () => freshContent(2) }) });
     assert.equal(ok, true);
     assert.equal(w.document.querySelector('#file h2').textContent, 'e02');
     assert.equal(w.document.querySelector('.wt-player-stage'), stage, 'the very same stage: the player was moved, not rebuilt');
     assert.equal(stage.closest('[id^="log-"]').id, 'log-i2', 'into the new card\'s log');
+    assert.equal(stage.closest('.live').parentElement.id, 'log-i2', 'as a whole view: its root came along, not just the inner wrapper');
     assert.equal(w.document.querySelectorAll('#subtitles').length, 1);
     assert.deepEqual(seen, ['destroy', 'init:list'], 'the old list was told it was going; the new one had its script started');
 });

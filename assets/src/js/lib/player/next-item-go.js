@@ -212,8 +212,16 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         }
         // Scripts in the render are inert when adopted this way, which is
         // wanted: the player is initialised here, by hand, on the stage.
-        for (const node of [...doc.body.childNodes]) {
-            if (node.nodeType === 1 && node.tagName === 'SCRIPT') continue;
+        //
+        // What is adopted is the CONTENT of the render's own wrapper (the
+        // <div class="relative"> around the video and its dialogs), into the
+        // old wrapper that holds the stage: adopting the wrapper itself nested
+        // one more level on every move. The stylesheet and script that follow
+        // the wrapper in the render are already on the page.
+        const player = doc.querySelector('.player');
+        const from = player && player.parentNode ? player.parentNode : doc.body;
+        for (const node of [...from.childNodes]) {
+            if (node.nodeType === 1 && (node.tagName === 'SCRIPT' || node.tagName === 'LINK')) continue;
             host.appendChild(document.importNode(node, true));
         }
         // No auto-resume note here (there was one in the first version): a
@@ -295,6 +303,21 @@ function kickTranslation(doc) {
     try { fetch(src, { method: 'HEAD' }).catch(() => {}); } catch (e) { /* best effort */ }
 }
 
+// liveRoot: everything of the playing stream that must survive a page sync, as
+// ONE element -- the top of the action view, the direct child of its log
+// container. Not `stage.parentNode`: the stream template wraps the video in a
+// <div class="relative">, so that was an INNER element, and the view's marker
+// (data-async-view, whose destroy handler is destroyPlayer) sat on its
+// ancestor. destroyViews(content, live) did not see the ancestor as part of
+// the live subtree, told it that it was going -- and the player that had just
+// mounted was destroyed a moment later, leaving the bare file list (owner,
+// 2026-09-20). It also left the view's own wrapper behind on every sync.
+export function liveRoot(stage) {
+    let el = stage;
+    while (el && el.parentElement && !/^log-/.test(el.parentElement.id || '')) el = el.parentElement;
+    return el && el.parentElement ? el : (stage ? stage.parentNode : null);
+}
+
 // syncPage brings the page around the player up to date with the file that is
 // now playing: the file card, the list, the address the buttons post to. The
 // player itself must not be re-rendered, so #content is not swapped the usual
@@ -328,7 +351,7 @@ export async function syncPage(url, { fetchImpl = fetch } = {}) {
     // library puts into this very container (lib/loadAsyncView.js).
     fresh.innerHTML = tpl ? tpl.innerHTML : text;
     const log = fresh.querySelector('#file [id^="log-"]');
-    const live = stageHost.parentNode; // the action view's root: stage + dialogs
+    const live = liveRoot(stageHost);
     if (!log || !live) return false;
     const video = stageHost.querySelector('video, audio');
     const wasPlaying = !!video && !video.paused;

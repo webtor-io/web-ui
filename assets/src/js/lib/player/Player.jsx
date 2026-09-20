@@ -9,6 +9,7 @@ import { Hls } from './hls-manager';
 import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } from './cue-offset';
 import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, savePrefs } from './player-prefs';
 import { createTapSeek } from './tap-seek';
+import { localSeekTarget, producedEnd } from './local-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
 import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
@@ -411,10 +412,43 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setOfferCard(false);
     }, [offer, trackOffer]);
 
+    // How seeks in a session split between "inside the run" and "new FFmpeg".
+    // Counted and sent once the seeking stops: a held arrow key is thirty
+    // seeks a second, and an event for each would be a flood saying one thing.
+    const seekCountsRef = useRef({ local: 0, session: 0 });
+    const seekEventRef = useRef(null);
+    if (!seekEventRef.current) {
+        seekEventRef.current = settled(() => {
+            const c = seekCountsRef.current;
+            seekCountsRef.current = { local: 0, session: 0 };
+            track('player-seek', c);
+        }, 5000);
+    }
+    const countSeek = (kind) => {
+        seekCountsRef.current[kind] += 1;
+        seekEventRef.current.push(true);
+    };
+    useEffect(() => () => seekEventRef.current.flush(), []);
+
     // Seek handler (session or direct)
     const handleSeek = useCallback((time, { play = false } = {}) => {
         if (sessionSeekingRef.current) return;
         if (isSession && sessionSeekUrl) {
+            // Inside the run that is playing? Then it is a plain seek
+            // (local-seek.js): no POST, no new FFmpeg, no frozen frame. The
+            // offset does not change, so cues and the translation's timeline
+            // stay where they are; the rest is what a direct seek does.
+            const video = videoRef.current;
+            const local = video ? localSeekTarget(time, seekOffsetRef.current, producedEnd(video, hlsRef.current)) : null;
+            if (local !== null) {
+                state.setCurrentTime(time);
+                video.currentTime = local;
+                if (play && video.paused) video.play().catch(() => {});
+                onDirectSeek();
+                countSeek('local');
+                return;
+            }
+            countSeek('session');
             // Immediately show target position on timeline
             state.setCurrentTime(time);
             // Lazily create session seeker (works with HLS.js or native HLS)
