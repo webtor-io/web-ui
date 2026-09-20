@@ -9,7 +9,8 @@
 const KEY = 'wt-player-prefs';
 
 export const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-export const DEFAULTS = { volume: 1, muted: false, rate: 1 };
+// autoplayNext: move on to the next episode / track by itself (next-item.js).
+export const DEFAULTS = { volume: 1, muted: false, rate: 1, autoplayNext: true };
 
 export function safeStorage() {
     try { return window.localStorage; } catch (e) { return null; }
@@ -28,6 +29,7 @@ export function loadPrefs(storage = safeStorage()) {
     if (!raw || typeof raw !== 'object') return out;
     if (typeof raw.volume === 'number' && isFinite(raw.volume)) out.volume = clamp01(raw.volume);
     if (typeof raw.muted === 'boolean') out.muted = raw.muted;
+    if (typeof raw.autoplayNext === 'boolean') out.autoplayNext = raw.autoplayNext;
     if (RATES.includes(raw.rate)) out.rate = raw.rate;
     return out;
 }

@@ -7,9 +7,11 @@ import { useSubtitleTranslation } from './hooks/useSubtitleTranslation';
 import { createSessionSeeker } from './session-seek';
 import { Hls } from './hls-manager';
 import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } from './cue-offset';
-import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay } from './player-prefs';
+import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, savePrefs } from './player-prefs';
 import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
+import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak } from './next-item';
+import { createNextItemGo } from './next-item-go';
 import { track, settled } from './player-telemetry';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
@@ -595,6 +597,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     break;
                 // The keys every player uses for speed (Shift+, / Shift+.);
                 // e.key is the produced character, so layouts agree.
+                // Next episode / track. Shift+N as well, the habit from YouTube.
+                case 'n':
+                case 'N':
+                    if (!next) break;
+                    e.preventDefault();
+                    goNext('key');
+                    break;
                 // Subtitle delay, VLC's keys: g earlier, h later.
                 case 'g':
                 case 'h':
@@ -732,12 +741,6 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // The prompt is answered for the viewer when the note says so. Through
     // the prompt's own state rather than around it: handleResume is the one
     // place that knows how to resume a session and a direct source.
-    useEffect(() => {
-        if (!showResumePrompt || !autoResumeRef.current) return;
-        autoResumeRef.current = false;
-        handleResume();
-    }, [showResumePrompt, handleResume]);
-
     const handleStartOver = useCallback(() => {
         setShowResumePrompt(false);
         resumeAnsweredRef.current = true;
@@ -752,6 +755,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const dur = duration > 0 ? duration : (video?.duration || 0);
         if (dur > 0) forceSendPosition(0, dur);
     }, [duration, forceSendPosition, isSession, playAfterPrompt]);
+
+    // ...and this is where the note answers it. A file the viewer had all but
+    // finished starts from the top (next-item.js resumeAt): an automatic move
+    // to the next episode that resumed at 98% would end at once and chain on.
+    useEffect(() => {
+        if (!showResumePrompt || !autoResumeRef.current) return;
+        autoResumeRef.current = false;
+        const dur = duration > 0 ? duration : ((videoRef.current && videoRef.current.duration) || 0);
+        if (resumeAt(resumePosition, dur) > 0) handleResume();
+        else handleStartOver();
+    }, [showResumePrompt, handleResume, handleStartOver]);
 
     // Chromecast integration
     useEffect(() => {
@@ -907,6 +921,88 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         document.addEventListener('click', onClick);
         return () => document.removeEventListener('click', onClick);
     }, [changeSubDelay, paintSubDelay]);
+
+    // Next episode / next track (next-item.js decides, next-item-go.js moves).
+    // `next` is the server's answer on the player element; without it none of
+    // this exists -- a film, the last file, an embed.
+    const next = useRef(readNext(videoEl)).current;
+    const [autoplayNext, setAutoplayNext] = useState(() => loadPrefs().autoplayNext);
+    const [nextCard, setNextCard] = useState(null); // null | 'soon' | 'offer' | 'ask'
+    const nextCancelledRef = useRef(false);
+    const nextGoRef = useRef(null);
+    if (next && !nextGoRef.current) {
+        nextGoRef.current = createNextItemGo({
+            next, resourceID, root: trackContainer,
+            getStage: currentStage, initPlayer, destroyPlayer,
+            onEvent: (name, data) => {
+                if (name === 'go') track('next-item-go', { kind: next.kind, ...data });
+                if (name === 'prepared') track('next-item-prepared', { kind: next.kind, ...data });
+            },
+        });
+    }
+    const safeSession = () => { try { return window.sessionStorage; } catch (e) { return null; } };
+    const goNext = useCallback((how) => {
+        if (!nextGoRef.current) return;
+        // An automatic move extends the streak; anything the viewer did
+        // themselves ends it (see the listener below).
+        if (how === 'auto') writeStreak(safeSession(), readStreak(safeSession()) + 1);
+        else writeStreak(safeSession(), 0);
+        setNextCard(null);
+        nextGoRef.current.go(how);
+    }, []);
+    // Any sign of a viewer ends the "is anyone there" streak.
+    useEffect(() => {
+        if (!next) return undefined;
+        const alive = () => writeStreak(safeSession(), 0);
+        document.addEventListener('pointerdown', alive, true);
+        document.addEventListener('keydown', alive, true);
+        return () => {
+            document.removeEventListener('pointerdown', alive, true);
+            document.removeEventListener('keydown', alive, true);
+        };
+    }, []);
+    // Prewarm and the "coming up" card follow the clock.
+    useEffect(() => {
+        if (!next || !nextGoRef.current) return;
+        const plan = advancePlan({
+            currentTime: state.currentTime, duration: state.duration, playing: state.playing,
+            hidden: typeof document !== 'undefined' && document.hidden,
+            prewarmed: nextGoRef.current.isPrepared(), kind: next.kind,
+        });
+        if (plan.prewarm) nextGoRef.current.prepare();
+        if (plan.card && !nextCancelledRef.current && nextCard === null) {
+            setNextCard('soon');
+            track('next-item-shown', { kind: next.kind, autoplay: autoplayNext });
+        }
+        if (!plan.card && nextCard === 'soon') setNextCard(null); // sought back
+    }, [state.currentTime, state.duration, state.playing]);
+    // The end of the file.
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!next || !video) return undefined;
+        const onEnded = () => {
+            const verdict = atEnd({ autoplay: autoplayNext, autoStreak: readStreak(safeSession()), cancelled: nextCancelledRef.current });
+            if (verdict === 'go') goNext('auto');
+            else if (verdict === 'offer' || verdict === 'ask') {
+                setNextCard(verdict);
+                if (verdict === 'ask') track('next-item-still-watching', { kind: next.kind });
+            }
+        };
+        video.addEventListener('ended', onEnded);
+        return () => video.removeEventListener('ended', onEnded);
+    }, [autoplayNext, goNext]);
+    const cancelNext = useCallback(() => {
+        nextCancelledRef.current = true;
+        setNextCard(null);
+        track('next-item-cancel', { kind: next ? next.kind : '' });
+    }, []);
+    const toggleAutoplayNext = useCallback(() => {
+        setAutoplayNext((v) => {
+            savePrefs({ autoplayNext: !v });
+            track('next-item-autoplay', { on: !v });
+            return !v;
+        });
+    }, []);
 
     // Media Session (media-session.js): lock screen, headset, media keys.
     // Bound once; position is reported in film time on the events that change
@@ -1099,6 +1195,31 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 </div>
             )}
 
+            {/* What comes after this file. 'soon': the last seconds, the next
+                one starts by itself at the end unless cancelled. 'offer':
+                autoplay is off, the file has ended. 'ask': several files went
+                by with no sign of a viewer. */}
+            {next && nextCard && (
+                <div class="wt-next-card" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <div class="wt-next-card-kicker">
+                        {nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? t('player.nextUpAuto') : t('player.nextUp'))}
+                    </div>
+                    <div class="wt-next-card-label" title={next.label}>{next.label}</div>
+                    <div class="wt-next-card-actions">
+                        <button type="button" class="wt-next-card-go" onClick={() => goNext('card')}>
+                            {nextCard === 'ask' ? t('player.continueWatching') : t('player.playNow')}
+                        </button>
+                        {nextCard === 'soon' && (
+                            <button type="button" class="wt-next-card-link" onClick={cancelNext}>{t('player.nextCancel')}</button>
+                        )}
+                    </div>
+                    <label class="wt-next-card-auto">
+                        <input type="checkbox" checked={autoplayNext} onChange={toggleAutoplayNext} />
+                        <span>{t('player.autoplayNext')}</span>
+                    </label>
+                </div>
+            )}
+
             {/* What a key just changed (speed, subtitle delay): the keys
                 have no other face. */}
             {toast && (
@@ -1133,6 +1254,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onToggleFullscreen={state.toggleFullscreen}
                     onCaptionsClick={handleCaptionsClick}
                     onEmbedClick={handleEmbedClick}
+                    onNext={next ? () => goNext('button') : null}
+                    nextLabel={next ? next.label : ''}
                     isVideo={isVideo}
                     features={features}
                 />
@@ -1242,7 +1365,15 @@ function parseFeatures(settings, isVideo, duration, isSession) {
  * Initialize player on a target container that contains a <video> or <audio> with class="player".
  * Called from action/stream.js.
  */
-export async function initPlayer(target) {
+// The STAGE is the element fullscreen is requested on, and the one thing that
+// outlives a player: moving to the next file (next-item-go.js) destroys this
+// player and mounts another INTO THE SAME STAGE, and a fullscreen element
+// stays fullscreen for as long as it stays in the document, whatever happens
+// to its children. Requested on the player's own container, as it used to
+// be, fullscreen ended with every transition -- and a browser will not
+// re-enter it without a gesture. `opts.stage` is that existing stage; an
+// ordinary start makes its own.
+export async function initPlayer(target, opts = {}) {
     const videoEl = target.querySelector('.player');
     if (!videoEl) return;
 
@@ -1271,7 +1402,13 @@ export async function initPlayer(target) {
     mountEl.className = 'wt-player-mount';
     if (fixedWidth) mountEl.style.width = fixedWidth;
     if (fixedHeight) mountEl.style.height = fixedHeight;
-    videoEl.parentNode.insertBefore(mountEl, videoEl);
+    let stage = opts.stage || null;
+    if (!stage) {
+        stage = document.createElement('div');
+        stage.className = 'wt-player-stage';
+        videoEl.parentNode.insertBefore(stage, videoEl);
+    }
+    stage.appendChild(mountEl);
 
     // Build the player container with video inside
     const playerContainer = document.createElement('div');
@@ -1300,7 +1437,7 @@ export async function initPlayer(target) {
         playerContainer
     );
 
-    _currentPlayer = { mountEl, playerContainer, videoEl };
+    _currentPlayer = { stage, mountEl, playerContainer, videoEl };
 }
 
 function wireEmbedCopy(container) {
@@ -1328,7 +1465,15 @@ function wireLogo(container, playerContainer) {
 /**
  * Destroy current player instance.
  */
-export function destroyPlayer() {
+// currentStage: the stage of the player on screen, for a caller that is about
+// to replace that player and wants the next one in the same place.
+export function currentStage() {
+    return _currentPlayer ? _currentPlayer.stage : null;
+}
+
+// `keepStage`: the player goes, its stage stays in the document for the next
+// one (see initPlayer).
+export function destroyPlayer({ keepStage = false } = {}) {
     // Before the early return: "this page's player is gone" is true whether
     // or not one was mounted, and it is what stands a queued PUT retry
     // down (persistTrackChoice). The same goes for the picker's 'async'
@@ -1336,7 +1481,7 @@ export function destroyPlayer() {
     // mount and so outlives it.
     releaseTrackDialog();
     if (!_currentPlayer) return;
-    const { mountEl, playerContainer, videoEl } = _currentPlayer;
+    const { stage, mountEl, playerContainer, videoEl } = _currentPlayer;
 
     // Destroy HLS
     if (window.hlsPlayer) {
@@ -1353,6 +1498,7 @@ export function destroyPlayer() {
 
     // Remove mount point
     mountEl.remove();
+    if (stage && !keepStage) stage.remove();
 
     _currentPlayer = null;
 }

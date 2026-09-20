@@ -196,9 +196,13 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
             const exit = document.exitFullscreen || document.webkitExitFullscreen;
             if (exit) exit.call(document);
         } else {
-            const enter = container.requestFullscreen || container.webkitRequestFullscreen;
+            // On the stage, not on the player's own container: the stage
+            // survives a move to the next file, and fullscreen with it
+            // (Player.jsx initPlayer).
+            const host = (container.closest && container.closest('.wt-player-stage')) || container;
+            const enter = host.requestFullscreen || host.webkitRequestFullscreen;
             if (enter) {
-                enter.call(container);
+                enter.call(host);
             } else {
                 // iOS: native video fullscreen (only option)
                 const video = container.querySelector('video');

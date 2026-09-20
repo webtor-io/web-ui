@@ -54,6 +54,14 @@ function initUserSubtitleUpload() {
 
 let destroyUserSubtitleUpload = () => {};
 
+// A move to the next file (lib/player/next-item-go.js) replaces the player and
+// its #subtitles dialog in place, without this view being re-run: the upload
+// wiring hangs on the OLD dialog and has to be made again.
+window.addEventListener('player_replaced', () => {
+    destroyUserSubtitleUpload();
+    destroyUserSubtitleUpload = initUserSubtitleUpload();
+});
+
 av(async function() {
     const { initPlayer } = await import('../../lib/player/Player');
     await initPlayer(this);

@@ -118,3 +118,56 @@ presses stop and is flushed on teardown):
 | `stream-start` | + `rate`, `subtitleDelay` | what the stream started with (remembered settings make no change event) |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
+
+## Next episode / next track — `next-item.js`, `next-item-go.js`
+
+Design, numbers and the owner's decisions: `docs/superpowers/specs/2026-09-20-next-episode-design.md`.
+86% of viewers who finish an episode open the next one by hand; the feature is about the minute that
+transition costs.
+
+**Server.** The stream job resolves what follows the file it renders (`jobs/scripts/next_item.go`
+over the pure `services/next_item`): the next `(season, episode)` of the series among this torrent's
+files — specials never bridge to regular seasons, a two-episode file is followed by what comes after
+its last episode, an episode without a file is skipped — or, for audio, the next audio file of the
+directory in natural order. A video that is not an episode has no next. It lands on the player
+element as `data-next-item-id|path|kind|label`; **absent = the feature is off** for this stream
+(a film, the last file, an embed, a failed lookup — and the kill switch). Bounded at 4 s.
+
+**Track choices travel as intent** (`models.TrackCarry`, `handlers/action/carry.go`). Track ids mean
+nothing in another file, so `readCarry()` reads the picker's current chips into `carry-*` form
+fields — audio language + label; subtitles off, or language + origin — and the picker resolves them
+against the new file's lists to an item id, which goes down the saved-choice path (the one place that
+knows about locked items and the "None" switch). A carry outranks the file's own saved choice and
+the ladder; same language from another origin beats the ladder; a carry the file cannot honour
+changes nothing. It is part of the job cache key. The subtitle delay does not travel: it belongs to
+one subtitle file.
+
+**Client.**
+- Button right after Play (`NextIcon`: a triangle with a bar on its right), key `n` / `Shift+N`.
+- `advancePlan()`: prewarm at 90% but never more than 5 min early (a prepared render and its
+  transcoder session live ~10 min), only while playing in a visible tab; the "up next" card in the
+  last 25 s, video only. No countdown — the move happens on `ended`.
+- `atEnd()`: `go` / `offer` (autoplay off) / `ask` ("still watching?" after 3 automatic moves with no
+  pointer or key event — a sleeper must not warm up and transcode a season) / `stay` (cancelled).
+- Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on), toggled on the card.
+- The move itself (`createNextItemGo`): the next file's render is fetched off the page
+  (`background-render.js`, with a silent Turnstile token for anonymous viewers), the old player is
+  destroyed **keeping its stage**, the new one is mounted into the same stage, the address and title
+  are updated, and the page around (`#content`: file card, list) is synced — at once when windowed,
+  on leaving fullscreen otherwise. `syncPage` fetches the fresh `#content` aside, moves the live
+  player into its new log container, then swaps. A carried AI translation is kicked with one HEAD
+  to the track so its first lines are ready. What cannot be done quietly (an error card, a cap
+  modal, a Turnstile checkbox) falls back to opening the next file the visible way.
+- The next player does not show "continue from…": it leaves the same one-shot note a settings
+  restart does (`markAutoResume`), and `resumeAt()` starts a file the viewer had ≥90% finished from
+  the top, so an automatic move cannot land at 98% and chain on.
+
+**The stage.** Fullscreen is requested on `.wt-player-stage`, a wrapper that outlives the player it
+holds (`initPlayer(target, { stage })`, `destroyPlayer({ keepStage })`): a fullscreen element stays
+fullscreen while it stays in the document, whatever happens to its children. On the player's own
+container, as before, every transition would have ended fullscreen — and a browser does not re-enter
+it without a gesture. iOS native video fullscreen cannot be kept; accepted.
+
+Events: `next-item-shown`, `next-item-prepared {ok}`, `next-item-go {how: auto|button|key|card,
+prewarmed, fallback, fullscreen, wait_ms}`, `next-item-cancel`, `next-item-autoplay {on}`,
+`next-item-still-watching`. `wait_ms` is the number the feature exists for; the baseline is ~58 s.

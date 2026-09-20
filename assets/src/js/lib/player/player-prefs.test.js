@@ -12,16 +12,16 @@ test('what was saved comes back', () => {
     assert.deepEqual(loadPrefs(s), DEFAULTS);
     assert.equal(savePrefs({ volume: 0.4 }, s), true);
     assert.equal(savePrefs({ rate: 1.5 }, s), true);
-    assert.deepEqual(loadPrefs(s), { volume: 0.4, muted: false, rate: 1.5 }, 'a patch keeps the other fields');
+    assert.deepEqual(loadPrefs(s), { volume: 0.4, muted: false, rate: 1.5, autoplayNext: true }, 'a patch keeps the other fields');
 });
 
 test('a stored value that is not ours reads as the default, field by field', () => {
     assert.deepEqual(loadPrefs(mem({ 'wt-player-prefs': 'not json' })), DEFAULTS);
     assert.deepEqual(loadPrefs(mem({ 'wt-player-prefs': '[1,2]' })), DEFAULTS);
     const s = mem({ 'wt-player-prefs': JSON.stringify({ volume: 7, muted: 'yes', rate: 16 }) });
-    assert.deepEqual(loadPrefs(s), { volume: 1, muted: false, rate: 1 }, 'clamped / ignored, never trusted');
+    assert.deepEqual(loadPrefs(s), { volume: 1, muted: false, rate: 1, autoplayNext: true }, 'clamped / ignored, never trusted');
     const ok = mem({ 'wt-player-prefs': JSON.stringify({ volume: 0.25, muted: true, rate: 3 }) });
-    assert.deepEqual(loadPrefs(ok), { volume: 0.25, muted: true, rate: 1 }, 'one bad field does not drop the good ones');
+    assert.deepEqual(loadPrefs(ok), { volume: 0.25, muted: true, rate: 1, autoplayNext: true }, 'one bad field does not drop the good ones');
 });
 
 test('no storage, or a storage that throws, never breaks the player', () => {

@@ -1,4 +1,4 @@
-import { PlayIcon, PauseIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, EmbedIcon } from './icons';
+import { PlayIcon, PauseIcon, NextIcon, FullscreenIcon, ExitFullscreenIcon, CaptionsIcon, EmbedIcon } from './icons';
 import { ProgressBar } from './ProgressBar';
 import { TimeDisplay } from './TimeDisplay';
 import { VolumeControl } from './VolumeControl';
@@ -12,7 +12,7 @@ import { t } from './i18n';
 export function Controls({
     playing, currentTime, duration, volume, muted, rate, fullscreen, buffered, seeking,
     onTogglePlay, onSeek, onVolumeChange, onRateChange, onToggleMute, onToggleFullscreen,
-    onCaptionsClick, onEmbedClick,
+    onCaptionsClick, onEmbedClick, onNext, nextLabel,
     isVideo, features,
 }) {
     return (
@@ -35,6 +35,15 @@ export function Controls({
                     {features.playpause && (
                         <button type="button" class="wt-player-btn wt-player-btn--play" onClick={seeking ? undefined : onTogglePlay} aria-label={playing ? t('player.pause') : t('player.play')} disabled={seeking}>
                             {playing ? <PauseIcon /> : <PlayIcon />}
+                        </button>
+                    )}
+
+                    {/* Next episode / track, right after Play (owner). Present
+                        only when the server named a next file. */}
+                    {onNext && (
+                        <button type="button" class="wt-player-btn wt-player-btn--next" onClick={seeking ? undefined : onNext} disabled={seeking}
+                            aria-label={nextLabel ? `${t('player.next')}: ${nextLabel}` : t('player.next')} title={nextLabel ? `${t('player.next')}: ${nextLabel}` : t('player.next')}>
+                            <NextIcon />
                         </button>
                     )}
 

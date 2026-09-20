@@ -19,6 +19,15 @@ export function PauseIcon() {
     );
 }
 
+// Skip-next: a play triangle with a bar on its right (owner, 2026-09-20).
+export function NextIcon() {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full">
+            <path d="M5.25 5.653c0-1.427 1.529-2.33 2.779-1.643l9.04 4.972V5.25a.75.75 0 0 1 .75-.75h1.125a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H17.82a.75.75 0 0 1-.75-.75v-3.732l-9.04 4.972c-1.25.687-2.779-.217-2.779-1.643V5.653Z" />
+        </svg>
+    );
+}
+
 export function VolumeUpIcon() {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-full h-full">
