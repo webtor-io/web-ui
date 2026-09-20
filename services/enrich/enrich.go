@@ -1074,6 +1074,17 @@ func (s *Enricher) GetEnrichedResourceForPath(ctx context.Context, resourceID st
 	return nil, "", nil
 }
 
+// SiblingEpisodes returns the episode rows of the series the file belongs to,
+// within the same resource (models.GetSiblingEpisodes) -- what the player's
+// "next episode" is picked from.
+func (s *Enricher) SiblingEpisodes(ctx context.Context, resourceID string, pathStr string) ([]*models.Episode, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("no db")
+	}
+	return models.GetSiblingEpisodes(ctx, db, resourceID, pathStr)
+}
+
 // ResolveVideoRef is the persisted answer to "which show/movie, which
 // season, which episode is this file": models.ResolveVideoFromResourcePath
 // against this enricher's DB. The subtitle hint prefers it to re-parsing

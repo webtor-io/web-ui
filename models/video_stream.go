@@ -23,7 +23,14 @@ type VideoStreamUserData struct {
 	// Accept-Language list, so audio and subtitles answer to one language.
 	// "" where the job resolves none (an embed, the feature off): the
 	// Accept-Language list alone decides, as it always did.
-	ResolvedLang    string
+	ResolvedLang string
+	// Carry is the track choice the viewer had on the PREVIOUS file when the
+	// player moved on to this one (next episode, next track). Track ids are
+	// per file, so what travels is the intent -- a language, an origin, "off"
+	// -- and the picker resolves it against this file's tracks. It outranks
+	// both this file's own saved choice and the language ladder: it is the
+	// freshest thing the viewer said. nil on an ordinary start.
+	Carry           *TrackCarry
 	FallbackLangTag language.Tag
 	Settings        *StreamSettings
 }
@@ -180,4 +187,23 @@ type UserSubtitleView struct {
 	// renders the chips and the client moves them into the radiogroup
 	// (adoptUploadChips, track-picker.js).
 	RenderChips bool
+}
+
+// TrackCarry: see VideoStreamUserData.Carry.
+type TrackCarry struct {
+	AudioLang  string
+	AudioLabel string
+	// Subtitles: "" = say nothing about subtitles, "off", or "on".
+	Subtitles        string
+	SubtitleLang     string
+	SubtitleProvider string
+}
+
+// Key is the part of a job's cache key this carry contributes: two starts of
+// one file with different carried choices are different renders.
+func (c *TrackCarry) Key() string {
+	if c == nil {
+		return ""
+	}
+	return c.AudioLang + "|" + c.AudioLabel + "|" + c.Subtitles + "|" + c.SubtitleLang + "|" + c.SubtitleProvider
 }

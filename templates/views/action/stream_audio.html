@@ -4,6 +4,9 @@
        crossorigin="anonymous"
        preload="{{ .ExportTag.Preload }}"
        data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
+       {{/* The file that follows this one (jobs/scripts/next_item.go): absent =
+            no "next" control, no autoplay. See docs/player.md. */}}
+       {{ if .Next }}data-next-item-id="{{ .Next.ItemID }}" data-next-path="{{ .Next.Path }}" data-next-kind="{{ .Next.Kind }}" data-next-label="{{ .Next.Label }}"{{ end }}
        data-path="{{ .Item.PathStr }}"
        {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
        {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}

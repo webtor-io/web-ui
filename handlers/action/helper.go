@@ -239,7 +239,14 @@ func (s *Helper) GetAudioTracks(ud *models.VideoStreamUserData, mp *api.MediaPro
 	// markSaved=false: Saved is a subtitle-only field (the audio list has
 	// no rule the player must not re-decide over), so the audio choice is
 	// honoured without writing a value nothing reads.
-	return s.selectListItem(s.canonizeSrcLangs(res), ud.AudioID, ud, false)
+	lis := s.canonizeSrcLangs(res)
+	// A choice carried over from the previous file outranks this file's own
+	// saved one (carry.go).
+	id := ud.AudioID
+	if cid := carryAudioID(lis, ud.Carry); cid != "" {
+		id = cid
+	}
+	return s.selectListItem(lis, id, ud, false)
 }
 
 type langIndex map[language.Tag]int
@@ -1080,6 +1087,9 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 		lis[i].Rank = ladderRank(lis[i])
 	}
 	audioLang := s.defaultAudioLang(ud, mp)
+	// From here on the carried choice, if this file can honour it, IS the
+	// viewer's saved choice (carry.go).
+	ud = withCarriedSubtitle(ud, lis)
 	if opts.PreferredLang == "" {
 		// Same rule as the ladder's, one phase down: with subtitles off the
 		// picker still needs the item the Accept-Language selection would

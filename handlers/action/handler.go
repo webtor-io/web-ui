@@ -288,6 +288,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
+	vsud.Carry = carryFromForm(c.PostForm)
 
 	return &PostArgs{
 		ResourceID:          rID[0],
@@ -410,4 +411,32 @@ func logRefusal(c *gin.Context, action string, err error) {
 func isNilVerifier(v ActionVerifier) bool {
 	rv := reflect.ValueOf(v)
 	return rv.Kind() == reflect.Ptr && rv.IsNil()
+}
+
+// carryFromForm reads the track choice a player hands over when it moves to
+// the next file (models.TrackCarry). Every field is a short token the picker
+// compares against its own values, never rendered or stored, so the only
+// hygiene needed is a length cap -- a label is free text from a media file.
+func carryFromForm(get func(string) string) *models.TrackCarry {
+	cut := func(v string) string {
+		v = strings.TrimSpace(v)
+		if len(v) > 128 {
+			v = v[:128]
+		}
+		return v
+	}
+	carry := &models.TrackCarry{
+		AudioLang:        cut(get("carry-audio-lang")),
+		AudioLabel:       cut(get("carry-audio-label")),
+		SubtitleLang:     cut(get("carry-sub-lang")),
+		SubtitleProvider: cut(get("carry-sub-provider")),
+	}
+	switch get("carry-sub") {
+	case "on", "off":
+		carry.Subtitles = get("carry-sub")
+	}
+	if *carry == (models.TrackCarry{}) {
+		return nil
+	}
+	return carry
 }

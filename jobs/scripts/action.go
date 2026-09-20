@@ -53,11 +53,13 @@ type StreamContent struct {
 	// /ext/ with the same credentials as the initial render.
 	EIURL               string
 	VideoStreamUserData *models.VideoStreamUserData
-	Settings            *models.StreamSettings
-	ExternalData        *models.ExternalData
-	DomainSettings      *embed.DomainSettingsData
-	TranscoderSession   *api.TranscoderSession
-	SessionSeekURL      string
+	// Next is the file that follows this one, nil when there is none.
+	Next              *NextItem
+	Settings          *models.StreamSettings
+	ExternalData      *models.ExternalData
+	DomainSettings    *embed.DomainSettingsData
+	TranscoderSession *api.TranscoderSession
+	SessionSeekURL    string
 	// GraceDurationSec is non-zero only for free-tier users when grace rules
 	// are enabled. Surfaced to the player JS so it knows when to show the
 	// soft signup CTA after the grace window passes.
@@ -746,6 +748,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		}
 	}
 	sc.VideoStreamUserData = vsud
+	// What plays after this file (next_item.go). Not for the embed: there is
+	// no file list there to move through.
+	if dsd == nil {
+		sc.Next = s.resolveNextItem(ctx, c.ApiClaims, resourceID, sc.Item)
+	}
 	sc.UserSubtitlesEnabled = s.userSubtitles.Enabled()
 	sc.EIURL = se.URL
 	if exportResponse.Source.MediaFormat == ra.Video {
@@ -1509,7 +1516,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
-	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags)
+	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags) + "/" + vsud.Carry.Key()
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
 	// Cache key includes the authenticated user's id so two users on the

@@ -56,3 +56,19 @@ func GetFirstEpisodePathForSeries(ctx context.Context, db *pg.DB, seriesID uuid.
 	}
 	return *ep.Path, nil
 }
+
+// GetSiblingEpisodes returns every episode row of the series the file at
+// (resourceID, path) belongs to, narrowed to the same resource -- the input
+// of services/next_item. Empty when the file is not an enriched episode.
+func GetSiblingEpisodes(ctx context.Context, db *pg.DB, resourceID string, path string) ([]*Episode, error) {
+	var eps []*Episode
+	_, err := db.QueryContext(ctx, &eps, `
+		select e2.*
+		from episode e
+		join episode e2 on e2.resource_id = e.resource_id and e2.series_id = e.series_id
+		where e.resource_id = ? and e.path = ?`, resourceID, path)
+	if err != nil {
+		return nil, err
+	}
+	return eps, nil
+}
