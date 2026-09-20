@@ -56,3 +56,23 @@ Shown only when **both** hold: the real `#torrent-status` has gone under the nav
 ## Warm-up size
 
 See `docs/warmup.md` → "Why the stream warm-up is 10MB".
+
+## Picking a file reloads the Content section only
+
+The file links in `partials/list.html` target `#content` (`views/resource/get.html`,
+template `resource/content`: the file card `#file` + the browser `#list`). They used to
+target `main`, which re-rendered the header, restarted the status SSE and threw the
+sticky status away on every click, then scrolled to the top of the page.
+
+- `#content` carries `data-async-update-title` (the title names the file on
+  non-enriched resources) and `data-async-update-nav` (language links must point at the
+  new URL). Nothing else above the section depends on the picked file.
+- `get_ads` is a script block, not a slot; it sits above `#content` so a file click does
+  not run it again.
+- The view's JS (`resource/get.js`) is not re-run by this swap. It listens for the global
+  `async` event and scrolls `#file` into view (`scroll-mt-36`: navbar + sticky bar) when
+  the card is out of sight — it is above the list the viewer clicked in.
+- The snippet travels as `X-Layout`, so it uses `has` guards
+  (`services/web/has_guard_test.go`). A page without `#content` falls back to `main`.
+- Still targeting `main` on purpose: directory links when no file is picked, and the
+  watched toggles (they keep the header button in sync).

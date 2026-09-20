@@ -45,6 +45,25 @@
     <div class="max-w-5xl mx-auto mt-1.5 piece-bar-slot" data-piece-bar-for="{{ .Data.Resource.ID }}"></div>
 </div>
 {{ end }}
+{{/* The "Content" section: the picked file's card and the file browser.
+     One async target, so a file link swaps both and leaves the rest of the
+     page alone. Called with the view context. */}}
+{{ define "resource/content" }}
+{{/* `has` guards: this snippet travels as X-Layout and a history entry can
+     replay it against another page's data (services/web/has_guard_test.go). */}}
+{{ with .Data }}
+    {{ if and (has . "Item") .Item }}
+    <div id="file" class="scroll-mt-36" data-async-layout="{{`{{ template "file" . }}`}}">
+      {{ template "file" $ }}
+    </div>
+    {{ end }}
+    {{ if and (has . "List") .List }}
+    <div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
+    {{ template "list" $ }}
+    </div>
+    {{ end }}
+{{ end }}
+{{ end }}
 {{ define "resource/status_container" }}
 <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
     {{ template "resource/status_inner" . }}
@@ -338,21 +357,20 @@
         <div class="flex-1 h-px bg-w-line/50"></div>
     </div>
 
-    <!-- File preview -->
-    {{ if .Item }}
-    <div id="file" data-async-layout="{{`{{ template "file" . }}`}}">
-      {{ template "file" $ }}
-    </div>
-    {{ end }}
-
+    {{/* A script block (window._ads), not a slot on the page: it used to sit
+         between the file card and the list, and stays out of #content so that
+         picking a file does not run it again. */}}
     {{ if and ($.Claims | hasAds) (not (.Resource.MagnetURI | isDemoMagnet)) }}{{ template "get_ads" $ }}{{ end }}
 
-    <!-- File browser -->
-    {{ if .List }}
-    <div id="list" data-async-layout="{{`{{ template "list" . }}`}}">
-    {{ template "list" $ }}
+    {{/* Picking a file reloads THIS and nothing above it (owner, 2026-09-20):
+         the links in partials/list.html target #content. They used to target
+         `main`, which re-rendered the header, restarted the status stream and
+         threw the sticky status away on every click. The title is the one
+         thing outside that names the file; nav carries the language links,
+         which must point at the new URL. */}}
+    <div id="content" data-async-layout="{{`{{ template "resource/content" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}">
+    {{ template "resource/content" $ }}
     </div>
-    {{ end }}
     {{ if and ($.User | hasAuth) .Vault }}
         <div id="pledge-modal" data-async-layout="{{`{{ template "vault/pledge-modal" (withContext $ .Data) }}`}}">
             {{ template "vault/pledge-modal" (withContext $ .) }}

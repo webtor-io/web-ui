@@ -49,6 +49,21 @@ av( async function() {
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);
     this._stickyStatusStop = stopSticky;
+    // Picking a file swaps #content only (views/resource/get.html), so this
+    // view is not re-run and nothing scrolls. The card that just changed is
+    // ABOVE the list the viewer clicked in -- bring it into view, under the
+    // navbar and the sticky status (#file carries the scroll margin). Only
+    // when it is actually out of sight: a short list needs no movement.
+    const onContentSwap = (e) => {
+        if (!e.detail || !e.detail.target || e.detail.target.id !== 'content') return;
+        const file = document.getElementById('file');
+        if (!file) return;
+        const r = file.getBoundingClientRect();
+        if (r.top >= 72 && r.top < window.innerHeight / 2) return;
+        file.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    };
+    window.addEventListener('async', onContentSwap);
+    this._contentSwapStop = () => window.removeEventListener('async', onContentSwap);
     if (window._ads !== undefined && window._sessionExpired !== true) {
         const renderAd = (await import('../../lib/ads')).default;
         for (const ad of window._ads) {
@@ -93,6 +108,10 @@ av( async function() {
         });
     }
 }, function () {
+    if (this._contentSwapStop) {
+        this._contentSwapStop();
+        this._contentSwapStop = null;
+    }
     if (this._stickyStatusStop) {
         this._stickyStatusStop();
         this._stickyStatusStop = null;
