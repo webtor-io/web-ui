@@ -45,7 +45,7 @@ function page() {
             <div data-status-badge-for="res"></div>
             <div data-piece-bar-for="res"></div>
         </div>`;
-    const stop = initStickyStatus(document, { slideMs: 0 });
+    const stop = initStickyStatus(document, { slideMs: 0, holdMs: 30 });
     return { stop, bar: document.querySelector('#torrent-status-sticky'), io: observers[0] };
 }
 const status = (detail) => document.dispatchEvent(new dom.window.CustomEvent('torrent-status', { detail }));
@@ -202,4 +202,33 @@ test('it slides out before it is hidden, and a quick return cancels the hiding',
     await new Promise((r) => setTimeout(r, 80));
     assert.equal(bar.hidden, true, 'left alone, the slide ends in hidden');
     stop();
+});
+
+test('a one-second gap in the data does not blink the bar; a lasting one takes it down', async () => {
+    const p = page(); // holdMs: 30
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    p.io.fire(false, -100);
+    await settle();
+    assert.equal(p.bar.hidden, false);
+
+    // Stats briefly unavailable, then back: the bar never leaves.
+    status({ resourceId: 'res', state: 'unknown', moving: false });
+    await settle();
+    assert.equal(p.bar.hidden, false, 'held through the gap');
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    await new Promise((r) => setTimeout(r, 60));
+    assert.equal(p.bar.hidden, false, 'and the cancelled stop never lands');
+
+    // The same status that stays is believed.
+    status({ resourceId: 'res', state: 'idle', moving: false });
+    await new Promise((r) => setTimeout(r, 60));
+    assert.equal(p.bar.hidden, true, 'a transfer that really stopped');
+
+    // An answer is not a gap: no waiting.
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    await settle();
+    status({ resourceId: 'res', state: 'cached', moving: false });
+    await settle();
+    assert.equal(p.bar.hidden, true, 'cached ends it at once');
+    p.stop();
 });

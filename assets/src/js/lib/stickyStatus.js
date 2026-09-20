@@ -31,7 +31,10 @@ const NAVBAR_H = 72;
 // `hidden` may take it out of the tree.
 const SLIDE_MS = 200;
 
-export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
+// How long a transfer may look stopped before the bar believes it.
+const HOLD_MS = 8000;
+
+export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs = HOLD_MS } = {}) {
     const bar = root.querySelector('#torrent-status-sticky');
     let real = root.querySelector('#torrent-status');
     if (!bar || !real || typeof IntersectionObserver !== 'function') return null;
@@ -85,10 +88,25 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     }, { threshold: 0, rootMargin: `-${NAVBAR_H}px 0px 0px 0px` });
     io.observe(real);
 
+    // A transfer does not stop being one because a single status said so.
+    // The stream reports `unknown` when the seeder's stats are briefly
+    // unavailable and `idle` when a stats event is missing, then `caching`
+    // again a second later -- and the bar blinked out and back with it
+    // (owner, 2026-09-20). Those two are held for a grace period before they
+    // count; an answer (`cached`, `vaulted`, `vault_failed`) ends it at once.
+    const HOLD = new Set(['unknown', 'idle']);
+    let stopTimer = null;
     const onStatus = (e) => {
         if (!e.detail || e.detail.resourceId !== real.dataset.resourceId) return;
-        moving = !!e.detail.moving;
-        apply();
+        const now = !!e.detail.moving;
+        if (now || !HOLD.has(e.detail.state)) {
+            if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+            moving = now;
+            apply();
+            return;
+        }
+        if (!moving || stopTimer) return;
+        stopTimer = setTimeout(() => { stopTimer = null; moving = false; apply(); }, holdMs);
     };
     document.addEventListener('torrent-status', onStatus);
 
@@ -108,6 +126,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
 
     return () => {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
         io.disconnect();
         document.removeEventListener('torrent-status', onStatus);
         window.removeEventListener('async', onSwap);

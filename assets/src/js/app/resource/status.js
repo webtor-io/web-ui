@@ -100,9 +100,19 @@ const MOVING = new Set(['caching', 'vaulting', 'vault_waiting']);
 // The badge goes to every host that asked for it: the one in the header (the
 // view's own, which also carries the status token) and any mirror, today the
 // sticky bar. Same shape as paintBars below.
+// The sticky mirror keeps its last picture through a status that is only a
+// gap in the data: `unknown` (stats briefly unavailable) and `idle` (a missed
+// stats event) come and go within a second mid-transfer, and repainting the
+// bar for them read as a blink -- badge text flipping, piece bar collapsing to
+// a hairline and back (owner, 2026-09-20). stickyStatus.js holds the bar up
+// through the same two states and takes it down if they last.
+const isGap = (status) => status.state === 'unknown' || status.state === 'idle';
+const inSticky = (host) => !!host.closest('#torrent-status-sticky');
+
 function paintBadges(badge, resourceId, status, html) {
     badge.innerHTML = html;
     document.querySelectorAll(`[data-status-badge-for="${resourceId}"]`).forEach((host) => {
+        if (isGap(status) && inSticky(host)) return;
         host.innerHTML = html;
     });
     // Broadcast rather than reach into the sticky bar from here: this view
@@ -115,6 +125,7 @@ function paintBadges(badge, resourceId, status, html) {
 function paintBars(resourceId, status) {
     const html = renderBar(status);
     document.querySelectorAll(`[data-piece-bar-for="${resourceId}"]`).forEach((host) => {
+        if (isGap(status) && inSticky(host)) return;
         host.innerHTML = html;
     });
 }
