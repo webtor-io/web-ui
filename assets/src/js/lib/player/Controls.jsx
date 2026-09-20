@@ -51,7 +51,7 @@ export function Controls({
                         (owner: no card between tracks), so it lives here. */}
                     {onNext && onToggleAutoplayNext && (
                         <label class="wt-player-autoplay" title={t('player.autoplayNext')}>
-                            <input type="checkbox" role="switch" class="wt-switch" checked={autoplayNext} onChange={onToggleAutoplayNext}
+                            <input type="checkbox" role="switch" class="toggle toggle-soft toggle-sm" checked={autoplayNext} onChange={onToggleAutoplayNext}
                                 aria-label={t('player.autoplayNext')} />
                         </label>
                     )}

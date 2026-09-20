@@ -49,8 +49,13 @@ export function readCarry(scope) {
 // that. Only while the film is actually being watched.
 export const PREWARM_AT = 0.9;
 export const PREWARM_MAX_LEAD_S = 300;
-export const CARD_LEAD_S = 25;
+// One countdown, whatever brought the card up: ten seconds. With known credits
+// it runs from the credits; without them the card comes up ten seconds before
+// the end, so the number is the same 10 -> 0 and never "next in 20 s" -- the
+// first version showed the card 25 s out and printed whatever was left
+// (owner, 2026-09-20).
 export const COUNTDOWN_S = 10;
+export const CARD_LEAD_S = COUNTDOWN_S;
 // After this many automatic transitions in a row with no sign of a viewer,
 // ask instead of playing on: a sleeper would otherwise warm up and transcode
 // a season overnight.
@@ -64,7 +69,7 @@ export const PREWARM_BEFORE_CREDITS_S = 60;
 
 // `creditsAt` (film time, or null) is where the credits begin as far as the
 // subtitles can tell (credits.js). It only ever moves things EARLIER: the
-// card from "the last 25 seconds" to "when the talking stops", and the
+// card from "the last ten seconds" to "when the talking stops", and the
 // prewarm ahead of that card, so that "Play now" on it does not mean a minute
 // of loading.
 export function advancePlan({ currentTime, duration, playing, hidden, prewarmed, kind, creditsAt = null }) {
@@ -80,7 +85,7 @@ export function advancePlan({ currentTime, duration, playing, hidden, prewarmed,
     // Music has no credits to sit through and no picture to cover: the next
     // track simply plays. The card is for video.
     const inCredits = credits !== null && currentTime >= credits;
-    plan.card = kind !== 'track' && remaining >= 0 && duration > CARD_LEAD_S * 2 && (remaining <= CARD_LEAD_S || inCredits);
+    plan.card = kind !== 'track' && remaining >= 0 && duration > 60 && (remaining <= CARD_LEAD_S || inCredits);
     return plan;
 }
 

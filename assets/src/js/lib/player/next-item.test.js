@@ -48,12 +48,14 @@ test('prewarm at 90%, but not more than five minutes early, and only while watch
     assert.equal(advancePlan({ ...base, duration: 0, currentTime: 5 }).prewarm, false, 'unknown duration');
 });
 
-test('the card is for video, in the last 25 seconds', () => {
+test('the card is for video, in the last ten seconds when the credits are unknown', () => {
     const base = { duration: 1200, playing: true, hidden: false, prewarmed: true, kind: 'episode' };
-    assert.equal(advancePlan({ ...base, currentTime: 1100 }).card, false);
-    assert.equal(advancePlan({ ...base, currentTime: 1180 }).card, true);
-    assert.equal(advancePlan({ ...base, currentTime: 1180, kind: 'track' }).card, false, 'music just plays on');
-    assert.equal(advancePlan({ ...base, duration: 40, currentTime: 30 }).card, false, 'a clip shorter than the card itself');
+    assert.equal(advancePlan({ ...base, currentTime: 1180 }).card, false, 'twenty seconds out: not yet');
+    assert.equal(advancePlan({ ...base, currentTime: 1191 }).card, true);
+    assert.equal(advancePlan({ ...base, currentTime: 1191, kind: 'track' }).card, false, 'music just plays on');
+    assert.equal(advancePlan({ ...base, duration: 40, currentTime: 35 }).card, false, 'a clip is not an episode');
+    // ...so the number on it is the same ten, never "next in 20 s".
+    assert.equal(countdown({ currentTime: 1190, duration: 1200 }).left, 10);
 });
 
 test('what `ended` means', () => {
@@ -102,8 +104,8 @@ test('known credits move the card and the prewarm earlier, never later', () => {
     // A hint that makes no sense is no hint.
     assert.equal(advancePlan({ ...base, currentTime: 2000, prewarmed: true, creditsAt: 9999 }).card, false);
     assert.equal(advancePlan({ ...base, currentTime: 2000, prewarmed: true, creditsAt: 0 }).card, false);
-    // The 25-second rule still stands on its own.
-    assert.equal(advancePlan({ ...base, currentTime: 2680, prewarmed: true, creditsAt: null }).card, true);
+    // The end-of-file rule still stands on its own.
+    assert.equal(advancePlan({ ...base, currentTime: 2692, prewarmed: true, creditsAt: null }).card, true);
     // Music has no credits card.
     assert.equal(advancePlan({ ...base, currentTime: 2410, kind: 'track', creditsAt: 2400 }).card, false);
 });
@@ -113,7 +115,7 @@ test('the countdown runs in film time: ten seconds into the credits, or to the e
     assert.equal(countdown({ currentTime: 2406.2, duration: 2700, creditsAt: 2400 }).left, 4);
     assert.equal(countdown({ currentTime: 2415, duration: 2700, creditsAt: 2400 }).left, 0, 'time to go');
     // No credits known: the number is simply what is left of the file.
-    assert.deepEqual(countdown({ currentTime: 2680, duration: 2700 }), { goAt: 2700, early: false, left: 20 });
+    assert.deepEqual(countdown({ currentTime: 2692, duration: 2700 }), { goAt: 2700, early: false, left: 8 });
     // Credits in the last seconds never push the move past the end.
     assert.equal(countdown({ currentTime: 2695, duration: 2700, creditsAt: 2696 }).goAt, 2700);
     assert.equal(countdown({ currentTime: 100, duration: 2700, creditsAt: 9999 }).early, false, 'a hint that makes no sense is no hint');

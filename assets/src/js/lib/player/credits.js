@@ -2,7 +2,7 @@
 // what follows is credits. Timings do not depend on the language, so any
 // whole-file subtitle track will do, shown or not.
 //
-// It moves the "up next" card earlier -- from "the last 25 seconds" to "when
+// It moves the "up next" card earlier -- from "the last ten seconds" to "when
 // the talking stops" -- and nothing else. The move to the next file still
 // happens on `ended` or on the viewer's click: a wrong guess then costs a card
 // that came early, never a cut episode or a lost post-credits scene.
@@ -19,7 +19,7 @@
 
 export const MIN_CUES = 20;              // fewer is not a transcript
 export const MAX_CREDITS_S = 600;        // credits longer than this are not credits
-export const MIN_GAIN_S = 25;            // no earlier than the card already is
+export const MIN_GAIN_S = 25;            // credits shorter than this are not worth a separate guess
 export const AFTER_LAST_LINE_S = 3;      // let the last line leave the screen
 export const SIGNATURE_GAP_S = 60;       // silence before a translator's signature
 export const SIGNATURE_MAX_CUES = 2;

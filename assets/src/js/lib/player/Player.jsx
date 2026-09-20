@@ -1283,7 +1283,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     </div>
                     <label class="wt-next-card-auto">
                         <span>{t('player.autoplayNext')}</span>
-                        <input type="checkbox" role="switch" class="wt-switch" checked={autoplayNext} onChange={toggleAutoplayNext} />
+                        <input type="checkbox" role="switch" class="toggle toggle-soft toggle-sm" checked={autoplayNext} onChange={toggleAutoplayNext} />
                     </label>
                 </div>
             )}

@@ -146,12 +146,12 @@ one subtitle file.
 - Button right after Play (`NextIcon`: a triangle with a bar on its right), key `n` / `Shift+N`.
 - `advancePlan()`: prewarm at 90% but never more than 5 min early (a prepared render and its
   transcoder session live ~10 min), only while playing in a visible tab; the "up next" card in the
-  last 25 s (earlier when the credits are known, see below), video only, with a countdown.
+  last 10 s (earlier when the credits are known, see below), video only, always a 10 → 0 countdown.
 - `atEnd()`: `go` / `offer` (autoplay off) / `ask` ("still watching?" after 3 automatic moves with no
   pointer or key event — a sleeper must not warm up and transcode a season) / `stay` (cancelled).
 - Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on) behind a switch
-  (`.wt-switch`, the player's own — DaisyUI's `toggle` lives in the page stylesheet): on the card for
-  video, next to the Next button for audio.
+  (the design system's `toggle toggle-soft`, the same as the subtitles switch — a home-made solid-pink
+  one was tried and looked like neither): on the card for video, next to the Next button for audio.
 - **Music has no card at all** (owner): tracks follow one another like an album, or do not, by the
   switch. No "still listening?" either — `atEnd()` for `kind: track` is `go` or `stay`.
 - The move itself (`createNextItemGo`): the next file's render is fetched off the page
@@ -180,13 +180,14 @@ one subtitle file.
   30×24 box; the button is wider by what the bar adds, so the two triangles match.
 
 **Credits from subtitle timings — `credits.js`.** Dialogue ends, credits begin: the end of the last
-cue + 3 s. It only moves things *earlier* — the card from "the last 25 s" to "when the talking
+cue + 3 s. It only moves things *earlier* — the card from "the last 10 s" to "when the talking
 stops", and the prewarm a minute ahead of that (never earlier than a prepared render lives, 8 min).
 With autoplay on, the card counts down `COUNTDOWN_S` (10 s) from the start of the credits and then
 moves on, with Cancel on it (owner's decision, 2026-09-20; the first version only showed the card
 early and moved on `ended`). `countdown()` runs in **film time** — a pause pauses it, a seek back
-withdraws it, there is no timer to cancel. Without known credits the number is simply what is left
-of the file. The ten seconds start when the **card** does (`shownAt`), not at the credits: a viewer
+withdraws it, there is no timer to cancel. Without known credits the card comes up ten seconds
+before the end, so the number is the same 10 → 0 (the first version came up 25 s out and printed
+"next in 20 s"). The ten seconds start when the **card** does (`shownAt`), not at the credits: a viewer
 who seeks into the credits arrived after "credits + 10 s" and was told "next in 0 s". The price of
 a wrong guess is ten seconds to press Cancel; the guards below and the
 discarding of late guesses (a post-credits scene) are what keep that rare. Timings do not depend on language, so any whole-file track
