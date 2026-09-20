@@ -121,6 +121,19 @@ func posterSource(kind SourceKind, videoID, posterURL string, cl *http.Client) *
 				return nil, err
 			}
 			defer resp.Body.Close()
+			// A poster URL that is gone is "no poster", not a server error.
+			// Metadata providers hand out placeholder URLs for titles they
+			// have no artwork for, and some of those answer 404 with an HTML
+			// page: decoding that read as "image: unknown format" and went
+			// out as a 500 -- about forty a day (2026-09-20), each one a
+			// broken card in a list. ErrNotFound is what the handler already
+			// turns into a 404, which the card's CSS placeholder is for.
+			if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+				return nil, errors.Wrapf(ErrNotFound, "poster source answered %d", resp.StatusCode)
+			}
+			if resp.StatusCode != http.StatusOK {
+				return nil, errors.Errorf("poster source answered %d", resp.StatusCode)
+			}
 			img, err := imaging.Decode(resp.Body)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to decode poster")

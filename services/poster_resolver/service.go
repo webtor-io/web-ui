@@ -159,6 +159,18 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 	}
 
 	img, err := src.Fetch(ctx)
+	if err != nil && mode.OG && src.Kind != sourceDefault && errors.Is(err, ErrNotFound) {
+		// The share card must not fail because the artwork is gone: same
+		// fallback as a resource with no source at all, above. Not cached
+		// under the dead source's key -- the default has its own.
+		src = s.defaultOGSource()
+		mode.Blur = false
+		ck = cacheKey(src, mode)
+		if buf, cerr := s.getFromS3(ctx, ck); cerr == nil && buf != nil {
+			return newResult(buf.Bytes()), nil
+		}
+		img, err = src.Fetch(ctx)
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch source image")
 	}
@@ -241,4 +253,3 @@ func (s *Service) putToS3(ctx context.Context, key string, b *bytes.Buffer) erro
 	})
 	return err
 }
-

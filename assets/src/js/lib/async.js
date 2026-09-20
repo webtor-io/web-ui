@@ -1,5 +1,6 @@
 import loadAsyncView from "./loadAsyncView";
 import { isActionForm, isBusy, markBusy, clearBusy } from "./actionBusy";
+import { seedInitialEntry } from "./historySeed";
 
 if (!window.__popstateFilters) window.__popstateFilters = [];
 export function addPopstateFilter(fn) {
@@ -233,6 +234,8 @@ function asyncLinks(p = {}) {
             return {url};
         },
     }, p)
+    // The entry the visit started on must be restorable too (historySeed.js).
+    seedInitialEntry(window, document, params.history.context);
     async('a', params);
 }
 
