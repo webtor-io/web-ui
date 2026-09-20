@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { readNext, readCarry, advancePlan, atEnd, resumeAt, readStreak, writeStreak, STILL_WATCHING_AFTER } from './next-item.js';
+import { readNext, readCarry, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown, STILL_WATCHING_AFTER } from './next-item.js';
 
 const dom = (html) => new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
 
@@ -61,6 +61,9 @@ test('what `ended` means', () => {
     assert.equal(atEnd({ autoplay: true, autoStreak: 0, cancelled: true }), 'stay');
     assert.equal(atEnd({ autoplay: false, autoStreak: 0, cancelled: false }), 'offer');
     assert.equal(atEnd({ autoplay: true, autoStreak: STILL_WATCHING_AFTER, cancelled: false }), 'ask', 'a sleeper does not transcode a season');
+    // Music: no card in any state -- it plays on or it does not.
+    assert.equal(atEnd({ autoplay: true, autoStreak: 99, cancelled: false, kind: 'track' }), 'go', 'an album is more than three tracks');
+    assert.equal(atEnd({ autoplay: false, autoStreak: 0, cancelled: false, kind: 'track' }), 'stay');
 });
 
 test('an automatic transition resumes quietly, or from the top if it was finished', () => {
@@ -81,4 +84,48 @@ test('the streak survives a transition and a storage that throws', () => {
     const bad = { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); } };
     assert.equal(readStreak(bad), 0);
     writeStreak(bad, 1);
+});
+
+test('known credits move the card and the prewarm earlier, never later', () => {
+    const base = { duration: 2700, playing: true, hidden: false, prewarmed: false, kind: 'episode' };
+    // Credits at 2400 (five minutes of them). Without the hint: prewarm at
+    // 2430 (90% = 2430, d-300 = 2400 -> max), card at 2675.
+    assert.equal(advancePlan({ ...base, currentTime: 2350 }).prewarm, false);
+    assert.equal(advancePlan({ ...base, currentTime: 2350, creditsAt: 2400 }).prewarm, true, 'a minute before the card can offer it');
+    assert.equal(advancePlan({ ...base, currentTime: 2330, creditsAt: 2400 }).prewarm, false);
+    assert.equal(advancePlan({ ...base, currentTime: 2410, prewarmed: true }).card, false);
+    assert.equal(advancePlan({ ...base, currentTime: 2410, prewarmed: true, creditsAt: 2400 }).card, true, 'the talking has stopped');
+    assert.equal(advancePlan({ ...base, currentTime: 2390, prewarmed: true, creditsAt: 2400 }).card, false);
+    // Never earlier than a prepared render can live.
+    assert.equal(advancePlan({ ...base, currentTime: 2150, creditsAt: 2160 }).prewarm, false, 'eight minutes is the floor');
+    assert.equal(advancePlan({ ...base, currentTime: 2225, creditsAt: 2160 }).prewarm, true);
+    // A hint that makes no sense is no hint.
+    assert.equal(advancePlan({ ...base, currentTime: 2000, prewarmed: true, creditsAt: 9999 }).card, false);
+    assert.equal(advancePlan({ ...base, currentTime: 2000, prewarmed: true, creditsAt: 0 }).card, false);
+    // The 25-second rule still stands on its own.
+    assert.equal(advancePlan({ ...base, currentTime: 2680, prewarmed: true, creditsAt: null }).card, true);
+    // Music has no credits card.
+    assert.equal(advancePlan({ ...base, currentTime: 2410, kind: 'track', creditsAt: 2400 }).card, false);
+});
+
+test('the countdown runs in film time: ten seconds into the credits, or to the end', () => {
+    assert.deepEqual(countdown({ currentTime: 2400, duration: 2700, creditsAt: 2400 }), { goAt: 2410, early: true, left: 10 });
+    assert.equal(countdown({ currentTime: 2406.2, duration: 2700, creditsAt: 2400 }).left, 4);
+    assert.equal(countdown({ currentTime: 2415, duration: 2700, creditsAt: 2400 }).left, 0, 'time to go');
+    // No credits known: the number is simply what is left of the file.
+    assert.deepEqual(countdown({ currentTime: 2680, duration: 2700 }), { goAt: 2700, early: false, left: 20 });
+    // Credits in the last seconds never push the move past the end.
+    assert.equal(countdown({ currentTime: 2695, duration: 2700, creditsAt: 2696 }).goAt, 2700);
+    assert.equal(countdown({ currentTime: 100, duration: 2700, creditsAt: 9999 }).early, false, 'a hint that makes no sense is no hint');
+});
+
+test('a viewer who seeks into the credits still gets their ten seconds', () => {
+    // Credits at 2400; the viewer lands at 2500 and the card comes up there.
+    const cd = countdown({ currentTime: 2500, duration: 2700, creditsAt: 2400, shownAt: 2500 });
+    assert.equal(cd.left, 10, 'not "next in 0 s"');
+    assert.equal(cd.goAt, 2510);
+    // Arriving with the credits, as usual: unchanged.
+    assert.equal(countdown({ currentTime: 2400, duration: 2700, creditsAt: 2400, shownAt: 2400 }).goAt, 2410);
+    // Seven seconds from the end there are only seven to give.
+    assert.equal(countdown({ currentTime: 2693, duration: 2700, creditsAt: 2400, shownAt: 2693 }).left, 7);
 });

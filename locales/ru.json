@@ -626,7 +626,7 @@
     "player.next": "Дальше",
     "player.nextUp": "Далее",
     "player.nextLoading": "Загружаем следующее…",
-    "player.nextUpAuto": "Далее — начнётся автоматически",
+    "player.nextIn": "Далее через %v с",
     "player.playNow": "Смотреть сейчас",
     "player.nextCancel": "Отмена",
     "player.autoplayNext": "Включать следующее автоматически",

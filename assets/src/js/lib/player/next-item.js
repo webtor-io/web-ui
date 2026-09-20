@@ -56,21 +56,61 @@ export const COUNTDOWN_S = 10;
 // a season overnight.
 export const STILL_WATCHING_AFTER = 3;
 
-export function advancePlan({ currentTime, duration, playing, hidden, prewarmed, kind }) {
+// A prepared render lives about eight minutes (next-item-go.js
+// PREPARED_MAX_AGE_MS): the earliest a prewarm is of any use.
+export const PREWARM_EARLIEST_S = 480;
+// Get the next file ready this long before the credits card can offer it.
+export const PREWARM_BEFORE_CREDITS_S = 60;
+
+// `creditsAt` (film time, or null) is where the credits begin as far as the
+// subtitles can tell (credits.js). It only ever moves things EARLIER: the
+// card from "the last 25 seconds" to "when the talking stops", and the
+// prewarm ahead of that card, so that "Play now" on it does not mean a minute
+// of loading.
+export function advancePlan({ currentTime, duration, playing, hidden, prewarmed, kind, creditsAt = null }) {
     const plan = { prewarm: false, card: false };
     if (!(duration > 0) || !(currentTime >= 0)) return plan;
     const remaining = duration - currentTime;
-    const threshold = Math.max(duration * PREWARM_AT, duration - PREWARM_MAX_LEAD_S);
+    let threshold = Math.max(duration * PREWARM_AT, duration - PREWARM_MAX_LEAD_S);
+    const credits = typeof creditsAt === 'number' && creditsAt > 0 && creditsAt < duration ? creditsAt : null;
+    if (credits !== null) {
+        threshold = Math.min(threshold, Math.max(credits - PREWARM_BEFORE_CREDITS_S, duration - PREWARM_EARLIEST_S));
+    }
     plan.prewarm = !prewarmed && playing && !hidden && currentTime >= threshold && remaining > 0;
     // Music has no credits to sit through and no picture to cover: the next
     // track simply plays. The card is for video.
-    plan.card = kind !== 'track' && remaining <= CARD_LEAD_S && remaining >= 0 && duration > CARD_LEAD_S * 2;
+    const inCredits = credits !== null && currentTime >= credits;
+    plan.card = kind !== 'track' && remaining >= 0 && duration > CARD_LEAD_S * 2 && (remaining <= CARD_LEAD_S || inCredits);
     return plan;
 }
 
-// atEnd decides what `ended` means.
-export function atEnd({ autoplay, autoStreak, cancelled }) {
+// countdown: when the automatic move happens, and how long until then -- in
+// FILM time, so a pause pauses it and a seek back withdraws it with no timer
+// to cancel. With known credits the move comes COUNTDOWN_S after they begin
+// (owner, 2026-09-20: "a countdown with a cancel, when the credits start");
+// without them it is simply the end of the file, and the number on the card is
+// the time that is left.
+//
+// `shownAt` is the film time at which the card came up. A viewer who seeks
+// INTO the credits arrives after "credits + 10 s" has already passed; counted
+// from the credits alone the card read "next in 0 s" and the film left at
+// once (owner, 2026-09-20). The ten seconds belong to the viewer: they start
+// when the card does.
+export function countdown({ currentTime, duration, creditsAt = null, shownAt = null }) {
+    const credits = typeof creditsAt === 'number' && creditsAt > 0 && creditsAt < duration ? creditsAt : null;
+    const from = credits !== null && typeof shownAt === 'number' ? Math.max(credits, shownAt) : credits;
+    const goAt = credits !== null ? Math.min(duration, from + COUNTDOWN_S) : duration;
+    return { goAt, early: credits !== null, left: Math.max(0, Math.ceil(goAt - currentTime)) };
+}
+
+// atEnd decides what `ended` -- or the end of the countdown -- means.
+//
+// Music has no card at all (owner, 2026-09-20): tracks follow one another the
+// way an album does, or do not, by the autoplay switch. No "still listening?"
+// either -- three songs is ten minutes, and an album ends by itself.
+export function atEnd({ autoplay, autoStreak, cancelled, kind }) {
     if (cancelled) return 'stay';
+    if (kind === 'track') return autoplay ? 'go' : 'stay';
     if (!autoplay) return 'offer';
     if (autoStreak >= STILL_WATCHING_AFTER) return 'ask';
     return 'go';

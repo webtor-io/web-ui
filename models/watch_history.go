@@ -20,8 +20,11 @@ type WatchHistory struct {
 	Position   float32   `pg:"position"`
 	Duration   float32   `pg:"duration"`
 	Watched    bool      `pg:"watched"`
-	CreatedAt  time.Time `pg:"created_at"`
-	UpdatedAt  time.Time `pg:"updated_at"`
+	// CreditsAt is where the credits begin as the player reported it with this
+	// update, 0 when unknown. An input to IsWatched, not a column.
+	CreditsAt float32   `pg:"-"`
+	CreatedAt time.Time `pg:"created_at"`
+	UpdatedAt time.Time `pg:"updated_at"`
 
 	Torrent          *TorrentResource  `pg:"rel:has-one,fk:resource_id"`
 	ResourceMetadata *ResourceMetadata `pg:"rel:has-one,fk:resource_id"`
@@ -62,13 +65,47 @@ func (wh *WatchHistory) DisplayName() string {
 	return ""
 }
 
+// The one rule for "this file has been watched". Two ways to get there,
+// whichever comes first:
+//
+//   - 90% of the duration -- the rule there has always been;
+//   - the start of the credits, when the player could tell where that is from
+//     subtitle timings (assets/src/js/lib/player/credits.js). An episode with
+//     ten minutes of credits ends, for the viewer, at 80%: they leave, and by
+//     the 90% rule alone it stayed "unfinished" forever -- in Continue
+//     watching, in the series' progress, and as the file the player offers to
+//     resume. It is the same moment the player offers the next episode
+//     (owner, 2026-09-20: "the logic should be the same").
+//
+// creditsAt comes from the client, so it is believed only inside the window
+// credits can plausibly occupy -- the same bounds credits.js applies
+// (MAX_CREDITS_S, MIN_GAIN_S). Outside it, or zero, the 90% rule stands alone.
+const (
+	watchedFraction   = 0.9
+	maxCreditsSeconds = 600
+	minCreditsSeconds = 25
+)
+
+func IsWatched(position, duration, creditsAt float32) bool {
+	if duration <= 0 {
+		return false
+	}
+	if position/duration >= watchedFraction {
+		return true
+	}
+	if creditsAt > 0 && creditsAt >= duration-maxCreditsSeconds && creditsAt <= duration-minCreditsSeconds {
+		return position >= creditsAt
+	}
+	return false
+}
+
 // UpsertWatchPosition writes the player position and returns transitioned=true
 // when this upsert is the one that flipped the `watched` flag from false to
 // true (i.e. the user has just crossed the 90% threshold for the first time).
 // Callers use this to trigger the IMDB-level auto-mark into user_video_status
 // exactly once, not on every subsequent 90%+ position frame.
 func UpsertWatchPosition(ctx context.Context, db *pg.DB, wh *WatchHistory) (transitioned bool, err error) {
-	watched := wh.Duration > 0 && wh.Position/wh.Duration >= 0.9
+	watched := IsWatched(wh.Position, wh.Duration, wh.CreditsAt)
 	wh.Watched = watched
 
 	// Read prior state (PK lookup, negligible cost) so we can detect the
@@ -90,7 +127,7 @@ func UpsertWatchPosition(ctx context.Context, db *pg.DB, wh *WatchHistory) (tran
 		OnConflict("(user_id, resource_id, path) DO UPDATE").
 		Set("position = EXCLUDED.position").
 		Set("duration = EXCLUDED.duration").
-		Set("watched = EXCLUDED.position / NULLIF(EXCLUDED.duration, 0) >= 0.9").
+		Set("watched = EXCLUDED.watched").
 		Insert()
 	if err != nil {
 		return false, errors.Wrap(err, "failed to upsert watch position")

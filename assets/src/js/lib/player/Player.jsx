@@ -10,8 +10,9 @@ import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } fr
 import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, savePrefs } from './player-prefs';
 import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
-import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak } from './next-item';
+import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
 import { createNextItemGo } from './next-item-go';
+import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL } from './credits';
 import { track, settled } from './player-telemetry';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
@@ -70,7 +71,7 @@ function loadCastSender() {
  * Main Player Preact component.
  * Wraps <video>/<audio>, renders custom controls, manages HLS + session seeking.
  */
-function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize, trackContainer, trackHooks }) {
+function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize, trackContainer, trackHooks, awaitStart = false }) {
     const containerRef = useRef(containerEl);
     const videoRef = useRef(videoEl);
     const [seekOffset, setSeekOffset] = useState(0);
@@ -288,8 +289,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // Watch history hook (position tracking + resume).
     // `paused` prevents overwriting saved position while resume prompt is open.
+    // Where the credits begin (credits.js), filled in further down. Declared
+    // here because the watch history reports it with every position.
+    const creditsAtRef = useRef(null);
     const { resumePosition, resumeReady, forceSendPosition } = useWatchHistory(videoRef, {
-        resourceID, path,
+        resourceID, path, creditsAtRef,
         currentTime: state.currentTime,
         duration: state.duration,
         playing: state.playing,
@@ -922,6 +926,26 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         return () => document.removeEventListener('click', onClick);
     }, [changeSubDelay, paintSubDelay]);
 
+    // A player mounted by a move to the next file (next-item-go.js) is about
+    // to play by itself. Until it does, it is LOADING, not paused: the big
+    // Play button of a paused film under a spinner was two answers at once
+    // (owner, 2026-09-20). Ends with the first frame, with a question only
+    // the viewer can answer (the resume prompt), or after ten seconds -- if
+    // autoplay was refused, Play is exactly what the viewer needs.
+    const [awaitingStart, setAwaitingStart] = useState(awaitStart);
+    useEffect(() => {
+        if (!awaitingStart) return undefined;
+        const video = videoRef.current;
+        const done = () => setAwaitingStart(false);
+        const timer = setTimeout(done, 10000);
+        if (video) video.addEventListener('playing', done, { once: true });
+        return () => {
+            clearTimeout(timer);
+            if (video) video.removeEventListener('playing', done);
+        };
+    }, [awaitingStart]);
+    useEffect(() => { if (showResumePrompt) setAwaitingStart(false); }, [showResumePrompt]);
+
     // Next episode / next track (next-item.js decides, next-item-go.js moves).
     // `next` is the server's answer on the player element; without it none of
     // this exists -- a film, the last file, an embed.
@@ -931,10 +955,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const nextCancelledRef = useRef(false);
     const [nextLoading, setNextLoading] = useState(false);
     const nextGoRef = useRef(null);
+    const earlyGoneRef = useRef(false); // the credits countdown fires once
+    const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
     if (next && !nextGoRef.current) {
         nextGoRef.current = createNextItemGo({
             next, resourceID, root: trackContainer,
-            getStage: currentStage, initPlayer, destroyPlayer,
+            getStage: currentStage, getAspectRatio: currentAspectRatio, initPlayer, destroyPlayer,
             onEvent: (name, data) => {
                 if (name === 'go') track('next-item-go', { kind: next.kind, ...data });
                 if (name === 'prepared') track('next-item-prepared', { kind: next.kind, ...data });
@@ -965,27 +991,65 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             document.removeEventListener('keydown', alive, true);
         };
     }, []);
+    // Where the credits begin, from subtitle timings (credits.js). Looked for
+    // once per file, past the middle -- by then the tracks that are going to
+    // load have loaded, and a viewer who leaves early costs nothing. Loaded
+    // cues first; otherwise ONE request for a whole-file track, timings only.
+    const creditsTriedRef = useRef(false);
+    useEffect(() => {
+        // For whom: a viewer with a next episode to be offered, or one whose
+        // "watched" marks the server keeps (signed in). Anyone else has no
+        // use for the answer, and the lookup can cost a request.
+        if (!isVideo || creditsTriedRef.current || !(next ? next.kind !== 'track' : !!window._userId)) return;
+        if (!(state.duration > 0) || state.currentTime < state.duration * 0.6) return;
+        creditsTriedRef.current = true;
+        const duration = state.duration;
+        const settle = (cues, source) => {
+            const at = creditsStart(cues, duration);
+            creditsAtRef.current = at;
+            track('next-item-credits', { source, found: at !== null, lead_s: at !== null ? Math.round(duration - at) : 0, next: !!next });
+        };
+        const loaded = cuesOfLoadedTracks(videoRef.current);
+        if (loaded.length) { settle(loaded, 'loaded'); return; }
+        const src = timingSourceURL(document.getElementById('subtitles'));
+        if (!src) { track('next-item-credits', { source: 'none', found: false, lead_s: 0 }); return; }
+        fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => settle(parseVttTimings(text), 'fetched')).catch(() => {});
+    }, [state.currentTime, state.duration]);
+
     // Prewarm and the "coming up" card follow the clock.
     useEffect(() => {
         if (!next || !nextGoRef.current) return;
         const plan = advancePlan({
             currentTime: state.currentTime, duration: state.duration, playing: state.playing,
             hidden: typeof document !== 'undefined' && document.hidden,
-            prewarmed: nextGoRef.current.isPrepared(), kind: next.kind,
+            prewarmed: nextGoRef.current.isPrepared(), kind: next.kind, creditsAt: creditsAtRef.current,
         });
         if (plan.prewarm) nextGoRef.current.prepare();
         if (plan.card && !nextCancelledRef.current && nextCard === null) {
+            cardShownAtRef.current = state.currentTime;
             setNextCard('soon');
             track('next-item-shown', { kind: next.kind, autoplay: autoplayNext });
         }
-        if (!plan.card && nextCard === 'soon') setNextCard(null); // sought back
+        if (!plan.card && nextCard === 'soon') { setNextCard(null); cardShownAtRef.current = null; } // sought back
+        // The countdown ran out inside the credits: the same verdict `ended`
+        // gets, a little earlier. Only while actually playing -- a paused
+        // film does not leave by itself.
+        if (plan.card && nextCard === 'soon' && state.playing && !nextCancelledRef.current && !earlyGoneRef.current) {
+            const cd = countdown({ currentTime: state.currentTime, duration: state.duration, creditsAt: creditsAtRef.current, shownAt: cardShownAtRef.current });
+            if (cd.early && cd.left === 0) {
+                earlyGoneRef.current = true;
+                const verdict = atEnd({ autoplay: autoplayNext, autoStreak: readStreak(safeSession()), cancelled: false, kind: next.kind });
+                if (verdict === 'go') goNext('auto');
+                else if (verdict === 'ask') { setNextCard('ask'); track('next-item-still-watching', { kind: next.kind }); }
+            }
+        }
     }, [state.currentTime, state.duration, state.playing]);
     // The end of the file.
     useEffect(() => {
         const video = videoRef.current;
         if (!next || !video) return undefined;
         const onEnded = () => {
-            const verdict = atEnd({ autoplay: autoplayNext, autoStreak: readStreak(safeSession()), cancelled: nextCancelledRef.current });
+            const verdict = atEnd({ autoplay: autoplayNext, autoStreak: readStreak(safeSession()), cancelled: nextCancelledRef.current, kind: next.kind });
             if (verdict === 'go') goNext('auto');
             else if (verdict === 'offer' || verdict === 'ask') {
                 setNextCard(verdict);
@@ -1182,14 +1246,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             })()}
 
             {/* Loading spinner (only when playing + buffering, or seeking) */}
-            {showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (state.playing && state.loading)) && (
+            {showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading)) && (
                 <div class="wt-player-overlay wt-player-overlay--loading">
                     <LoadingSpinner />
                 </div>
             )}
 
             {/* Big play button — shown when paused, regardless of loading state */}
-            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && (
+            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && !awaitingStart && !nextLoading && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
                     <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label={t('player.play')}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
@@ -1203,10 +1267,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 one starts by itself at the end unless cancelled. 'offer':
                 autoplay is off, the file has ended. 'ask': several files went
                 by with no sign of a viewer. */}
-            {next && nextCard && (
+            {next && next.kind !== 'track' && nextCard && (
                 <div class="wt-next-card" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
                     <div class="wt-next-card-kicker">
-                        {nextLoading ? t('player.nextLoading') : (nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? t('player.nextUpAuto') : t('player.nextUp')))}
+                        {nextLoading ? t('player.nextLoading') : (nextCard === 'ask' ? t('player.stillWatching') : (nextCard === 'soon' && autoplayNext ? tf('player.nextIn', countdown({ currentTime: state.currentTime, duration: state.duration, creditsAt: creditsAtRef.current, shownAt: cardShownAtRef.current }).left) : t('player.nextUp')))}
                     </div>
                     <div class="wt-next-card-label" title={next.label}>{next.label}</div>
                     <div class="wt-next-card-actions">
@@ -1218,8 +1282,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         )}
                     </div>
                     <label class="wt-next-card-auto">
-                        <input type="checkbox" checked={autoplayNext} onChange={toggleAutoplayNext} />
                         <span>{t('player.autoplayNext')}</span>
+                        <input type="checkbox" role="switch" class="wt-switch" checked={autoplayNext} onChange={toggleAutoplayNext} />
                     </label>
                 </div>
             )}
@@ -1260,6 +1324,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onEmbedClick={handleEmbedClick}
                     onNext={next ? () => goNext('button') : null}
                     nextBusy={nextLoading}
+                    autoplayNext={autoplayNext}
+                    onToggleAutoplayNext={next && next.kind === 'track' ? toggleAutoplayNext : null}
                     nextLabel={next ? next.label : ''}
                     isVideo={isVideo}
                     features={features}
@@ -1417,6 +1483,13 @@ export async function initPlayer(target, opts = {}) {
 
     // Build the player container with video inside
     const playerContainer = document.createElement('div');
+    // The shape of the picture that was here a moment ago (next-item-go.js).
+    // Until `canplay` reports the real one the container has only the
+    // default 16:9-ish height, shorter or taller than the stage that is
+    // holding the old height -- and the controls, pinned to the container's
+    // bottom, jumped up and back (owner, 2026-09-20). Episodes of a series
+    // share their shape; if this one does not, canplay corrects it.
+    if (opts.aspectRatio) playerContainer.style.aspectRatio = opts.aspectRatio;
     mountEl.appendChild(playerContainer);
     playerContainer.appendChild(videoEl);
 
@@ -1438,7 +1511,7 @@ export async function initPlayer(target, opts = {}) {
 
     // Render Preact controls into the player container (after video)
     render(
-        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} trackContainer={target} trackHooks={trackHooks} />,
+        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} trackContainer={target} trackHooks={trackHooks} awaitStart={!!opts.awaitStart} />,
         playerContainer
     );
 
@@ -1474,6 +1547,12 @@ function wireLogo(container, playerContainer) {
 // to replace that player and wants the next one in the same place.
 export function currentStage() {
     return _currentPlayer ? _currentPlayer.stage : null;
+}
+
+// currentAspectRatio: the CSS aspect-ratio of the player on screen ('' before
+// its first canplay), to hand to the player that replaces it.
+export function currentAspectRatio() {
+    return _currentPlayer ? (_currentPlayer.playerContainer.style.aspectRatio || '') : '';
 }
 
 // `keepStage`: the player goes, its stage stays in the document for the next

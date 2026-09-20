@@ -626,7 +626,7 @@
     "player.next": "Další",
     "player.nextUp": "Následuje",
     "player.nextLoading": "Načítá se další…",
-    "player.nextUpAuto": "Následuje — spustí se automaticky",
+    "player.nextIn": "Další za %v s",
     "player.playNow": "Přehrát hned",
     "player.nextCancel": "Zrušit",
     "player.autoplayNext": "Přehrávat další automaticky",

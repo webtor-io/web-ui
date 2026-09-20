@@ -146,10 +146,14 @@ one subtitle file.
 - Button right after Play (`NextIcon`: a triangle with a bar on its right), key `n` / `Shift+N`.
 - `advancePlan()`: prewarm at 90% but never more than 5 min early (a prepared render and its
   transcoder session live ~10 min), only while playing in a visible tab; the "up next" card in the
-  last 25 s, video only. No countdown — the move happens on `ended`.
+  last 25 s (earlier when the credits are known, see below), video only, with a countdown.
 - `atEnd()`: `go` / `offer` (autoplay off) / `ask` ("still watching?" after 3 automatic moves with no
   pointer or key event — a sleeper must not warm up and transcode a season) / `stay` (cancelled).
-- Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on), toggled on the card.
+- Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on) behind a switch
+  (`.wt-switch`, the player's own — DaisyUI's `toggle` lives in the page stylesheet): on the card for
+  video, next to the Next button for audio.
+- **Music has no card at all** (owner): tracks follow one another like an album, or do not, by the
+  switch. No "still listening?" either — `atEnd()` for `kind: track` is `go` or `stay`.
 - The move itself (`createNextItemGo`): the next file's render is fetched off the page
   (`background-render.js`, with a silent Turnstile token for anonymous viewers), the old player is
   destroyed **keeping its stage**, the new one is mounted into the same stage, the address and title
@@ -166,9 +170,38 @@ one subtitle file.
   player says so: spinner overlay, a spinner in the Next button, the card's kicker reads "Loading
   the next one…". Between the two players the stage keeps its height
   (`.wt-player-stage--switching`) — an empty block has none, and the page jumped.
+- A player mounted by a move is **loading, not paused** (`awaitStart`): until its first frame it
+  shows the spinner, not the big Play button — both at once was two answers. Ends with `playing`,
+  with the resume prompt (a question only the viewer can answer), or after 10 s (autoplay refused:
+  Play is what they need). The empty stage shows the player's own spinner (`--empty`, the same SVG
+  as `LoadingSpinner`), removed as soon as a player is in it.
 - Look: the player's own vocabulary (the glass buttons of the resume prompt), not the site's —
   a pink button here means a homepage CTA. `NextIcon` is Play's exact triangle plus a bar, in a
   30×24 box; the button is wider by what the bar adds, so the two triangles match.
+
+**Credits from subtitle timings — `credits.js`.** Dialogue ends, credits begin: the end of the last
+cue + 3 s. It only moves things *earlier* — the card from "the last 25 s" to "when the talking
+stops", and the prewarm a minute ahead of that (never earlier than a prepared render lives, 8 min).
+With autoplay on, the card counts down `COUNTDOWN_S` (10 s) from the start of the credits and then
+moves on, with Cancel on it (owner's decision, 2026-09-20; the first version only showed the card
+early and moved on `ended`). `countdown()` runs in **film time** — a pause pauses it, a seek back
+withdraws it, there is no timer to cancel. Without known credits the number is simply what is left
+of the file. The ten seconds start when the **card** does (`shownAt`), not at the credits: a viewer
+who seeks into the credits arrived after "credits + 10 s" and was told "next in 0 s". The price of
+a wrong guess is ten seconds to press Cancel; the guards below and the
+discarding of late guesses (a post-credits scene) are what keep that rare. Timings do not depend on language, so any whole-file track
+does: cues of an already loaded `<track>` first (authored times, `__absStart`), otherwise **one**
+request for a whole-file chip's VTT (never a translation — that starts a paid job; never a muxed
+track — hls.js feeds those segment by segment). Looked for once per file, past 60%. Guards:
+≥20 cues; a trailing run of ≤2 cues / ≤15 s after ≥60 s of silence is a translator's signature and
+is dropped (a real post-credits scene is more lines and survives, which lands the guess at the end
+and discards it); a result later than 25 s before the end or earlier than 10 min before it is no
+result. Event `next-item-credits {source: loaded|fetched|none, found, lead_s}`. Container chapters
+("End Credits") would be more exact; `content-prober` does not ask ffprobe for them yet.
+
+Between two players the new container takes the old picture's `aspect-ratio`
+(`initPlayer({ aspectRatio })`): until `canplay` reports the real one it had a default height, and
+the controls, pinned to its bottom, jumped inside the held stage.
 
 **The stage.** Fullscreen is requested on `.wt-player-stage`, a wrapper that outlives the player it
 holds (`initPlayer(target, { stage })`, `destroyPlayer({ keepStage })`): a fullscreen element stays
@@ -179,3 +212,22 @@ it without a gesture. iOS native video fullscreen cannot be kept; accepted.
 Events: `next-item-shown`, `next-item-prepared {ok}`, `next-item-go {how: auto|button|key|card,
 prewarmed, fallback, fullscreen, wait_ms}`, `next-item-cancel`, `next-item-autoplay {on}`,
 `next-item-still-watching`. `wait_ms` is the number the feature exists for; the baseline is ~58 s.
+
+## "Watched" and the credits — `models.IsWatched`
+
+One rule, two ways to satisfy it, whichever comes first: 90% of the duration (as always), or the start
+of the credits when the player could tell where that is (`credits.js`; sent as `credits_at` with
+every `PUT /watch/position`, `useWatchHistory`). An episode with ten minutes of credits ends, for the
+viewer, at 80% — by the 90% rule alone it stayed unfinished forever: in Continue watching, in the
+series' progress, and as the file offered for resume. It is the same moment the player offers the
+next episode. `credits_at` is client input, so it is believed only inside the window credits can
+occupy (25 s … 10 min before the end, the bounds `credits.js` uses); outside it the 90% rule stands
+alone. The lookup therefore runs for signed-in viewers of any video, not only when there is a next
+file. `watched` is still recomputed on every update (rewinding un-watches, as before).
+
+## Saved position — `useWatchHistory`
+
+A position under `MIN_SAVED_POSITION` (30 s) is neither saved nor offered: it is a viewer who looked
+in and left, and "Continue from 0:12?" is a question about nothing. Exactly 0 still goes through —
+that is "Start over" resetting a real position. A file the server calls `watched` (90%, or past the
+credits — `models.IsWatched`) is not offered for resume either.

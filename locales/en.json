@@ -674,7 +674,7 @@
     "player.next": "Next",
     "player.nextUp": "Up next",
     "player.nextLoading": "Loading the next one…",
-    "player.nextUpAuto": "Up next — starts automatically",
+    "player.nextIn": "Next in %v s",
     "player.playNow": "Play now",
     "player.nextCancel": "Cancel",
     "player.autoplayNext": "Autoplay the next one",

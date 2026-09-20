@@ -2,6 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 
 const SAVE_INTERVAL = 15000; // 15 seconds
 const MIN_POSITION_CHANGE = 5; // minimum seconds change before sending update
+// A position in the first half-minute is not a place to come back to: it is a
+// viewer who looked in and left, and "Continue from 0:12?" on their return is
+// a question about nothing (owner, 2026-09-20). Not saved, and not offered if
+// an older build saved one. Exactly 0 is different -- that is "Start over"
+// resetting a real position (forceSendPosition) and always goes through.
+export const MIN_SAVED_POSITION = 30;
+export const worthSaving = (pos) => pos >= MIN_SAVED_POSITION;
 
 /**
  * Hook for tracking watch position and fetching resume position.
@@ -10,7 +17,15 @@ const MIN_POSITION_CHANGE = 5; // minimum seconds change before sending update
  * - On pause/visibilitychange/beforeunload: sends current position
  * - Returns resumePosition (null until fetched)
  */
-export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing, paused }) {
+// `creditsAtRef`: where the credits begin, once the player knows
+// (credits.js). Sent along so the server's "watched" agrees with the moment
+// the player offers the next episode -- models.IsWatched.
+const withCredits = (payload, creditsAtRef) => {
+    const at = creditsAtRef && creditsAtRef.current;
+    return typeof at === 'number' && at > 0 ? { ...payload, credits_at: at } : payload;
+};
+
+export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing, paused, creditsAtRef }) {
     const [resumePosition, setResumePosition] = useState(null);
     const [resumeReady, setResumeReady] = useState(false);
     const lastSentPositionRef = useRef(0);
@@ -38,9 +53,10 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
                 return null;
             })
             .then(data => {
-                if (data && data.position > 0 && data.duration > 0) {
-                    // Don't resume if nearly finished (>= 90%)
-                    if (data.position / data.duration < 0.9) {
+                if (data && worthSaving(data.position) && data.duration > 0) {
+                    // Don't resume a finished file: 90%, or past the credits
+                    // as the server saw them (models.IsWatched).
+                    if (!data.watched && data.position / data.duration < 0.9) {
                         setResumePosition(data.position);
                     }
                 }
@@ -51,7 +67,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
 
     // Send position to server
     const sendPosition = useCallback((pos, dur) => {
-        if (!resourceID || !path || dur <= 0) return;
+        if (!resourceID || !path || dur <= 0 || !worthSaving(pos)) return;
         const now = Date.now();
         const posDelta = Math.abs(pos - lastSentPositionRef.current);
         const timeDelta = now - lastSentTimeRef.current;
@@ -62,12 +78,12 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         lastSentPositionRef.current = pos;
         lastSentTimeRef.current = now;
 
-        const body = JSON.stringify({
+        const body = JSON.stringify(withCredits({
             resource_id: resourceID,
             path,
             position: pos,
             duration: dur,
-        });
+        }, creditsAtRef));
 
         fetch('/watch/position', {
             method: 'PUT',
@@ -82,13 +98,13 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
 
     // Send position via sendBeacon (for beforeunload)
     const sendBeaconPosition = useCallback(() => {
-        if (!resourceID || !path || durationRef.current <= 0) return;
-        const body = JSON.stringify({
+        if (!resourceID || !path || durationRef.current <= 0 || !worthSaving(currentTimeRef.current)) return;
+        const body = JSON.stringify(withCredits({
             resource_id: resourceID,
             path,
             position: currentTimeRef.current,
             duration: durationRef.current,
-        });
+        }, creditsAtRef));
         try {
             navigator.sendBeacon('/watch/position', new Blob([body], { type: 'application/json' }));
         } catch (e) {
@@ -144,7 +160,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         if (!resourceID || !path || dur <= 0) return;
         lastSentPositionRef.current = pos;
         lastSentTimeRef.current = Date.now();
-        const body = JSON.stringify({ resource_id: resourceID, path, position: pos, duration: dur });
+        const body = JSON.stringify(withCredits({ resource_id: resourceID, path, position: pos, duration: dur }, creditsAtRef));
         fetch('/watch/position', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window._CSRF || '' },

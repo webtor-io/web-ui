@@ -53,7 +53,7 @@ export function nextURL(href, path) {
     return u.pathname + u.search;
 }
 
-export function createNextItemGo({ next, resourceID, root, getStage, initPlayer, destroyPlayer, onEvent = () => {},
+export function createNextItemGo({ next, resourceID, root, getStage, getAspectRatio = () => '', initPlayer, destroyPlayer, onEvent = () => {},
     fetchRender = fetchStreamRender, getToken = backgroundToken, now = () => Date.now(),
     navigate = (u) => window.location.assign(u) }) {
     let prepared = null;   // { doc, at }
@@ -140,18 +140,21 @@ export function createNextItemGo({ next, resourceID, root, getStage, initPlayer,
     // or the new render's #subtitles would be the second one in the document.
     function mountOnStage(doc) {
         const stage = getStage();
+        const aspectRatio = getAspectRatio(); // before the old player is gone
         // The stage is empty between the two players, and an empty block has
         // no height: the page below jumped up and back (owner). Hold the
         // height it has now until the new player is ready, and say "loading"
         // inside it meanwhile.
         if (stage) {
             stage.style.minHeight = `${stage.offsetHeight}px`;
-            stage.classList.add('wt-player-stage--switching');
+            // --switching holds the height; --empty is the spinner, and only
+            // for as long as there is no player in the stage to show its own.
+            stage.classList.add('wt-player-stage--switching', 'wt-player-stage--empty');
             const release = () => {
                 window.removeEventListener('player_ready', release);
                 clearTimeout(timer);
                 stage.style.minHeight = '';
-                stage.classList.remove('wt-player-stage--switching');
+                stage.classList.remove('wt-player-stage--switching', 'wt-player-stage--empty');
             };
             const timer = setTimeout(release, 15000);
             window.addEventListener('player_ready', release);
@@ -172,7 +175,10 @@ export function createNextItemGo({ next, resourceID, root, getStage, initPlayer,
         // ... / start over" like any other file -- it is their question, and
         // answering it for them read as the position being ignored (owner,
         // 2026-09-20).
-        return Promise.resolve(initPlayer(host, { stage })).then(() => {
+        // awaitStart: the new player is about to play by itself; until it does
+        // it shows a spinner, not the big Play button of a paused film.
+        return Promise.resolve(initPlayer(host, { stage, aspectRatio, awaitStart: true })).then(() => {
+            if (stage) stage.classList.remove('wt-player-stage--empty');
             window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
         });
     }

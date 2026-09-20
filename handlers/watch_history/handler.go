@@ -21,6 +21,9 @@ type PositionRequest struct {
 	Path       string  `json:"path"`
 	Position   float32 `json:"position"`
 	Duration   float32 `json:"duration"`
+	// CreditsAt: where the credits begin, when the player could tell
+	// (models.IsWatched validates it). Optional.
+	CreditsAt float32 `json:"credits_at"`
 }
 
 type PositionResponse struct {
@@ -65,6 +68,7 @@ func (h *Handler) updatePosition(c *gin.Context) {
 		Path:       req.Path,
 		Position:   req.Position,
 		Duration:   req.Duration,
+		CreditsAt:  req.CreditsAt,
 	}
 
 	transitioned, err := models.UpsertWatchPosition(c.Request.Context(), db, wh)

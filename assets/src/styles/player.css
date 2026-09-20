@@ -1156,19 +1156,22 @@ video::cue {
     border-radius: var(--rounded-btn, 0.5rem);
 }
 
-.wt-player-stage--switching::after {
+/* The player's own spinner (icons.jsx LoadingSpinner), not a look-alike: the
+   first version drew a thinner ring, and it sat on top of the next player's
+   Play button (owner, 2026-09-20). Shown only while the stage is empty. */
+.wt-player-stage--empty::after {
     content: "";
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 2.5rem;
-    height: 2.5rem;
-    margin: -1.25rem 0 0 -1.25rem;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: wt-spin 0.8s linear infinite;
+    width: 3rem;
+    height: 3rem;
+    margin: -1.5rem 0 0 -1.5rem;
+    opacity: 0.7;
+    background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3E%3Ccircle opacity='.25' cx='12' cy='12' r='10' stroke='%23fff' stroke-width='4'/%3E%3Cpath opacity='.75' fill='%23fff' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'/%3E%3C/svg%3E");
+    animation: wt-spin 1s linear infinite;
 }
+
 
 /* Next episode / track (next-item.js). Bottom-right, above the controls and
    clear of the subtitles' line; small on purpose -- the last seconds of an
@@ -1260,6 +1263,7 @@ video::cue {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-content: space-between;
     margin-top: 0.625rem;
     padding-top: 0.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1268,15 +1272,52 @@ video::cue {
     cursor: pointer;
 }
 
-.wt-next-card-auto input {
-    accent-color: #fff;
+/* A switch, not a tick box (owner): the player's own, since DaisyUI's
+   `toggle` lives in the page stylesheet and the player ships with its own. */
+.wt-switch {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: none;
+    width: 2rem;
+    height: 1.125rem;
+    margin: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: background 0.15s;
 }
 
-/* The audio player is one row tall: the card would cover all of it. Music
-   simply plays on (advancePlan shows no 'soon' card for tracks); the end-of-
-   file states sit inline instead. */
-.wt-player--audio .wt-next-card {
-    position: static;
-    width: auto;
-    margin: 0.5rem 0.75rem 0;
+.wt-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.125rem - 4px);
+    height: calc(1.125rem - 4px);
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
 }
+
+/* Pink, the colour of `toggle-soft` and of the lit speed button: cyan is a
+   site token the player uses nowhere (owner, 2026-09-20). */
+.wt-switch:checked {
+    background: #fd79a8;
+}
+
+.wt-switch:checked::after {
+    transform: translateX(0.875rem);
+}
+
+.wt-switch:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.wt-player-autoplay {
+    display: flex;
+    align-items: center;
+    padding: 0 0.375rem;
+}
+

@@ -616,7 +616,7 @@
     "player.next": "Sonraki",
     "player.nextUp": "Sıradaki",
     "player.nextLoading": "Sonraki yükleniyor…",
-    "player.nextUpAuto": "Sıradaki — otomatik başlayacak",
+    "player.nextIn": "Sonraki %v sn içinde",
     "player.playNow": "Şimdi izle",
     "player.nextCancel": "İptal",
     "player.autoplayNext": "Sonrakini otomatik oynat",

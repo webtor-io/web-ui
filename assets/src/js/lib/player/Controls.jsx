@@ -12,7 +12,7 @@ import { t } from './i18n';
 export function Controls({
     playing, currentTime, duration, volume, muted, rate, fullscreen, buffered, seeking,
     onTogglePlay, onSeek, onVolumeChange, onRateChange, onToggleMute, onToggleFullscreen,
-    onCaptionsClick, onEmbedClick, onNext, nextLabel, nextBusy,
+    onCaptionsClick, onEmbedClick, onNext, nextLabel, nextBusy, autoplayNext, onToggleAutoplayNext,
     isVideo, features,
 }) {
     return (
@@ -45,6 +45,15 @@ export function Controls({
                             aria-label={nextLabel ? `${t('player.next')}: ${nextLabel}` : t('player.next')} title={nextLabel ? `${t('player.next')}: ${nextLabel}` : t('player.next')}>
                             {nextBusy ? <span class="wt-player-btn-spinner" aria-hidden="true" /> : <NextIcon />}
                         </button>
+                    )}
+
+                    {/* Music has no "up next" card to carry the autoplay switch
+                        (owner: no card between tracks), so it lives here. */}
+                    {onNext && onToggleAutoplayNext && (
+                        <label class="wt-player-autoplay" title={t('player.autoplayNext')}>
+                            <input type="checkbox" role="switch" class="wt-switch" checked={autoplayNext} onChange={onToggleAutoplayNext}
+                                aria-label={t('player.autoplayNext')} />
+                        </label>
                     )}
 
                     {features.duration && (
