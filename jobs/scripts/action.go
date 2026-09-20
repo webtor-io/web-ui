@@ -224,12 +224,16 @@ func (e *NoPeersError) Error() string {
 //
 // Length-bounded extension trim (≤5 chars) avoids eating "Movie 2020.
 // Director's Cut" where the dot is meaningful.
-func resourceLeafTitle(md *models.VideoMetadata, r *ra.ResourceResponse, item *ra.ListItem) string {
+func resourceLeafTitle(md *models.VideoMetadata, ref *models.VideoRef, r *ra.ResourceResponse, item *ra.ListItem) string {
 	if md != nil && md.Title != "" {
+		title := md.Title
 		if md.Year != nil && *md.Year > 0 {
-			return fmt.Sprintf("%s (%d)", md.Title, *md.Year)
+			title = fmt.Sprintf("%s (%d)", md.Title, *md.Year)
 		}
-		return md.Title
+		if tag := episodeTag(ref); tag != "" {
+			title += " \u00b7 " + tag
+		}
+		return title
 	}
 	if item != nil {
 		name := item.Name
@@ -247,6 +251,16 @@ func resourceLeafTitle(md *models.VideoMetadata, r *ra.ResourceResponse, item *r
 		return r.Name
 	}
 	return ""
+}
+
+// episodeTag is "S01E02" for an episode, "" for anything else. The compact
+// form on purpose: it is the same in every locale, and the title bar of a
+// phone-width player has room for little more.
+func episodeTag(ref *models.VideoRef) string {
+	if ref == nil || ref.Kind != models.VideoRefKindEpisode || ref.Episode <= 0 || ref.Season < 0 {
+		return ""
+	}
+	return fmt.Sprintf("S%02dE%02d", ref.Season, ref.Episode)
 }
 
 func getVideoBitrate(mp *api.MediaProbe) int64 {
@@ -483,15 +497,22 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// subtitleHints whether the id addresses a film or a show.
 	var enrichedMD *models.VideoMetadata
 	var enrichedCT models.ContentType
+	var titleRef *models.VideoRef
 	if s.enricher != nil {
 		emdCtx, emdCancel := context.WithTimeout(ctx, 5*time.Second)
 		enrichedMD, enrichedCT, _ = s.enricher.GetEnrichedResourceForPath(emdCtx, resourceID, exportResponse.Source.PathStr)
 		if enrichedMD != nil {
 			s.enricher.Localize(emdCtx, enrichedMD, c.Lang)
 		}
+		// Which episode this file is: a series title alone names eight
+		// files of a season identically, in the player's title bar, on the
+		// lock screen and in the share text (owner, 2026-09-20).
+		if enrichedMD != nil && enrichedCT == models.ContentTypeSeries {
+			titleRef, _ = s.enricher.ResolveVideoRef(emdCtx, resourceID, exportResponse.Source.PathStr)
+		}
 		emdCancel()
 	}
-	sc.Title = resourceLeafTitle(enrichedMD, sc.Resource, sc.Item)
+	sc.Title = resourceLeafTitle(enrichedMD, titleRef, sc.Resource, sc.Item)
 
 	// Subtitle-ladder inputs. The feature flag and the embed widget are the
 	// master switch (subtitleOptsFor): with either in force the render must
