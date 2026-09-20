@@ -127,6 +127,14 @@ module.exports = async (env, options) => {
         optimization: {
             // splitChunks disabled: entry points are loaded independently via Go
             // template helpers, which don't support automatic chunk dependencies.
+            //
+            // The standing cost, and it has bitten twice (2026-09-20): a module
+            // imported by two entries, or by an entry and a lazy chunk, is
+            // DUPLICATED -- each copy with its own module-level state. So
+            // module scope is per-bundle, not per-page. Anything two bundles
+            // must agree on belongs in the DOM or on `window`, never in a
+            // module-level Map/let. See lib/actionBusy.js (the job-start
+            // spinner that no job ever stopped) and lib/turnstileAction.js.
             minimize: true,
             minimizer: [
                 new TerserPlugin({ parallel: true }),

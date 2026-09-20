@@ -34,6 +34,14 @@ body:not([data-iframe-height]) .wt-preview-mount {
     user-select: none;
     -webkit-user-select: none;
     border-radius: var(--rounded-btn, 0.5rem);
+    /* Everything inside stacks against the player, not against the page.
+       Without a stacking context here (position:relative with z-index:auto
+       makes none) the overlays below -- controls 20, top overlay 20, catch-up
+       pill 40, offer card 41 -- competed with the navbar (z-navbar 30) and the
+       sticky torrent status (z-sticky 20) and won: the film's title drew over
+       both (owner, 2026-09-20). Native fullscreen is unaffected, the element
+       goes to the top layer. */
+    isolation: isolate;
 }
 
 .wt-player--video {

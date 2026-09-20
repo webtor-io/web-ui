@@ -1,6 +1,7 @@
 import av from '../../lib/av';
 import { waitForElement } from '../../lib/waitForElement';
 import { findTextCut, trimTextCut } from '../../lib/textClamp';
+import { initStickyStatus } from '../../lib/stickyStatus';
 import '../../lib/share/share';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
 // at the longest fitting prefix (shared findTextCut from lib/textClamp)
@@ -44,6 +45,10 @@ function initPlotClamp() {
 }
 av( async function() {
     initPlotClamp();
+    // Before the early return below: the status mirror is for every visit to
+    // this page, not only the ones that arrive with #action=stream.
+    const stopSticky = initStickyStatus(document);
+    this._stickyStatusStop = stopSticky;
     if (window._ads !== undefined && window._sessionExpired !== true) {
         const renderAd = (await import('../../lib/ads')).default;
         for (const ad of window._ads) {
@@ -86,5 +91,10 @@ av( async function() {
             const checkbox = document.getElementById(modal + '-checkbox');
             checkbox.checked = true;
         });
+    }
+}, function () {
+    if (this._stickyStatusStop) {
+        this._stickyStatusStop();
+        this._stickyStatusStop = null;
     }
 });

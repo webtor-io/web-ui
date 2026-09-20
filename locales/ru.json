@@ -633,7 +633,6 @@
     "player.subtitleCaughtUp": "ИИ-перевод догнал",
     "player.subtitleOfferLater": "Не сейчас",
     "player.subtitleOfferNever": "Не предлагать",
-    "job.preparing": "готовим…",
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",

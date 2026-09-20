@@ -13,6 +13,38 @@
 <div id="torrent-status-badge" data-status-token="{{ .Data.Resource | statusToken }}">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
 {{ "resource/status.js" | asset }}
 {{ end }}
+{{/* The status where the eye cannot lose it (owner, 2026-09-19). Measured:
+     the median wait from pressing Watch to the first frame is 58 s, and the
+     only sign of progress -- this badge and its piece bar -- lives in the
+     header and scrolls away while people wait. Out of sight, 59% of them
+     pressed Watch again.
+
+     A fixed bar rather than `sticky`: it belongs to the page, not to the card
+     it mirrors, and it must not reflow anything when it appears. It carries
+     the same badge and the same piece bar, painted by the same SSE into these
+     hosts (resource/status.js paints every [data-status-badge-for] and
+     [data-piece-bar-for]). Hidden until the real status scrolls out of view,
+     and only while a transfer is actually moving -- see stickyStatus.js. */}}
+{{ define "resource/status_sticky" }}
+<div id="torrent-status-sticky" hidden
+     {{/* Same glass as the navbar above it (nav.html + .navbar-redesign:
+          rgba(10,14,26,.9) with backdrop-blur-xl): the two bars touch, and a
+          denser one below read as a second, opaque strip (owner). */}}
+     class="fixed inset-x-0 top-[72px] z-sticky px-3 sm:px-6 py-2 bg-w-bg/90 backdrop-blur-xl border-b border-w-line
+            transition-transform duration-200 -translate-y-full motion-reduce:transition-none"
+     {{/* aria-live is switched OFF explicitly: role="status" implies
+          "polite", and the badge is repainted by every SSE message (the MB/s
+          figure changes each second) -- a live region would read that out
+          for as long as the bar is up. The header badge it mirrors is not
+          live either. */}}
+     role="status" aria-live="off">
+    <div class="max-w-5xl mx-auto flex items-center gap-2 min-w-0">
+        <div data-status-badge-for="{{ .Data.Resource.ID }}" class="shrink-0"></div>
+        <span class="text-xs text-w-muted truncate" title="{{ .Data.Resource.Name }}">{{ .Data.Resource.Name }}</span>
+    </div>
+    <div class="max-w-5xl mx-auto mt-1.5 piece-bar-slot" data-piece-bar-for="{{ .Data.Resource.ID }}"></div>
+</div>
+{{ end }}
 {{ define "resource/status_container" }}
 <div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
     {{ template "resource/status_inner" . }}
@@ -106,6 +138,11 @@
 {{ end }}{{ end }}
 {{ end }}
 {{ define "main" }}
+{{/* Outside the cards on purpose: a page-level fixed bar nested inside the
+     header card sat under its `overflow-hidden` (and one `transform` away
+     from being positioned against the card instead of the viewport), which
+     is why nothing appeared. */}}
+{{ with .Data }}{{ if .TorrentStatus }}{{ template "resource/status_sticky" $ }}{{ end }}{{ end }}
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
     {{ if .Claims | hasAds }}

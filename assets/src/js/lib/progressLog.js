@@ -208,15 +208,18 @@ class Renderer {
             this.inited = true;
             this.el.classList.remove('hidden');
         }
+        // The job is over, whichever way it went: the button that started it
+        // goes back to being a button (actionBusy.js). Every ending counts --
+        // `error` (no peers, the cap modal) and `rendertemplate` (the player
+        // is on screen; the wait the button was reporting is what ended) as
+        // much as `close`. First in renderMessage, so a throw further down
+        // can never leave a button working for a job that has finished.
+        if (data.level === 'close' || data.level === 'error' || data.level === 'rendertemplate'
+            || data.level === 'download' || data.level === 'redirect') {
+            clearBusyFor(this.el);
+        }
         if (data.level === 'close') {
             this.showClose();
-        }
-        // The job is over, whichever way it went: the button that started it
-        // goes back to being a button (actionBusy.js). `error` is an ending
-        // too -- no peers, the cap modal -- and the viewer may well want to
-        // press it again.
-        if (data.level === 'close' || data.level === 'error') {
-            clearBusyFor(this.el);
         }
         if (data.level === 'redirect') {
             this.addSummary(data);

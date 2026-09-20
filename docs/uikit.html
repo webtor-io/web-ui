@@ -271,6 +271,25 @@
       <button class="btn btn-pink" disabled>btn-pink disabled</button>
       <button class="btn btn-soft" disabled>btn-soft disabled</button>
       <button class="btn btn-soft-cyan" disabled>btn-soft-cyan disabled</button>
+      <button class="btn btn-accent" disabled>btn-accent disabled</button>
+    </div>
+    <div class="uikit-label mb-6">Every variant mutes to the same grey: the custom colours are set with
+      <code>!important</code>, so DaisyUI&rsquo;s own <code>:disabled</code> never reached them and a disabled button
+      looked exactly like a ready one (fixed 2026-09-19).</div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Busy (<code>btn-busy</code>)</h3>
+    <div class="uikit-row">
+      <button class="btn btn-soft btn-busy" aria-busy="true" aria-disabled="true"><span class="loading loading-spinner loading-xs" aria-hidden="true"></span>Watch</button>
+      <button class="btn btn-soft btn-busy" aria-busy="true" aria-disabled="true"><span class="loading loading-spinner loading-xs" aria-hidden="true"></span>Download [1.4&nbsp;GB]</button>
+      <button class="btn btn-accent btn-busy" aria-busy="true" aria-disabled="true"><span class="loading loading-spinner loading-xs" aria-hidden="true"></span>Save to Vault</button>
+    </div>
+    <div class="uikit-rule mt-3 mb-6">
+      A button whose job is running. <strong>Not <code>disabled</code></strong>: a disabled button says &ldquo;you
+      cannot do this&rdquo;, and this one is doing it &mdash; it keeps its own colour, dimmed to 55%, with
+      a <code>loading loading-spinner loading-xs</code> in front of the label.
+      The label stays: it is what says which of the two buttons was pressed, and the job log below carries the detail.<br>
+      Applied and released by <code>lib/actionBusy.js</code>, never hand-written in a template &mdash; it also swallows
+      the second press and releases the button when the job ends, fails, or a backstop expires.
     </div>
 
     <div class="uikit-rule mt-6">

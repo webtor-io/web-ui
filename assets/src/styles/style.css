@@ -960,6 +960,37 @@ input:-webkit-autofill:focus {
   color: #00cec9 !important;
 }
 
+/* A button whose job is running (lib/actionBusy.js). Not :disabled — a
+   disabled button reads as "you cannot do this", and this one is doing it:
+   it keeps its own colour, dimmed, and says so with a spinner. pointer-events
+   are off so it neither highlights nor takes a press (and so shows no cursor
+   of its own); the duplicate-press guard in lib/async.js is what actually
+   swallows a keyboard Enter. */
+.btn-busy {
+  opacity: 0.55;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+/* Disabled, for real: the action is not available. The variants above set
+   their colours with !important, so DaisyUI's own :disabled styling never
+   reached them and a disabled button was indistinguishable from a ready one.
+   Muted rather than invisible — the label still has to be readable. */
+.btn-pink:disabled,
+.btn-pink[disabled],
+.btn-soft:disabled,
+.btn-soft[disabled],
+.btn-soft-cyan:disabled,
+.btn-soft-cyan[disabled],
+.btn-accent:disabled,
+.btn-accent[disabled] {
+  background-color: rgba(100, 116, 139, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+
 .toggle-soft:checked,
 .toggle-soft[aria-checked=true] {
   --input-color: #fd79a8 !important;

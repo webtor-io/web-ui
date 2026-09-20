@@ -92,6 +92,26 @@ function renderBar(status) {
     return `<div class="piece-bar ${color}" role="img" aria-label="${title}" title="${title}">${cells}</div>`;
 }
 
+// A transfer that is actually moving -- the states that paint a piece bar and
+// the only ones the sticky mirror is for (stickyStatus.js). "cached" and
+// "vaulted" are answers, not progress.
+const MOVING = new Set(['caching', 'vaulting', 'vault_waiting']);
+
+// The badge goes to every host that asked for it: the one in the header (the
+// view's own, which also carries the status token) and any mirror, today the
+// sticky bar. Same shape as paintBars below.
+function paintBadges(badge, resourceId, status, html) {
+    badge.innerHTML = html;
+    document.querySelectorAll(`[data-status-badge-for="${resourceId}"]`).forEach((host) => {
+        host.innerHTML = html;
+    });
+    // Broadcast rather than reach into the sticky bar from here: this view
+    // owns the stream, not the page furniture that mirrors it.
+    document.dispatchEvent(new CustomEvent('torrent-status', {
+        detail: { resourceId, state: status.state, moving: MOVING.has(status.state) },
+    }));
+}
+
 function paintBars(resourceId, status) {
     const html = renderBar(status);
     document.querySelectorAll(`[data-piece-bar-for="${resourceId}"]`).forEach((host) => {
@@ -207,7 +227,7 @@ av(async function() {
         source.onmessage = (e) => {
             try {
                 const status = JSON.parse(e.data);
-                badge.innerHTML = renderBadge(status);
+                paintBadges(badge, resourceId, status, renderBadge(status));
                 paintBars(resourceId, status);
                 if (status.state === 'vaulted') {
                     source.close();

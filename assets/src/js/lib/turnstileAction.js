@@ -37,9 +37,18 @@ const SCRIPT_WAIT_MS = 15000;
 const READY = 'turnstileReady';
 const STEP_TAG = 'turnstile';
 
-let warmId = null;
-let liveId = null;
-let pending = null;
+// One state per page, not one per copy of this module. splitChunks is off by
+// design (webpack.config.js: Go template helpers load entries independently),
+// so the page entry and the lazy player chunk -- which calls silentToken()
+// for a background start -- each get their own copy of this file. With the
+// state in module scope the chunk's copy saw warmId === null and would render
+// a SECOND widget into the one #turnstile-action container, and callbacks
+// from the page's widget resolved a `pending` the chunk could not see. Same
+// root cause as the job-start spinner that never stopped (actionBusy.js,
+// 2026-09-20), and the same cure: keep shared state somewhere both copies
+// look.
+if (!window.__turnstileAction) window.__turnstileAction = { warmId: null, liveId: null, pending: null };
+const st = window.__turnstileAction;
 
 function container() {
     return document.getElementById('turnstile-action');
@@ -63,8 +72,8 @@ function widgetOptions(onInteractive) {
         sitekey: container().dataset.sitekey,
         appearance: 'interaction-only',
         execution: 'execute',
-        callback: (token) => { if (pending) pending.finish(token); },
-        'error-callback': () => { if (pending) pending.finish('', 'widget-error'); },
+        callback: (token) => { if (st.pending) st.pending.finish(token); },
+        'error-callback': () => { if (st.pending) st.pending.finish('', 'widget-error'); },
         'expired-callback': () => {},
         'before-interactive-callback': onInteractive,
     };
@@ -76,7 +85,7 @@ function widgetOptions(onInteractive) {
 function warmUp() {
     const started = Date.now();
     const tick = () => {
-        if (warmId !== null) return;
+        if (st.warmId !== null) return;
         if (hasTurnstile()) { renderWarm(); return; }
         if (Date.now() - started < SCRIPT_WAIT_MS) setTimeout(tick, 250);
     };
@@ -85,48 +94,48 @@ function warmUp() {
 
 function renderWarm() {
     const el = container();
-    if (!el || !hasTurnstile() || warmId !== null) return;
+    if (!el || !hasTurnstile() || st.warmId !== null) return;
     try {
-        warmId = turnstile.render(el, widgetOptions(() => {
+        st.warmId = turnstile.render(el, widgetOptions(() => {
             // Cloudflare wants a click: the hidden widget cannot take it,
             // and moving it kills it — render a live one where the person
             // looks, inside the step block of the form being submitted.
-            if (!pending) return;
+            if (!st.pending) return;
             // A start nobody pressed a button for (silentToken) has nowhere
             // to show a checkbox and nobody waiting to click it.
-            if (pending.silentOnly) { pending.finish('', 'needs-interaction'); return; }
+            if (st.pending.silentOnly) { st.pending.finish('', 'needs-interaction'); return; }
             dropWarm();
-            renderLive(pending.slot);
+            renderLive(st.pending.slot);
         }));
     } catch (e) {
-        warmId = null;
+        st.warmId = null;
     }
 }
 
 function dropWarm() {
-    if (warmId !== null) {
-        try { turnstile.remove(warmId); } catch (e) { /* already gone */ }
-        warmId = null;
+    if (st.warmId !== null) {
+        try { turnstile.remove(st.warmId); } catch (e) { /* already gone */ }
+        st.warmId = null;
     }
 }
 
 function renderLive(slot) {
-    if (!slot || !hasTurnstile()) { if (pending) pending.finish('', 'no-live-slot'); return; }
+    if (!slot || !hasTurnstile()) { if (st.pending) st.pending.finish('', 'no-live-slot'); return; }
     try {
-        liveId = turnstile.render(slot, widgetOptions(() => {
-            if (pending) pending.interactive();
+        st.liveId = turnstile.render(slot, widgetOptions(() => {
+            if (st.pending) st.pending.interactive();
         }));
-        turnstile.execute(liveId);
+        turnstile.execute(st.liveId);
     } catch (e) {
-        liveId = null;
-        if (pending) pending.finish('', 'live-render-failed');
+        st.liveId = null;
+        if (st.pending) st.pending.finish('', 'live-render-failed');
     }
 }
 
 function dropLive() {
-    if (liveId !== null) {
-        try { turnstile.remove(liveId); } catch (e) { /* already gone */ }
-        liveId = null;
+    if (st.liveId !== null) {
+        try { turnstile.remove(st.liveId); } catch (e) { /* already gone */ }
+        st.liveId = null;
     }
 }
 
@@ -182,7 +191,7 @@ function getToken(form) {
             if (done) return;
             done = true;
             clearTimeout(timer);
-            pending = null;
+            st.pending = null;
             dropLive();
             form.dataset.turnstileReason = t ? '' : `${reason || 'unknown'}:${Date.now() - started}`;
             if (step.line) step.line.classList.replace('inprogress', t ? 'done' : 'error');
@@ -190,21 +199,21 @@ function getToken(form) {
             // A used warm widget is reset for the next start; one that
             // failed is dropped and rendered anew, an errored widget stays
             // errored.
-            if (t && warmId !== null) { try { turnstile.reset(warmId); } catch (e) { dropWarm(); } }
+            if (t && st.warmId !== null) { try { turnstile.reset(st.warmId); } catch (e) { dropWarm(); } }
             else dropWarm();
-            if (warmId === null) renderWarm();
+            if (st.warmId === null) renderWarm();
             resolve(t || '');
         };
         const interactive = () => {
             clearTimeout(timer);
             timer = setTimeout(() => finish('', 'interactive-timeout'), INTERACTIVE_TIMEOUT_MS);
         };
-        pending = { finish, interactive, slot: step.slot };
+        st.pending = { finish, interactive, slot: step.slot };
         timer = setTimeout(() => finish('', 'silent-timeout'), SILENT_TIMEOUT_MS);
-        if (warmId === null) renderWarm();
-        if (warmId === null) { finish('', 'no-widget'); return; }
+        if (st.warmId === null) renderWarm();
+        if (st.warmId === null) { finish('', 'no-widget'); return; }
         try {
-            turnstile.execute(warmId);
+            turnstile.execute(st.warmId);
         } catch (e) {
             finish('', 'execute-failed');
         }
@@ -221,25 +230,25 @@ function getToken(form) {
 const BACKGROUND_TIMEOUT_MS = 8000;
 export function silentToken() {
     return new Promise((resolve) => {
-        if (!hasTurnstile() || !container() || pending) { resolve(''); return; }
+        if (!hasTurnstile() || !container() || st.pending) { resolve(''); return; }
         let done = false;
         let timer = null;
         const finish = (t) => {
             if (done) return;
             done = true;
             clearTimeout(timer);
-            pending = null;
-            if (t && warmId !== null) { try { turnstile.reset(warmId); } catch (e) { dropWarm(); } }
+            st.pending = null;
+            if (t && st.warmId !== null) { try { turnstile.reset(st.warmId); } catch (e) { dropWarm(); } }
             else dropWarm();
-            if (warmId === null) renderWarm();
+            if (st.warmId === null) renderWarm();
             resolve(t || '');
         };
-        pending = { finish, interactive: () => finish(''), slot: null, silentOnly: true };
+        st.pending = { finish, interactive: () => finish(''), slot: null, silentOnly: true };
         timer = setTimeout(() => finish(''), BACKGROUND_TIMEOUT_MS);
-        if (warmId === null) renderWarm();
-        if (warmId === null) { finish(''); return; }
+        if (st.warmId === null) renderWarm();
+        if (st.warmId === null) { finish(''); return; }
         try {
-            turnstile.execute(warmId);
+            turnstile.execute(st.warmId);
         } catch (e) {
             finish('');
         }
@@ -286,7 +295,7 @@ export default function init() {
         }
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (pending) return; // a check is already running for some form
+        if (st.pending) return; // a check is already running for some form
         // Remember the button that submitted, so requestSubmit() keeps its
         // name/value (select.js and the download split button rely on it).
         const submitter = e.submitter || null;

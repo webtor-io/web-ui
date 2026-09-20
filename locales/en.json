@@ -681,7 +681,6 @@
     "player.subtitleCaughtUp": "AI translation caught up",
     "player.subtitleOfferLater": "Not now",
     "player.subtitleOfferNever": "Don’t offer again",
-    "job.preparing": "preparing…",
     "job.retrievingData": "retrieving resource data",
     "job.retrievingStreamUrl": "retrieving stream url",
     "job.probingMedia": "probing content media info",
