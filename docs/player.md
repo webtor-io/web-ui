@@ -151,7 +151,12 @@ one subtitle file.
   pointer or key event — a sleeper must not warm up and transcode a season) / `stay` (cancelled).
 - Autoplay is a remembered setting (`player-prefs` `autoplayNext`, default on) behind a switch
   (the design system's `toggle toggle-soft`, the same as the subtitles switch — a home-made solid-pink
-  one was tried and looked like neither): on the card for video, next to the Next button for audio.
+  one was tried and looked like neither). It lives in the **gear menu** (`SettingsControl.jsx`), with
+  its name next to it and reachable at any time, for video and audio alike, and on the card as well.
+  A bare switch in the audio bar was tried first: it said nothing about what it switched. The gear
+  shows only where there is a next file. Its menu and the speed menu share `useAnchoredPopover`
+  (top-layer popover placed from the button's rect, outside press / Escape / scroll close it) and
+  the `.wt-player-menu` styles.
 - **Music has no card at all** (owner): tracks follow one another like an album, or do not, by the
   switch. No "still listening?" either — `atEnd()` for `kind: track` is `go` or `stay`.
 - The move itself (`createNextItemGo`): the next file's render is fetched off the page

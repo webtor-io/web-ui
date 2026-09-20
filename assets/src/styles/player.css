@@ -982,43 +982,65 @@ video::cue {
     color: #fd79a8;
 }
 
-/* In-flow fallback (no Popover API): above the button, clipped by the
-   player's frame if the picture is short. Shown by the --open class. */
-.wt-player-speed-menu {
+/* The player's menus (speed, settings). In-flow fallback first (no Popover
+   API): above the button, clipped by the player's frame if the picture is
+   short; shown by the --open class. */
+.wt-player-menu {
     position: absolute;
     right: 0;
     bottom: calc(100% + 0.5rem);
     z-index: 30;
     display: none;
     flex-direction: column;
-    min-width: 4.5rem;
+    min-width: 13rem;
     padding: 0.25rem;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 0.625rem;
     background: rgba(15, 15, 25, 0.92);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    color: #fff;
 }
 
-.wt-player-speed-menu--open {
+.wt-player-menu--narrow {
+    min-width: 4.5rem;
+}
+
+.wt-player-menu--open {
     display: flex;
 }
 
 /* The real thing: a popover lives in the top layer, so neither the player's
-   overflow:hidden nor fullscreen can cut it. SpeedControl.jsx sets top/left;
-   the UA's centring (inset:0 + margin:auto) is undone here. */
-.wt-player-speed-menu[popover] {
+   overflow:hidden nor fullscreen can cut it. useAnchoredPopover sets
+   top/left; the UA's centring (inset:0 + margin:auto) is undone here. */
+.wt-player-menu[popover] {
     position: fixed;
     inset: auto;
     right: auto;
     bottom: auto;
     margin: 0;
-    color: inherit;
     display: none;
 }
 
-.wt-player-speed-menu[popover]:popover-open {
+.wt-player-menu[popover]:popover-open {
     display: flex;
+}
+
+.wt-player-settings {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.wt-player-menu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
 }
 
 .wt-player-speed-item {
@@ -1278,9 +1300,4 @@ video::cue {
    like neither (owner, 2026-09-20). Both places it appears in, the card and
    the audio controls, exist only on the main site, where that stylesheet is
    loaded; the embed has no "next". */
-.wt-player-autoplay {
-    display: flex;
-    align-items: center;
-    padding: 0 0.375rem;
-}
 

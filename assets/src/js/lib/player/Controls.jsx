@@ -3,6 +3,7 @@ import { ProgressBar } from './ProgressBar';
 import { TimeDisplay } from './TimeDisplay';
 import { VolumeControl } from './VolumeControl';
 import { SpeedControl } from './SpeedControl';
+import { SettingsControl } from './SettingsControl';
 import { t } from './i18n';
 
 /**
@@ -47,15 +48,6 @@ export function Controls({
                         </button>
                     )}
 
-                    {/* Music has no "up next" card to carry the autoplay switch
-                        (owner: no card between tracks), so it lives here. */}
-                    {onNext && onToggleAutoplayNext && (
-                        <label class="wt-player-autoplay" title={t('player.autoplayNext')}>
-                            <input type="checkbox" role="switch" class="toggle toggle-soft toggle-sm" checked={autoplayNext} onChange={onToggleAutoplayNext}
-                                aria-label={t('player.autoplayNext')} />
-                        </label>
-                    )}
-
                     {features.duration && (
                         <TimeDisplay currentTime={currentTime} duration={duration} />
                     )}
@@ -74,6 +66,13 @@ export function Controls({
 
                     {features.speed && (
                         <SpeedControl rate={rate} onRateChange={onRateChange} menu={isVideo} />
+                    )}
+
+                    {/* The gear: autoplay of the next file, at any time and with
+                        its name on it. Only where there is a next file to
+                        speak of. */}
+                    {onNext && onToggleAutoplayNext && (
+                        <SettingsControl autoplayNext={autoplayNext} onToggleAutoplayNext={onToggleAutoplayNext} />
                     )}
 
                     {features.advancedtracks && (

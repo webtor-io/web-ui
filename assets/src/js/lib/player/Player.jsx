@@ -1325,7 +1325,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onNext={next ? () => goNext('button') : null}
                     nextBusy={nextLoading}
                     autoplayNext={autoplayNext}
-                    onToggleAutoplayNext={next && next.kind === 'track' ? toggleAutoplayNext : null}
+                    onToggleAutoplayNext={next ? toggleAutoplayNext : null}
                     nextLabel={next ? next.label : ''}
                     isVideo={isVideo}
                     features={features}
