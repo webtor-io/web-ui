@@ -10,6 +10,7 @@ import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } fr
 import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay } from './player-prefs';
 import { createTapSeek } from './tap-seek';
 import { bindMediaSession } from './media-session';
+import { track, settled } from './player-telemetry';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -116,12 +117,21 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     }, []);
     useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
     const formatDelay = (d) => `${d > 0 ? '+' : d < 0 ? '\u2212' : ''}${Math.abs(d).toFixed(2)}`;
+    // Telemetry (player-telemetry.js): one event per decision.
+    const delayEventRef = useRef(null);
+    if (!delayEventRef.current) delayEventRef.current = settled((v) => track('subtitle-delay', v), 2000);
+    const tapEventRef = useRef(null);
+    if (!tapEventRef.current) tapEventRef.current = settled((v) => track('player-tap-seek', v), 900);
+    useEffect(() => () => { delayEventRef.current.flush(); tapEventRef.current.flush(); }, []);
+
     const changeSubDelay = useCallback((next, { announce = true } = {}) => {
         const d = normalizeDelay(next);
         subDelayRef.current = d;
         setSubDelayState(d);
         saveSubtitleDelay(delayKey, d);
         if (announce) showToast(tf('player.subtitleDelayToast', formatDelay(d)));
+        // `announce` is true for the keys and false for the dialog's buttons.
+        delayEventRef.current.push({ delay: d, source: announce ? 'key' : 'dialog' });
     }, [delayKey, showToast]);
 
     // Source URL from first <source> element
@@ -474,6 +484,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             isVideo,
             isSession,
             resourceID: resourceID || '',
+            // The remembered settings this stream started with: `player-speed`
+            // counts changes, and a viewer who set 1.5x a week ago makes none.
+            rate: videoRef.current ? videoRef.current.playbackRate : 1,
+            subtitleDelay: subDelayRef.current,
         });
         const modal = document.getElementById('subtitles');
         // getLang(), not document.documentElement.lang: the embed
@@ -596,6 +610,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                         const next = stepRate(state.rate, e.key === '>' ? +1 : -1);
                         state.setRate(next);
                         showToast(rateLabel(next));
+                        if (next !== state.rate) track('player-speed', { rate: next, source: 'key' });
                     }
                     resetHideTimer();
                     break;
@@ -833,6 +848,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 const to = Math.max(0, Math.min(duration || Infinity, currentTime + dir * TAP_SEEK_STEP));
                 handleSeekRef.current(to);
                 setTapFx({ dir, total: streak * TAP_SEEK_STEP, n: Date.now() });
+                tapEventRef.current.push({ dir: dir > 0 ? 'forward' : 'back', seconds: streak * TAP_SEEK_STEP });
                 if (tapFxTimerRef.current) clearTimeout(tapFxTimerRef.current);
                 tapFxTimerRef.current = setTimeout(() => setTapFx(null), 650);
             },
@@ -899,14 +915,18 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => {
         const video = videoRef.current;
         if (!video || typeof navigator === 'undefined') return undefined;
+        const seen = new Set();
+        const msUsed = (action) => { if (!seen.has(action)) { seen.add(action); track('player-media-session', { action }); } };
         const ms = bindMediaSession({
             session: navigator.mediaSession,
             Metadata: typeof window.MediaMetadata === 'function' ? window.MediaMetadata : null,
             title: getResourceTitle(videoEl),
             artwork: video.poster || '',
-            onPlay: () => { if (video.paused) togglePlayRef.current(); },
-            onPause: () => { if (!video.paused) togglePlayRef.current(); },
-            onSeekTo: (t) => handleSeekRef.current(t),
+            // Counted once per action per player: a headset's play/pause can
+            // fire dozens of times in a film and says nothing new after the first.
+            onPlay: () => { msUsed('play'); if (video.paused) togglePlayRef.current(); },
+            onPause: () => { msUsed('pause'); if (!video.paused) togglePlayRef.current(); },
+            onSeekTo: (t) => { msUsed('seek'); handleSeekRef.current(t); },
             getPosition: () => ({ ...seekPosRef.current, rate: video.playbackRate }),
         });
         mediaSessionRef.current = ms;
@@ -1108,7 +1128,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onTogglePlay={togglePlay}
                     onSeek={handleSeek}
                     onVolumeChange={state.setVolume}
-                    onRateChange={state.setRate}
+                    onRateChange={(r) => { if (r !== state.rate) track('player-speed', { rate: r, source: 'menu' }); state.setRate(r); }}
                     onToggleMute={state.toggleMute}
                     onToggleFullscreen={state.toggleFullscreen}
                     onCaptionsClick={handleCaptionsClick}

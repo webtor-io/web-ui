@@ -103,3 +103,18 @@ are ours to get right: **position state is reported in film time** (a transcoder
 `seekOffset`; the element's own clock describes the run), and **seeks go through `handleSeek`**
 (a session seek is a POST, not a `currentTime` write). `navigator.mediaSession` and
 `MediaMetadata` are injected — testable, and a browser without them is a no-op.
+
+## Usage events — `player-telemetry.js`
+
+One Umami event per **decision**, not per press (`settled()` holds the last value until the
+presses stop and is flushed on teardown):
+
+| event | data | when |
+|---|---|---|
+| `player-speed` | `rate`, `source: menu\|key` | the rate actually changed |
+| `player-tap-seek` | `dir: forward\|back`, `seconds` | a streak of double taps ended (900 ms) |
+| `subtitle-delay` | `delay`, `source: dialog\|key` | the delay settled (2 s) |
+| `player-media-session` | `action: play\|pause\|seek` | first use of each action per player |
+| `stream-start` | + `rate`, `subtitleDelay` | what the stream started with (remembered settings make no change event) |
+
+Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
