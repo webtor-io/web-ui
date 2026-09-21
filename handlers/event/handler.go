@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -25,7 +26,9 @@ type Handler struct {
 	// ci follows the seeder's cache events (cached.go); nil leaves them unread.
 	ci   cacheIndexer
 	subs []*nats.Subscription
-	done chan struct{}
+	// subsMu: the cache subscriptions are added from their retry goroutines.
+	subsMu sync.Mutex
+	done   chan struct{}
 }
 
 func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service, billing notification.Billing, index *cache_index.CacheIndex) *Handler {
@@ -79,10 +82,14 @@ func (h *Handler) Serve() error {
 }
 
 // subscribeCacheEvents is allowed to fail, unlike the subscriptions above. The
-// consumers are declared by the deployment, and one that is not there yet (an
+// consumers are declared by the deployment, and one that is not there (an
 // older chart, a NATS without them) must not take the process down over an
 // optimisation: the index then works as it did before the events, on marks
-// made at play time and the expiry. It says so, once, at start.
+// made at play time and the expiry. It says so, once.
+//
+// It keeps trying, though. On the rollout that introduces a consumer the pod
+// can easily start before the operator has created it, and a single attempt
+// would leave that pod deaf until its next restart.
 func (h *Handler) subscribeCacheEvents(js nats.JetStreamContext) {
 	if h.ci == nil {
 		return
@@ -94,11 +101,39 @@ func (h *Handler) subscribeCacheEvents(js nats.JetStreamContext) {
 		{"resource.cached", "web-ui-resource-cached", resourceCached},
 		{"resource.uncached", "web-ui-resource-uncached", resourceUncached},
 	} {
-		handler := sub.handler
-		err := h.subscribe(js, "common", sub.subject, sub.consumer, func(b []byte) error { return handler(h.ci, b) })
-		if err != nil {
-			log.WithError(err).WithField("consumer", sub.consumer).
-				Warn("cache events are not consumed: the cache index falls back to play-time marks and expiry")
+		subject, consumer, handler := sub.subject, sub.consumer, sub.handler
+		go retryUntil(h.done, cacheSubscribeRetry, func(attempt int) bool {
+			h.subsMu.Lock()
+			err := h.subscribe(js, "common", subject, consumer, func(b []byte) error { return handler(h.ci, b) })
+			h.subsMu.Unlock()
+			if err == nil {
+				if attempt > 0 {
+					log.WithField("consumer", consumer).Info("cache events are consumed")
+				}
+				return true
+			}
+			if attempt == 0 {
+				log.WithError(err).WithField("consumer", consumer).
+					Warn("cache events are not consumed yet: the cache index runs on play-time marks and expiry; retrying")
+			}
+			return false
+		})
+	}
+}
+
+const cacheSubscribeRetry = time.Minute
+
+// retryUntil calls try (attempt 0, 1, 2, ...) until it reports success or done
+// is closed.
+func retryUntil(done <-chan struct{}, every time.Duration, try func(attempt int) bool) {
+	for attempt := 0; ; attempt++ {
+		if try(attempt) {
+			return
+		}
+		select {
+		case <-done:
+			return
+		case <-time.After(every):
 		}
 	}
 }
@@ -143,6 +178,8 @@ func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject str
 }
 
 func (h *Handler) Close() {
+	h.subsMu.Lock()
+	defer h.subsMu.Unlock()
 	for _, sub := range h.subs {
 		_ = sub.Unsubscribe()
 	}

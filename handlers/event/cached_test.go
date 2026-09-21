@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 type fakeIndex struct {
@@ -107,4 +108,32 @@ func equal(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// The consumer can appear after the pod (first rollout of the chart): the
+// subscription has to come up on its own, not at the next restart.
+func TestRetryUntil(t *testing.T) {
+	done := make(chan struct{})
+	var attempts []int
+	retryUntil(done, time.Millisecond, func(a int) bool {
+		attempts = append(attempts, a)
+		return a == 2
+	})
+	if len(attempts) != 3 || attempts[2] != 2 {
+		t.Errorf("attempts %v, want [0 1 2]", attempts)
+	}
+
+	// Shutdown ends it even if it never succeeds.
+	n := 0
+	stopped := make(chan struct{})
+	go func() {
+		retryUntil(done, time.Hour, func(int) bool { n++; return false })
+		close(stopped)
+	}()
+	close(done)
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not stop on done")
+	}
 }

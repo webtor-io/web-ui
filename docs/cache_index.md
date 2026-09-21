@@ -59,7 +59,15 @@ a database error is returned, so the message is NAKed and comes again.
 
 Unlike the other subscriptions these two **may fail to bind** without taking
 the process down — a deployment without the consumers runs as before the
-events, and says so once at start (`cache events are not consumed: …`).
+events, and says so once (`cache events are not consumed yet: …`). The bind is
+retried every minute: on the rollout that introduces a consumer the pod can
+start before the operator has created it.
+
+Publishers: `torrent-web-seeder` (`server/services/cache_events.go`, from the
+piece-completion layer — once per transition, not per tick) and
+`torrent-web-seeder-cleaner` (`services/cache_events.go`, after a directory is
+removed). Both are on when `NATS_SERVICE_HOST` is set, which Kubernetes does by
+itself for pods in the namespace of the `nats` service.
 
 ## Discover
 
