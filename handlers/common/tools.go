@@ -44,9 +44,22 @@ var Tools = []Tool{
 	}},
 	{Url: "magnet-to-torrent", Title: "tool.magnetToTorrent.title", Benefit: "tool.magnetToTorrent.benefit", Description: "tool.magnetToTorrent.description", Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
-		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"},
+			// The two conversions are one pair; each page points at the other.
+			Link: &AboutLink{Url: "/torrent-to-magnet", TitleKey: "tool.torrentToMagnet.title"}},
 		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"magnet", "torrent"}, Footer: true},
 		{Kind: AboutChecklist, Key: "useCases", Badge: "useCases", Accent: "pink", Alt: true, Items: 4, Extra: "reverse"},
+		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
+	}},
+	// The reverse direction had no page of its own: the query landed on the
+	// home page and on /magnet-to-torrent, whose "reverse" callout did not
+	// hold it.
+	{Url: "torrent-to-magnet", Title: "tool.torrentToMagnet.title", Benefit: "tool.torrentToMagnet.benefit", Description: "tool.torrentToMagnet.description", Sections: []AboutSection{
+		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"},
+			Link: &AboutLink{Url: "/magnet-to-torrent", TitleKey: "tool.magnetToTorrent.title"}},
+		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"torrent", "magnet"}, Footer: true},
+		{Kind: AboutChecklist, Key: "useCases", Badge: "useCases", Accent: "pink", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
 	{Url: "torrent-to-stream", Title: "tool.torrentToStream.title", Benefit: "tool.torrentToStream.benefit", Description: "tool.torrentToStream.description", Sections: []AboutSection{
