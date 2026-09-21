@@ -17,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
@@ -48,7 +49,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 	}
 	r.POST("/", h.post)
 	r.GET("/share", h.share)
-	r.GET("/:resource_id/status", h.status)
+	r.GET("/:resource_id/status", metrics.Streaming, h.status)
 	r.GET("/:resource_id", func(c *gin.Context) {
 		rid := c.Param("resource_id")
 		if strings.HasPrefix(rid, "magnet") {

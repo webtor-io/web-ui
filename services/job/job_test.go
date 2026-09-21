@@ -2,9 +2,13 @@ package job
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/webtor-io/web-ui/services/metrics"
+	"github.com/webtor-io/web-ui/services/metrics/metricstest"
 )
 
 func itemsOf(j *Job) []LogItem {
@@ -120,5 +124,65 @@ func TestRetireLeavesAReplacementAlone(t *testing.T) {
 	}
 	if jobs.jobs["id"] != replacement {
 		t.Error("the replacement must stay in the map")
+	}
+}
+
+// replayStorage answers Sub with a stored log, the way Redis does for a job
+// id that already ran on another replica.
+type replayStorage struct {
+	NilStorage
+}
+
+func (s *replayStorage) Sub(_ context.Context, _ string, _ string) (chan LogItem, error) {
+	c := make(chan LogItem, 2)
+	c <- LogItem{Level: Info, Message: "stored"}
+	c <- LogItem{Level: Close}
+	close(c)
+	return c, nil
+}
+
+type panicScript struct{}
+
+func (panicScript) Run(_ context.Context, _ *Job) error { panic("script exploded") }
+
+// One counter increment per script execution, under the outcome the run
+// actually had. The failure log line is written twice on purpose (Error and
+// retire); the counter must not follow the logging.
+func TestRun_ReportsOutcomeOnce(t *testing.T) {
+	const q = "metrics-outcome-test"
+	before := func(outcome string) float64 {
+		return metricstest.Counter(t, "webui_jobs_total", map[string]string{"job": q, "outcome": outcome})
+	}
+	ok0, err0, rej0 := before(metrics.JobOK), before(metrics.JobError), before(metrics.JobRejected)
+
+	run := func(r Runnable, storage Storage) {
+		_ = New(context.Background(), "id", q, r, storage, true, nil).Run(context.Background())
+	}
+	run(NewScript(func(j *Job) error { return nil }), &NilStorage{})
+	run(NewScript(func(j *Job) error { return errors.New("boom: detail") }), &NilStorage{})
+	run(NewScript(func(j *Job) error { return errors.New("hash found in stoplist") }), &NilStorage{})
+	run(panicScript{}, &NilStorage{})
+
+	if got := before(metrics.JobOK) - ok0; got != 1 {
+		t.Fatalf("ok: got %v, want 1", got)
+	}
+	if got := before(metrics.JobError) - err0; got != 2 {
+		t.Fatalf("error: got %v, want 2 (one failure, one panic)", got)
+	}
+	if got := before(metrics.JobRejected) - rej0; got != 1 {
+		t.Fatalf("rejected: got %v, want 1", got)
+	}
+	if got := metricstest.Gauge(t, "webui_jobs_in_flight"); got != 0 {
+		t.Fatalf("in-flight must return to 0, also after a panic: got %v", got)
+	}
+
+	// A replay from storage serves a stored result; the script never runs.
+	j := New(context.Background(), "id", q, NewScript(func(j *Job) error {
+		t.Fatal("script must not run when storage has a result")
+		return nil
+	}), &replayStorage{}, false, nil)
+	_ = j.Run(context.Background())
+	if got := before(metrics.JobOK) - ok0; got != 1 {
+		t.Fatalf("replay must not be counted as a run: ok=%v", got)
 	}
 }

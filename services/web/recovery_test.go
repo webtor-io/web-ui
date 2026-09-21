@@ -8,6 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
+
+	"github.com/webtor-io/web-ui/services/metrics/metricstest"
 )
 
 // A handler panic must come back as a 500 AND land in logrus with the
@@ -31,5 +33,28 @@ func TestRecoverToLog(t *testing.T) {
 	}
 	if e.Data["panic"] != "kaboom" || e.Data["path"] != "/boom" || e.Data["query"] != "x=1" {
 		t.Errorf("fields = %+v", e.Data)
+	}
+}
+
+// The panic counter is what an alert watches; the log line alone was not
+// enough on 2026-09-18 (see RecoverToLog). The label is the route template,
+// not the concrete path.
+func TestRecoverToLog_CountsPanicUnderRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const route = "/recovery-test/:id"
+	labels := map[string]string{"route": route}
+	before := metricstest.Counter(t, "webui_panics_total", labels)
+
+	r := gin.New()
+	r.Use(gin.CustomRecovery(RecoverToLog))
+	r.GET(route, func(c *gin.Context) { panic("handler exploded") })
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/recovery-test/abc", nil))
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", w.Code)
+	}
+	if got := metricstest.Counter(t, "webui_panics_total", labels) - before; got != 1 {
+		t.Fatalf("panics_total{route=%q} = %v, want 1", route, got)
 	}
 }

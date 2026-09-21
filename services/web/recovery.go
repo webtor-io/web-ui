@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/webtor-io/web-ui/services/metrics"
 )
 
 // RecoverToLog is the router's panic recovery. gin.Default's recovery writes
@@ -23,5 +25,6 @@ func RecoverToLog(c *gin.Context, recovered any) {
 		"panic":  fmt.Sprint(recovered),
 		"stack":  string(debug.Stack()),
 	}).Error("panic recovered")
+	metrics.PanicRecovered(c)
 	c.AbortWithStatus(http.StatusInternalServerError)
 }

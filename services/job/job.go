@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/webtor-io/web-ui/services/metrics"
 )
 
 type Observer struct {
@@ -197,7 +199,7 @@ func (s *Job) Run(ctx context.Context) error {
 	}
 
 	if s.runnable != nil {
-		err := s.runnable.Run(ctx, s)
+		err := s.execute(ctx)
 		if err != nil {
 			errr := s.Error(err)
 			if errr != nil {
@@ -207,6 +209,34 @@ func (s *Job) Run(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// execute runs the script and reports its outcome exactly once. The log
+// lines for a failure are written twice (here in Error and again in retire),
+// so the counter lives with the execution rather than with the logging. A
+// replay of a stored result never reaches here and is not a run.
+func (s *Job) execute(ctx context.Context) (err error) {
+	metrics.JobStarted()
+	// A panicking script unwinds through this defer before Run's recover
+	// swallows it: with outcome left at error, a crashing script still counts.
+	outcome := metrics.JobError
+	defer func() {
+		metrics.JobFinished(s.Queue, outcome)
+	}()
+	err = s.runnable.Run(ctx, s)
+	outcome = outcomeOf(err)
+	return err
+}
+
+func outcomeOf(err error) string {
+	switch {
+	case err == nil:
+		return metrics.JobOK
+	case isStoplistBlock(err):
+		return metrics.JobRejected
+	default:
+		return metrics.JobError
+	}
 }
 
 func (s *Job) ObserveLog() *Observer {

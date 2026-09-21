@@ -39,6 +39,7 @@ import (
 
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/metrics"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 )
 
@@ -64,10 +65,10 @@ func RegisterHandler(r *gin.Engine, svc rec.Service) {
 	gr := r.Group("/discover/ai")
 	gr.Use(auth.HasAuth)
 	gr.GET("/chips", h.getChips)
-	gr.GET("/chips/stream", h.getChipsStream)
+	gr.GET("/chips/stream", metrics.Streaming, h.getChipsStream)
 	gr.POST("/chips/refresh", h.refreshChips)
-	gr.GET("/recommend/stream", h.recommendStream)
-	gr.GET("/refine/stream", h.refineStream)
+	gr.GET("/recommend/stream", metrics.Streaming, h.recommendStream)
+	gr.GET("/refine/stream", metrics.Streaming, h.refineStream)
 }
 
 // --- request / response dtos ---

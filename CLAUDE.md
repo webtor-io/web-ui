@@ -212,6 +212,7 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 ## Debugging
 
 - pprof/probe via `common-services` flags (secondary port)
+- Prometheus metrics on `PROM_PORT` (8083) `/metrics`, `USE_PROM` — collectors in `services/metrics`, see `docs/metrics.md`. **Locally `webpack-dev-server` also uses 8083**: set `USE_PROM=false` (or `PROM_PORT=8084`) in the run configuration or the Go process exits on bind
 - Test API without RapidAPI: port-forward `rest-api` from K8s or set `REST_API_SERVICE_HOST/PORT`
 - Asset path issues: use `--assets-path` or `WEB_ASSETS_HOST` for CDN
 - Ad testing: set cookie `test-ads` or query param `test-ads`

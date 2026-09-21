@@ -61,6 +61,7 @@ import (
 	"github.com/webtor-io/web-ui/services/libapi"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
 	"github.com/webtor-io/web-ui/services/memwatch"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/notification"
 	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
@@ -111,6 +112,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterPGFlags(c.Flags)
 	c.Flags = cs.RegisterNATSFlags(c.Flags)
 	c.Flags = cs.RegisterProbeFlags(c.Flags)
+	c.Flags = cs.RegisterPromFlags(c.Flags)
 	c.Flags = cs.RegisterS3ClientFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
 	c.Flags = w.RegisterFlags(c.Flags)
@@ -191,9 +193,19 @@ func serve(c *cli.Context) error {
 		servers = append(servers, pprof)
 		defer pprof.Close()
 	}
-	// Setting Gin
+
+	// Setting Prom
+	prom := cs.NewProm(c)
+	if prom != nil {
+		servers = append(servers, prom)
+		defer prom.Close()
+	}
+
+	// Setting Gin. The metrics middleware wraps recovery on purpose: it
+	// reads the status once the chain returns, and a panic returns through
+	// recovery, which writes the 500 (metrics.Middleware).
 	r := gin.New()
-	r.Use(gin.Logger(), gin.CustomRecovery(w.RecoverToLog))
+	r.Use(gin.Logger(), metrics.Middleware(), gin.CustomRecovery(w.RecoverToLog))
 	r.Use(w.ErrorHandler(tm.MustRegisterViews("error/*").WithLayout("main")))
 	s3Hosts := s3svc.Hosts(c)
 	apiHosts := libapi.Hosts(c)
