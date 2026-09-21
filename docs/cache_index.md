@@ -12,13 +12,16 @@ stored in the **Vault**. rest-api reports exactly that as `Meta.Cache` (a
 
 | Source (`source` column) | Written by | Taken back by | Believed for |
 |---|---|---|---|
-| `probe` | anything that asked the backend and got "cached": `link_resolver.ResolveLink` (Stremio, library), and every **stream and download job on the site** (`jobs/scripts/cache_note.go`) | the same question answered "no" (removes **every** source for that file), or age | `CACHE_INDEX_EXPIRE`, 12 h |
-| `seeder` | NATS `resource.cached` from the seeder — the file became complete on its disk | NATS `resource.uncached` from the seeder (piece eviction) or its disk cleaner (whole torrent), or age | `CACHE_INDEX_SEEDER_EXPIRE`, 7 d |
+| `probe` (1) | anything that asked the backend and got "cached": `link_resolver.ResolveLink` (Stremio, library), and every **stream and download job on the site** (`jobs/scripts/cache_note.go`) | the same question answered "no" (removes **every** source for that file), or age | `CACHE_INDEX_EXPIRE`, 12 h |
+| `seeder` (2) | NATS `resource.cached` from the seeder — the file became complete on its disk | NATS `resource.uncached` from the seeder (piece eviction) or its disk cleaner (whole torrent), or age | `CACHE_INDEX_SEEDER_EXPIRE`, 7 d |
 
 A whole torrent in the Vault is not in this table at all: readers take it from
 `vault.resource.vaulted` (`CacheIndex.Lookup`).
 
 ### Why the source is part of the key (migration 73)
+
+`source` is a `smallint`; the dictionary is `models.CacheSource` (numbers are
+never reused, and start at 1 because go-pg drops zero values from an insert).
 
 One shared row would let a cleaner's "gone from my disk" erase the knowledge
 that the same file is in the Vault — per-file Vault storage is known to the

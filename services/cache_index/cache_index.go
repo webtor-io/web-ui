@@ -105,7 +105,7 @@ func markKey(backendType models.StreamingBackendType, source models.CacheSource,
 // Unmark records that the backend, asked just now, does NOT have the file --
 // so whatever any source said before is over.
 func (s *CacheIndex) Unmark(ctx context.Context, backendType models.StreamingBackendType, resourceID string, fileIdx *int) error {
-	return s.unmark(ctx, backendType, "", resourceID, fileIdx)
+	return s.unmark(ctx, backendType, models.CacheSourceAny, resourceID, fileIdx)
 }
 
 // UnmarkFromSeeder records that the file left the seeder's disk; a nil fileIdx
@@ -128,7 +128,7 @@ func (s *CacheIndex) unmark(ctx context.Context, backendType models.StreamingBac
 	// The memo maps too, or a mark arriving within the minute would be taken
 	// for the one already written and the entry would stay deleted.
 	for _, src := range []models.CacheSource{models.CacheSourceProbe, models.CacheSourceSeeder} {
-		if source != "" && source != src {
+		if source != models.CacheSourceAny && source != src {
 			continue
 		}
 		if fileIdx != nil {

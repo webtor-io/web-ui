@@ -66,6 +66,12 @@ test('a good answer is applied; a list with no hashes is not asked about', async
         calls++;
         assert.match(url, /\/discover\/availability$/);
         assert.equal(JSON.parse(opts.body).items.length, 2);
+        // The route is a POST on the main engine, so the CSRF middleware
+        // answers 400 without this header -- and withCached would swallow that
+        // as "no answer": the chip would silently never appear.
+        assert.equal(opts.method, 'POST');
+        assert.equal(opts.headers['X-CSRF-TOKEN'], 'csrf-token');
+        assert.equal(opts.headers['Content-Type'], 'application/json');
         return { ok: true, json: async () => ({ cached: [1] }) };
     };
     const out = await withCached([s(1), s(2)], { fetchImpl });

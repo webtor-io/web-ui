@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -10,14 +11,33 @@ import (
 
 // CacheSource is where an index entry came from -- see migration 73 for why
 // the two are kept apart.
-type CacheSource string
+//
+// Stored as a smallint; this is the dictionary. Numbers are never reused or
+// renumbered -- they are in the table. They start at 1: go-pg leaves a zero
+// value out of an insert, and a source of 0 would quietly be written as the
+// column default.
+type CacheSource int16
 
 const (
+	// CacheSourceAny is not stored: it is "whatever the source" in a removal.
+	CacheSourceAny CacheSource = 0
 	// CacheSourceProbe: a backend was asked at play time and said "cached".
-	CacheSourceProbe CacheSource = "probe"
+	CacheSourceProbe CacheSource = 1
 	// CacheSourceSeeder: the seeder reported the file complete on its disk.
-	CacheSourceSeeder CacheSource = "seeder"
+	CacheSourceSeeder CacheSource = 2
 )
+
+func (s CacheSource) String() string {
+	switch s {
+	case CacheSourceAny:
+		return "any"
+	case CacheSourceProbe:
+		return "probe"
+	case CacheSourceSeeder:
+		return "seeder"
+	}
+	return fmt.Sprintf("source(%d)", int16(s))
+}
 
 // CacheWindows is how long an entry of each source is believed without being
 // confirmed again.
@@ -145,7 +165,7 @@ func GetCachedFiles(ctx context.Context, db *pg.DB, resourceIDs []string, backen
 
 // UnmarkCached drops index entries of one backend for a resource: one file
 // when fileIdx is set, every file of the resource when it is nil (the whole
-// torrent left the cache at once). An empty source means every source -- the
+// torrent left the cache at once). CacheSourceAny means every source -- the
 // backend itself was asked and said no; a named one removes only what that
 // source wrote, so the seeder losing a file cannot erase what is known of the
 // Vault.
@@ -159,7 +179,7 @@ func UnmarkCached(ctx context.Context, db *pg.DB, backendType StreamingBackendTy
 }
 
 func unmarkScope(q *pg.Query, source CacheSource, fileIdx *int) *pg.Query {
-	if source != "" {
+	if source != CacheSourceAny {
 		q = q.Where("source = ?", source)
 	}
 	if fileIdx != nil {

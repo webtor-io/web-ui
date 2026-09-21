@@ -39,13 +39,13 @@ func TestCacheIndexWindowsSQL(t *testing.T) {
 		ColumnExpr("DISTINCT resource_id, file_idx").
 		Where("resource_id IN (?)", pg.In([]string{"a", "b"})).
 		Where("backend_type = ?", StreamingBackendTypeWebtor)), "select")
-	wantSel := `SELECT DISTINCT resource_id, file_idx FROM "cache_index" AS "cache_index" WHERE (resource_id IN ('a','b')) AND (backend_type = 'webtor') AND (((source = 'seeder' AND last_seen_at >= 'TS')) OR ((source <> 'seeder' AND last_seen_at >= 'TS')))`
+	wantSel := `SELECT DISTINCT resource_id, file_idx FROM "cache_index" AS "cache_index" WHERE (resource_id IN ('a','b')) AND (backend_type = 'webtor') AND (((source = 2 AND last_seen_at >= 'TS')) OR ((source <> 2 AND last_seen_at >= 'TS')))`
 	if sel != wantSel {
 		t.Errorf("select:\n got %s\nwant %s", sel, wantSel)
 	}
 
 	del := renderSQL(t, w.stale(db.Model((*CacheIndex)(nil))), "delete")
-	if !strings.Contains(del, `WHERE (((source = 'seeder' AND last_seen_at < 'TS')) OR ((source <> 'seeder' AND last_seen_at < 'TS')))`) {
+	if !strings.Contains(del, `WHERE (((source = 2 AND last_seen_at < 'TS')) OR ((source <> 2 AND last_seen_at < 'TS')))`) {
 		t.Errorf("delete: %s", del)
 	}
 }
@@ -64,13 +64,48 @@ func TestUnmarkCachedScopesBySource(t *testing.T) {
 		return renderSQL(t, q, "delete")
 	}
 	three := 3
-	if got := build(CacheSourceSeeder, nil); !strings.HasSuffix(got, `AND (source = 'seeder')`) {
+	if got := build(CacheSourceSeeder, nil); !strings.HasSuffix(got, `AND (source = 2)`) {
 		t.Errorf("seeder, whole torrent: %s", got)
 	}
-	if got := build(CacheSourceSeeder, &three); !strings.HasSuffix(got, `AND (source = 'seeder') AND (file_idx = 3)`) {
+	if got := build(CacheSourceSeeder, &three); !strings.HasSuffix(got, `AND (source = 2) AND (file_idx = 3)`) {
 		t.Errorf("seeder, one file: %s", got)
 	}
-	if got := build("", &three); strings.Contains(got, "(source") || !strings.HasSuffix(got, `AND (file_idx = 3)`) {
+	if got := build(CacheSourceAny, &three); strings.Contains(got, "(source") || !strings.HasSuffix(got, `AND (file_idx = 3)`) {
 		t.Errorf("probe said no: every source goes, one file only: %s", got)
+	}
+}
+
+// The numbers are in the table: a renumbering is a silent data change.
+func TestCacheSourceDictionary(t *testing.T) {
+	if CacheSourceAny != 0 || CacheSourceProbe != 1 || CacheSourceSeeder != 2 {
+		t.Fatal("cache sources were renumbered")
+	}
+	// go-pg omits zero values from an insert: a stored source must not be 0.
+	for _, s := range []CacheSource{CacheSourceProbe, CacheSourceSeeder} {
+		if s == 0 {
+			t.Fatalf("%v is zero", s)
+		}
+	}
+	if CacheSourceSeeder.String() != "seeder" || CacheSource(9).String() != "source(9)" {
+		t.Fatal("names")
+	}
+}
+
+// What actually goes into the insert: the source as its number, and present.
+func TestMarkAsCachedInsertSQL(t *testing.T) {
+	db := pg.Connect(&pg.Options{Addr: "127.0.0.1:1"})
+	defer db.Close()
+	row := &CacheIndex{BackendType: StreamingBackendTypeWebtor, Source: CacheSourceSeeder, ResourceID: "h", FileIdx: 0, LastSeenAt: time.Unix(0, 0)}
+	q := db.Model(row).
+		Column("backend_type", "source", "resource_id", "file_idx", "last_seen_at").
+		OnConflict("(resource_id, file_idx, backend_type, source) DO UPDATE").
+		Set("last_seen_at = EXCLUDED.last_seen_at")
+	b, err := orm.NewInsertQuery(q).AppendQuery(orm.NewFormatter(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if !strings.Contains(got, `("backend_type", "source", "resource_id", "file_idx", "last_seen_at") VALUES ('webtor', 2, 'h', 0, `) {
+		t.Errorf("insert: %s", got)
 	}
 }
