@@ -33,12 +33,11 @@ test('readCarry: subtitles off is an intent too; a track with no language is not
     assert.deepEqual(readCarry(null), {});
 });
 
-test('prewarm at 90%, but not more than five minutes early, and only while watched', () => {
-    const base = { duration: 1200, playing: true, hidden: false, prewarmed: false, kind: 'episode' };
+test('prewarm at 90%, but not more than five minutes early, and only while playing', () => {
+    const base = { duration: 1200, playing: true, prewarmed: false, kind: 'episode' };
     assert.equal(advancePlan({ ...base, currentTime: 1000 }).prewarm, false, '83%');
     assert.equal(advancePlan({ ...base, currentTime: 1085 }).prewarm, true, '90%');
     assert.equal(advancePlan({ ...base, currentTime: 1085, playing: false }).prewarm, false, 'paused');
-    assert.equal(advancePlan({ ...base, currentTime: 1085, hidden: true }).prewarm, false, 'tab in the background');
     assert.equal(advancePlan({ ...base, currentTime: 1085, prewarmed: true }).prewarm, false, 'once');
     // A two-hour file: 90% is twelve minutes before the end -- longer than a
     // prepared render lives. Five minutes it is.
@@ -49,7 +48,7 @@ test('prewarm at 90%, but not more than five minutes early, and only while watch
 });
 
 test('the card is for video, in the last ten seconds when the credits are unknown', () => {
-    const base = { duration: 1200, playing: true, hidden: false, prewarmed: true, kind: 'episode' };
+    const base = { duration: 1200, playing: true, prewarmed: true, kind: 'episode' };
     assert.equal(advancePlan({ ...base, currentTime: 1180 }).card, false, 'twenty seconds out: not yet');
     assert.equal(advancePlan({ ...base, currentTime: 1191 }).card, true);
     assert.equal(advancePlan({ ...base, currentTime: 1191, kind: 'track' }).card, false, 'music just plays on');
@@ -89,7 +88,7 @@ test('the streak survives a transition and a storage that throws', () => {
 });
 
 test('known credits move the card and the prewarm earlier, never later', () => {
-    const base = { duration: 2700, playing: true, hidden: false, prewarmed: false, kind: 'episode' };
+    const base = { duration: 2700, playing: true, prewarmed: false, kind: 'episode' };
     // Credits at 2400 (five minutes of them). Without the hint: prewarm at
     // 2430 (90% = 2430, d-300 = 2400 -> max), card at 2675.
     assert.equal(advancePlan({ ...base, currentTime: 2350 }).prewarm, false);
@@ -133,7 +132,7 @@ test('a viewer who seeks into the credits still gets their ten seconds', () => {
 });
 
 test('music gets its next track ready from the middle, not from the last seconds', () => {
-    const song = { duration: 180, playing: true, hidden: false, prewarmed: false, kind: 'track' };
+    const song = { duration: 180, playing: true, prewarmed: false, kind: 'track' };
     assert.equal(advancePlan({ ...song, currentTime: 80 }).prewarm, false);
     assert.equal(advancePlan({ ...song, currentTime: 95 }).prewarm, true, 'half way: eighty-five seconds for a cold start');
     assert.equal(advancePlan({ ...song, currentTime: 95, kind: 'episode' }).prewarm, false, 'an episode still waits for 90%');
@@ -143,9 +142,13 @@ test('music gets its next track ready from the middle, not from the last seconds
     assert.equal(advancePlan({ ...chapter, currentTime: 3305 }).prewarm, true);
 });
 
-test('music prewarms in a background tab; a film does not', () => {
-    const base = { duration: 200, currentTime: 120, playing: true, hidden: true, prewarmed: false };
-    assert.equal(advancePlan({ ...base, kind: 'track' }).prewarm, true, 'that is where music plays');
-    assert.equal(advancePlan({ ...base, kind: 'track', playing: false }).prewarm, false);
-    assert.equal(advancePlan({ ...base, kind: 'episode', duration: 2000, currentTime: 1900 }).prewarm, false, 'nobody is watching a hidden film');
+test('the plan does not ask whether the tab is visible', () => {
+    // It used to, and music -- which lives in a background tab -- went
+    // unprepared; so did a film left playing to its end in one. The caller
+    // feeds this from `timeupdate`, which a background tab still fires.
+    const film = { duration: 2000, currentTime: 1900, playing: true, prewarmed: false, kind: 'episode' };
+    assert.equal(advancePlan({ ...film, hidden: true }).prewarm, true);
+    assert.equal(advancePlan({ ...film, playing: false, hidden: true }).prewarm, false, 'paused is still paused');
+    const song = { duration: 200, currentTime: 120, playing: true, prewarmed: false, kind: 'track' };
+    assert.equal(advancePlan({ ...song, hidden: true }).prewarm, true);
 });

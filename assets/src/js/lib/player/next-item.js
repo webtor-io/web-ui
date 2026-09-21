@@ -73,7 +73,7 @@ export const PREWARM_BEFORE_CREDITS_S = 60;
 // card from "the last ten seconds" to "when the talking stops", and the
 // prewarm ahead of that card, so that "Play now" on it does not mean a minute
 // of loading.
-export function advancePlan({ currentTime, duration, playing, hidden, prewarmed, kind, creditsAt = null }) {
+export function advancePlan({ currentTime, duration, playing, prewarmed, kind, creditsAt = null }) {
     const plan = { prewarm: false, card: false };
     if (!(duration > 0) || !(currentTime >= 0)) return plan;
     const remaining = duration - currentTime;
@@ -87,13 +87,16 @@ export function advancePlan({ currentTime, duration, playing, hidden, prewarmed,
     if (credits !== null) {
         threshold = Math.min(threshold, Math.max(credits - PREWARM_BEFORE_CREDITS_S, duration - PREWARM_EARLIEST_S));
     }
-    // "Being watched" means playing in a visible tab -- for a film. Music is
-    // LISTENED to, and the tab it plays in is in the background as a rule: the
-    // first night in production 11 of 14 automatic moves between tracks came
-    // unprepared, a gap of ~8 s between songs (2026-09-21). For a track,
-    // playing is enough.
-    const attended = kind === 'track' ? playing : (playing && !hidden);
-    plan.prewarm = !prewarmed && attended && currentTime >= threshold && remaining > 0;
+    // Playing is enough; whether the tab is visible is not asked. It used to
+    // be ("nobody is watching a hidden film"), and that was wrong twice over.
+    // Music lives in a background tab: the first night in production 11 of 14
+    // automatic moves between tracks came unprepared, ~8 s of silence between
+    // songs. And a film that plays to its end in a background tab moves on
+    // at `ended` all the same -- the start of the next file is not saved by
+    // refusing to prepare it, only moved to the moment it hurts. The waste the
+    // rule guarded against (a tab closed in the last 10%) is the same for a
+    // visible tab.
+    plan.prewarm = !prewarmed && playing && currentTime >= threshold && remaining > 0;
     // Music has no credits to sit through and no picture to cover: the next
     // track simply plays. The card is for video.
     const inCredits = credits !== null && currentTime >= credits;

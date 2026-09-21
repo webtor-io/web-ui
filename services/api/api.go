@@ -151,6 +151,14 @@ type ExtSubtitle struct {
 	MovieHashMatch *bool `json:"moviehash_match"`
 }
 
+type MediaProbeChapter struct {
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+	Tags      struct {
+		Title string `json:"title"`
+	} `json:"tags"`
+}
+
 type MediaProbe struct {
 	Format struct {
 		FormatName string `json:"format_name"`
@@ -167,7 +175,12 @@ type MediaProbe struct {
 			Title            string    `json:"title"`
 		} `json:"tags"`
 	} `json:"format"`
-	Streams []struct {
+	// Chapters is the container's chapter list (ffprobe -show_chapters), present
+	// for probes made since content-prober started asking for it (2026-09-21);
+	// an older cached probe simply has none. The player reads where the
+	// credits begin from it -- jobs/scripts/credits.go.
+	Chapters []MediaProbeChapter `json:"chapters,omitempty"`
+	Streams  []struct {
 		CodecName string `json:"codec_name"`
 		CodecType string `json:"codec_type"`
 		Width     int    `json:"width,omitempty"`

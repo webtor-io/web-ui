@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { creditsStart, parseVttTimings, cuesOfLoadedTracks, timingSourceURL } from './credits.js';
+import { creditsStart, parseVttTimings, cuesOfLoadedTracks, timingSourceURL, creditsFromElement } from './credits.js';
 
 // A 45-minute episode with a line every ~10 s up to `until`.
 function transcript(until, from = 5) {
@@ -81,4 +81,14 @@ test('the timing source is a whole-file track, never a translation or a muxed on
     </div>`).window.document;
     assert.equal(timingSourceURL(d.getElementById('m')), 'https://t/os.vtt');
     assert.equal(timingSourceURL(null), '');
+});
+
+test("the container's chapters answer first, inside the same bounds", () => {
+    const el = (v) => ({ dataset: v === undefined ? {} : { creditsAt: String(v) } });
+    assert.equal(creditsFromElement(el(2467.5), 2700), 2467.5);
+    assert.equal(creditsFromElement(el(undefined), 2700), null, 'no chapters, or an older cached probe');
+    assert.equal(creditsFromElement(el(1000), 2700), null, 'too early to be credits');
+    assert.equal(creditsFromElement(el(2690), 2700), null, 'nothing gained');
+    assert.equal(creditsFromElement(el(2467.5), 0), null, 'unknown duration');
+    assert.equal(creditsFromElement(null, 2700), null);
 });

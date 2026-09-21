@@ -214,11 +214,13 @@ one subtitle file.
 - A failed mount falls back to the visible way in: the old player is already gone by then, and a
   half-built page is the one outcome worse than a reload. A page without the start form or
   `#content` has no "next" at all (`canMoveOn`).
-- **Music prewarms in a background tab.** For a film "being watched" means playing in a visible
-  tab; music is listened to, and its tab is in the background as a rule. The plan for tracks ignores
-  `hidden` and is driven by the element's `timeupdate`, not by `state.currentTime` — that one is fed
-  by `requestAnimationFrame`, which a background tab does not run at all. First night in production:
-  11 of 14 automatic moves between tracks came unprepared, ~8 s of silence between songs.
+- **The prewarm does not ask whether the tab is visible**, and follows the element's `timeupdate`
+  rather than `state.currentTime` (fed by `requestAnimationFrame`, which a background tab does not
+  run at all). Music lives in a background tab: the first night in production 11 of 14 automatic
+  moves between tracks came unprepared, ~8 s of silence between songs. And a film left to play out
+  in a background tab moves on at `ended` all the same — refusing to prepare the next file does not
+  save its start, it only moves it to the moment it hurts. The card stays on the state-driven
+  effect: it is something to look at.
 - **Music prewarms from the middle** (`PREWARM_AT_TRACK` 0.5): 10% of a three-minute song is
   eighteen seconds, less than a cold start, and the album would stutter between tracks.
 - **The card is a top-layer popover** docked to the player's bottom-right corner, above the control
@@ -229,7 +231,18 @@ one subtitle file.
   a pink button here means a homepage CTA. `NextIcon` is Play's exact triangle plus a bar, in a
   30×24 box; the button is wider by what the bar adds, so the two triangles match.
 
-**Credits from subtitle timings — `credits.js`.** Dialogue ends, credits begin: the end of the last
+**Credits from the container's chapters — `jobs/scripts/credits.go`.** The file's own answer, and the
+first one asked: `content-prober` runs ffprobe with `-show_chapters` (since 2026-09-21), the stream
+job reads the earliest chapter whose title names the closing ("End Credits", "Ending", "ED", "Outro",
+«Титры», …) inside the 25 s … 10 min window before the end, and puts it on the player as
+`data-credits-at`. Earliest, because "Ending" is followed by "Preview" and "End Credits" by
+"Post-credits scene": the decision point is where the first begins, and there is a countdown and a
+Cancel from there. Generic names ("Chapter 12") say where, not what, and match nothing. Known from
+the first second, needs no subtitles (the subtitle guess found something in 11% of lookups the first
+night: 78% of streams had no whole-file track). Probes cached before the change have no chapters;
+they refresh within a week. RE2's `\b` is ASCII-only — the Cyrillic alternatives go without it.
+
+**Credits from subtitle timings — `credits.js`** (when the chapters say nothing)**.** Dialogue ends, credits begin: the end of the last
 cue + 3 s. It only moves things *earlier* — the card from "the last 10 s" to "when the talking
 stops", and the prewarm a minute ahead of that (never earlier than a prepared render lives, 8 min).
 With autoplay on, the card counts down `COUNTDOWN_S` (10 s) from the start of the credits and then

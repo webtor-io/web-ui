@@ -14,7 +14,7 @@ import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
 import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
 import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
-import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL } from './credits';
+import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
@@ -1064,6 +1064,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // "watched" marks the server keeps (signed in). Anyone else has no
         // use for the answer, and the lookup can cost a request.
         if (!isVideo || creditsTriedRef.current || !(next ? next.kind !== 'track' : !!window._userId)) return;
+        // The container's chapters first: the file's own answer, no subtitles
+        // needed, and known from the first second rather than from 60%.
+        if (state.duration > 0) {
+            const fromChapters = creditsFromElement(videoEl, state.duration);
+            if (fromChapters !== null) {
+                creditsTriedRef.current = true;
+                creditsAtRef.current = fromChapters;
+                track('next-item-credits', { source: 'chapters', found: true, lead_s: Math.round(state.duration - fromChapters), next: !!next });
+                return;
+            }
+        }
         if (!(state.duration > 0) || state.currentTime < state.duration * 0.6) return;
         creditsTriedRef.current = true;
         const duration = state.duration;
@@ -1091,10 +1102,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (!next || !nextGoRef.current) return;
         const plan = advancePlan({
             currentTime: state.currentTime, duration: state.duration, playing: state.playing,
-            hidden: typeof document !== 'undefined' && document.hidden,
             prewarmed: nextGoRef.current.isPrepared(), kind: next.kind, creditsAt: creditsAtRef.current,
         });
-        if (plan.prewarm) nextGoRef.current.prepare();
+        // The prewarm is not decided here: see the `timeupdate` effect below.
         if (plan.card && !nextCancelledRef.current && nextCard === null) {
             cardShownAtRef.current = state.currentTime;
             setNextCard('soon');
@@ -1114,20 +1124,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             }
         }
     }, [state.currentTime, state.duration, state.playing]);
-    // Music: the same plan, driven by the element's own `timeupdate`. The
-    // effect above follows state.currentTime, which is fed by
-    // requestAnimationFrame -- and a background tab, where music lives, runs
-    // no animation frames at all: the prewarm never got its turn. `timeupdate`
-    // keeps firing there (about once a second).
+    // The prewarm follows the element's own `timeupdate`, for every kind of
+    // file. The effect above follows state.currentTime, which is fed by
+    // requestAnimationFrame -- and a background tab, where music lives and
+    // where a film may well be left to play out, runs no animation frames at
+    // all: the prewarm never got its turn there. `timeupdate` keeps firing
+    // (about once a second). The card stays with the effect above: it is
+    // something to look at, and a hidden tab has nobody looking.
     useEffect(() => {
         const video = videoRef.current;
-        if (!next || next.kind !== 'track' || !video || !nextGoRef.current) return undefined;
+        if (!next || !video || !nextGoRef.current) return undefined;
         const onTime = () => {
             const dur = seekPosRef.current.duration || video.duration || 0;
             const plan = advancePlan({
                 currentTime: (video.currentTime || 0) + seekOffsetRef.current, duration: dur,
-                playing: !video.paused, hidden: false,
-                prewarmed: nextGoRef.current.isPrepared(), kind: 'track',
+                playing: !video.paused, prewarmed: nextGoRef.current.isPrepared(),
+                kind: next.kind, creditsAt: creditsAtRef.current,
             });
             if (plan.prewarm) nextGoRef.current.prepare();
         };

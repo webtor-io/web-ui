@@ -70,6 +70,17 @@ export function creditsStart(cues, duration) {
     return at;
 }
 
+// creditsFromElement: the container's own answer, when the server found one in
+// the file's chapters (jobs/scripts/credits.go -> data-credits-at). Validated
+// here against the same bounds as everything else -- the attribute is ours,
+// but the duration the server saw and the one the player has can differ.
+export function creditsFromElement(el, duration) {
+    const raw = el && el.dataset ? parseFloat(el.dataset.creditsAt) : NaN;
+    if (!(raw > 0) || !(duration > 0)) return null;
+    if (raw > duration - MIN_GAIN_S || raw < duration - MAX_CREDITS_S) return null;
+    return raw;
+}
+
 // --- Where the timings come from -------------------------------------------
 
 // cuesOfLoadedTracks: film-time cues of element-backed <track>s that already

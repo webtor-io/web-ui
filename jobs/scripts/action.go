@@ -53,6 +53,9 @@ type StreamContent struct {
 	// /ext/ with the same credentials as the initial render.
 	EIURL               string
 	VideoStreamUserData *models.VideoStreamUserData
+	// CreditsAt is where the closing credits begin, in seconds, as the
+	// container's chapters say it (credits.go); 0 when they do not.
+	CreditsAt float64
 	// Next is the file that follows this one, nil when there is none.
 	Next              *NextItem
 	Settings          *models.StreamSettings
@@ -636,6 +639,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		log.WithError(probeErr).Warn("failed to get content probe")
 	} else {
 		sc.MediaProbe = mp
+		sc.CreditsAt = creditsFromChapters(mp)
 		log.Infof("got media probe %+v", mp)
 	}
 	j.Done()

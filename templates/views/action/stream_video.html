@@ -14,6 +14,7 @@
            data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
            {{/* The file that follows this one (jobs/scripts/next_item.go): absent =
                 no "next" control, no autoplay. See docs/player.md. */}}
+           {{ if .CreditsAt }}data-credits-at="{{ .CreditsAt }}"{{ end }}
            {{ if .Next }}data-next-item-id="{{ .Next.ItemID }}" data-next-path="{{ .Next.Path }}" data-next-kind="{{ .Next.Kind }}" data-next-label="{{ .Next.Label }}"{{ end }}
            data-path="{{ .Item.PathStr }}"
            {{ if .Title }}data-resource-title="{{ .Title }}"{{ end }}
