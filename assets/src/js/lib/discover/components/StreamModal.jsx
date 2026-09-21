@@ -858,14 +858,6 @@ function StreamRow({ stream, info, onStreamClick }) {
             </div>
             <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 flex-wrap">
-                    {/* First in the row, before the source's name: it is the one
-                        thing here that is about the wait, and the eye lands on
-                        the left edge. */}
-                    {stream.cached && (
-                        <span class="bg-w-cyan text-w-bg text-[10px] px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-0.5" title={t('discover.cachedHint')}>
-                            {CACHED_CHIP_ICON}{t('discover.cached')}
-                        </span>
-                    )}
                     <span class="text-sm font-medium">{info.source}</span>
                     {info.labels.map(label => (
                         <span key={label} class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{label}</span>
@@ -877,6 +869,14 @@ function StreamRow({ stream, info, onStreamClick }) {
                     {(stream.alsoFrom || []).map(name => (
                         <span key={name} class="border border-w-line text-w-muted text-[10px] px-1.5 py-0.5 rounded font-medium" title={t('discover.alsoFrom')}>+ {name}</span>
                     ))}
+                    {/* Last: the chips before it describe the release, this one is
+                        an extra about the wait (owner, 2026-09-21). Being filled
+                        is what makes it findable, not its place. */}
+                    {stream.cached && (
+                        <span class="bg-w-cyan text-w-bg text-[10px] px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-0.5" title={t('discover.cachedHint')}>
+                            {CACHED_CHIP_ICON}{t('discover.cached')}
+                        </span>
+                    )}
                 </div>
                 {titleLines.map((line, i) => (
                     <div key={i} class="text-xs text-w-sub line-clamp-1">{line}</div>
