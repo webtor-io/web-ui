@@ -1114,6 +1114,27 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             }
         }
     }, [state.currentTime, state.duration, state.playing]);
+    // Music: the same plan, driven by the element's own `timeupdate`. The
+    // effect above follows state.currentTime, which is fed by
+    // requestAnimationFrame -- and a background tab, where music lives, runs
+    // no animation frames at all: the prewarm never got its turn. `timeupdate`
+    // keeps firing there (about once a second).
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!next || next.kind !== 'track' || !video || !nextGoRef.current) return undefined;
+        const onTime = () => {
+            const dur = seekPosRef.current.duration || video.duration || 0;
+            const plan = advancePlan({
+                currentTime: (video.currentTime || 0) + seekOffsetRef.current, duration: dur,
+                playing: !video.paused, hidden: false,
+                prewarmed: nextGoRef.current.isPrepared(), kind: 'track',
+            });
+            if (plan.prewarm) nextGoRef.current.prepare();
+        };
+        video.addEventListener('timeupdate', onTime);
+        return () => video.removeEventListener('timeupdate', onTime);
+    }, []);
+
     // The end of the file.
     useEffect(() => {
         const video = videoRef.current;

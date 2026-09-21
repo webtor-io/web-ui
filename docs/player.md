@@ -214,6 +214,11 @@ one subtitle file.
 - A failed mount falls back to the visible way in: the old player is already gone by then, and a
   half-built page is the one outcome worse than a reload. A page without the start form or
   `#content` has no "next" at all (`canMoveOn`).
+- **Music prewarms in a background tab.** For a film "being watched" means playing in a visible
+  tab; music is listened to, and its tab is in the background as a rule. The plan for tracks ignores
+  `hidden` and is driven by the element's `timeupdate`, not by `state.currentTime` — that one is fed
+  by `requestAnimationFrame`, which a background tab does not run at all. First night in production:
+  11 of 14 automatic moves between tracks came unprepared, ~8 s of silence between songs.
 - **Music prewarms from the middle** (`PREWARM_AT_TRACK` 0.5): 10% of a three-minute song is
   eighteen seconds, less than a cold start, and the album would stutter between tracks.
 - **The card is a top-layer popover** docked to the player's bottom-right corner, above the control

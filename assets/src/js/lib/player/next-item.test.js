@@ -142,3 +142,10 @@ test('music gets its next track ready from the middle, not from the last seconds
     assert.equal(advancePlan({ ...chapter, currentTime: 1900 }).prewarm, false);
     assert.equal(advancePlan({ ...chapter, currentTime: 3305 }).prewarm, true);
 });
+
+test('music prewarms in a background tab; a film does not', () => {
+    const base = { duration: 200, currentTime: 120, playing: true, hidden: true, prewarmed: false };
+    assert.equal(advancePlan({ ...base, kind: 'track' }).prewarm, true, 'that is where music plays');
+    assert.equal(advancePlan({ ...base, kind: 'track', playing: false }).prewarm, false);
+    assert.equal(advancePlan({ ...base, kind: 'episode', duration: 2000, currentTime: 1900 }).prewarm, false, 'nobody is watching a hidden film');
+});

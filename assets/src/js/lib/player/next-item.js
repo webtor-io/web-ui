@@ -87,7 +87,13 @@ export function advancePlan({ currentTime, duration, playing, hidden, prewarmed,
     if (credits !== null) {
         threshold = Math.min(threshold, Math.max(credits - PREWARM_BEFORE_CREDITS_S, duration - PREWARM_EARLIEST_S));
     }
-    plan.prewarm = !prewarmed && playing && !hidden && currentTime >= threshold && remaining > 0;
+    // "Being watched" means playing in a visible tab -- for a film. Music is
+    // LISTENED to, and the tab it plays in is in the background as a rule: the
+    // first night in production 11 of 14 automatic moves between tracks came
+    // unprepared, a gap of ~8 s between songs (2026-09-21). For a track,
+    // playing is enough.
+    const attended = kind === 'track' ? playing : (playing && !hidden);
+    plan.prewarm = !prewarmed && attended && currentTime >= threshold && remaining > 0;
     // Music has no credits to sit through and no picture to cover: the next
     // track simply plays. The card is for video.
     const inCredits = credits !== null && currentTime >= credits;
