@@ -191,3 +191,22 @@ func DeleteResource(ctx context.Context, db *pg.DB, resourceID string) error {
 	}
 	return nil
 }
+
+// GetVaultedResourceIDs returns which of the given resources are fully in the
+// Vault -- the batch form of GetResource(...).Vaulted.
+func GetVaultedResourceIDs(ctx context.Context, db *pg.DB, resourceIDs []string) ([]string, error) {
+	var out []string
+	if len(resourceIDs) == 0 {
+		return out, nil
+	}
+	err := db.Model((*Resource)(nil)).
+		Context(ctx).
+		Column("resource_id").
+		Where("resource_id IN (?)", pg.In(resourceIDs)).
+		Where("vaulted = ?", true).
+		Select(&out)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get vaulted resources")
+	}
+	return out, nil
+}

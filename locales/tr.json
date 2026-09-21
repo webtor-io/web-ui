@@ -878,6 +878,8 @@
     "discover.warning4kBody": "4K içerik çok büyüktür ve video yayını büyük olasılıkla çalışmayacaktır. Ayrıca 4K için devre dışı bırakılan kod dönüştürme gerektirebilir. Yalnızca indirme önerilir.",
     "discover.show4k": "4K göster",
     "discover.noTorrent": "Torrent yok",
+    "discover.cached": "Anında",
+    "discover.cachedHint": "Zaten Webtor'da: torrent beklenmeden başlar",
     "discover.alsoFrom": "Bu kaynak da buldu",
     "discover.noEpisodes": "Bölüm bulunamadı.",
     "discover.specials": "Özel bölümler",

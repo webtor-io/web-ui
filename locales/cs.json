@@ -888,6 +888,8 @@
     "discover.warning4kBody": "4K obsah je velmi velký a streamování videa s největší pravděpodobností nebude fungovat. Může také vyžadovat překódování, které je pro 4K zakázáno. Doporučuje se pouze stažení.",
     "discover.show4k": "Zobrazit 4K",
     "discover.noTorrent": "Žádný torrent",
+    "discover.cached": "Okamžitě",
+    "discover.cachedHint": "Už je na Webtoru: spustí se bez čekání na torrent",
     "discover.alsoFrom": "Tento zdroj to našel také",
     "discover.noEpisodes": "Nebyly nalezeny žádné epizody.",
     "discover.specials": "Speciály",

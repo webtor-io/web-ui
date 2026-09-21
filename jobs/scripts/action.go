@@ -563,6 +563,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		return errors.New("resource has no stream export")
 	}
 	seMeta := exportMeta(se)
+	noteCache(s.cacheIndex, resourceID, exportResponse.Source, seMeta.Cache)
 
 	var downloadSpeed float64
 	var quickElapsed time.Duration
@@ -946,6 +947,8 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	j.Done()
 	de := resp.ExportItems["download"]
 	//url := de.URL
+	// A directory download has no file of its own to index (noteCache skips it).
+	noteCache(s.cacheIndex, resourceID, resp.Source, exportMeta(de).Cache)
 	if !exportMeta(de).Cache {
 		const downloadHeadWarmup = 1024 * 1024
 		statsURL := resp.ExportItems["torrent_client_stat"].URL
@@ -1388,6 +1391,7 @@ type ActionScript struct {
 	thumbnail     *thumb.Service
 	enricher      *enrich.Enricher
 	prefs         *streamprefs.Service
+	cacheIndex    CacheIndexer // cache_note.go; nil is fine
 	resourceId    string
 	itemId        string
 	action        string
@@ -1519,7 +1523,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, cacheIndex CacheIndexer, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags) + "/" + vsud.Carry.Key()
 	settingsID := fmt.Sprintf("%+v", settings)
 	now := time.Now().UTC()
@@ -1605,6 +1609,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 			thumbnail:     thumbnailSvc,
 			enricher:      enricher,
 			prefs:         prefs,
+			cacheIndex:    cacheIndex,
 			c:             c,
 			resourceId:    resourceID,
 			itemId:        itemID,

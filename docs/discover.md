@@ -441,3 +441,7 @@ Uses the [Stremio addon protocol](https://github.com/Stremio/stremio-addon-sdk/b
 - Search: `GET {baseUrl}/catalog/{type}/{catalogId}/search={query}.json`
 - Meta: `GET {baseUrl}/meta/{type}/{id}.json`
 - Streams: `GET {baseUrl}/stream/{type}/{id}.json`
+
+## Cached streams first
+
+Streams Webtor already holds get an "Instant" chip and are listed first — see `docs/cache_index.md` (`POST /discover/availability`).

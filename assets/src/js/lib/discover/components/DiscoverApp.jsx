@@ -8,6 +8,7 @@ import {
 } from './discoverReducer';
 import { StreamModal } from './StreamModal';
 import { dedupeStreamsByHash, interleaveBySource } from '../stream';
+import { withCached } from '../availabilityClient';
 import { AddonWizard } from './AddonWizard';
 import { loadPrefs, savePrefs, getViewMode } from '../prefs';
 import { useDiscoverUrl } from './useDiscoverUrl';
@@ -481,7 +482,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         // Dedup first (order decides which copy wins), then interleave so
         // every source is visible near the top rather than whichever one
         // returned the most results.
-        const allStreams = interleaveBySource(dedupeStreamsByHash(bySource.flat()));
+        // ...and what Webtor already holds goes above all of it, marked (see
+        // availabilityClient.js). Awaited, so the order is final when shown.
+        const allStreams = await withCached(interleaveBySource(dedupeStreamsByHash(bySource.flat())));
+        if (!current()) return;
         // Carry per-addon statuses into the streams view so the modal can
         // surface "Torrentio failed" instead of degrading silently to the
         // generic "no streams" empty-state. Combines fetch-time errors
@@ -490,7 +494,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const failedFromFetch = addonStatuses.filter(s => s.status === 'error');
         const failedAddons = [...failedFromFetch, ...inferredFailures];
         dispatch({ type: 'SHOW_MODAL', modal: { view: 'streams', title, poster, metaId, itemType, ...itemMeta, streams: allStreams, addons: [...addonStatuses], failedAddons, ...modalExtra } });
-        window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length, failedAddons: failedAddons.length });
+        window.umami?.track('discover-streams-loaded', { type, id, count: allStreams.length, cached: allStreams.filter(s => s.cached).length, failedAddons: failedAddons.length });
     }, [client]);
 
     const cardClick = useCallback(async (item) => {
@@ -1096,6 +1100,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 if (streams.length > 0) break;
                 if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
             }
+            streams = await withCached(streams);
             dispatch({ type: 'SHOW_MODAL', modal: {
                 view: 'streams', title: pending.title, poster: pending.poster, ...pendingIdentity, streams,
                 backToEpisodes: pending.backToEpisodes,

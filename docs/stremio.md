@@ -209,3 +209,7 @@ P2P addons (e.g. Torrentio without debrid) play via Stremio's torrent engine and
 skip the HTTP HEAD probe, so they binge even when an HTTP addon does not — a
 useful tell when debugging: if Torrentio binges and webtor doesn't, suspect the
 playback URL (HEAD reachability / non-404), not the bingeGroup.
+
+## Where the bolt comes from
+
+The cache index and who feeds it: `docs/cache_index.md`.

@@ -188,7 +188,9 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	// neither service is needed. Enricher is plumbed through so the
 	// player overlay's title respects IMDb-matched metadata even on
 	// embed pages — falls back to the file basename when nil.
-	as, _ := Action(s.tb, s.api, s.i18n, nil, nil, s.enricher, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmup, GraceSettings{}, false, "", "", nil)
+	// No cache index either: embed starts do not report to it. What they
+	// complete in the seeder reaches the index through the seeder's events.
+	as, _ := Action(s.tb, s.api, s.i18n, nil, nil, s.enricher, nil, nil, s.c, id, i.ID, action, &s.settings.StreamSettings, s.dsd, vsud, s.warmup, GraceSettings{}, false, "", "", nil)
 	err = as.Run(ctx, j)
 	if err != nil {
 		return err

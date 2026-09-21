@@ -426,7 +426,11 @@ func serve(c *cli.Context) error {
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))
 
 	streamPrefs := streamprefs.New(c, pg)
-	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc, streamPrefs)
+	// Setting CacheIndex. Before the jobs: stream and download starts report
+	// to it (jobs/scripts/cache_note.go).
+	cacheIndex := ci.New(c, pg)
+
+	jobs := jj.New(c, queues, tm, sapi, en, i18nSvc, userSubtitleSvc, thumbnailSvc, uc, streamPrefs, cacheIndex)
 
 	// Setting JobHandler
 	wj.RegisterHandler(r, queues)
@@ -560,7 +564,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting Discover
-	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil)
+	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil, cacheIndex)
 
 	// Setting Discover Watchlist
 	discover_watchlist.RegisterHandler(r, pg, en)
@@ -572,9 +576,6 @@ func serve(c *cli.Context) error {
 	// set the service is nil; RegisterHandler skips its routes and the UI
 	// hides the feature.
 	ush.RegisterHandler(r, tm, userSubtitleSvc, sapi)
-
-	// Setting CacheIndex
-	cacheIndex := ci.New(c, pg)
 
 	// Setting AddonValidator with custom client and cli context
 	av := stremios.NewAddonValidator(c, stremioAddonCl)
@@ -620,7 +621,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Events
 	if nats != nil {
-		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c))
+		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), cacheIndex)
 		if eh != nil {
 			servers = append(servers, eh)
 			defer eh.Close()

@@ -888,6 +888,8 @@
     "discover.warning4kBody": "Treści 4K są bardzo duże i streaming wideo najprawdopodobniej nie będzie działać. Może również wymagać transkodowania, które jest wyłączone dla 4K. Zalecane jest tylko pobieranie.",
     "discover.show4k": "Pokaż 4K",
     "discover.noTorrent": "Brak torrenta",
+    "discover.cached": "Od razu",
+    "discover.cachedHint": "Już na Webtor: startuje bez czekania na torrent",
     "discover.alsoFrom": "To źródło też to znalazło",
     "discover.noEpisodes": "Nie znaleziono odcinków.",
     "discover.specials": "Odcinki specjalne",

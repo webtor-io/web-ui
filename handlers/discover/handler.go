@@ -2,6 +2,7 @@ package discover
 
 import (
 	"context"
+	"github.com/webtor-io/web-ui/services/cache_index"
 	"net/http"
 	"net/url"
 	"time"
@@ -89,9 +90,11 @@ type Handler struct {
 	// aiEnabled mirrors whether serve.go registered the recommendations
 	// routes at all; see indexData.AIEnabled for why the page has to be told.
 	aiEnabled bool
+	// ci answers which streams are already cached -- see availability.go.
+	ci availabilityLookup
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder, aiEnabled bool) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder, aiEnabled bool, index *cache_index.CacheIndex) {
 	h := &Handler{
 		tb:        tm.MustRegisterViews("discover/*").WithLayout("main"),
 		pg:        pg,
@@ -99,10 +102,14 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 		sb:        sb,
 		aiEnabled: aiEnabled,
 	}
+	if index != nil {
+		h.ci = index
+	}
 	r.GET("/discover", h.index)
 	r.POST("/discover/localize", auth.HasAuth, h.localize)
 	r.POST("/discover/reviews", auth.HasAuth, h.reviews)
 	r.POST("/discover/torznab/streams", auth.HasAuth, h.torznabStreams)
+	r.POST("/discover/availability", auth.HasAuth, h.availability)
 }
 
 func (h *Handler) index(c *gin.Context) {

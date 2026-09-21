@@ -831,6 +831,15 @@ function FilterChips({ allSources, allLabels, allLangs, activeSources, activeLab
     );
 }
 
+// The mark of a stream Webtor already holds. Filled where the quality chips
+// are tinted: it is the one chip that says something about the wait, not about
+// the release.
+const CACHED_CHIP_ICON = (
+    <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </svg>
+);
+
 const PLAY_ICON = (
     <svg class="w-4 h-4 text-w-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -850,6 +859,11 @@ function StreamRow({ stream, info, onStreamClick }) {
             <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="text-sm font-medium">{info.source}</span>
+                    {stream.cached && (
+                        <span class="bg-w-cyan text-w-bg text-[10px] px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-0.5" title={t('discover.cachedHint')}>
+                            {CACHED_CHIP_ICON}{t('discover.cached')}
+                        </span>
+                    )}
                     {info.labels.map(label => (
                         <span key={label} class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{label}</span>
                     ))}

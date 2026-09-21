@@ -878,6 +878,8 @@
     "discover.warning4kBody": "4K-content is erg groot en videostreaming zal hoogstwaarschijnlijk niet werken. Het kan ook transcodering vereisen, die is uitgeschakeld voor 4K. Alleen downloaden wordt aanbevolen.",
     "discover.show4k": "4K tonen",
     "discover.noTorrent": "Geen torrent",
+    "discover.cached": "Direct",
+    "discover.cachedHint": "Al op Webtor: start zonder op de torrent te wachten",
     "discover.alsoFrom": "Deze bron vond het ook",
     "discover.noEpisodes": "Geen afleveringen gevonden.",
     "discover.specials": "Specials",

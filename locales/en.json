@@ -938,6 +938,8 @@
     "discover.warning4kBody": "4K content is very large and video streaming will most likely not work. It may also require transcoding, which is disabled for 4K. Only download is recommended.",
     "discover.show4k": "Show 4K",
     "discover.noTorrent": "No torrent",
+    "discover.cached": "Instant",
+    "discover.cachedHint": "Already on Webtor: starts without waiting for the torrent",
     "discover.alsoFrom": "Also found by this source",
     "discover.noEpisodes": "No episodes found.",
     "discover.specials": "Specials",
