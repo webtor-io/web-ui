@@ -108,12 +108,12 @@ func (m *mockReaperNotification) SendExpired(to string, _ uuid.UUID, r *vaultMod
 
 func newTestReaper(store reaperStore, v reaperVault, n reaperNotification) *reaper {
 	return &reaper{
-		store:                  store,
-		vault:                  v,
-		notification:           n,
-		expirePeriod:           7 * 24 * time.Hour,
-		abandonedExpirePeriod:  24 * time.Hour,
-		transferTimeoutPeriod:  7 * 24 * time.Hour,
+		store:                 store,
+		vault:                 v,
+		notification:          n,
+		expirePeriod:          7 * 24 * time.Hour,
+		abandonedExpirePeriod: 24 * time.Hour,
+		transferTimeoutPeriod: 7 * 24 * time.Hour,
 	}
 }
 
@@ -669,8 +669,8 @@ func TestRun_FullFlow_MixedResources(t *testing.T) {
 
 	store := &mockReaperStore{
 		expiredResources: []vaultModels.Resource{
-			makeResource("expired-res", expired),    // has ExpiredAt -> expiration
-			makeResource("timeout-res", nil),         // no ExpiredAt -> transfer timeout
+			makeResource("expired-res", expired), // has ExpiredAt -> expiration
+			makeResource("timeout-res", nil),     // no ExpiredAt -> transfer timeout
 		},
 		pledgesWithUsers: map[string][]vaultModels.Pledge{
 			"expired-res": {
@@ -947,5 +947,69 @@ func TestReapGhostResources_MixedWithExpired(t *testing.T) {
 	}
 	if len(n.calls) != 1 {
 		t.Errorf("expected 1 notification, got %d", len(n.calls))
+	}
+}
+
+// fkReaperVault refuses to remove a resource that still has pledges, the way
+// pledge_resource_fk (ON DELETE RESTRICT) does.
+type fkReaperVault struct {
+	mockReaperVault
+	pledges map[string]int
+}
+
+func (m *fkReaperVault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) error {
+	m.pledges[pledge.ResourceID]--
+	return m.mockReaperVault.RemovePledge(ctx, pledge)
+}
+
+func (m *fkReaperVault) RemoveResource(ctx context.Context, resourceID string) error {
+	if m.pledges[resourceID] > 0 {
+		return fmt.Errorf("violates foreign key constraint pledge_resource_fk")
+	}
+	return m.mockReaperVault.RemoveResource(ctx, resourceID)
+}
+
+// A ghost with an UNFUNDED pledge left on it: the pledger lost their points,
+// the pledge row stayed. Removing the resource alone deleted the content from
+// the Vault and then failed on the foreign key -- hourly, for three weeks
+// (a1ad8f2e, 2026-08-29..09-21), leaving a row that said "vaulted".
+func TestReapGhostResources_WithLeftoverPledge(t *testing.T) {
+	userID := uuid.NewV4()
+	pledgeID := uuid.NewV4()
+	store := &mockReaperStore{
+		ghostResources: []vaultModels.Resource{makeResource("ghost", nil)},
+		pledgesWithUsers: map[string][]vaultModels.Pledge{
+			"ghost": {makePledge(pledgeID, "ghost", userID, 25.8, &models.User{UserID: userID, Email: "user@example.com"})},
+		},
+	}
+	v := &fkReaperVault{pledges: map[string]int{"ghost": 1}}
+	n := &mockReaperNotification{}
+	r := newTestReaper(store, v, n)
+
+	r.reapGhostResources(context.Background())
+
+	if len(v.removePledgeCalls) != 1 || v.removePledgeCalls[0].pledgeID != pledgeID {
+		t.Fatalf("the leftover pledge was not removed: %+v", v.removePledgeCalls)
+	}
+	if len(v.removeResourceIDs) != 1 || v.removeResourceIDs[0] != "ghost" {
+		t.Fatalf("the ghost was not removed: %v", v.removeResourceIDs)
+	}
+	// The content was stored and lost its funding: "expired", not "we could
+	// not store it" -- although ExpiredAt is nil, which is what processResource
+	// reads as a transfer timeout.
+	if len(n.calls) != 1 || n.calls[0].action != "expired" {
+		t.Fatalf("notification: %+v", n.calls)
+	}
+}
+
+// The case the ghost sweep was written for: the user is gone, the pledges went
+// with them.
+func TestReapGhostResources_NoPledges(t *testing.T) {
+	store := &mockReaperStore{ghostResources: []vaultModels.Resource{makeResource("ghost", nil)}}
+	v := &fkReaperVault{pledges: map[string]int{}}
+	n := &mockReaperNotification{}
+	newTestReaper(store, v, n).reapGhostResources(context.Background())
+	if len(v.removeResourceIDs) != 1 || len(n.calls) != 0 {
+		t.Fatalf("removed %v, notified %+v", v.removeResourceIDs, n.calls)
 	}
 }

@@ -462,3 +462,19 @@ torrents itself, and a stream that closes after a quiet spell is that, not an
 interruption — it falls back to idle instead of waking a pod for a badge. Meanwhile the last
 status stays on screen without speed or verdicts; after the retries the badge
 goes to "status unavailable". Review: `?debug_status=caching&progress=40&noseeders=1`.
+
+## Ghost resources (reaper)
+
+A ghost is a resource with `funded_vp > 0` and no *funded* pledge
+(`GetGhostResources`). It was written for account deletion, where the pledges
+cascade away with the user — but a pledger who merely lost their points leaves
+an **unfunded pledge row behind**, and `vault.pledge` references the resource
+`ON DELETE RESTRICT`.
+
+The sweep therefore goes through the same path as any reaped resource
+(`reaper.reapResource`): pledges removed and pledgers told first, the resource
+last. Until 2026-09-21 it called `RemoveResource` alone, which deleted the
+content from the Vault, failed on the foreign key, and left the row saying
+`vaulted = true` — every hour, for the one resource it happened to
+(2026-08-29 → 09-21). The message is "expired", not "transfer timeout": the
+content was stored, its funding went away.

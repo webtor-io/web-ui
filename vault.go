@@ -217,20 +217,26 @@ func (r *reaper) reapGhostResources(ctx context.Context) {
 			WithField("funded_vp", resource.FundedVP).
 			Info("removing ghost resource")
 
-		err := r.vault.RemoveResource(ctx, resource.ResourceID)
-		if err != nil {
-			log.WithError(err).
-				WithField("resource_id", resource.ResourceID).
-				Warn("failed to remove ghost resource")
-			continue
-		}
-
-		log.WithField("resource_id", resource.ResourceID).Info("removed ghost resource")
+		// A ghost can still have pledges -- unfunded ones. The account-deletion
+		// case this was written for has none (they cascade away with the user),
+		// but a pledger who merely lost their points leaves one behind, and
+		// then RemoveResource alone did the worst of both: it deleted the
+		// content from the Vault, failed on pledge_resource_fk, and left the
+		// row saying "vaulted" -- every hour, from 2026-08-29 to 2026-09-21
+		// for the one resource it happened to. So: the same path as any other
+		// reaped resource. "Expired" is the message, not "transfer timeout":
+		// the content was stored, its funding went away.
+		r.reapResource(ctx, resource, false)
 	}
 }
 
 func (r *reaper) processResource(ctx context.Context, resource vaultModels.Resource) {
-	isTransferTimeout := resource.ExpiredAt == nil
+	r.reapResource(ctx, resource, resource.ExpiredAt == nil)
+}
+
+// reapResource removes the pledges (each pledger is told), then the resource.
+// In that order: vault.pledge references the resource ON DELETE RESTRICT.
+func (r *reaper) reapResource(ctx context.Context, resource vaultModels.Resource, isTransferTimeout bool) {
 
 	log.WithField("resource_id", resource.ResourceID).
 		WithField("is_transfer_timeout", isTransferTimeout).
