@@ -163,6 +163,10 @@ func TestPitch(t *testing.T) {
 		// 4.3 GiB at 5 Mbps ≈ 2 h 3 min; at 50 Mbps ≈ 12 min.
 		{"typical movie", silver, 43 * gb / 10, 5, false, "offer.eta.hMin map[H:2 M:3]", "offer.eta.min map[M:12]"},
 		{"small file is not worth it", silver, 50 << 20, 5, true, "", ""},
+		// 123 MB is a 3-minute wait: "3 min instead of 20 s" sells nothing.
+		{"under ten minutes", silver, 123 << 20, 5, true, "", ""},
+		// Just over the threshold: the fast side is counted in seconds.
+		{"ten minutes", silver, 400 << 20, 5, false, "offer.eta.min map[M:11]", "offer.eta.min map[M:1]"},
 		{"size unknown", silver, 0, 5, true, "", ""},
 		{"user rate unlimited", silver, 4 * gb, 0, true, "", ""},
 		{"plan not faster", silver, 4 * gb, 50, true, "", ""},
@@ -192,7 +196,12 @@ func TestDurationParts(t *testing.T) {
 		key  string
 		data string
 	}{
-		{5, "offer.eta.min", "map[M:1]"},
+		// Under a minute: seconds in fives, never "1 min" — rounding 20 s up
+		// made a 10× plan read as 3× next to a 3-minute wait.
+		{1, "offer.eta.sec", "map[S:5]"},
+		{21, "offer.eta.sec", "map[S:20]"},
+		{57, "offer.eta.sec", "map[S:55]"},
+		{58, "offer.eta.min", "map[M:1]"},
 		{89, "offer.eta.min", "map[M:1]"},
 		{91, "offer.eta.min", "map[M:2]"},
 		{3599, "offer.eta.h", "map[H:1]"},
@@ -207,6 +216,31 @@ func TestDurationParts(t *testing.T) {
 		k, d := durationParts(c.sec)
 		if k != c.key || fmt.Sprint(d) != c.data {
 			t.Errorf("%v s: got %s %v, want %s %s", c.sec, k, d, c.key, c.data)
+		}
+	}
+}
+
+// The CTA quotes how many times faster the plan is — a number from the
+// catalog, rounded down, and only when it is worth saying.
+func TestSpeedUp(t *testing.T) {
+	silver := &Offer{Tier: "silver", RateMbps: 50}
+	cases := []struct {
+		name string
+		o    *Offer
+		rate int
+		want int
+	}{
+		{"free to silver", silver, 5, 10},
+		{"bronze to silver: 2.5× rounds down", silver, 20, 2},
+		{"under 2× is not a pitch", silver, 30, 0},
+		{"same speed", silver, 50, 0},
+		{"viewer rate unknown", silver, 0, 0},
+		{"unlimited plan has no ratio", &Offer{Tier: "sparkling"}, 5, 0},
+		{"no offer", nil, 5, 0},
+	}
+	for _, c := range cases {
+		if got := speedUp(c.o, c.rate); got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
 		}
 	}
 }

@@ -584,8 +584,8 @@
     "action.download.downloadStarting": "Download starting...",
     "action.download.cancel": "cancel",
     "action.download.copied": "Copied!",
-    "action.download.limitedTitle": "Downloading at {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} takes about {{.Slow}} at this speed — about {{.Fast}} at {{.FastRate}} Mbps",
+    "action.download.limitedTitle": "Download speed is capped at {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} takes about {{.Slow}}. With a subscription — about {{.Fast}}",
     "action.download.limitedSubUnlimited": "No speed cap with a subscription",
     "action.download.limitedSub": "Up to {{.Rate}} Mbps with a subscription",
     "action.noPeers.title": "This torrent has no active seeders right now",
@@ -618,6 +618,7 @@
     "action.slow.continueSlow": "Continue at slow speed",
     "action.upgrade.paid": "Upgrade plan",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} d",
@@ -626,8 +627,22 @@
         "one": "Try free for {{.Count}} day",
         "other": "Try free for {{.Count}} days"
     },
-    "offer.getRate": "Get {{.Rate}} Mbps",
-    "offer.getVault": "Get Vault",
+    "offer.downloadFaster": {
+        "one": "Download {{.Count}}× faster",
+        "other": "Download {{.Count}}× faster"
+    },
+    "offer.downloadUpTo": {
+        "one": "Download up to {{.Count}}× faster",
+        "other": "Download up to {{.Count}}× faster"
+    },
+    "offer.downloadFasterPlain": "Download faster",
+    "offer.watchUncapped": "Watch without the speed cap",
+    "offer.keepFullSpeed": "Keep watching at full speed",
+    "offer.saveToVault": "Save to Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} day free · cancel anytime",
+        "other": "{{.Count}} days free · cancel anytime"
+    },
     "action.grace.title": "Free preview is ending",
     "action.grace.body": "You've watched 20 minutes at full speed. Upgrade to keep watching without throttling.",
     "action.grace.continue": "Continue at slow speed",

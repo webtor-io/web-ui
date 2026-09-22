@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Avvio del download...",
     "action.download.cancel": "annulla",
     "action.download.copied": "Copiato!",
-    "action.download.limitedTitle": "Download a {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} richiede circa {{.Slow}} a questa velocità, circa {{.Fast}} a {{.FastRate}} Mbps",
+    "action.download.limitedTitle": "Velocità di download limitata a {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} richiede circa {{.Slow}}. Con un abbonamento circa {{.Fast}}",
     "action.download.limitedSubUnlimited": "Nessun limite di velocità con un abbonamento",
     "action.download.limitedSub": "Fino a {{.Rate}} Mbps con un abbonamento",
     "action.noPeers.title": "Questo torrent non ha seeder attivi al momento",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Guarda comunque",
     "action.upgrade.paid": "Aggiorna piano",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} g",
@@ -569,8 +570,25 @@
         "many": "Prova {{.Count}} giorni gratis",
         "other": "Prova {{.Count}} giorni gratis"
     },
-    "offer.getRate": "Ottieni {{.Rate}} Mbps",
-    "offer.getVault": "Ottieni Vault",
+    "offer.downloadFaster": {
+        "one": "Scarica {{.Count}}× più veloce",
+        "many": "Scarica {{.Count}}× più veloce",
+        "other": "Scarica {{.Count}}× più veloce"
+    },
+    "offer.downloadUpTo": {
+        "one": "Scarica fino a {{.Count}}× più veloce",
+        "many": "Scarica fino a {{.Count}}× più veloce",
+        "other": "Scarica fino a {{.Count}}× più veloce"
+    },
+    "offer.downloadFasterPlain": "Scarica più veloce",
+    "offer.watchUncapped": "Guarda senza limite di velocità",
+    "offer.keepFullSpeed": "Continua a piena velocità",
+    "offer.saveToVault": "Salva in Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} giorno gratis · disdici quando vuoi",
+        "many": "{{.Count}} giorni gratis · disdici quando vuoi",
+        "other": "{{.Count}} giorni gratis · disdici quando vuoi"
+    },
     "action.grace.title": "L'anteprima gratuita sta finendo",
     "action.grace.body": "Hai guardato 20 minuti a piena velocità. Aggiorna il tuo piano per continuare senza limiti.",
     "action.grace.continue": "Continua a velocità ridotta",

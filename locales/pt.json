@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Iniciando download...",
     "action.download.cancel": "cancelar",
     "action.download.copied": "Copiado!",
-    "action.download.limitedTitle": "Baixando a {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} leva cerca de {{.Slow}} nesta velocidade; a {{.FastRate}} Mbps, cerca de {{.Fast}}",
+    "action.download.limitedTitle": "Velocidade de download limitada a {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} leva cerca de {{.Slow}}. Com uma assinatura, cerca de {{.Fast}}",
     "action.download.limitedSubUnlimited": "Sem limite de velocidade com uma assinatura",
     "action.download.limitedSub": "Até {{.Rate}} Mbps com uma assinatura",
     "action.noPeers.title": "Este torrent não tem seeders ativos agora",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Assistir mesmo assim",
     "action.upgrade.paid": "Fazer upgrade",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} d",
@@ -569,8 +570,25 @@
         "many": "Experimente {{.Count}} dias grátis",
         "other": "Experimente {{.Count}} dias grátis"
     },
-    "offer.getRate": "Pegar {{.Rate}} Mbps",
-    "offer.getVault": "Pegar o Vault",
+    "offer.downloadFaster": {
+        "one": "Baixar {{.Count}}× mais rápido",
+        "many": "Baixar {{.Count}}× mais rápido",
+        "other": "Baixar {{.Count}}× mais rápido"
+    },
+    "offer.downloadUpTo": {
+        "one": "Baixar até {{.Count}}× mais rápido",
+        "many": "Baixar até {{.Count}}× mais rápido",
+        "other": "Baixar até {{.Count}}× mais rápido"
+    },
+    "offer.downloadFasterPlain": "Baixar mais rápido",
+    "offer.watchUncapped": "Assistir sem limite de velocidade",
+    "offer.keepFullSpeed": "Continuar assistindo em velocidade total",
+    "offer.saveToVault": "Salvar no Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} dia grátis · cancele quando quiser",
+        "many": "{{.Count}} dias grátis · cancele quando quiser",
+        "other": "{{.Count}} dias grátis · cancele quando quiser"
+    },
     "action.grace.title": "A prévia gratuita está acabando",
     "action.grace.body": "Você assistiu 20 minutos em velocidade total. Faça upgrade para continuar sem limites.",
     "action.grace.continue": "Continuar em velocidade lenta",

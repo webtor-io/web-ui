@@ -47,7 +47,7 @@ func TestNoPeersModalRenders(t *testing.T) {
 	}{
 		// A dead swarm sells Vault, straight at the promo plan's trial.
 		{"dead", trial, func() NoPeersData { d := base; d.Reason = "dead"; d.ElapsedSec = 60; return d },
-			[]string{"no active seeders", "donate-no-peers", "https://checkout.example/trial", "Try free for 7 days", "Vault saves the torrent", "another torrent", "no-peers-retry", `reason: 'dead'`},
+			[]string{"no active seeders", "donate-no-peers", "https://checkout.example/trial", "Save to Vault", "7 days free · cancel anytime", "Vault saves the torrent", "another torrent", "no-peers-retry", `reason: 'dead'`},
 			[]string{"received from", "Mbps"}},
 		// Nothing to sell (no catalog): no button, no Vault promise, and the
 		// alternative stands on its own instead of dangling after an "or".
@@ -61,7 +61,7 @@ func TestNoPeersModalRenders(t *testing.T) {
 		// Paying: the instruction, never an upsell.
 		{"dead", trial, func() NoPeersData { d := base; d.TierName = "silver"; d.Reason = "dead"; return d },
 			[]string{"Save it to Vault"},
-			[]string{"donate-no-peers", "Try free"}},
+			[]string{"donate-no-peers", "days free"}},
 		{"slow", trial, func() NoPeersData {
 			d := base
 			d.Reason, d.Peers, d.Seeders, d.Leechers, d.Bytes, d.BytesRaw, d.ElapsedSec = "slow", 3, 1, 2, "340 KiB", 340*1024, 120

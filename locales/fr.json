@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Téléchargement en cours de démarrage...",
     "action.download.cancel": "annuler",
     "action.download.copied": "Copié !",
-    "action.download.limitedTitle": "Téléchargement à {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} prend environ {{.Slow}} à cette vitesse, environ {{.Fast}} à {{.FastRate}} Mbps",
+    "action.download.limitedTitle": "Vitesse de téléchargement limitée à {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} prend environ {{.Slow}}. Avec un abonnement, environ {{.Fast}}",
     "action.download.limitedSubUnlimited": "Aucune limite de vitesse avec un abonnement",
     "action.download.limitedSub": "Jusqu'à {{.Rate}} Mbps avec un abonnement",
     "action.noPeers.title": "Ce torrent n'a aucun seeder actif pour le moment",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Continuer quand même",
     "action.upgrade.paid": "Améliorer l'offre",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} j",
@@ -569,8 +570,25 @@
         "many": "Essayer {{.Count}} jours gratuitement",
         "other": "Essayer {{.Count}} jours gratuitement"
     },
-    "offer.getRate": "Obtenir {{.Rate}} Mbps",
-    "offer.getVault": "Obtenir Vault",
+    "offer.downloadFaster": {
+        "one": "Télécharger {{.Count}}× plus vite",
+        "many": "Télécharger {{.Count}}× plus vite",
+        "other": "Télécharger {{.Count}}× plus vite"
+    },
+    "offer.downloadUpTo": {
+        "one": "Télécharger jusqu'à {{.Count}}× plus vite",
+        "many": "Télécharger jusqu'à {{.Count}}× plus vite",
+        "other": "Télécharger jusqu'à {{.Count}}× plus vite"
+    },
+    "offer.downloadFasterPlain": "Télécharger plus vite",
+    "offer.watchUncapped": "Regarder sans limite de vitesse",
+    "offer.keepFullSpeed": "Continuer à pleine vitesse",
+    "offer.saveToVault": "Enregistrer dans Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} jour gratuit · résiliable à tout moment",
+        "many": "{{.Count}} jours gratuits · résiliable à tout moment",
+        "other": "{{.Count}} jours gratuits · résiliable à tout moment"
+    },
     "action.grace.title": "L'aperçu gratuit se termine",
     "action.grace.body": "Vous avez regardé 20 minutes à pleine vitesse. Améliorez votre offre pour continuer sans limitation.",
     "action.grace.continue": "Continuer à vitesse réduite",

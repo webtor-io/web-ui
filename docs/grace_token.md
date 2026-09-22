@@ -96,7 +96,7 @@ Files:
   - `StreamContent` — `GraceDurationSec`, `GraceFreeRateMbps` fields surfaced to template/JS
   - `streamContent` — `applyGraceRules` invoked once at the top, before any rest-api call
   - Step 3 bandwidth check — cached/rate-limit branch gated on `!graceMode`
-- `templates/views/action/stream_video.html` + `stream_audio.html` — `data-grace-duration-sec` attribute on player tag; `#grace-cta` popup on video page (title + body + the promo plan's CTA — `offer.trialCta` / `offer.getRate`, rendered only when there is a catalog to sell from — + `Continue at <rate> Mbps` secondary + dismiss X)
+- `templates/views/action/stream_video.html` + `stream_audio.html` — `data-grace-duration-sec` attribute on player tag; `#grace-cta` popup on video page (title + body + the promo plan's CTA — `offer.keepFullSpeed` with `offer.trialNote` under it, rendered only when there is a catalog to sell from — + `Continue at <rate> Mbps` secondary + dismiss X)
 - `templates/views/action/errors/slow_download.html` — simplified: rate-limited branch removed, BT-slow only
 - `assets/src/js/lib/player/Player.jsx` — `useEffect` toggles `#grace-cta` visibility when `state.currentTime` (movie-time, includes seek offset) crosses `graceDurationSec`; wires dismiss + continue-slow handlers with Umami
 - `locales/{11 langs}.json` — `action.grace.{title,body,continue,continueWithRate,dismiss}` keys

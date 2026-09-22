@@ -27,12 +27,17 @@
             </h3>
         </div>
         {{- if $pitch }}
-        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-reason="{{ .Data.Reason }}" data-umami-event-target="{{ if $offer.TrialDays }}trial{{ else if $offer.URL }}checkout{{ else }}donate{{ end }}" href="{{ if $offer.URL }}{{ $offer.URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
-                <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
-            </svg>
-            {{ if $offer.TrialDays }}{{ tn $.Lang "offer.trialCta" $offer.TrialDays }}{{ else }}{{ t $.Lang "offer.getVault" }}{{ end }}
-        </a>
+        <div class="flex flex-col items-center gap-1 shrink-0">
+            <a class="btn btn-sm btn-soft" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-reason="{{ .Data.Reason }}" data-umami-event-target="{{ if $offer.TrialDays }}trial{{ else if $offer.URL }}checkout{{ else }}donate{{ end }}" href="{{ if $offer.URL }}{{ $offer.URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+                    <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
+                </svg>
+                {{ t $.Lang "offer.saveToVault" }}
+            </a>
+            {{- if $offer.TrialDays }}
+            <span class="text-[11px] text-w-muted leading-tight text-center">{{ tn $.Lang "offer.trialNote" $offer.TrialDays }}</span>
+            {{- end }}
+        </div>
         {{- end }}
     </div>
 

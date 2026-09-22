@@ -831,7 +831,7 @@ log
     </p>
 
     <!-- State A: Free + rate-limited -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free user, plan caps speed &mdash; the promo plan's trial ("Try free for 7&nbsp;days"), or its speed ("Get 50&nbsp;Mbps") when no trial can be started</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user, plan caps speed &mdash; the button names the outcome ("Watch without the speed cap"), the line under it the trial</div>
     <div class="progress-alert mb-2" style="max-width:600px">
       <pre class="done"><span class="line">resource data fetched</span></pre>
       <pre class="done"><span class="line">stream link ready</span></pre>
@@ -846,12 +846,6 @@ log
             </svg>
             <h3 class="font-semibold text-base text-base-content leading-snug">Not enough speed for smooth playback</h3>
           </div>
-          <a class="btn btn-sm btn-soft shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
-              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-            </svg>
-            Get 50 Mbps
-          </a>
         </div>
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
           <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
@@ -876,12 +870,19 @@ log
           </ul>
         </div>
       </div>
-      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
-        <a class="close">Got it</a>
+      <div class="pt-3 px-5 flex flex-wrap gap-2 justify-between items-center">
+        <a class="close btn btn-ghost">Got it</a>
+        <div class="flex flex-wrap gap-2 items-center">
+          <a class="btn btn-ghost border border-w-line whitespace-nowrap">Continue at slow speed</a>
+          <div class="flex flex-col items-center gap-1">
+            <a class="btn btn-soft whitespace-nowrap"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" /></svg> Watch without the speed cap</a>
+            <span class="text-[11px] text-w-muted leading-tight text-center">7 days free &middot; cancel anytime</span>
+          </div>
+        </div>
       </div>
     </div>
     <div class="uikit-label mb-6">
-      Free + IsRateLimited &mdash; Vault bullet hidden (Vault is paid-only) &middot; "more seeders" hint also hidden (the bottleneck is the user's pipe, not BT) &middot; CTA inside card top-right names the upsell ("Get 50 Mbps", trial pitch)
+      Free + IsRateLimited &mdash; Vault bullet hidden (Vault is paid-only) &middot; "more seeders" hint also hidden (the bottleneck is the user's pipe, not BT) &middot; CTA in the action row, next to "Continue at slow speed": outcome on the button, trial on the line under it (&sect;20)
     </div>
 
     <!-- State B: Paid + rate-limited -->
@@ -990,7 +991,7 @@ log
 
     <div class="uikit-rule mb-8">
       <strong>Decision matrix</strong> (the CTA is the promo plan from the catalog &mdash; see &sect;20):<br>
-      <code>IsRateLimited && free && promoOffer</code> &rarr; the plan's own checkout: <code>offer.trialCta</code> ("Try free for 7 days") when it has a trial, else <code>offer.getRate</code> ("Get 50 Mbps")<br>
+      <code>IsRateLimited && free && promoOffer</code> &rarr; the plan's own checkout: <code>offer.watchUncapped</code> on the button, <code>offer.trialNote</code> under it when the plan has a trial<br>
       <code>IsRateLimited && paid && hasPlans</code> &rarr; generic CTA <code>action.upgrade.paid</code> ("Upgrade plan") &rarr; /donate<br>
       <code>!promoOffer</code> / <code>!hasPlans</code> &rarr; no CTA at all: nothing to sell (no storefront catalog)<br>
       <code>!IsRateLimited</code> &rarr; no upgrade CTA at all (network won't be helped by a higher cap)<br>
@@ -1015,7 +1016,7 @@ log
     </p>
 
     <!-- State A: Free + ads -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free viewer &mdash; the wait in minutes, then the trial; clean action row below</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free viewer &mdash; the limit, the wait, the outcome on the button, the trial under it; clean action row below</div>
     <div class="progress-alert mb-2" style="max-width:680px">
       <pre class="done"><span class="line">stream link ready</span></pre>
       <pre class="done"><span class="line">warming up</span></pre>
@@ -1027,16 +1028,14 @@ log
             <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
           </svg>
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-base-content leading-snug">Downloading at 5 Mbps</div>
-            <div class="text-xs text-w-muted mt-0.5">4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min at this speed &mdash; about 12&nbsp;min at 50&nbsp;Mbps</div>
+            <div class="text-sm font-semibold text-base-content leading-snug">Download speed is capped at 5&nbsp;Mbps</div>
+            <div class="text-xs text-w-muted mt-0.5">4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min. With a subscription &mdash; about 12&nbsp;min</div>
           </div>
         </div>
-        <a class="btn btn-sm btn-soft shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
-            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-          </svg>
-          Try free for 7&nbsp;days
-        </a>
+        <div class="flex flex-col items-center gap-1 shrink-0">
+          <a class="btn btn-sm btn-soft"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" /></svg> Download up to 10&times; faster</a>
+          <span class="text-[11px] text-w-muted leading-tight text-center">7 days free &middot; cancel anytime</span>
+        </div>
       </div>
 
       <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
@@ -1110,7 +1109,9 @@ log
       copy chips (<code>btn-xs btn-ghost border</code>) grouped on the left via <code>mr-auto</code><br>
       <strong>Copy chips</strong>: hover transitions to cyan border &amp; text (<code>hover:border-w-cyan/50 hover:text-w-cyan</code>) &middot;
       title attr carries full label for a11y, visible label is just the protocol name<br>
-      <strong>Nudge sub-text</strong> prices the wait instead of describing it: <code>downloadPitch</code> (&sect;20) turns this file's size and the viewer's cap into "4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min &mdash; about 12&nbsp;min at 50&nbsp;Mbps". Under two minutes of waiting it falls back to the plan's speed alone ("Up to 50&nbsp;Mbps with a subscription"): a wait nobody feels is not an argument<br>
+      <strong>Title</strong> names the limit ("Download speed is capped at 5&nbsp;Mbps"), not the state ("Downloading at 5&nbsp;Mbps"): the reader must see that the cap is the problem before a button can be the fix<br>
+      <strong>Sub-text</strong> prices the wait: <code>downloadPitch</code> (&sect;20) turns size and cap into "4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min. With a subscription &mdash; about 12&nbsp;min". Only from 10&nbsp;minutes of waiting &mdash; "3&nbsp;min instead of 20&nbsp;s" sells nothing; below that the line is the plan's speed ("Up to 50&nbsp;Mbps with a subscription"). Under a minute it counts seconds, never "1&nbsp;min"<br>
+      <strong>Button</strong>: <code>offer.downloadUpTo</code> "Download up to 10&times; faster"; <code>offer.downloadFaster</code> "Download 10&times; faster" only when the file is already whole on our side (<code>FileDownload.Cached</code>) &mdash; then the cap is the only brake. The ratio is <code>speedUp</code>: plan rate &divide; viewer rate, rounded down, shown from 2&times;; otherwise <code>offer.downloadFasterPlain</code><br>
       <strong>Umami</strong>: click <code>donate-download</code> (+ <code>tier</code>, <code>target</code>) and impression <code>donate-download-shown</code> (+ <code>eta</code> 1|0) &mdash; the nudge had clicks and no denominator before<br>
       <strong>Same Bolt/CTA</strong> pattern as 9.10 keeps the upgrade visual consistent across slow_download &amp; download_file
     </div>
@@ -1127,7 +1128,7 @@ log
     </p>
 
     <!-- State A: Free + no peers -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free user &mdash; Vault is the value prop and the CTA sells it: the trial when there is one, else "Get Vault"</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user &mdash; Vault is the value prop, the button its outcome ("Save to Vault"), the trial under it</div>
     <div class="progress-alert mb-2" style="max-width:680px">
       <pre class="done"><span class="line">resource data fetched</span></pre>
       <pre class="done"><span class="line">stream link ready</span></pre>
@@ -1146,8 +1147,9 @@ log
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
               <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
             </svg>
-            Try free for 7&nbsp;days
+            Save to Vault
           </a>
+          <span class="basis-full text-right text-[11px] text-w-muted leading-tight">7 days free &middot; cancel anytime</span>
         </div>
         <p class="text-sm text-w-sub mt-3 leading-relaxed">Vault saves the torrent and grabs it as soon as a seeder appears &mdash; included with any paid plan.</p>
         <p class="text-xs text-w-muted mt-3">or try another torrent with more seeders</p>
@@ -1190,7 +1192,8 @@ log
 
     <div class="uikit-rule mb-8">
       <strong>Decision matrix</strong> (dead swarm only &mdash; slow and timeout never sell):<br>
-      <code>free && promoOffer.HasVault</code> &rarr; <code>vaultPitch</code> copy + CTA <code>offer.trialCta</code> / <code>offer.getVault</code><br>
+      <code>free && promoOffer.HasVault</code> &rarr; <code>vaultPitch</code> copy + CTA <code>offer.saveToVault</code> + <code>offer.trialNote</code><br>
+      <code>free && no body sentence</code> &rarr; the alternative stands alone: <code>action.noPeers.altSearchAlone</code> ("Try another torrent&hellip;"), not a dangling "or&hellip;"<br>
       <code>free && no promo plan (or one without Vault)</code> &rarr; no pitch and no CTA, just the retry and "try another torrent"<br>
       <code>TierName!="free"</code> &rarr; <code>vaultUse</code> copy + dismiss-only<br>
       <strong>Icon</strong>: clock from feather icons (24x24, 1.8 stroke, in <code>text-w-pinkL</code>) &mdash; "wait for peers" framing rather than warning/paywall<br>
@@ -2433,20 +2436,52 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <code>hasPlans</code> &rarr; the storefront has something to sell at all<br>
       <code>downloadPitch $.Lang &lt;bytes&gt; &lt;rateMbps&gt;</code> &rarr; <code>.Size</code>,
       <code>.Slow</code>, <code>.Fast</code>, <code>.FastRate</code>, or nil when the file is too small,
-      a rate is unknown or the plan is not faster<br>
+      a rate is unknown or the plan is not faster (the clock shows only from 10&nbsp;minutes of waiting)<br>
+      <code>speedUp &lt;rateMbps&gt;</code> &rarr; how many times faster the plan is, rounded down; 0 under 2&times;<br>
       <strong>No catalog, no offer.</strong> A deployment without the webhook (self-hosted) shows no
       upsell anywhere rather than a button to someone else's storefront; in production a webhook
       outage is invisible because the last good catalog stays in memory.
+    </div>
+
+    <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Anatomy of an upsell button</h3>
+    <div class="flex flex-wrap items-start gap-8 mb-4">
+      <div class="flex flex-col items-center gap-1">
+        <a class="btn btn-sm btn-soft"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" /></svg> Download up to 10&times; faster</a>
+        <span class="text-[11px] text-w-muted leading-tight text-center">7 days free &middot; cancel anytime</span>
+      </div>
+      <div class="flex flex-col items-center gap-1">
+        <a class="btn btn-soft"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" /></svg> Watch without the speed cap</a>
+        <span class="text-[11px] text-w-muted leading-tight text-center">7 days free &middot; cancel anytime</span>
+      </div>
+      <div class="flex flex-col items-center gap-1">
+        <a class="btn btn-sm btn-soft"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg> Save to Vault</a>
+        <span class="text-[11px] text-w-muted leading-tight text-center">7 days free &middot; cancel anytime</span>
+      </div>
+    </div>
+    <div class="uikit-rule mb-6">
+      <strong>The button says what the viewer gets; the line under it says it is free to try.</strong>
+      A button that read "Try free for 7&nbsp;days" named the mechanism, not the result, and nothing linked
+      it to the limit shown next to it. Now: outcome on the button (<code>offer.downloadUpTo</code>,
+      <code>offer.watchUncapped</code>, <code>offer.keepFullSpeed</code>, <code>offer.saveToVault</code>),
+      risk remover under it (<code>offer.trialNote</code> &mdash; "7&nbsp;days free &middot; cancel anytime",
+      only when the plan has a trial the checkout can start). The two objections it answers are the ones
+      we see in support: paying for nothing, and not being able to leave.<br>
+      <strong>Markup</strong>: <code>div.flex.flex-col.items-center.gap-1</code> around the
+      <code>btn btn-soft</code> and a <code>span.text-[11px].text-w-muted.leading-tight.text-center</code>;
+      in a wrapping row it drops to its own line on a phone and stays centred.<br>
+      <strong>Promise only what the plan guarantees</strong>: "up to 10&times;" &mdash; the plan lifts the cap,
+      it cannot make a slow swarm fast. The unqualified "10&times;" is reserved for a file already whole on our
+      side, where the cap is the only brake.
     </div>
 
     <table class="w-full text-sm mb-6">
       <thead><tr class="text-w-muted text-left"><th class="pr-4 py-1">Surface</th><th class="pr-4 py-1">Shown to</th><th class="pr-4 py-1">Says</th><th class="py-1">Umami</th></tr></thead>
       <tbody class="text-w-sub align-top">
         <tr><td class="pr-4 py-1">Promo banner (home, resource page)</td><td class="pr-4 py-1">not paying</td><td class="pr-4 py-1"><code>promo.speedTrial</code>: the plan's speed and trial length</td><td class="py-1"><code>promo</code> + <code>target</code></td></tr>
-        <tr><td class="pr-4 py-1">Download ready (&sect;9.11)</td><td class="pr-4 py-1">free</td><td class="pr-4 py-1">this file's wait now vs on the plan</td><td class="py-1"><code>donate-download</code>, <code>donate-download-shown</code></td></tr>
-        <tr><td class="pr-4 py-1">Cap modal (&sect;9.10)</td><td class="pr-4 py-1">free capped / paid capped</td><td class="pr-4 py-1">trial or the plan's speed / compare plans</td><td class="py-1"><code>donate-slow-download</code></td></tr>
-        <tr><td class="pr-4 py-1">Grace popup (player)</td><td class="pr-4 py-1">free, after the grace window</td><td class="pr-4 py-1">trial or the plan's speed</td><td class="py-1"><code>donate-grace</code>, <code>grace-continue-slow</code></td></tr>
-        <tr><td class="pr-4 py-1">No peers, dead swarm (&sect;9.12)</td><td class="pr-4 py-1">free, plan includes Vault</td><td class="pr-4 py-1">Vault keeps the torrent &mdash; never Mbps</td><td class="py-1"><code>donate-no-peers</code></td></tr>
+        <tr><td class="pr-4 py-1">Download ready (&sect;9.11)</td><td class="pr-4 py-1">free</td><td class="pr-4 py-1">the limit, this file's wait, "Download up to 10&times; faster"</td><td class="py-1"><code>donate-download</code>, <code>donate-download-shown</code></td></tr>
+        <tr><td class="pr-4 py-1">Cap modal (&sect;9.10)</td><td class="pr-4 py-1">free capped / paid capped</td><td class="pr-4 py-1">"Watch without the speed cap" / compare plans</td><td class="py-1"><code>donate-slow-download</code></td></tr>
+        <tr><td class="pr-4 py-1">Grace popup (player)</td><td class="pr-4 py-1">free, after the grace window</td><td class="pr-4 py-1">"Keep watching at full speed"</td><td class="py-1"><code>donate-grace</code>, <code>grace-continue-slow</code></td></tr>
+        <tr><td class="pr-4 py-1">No peers, dead swarm (&sect;9.12)</td><td class="pr-4 py-1">free, plan includes Vault</td><td class="pr-4 py-1">"Save to Vault" &mdash; never Mbps</td><td class="py-1"><code>donate-no-peers</code></td></tr>
         <tr><td class="pr-4 py-1">Onboarding locked steps (&sect;18)</td><td class="pr-4 py-1">free, PRO steps</td><td class="pr-4 py-1"><code>offer.trialCta</code> with the plan's trial length</td><td class="py-1"><code>onboarding-pro-*</code></td></tr>
         <tr><td class="pr-4 py-1">/donate tier cards</td><td class="pr-4 py-1">everyone</td><td class="pr-4 py-1">speed and Vault per tier; trial plaque and RECOMMENDED on the promo plan; "then $5/month, cancel anytime"</td><td class="py-1"><code>donate-trial-plaque</code>, <code>donate-patreon-join</code></td></tr>
         <tr><td class="pr-4 py-1">/speedtest plan list</td><td class="pr-4 py-1">everyone</td><td class="pr-4 py-1">tiers and caps from the catalog (free included); hidden without one</td><td class="py-1"><code>donate-speedtest</code></td></tr>
@@ -2463,7 +2498,7 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <strong>Copy rules.</strong> Quote what the plan grants, never a benefit it does not: the
       "no ads" line is gone from the cards and the nudge because free accounts have seen no ads since
       the 2026-06 experiment. Numbers carry a no-break space before the unit ("50&nbsp;Mbps"), and day
-      counts use CLDR plural keys (<code>offer.trialCta</code>, <code>donate.patreon.trialBanner</code>)
+      counts use CLDR plural keys (<code>offer.trialNote</code>, <code>offer.trialCta</code>, <code>donate.patreon.trialBanner</code>, and <code>offer.downloadUpTo</code> for the ratio &mdash; «в 2 раза», «в 10 раз»)
       because 7 and 1 decline differently in half our locales.
     </div>
     <div class="uikit-note">

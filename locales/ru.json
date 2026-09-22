@@ -534,8 +534,8 @@
     "action.download.downloadStarting": "Скачивание начинается...",
     "action.download.cancel": "отмена",
     "action.download.copied": "Скопировано!",
-    "action.download.limitedTitle": "Скачивание со скоростью {{.Rate}} Мбит/с",
-    "action.download.eta": "{{.Size}} скачается примерно за {{.Slow}}, на {{.FastRate}} Мбит/с — за {{.Fast}}",
+    "action.download.limitedTitle": "Скорость скачивания ограничена: {{.Rate}} Мбит/с",
+    "action.download.eta": "{{.Size}} — около {{.Slow}}. С подпиской — около {{.Fast}}",
     "action.download.limitedSubUnlimited": "С подпиской — без ограничения скорости",
     "action.download.limitedSub": "С подпиской — до {{.Rate}} Мбит/с",
     "action.noPeers.title": "У торрента сейчас нет активных сидеров",
@@ -570,6 +570,7 @@
     "action.slow.continueSlow": "Смотреть как есть",
     "action.upgrade.paid": "Улучшить тариф",
     "offer.eta.min": "{{.M}} мин",
+    "offer.eta.sec": "{{.S}} сек",
     "offer.eta.h": "{{.H}} ч",
     "offer.eta.hMin": "{{.H}} ч {{.M}} мин",
     "offer.eta.d": "{{.D}} дн.",
@@ -580,8 +581,28 @@
         "many": "Попробовать {{.Count}} дней бесплатно",
         "other": "Попробовать {{.Count}} дня бесплатно"
     },
-    "offer.getRate": "Получить {{.Rate}} Мбит/с",
-    "offer.getVault": "Получить Vault",
+    "offer.downloadFaster": {
+        "one": "Скачать в {{.Count}} раз быстрее",
+        "few": "Скачать в {{.Count}} раза быстрее",
+        "many": "Скачать в {{.Count}} раз быстрее",
+        "other": "Скачать в {{.Count}} раза быстрее"
+    },
+    "offer.downloadUpTo": {
+        "one": "Скачать до {{.Count}} раза быстрее",
+        "few": "Скачать до {{.Count}} раз быстрее",
+        "many": "Скачать до {{.Count}} раз быстрее",
+        "other": "Скачать до {{.Count}} раза быстрее"
+    },
+    "offer.downloadFasterPlain": "Скачать быстрее",
+    "offer.watchUncapped": "Смотреть без ограничения скорости",
+    "offer.keepFullSpeed": "Смотреть дальше на полной скорости",
+    "offer.saveToVault": "Сохранить в Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} день бесплатно · отмена в любой момент",
+        "few": "{{.Count}} дня бесплатно · отмена в любой момент",
+        "many": "{{.Count}} дней бесплатно · отмена в любой момент",
+        "other": "{{.Count}} дня бесплатно · отмена в любой момент"
+    },
     "action.grace.title": "Бесплатный показ заканчивается",
     "action.grace.body": "Вы посмотрели 20 минут на полной скорости. Улучшите тариф, чтобы продолжать без ограничений.",
     "action.grace.continue": "Смотреть как есть",

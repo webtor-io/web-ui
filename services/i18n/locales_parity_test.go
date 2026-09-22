@@ -125,7 +125,7 @@ func TestNoLocaleHasAnEmptyTranslation(t *testing.T) {
 // units and may wrap.
 // Long units are unambiguous, so a Turkish suffix glued to them with an
 // apostrophe ("50 Mbps'ye") still counts as the unit.
-var breakableUnitLong = regexp.MustCompile(`(\}\}|[0-9]) (?:sec|сек|дн\.|d\.|min|мин|godz\.|Std\.|Min\.|Tg\.|MB|GB|kB|KB|TB|МБ|ГБ|КБ|ТБ|Mbps|Mbit/s|Мбит/с|MB/s|Мб/с|Mo|Go|To|ko|Мбит)(?:'\p{L}+)?(?:$|[\s.,;:!?)\]<»"”])`)
+var breakableUnitLong = regexp.MustCompile(`(\}\}|[0-9]) (?:sec|сек|дн\.|d\.|min|мин|godz\.|Std\.|Min\.|Tg\.|Sek\.|MB|GB|kB|KB|TB|МБ|ГБ|КБ|ТБ|Mbps|Mbit/s|Мбит/с|MB/s|Мб/с|Mo|Go|To|ko|Мбит)(?:'\p{L}+)?(?:$|[\s.,;:!?)\]<»"”])`)
 
 // One- and two-letter units are also ordinary words in some locales, so they
 // need a hard boundary and no suffix rule.
@@ -146,7 +146,7 @@ func TestUnitGuardKnowsTheUnitsWeShip(t *testing.T) {
 	for _, s := range []string{
 		"{{.M}} min", "{{.M}} мин", "{{.H}} h", "{{.H}} ч", "{{.H}} Std.", "{{.M}} Min.",
 		"{{.D}} d", "{{.D}} d.", "{{.D}} дн.", "{{.D}} j", "{{.D}} g", "{{.H}} u", "{{.H}} godz.", "{{.D}} Tg.",
-		"{{.M}} dk", "{{.H}} sa", "50 Mbps", "50 Mbit/s", "50 Мбит/с", "50 Mbps'ye kadar",
+		"{{.M}} dk", "{{.H}} sa", "{{.S}} s", "{{.S}} сек", "{{.S}} Sek.", "{{.S}} sn", "50 Mbps", "50 Mbit/s", "50 Мбит/с", "50 Mbps'ye kadar",
 		"250 GB", "1 TB", "250 ГБ", "1 ТБ", "250 Go)", "1 To)", "43 s",
 	} {
 		if breakableUnit(s) == "" {

@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "İndirme başlıyor...",
     "action.download.cancel": "iptal",
     "action.download.copied": "Kopyalandı!",
-    "action.download.limitedTitle": "İndirme {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} bu hızda yaklaşık {{.Slow}}, {{.FastRate}} Mbps ile yaklaşık {{.Fast}} sürer",
+    "action.download.limitedTitle": "İndirme hızı {{.Rate}} Mbps ile sınırlı",
+    "action.download.eta": "{{.Size}} yaklaşık {{.Slow}} sürer. Abonelikle yaklaşık {{.Fast}}",
     "action.download.limitedSubUnlimited": "Abonelikle hız sınırı yok",
     "action.download.limitedSub": "Abonelikle {{.Rate}} Mbps'ye kadar",
     "action.noPeers.title": "Bu torrentin şu an aktif seeder'i yok",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Yine de izle",
     "action.upgrade.paid": "Planı yükselt",
     "offer.eta.min": "{{.M}} dk",
+    "offer.eta.sec": "{{.S}} sn",
     "offer.eta.h": "{{.H}} sa",
     "offer.eta.hMin": "{{.H}} sa {{.M}} dk",
     "offer.eta.d": "{{.D}} gün",
@@ -568,8 +569,22 @@
         "one": "{{.Count}} gün ücretsiz dene",
         "other": "{{.Count}} gün ücretsiz dene"
     },
-    "offer.getRate": "{{.Rate}} Mbps al",
-    "offer.getVault": "Vault al",
+    "offer.downloadFaster": {
+        "one": "{{.Count}} kat daha hızlı indir",
+        "other": "{{.Count}} kat daha hızlı indir"
+    },
+    "offer.downloadUpTo": {
+        "one": "{{.Count}} kata kadar daha hızlı indir",
+        "other": "{{.Count}} kata kadar daha hızlı indir"
+    },
+    "offer.downloadFasterPlain": "Daha hızlı indir",
+    "offer.watchUncapped": "Hız sınırı olmadan izle",
+    "offer.keepFullSpeed": "Tam hızda izlemeye devam et",
+    "offer.saveToVault": "Vault'a kaydet",
+    "offer.trialNote": {
+        "one": "{{.Count}} gün ücretsiz · istediğin zaman iptal",
+        "other": "{{.Count}} gün ücretsiz · istediğin zaman iptal"
+    },
     "action.grace.title": "Ücretsiz önizleme bitiyor",
     "action.grace.body": "Tam hızda 20 dakika izlediniz. Sınırlama olmadan izlemeye devam etmek için planınızı yükseltin.",
     "action.grace.continue": "Yavaş hızda devam et",

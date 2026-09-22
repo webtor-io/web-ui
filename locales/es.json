@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Iniciando descarga...",
     "action.download.cancel": "cancelar",
     "action.download.copied": "¡Copiado!",
-    "action.download.limitedTitle": "Descarga a {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} tarda cerca de {{.Slow}} a esta velocidad; a {{.FastRate}} Mbps, cerca de {{.Fast}}",
+    "action.download.limitedTitle": "Velocidad de descarga limitada a {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} tarda cerca de {{.Slow}}. Con una suscripción, cerca de {{.Fast}}",
     "action.download.limitedSubUnlimited": "Sin límite de velocidad con una suscripción",
     "action.download.limitedSub": "Hasta {{.Rate}} Mbps con una suscripción",
     "action.noPeers.title": "Este torrent no tiene seeders activos ahora",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Ver de todos modos",
     "action.upgrade.paid": "Mejorar plan",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} d",
@@ -568,8 +569,22 @@
         "one": "Prueba {{.Count}} día gratis",
         "other": "Prueba {{.Count}} días gratis"
     },
-    "offer.getRate": "Conseguir {{.Rate}} Mbps",
-    "offer.getVault": "Conseguir Vault",
+    "offer.downloadFaster": {
+        "one": "Descargar {{.Count}}× más rápido",
+        "other": "Descargar {{.Count}}× más rápido"
+    },
+    "offer.downloadUpTo": {
+        "one": "Descargar hasta {{.Count}}× más rápido",
+        "other": "Descargar hasta {{.Count}}× más rápido"
+    },
+    "offer.downloadFasterPlain": "Descargar más rápido",
+    "offer.watchUncapped": "Ver sin límite de velocidad",
+    "offer.keepFullSpeed": "Seguir viendo a toda velocidad",
+    "offer.saveToVault": "Guardar en Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} día gratis · cancela cuando quieras",
+        "other": "{{.Count}} días gratis · cancela cuando quieras"
+    },
     "action.grace.title": "La vista previa gratuita está terminando",
     "action.grace.body": "Has visto 20 minutos a velocidad completa. Mejora tu plan para seguir sin limitaciones.",
     "action.grace.continue": "Continuar a velocidad lenta",

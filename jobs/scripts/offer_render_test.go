@@ -55,6 +55,7 @@ func offerFuncs(t *testing.T, c *payments.Catalog, trialCheckout bool) template.
 		"promoOffer":    oh.PromoOffer,
 		"hasPlans":      oh.HasPlans,
 		"downloadPitch": oh.DownloadPitch,
+		"speedUp":       oh.SpeedUp,
 	}
 }
 
@@ -103,19 +104,31 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		data          FileDownload
 		want, banned  []string
 	}{
+		// The title names the limit, the button the outcome ("up to": the file
+		// is not whole on our side, the swarm may be slower than any plan),
+		// the line under the button the risk remover.
 		{"free, movie", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
-			[]string{"Downloading at 5\u00a0Mbps", "4.3\u00a0GB takes about 2\u00a0h 3\u00a0min", "about 12\u00a0min at 50\u00a0Mbps",
-				"https://checkout.example/silver?trial", "Try free for 7 days", `data-umami-event="donate-download"`,
-				`data-umami-event-target="trial"`, "donate-download-shown", "eta: 1"},
-			[]string{"ads", "action.", "offer."}},
-		// Too small for the wait to matter: the plan's speed, no clock.
-		{"free, small file", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: 20 << 20},
-			[]string{"Up to 50\u00a0Mbps with a subscription", "Try free for 7 days", "eta: 0"},
+			[]string{"Download speed is capped at 5\u00a0Mbps", "4.3\u00a0GB takes about 2\u00a0h 3\u00a0min. With a subscription — about 12\u00a0min",
+				"https://checkout.example/silver?trial", "Download up to 10× faster", "7 days free · cancel anytime",
+				`data-umami-event="donate-download"`, `data-umami-event-target="trial"`, "donate-download-shown", "eta: 1"},
+			[]string{"ads", "action.", "offer.", "Try free"}},
+		// Already whole on our side: the cap is the only brake, so the full
+		// speed-up is a fact, not a ceiling.
+		{"free, cached", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie, Cached: true},
+			[]string{"Download 10× faster"},
+			[]string{"up to 10×"}},
+		// A 3-minute wait: no clock, the plan's speed instead.
+		{"free, small file", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: 123 << 20},
+			[]string{"Up to 50\u00a0Mbps with a subscription", "Download up to 10× faster", "7 days free", "eta: 0"},
 			[]string{"takes about"}},
-		// Patreon cannot start the trial: the plan's own checkout, its speed on the button.
+		// Patreon cannot start the trial: the plan's own checkout, no trial line.
 		{"free, no trial checkout", prodCatalog(), false, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
-			[]string{"https://checkout.example/silver", "Get 50\u00a0Mbps", `data-umami-event-target="checkout"`},
-			[]string{"Try free", "?trial"}},
+			[]string{"https://checkout.example/silver", "Download up to 10× faster", `data-umami-event-target="checkout"`},
+			[]string{"days free", "?trial"}},
+		// Viewer rate unknown: no ratio to quote, the outcome without a number.
+		{"free, rate unknown", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", SizeBytes: movie},
+			[]string{"Download faster", "7 days free"},
+			[]string{"×", "Download speed is capped"}},
 		{"paying viewer", prodCatalog(), true, FileDownload{URL: "u", TierName: "silver", RateMbps: 50, SizeBytes: movie},
 			nil, []string{"donate-download", "Downloading at"}},
 		{"no storefront", nil, true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
@@ -154,8 +167,8 @@ func TestSlowDownloadUpsellRenders(t *testing.T) {
 		want, banned []string
 	}{
 		{"free capped", prodCatalog(), "free", true,
-			[]string{"https://checkout.example/silver?trial", "Try free for 7 days", `data-umami-event="donate-slow-download"`, `data-umami-event-target="trial"`},
-			[]string{"Upgrade plan"}},
+			[]string{"https://checkout.example/silver?trial", "Watch without the speed cap", "7 days free · cancel anytime", `data-umami-event="donate-slow-download"`, `data-umami-event-target="trial"`},
+			[]string{"Upgrade plan", "Try free"}},
 		{"paid capped", prodCatalog(), "bronze", true,
 			[]string{"Upgrade plan", `href="/donate"`}, []string{"Try free", "checkout.example"}},
 		{"not a cap", prodCatalog(), "free", false,

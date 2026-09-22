@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Download wordt gestart...",
     "action.download.cancel": "annuleren",
     "action.download.copied": "Gekopieerd!",
-    "action.download.limitedTitle": "Downloaden met {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} duurt op deze snelheid ongeveer {{.Slow}}, met {{.FastRate}} Mbps ongeveer {{.Fast}}",
+    "action.download.limitedTitle": "Downloadsnelheid beperkt tot {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} duurt ongeveer {{.Slow}}. Met een abonnement ongeveer {{.Fast}}",
     "action.download.limitedSubUnlimited": "Geen snelheidslimiet met een abonnement",
     "action.download.limitedSub": "Tot {{.Rate}} Mbps met een abonnement",
     "action.noPeers.title": "Deze torrent heeft op dit moment geen actieve seeders",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Toch verder kijken",
     "action.upgrade.paid": "Plan upgraden",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} u",
     "offer.eta.hMin": "{{.H}} u {{.M}} min",
     "offer.eta.d": "{{.D}} d",
@@ -568,8 +569,22 @@
         "one": "Probeer {{.Count}} dag gratis",
         "other": "Probeer {{.Count}} dagen gratis"
     },
-    "offer.getRate": "{{.Rate}} Mbps krijgen",
-    "offer.getVault": "Vault krijgen",
+    "offer.downloadFaster": {
+        "one": "{{.Count}}× sneller downloaden",
+        "other": "{{.Count}}× sneller downloaden"
+    },
+    "offer.downloadUpTo": {
+        "one": "Tot {{.Count}}× sneller downloaden",
+        "other": "Tot {{.Count}}× sneller downloaden"
+    },
+    "offer.downloadFasterPlain": "Sneller downloaden",
+    "offer.watchUncapped": "Kijken zonder snelheidslimiet",
+    "offer.keepFullSpeed": "Verder kijken op volle snelheid",
+    "offer.saveToVault": "Opslaan in Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} dag gratis · altijd opzegbaar",
+        "other": "{{.Count}} dagen gratis · altijd opzegbaar"
+    },
     "action.grace.title": "Gratis preview loopt af",
     "action.grace.body": "Je hebt 20 minuten op volle snelheid gekeken. Upgrade je plan om zonder beperkingen verder te kijken.",
     "action.grace.continue": "Doorgaan op lage snelheid",

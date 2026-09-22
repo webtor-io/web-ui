@@ -909,6 +909,11 @@ type FileDownload struct {
 	// the download in time against the promo plan (offer.DownloadPitch).
 	RateMbps  int
 	SizeBytes int64
+	// Cached: the file is already whole on our side, so the viewer's cap is
+	// the only thing setting the pace — the nudge may promise the full
+	// speed-up. Otherwise the swarm can be slower than any plan, and the
+	// promise is "up to".
+	Cached bool
 	// ZipWarning surfaces the CRC note for on-the-fly ZIP archives: they
 	// carry no per-file checksums, so picky unpackers may warn. TAR (the
 	// default) has no such problem.
@@ -990,6 +995,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		TierName:   tierName,
 		RateMbps:   rate,
 		SizeBytes:  size,
+		Cached:     exportMeta(de).Cache,
 		ZipWarning: s.archiveFormat == "zip",
 		IsArchive:  s.archiveFormat != "",
 	}))

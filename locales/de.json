@@ -526,8 +526,8 @@
     "action.download.downloadStarting": "Download startet...",
     "action.download.cancel": "abbrechen",
     "action.download.copied": "Kopiert!",
-    "action.download.limitedTitle": "Download mit {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} dauert bei diesem Tempo etwa {{.Slow}}, mit {{.FastRate}} Mbps etwa {{.Fast}}",
+    "action.download.limitedTitle": "Download-Geschwindigkeit begrenzt auf {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} dauert etwa {{.Slow}}. Mit Abo etwa {{.Fast}}",
     "action.download.limitedSubUnlimited": "Mit Abo ohne Tempolimit",
     "action.download.limitedSub": "Mit Abo bis zu {{.Rate}} Mbps",
     "action.noPeers.title": "Dieser Torrent hat aktuell keine aktiven Seeder",
@@ -560,6 +560,7 @@
     "action.slow.continueSlow": "Trotzdem weiterschauen",
     "action.upgrade.paid": "Plan upgraden",
     "offer.eta.min": "{{.M}} Min.",
+    "offer.eta.sec": "{{.S}} Sek.",
     "offer.eta.h": "{{.H}} Std.",
     "offer.eta.hMin": "{{.H}} Std. {{.M}} Min.",
     "offer.eta.d": "{{.D}} Tg.",
@@ -568,8 +569,22 @@
         "one": "{{.Count}} Tag gratis testen",
         "other": "{{.Count}} Tage gratis testen"
     },
-    "offer.getRate": "{{.Rate}} Mbps holen",
-    "offer.getVault": "Vault holen",
+    "offer.downloadFaster": {
+        "one": "{{.Count}}× schneller herunterladen",
+        "other": "{{.Count}}× schneller herunterladen"
+    },
+    "offer.downloadUpTo": {
+        "one": "Bis zu {{.Count}}× schneller herunterladen",
+        "other": "Bis zu {{.Count}}× schneller herunterladen"
+    },
+    "offer.downloadFasterPlain": "Schneller herunterladen",
+    "offer.watchUncapped": "Ohne Tempolimit ansehen",
+    "offer.keepFullSpeed": "Mit voller Geschwindigkeit weitersehen",
+    "offer.saveToVault": "In Vault speichern",
+    "offer.trialNote": {
+        "one": "{{.Count}} Tag gratis · jederzeit kündbar",
+        "other": "{{.Count}} Tage gratis · jederzeit kündbar"
+    },
     "action.grace.title": "Kostenlose Vorschau endet",
     "action.grace.body": "Du hast 20 Minuten in voller Geschwindigkeit gesehen. Upgrade deinen Plan, um ohne Drosselung weiterzusehen.",
     "action.grace.continue": "Mit langsamer Geschwindigkeit fortfahren",

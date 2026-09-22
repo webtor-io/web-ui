@@ -534,8 +534,8 @@
     "action.download.downloadStarting": "Rozpoczynanie pobierania...",
     "action.download.cancel": "anuluj",
     "action.download.copied": "Skopiowano!",
-    "action.download.limitedTitle": "Pobieranie z prędkością {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} pobierze się w około {{.Slow}}, przy {{.FastRate}} Mbps — w około {{.Fast}}",
+    "action.download.limitedTitle": "Prędkość pobierania ograniczona do {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} pobierze się w około {{.Slow}}. Z subskrypcją — w około {{.Fast}}",
     "action.download.limitedSubUnlimited": "Bez limitu prędkości z subskrypcją",
     "action.download.limitedSub": "Do {{.Rate}} Mbps z subskrypcją",
     "action.noPeers.title": "Ten torrent nie ma teraz aktywnych seederów",
@@ -570,6 +570,7 @@
     "action.slow.continueSlow": "Oglądaj mimo to",
     "action.upgrade.paid": "Ulepsz plan",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} godz.",
     "offer.eta.hMin": "{{.H}} godz. {{.M}} min",
     "offer.eta.d": "{{.D}} d.",
@@ -580,8 +581,28 @@
         "many": "Wypróbuj {{.Count}} dni za darmo",
         "other": "Wypróbuj {{.Count}} dnia za darmo"
     },
-    "offer.getRate": "Zdobądź {{.Rate}} Mbps",
-    "offer.getVault": "Zdobądź Vault",
+    "offer.downloadFaster": {
+        "one": "Pobieraj {{.Count}}× szybciej",
+        "few": "Pobieraj {{.Count}}× szybciej",
+        "many": "Pobieraj {{.Count}}× szybciej",
+        "other": "Pobieraj {{.Count}}× szybciej"
+    },
+    "offer.downloadUpTo": {
+        "one": "Pobieraj do {{.Count}}× szybciej",
+        "few": "Pobieraj do {{.Count}}× szybciej",
+        "many": "Pobieraj do {{.Count}}× szybciej",
+        "other": "Pobieraj do {{.Count}}× szybciej"
+    },
+    "offer.downloadFasterPlain": "Pobieraj szybciej",
+    "offer.watchUncapped": "Oglądaj bez limitu prędkości",
+    "offer.keepFullSpeed": "Oglądaj dalej z pełną prędkością",
+    "offer.saveToVault": "Zapisz w Vault",
+    "offer.trialNote": {
+        "one": "{{.Count}} dzień za darmo · anulujesz kiedy chcesz",
+        "few": "{{.Count}} dni za darmo · anulujesz kiedy chcesz",
+        "many": "{{.Count}} dni za darmo · anulujesz kiedy chcesz",
+        "other": "{{.Count}} dnia za darmo · anulujesz kiedy chcesz"
+    },
     "action.grace.title": "Bezpłatny pokaz dobiega końca",
     "action.grace.body": "Obejrzałeś 20 minut w pełnej prędkości. Ulepsz plan, aby kontynuować bez ograniczeń.",
     "action.grace.continue": "Kontynuuj w wolnym tempie",

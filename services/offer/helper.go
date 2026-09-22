@@ -6,9 +6,10 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 )
 
-// minPitchSeconds: a download that takes under two minutes at the free cap
-// is not worth an upsell — the wait is shorter than reading the pitch.
-const minPitchSeconds = 120
+// minPitchSeconds: below ten minutes at the free cap the wait is not what
+// makes anyone pay — "3 min instead of 20 s" sells nothing, "2 h instead of
+// 12 min" does. Smaller files still get the nudge, without the clock.
+const minPitchSeconds = 600
 
 // Translate renders an i18n key with template data in a language.
 type Translate func(lang, key string, data map[string]any) string
@@ -32,6 +33,24 @@ func (h *Helper) PromoOffer() *Offer {
 // HasPlans: the storefront has plans — an "upgrade" link leads somewhere.
 func (h *Helper) HasPlans() bool {
 	return h.s.HasPlans()
+}
+
+// SpeedUp is how many times faster the promo plan downloads than rateMbps,
+// rounded down; 0 when that is not worth saying (under 2×, an unknown rate or
+// an unlimited plan). The CTA quotes it: "Download up to 10× faster".
+// Template usage: {{ $x := speedUp .Data.RateMbps }}
+func (h *Helper) SpeedUp(rateMbps int) int {
+	return speedUp(h.s.Promo(), rateMbps)
+}
+
+func speedUp(o *Offer, rateMbps int) int {
+	if o == nil || o.RateMbps <= 0 || rateMbps <= 0 {
+		return 0
+	}
+	if x := o.RateMbps / rateMbps; x >= 2 {
+		return x
+	}
+	return 0
 }
 
 // Pitch is the download nudge in numbers: this file at the user's cap and at
@@ -83,9 +102,17 @@ func (h *Helper) duration(lang string, sec float64) string {
 }
 
 // durationParts picks the two most significant units, rounded to the nearest
-// minute (hour for multi-day waits); anything under a minute reads as one
-// minute — "0 min" would promise an instant download.
+// minute (hour for multi-day waits). Under a minute it counts seconds in
+// fives: rounding 20 s up to "1 min" made a 10× plan read as 3× next to a
+// 3-minute wait.
 func durationParts(sec float64) (string, map[string]any) {
+	if sec < 57.5 {
+		s := int(math.Round(sec/5)) * 5
+		if s < 5 {
+			s = 5
+		}
+		return "offer.eta.sec", map[string]any{"S": s}
+	}
 	min := int(math.Round(sec / 60))
 	if min < 1 {
 		min = 1

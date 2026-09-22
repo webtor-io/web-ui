@@ -534,8 +534,8 @@
     "action.download.downloadStarting": "Spouští se stahování...",
     "action.download.cancel": "zrušit",
     "action.download.copied": "Zkopírováno!",
-    "action.download.limitedTitle": "Stahování rychlostí {{.Rate}} Mbps",
-    "action.download.eta": "{{.Size}} se touto rychlostí stáhne asi za {{.Slow}}, při {{.FastRate}} Mbps asi za {{.Fast}}",
+    "action.download.limitedTitle": "Rychlost stahování omezena na {{.Rate}} Mbps",
+    "action.download.eta": "{{.Size}} se stáhne asi za {{.Slow}}. S předplatným asi za {{.Fast}}",
     "action.download.limitedSubUnlimited": "S předplatným bez omezení rychlosti",
     "action.download.limitedSub": "S předplatným až {{.Rate}} Mbps",
     "action.noPeers.title": "Tento torrent teď nemá žádné aktivní seedery",
@@ -570,6 +570,7 @@
     "action.slow.continueSlow": "Přesto pokračovat",
     "action.upgrade.paid": "Upgradovat plán",
     "offer.eta.min": "{{.M}} min",
+    "offer.eta.sec": "{{.S}} s",
     "offer.eta.h": "{{.H}} h",
     "offer.eta.hMin": "{{.H}} h {{.M}} min",
     "offer.eta.d": "{{.D}} d",
@@ -580,8 +581,28 @@
         "many": "Vyzkoušet {{.Count}} dne zdarma",
         "other": "Vyzkoušet {{.Count}} dní zdarma"
     },
-    "offer.getRate": "Získat {{.Rate}} Mbps",
-    "offer.getVault": "Získat Vault",
+    "offer.downloadFaster": {
+        "one": "Stáhnout {{.Count}}× rychleji",
+        "few": "Stáhnout {{.Count}}× rychleji",
+        "many": "Stáhnout {{.Count}}× rychleji",
+        "other": "Stáhnout {{.Count}}× rychleji"
+    },
+    "offer.downloadUpTo": {
+        "one": "Stáhnout až {{.Count}}× rychleji",
+        "few": "Stáhnout až {{.Count}}× rychleji",
+        "many": "Stáhnout až {{.Count}}× rychleji",
+        "other": "Stáhnout až {{.Count}}× rychleji"
+    },
+    "offer.downloadFasterPlain": "Stáhnout rychleji",
+    "offer.watchUncapped": "Sledovat bez omezení rychlosti",
+    "offer.keepFullSpeed": "Sledovat dál v plné rychlosti",
+    "offer.saveToVault": "Uložit do Vaultu",
+    "offer.trialNote": {
+        "one": "{{.Count}} den zdarma · kdykoli zrušíte",
+        "few": "{{.Count}} dny zdarma · kdykoli zrušíte",
+        "many": "{{.Count}} dne zdarma · kdykoli zrušíte",
+        "other": "{{.Count}} dní zdarma · kdykoli zrušíte"
+    },
     "action.grace.title": "Bezplatná ukázka končí",
     "action.grace.body": "Sledovali jste 20 minut v plné rychlosti. Vylepšete svůj plán pro pokračování bez omezení.",
     "action.grace.continue": "Pokračovat pomalou rychlostí",
