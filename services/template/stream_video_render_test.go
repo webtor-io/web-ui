@@ -18,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
@@ -77,6 +78,8 @@ func TestStreamVideoRenders(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -223,6 +226,8 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -548,6 +553,8 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return true },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -676,6 +683,8 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 		"json":          func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":         func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":       func(interface{}) bool { return true },
+		"promoOffer":    func() *offer.Offer { return nil },
+		"tn":            func(lang, key string, n int, args ...any) string { return key },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"withContext":   func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":             echo,
@@ -803,6 +812,8 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -929,6 +940,8 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		// The uploads partial renders its chips only for a signed-in viewer.
 		"hasAuth":     func(interface{}) bool { return true },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -1051,6 +1064,8 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -1238,6 +1253,8 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,
@@ -1375,6 +1392,8 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 		"json":        func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":       func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
 		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":           echo,
 		"tp":          echoVariadic,

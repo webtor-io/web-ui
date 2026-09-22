@@ -98,13 +98,16 @@ func welcomeNeeded(prev, next string) bool {
 func (h *Handler) sendTierWelcome(ctx context.Context, db *pg.DB, user *models.User, m userUpdatedMsg) error {
 	w := notification.TierWelcome{
 		Tier:         user.Tier,
-		BenefitKeys:  donate.TierBenefitKeys(user.Tier),
+		Benefits:     donate.TierBenefits(user.Tier, h.offers.Catalog().TierNamed(user.Tier)),
 		ShowStremio:  true,
 		ShowVault:    h.vault != nil,
 		ShowDiscover: true,
 		Billing:      h.billing,
 		IsFreeTrial:  m.IsFreeTrial,
 		NextCharge:   parseChargeDate(m.NextChargeDate),
+	}
+	if w.Billing.Provider != "" {
+		w.Billing.TrialDays = h.offers.TrialDays(user.Tier)
 	}
 	// Skip the lines about things the account has already done. The
 	// onboarding progress query answers exactly these questions; a nil

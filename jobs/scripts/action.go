@@ -903,8 +903,12 @@ func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, sc *Stre
 
 type FileDownload struct {
 	URL      string
-	HasAds   bool
 	TierName string
+	// RateMbps is the viewer's download cap (0 = unlimited or unknown) and
+	// SizeBytes what this link downloads (0 = unknown); together they price
+	// the download in time against the promo plan (offer.DownloadPitch).
+	RateMbps  int
+	SizeBytes int64
 	// ZipWarning surfaces the CRC note for on-the-fly ZIP archives: they
 	// carry no per-file checksums, so picky unpackers may warn. TAR (the
 	// default) has no such problem.
@@ -965,20 +969,27 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	// internally.
 	s.generateThumbnailAsync(c.ApiClaims, resourceID)
 	tpl := s.tb.Build("action/download_file").WithLayoutBody(`{{ template "main" . }}`)
-	hasAds := false
 	tierName := "free"
+	rate := 0
 	if c.Claims != nil {
-		if c.Claims.Claims != nil {
-			hasAds = !c.Claims.Claims.Site.NoAds
+		if c.Claims.Claims != nil && c.Claims.Claims.Connection != nil && c.Claims.Claims.Connection.Rate != nil {
+			rate = int(*c.Claims.Claims.Connection.Rate)
 		}
 		if c.Claims.Context != nil && c.Claims.Context.Tier != nil && c.Claims.Context.Tier.Name != "" {
 			tierName = c.Claims.Context.Tier.Name
 		}
 	}
+	// A partial archive is some of the directory: its size is unknown here,
+	// and quoting the whole directory's wait would overstate it.
+	var size int64
+	if len(s.selectedPaths) == 0 {
+		size = int64(resp.Source.Size)
+	}
 	str, err := tpl.ToString(c.WithData(&FileDownload{
 		URL:        de.URL,
-		HasAds:     hasAds,
 		TierName:   tierName,
+		RateMbps:   rate,
+		SizeBytes:  size,
 		ZipWarning: s.archiveFormat == "zip",
 		IsArchive:  s.archiveFormat != "",
 	}))

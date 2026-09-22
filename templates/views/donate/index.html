@@ -64,17 +64,22 @@
                             <button type="submit" name="tier_id" value="{{ .TierID }}" class="btn btn-pink w-full mb-4" data-umami-event="donate-crypto-join" data-umami-event-tier="{{ .Name }}">{{ t $.Lang "donate.crypto.join" }}</button>
                             {{ end }}
                             {{ if .TaglineKey }}<p class="text-sm italic text-w-sub mb-3">{{ t $.Lang .TaglineKey }}</p>{{ end }}
-                            {{ if .BenefitKeys }}
+                            {{ if .Benefits }}
                             <p class="text-sm font-semibold mb-2">{{ t $.Lang "donate.crypto.youGet" }}</p>
                             <ul class="flex flex-col gap-2 text-sm text-w-sub leading-snug">
-                                {{ range .BenefitKeys }}
-                                <li>{{ t $.Lang . }}</li>
+                                {{ range .Benefits }}
+                                <li>{{ tp $.Lang .Key "Rate" .Rate "VP" .VP "TB" .TB }}</li>
                                 {{ end }}
                             </ul>
                             {{ end }}
-                            {{ if .HasTrial }}
+                            {{ if .TrialDays }}
                             <div class="mt-auto pt-5">
-                                <a href="{{ $.Data.PatreonTrialURL }}" target="_blank" rel="noopener" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ t $.Lang "donate.patreon.trialBanner" }}</a>
+                                <a href="{{ .TrialURL }}" target="_blank" rel="noopener" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ tn $.Lang "donate.patreon.trialBanner" .TrialDays }}</a>
+                                {{/* The trial starts the MONTHLY plan whatever the annual
+                                     toggle shows, and "how do I cancel" is the single most
+                                     common support request — so the card says the price it
+                                     converts to and where it is cancelled. */}}
+                                {{ if .HasMonthly }}<p class="text-center text-xs text-w-muted mt-2">{{ tp $.Lang "donate.patreon.trialAfter" "Amount" .MonthlyUSD }}</p>{{ end }}
                             </div>
                             {{ end }}
                         </div>
@@ -109,7 +114,9 @@
                     <rect x="0" y="0" width="100" height="545.8"/>
                 </svg>
                 <h2 class="text-lg font-bold leading-none">{{ t $.Lang "donate.patreon.title" }}</h2>
-                <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ t $.Lang "donate.patreon.trial" }}</span>
+                {{ if .TrialDays }}
+                <span class="badge badge-sm grow justify-center bg-[#FF424D]/10 border-[#FF424D]/40 text-w-text">🎁 {{ tn $.Lang "donate.patreon.trial" .TrialDays "Tier" .TrialTier }}</span>
+                {{ end }}
             </div>
             <p class="text-sm text-w-sub leading-relaxed text-center sm:text-left mb-5">{{ t $.Lang "donate.patreon.description" }}</p>
             <a href="{{ langPath $.Lang "/donate/patreon" }}" target="_blank" rel="noopener" class="btn bg-[#FF424D] hover:bg-[#e03c46] text-white border-0 w-full" data-umami-event="donate-patreon">{{ t $.Lang "donate.patreon.cta" }}</a>

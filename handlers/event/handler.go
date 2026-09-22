@@ -12,6 +12,7 @@ import (
 	"github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/notification"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
@@ -23,6 +24,9 @@ type Handler struct {
 	ns     *notification.Service
 	// billing feeds the tier-welcome message; zero when no provider is on.
 	billing notification.Billing
+	// offers is the storefront catalog: the tier's benefit lines and trial
+	// length in that message come from it.
+	offers *offer.Service
 	// ci follows the seeder's cache events (cached.go); nil leaves them unread.
 	ci   cacheIndexer
 	subs []*nats.Subscription
@@ -31,7 +35,7 @@ type Handler struct {
 	done   chan struct{}
 }
 
-func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service, billing notification.Billing, index *cache_index.CacheIndex) *Handler {
+func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service, billing notification.Billing, offers *offer.Service, index *cache_index.CacheIndex) *Handler {
 	if !c.Bool(useEventHandlerFlag) {
 		return nil
 	}
@@ -47,6 +51,7 @@ func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Cl
 		claims:  cl,
 		ns:      ns,
 		billing: billing,
+		offers:  offers,
 		done:    make(chan struct{}),
 	}
 }

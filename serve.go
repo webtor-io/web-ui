@@ -63,6 +63,7 @@ import (
 	"github.com/webtor-io/web-ui/services/memwatch"
 	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/notification"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
@@ -170,6 +171,18 @@ func serve(c *cli.Context) error {
 	// Setting i18n (must be before template manager for helper registration)
 	i18nSvc := newI18n()
 
+	// Setting Payments client (shared by profile and donate) and the offers
+	// built on its storefront catalog. Before the template manager: every
+	// upsell template reads the offers through its helper.
+	payClient := npg.New(c)
+	var offerSrc offer.Source
+	if payClient != nil {
+		offerSrc = payClient
+	}
+	offers := offer.New(offerSrc, donate.Checkout(c))
+	offers.Start()
+	defer offers.Close()
+
 	tm := template.NewManager[*w.Context](re).
 		WithHelper(w.NewHelper(c)).
 		WithHelper(umami.NewHelper(c)).
@@ -177,7 +190,10 @@ func serve(c *cli.Context) error {
 		WithHelper(rec.NewHelper(c)).
 		WithHelper(si18n.NewHelper(i18nSvc)).
 		WithHelper(turnstile.NewHelper(c)).
-		WithHelper(stremios.NewHelper())
+		WithHelper(stremios.NewHelper()).
+		WithHelper(offer.NewHelper(offers, func(lang, key string, data map[string]any) string {
+			return si18n.TranslateWithLocalizerData(i18nSvc.Localizer(lang), key, data)
+		}))
 
 	var servers []cs.Servable
 	// Setting Probe
@@ -403,7 +419,7 @@ func serve(c *cli.Context) error {
 	// feature tables and keeps no state of its own. Mounted globally, before
 	// any route is registered, because the navbar shows a progress counter on
 	// every page — and after auth/claims, which the resolver reads.
-	onboardingSvc := onboarding.New(pg, vaultApi != nil, donate.TrialAvailable(c))
+	onboardingSvc := onboarding.New(pg, vaultApi != nil, offers)
 	r.Use(w.OnboardingMiddleware(onboardingSvc))
 
 	// Mounted here for the same reason the onboarding middleware above is:
@@ -467,7 +483,7 @@ func serve(c *cli.Context) error {
 	about.RegisterHandler(r, tm)
 
 	// Setting Speedtest
-	speedtest.RegisterHandler(r, tm, sapi, pg)
+	speedtest.RegisterHandler(r, tm, sapi, pg, offers)
 
 	// Setting DomainSettings
 	ds, err := embed.NewDomainSettings(c, pg, uc)
@@ -505,9 +521,6 @@ func serve(c *cli.Context) error {
 	// Setting ActionHandler
 	wa.RegisterHandler(r, tm, jobs, sapi, actionTS, streamPrefs)
 
-	// Setting Payments client (shared by profile and donate)
-	payClient := npg.New(c)
-
 	// Setting release subscriptions. One service, two surfaces: the profile
 	// lists them, the Discover app and the resource banner create them.
 	releaseSubSvc := rss.New(pg, en, ns, c.String(common.DomainFlag), c.String(common.SessionSecretFlag))
@@ -515,7 +528,7 @@ func serve(c *cli.Context) error {
 
 	// Setting NotificationHandler (the in-app feed behind the navbar bell —
 	// ns is the same Service the unread-count middleware above reads from).
-	notifications.RegisterHandler(r, tm, ns, donate.Billing(c))
+	notifications.RegisterHandler(r, tm, ns, donate.Billing(c), offers)
 
 	// Setting ProfileHandler
 	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get())
@@ -633,7 +646,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Events
 	if nats != nil {
-		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), cacheIndex)
+		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), offers, cacheIndex)
 		if eh != nil {
 			servers = append(servers, eh)
 			defer eh.Close()

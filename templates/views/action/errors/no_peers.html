@@ -6,6 +6,13 @@
      hard timeout says nothing is known yet. All three can be retried. */}}
 {{ $slow := eq .Data.Reason "slow" }}
 {{ $timeout := eq .Data.Reason "timeout" }}
+{{/* A dead swarm is not a speed problem, so a faster plan is not the pitch —
+     Vault is: it keeps the torrent and fetches it when a seeder returns. Sold
+     only when the promo plan includes Vault; no catalog, no pitch. */}}
+{{ $offer := promoOffer }}
+{{ $pitch := and $isFree (not $slow) (not $timeout) $offer }}
+{{ if $pitch }}{{ $pitch = $offer.HasVault }}{{ end }}
+{{ $body := or $slow $timeout $pitch (not $isFree) }}
 <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
     <div class="flex items-start gap-3 flex-wrap">
         <div class="flex items-start gap-3 flex-1 min-w-[200px]">
@@ -19,27 +26,32 @@
                 {{- else }}{{ t $.Lang "action.noPeers.title" }}{{ end -}}
             </h3>
         </div>
-        {{- if and $isFree (not $slow) (not $timeout) }}
-        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-reason="{{ .Data.Reason }}" href="/donate" target="_blank">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
-                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+        {{- if $pitch }}
+        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-no-peers" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-reason="{{ .Data.Reason }}" data-umami-event-target="{{ if $offer.TrialDays }}trial{{ else if $offer.URL }}checkout{{ else }}donate{{ end }}" href="{{ if $offer.URL }}{{ $offer.URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+                <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
             </svg>
-            {{ t $.Lang "action.upgrade.free" }}
+            {{ if $offer.TrialDays }}{{ tn $.Lang "offer.trialCta" $offer.TrialDays }}{{ else }}{{ t $.Lang "offer.getVault" }}{{ end }}
         </a>
         {{- end }}
     </div>
 
+    {{- if $body }}
     <p class="text-sm text-w-sub mt-3 leading-relaxed">
         {{- if $slow }}{{ t $.Lang "action.noPeers.slowBody" }}
         {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutBody" }}
-        {{- else if $isFree }}{{ t $.Lang "action.noPeers.vaultPitch" }}
+        {{- else if $pitch }}{{ t $.Lang "action.noPeers.vaultPitch" }}
         {{- else }}{{ t $.Lang "action.noPeers.vaultUse" }}{{ end -}}
     </p>
+    {{- end }}
 
     {{- if or (gt .Data.Peers 0) (gt .Data.BytesRaw 0) }}
     <p class="text-xs text-w-muted mt-3 tabular-nums">{{ tn $.Lang "action.noPeers.stats" .Data.Peers "Bytes" .Data.Bytes "Peers" .Data.Peers "Sec" .Data.ElapsedSec }}</p>
     {{- else if not $timeout }}
-    <p class="text-xs text-w-muted mt-3">{{ t $.Lang "action.noPeers.altSearch" }}</p>
+    {{- /* "or try another..." needs something to be an alternative TO: with no
+         body sentence above (a free viewer and nothing to sell) it stands on
+         its own. */}}
+    <p class="text-xs text-w-muted mt-3">{{ if $body }}{{ t $.Lang "action.noPeers.altSearch" }}{{ else }}{{ t $.Lang "action.noPeers.altSearchAlone" }}{{ end }}</p>
     {{- end }}
 </div>
 

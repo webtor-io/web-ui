@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/webtor-io/web-ui/services/offer"
+
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -24,9 +26,10 @@ type Billing struct {
 	// page — three support requests in August came back "I can't" after
 	// being given ManageURL alone.
 	CancelGuideURL string
-	// TrialDays is the length of the provider's free trial, 0 when there is
-	// none. Until the tier-change event carries whether THIS subscription
-	// began as a trial, the message states the rule conditionally.
+	// TrialDays is the length of the free trial on this tier's plan (from
+	// the catalog), 0 when there is none. Until the tier-change event carries
+	// whether THIS subscription began as a trial, the message states the rule
+	// conditionally.
 	TrialDays int
 }
 
@@ -34,9 +37,10 @@ type Billing struct {
 // turned paid; it decides which "what you unlocked" lines are worth saying.
 type TierWelcome struct {
 	Tier string
-	// BenefitKeys are the tier's benefit lines as i18n keys (the donate
-	// page's card copy); empty for tiers the shop has no copy for.
-	BenefitKeys []string
+	// Benefits are the tier's benefit lines (the donate card's copy, with
+	// speed and Vault from the catalog); empty for tiers the shop has no
+	// copy for.
+	Benefits []offer.Benefit
 	// ShowStremio: the account has not connected the Stremio addon yet.
 	// Connecting it is the single strongest retention action we have
 	// measured, so it goes first — and is omitted once done, because
@@ -93,7 +97,7 @@ func (s *Service) tierWelcomeSubject(lang string, w TierWelcome) string {
 func (s *Service) tierWelcomeData(lang string, w TierWelcome) map[string]any {
 	return map[string]any{
 		"Tier":           s.tierTitle(lang, w.Tier),
-		"BenefitKeys":    w.BenefitKeys,
+		"Benefits":       w.Benefits,
 		"SupportURL":     withUTM(s.domain+"/support", "tier-welcome"),
 		"ShowStremio":    w.ShowStremio,
 		"StremioURL":     withUTM(s.domain+"/stremio/configure", "tier-welcome"),

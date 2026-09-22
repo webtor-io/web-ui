@@ -104,12 +104,12 @@
                          (views/vault/index.html). btn-soft rather than btn-pink — visible
                          without outshouting the steps the user can actually do. */}}
                     <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="btn btn-xs btn-soft gap-1.5 mt-2">
-                        {{ t $.Ctx.Lang .CTAKey }}
+                        {{ if .CTACount }}{{ tn $.Ctx.Lang .CTAKey .CTACount }}{{ else }}{{ t $.Ctx.Lang .CTAKey }}{{ end }}
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </a>
                     {{ else }}
                     <a href="{{ langPath $.Ctx.Lang .Path }}{{ .Fragment }}"{{ if .Async }} data-async-target="main"{{ end }} data-umami-event="{{ .UmamiEvent }}" class="inline-flex items-center gap-1.5 text-xs font-medium mt-2 text-w-pinkL hover:text-w-pink">
-                        {{ t $.Ctx.Lang .CTAKey }}
+                        {{ if .CTACount }}{{ tn $.Ctx.Lang .CTAKey .CTACount }}{{ else }}{{ t $.Ctx.Lang .CTAKey }}{{ end }}
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </a>
                     {{ end }}

@@ -19,6 +19,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/notification"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -31,6 +32,7 @@ const feedLimit = 100
 type Handler struct {
 	ns      *notification.Service
 	billing notification.Billing
+	offers  *offer.Service
 	tb      *template.BuilderWithLayout[*web.Context]
 }
 
@@ -69,10 +71,11 @@ func NewItem(n models.Notification) Item {
 	}
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *notification.Service, billing notification.Billing) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *notification.Service, billing notification.Billing, offers *offer.Service) {
 	h := &Handler{
 		ns:      ns,
 		billing: billing,
+		offers:  offers,
 		tb:      tm.MustRegisterViews("notifications/*").WithLayout("main"),
 	}
 	gr := r.Group("/notifications")
@@ -105,15 +108,20 @@ func (h *Handler) previewTierWelcome(c *gin.Context) {
 	on := func(name string) bool { return c.DefaultQuery(name, "1") != "0" }
 	w := notification.TierWelcome{
 		Tier:         tier,
-		BenefitKeys:  donate.TierBenefitKeys(tier),
+		Benefits:     donate.TierBenefits(tier, h.offers.Catalog().TierNamed(tier)),
 		ShowStremio:  on("stremio"),
 		ShowVault:    on("vault"),
 		ShowDiscover: on("discover"),
 	}
 	if on("billing") {
 		w.Billing = h.billing
-		if !on("trial") {
-			w.Billing.TrialDays = 0
+		if on("trial") {
+			w.Billing.TrialDays = h.offers.TrialDays(tier)
+			if w.Billing.TrialDays == 0 {
+				// A dev machine usually has no catalog: preview the trial
+				// sentence with a sample length rather than hide it.
+				w.Billing.TrialDays = 7
+			}
 		}
 	}
 	// ?known=1 pretends the event carried the membership facts: a trial (or

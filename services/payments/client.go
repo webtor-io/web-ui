@@ -61,11 +61,63 @@ type Price struct {
 	// Available is a pointer so a webhook build that predates the field
 	// (absent key) reads as available rather than as false.
 	Available *bool `json:"available"`
+	// TrialDays > 0: the plan starts with a free trial this long (offer
+	// terms, zero on a webhook that predates them).
+	TrialDays int `json:"trial_days"`
+	// IsPromo: the one plan in-app offers sell and /donate recommends.
+	IsPromo bool `json:"is_promo"`
 }
 
 // IsAvailable reports whether the plan can currently be purchased.
 func (p Price) IsAvailable() bool {
 	return p.Available == nil || *p.Available
+}
+
+// Tier is what a tier grants — the same columns the claims are built from.
+// A nil DownloadRate / VaultPoints is unlimited, not zero.
+type Tier struct {
+	TierID       int    `json:"tier_id"`
+	Name         string `json:"name"`
+	DownloadRate *int64 `json:"download_rate"`
+	VaultPoints  *int64 `json:"vault_points"`
+	SiteNoAds    bool   `json:"site_noads"`
+	EmbedNoAds   bool   `json:"embed_noads"`
+}
+
+// Catalog is the storefront as the webhook serves it: plans on sale and what
+// each tier grants.
+type Catalog struct {
+	Prices []Price
+	// Tiers is nil when the webhook predates the tier catalog — "unknown",
+	// as opposed to an empty list.
+	Tiers []Tier
+}
+
+// TierNamed returns the facts of the tier with that name, nil when the
+// catalog does not list it.
+func (c *Catalog) TierNamed(name string) *Tier {
+	if c == nil {
+		return nil
+	}
+	for i := range c.Tiers {
+		if c.Tiers[i].Name == name {
+			return &c.Tiers[i]
+		}
+	}
+	return nil
+}
+
+// Tier returns the facts of one tier, nil when the catalog does not list it.
+func (c *Catalog) Tier(id int) *Tier {
+	if c == nil {
+		return nil
+	}
+	for i := range c.Tiers {
+		if c.Tiers[i].TierID == id {
+			return &c.Tiers[i]
+		}
+	}
+	return nil
 }
 
 type Payment struct {
@@ -85,9 +137,9 @@ type Invoice struct {
 }
 
 type Client struct {
-	url         string
-	cl          *http.Client
-	pricesCache *lazymap.LazyMap[[]Price]
+	url          string
+	cl           *http.Client
+	catalogCache *lazymap.LazyMap[*Catalog]
 }
 
 // New returns nil unless payments are enabled AND the webhook service is
@@ -109,15 +161,25 @@ func New(c *cli.Context) *Client {
 	return &Client{
 		url: fmt.Sprintf("%s://%s:%d", scheme, host, c.Int(webhookPortFlag)),
 		cl:  &http.Client{Timeout: 30 * time.Second},
-		pricesCache: lazymap.New[[]Price](&lazymap.Config{
+		catalogCache: lazymap.New[*Catalog](&lazymap.Config{
 			Expire:      5 * time.Minute,
 			ErrorExpire: 10 * time.Second,
 		}),
 	}
 }
 
-func (s *Client) Prices(_ context.Context) ([]Price, error) {
-	return s.pricesCache.Get("prices", func() ([]Price, error) {
+func (s *Client) Prices(ctx context.Context) ([]Price, error) {
+	c, err := s.Catalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.Prices, nil
+}
+
+// Catalog fetches the storefront catalog (GET /prices), shared across
+// callers through a short cache.
+func (s *Client) Catalog(_ context.Context) (*Catalog, error) {
+	return s.catalogCache.Get("catalog", func() (*Catalog, error) {
 		// Deliberately not the caller's context: the fetch is shared
 		// across requests via lazymap, and one cancelled request must not
 		// fail it for every waiter (the error would be cached too).
@@ -125,11 +187,21 @@ func (s *Client) Prices(_ context.Context) ([]Price, error) {
 		defer cancel()
 		var out struct {
 			Prices []Price `json:"prices"`
+			// Pointer: a missing key (older webhook) stays nil, an empty
+			// table decodes to an empty slice.
+			Tiers *[]Tier `json:"tiers"`
 		}
 		if err := s.do(ctx, http.MethodGet, "/prices", nil, &out); err != nil {
 			return nil, err
 		}
-		return out.Prices, nil
+		c := &Catalog{Prices: out.Prices}
+		if out.Tiers != nil {
+			c.Tiers = *out.Tiers
+			if c.Tiers == nil {
+				c.Tiers = []Tier{}
+			}
+		}
+		return c, nil
 	})
 }
 

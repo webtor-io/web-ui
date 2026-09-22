@@ -5,25 +5,45 @@
         var wgetCmd = `wget -c -O "${file}" -t 20 "${url}"`;
         var curlCmd = `curl -o "${file}" -C - --retry 20 "${url}"`;
     </script>
-    {{- if .Data.HasAds }}
-    {{ $isFree := eq .Data.TierName "free" }}
+    {{- /* The nudge sells the promo plan (services/offer) to a free viewer: this
+         file's wait at their cap next to the plan's, and a button straight to
+         the plan's checkout — the trial when it has one. No promo plan (no
+         catalog, e.g. self-hosted) — no nudge. */}}
+    {{- $offer := promoOffer }}
+    {{- if and $offer (eq .Data.TierName "free") }}
+    {{- $pitch := downloadPitch $.Lang .Data.SizeBytes .Data.RateMbps }}
+    {{- $target := "donate" }}{{ if $offer.TrialDays }}{{ $target = "trial" }}{{ else if $offer.URL }}{{ $target = "checkout" }}{{ end }}
     <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-center gap-4 flex-wrap">
         <div class="flex items-start gap-3 flex-1 min-w-[240px]">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
             </svg>
             <div class="min-w-0">
-                <div class="text-sm font-semibold text-base-content leading-snug">{{ tp $.Lang "action.download.limitedTitle" "Rate" .Claims.Claims.Connection.Rate }}</div>
-                <div class="text-xs text-w-muted mt-0.5">{{ t $.Lang "action.download.limitedSub" }}</div>
+                {{- if .Data.RateMbps }}
+                <div class="text-sm font-semibold text-base-content leading-snug">{{ tp $.Lang "action.download.limitedTitle" "Rate" .Data.RateMbps }}</div>
+                {{- end }}
+                <div class="text-xs text-w-muted mt-0.5">
+                    {{- if $pitch }}{{ tp $.Lang "action.download.eta" "Size" $pitch.Size "Slow" $pitch.Slow "Fast" $pitch.Fast "FastRate" $pitch.FastRate }}
+                    {{- else if $offer.RateMbps }}{{ tp $.Lang "action.download.limitedSub" "Rate" $offer.RateMbps }}
+                    {{- else }}{{ t $.Lang "action.download.limitedSubUnlimited" }}{{ end -}}
+                </div>
             </div>
         </div>
-        <a class="btn btn-sm btn-soft shrink-0" data-umami-event="donate-download" data-umami-event-tier="{{ .Data.TierName }}" href="/donate" target="_blank">
+        <a class="btn btn-sm btn-soft shrink-0" href="{{ if $offer.URL }}{{ $offer.URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener"
+           data-umami-event="donate-download" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-target="{{ $target }}">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
             </svg>
-            {{ if $isFree }}{{ t $.Lang "action.upgrade.free" }}{{ else }}{{ t $.Lang "action.upgrade.paid" }}{{ end }}
+            {{ if $offer.TrialDays }}{{ tn $.Lang "offer.trialCta" $offer.TrialDays }}{{ else if $offer.RateMbps }}{{ tp $.Lang "offer.getRate" "Rate" $offer.RateMbps }}{{ else }}{{ t $.Lang "action.upgrade.paid" }}{{ end }}
         </a>
     </div>
+    {{- /* Impression: without it the nudge had clicks and no denominator. */}}
+    <script>
+    (function () {
+        if (!window.umami) return;
+        window.umami.track('donate-download-shown', { tier: '{{ .Data.TierName }}', target: '{{ $target }}', eta: {{ if $pitch }}1{{ else }}0{{ end }} });
+    })();
+    </script>
     {{- end }}
     {{- if .Data.IsArchive }}
     <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">

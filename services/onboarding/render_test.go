@@ -54,6 +54,7 @@ func newRenderer(t *testing.T) *template.Template {
 	tmpl, err := template.New("onboarding_checklist.html").Funcs(template.FuncMap{
 		"t":        h.T,
 		"tp":       h.Tp,
+		"tn":       h.Tn,
 		"langPath": langPathStub,
 		"asset":    assetStub,
 	}).ParseFiles(partialPath)
@@ -202,8 +203,20 @@ func TestRenderLockedStepsShowProBadgeAndQuietPlansLink(t *testing.T) {
 		cl := build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, false, trialOn, now)
 		out := render(t, tmpl, lang, cl)
 
-		if strings.Contains(out, "onboarding.") {
+		if strings.Contains(out, "onboarding.") || strings.Contains(out, "offer.") {
 			t.Errorf("lang=%s: unresolved translation key in the locked variant", lang)
+		}
+		// The trial invitation is a plural message rendered for the plan's
+		// own trial length: with `t` instead of `tn` it prints "<no value>",
+		// and with the wrong count the Slavic locales decline it wrongly.
+		if strings.Contains(out, "<no value>") {
+			t.Errorf("lang=%s: the trial CTA lost its count:\n%s", lang, out)
+		}
+		if lang == "en" && !strings.Contains(out, "Try free for 7 days") {
+			t.Errorf("the trial CTA must quote the plan's trial length:\n%s", out)
+		}
+		if lang == "ru" && !strings.Contains(out, "Попробовать 7 дней бесплатно") {
+			t.Errorf("ru: the trial CTA must use the plural form for 7:\n%s", out)
 		}
 		if strings.Count(out, ">PRO<") != 2 {
 			t.Errorf("lang=%s: expected a PRO badge on both locked steps, got %d", lang, strings.Count(out, ">PRO<"))

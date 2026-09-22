@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/offer"
 )
 
 const (
 	withVault = true
 	paidUser  = true
 	freeUser  = false
-	trialOn   = true
-	noTrial   = false
+	trialOn   = 7
+	noTrial   = 0
 )
 
 func progress(age time.Duration, library, watchlist, vault, stremio bool) (*models.OnboardingProgress, time.Time) {
@@ -300,8 +301,8 @@ func TestLockedStepsInviteToTrialWhenAvailable(t *testing.T) {
 		if !s.Locked {
 			continue
 		}
-		if s.CTAKey != "onboarding.trialCta" {
-			t.Errorf("step %s: expected trial CTA, got %s", s.Key, s.CTAKey)
+		if s.CTAKey != "offer.trialCta" || s.CTACount != trialOn {
+			t.Errorf("step %s: expected trial CTA for %d days, got %s/%d", s.Key, trialOn, s.CTAKey, s.CTACount)
 		}
 		if s.Path != "/donate" {
 			t.Errorf("step %s: trial CTA must still lead to /donate, got %s", s.Key, s.Path)
@@ -334,7 +335,7 @@ func TestTrialAvailabilityDoesNotAffectPaidUsers(t *testing.T) {
 		if s.Locked {
 			t.Errorf("step %s: paid user must not see locked steps", s.Key)
 		}
-		if s.CTAKey == "onboarding.trialCta" || s.CTAKey == "onboarding.proCta" {
+		if s.CTAKey == "offer.trialCta" || s.CTAKey == "onboarding.proCta" {
 			t.Errorf("step %s: paid user must keep the step's own CTA, got %s", s.Key, s.CTAKey)
 		}
 	}
@@ -343,9 +344,13 @@ func TestTrialAvailabilityDoesNotAffectPaidUsers(t *testing.T) {
 // Preview is the dev-only `?onboarding=` review mode: a pristine account of the
 // requested tier, past no gates. Free must show the locked rows (that is what
 // the mode exists to review); paid must show every step actionable.
+type fakeTrials struct{ days int }
+
+func (f fakeTrials) Promo() *offer.Offer { return &offer.Offer{Tier: "silver", TrialDays: f.days} }
+
 func TestPreviewRendersFreshAccountOfRequestedTier(t *testing.T) {
 	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
-	svc := &Service{vaultEnabled: true, trialAvailable: true}
+	svc := &Service{vaultEnabled: true, trials: fakeTrials{days: 7}}
 
 	free := svc.Preview(false, now)
 	if free == nil {
@@ -355,8 +360,8 @@ func TestPreviewRendersFreshAccountOfRequestedTier(t *testing.T) {
 	for _, s := range free.Steps {
 		if s.Locked {
 			locked++
-			if s.CTAKey != "onboarding.trialCta" {
-				t.Errorf("step %s: free preview with a trial must invite to it, got %s", s.Key, s.CTAKey)
+			if s.CTAKey != "offer.trialCta" || s.CTACount != 7 {
+				t.Errorf("step %s: free preview with a trial must invite to it, got %s/%d", s.Key, s.CTAKey, s.CTACount)
 			}
 		}
 	}

@@ -826,12 +826,12 @@ log
     <p class="desc">
       Inline component shown inside a <code>progress-alert</code> when streaming bandwidth is insufficient.
       Three states based on <code>IsRateLimited</code> + <code>TierName</code>:
-      free rate-limited (trial pitch) &middot; paid rate-limited (generic upgrade) &middot; genuinely slow (no upsell).
+      free rate-limited (the promo plan, trial first) &middot; paid rate-limited (generic upgrade) &middot; genuinely slow (no upsell).
       Source: <code>templates/views/action/errors/slow_download.html</code>.
     </p>
 
     <!-- State A: Free + rate-limited -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free user, plan caps speed &mdash; trial pitch with concrete number ("Get 50 Mbps")</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user, plan caps speed &mdash; the promo plan's trial ("Try free for 7&nbsp;days"), or its speed ("Get 50&nbsp;Mbps") when no trial can be started</div>
     <div class="progress-alert mb-2" style="max-width:600px">
       <pre class="done"><span class="line">resource data fetched</span></pre>
       <pre class="done"><span class="line">stream link ready</span></pre>
@@ -989,15 +989,16 @@ log
     </div>
 
     <div class="uikit-rule mb-8">
-      <strong>Decision matrix:</strong><br>
-      <code>IsRateLimited && TierName=="free"</code> &rarr; trial pitch CTA <code>action.upgrade.free</code> ("Get 50 Mbps")<br>
-      <code>IsRateLimited && TierName!="free"</code> &rarr; generic CTA <code>action.upgrade.paid</code> ("Upgrade plan")<br>
+      <strong>Decision matrix</strong> (the CTA is the promo plan from the catalog &mdash; see &sect;20):<br>
+      <code>IsRateLimited && free && promoOffer</code> &rarr; the plan's own checkout: <code>offer.trialCta</code> ("Try free for 7 days") when it has a trial, else <code>offer.getRate</code> ("Get 50 Mbps")<br>
+      <code>IsRateLimited && paid && hasPlans</code> &rarr; generic CTA <code>action.upgrade.paid</code> ("Upgrade plan") &rarr; /donate<br>
+      <code>!promoOffer</code> / <code>!hasPlans</code> &rarr; no CTA at all: nothing to sell (no storefront catalog)<br>
       <code>!IsRateLimited</code> &rarr; no upgrade CTA at all (network won't be helped by a higher cap)<br>
       <strong>Vault bullet</strong> hidden when <code>TierName=="free"</code> (Vault is a paid feature)<br>
       <strong>"More seeders" bullet</strong> only shown when <code>!IsRateLimited</code> &mdash; under a plan cap, extra seeders don't help because the user's pipe is the bottleneck, not BT<br>
       <strong>Bolt icon</strong> in header &amp; CTA from heroicons (BoltIcon, 24x24)<br>
       <strong>Right card</strong> uses <code>gradient-text</code> + <code>bg-w-pink/10 border-w-pink/30</code> to anchor the gap visually<br>
-      <strong>Umami</strong>: <code>data-umami-event="donate-slow-download"</code> + <code>data-umami-event-tier</code> for funnel split<br>
+      <strong>Umami</strong>: <code>data-umami-event="donate-slow-download"</code> + <code>data-umami-event-tier</code> + <code>data-umami-event-target</code> (<code>trial</code>|<code>checkout</code>|<code>donate</code>) for funnel split<br>
       <strong>CTA placement</strong>: <em>inside</em> the card's header row, right of the title (wraps below on narrow viewports via <code>flex-wrap</code> + <code>min-w-[200px]</code> on the title block) &mdash; consistent with 9.11 download_file and 9.12 no_peers
     </div>
 
@@ -1006,14 +1007,15 @@ log
     <!-- 9.11 Download Ready (with optional upgrade nudge) -->
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Download Ready (with optional Upgrade Nudge)</h3>
     <p class="desc">
-      Action panel shown after a download link is ready. For ad-supported tiers (<code>HasAds</code>),
-      a compact horizontal nudge appears above the actions. Action row groups copy chips on the left
-      (tertiary) and primary download CTA on the right with a ghost dismiss between.
+      Action panel shown after a download link is ready. A free viewer gets a compact horizontal
+      nudge above the actions: this file's wait at their cap next to the promo plan's, and a button
+      straight to that plan's checkout. Action row groups copy chips on the left (tertiary) and
+      primary download CTA on the right with a ghost dismiss between.
       Source: <code>templates/views/action/download_file.html</code>.
     </p>
 
     <!-- State A: Free + ads -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free user with ads &mdash; horizontal nudge offers trial speed; clean action row below</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free viewer &mdash; the wait in minutes, then the trial; clean action row below</div>
     <div class="progress-alert mb-2" style="max-width:680px">
       <pre class="done"><span class="line">stream link ready</span></pre>
       <pre class="done"><span class="line">warming up</span></pre>
@@ -1026,14 +1028,14 @@ log
           </svg>
           <div class="min-w-0">
             <div class="text-sm font-semibold text-base-content leading-snug">Downloading at 5 Mbps</div>
-            <div class="text-xs text-w-muted mt-0.5">A subscription removes the cap and ads</div>
+            <div class="text-xs text-w-muted mt-0.5">4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min at this speed &mdash; about 12&nbsp;min at 50&nbsp;Mbps</div>
           </div>
         </div>
         <a class="btn btn-sm btn-soft shrink-0">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
             <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
           </svg>
-          Get 50 Mbps
+          Try free for 7&nbsp;days
         </a>
       </div>
 
@@ -1068,7 +1070,7 @@ log
     </div>
 
     <!-- State B: No ads (paid) -->
-    <div class="uikit-label mb-2"><strong>B.</strong> Paid user (no ads) &mdash; nudge omitted entirely, just clean action row</div>
+    <div class="uikit-label mb-2"><strong>B.</strong> Paying viewer (or no storefront catalog) &mdash; nudge omitted entirely, just clean action row</div>
     <div class="progress-alert mb-2" style="max-width:680px">
       <pre class="done"><span class="line">stream link ready</span></pre>
       <pre class="done"><span class="line">warming up</span></pre>
@@ -1099,7 +1101,7 @@ log
       </div>
     </div>
     <div class="uikit-label mb-6">
-      <code>!HasAds</code> &rarr; nudge skipped &middot; same action row pattern, no upsell
+      <code>TierName != "free"</code> or no <code>promoOffer</code> &rarr; nudge skipped &middot; same action row pattern, no upsell
     </div>
 
     <div class="uikit-rule mb-8">
@@ -1108,7 +1110,8 @@ log
       copy chips (<code>btn-xs btn-ghost border</code>) grouped on the left via <code>mr-auto</code><br>
       <strong>Copy chips</strong>: hover transitions to cyan border &amp; text (<code>hover:border-w-cyan/50 hover:text-w-cyan</code>) &middot;
       title attr carries full label for a11y, visible label is just the protocol name<br>
-      <strong>Nudge sub-text</strong> ("subscription removes cap and ads") names the second value (no ads) &mdash; cap alone isn't always the strongest hook<br>
+      <strong>Nudge sub-text</strong> prices the wait instead of describing it: <code>downloadPitch</code> (&sect;20) turns this file's size and the viewer's cap into "4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min &mdash; about 12&nbsp;min at 50&nbsp;Mbps". Under two minutes of waiting it falls back to the plan's speed alone ("Up to 50&nbsp;Mbps with a subscription"): a wait nobody feels is not an argument<br>
+      <strong>Umami</strong>: click <code>donate-download</code> (+ <code>tier</code>, <code>target</code>) and impression <code>donate-download-shown</code> (+ <code>eta</code> 1|0) &mdash; the nudge had clicks and no denominator before<br>
       <strong>Same Bolt/CTA</strong> pattern as 9.10 keeps the upgrade visual consistent across slow_download &amp; download_file
     </div>
 
@@ -1118,13 +1121,13 @@ log
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">No Peers (tier-aware Vault pitch)</h3>
     <p class="desc">
       Shown when stream/download warm-up times out (no active seeders). Two-card structure:
-      free user gets a Vault-as-value pitch + upgrade CTA; paid user gets the action prompt to use Vault directly (no upsell).
+      free user gets a Vault-as-value pitch + a CTA to the promo plan (a dead swarm is not a speed problem, so the button sells Vault, never Mbps); paid user gets the action prompt to use Vault directly (no upsell).
       Uses the clock icon to convey "wait for peers" rather than a paywall framing.
       Source: <code>templates/views/action/errors/no_peers.html</code>.
     </p>
 
     <!-- State A: Free + no peers -->
-    <div class="uikit-label mb-2"><strong>A.</strong> Free user &mdash; Vault is the value prop, "Get 50 Mbps" CTA bundles it</div>
+    <div class="uikit-label mb-2"><strong>A.</strong> Free user &mdash; Vault is the value prop and the CTA sells it: the trial when there is one, else "Get Vault"</div>
     <div class="progress-alert mb-2" style="max-width:680px">
       <pre class="done"><span class="line">resource data fetched</span></pre>
       <pre class="done"><span class="line">stream link ready</span></pre>
@@ -1140,10 +1143,10 @@ log
             <h3 class="font-semibold text-base text-base-content leading-snug">This torrent has no active seeders right now</h3>
           </div>
           <a class="btn btn-sm btn-soft shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
-              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+              <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
             </svg>
-            Get 50 Mbps
+            Try free for 7&nbsp;days
           </a>
         </div>
         <p class="text-sm text-w-sub mt-3 leading-relaxed">Vault saves the torrent and grabs it as soon as a seeder appears &mdash; included with any paid plan.</p>
@@ -1154,7 +1157,7 @@ log
       </div>
     </div>
     <div class="uikit-label mb-6">
-      Free + no peers &mdash; Vault narrative leads ("saves the torrent, grabs it when a seeder appears") &middot; CTA inside card top-right bundles trial speed + Vault access
+      Free + no peers &mdash; Vault narrative leads ("saves the torrent, grabs it when a seeder appears") &middot; CTA inside card top-right sells the promo plan's Vault (archive icon, not the bolt: speed is irrelevant to a dead swarm)
     </div>
 
     <!-- State B: Paid + no peers -->
@@ -1186,12 +1189,13 @@ log
     </div>
 
     <div class="uikit-rule mb-8">
-      <strong>Decision matrix:</strong><br>
-      <code>TierName=="free"</code> &rarr; <code>vaultPitch</code> copy + upgrade CTA <code>action.upgrade.free</code><br>
+      <strong>Decision matrix</strong> (dead swarm only &mdash; slow and timeout never sell):<br>
+      <code>free && promoOffer.HasVault</code> &rarr; <code>vaultPitch</code> copy + CTA <code>offer.trialCta</code> / <code>offer.getVault</code><br>
+      <code>free && no promo plan (or one without Vault)</code> &rarr; no pitch and no CTA, just the retry and "try another torrent"<br>
       <code>TierName!="free"</code> &rarr; <code>vaultUse</code> copy + dismiss-only<br>
       <strong>Icon</strong>: clock from feather icons (24x24, 1.8 stroke, in <code>text-w-pinkL</code>) &mdash; "wait for peers" framing rather than warning/paywall<br>
       <strong>Alt suggestion</strong> ("or try another torrent with more seeders") shown to both tiers as a soft secondary in <code>text-xs text-w-muted</code><br>
-      <strong>Umami</strong>: <code>data-umami-event="donate-no-peers"</code> + <code>data-umami-event-tier</code>
+      <strong>Umami</strong>: <code>data-umami-event="donate-no-peers"</code> + <code>data-umami-event-tier</code> + <code>data-umami-event-reason</code> + <code>data-umami-event-target</code>
     </div>
   </div>
 
@@ -2402,6 +2406,70 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
     </div>
     <div class="uikit-note">
       <strong>Why chips and not Netflix-style rows:</strong> rows scale better past ~15 items, but our lists are bounded (≤3 OS tracks per language, a handful of embedded/sidecar) and the language row already narrows them to a few chips; chips match Discover and keep audio and subtitles in one viewport. If a language ever exceeds ~8 tracks, switch that group to rows — the origin badge and check icon carry over unchanged.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
+  <!-- =========================================================
+       20. SALES OFFERS
+       ========================================================= -->
+  <div class="uikit-section" id="offers">
+    <h2>20. Sales offers (catalog-driven)</h2>
+    <p class="desc">
+      Every place the app asks for money shows <em>one</em> offer: the promo plan from the storefront
+      catalog (webhook <code>GET /prices</code> &rarr; <code>services/offer</code>). Its speed and Vault
+      come from the tier row the claims are built from, its trial and "this is the plan we sell" from
+      the price row (<code>trial_days</code>, <code>is_promo</code>). Nothing about a tier is written in
+      a template, a locale file or a Go constant &mdash; if the plan changes in the database, every
+      surface below changes with it.
+    </p>
+
+    <div class="uikit-rule mb-6">
+      <strong>Template helpers</strong> (<code>services/offer/helper.go</code>):<br>
+      <code>promoOffer</code> &rarr; the plan or <code>nil</code>: <code>.RateMbps</code> (0 = unlimited),
+      <code>.VaultPoints</code>/<code>.HasVault</code>, <code>.TrialDays</code> (&gt; 0 only when the
+      checkout can actually start it), <code>.URL</code> (direct checkout; empty &rarr; link /donate)<br>
+      <code>hasPlans</code> &rarr; the storefront has something to sell at all<br>
+      <code>downloadPitch $.Lang &lt;bytes&gt; &lt;rateMbps&gt;</code> &rarr; <code>.Size</code>,
+      <code>.Slow</code>, <code>.Fast</code>, <code>.FastRate</code>, or nil when the file is too small,
+      a rate is unknown or the plan is not faster<br>
+      <strong>No catalog, no offer.</strong> A deployment without the webhook (self-hosted) shows no
+      upsell anywhere rather than a button to someone else's storefront; in production a webhook
+      outage is invisible because the last good catalog stays in memory.
+    </div>
+
+    <table class="w-full text-sm mb-6">
+      <thead><tr class="text-w-muted text-left"><th class="pr-4 py-1">Surface</th><th class="pr-4 py-1">Shown to</th><th class="pr-4 py-1">Says</th><th class="py-1">Umami</th></tr></thead>
+      <tbody class="text-w-sub align-top">
+        <tr><td class="pr-4 py-1">Promo banner (home, resource page)</td><td class="pr-4 py-1">not paying</td><td class="pr-4 py-1"><code>promo.speedTrial</code>: the plan's speed and trial length</td><td class="py-1"><code>promo</code> + <code>target</code></td></tr>
+        <tr><td class="pr-4 py-1">Download ready (&sect;9.11)</td><td class="pr-4 py-1">free</td><td class="pr-4 py-1">this file's wait now vs on the plan</td><td class="py-1"><code>donate-download</code>, <code>donate-download-shown</code></td></tr>
+        <tr><td class="pr-4 py-1">Cap modal (&sect;9.10)</td><td class="pr-4 py-1">free capped / paid capped</td><td class="pr-4 py-1">trial or the plan's speed / compare plans</td><td class="py-1"><code>donate-slow-download</code></td></tr>
+        <tr><td class="pr-4 py-1">Grace popup (player)</td><td class="pr-4 py-1">free, after the grace window</td><td class="pr-4 py-1">trial or the plan's speed</td><td class="py-1"><code>donate-grace</code>, <code>grace-continue-slow</code></td></tr>
+        <tr><td class="pr-4 py-1">No peers, dead swarm (&sect;9.12)</td><td class="pr-4 py-1">free, plan includes Vault</td><td class="pr-4 py-1">Vault keeps the torrent &mdash; never Mbps</td><td class="py-1"><code>donate-no-peers</code></td></tr>
+        <tr><td class="pr-4 py-1">Onboarding locked steps (&sect;18)</td><td class="pr-4 py-1">free, PRO steps</td><td class="pr-4 py-1"><code>offer.trialCta</code> with the plan's trial length</td><td class="py-1"><code>onboarding-pro-*</code></td></tr>
+        <tr><td class="pr-4 py-1">/donate tier cards</td><td class="pr-4 py-1">everyone</td><td class="pr-4 py-1">speed and Vault per tier; trial plaque and RECOMMENDED on the promo plan; "then $5/month, cancel anytime"</td><td class="py-1"><code>donate-trial-plaque</code>, <code>donate-patreon-join</code></td></tr>
+        <tr><td class="pr-4 py-1">/speedtest plan list</td><td class="pr-4 py-1">everyone</td><td class="pr-4 py-1">tiers and caps from the catalog (free included); hidden without one</td><td class="py-1"><code>donate-speedtest</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="uikit-note">
+      <strong>The button is the plan's checkout, not /donate.</strong> A trial the provider can start is
+      one click from the moment the cap hurts; <code>/donate</code> is the fallback when there is no
+      direct checkout. Every CTA carries <code>data-umami-event-target</code> =
+      <code>trial</code>|<code>checkout</code>|<code>donate</code>, so the funnel can be read per step.
+    </div>
+    <div class="uikit-note">
+      <strong>Copy rules.</strong> Quote what the plan grants, never a benefit it does not: the
+      "no ads" line is gone from the cards and the nudge because free accounts have seen no ads since
+      the 2026-06 experiment. Numbers carry a no-break space before the unit ("50&nbsp;Mbps"), and day
+      counts use CLDR plural keys (<code>offer.trialCta</code>, <code>donate.patreon.trialBanner</code>)
+      because 7 and 1 decline differently in half our locales.
+    </div>
+    <div class="uikit-note">
+      <strong>Icons.</strong> Bolt for anything about speed (nudge, cap modal, grace); the archive box
+      for Vault (no-peers). The icon states which promise the button carries &mdash; a bolt on a dead
+      swarm would be a lie.
     </div>
   </div>
 

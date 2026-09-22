@@ -21,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/notification"
+	"github.com/webtor-io/web-ui/services/offer"
 	np "github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
@@ -30,16 +31,12 @@ const (
 	patreonURL         = "https://www.patreon.com/join/pavel_tatarskiy"
 	patreonGiftURL     = "https://www.patreon.com/pavel_tatarskiy/gift"
 	patreonCheckoutFmt = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=%s"
-	// Direct checkout of the Silver tier's 7-day free trial.
-	patreonTrialURL = "https://www.patreon.com/checkout/pavel_tatarskiy?rid=3972747&is_free_trial=true"
 	// patreonManageURL is where a member sees, changes and cancels the
 	// membership — the page support keeps sending people to.
 	patreonManageURL = "https://www.patreon.com/settings/memberships"
 	// patreonCancelGuideURL is Patreon's step-by-step "cancel a paid
 	// membership" article.
 	patreonCancelGuideURL = "https://support.patreon.com/hc/en-us/articles/360005502572-Canceling-a-paid-membership"
-	// patreonTrialDays is Patreon's free-trial length for the trial tier.
-	patreonTrialDays = 7
 
 	patreonFlag = "donate-patreon"
 	cryptoFlag  = "donate-crypto"
@@ -65,50 +62,81 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 	)
 }
 
-// TrialAvailable answers "can this deployment offer a free trial": Patreon is
-// configured and at least one tier is fronted by a trial there. Callers
-// outside the donate page (the onboarding checklist) use it to decide whether
-// a locked feature can say "try it" instead of "buy it".
-func TrialAvailable(c *cli.Context) bool {
+// Checkout builds direct Patreon checkout links for the offers
+// (services/offer): the trial variant for a plan with trial days, the annual
+// cadence for a yearly plan. nil when Patreon is off — offers then lead to
+// /donate — and "" for a tier Patreon does not sell.
+func Checkout(c *cli.Context) offer.Checkout {
 	if !c.BoolT(patreonFlag) {
-		return false
-	}
-	for _, m := range tierMetas {
-		if m.trial {
-			return true
-		}
-	}
-	return false
-}
-
-// TierBenefitKeys lists the i18n keys of a tier's marketing benefits — the
-// same lines the donate page prints on the tier's card — so a welcome message
-// can restate what was just bought without a second copy of the copy.
-func TierBenefitKeys(tier string) []string {
-	m, ok := tierMetas[tier]
-	if !ok {
 		return nil
 	}
-	keys := make([]string, 0, m.benefits)
-	for i := 1; i <= m.benefits; i++ {
-		keys = append(keys, "donate.crypto.tier."+tier+".b"+strconv.Itoa(i))
+	return patreonCheckout
+}
+
+func patreonCheckout(tier string, periodDays int, trial bool) string {
+	m, ok := tierMetas[tier]
+	if !ok || m.patreonRid == "" {
+		return ""
 	}
-	return keys
+	u := fmt.Sprintf(patreonCheckoutFmt, m.patreonRid)
+	if periodDays == 365 {
+		u += "&cadence=12"
+	}
+	if trial {
+		// Patreon fronts the plan with the free trial itself.
+		u += "&is_free_trial=true"
+	}
+	return u
+}
+
+// TierBenefits lists a tier's marketing lines — the same ones the donate
+// card prints — so a welcome message can restate what was just bought
+// without a second copy of the copy. Speed and Vault come from the tier's
+// catalog facts (nil facts: those lines are left out rather than guessed);
+// the rest is per-tier copy.
+func TierBenefits(tier string, facts *np.Tier) []offer.Benefit {
+	var out []offer.Benefit
+	if facts != nil {
+		switch {
+		case facts.VaultPoints == nil:
+			out = append(out, offer.Benefit{Key: "donate.tier.vaultUnlimited"})
+		case *facts.VaultPoints > 0:
+			out = append(out, vaultBenefit(*facts.VaultPoints))
+		}
+		if facts.DownloadRate == nil {
+			out = append(out, offer.Benefit{Key: "donate.tier.speedUnlimited"})
+		} else {
+			out = append(out, offer.Benefit{Key: "donate.tier.speed", Rate: *facts.DownloadRate})
+		}
+	}
+	if m, ok := tierMetas[tier]; ok {
+		for _, k := range m.extraBenefits {
+			out = append(out, offer.Benefit{Key: k})
+		}
+	}
+	return out
+}
+
+// vaultBenefit restates Vault Points as storage (1 VP = 1 GB), in TB from a
+// whole thousand up — "1000 Vault Points (1 TB)". The unit is in the key so
+// each language writes its own ("ГБ").
+func vaultBenefit(vp int64) offer.Benefit {
+	if vp >= 1000 && vp%1000 == 0 {
+		return offer.Benefit{Key: "donate.tier.vaultTB", VP: vp, TB: vp / 1000}
+	}
+	return offer.Benefit{Key: "donate.tier.vaultGB", VP: vp}
 }
 
 // Billing is what the rest of the app may say about payments: with Patreon
-// on, subscriptions are managed there and the trial tier's length applies;
-// with it off there is no provider to point anyone at and the zero value
-// keeps welcome mail silent on the subject.
+// on, subscriptions are managed there; with it off there is no provider to
+// point anyone at and the zero value keeps welcome mail silent on the
+// subject. The trial length is not here — it is a plan's term, read from the
+// catalog when a message needs it.
 func Billing(c *cli.Context) notification.Billing {
 	if !c.BoolT(patreonFlag) {
 		return notification.Billing{}
 	}
-	b := notification.Billing{Provider: "Patreon", ManageURL: patreonManageURL, CancelGuideURL: patreonCancelGuideURL}
-	if TrialAvailable(c) {
-		b.TrialDays = patreonTrialDays
-	}
-	return b
+	return notification.Billing{Provider: "Patreon", ManageURL: patreonManageURL, CancelGuideURL: patreonCancelGuideURL}
 }
 
 type Handler struct {
@@ -156,23 +184,23 @@ func methodRedirect(enabled bool, url string) gin.HandlerFunc {
 }
 
 // tierMeta carries the marketing copy of the known tiers as i18n keys
-// (translation-keys-in-Go pattern); unknown tiers still render a bare
-// purchasable card.
+// (translation-keys-in-Go pattern) and their Patreon tier ids; unknown tiers
+// still render a bare purchasable card. What a tier grants (speed, Vault) and
+// how its plans are sold (trial, promo) are catalog data, not listed here.
 type tierMeta struct {
 	titleKey   string
 	taglineKey string
-	benefits   int
-	// trial: the tier has a free trial on Patreon — the card shows the
-	// trial plaque.
-	trial bool
+	// extraBenefits: the tier's lines beyond speed and Vault — perks the
+	// catalog does not model.
+	extraBenefits []string
 	// patreonRid is the Patreon tier id for direct checkout links.
 	patreonRid string
 }
 
 var tierMetas = map[string]tierMeta{
-	"bronze": {"donate.crypto.tier.bronze.title", "donate.crypto.tier.bronze.tagline", 4, false, "3981231"},
-	"silver": {"donate.crypto.tier.silver.title", "donate.crypto.tier.silver.tagline", 5, true, "3972747"},
-	"gold":   {"donate.crypto.tier.gold.title", "donate.crypto.tier.gold.tagline", 5, false, "3981014"},
+	"bronze": {"donate.crypto.tier.bronze.title", "donate.crypto.tier.bronze.tagline", []string{"donate.tier.supporterBadge"}, "3981231"},
+	"silver": {"donate.crypto.tier.silver.title", "donate.crypto.tier.silver.tagline", []string{"donate.tier.prioritySupport", "donate.tier.supporterBadge"}, "3972747"},
+	"gold":   {"donate.crypto.tier.gold.title", "donate.crypto.tier.gold.tagline", []string{"donate.tier.prioritySupport", "donate.tier.supporterBadge"}, "3981014"},
 }
 
 type tierCard struct {
@@ -180,9 +208,13 @@ type tierCard struct {
 	Name        string
 	TitleKey    string
 	TaglineKey  string
-	BenefitKeys []string
+	Benefits    []offer.Benefit
 	Recommended bool
-	HasTrial    bool
+	// TrialDays > 0: the monthly plan starts with a free trial this long
+	// (and Patreon can start it) — the card shows the trial plaque, linked
+	// to TrialURL.
+	TrialDays int
+	TrialURL  string
 
 	HasMonthly bool
 	MonthlyUSD string
@@ -218,9 +250,13 @@ type donateData struct {
 	AnnualSavePct int
 	// FreeMonths restates the annual discount as months of 12 not paid for
 	// (25% → 3).
-	FreeMonths      int
-	PatreonGiftURL  string
-	PatreonTrialURL string
+	FreeMonths     int
+	PatreonGiftURL string
+	// TrialDays / TrialTier: the trial the Patreon block advertises — the
+	// one on the promo plan, else on any plan; 0 hides the badge. TrialTier
+	// is display-ready ("Silver").
+	TrialDays int
+	TrialTier string
 }
 
 func fmtUSD(v float64) string {
@@ -230,12 +266,18 @@ func fmtUSD(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
 }
 
-func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
+func buildCards(cat *np.Catalog, patreonOn, cryptoOn bool) *donateData {
+	var prices []np.Price
+	if cat != nil {
+		prices = cat.Prices
+	}
 	byTier := map[int]*tierCard{}
 	monthlyRaw := map[int]float64{}
 	order := []int{}
 	savePct := 0
 	hasUnavailable := false
+	promoTier := -1
+	trialDays, trialTier, trialIsPromo := 0, "", false
 	for _, p := range prices {
 		card, ok := byTier[p.TierID]
 		if !ok {
@@ -243,24 +285,17 @@ func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
 			if m, known := tierMetas[p.TierName]; known {
 				card.TitleKey = m.titleKey
 				card.TaglineKey = m.taglineKey
-				card.HasTrial = m.trial && patreonOn
-				for i := 1; i <= m.benefits; i++ {
-					card.BenefitKeys = append(card.BenefitKeys,
-						"donate.crypto.tier."+p.TierName+".b"+strconv.Itoa(i))
-				}
-				if m.patreonRid != "" && patreonOn {
-					base := fmt.Sprintf(patreonCheckoutFmt, m.patreonRid)
-					card.PatreonMonthURL = base
-					if m.trial {
-						// Patreon fronts this tier's monthly plan with the
-						// free trial itself.
-						card.PatreonMonthURL = base + "&is_free_trial=true"
-					}
-					card.PatreonYearURL = base + "&cadence=12"
+				card.Benefits = TierBenefits(p.TierName, cat.Tier(p.TierID))
+				if patreonOn {
+					card.PatreonMonthURL = patreonCheckout(p.TierName, 30, false)
+					card.PatreonYearURL = patreonCheckout(p.TierName, 365, false)
 				}
 			}
 			byTier[p.TierID] = card
 			order = append(order, p.TierID)
+		}
+		if p.IsPromo {
+			promoTier = p.TierID
 		}
 		switch p.PeriodDays {
 		case 30:
@@ -271,6 +306,16 @@ func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
 			} else {
 				card.MonthlyUnavailable = true
 				hasUnavailable = true
+			}
+			if p.TrialDays > 0 && patreonOn {
+				if u := patreonCheckout(p.TierName, 30, true); u != "" {
+					// The card's monthly Join starts the trial too: on
+					// Patreon a trial plan has no other checkout.
+					card.TrialDays, card.TrialURL, card.PatreonMonthURL = p.TrialDays, u, u
+					if trialDays == 0 || (p.IsPromo && !trialIsPromo) {
+						trialDays, trialTier, trialIsPromo = p.TrialDays, p.TierName, p.IsPromo
+					}
+				}
 			}
 		case 365:
 			if !p.IsAvailable() {
@@ -302,7 +347,16 @@ func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
 			break
 		}
 	}
-	if len(cards) > 0 {
+	// The recommended card is the promo plan's tier. A catalog without one
+	// (a webhook that predates offer terms) keeps the old rule, the middle
+	// card, so the page does not change shape during a rollout.
+	recommended := false
+	for i := range cards {
+		if cards[i].TierID == promoTier {
+			cards[i].Recommended, recommended = true, true
+		}
+	}
+	if !recommended && len(cards) > 0 {
 		cards[len(cards)/2].Recommended = true
 	}
 	return &donateData{
@@ -311,12 +365,22 @@ func buildCards(prices []np.Price, patreonOn, cryptoOn bool) *donateData {
 		CryptoEnabled:  cryptoOn,
 		// The footnote explains greyed-out crypto options; without the
 		// crypto links there is nothing to explain.
-		HasUnavailable:  hasUnavailable && cryptoOn,
-		AnnualSavePct:   savePct,
-		FreeMonths:      int(math.Round(12 * float64(savePct) / 100)),
-		PatreonGiftURL:  patreonGiftURL,
-		PatreonTrialURL: patreonTrialURL,
+		HasUnavailable: hasUnavailable && cryptoOn,
+		AnnualSavePct:  savePct,
+		FreeMonths:     int(math.Round(12 * float64(savePct) / 100)),
+		PatreonGiftURL: patreonGiftURL,
+		TrialDays:      trialDays,
+		TrialTier:      displayTierName(trialTier),
 	}
+}
+
+// displayTierName is a tier id as a name in copy: "silver" → "Silver" (the
+// brand the Patreon tiers carry in every language).
+func displayTierName(name string) string {
+	if name == "" {
+		return ""
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
 }
 
 // pickPeriod resolves the billing period to what the card actually displayed:
@@ -357,12 +421,12 @@ func (h *Handler) pickPeriod(ctx context.Context, tierID int, annual bool) (int,
 func (h *Handler) index(c *gin.Context) {
 	tpl := h.tb.Build("donate/index")
 
-	var prices []np.Price
+	var cat *np.Catalog
 	var pricesErr error
 	if h.np != nil {
-		prices, pricesErr = h.np.Prices(c.Request.Context())
+		cat, pricesErr = h.np.Catalog(c.Request.Context())
 	}
-	data := buildCards(prices, h.patreonOn, h.cryptoOn)
+	data := buildCards(cat, h.patreonOn, h.cryptoOn)
 
 	// The tier grid is built entirely from the payment provider's prices, so
 	// with no provider -- unconfigured, or down -- there is nothing to choose
@@ -423,9 +487,9 @@ func (h *Handler) cryptoCheckout(c *gin.Context) {
 		PeriodDays: periodDays,
 	})
 	if err != nil {
-		prices, _ := h.np.Prices(ctx)
+		cat, _ := h.np.Catalog(ctx)
 		h.tb.Build("donate/index").HTML(http.StatusInternalServerError,
-			web.NewContext(c).WithData(buildCards(prices, h.patreonOn, h.cryptoOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
+			web.NewContext(c).WithData(buildCards(cat, h.patreonOn, h.cryptoOn)).WithErr(errors.Wrap(err, "failed to create invoice")))
 		return
 	}
 	// Hosted checkout lives on the payment provider's domain.

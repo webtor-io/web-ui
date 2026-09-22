@@ -164,7 +164,9 @@
 {{ with .Data }}{{ if .TorrentStatus }}{{ template "resource/status_sticky" $ }}{{ end }}{{ end }}
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
   <div class="max-w-[900px] mx-auto">
-    {{ if .Claims | hasAds }}
+    {{/* Shown to whoever does not have a paid plan yet: a sales banner
+         follows the sale, not the ads claim. */}}
+    {{ if and (not (.Claims | isPaid)) promoOffer }}
     <div class="promo-compact">
         <div id="promo-banner" class="relative max-w-[680px] mx-auto z-10">
             {{ template "promo" . }}

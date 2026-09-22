@@ -69,7 +69,9 @@
       {{ end }}
     </div>
 
-    <!-- Plan recommendations -->
+    <!-- Plan recommendations: tiers and caps from the storefront catalog;
+         no catalog, no list -->
+    {{ if .Data.Plans }}
     <h2 class="text-lg font-bold mb-3">{{ t $.Lang "speedtest.planRecommendations" }}</h2>
     <div class="space-y-2 mb-8">
       {{ range .Data.Plans }}
@@ -89,6 +91,7 @@
       </div>
       {{ end }}
     </div>
+    {{ end }}
 
     {{ if .Data.RateLimited }}
     <div class="alert bg-w-purple/10 text-w-purpleL text-sm mb-8">

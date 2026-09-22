@@ -24,6 +24,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/offer"
 )
 
 // ActivationWindow bounds how long the checklist follows a new account.
@@ -64,14 +65,30 @@ const (
 type Service struct {
 	pg           *cs.PG
 	vaultEnabled bool
-	// trialAvailable: some tier is fronted by a free trial (see
-	// donate.TrialAvailable) — locked rows then invite the user to try the
-	// feature instead of asking them to buy it sight unseen.
-	trialAvailable bool
+	// trials is the storefront's promo plan: when it starts with a free
+	// trial, locked rows invite the user to try the feature instead of
+	// asking them to buy it sight unseen.
+	trials TrialOffer
 }
 
-func New(pg *cs.PG, vaultEnabled, trialAvailable bool) *Service {
-	return &Service{pg: pg, vaultEnabled: vaultEnabled, trialAvailable: trialAvailable}
+// TrialOffer is the promo plan the checklist may invite to (offer.Service).
+type TrialOffer interface {
+	Promo() *offer.Offer
+}
+
+func New(pg *cs.PG, vaultEnabled bool, trials TrialOffer) *Service {
+	return &Service{pg: pg, vaultEnabled: vaultEnabled, trials: trials}
+}
+
+// trialDays is the promo plan's trial, 0 without one (or without a catalog).
+func (s *Service) trialDays() int {
+	if s.trials == nil {
+		return 0
+	}
+	if o := s.trials.Promo(); o != nil {
+		return o.TrialDays
+	}
+	return 0
 }
 
 // Get returns the checklist for a signed-in user, or nil when it should not be
@@ -92,7 +109,7 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID, paid bool, now time
 	if p == nil {
 		return nil, nil
 	}
-	return build(p, s.vaultEnabled, paid, s.trialAvailable, now), nil
+	return build(p, s.vaultEnabled, paid, s.trialDays(), now), nil
 }
 
 // Preview renders the checklist exactly as a freshly registered account of the
@@ -102,7 +119,7 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID, paid bool, now time
 // both past the activation window and has every step done, so the card would
 // be nil long before the tier mattered.
 func (s *Service) Preview(paid bool, now time.Time) *Checklist {
-	return build(&models.OnboardingProgress{CreatedAt: now}, s.vaultEnabled, paid, s.trialAvailable, now)
+	return build(&models.OnboardingProgress{CreatedAt: now}, s.vaultEnabled, paid, s.trialDays(), now)
 }
 
 // paidOnlySteps are the steps a free account cannot complete. Vault shows an
@@ -116,7 +133,7 @@ var paidOnlySteps = map[StepKey]bool{
 }
 
 // build is the whole decision, kept pure so it can be tested without a DB.
-func build(p *models.OnboardingProgress, vaultEnabled, paid, trialAvailable bool, now time.Time) *Checklist {
+func build(p *models.OnboardingProgress, vaultEnabled, paid bool, trialDays int, now time.Time) *Checklist {
 	if now.Sub(p.CreatedAt) >= ActivationWindow {
 		return nil
 	}
@@ -223,8 +240,9 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid, trialAvailable bool
 			// touched, and the 2026-09 cohort measure showed trial-first
 			// payers retain at least as well as direct ones.
 			steps[i].CTAKey = "onboarding.proCta"
-			if trialAvailable {
-				steps[i].CTAKey = "onboarding.trialCta"
+			if trialDays > 0 {
+				steps[i].CTAKey = "offer.trialCta"
+				steps[i].CTACount = trialDays
 			}
 			steps[i].UmamiEvent = "onboarding-pro-" + string(steps[i].Key)
 			continue

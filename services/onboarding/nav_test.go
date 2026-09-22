@@ -38,6 +38,7 @@ func TestNavCounterRenders(t *testing.T) {
 	h := i18n.NewHelper(i18n.New(os.DirFS("../../locales")))
 	tmpl := template.Must(template.New("nav-counter").Funcs(template.FuncMap{
 		"tp":       h.Tp,
+		"tn":       h.Tn,
 		"langPath": func(l, p string) string { return "[" + l + "]" + p },
 	}).Parse(navCounterSnippet(t)))
 

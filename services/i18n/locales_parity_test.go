@@ -123,12 +123,48 @@ func TestNoLocaleHasAnEmptyTranslation(t *testing.T) {
 // units"): that space is a no-break space, U+00A0, so "43 s" and "1.0 MB"
 // never split across lines on a phone. Whole words ("6 seeders") are not
 // units and may wrap.
-var breakableUnit = regexp.MustCompile(`(\}\}|[0-9]) (?:s|с|sn|sec|сек|дн\.|d\.|min|мин|h|ч|MB|GB|kB|KB|TB|МБ|ГБ|КБ|ТБ|Mbps|Mbit/s|Мбит/с|MB/s|Мб/с|Mo|Go|ko|Мбит)(?:$|[\s.,;:!?)\]<»"”])`)
+// Long units are unambiguous, so a Turkish suffix glued to them with an
+// apostrophe ("50 Mbps'ye") still counts as the unit.
+var breakableUnitLong = regexp.MustCompile(`(\}\}|[0-9]) (?:sec|сек|дн\.|d\.|min|мин|godz\.|Std\.|Min\.|Tg\.|MB|GB|kB|KB|TB|МБ|ГБ|КБ|ТБ|Mbps|Mbit/s|Мбит/с|MB/s|Мб/с|Mo|Go|To|ko|Мбит)(?:'\p{L}+)?(?:$|[\s.,;:!?)\]<»"”])`)
+
+// One- and two-letter units are also ordinary words in some locales, so they
+// need a hard boundary and no suffix rule.
+var breakableUnitShort = regexp.MustCompile(`(\}\}|[0-9]) (?:s|с|sn|h|ч|d|j|g|u|dk|sa)(?:$|[\s.,;:!?)\]<»"”])`)
+
+func breakableUnit(v string) string {
+	if m := breakableUnitLong.FindString(v); m != "" {
+		return m
+	}
+	return breakableUnitShort.FindString(v)
+}
+
+// Negative control for the guard above: the vocabulary has to actually match
+// the units we ship. Every unit added to a locale belongs here — the guard
+// stays silent about a unit it does not know, which is how a whole set of new
+// ones slipped through unnoticed before.
+func TestUnitGuardKnowsTheUnitsWeShip(t *testing.T) {
+	for _, s := range []string{
+		"{{.M}} min", "{{.M}} мин", "{{.H}} h", "{{.H}} ч", "{{.H}} Std.", "{{.M}} Min.",
+		"{{.D}} d", "{{.D}} d.", "{{.D}} дн.", "{{.D}} j", "{{.D}} g", "{{.H}} u", "{{.H}} godz.", "{{.D}} Tg.",
+		"{{.M}} dk", "{{.H}} sa", "50 Mbps", "50 Mbit/s", "50 Мбит/с", "50 Mbps'ye kadar",
+		"250 GB", "1 TB", "250 ГБ", "1 ТБ", "250 Go)", "1 To)", "43 s",
+	} {
+		if breakableUnit(s) == "" {
+			t.Errorf("the unit guard does not know %q — a locale could ship it with a breakable space and stay green", s)
+		}
+	}
+	// ...and it must not fire on whole words, which keep a normal space.
+	for _, s := range []string{"6 seeders", "7 days", "7 дней", "7 gün", "3 mesi gratis", "2 dny zdarma"} {
+		if m := breakableUnit(s); m != "" {
+			t.Errorf("the unit guard fired on a whole word: %q in %q", m, s)
+		}
+	}
+}
 
 func TestUnitsFollowTheirNumberWithANoBreakSpace(t *testing.T) {
 	for lang, d := range localeFiles(t) {
 		for k, v := range d {
-			if m := breakableUnit.FindString(v); m != "" {
+			if m := breakableUnit(v); m != "" {
 				t.Errorf("locales/%s.json: %s has a breakable space before a unit (%q) — use U+00A0", lang, k, m)
 			}
 		}

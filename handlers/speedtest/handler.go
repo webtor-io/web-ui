@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/template"
 	w "github.com/webtor-io/web-ui/services/web"
 )
@@ -25,6 +28,8 @@ type Handler struct {
 	tb   template.Builder[*w.Context]
 	sapi *api.Api
 	pg   *cs.PG
+	// offers holds the storefront catalog the plan list is read from.
+	offers *offer.Service
 }
 
 type Data struct {
@@ -74,22 +79,44 @@ var qualityTiers = []struct {
 	{"4K Ultra HD", 37.5},
 }
 
-var plans = []struct {
-	Name  string
-	Speed int
-	Label string
-}{
-	{"Free", 5, "5 Mbps"},
-	{"Bronze", 20, "20 Mbps"},
-	{"Silver", 50, "50 Mbps"},
-	{"Gold", 100, "100 Mbps"},
+// catalogPlans lists the tiers a viewer can be on or move to — free plus
+// every tier with a plan on sale — with the download cap each grants, from
+// the storefront catalog. No catalog: no list (a deployment without a
+// storefront has no plans to compare against).
+func catalogPlans(c *payments.Catalog) []Plan {
+	if c == nil {
+		return nil
+	}
+	sold := map[int]bool{}
+	for _, p := range c.Prices {
+		sold[p.TierID] = true
+	}
+	var out []Plan
+	for _, t := range c.Tiers {
+		if t.TierID != 0 && !sold[t.TierID] {
+			continue
+		}
+		if t.Name == "" {
+			// Broken reference data; the rest of the table still compares.
+			continue
+		}
+		p := Plan{Name: strings.ToUpper(t.Name[:1]) + t.Name[1:], Label: "∞"}
+		if t.DownloadRate != nil {
+			p.Speed = int(*t.DownloadRate)
+			p.Label = fmt.Sprintf("%d\u00a0Mbps", p.Speed)
+		}
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Speed != 0 && (out[j].Speed == 0 || out[i].Speed < out[j].Speed) })
+	return out
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*w.Context], sapi *api.Api, pg *cs.PG) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*w.Context], sapi *api.Api, pg *cs.PG, offers *offer.Service) {
 	h := &Handler{
-		tb:   tm.MustRegisterViews("speedtest/*").WithLayout("main"),
-		sapi: sapi,
-		pg:   pg,
+		tb:     tm.MustRegisterViews("speedtest/*").WithLayout("main"),
+		sapi:   sapi,
+		pg:     pg,
+		offers: offers,
 	}
 	r.GET("/speedtest", h.get)
 	r.GET("/speedtest/:id", h.getShared)
@@ -253,15 +280,10 @@ func (s *Handler) buildResultData(speedMbps, premiumMbps float64, tierName strin
 		})
 	}
 
-	var planList []Plan
-	for _, p := range plans {
-		planList = append(planList, Plan{
-			Name:      p.Name,
-			Speed:     p.Speed,
-			Label:     p.Label,
-			IsCurrent: strings.EqualFold(p.Name, tierName),
-			Supported: bestSpeed >= float64(p.Speed),
-		})
+	planList := catalogPlans(s.offers.Catalog())
+	for i := range planList {
+		planList[i].IsCurrent = strings.EqualFold(planList[i].Name, tierName)
+		planList[i].Supported = bestSpeed >= float64(planList[i].Speed)
 	}
 
 	rateLimited := rateLimit > 0 && speedMbps >= float64(rateLimit)*0.9

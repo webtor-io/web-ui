@@ -1,7 +1,7 @@
 <p>{{ tp "email.tierWelcome.heading" "Tier" .Tier }}</p>
-{{ if .BenefitKeys }}<h3>{{ t "email.tierWelcome.benefitsTitle" }}</h3>
+{{ if .Benefits }}<h3>{{ t "email.tierWelcome.benefitsTitle" }}</h3>
 <ul>
-{{ range .BenefitKeys }}    <li>{{ t . }}</li>
+{{ range .Benefits }}    <li>{{ tp .Key "Rate" .Rate "VP" .VP "TB" .TB }}</li>
 {{ end }}</ul>
 {{ end }}<h3>{{ t "email.tierWelcome.startTitle" }}</h3>
 {{ if .ShowStremio }}<p><b>{{ t "email.tierWelcome.stremioTitle" }}</b><br>{{ t "email.tierWelcome.stremio" }}<br><a href="{{ .StremioURL }}">{{ t "email.tierWelcome.stremioCta" }}</a></p>

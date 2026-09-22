@@ -32,6 +32,9 @@ type OnboardingStep struct {
 	TitleKey string
 	DescKey  string
 	CTAKey   string
+	// CTACount > 0 makes CTAKey a plural message rendered for that count
+	// (the trial invitation: "Try free for 7 days").
+	CTACount int
 
 	// Path is language-agnostic; templates wrap it in langPath.
 	Path     string

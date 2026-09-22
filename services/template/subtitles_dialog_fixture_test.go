@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
 )
 
@@ -250,6 +251,8 @@ func renderUploadsAsync(t *testing.T, subs []models.UserSubtitleTrack) string {
 		"t":             helper.T,
 		"langPath":      func(lang, p string) string { return p },
 		"hasAuth":       func(interface{}) bool { return true },
+		"promoOffer":    func() *offer.Offer { return nil },
+		"tn":            helper.Tn,
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"langDisplay":   stremio.NewHelper().LangDisplay,
 		"langDisplayIn": stremio.NewHelper().LangDisplayIn,
@@ -331,6 +334,8 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"json":          func(v interface{}) template.JS { return template.JS("{}") },
 		"asset":         func(p string) template.HTML { return template.HTML(p) },
 		"hasAuth":       func(interface{}) bool { return true },
+		"promoOffer":    func() *offer.Offer { return nil },
+		"tn":            func(lang, key string, n int, args ...any) string { return key },
 		"bitsForHumans": func(int64) string { return "1 KB" },
 		"withContext":   func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
 		"t":             echo,

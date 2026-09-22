@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/offer"
 )
 
 func newTierWelcomeService(t *testing.T, store *mockStore, mail *mockMailer) *Service {
@@ -29,8 +30,11 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 	svc := newTierWelcomeService(t, store, &mockMailer{})
 
 	err := svc.SendTierWelcome("user@example.com", testUserID, TierWelcome{
-		Tier:         "silver",
-		BenefitKeys:  []string{"donate.crypto.tier.silver.b1", "donate.crypto.tier.silver.b2"},
+		Tier: "silver",
+		Benefits: []offer.Benefit{
+			{Key: "donate.tier.vaultGB", VP: 250},
+			{Key: "donate.tier.speed", Rate: 50},
+		},
 		ShowStremio:  true,
 		ShowDiscover: true,
 		ShowVault:    true,
@@ -57,8 +61,10 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 		"through Patreon",
 		"free trial",
 		"Silver",
-		// Benefit lines come from the donate card's copy.
-		"250 Vault Points",
+		// Benefit lines come from the donate card's copy, numbers from
+		// the catalog.
+		"250 Vault Points (250\u00a0GB)",
+		"up to 50\u00a0Mbit/s",
 		// Links carry labels, never raw URLs as text.
 		">Connect Stremio<", ">Open Vault<", ">Open Discover<", ">Pick a series to follow<", ">Manage or cancel on Patreon<",
 		"support.patreon.com", ">How to cancel, step by step<",
@@ -68,7 +74,7 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 			t.Errorf("body lacks %q:\n%s", want, store.created.Body)
 		}
 	}
-	if strings.Contains(store.created.Body, "email.tierWelcome.") || strings.Contains(store.created.Body, "donate.crypto.") {
+	if strings.Contains(store.created.Body, "email.tierWelcome.") || strings.Contains(store.created.Body, "donate.tier.") {
 		t.Errorf("unresolved translation key in body:\n%s", store.created.Body)
 	}
 	if strings.Contains(store.created.Body, ">https://") {
