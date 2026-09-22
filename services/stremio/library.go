@@ -136,32 +136,30 @@ type Args struct {
 	Episode int
 }
 
+// bindArgs splits a Stremio content ID into the series ID and, for an
+// episode, its season and episode: "tt0944947:1:2". Only a numeric tail
+// counts as season/episode, because the series ID itself may contain colons
+// — other addons' IDs reach us too ("tmdb:series:76747", "mx:…:batman-…"),
+// and reading their second segment as a season number turned every such meta
+// request into a 500. Anything without a numeric tail is a whole series ID:
+// the library simply does not have it, which is an answer, not an error.
 func (s *Library) bindArgs(ct, id string) (args *Args, err error) {
+	return parseLibraryID(ct, id), nil
+}
+
+func parseLibraryID(ct, id string) *Args {
 	if ct == "movie" {
-		args = &Args{
-			ID: id,
-		}
-		return
+		return &Args{ID: id}
 	}
 	parts := strings.Split(id, ":")
-	id = parts[0]
-	var season, episode int
-	if len(parts) > 2 {
-		season, err = strconv.Atoi(parts[1])
-		if err != nil {
-			return
-		}
-		episode, err = strconv.Atoi(parts[2])
-		if err != nil {
-			return
+	if n := len(parts); n >= 3 {
+		season, errS := strconv.Atoi(parts[n-2])
+		episode, errE := strconv.Atoi(parts[n-1])
+		if errS == nil && errE == nil {
+			return &Args{ID: strings.Join(parts[:n-2], ":"), Season: season, Episode: episode}
 		}
 	}
-	args = &Args{
-		ID:      id,
-		Season:  season,
-		Episode: episode,
-	}
-	return
+	return &Args{ID: id}
 }
 
 func (s *Library) getStreamItem(ctx context.Context, vc models.VideoContentWithMetadata, ct string, args *Args) (*StreamItem, error) {

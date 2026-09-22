@@ -161,3 +161,38 @@ func TestLibrary_resolveFileItem_ZeroIdxIsValid(t *testing.T) {
 		t.Errorf("name = %q, want movie.mkv", gotName)
 	}
 }
+
+// Other addons' IDs reach our meta and stream handlers too. Only a numeric
+// tail is a season/episode; everything else is a whole series ID the library
+// does not have — reading "series" from "tmdb:series:76747" as a season was a
+// 500 on ~130 meta requests a day.
+func TestParseLibraryID(t *testing.T) {
+	cases := []struct {
+		ct, id string
+		want   Args
+	}{
+		{"movie", "tt0133093", Args{ID: "tt0133093"}},
+		{"movie", "tt0133093:1:2", Args{ID: "tt0133093:1:2"}},
+		{"series", "tt0944947", Args{ID: "tt0944947"}},
+		{"series", "tt0944947:1:2", Args{ID: "tt0944947", Season: 1, Episode: 2}},
+		{"series", "kp306084:3:10", Args{ID: "kp306084", Season: 3, Episode: 10}},
+		{"series", "tmdb1399:2:5", Args{ID: "tmdb1399", Season: 2, Episode: 5}},
+		{"series", "wt-5b0c1c7e-2a4f-4bd3-9e7a-6f1b2c3d4e5f:1:1", Args{ID: "wt-5b0c1c7e-2a4f-4bd3-9e7a-6f1b2c3d4e5f", Season: 1, Episode: 1}},
+		// Foreign IDs: whole series IDs, never an error.
+		{"series", "tmdb:series:76747", Args{ID: "tmdb:series:76747"}},
+		{"series", "mx:2226969025052033872:batman-caped-crusader-Sxx7RwAxvE2", Args{ID: "mx:2226969025052033872:batman-caped-crusader-Sxx7RwAxvE2"}},
+		// A foreign episode ID keeps its own colons in the series part.
+		{"series", "tmdb:series:76747:1:3", Args{ID: "tmdb:series:76747", Season: 1, Episode: 3}},
+		// Kitsu episodes are "kitsu:<id>:<episode>" with no season; the
+		// numeric tail reads as season/episode and the series part is "kitsu"
+		// — no library item has that ID, so the answer is "not found", which
+		// is right: the library never holds Kitsu IDs.
+		{"series", "kitsu:12345:7", Args{ID: "kitsu", Season: 12345, Episode: 7}},
+	}
+	for _, c := range cases {
+		got := parseLibraryID(c.ct, c.id)
+		if *got != c.want {
+			t.Errorf("%s %q: got %+v, want %+v", c.ct, c.id, *got, c.want)
+		}
+	}
+}
