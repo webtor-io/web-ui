@@ -10,7 +10,7 @@ on:
 
 jobs:
   docker:
-    uses: webtor-io/.github/.github/workflows/docker-multiarch-native.yml@main
+    uses: webtor-io/.github/.github/workflows/docker-multiarch.yml@main
     permissions:
       contents: read
       packages: write
