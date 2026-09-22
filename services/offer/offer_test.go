@@ -162,11 +162,10 @@ func TestPitch(t *testing.T) {
 	}{
 		// 4.3 GiB at 5 Mbps ≈ 2 h 3 min; at 50 Mbps ≈ 12 min.
 		{"typical movie", silver, 43 * gb / 10, 5, false, "offer.eta.hMin map[H:2 M:3]", "offer.eta.min map[M:12]"},
-		{"small file is not worth it", silver, 50 << 20, 5, true, "", ""},
-		// 123 MB is a 3-minute wait: "3 min instead of 20 s" sells nothing.
-		{"under ten minutes", silver, 123 << 20, 5, true, "", ""},
-		// Just over the threshold: the fast side is counted in seconds.
-		{"ten minutes", silver, 400 << 20, 5, false, "offer.eta.min map[M:11]", "offer.eta.min map[M:1]"},
+		// Every file shows the difference, a small one too — in seconds, not
+		// rounded up to a minute.
+		{"small file", silver, 123 << 20, 5, false, "offer.eta.min map[M:3]", "offer.eta.sec map[S:20]"},
+		{"tiny file", silver, 5 << 20, 5, false, "offer.eta.sec map[S:10]", "offer.eta.sec map[S:5]"},
 		{"size unknown", silver, 0, 5, true, "", ""},
 		{"user rate unlimited", silver, 4 * gb, 0, true, "", ""},
 		{"plan not faster", silver, 4 * gb, 50, true, "", ""},

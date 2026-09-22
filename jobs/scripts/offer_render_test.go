@@ -117,9 +117,13 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		{"free, cached", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie, Cached: true},
 			[]string{"Download 10× faster"},
 			[]string{"up to 10×"}},
-		// A 3-minute wait: no clock, the plan's speed instead.
+		// A 3-minute wait still shows the difference, the fast side in seconds.
 		{"free, small file", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: 123 << 20},
-			[]string{"Up to 50\u00a0Mbps with a subscription", "Download up to 10× faster", "7 days free", "eta: 0"},
+			[]string{"123\u00a0MB takes about 3\u00a0min. With a subscription — about 20\u00a0s", "Download up to 10× faster", "eta: 1"},
+			[]string{"Up to 50"}},
+		// Size unknown (a partial archive): the plan's speed instead of a clock.
+		{"free, size unknown", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5},
+			[]string{"Up to 50\u00a0Mbps with a subscription", "Download up to 10× faster", "eta: 0"},
 			[]string{"takes about"}},
 		// Patreon cannot start the trial: the plan's own checkout, no trial line.
 		{"free, no trial checkout", prodCatalog(), false, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},

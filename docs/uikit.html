@@ -1110,7 +1110,7 @@ log
       <strong>Copy chips</strong>: hover transitions to cyan border &amp; text (<code>hover:border-w-cyan/50 hover:text-w-cyan</code>) &middot;
       title attr carries full label for a11y, visible label is just the protocol name<br>
       <strong>Title</strong> names the limit ("Download speed is capped at 5&nbsp;Mbps"), not the state ("Downloading at 5&nbsp;Mbps"): the reader must see that the cap is the problem before a button can be the fix<br>
-      <strong>Sub-text</strong> prices the wait: <code>downloadPitch</code> (&sect;20) turns size and cap into "4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min. With a subscription &mdash; about 12&nbsp;min". Only from 10&nbsp;minutes of waiting &mdash; "3&nbsp;min instead of 20&nbsp;s" sells nothing; below that the line is the plan's speed ("Up to 50&nbsp;Mbps with a subscription"). Under a minute it counts seconds, never "1&nbsp;min"<br>
+      <strong>Sub-text</strong> prices the wait: <code>downloadPitch</code> (&sect;20) turns size and cap into "4.3&nbsp;GB takes about 2&nbsp;h 3&nbsp;min. With a subscription &mdash; about 12&nbsp;min". Shown for every file whose size is known, a small one too ("123&nbsp;MB takes about 3&nbsp;min. With a subscription &mdash; about 20&nbsp;s"): the difference in time should be felt on every download. Only when the size is unknown (a partial archive) is the line the plan's speed instead ("Up to 50&nbsp;Mbps with a subscription"). Under a minute it counts seconds, never "1&nbsp;min"<br>
       <strong>Button</strong>: <code>offer.downloadUpTo</code> "Download up to 10&times; faster"; <code>offer.downloadFaster</code> "Download 10&times; faster" only when the file is already whole on our side (<code>FileDownload.Cached</code>) &mdash; then the cap is the only brake. The ratio is <code>speedUp</code>: plan rate &divide; viewer rate, rounded down, shown from 2&times;; otherwise <code>offer.downloadFasterPlain</code><br>
       <strong>Umami</strong>: click <code>donate-download</code> (+ <code>tier</code>, <code>target</code>) and impression <code>donate-download-shown</code> (+ <code>eta</code> 1|0) &mdash; the nudge had clicks and no denominator before<br>
       <strong>Same Bolt/CTA</strong> pattern as 9.10 keeps the upgrade visual consistent across slow_download &amp; download_file
@@ -2435,8 +2435,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       checkout can actually start it), <code>.URL</code> (direct checkout; empty &rarr; link /donate)<br>
       <code>hasPlans</code> &rarr; the storefront has something to sell at all<br>
       <code>downloadPitch $.Lang &lt;bytes&gt; &lt;rateMbps&gt;</code> &rarr; <code>.Size</code>,
-      <code>.Slow</code>, <code>.Fast</code>, <code>.FastRate</code>, or nil when the file is too small,
-      a rate is unknown or the plan is not faster (the clock shows only from 10&nbsp;minutes of waiting)<br>
+      <code>.Slow</code>, <code>.Fast</code>, <code>.FastRate</code>, or nil when the size or a rate is
+      unknown or the plan is not faster &mdash; any file size gets the clock<br>
       <code>speedUp &lt;rateMbps&gt;</code> &rarr; how many times faster the plan is, rounded down; 0 under 2&times;<br>
       <strong>No catalog, no offer.</strong> A deployment without the webhook (self-hosted) shows no
       upsell anywhere rather than a button to someone else's storefront; in production a webhook

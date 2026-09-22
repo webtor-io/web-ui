@@ -6,11 +6,6 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 )
 
-// minPitchSeconds: below ten minutes at the free cap the wait is not what
-// makes anyone pay — "3 min instead of 20 s" sells nothing, "2 h instead of
-// 12 min" does. Smaller files still get the nudge, without the clock.
-const minPitchSeconds = 600
-
 // Translate renders an i18n key with template data in a language.
 type Translate func(lang, key string, data map[string]any) string
 
@@ -62,9 +57,11 @@ type Pitch struct {
 	FastRate int
 }
 
-// DownloadPitch prices a download in time: nil when there is no promo plan,
-// the user's or the plan's rate is unknown/unlimited, the plan is not faster,
-// or the file is too small for the wait to matter.
+// DownloadPitch prices a download in time, for any file whose size is known:
+// the difference is meant to be felt on every download, a 3-minute one
+// included ("about 3 min. With a subscription — about 20 s"). nil when there
+// is no promo plan, the size or a rate is unknown/unlimited, or the plan is
+// not faster.
 // Template usage: {{ with downloadPitch $.Lang .Data.SizeBytes .Data.RateMbps }}
 func (h *Helper) DownloadPitch(lang string, sizeBytes int64, rateMbps int) *Pitch {
 	o := h.s.Promo()
@@ -79,9 +76,6 @@ func pitch(o *Offer, sizeBytes int64, rateMbps int, format func(float64) string)
 		return nil
 	}
 	slow := transferSeconds(sizeBytes, rateMbps)
-	if slow < minPitchSeconds {
-		return nil
-	}
 	return &Pitch{
 		Size:     helpers.Bytes(uint64(sizeBytes)),
 		Slow:     format(slow),

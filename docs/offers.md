@@ -66,9 +66,11 @@ funnel is readable per step, and links to the plan's own checkout when there is 
 
 `downloadPitch` prices a download in time: best case at the viewer's cap next to best
 case on the plan ("4.3 GB takes about 2 h 3 min. With a subscription — about 12 min").
-It returns nothing under ten minutes of waiting ("3 min instead of 20 s" sells nothing),
-when either rate is unknown or unlimited, or when the plan is not faster. Under a minute
-it counts seconds, never "1 min" — rounding up made a 10× plan read as 3×.
+It is shown for every file whose size is known, small ones too — the difference in time
+should be felt on every download ("123 MB takes about 3 min. With a subscription — about
+20 s"). It returns nothing only when the size (a partial archive) or a rate is unknown,
+or the plan is not faster. Under a minute it counts seconds, never "1 min" — rounding up
+made a 10× plan read as 3×.
 
 `speedUp` is how many times faster the plan is than the viewer's cap (rounded down,
 0 below 2×) — the number on the download button.
