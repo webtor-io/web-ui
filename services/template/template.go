@@ -341,6 +341,21 @@ func (s *Manager[K]) Init() error {
 	return nil
 }
 
+// HasView reports whether a view of that name was registered, under any
+// layout. For a handler that takes the view name from the URL: without the
+// check an unknown name fails at render time, as a 500.
+//
+// s.views is append-only during RegisterViews (startup) and immutable once
+// serving starts, so reading it without the lock is safe.
+func (s *Manager[K]) HasView(name string) bool {
+	for _, v := range s.views {
+		if v.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Manager[K]) RenderViewByNameAndLayout(name string, layout string) (string, error) {
 	for _, v := range s.views {
 		if v.Name == name && v.Layout == layout {

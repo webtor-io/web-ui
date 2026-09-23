@@ -35,7 +35,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) error {
 	assetsPath := c.String(AssetsPathFlag)
 	pubPath := "pub"
 
-	r.Static("/assets", assetsPath)
+	registerAssets(r, assetsPath)
 	r.Static("/pub", pubPath)
 
 	err := filepath.Walk(pubPath, func(path string, info os.FileInfo, err error) error {
@@ -83,4 +83,11 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) error {
 		r.StaticFile("/"+name, nightPath+"/"+name)
 	}
 	return nil
+}
+
+// registerAssets serves the built assets at /assets: the same route and file
+// server as r.Static("/assets", …), with the Cache-Control of assetCache in
+// front of it.
+func registerAssets(r gin.IRouter, assetsPath string) {
+	r.Group("/assets", assetCache(NewAssetHashes(assetsPath))).Static("", assetsPath)
 }

@@ -1656,6 +1656,7 @@
     "time.years": "vor %v Jahren",
     "error.forbidden": "Dieser Inhalt wurde auf Anfrage des Rechteinhabers gesperrt.",
     "error.not_found": "Ressource nicht gefunden.",
+    "error.page_not_found": "Seite nicht gefunden.",
     "error.service_unavailable": "Ups, etwas ist schiefgelaufen. Bitte versuche es später erneut.",
     "error.back_home": "Zur Startseite",
     "error.invalid_resource": "Ungültiger Link oder Torrent-Datei.",

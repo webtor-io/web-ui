@@ -1718,6 +1718,7 @@
     "time.years": "%v years ago",
     "error.forbidden": "This content has been blocked at the request of the rights holder.",
     "error.not_found": "Resource not found.",
+    "error.page_not_found": "Page not found.",
     "error.service_unavailable": "Oops, something went wrong. Please come back later.",
     "error.back_home": "Back to home",
     "error.invalid_resource": "Invalid link or torrent file.",

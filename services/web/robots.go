@@ -76,3 +76,12 @@ func IndexFollow() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// Noindex takes one response of an IndexFollow route out of the index: the
+// home page or a tool page carrying a one-off error (/?err=…). Called from the
+// handler, after the route middleware, so it is the last X-Robots-Tag set
+// before the response goes out. Routes outside the sitemap need no call, they
+// are noindex already (NoindexDefault); on staging everything is.
+func Noindex(c *gin.Context) {
+	c.Header("X-Robots-Tag", "noindex")
+}

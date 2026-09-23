@@ -1660,6 +1660,7 @@
     "time.years": "%v anni fa",
     "error.forbidden": "Questo contenuto è stato bloccato su richiesta del titolare dei diritti.",
     "error.not_found": "Risorsa non trovata.",
+    "error.page_not_found": "Pagina non trovata.",
     "error.service_unavailable": "Ops, qualcosa è andato storto. Riprova più tardi.",
     "error.back_home": "Torna alla home",
     "error.invalid_resource": "Link o file torrent non valido.",

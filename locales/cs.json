@@ -1674,6 +1674,7 @@
     "time.years": "před %v lety",
     "error.forbidden": "Tento obsah byl zablokován na žádost držitele práv.",
     "error.not_found": "Zdroj nebyl nalezen.",
+    "error.page_not_found": "Stránka nebyla nalezena.",
     "error.service_unavailable": "Jejda, něco se pokazilo. Zkuste to prosím později.",
     "error.back_home": "Zpět na úvod",
     "error.invalid_resource": "Neplatný odkaz nebo torrent soubor.",
