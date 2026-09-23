@@ -231,8 +231,8 @@ func TestResourceGet_OtherFailuresStillRedirect(t *testing.T) {
 	}{
 		{http.MethodGet, "/" + hashBanned, "", "error.forbidden"},
 		{http.MethodGet, "/" + hashBroken, "", "error.generic"},
-		{http.MethodPost, "/", "resource=not+a+magnet", "error.invalid_resource"},
-		{http.MethodGet, "/magnet:?xt=urn:btih:zz", "", "error.invalid_resource"},
+		{http.MethodPost, "/", "resource=not+a+magnet", "error.free_text"},
+		{http.MethodGet, "/magnet:?xt=urn:btih:zz", "", "error.magnet_invalid"},
 	}
 	for _, tc := range cases {
 		var req *http.Request

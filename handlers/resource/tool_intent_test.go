@@ -162,6 +162,7 @@ func TestProgressPageKeepsTheToolPage(t *testing.T) {
 	tpl, err := template.New("index.html").Funcs(funcs).ParseFiles(
 		"../../templates/views/index.html",
 		"../../templates/partials/load/progress.html",
+		"../../templates/partials/about/heading.html",
 	)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
