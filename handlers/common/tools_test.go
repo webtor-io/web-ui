@@ -172,3 +172,20 @@ func TestStremioAddonLandingSaysThePlanIsPaid(t *testing.T) {
 		}
 	}
 }
+
+// /watch-torrents-ios says only what its sources say. Safari's compact layout
+// hides Share behind ••• (Apple Support, 2026-09), so every locale names both
+// taps. µTorrent Lite's own page lists iPadOS, not iPhone, among the
+// platforms it supports; the comparison quotes that list instead of offering
+// Lite as an iPhone app.
+func TestIOSGuideKeepsToItsSources(t *testing.T) {
+	const p = "tool.watchTorrentsIos.about."
+	for lang, d := range locales(t) {
+		if v := d[p+"explained.p3"]; !strings.Contains(v, "•••") {
+			t.Errorf("%s: explained.p3 does not mention the ••• button: %q", lang, v)
+		}
+		if v := d[p+"utorrent.subtitle"]; !strings.Contains(v, "iPadOS") || !strings.Contains(v, "Edge") {
+			t.Errorf("%s: utorrent.subtitle does not quote Lite's platform list: %q", lang, v)
+		}
+	}
+}
