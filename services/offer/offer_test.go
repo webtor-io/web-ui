@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/webtor-io/web-ui/services/payments"
 )
@@ -241,5 +242,65 @@ func TestSpeedUp(t *testing.T) {
 		if got := speedUp(c.o, c.rate); got != c.want {
 			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
 		}
+	}
+}
+
+// A code is handed out only while it will still be honoured DiscountLead
+// later — a letter read a couple of days after it was sent must not lead to a
+// dead code — and among the live ones the code with the most time left wins.
+func TestDiscount(t *testing.T) {
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	code := func(c string, pct int, periodDays int, left time.Duration) payments.Discount {
+		return payments.Discount{Code: c, PercentOff: pct, PeriodDays: periodDays, ExpiresAt: now.Add(left)}
+	}
+	withDiscounts := func(ds ...payments.Discount) *Service {
+		c := prodCatalog()
+		c.Discounts = ds
+		return loaded(c, checkoutAll)
+	}
+	cases := []struct {
+		name string
+		svc  *Service
+		want string
+	}{
+		{"no webhook configured", New(nil, checkoutAll), ""},
+		{"webhook predates discounts", loaded(prodCatalog(), checkoutAll), ""},
+		{"live code", withDiscounts(code("SAMPLE50", 50, 30, 180*24*time.Hour)), "SAMPLE50"},
+		{"expired", withDiscounts(code("old", 50, 30, -time.Hour)), ""},
+		{"inside the lead", withDiscounts(code("soon", 50, 30, DiscountLead-time.Minute)), ""},
+		{"exactly at the lead", withDiscounts(code("edge", 50, 30, DiscountLead)), "edge"},
+		{"most time left wins", withDiscounts(code("short", 50, 30, 10*24*time.Hour), code("long", 30, 365, 90*24*time.Hour)), "long"},
+		{"unknown plan length skipped", withDiscounts(code("week", 50, 7, 90*24*time.Hour)), ""},
+		{"no code skipped", withDiscounts(payments.Discount{PercentOff: 50, PeriodDays: 30, ExpiresAt: now.Add(90 * 24 * time.Hour)}), ""},
+	}
+	for _, c := range cases {
+		got := c.svc.Discount(now)
+		switch {
+		case c.want == "" && got != nil:
+			t.Errorf("%s: want none, got %q", c.name, got.Code)
+		case c.want != "" && (got == nil || got.Code != c.want):
+			t.Errorf("%s: want %q, got %+v", c.name, c.want, got)
+		}
+	}
+}
+
+// The code is typed in at the provider's checkout of the plan it discounts:
+// monthly for a first-month code, annual for a first-year one, never the trial
+// variant — a former trialist cannot start another trial.
+func TestDiscountCheckout(t *testing.T) {
+	month := &payments.Discount{Code: "SAMPLE50", PercentOff: 50, PeriodDays: 30}
+	year := &payments.Discount{Code: "SAMPLE30", PercentOff: 30, PeriodDays: 365}
+	svc := loaded(prodCatalog(), checkoutAll)
+	if got := svc.DiscountCheckout("silver", month); got != "co:silver:30:false" {
+		t.Errorf("month: %q", got)
+	}
+	if got := svc.DiscountCheckout("gold", year); got != "co:gold:365:false" {
+		t.Errorf("year: %q", got)
+	}
+	if got := svc.DiscountCheckout("", month); got != "" {
+		t.Errorf("no tier: %q", got)
+	}
+	if got := loaded(prodCatalog(), nil).DiscountCheckout("silver", month); got != "" {
+		t.Errorf("no provider: %q", got)
 	}
 }

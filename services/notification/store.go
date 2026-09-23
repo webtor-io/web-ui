@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
@@ -21,6 +22,12 @@ type notificationStore interface {
 	GetLastByKeyAndUser(ctx context.Context, key string, userID uuid.UUID) (*models.Notification, error)
 	Create(ctx context.Context, n *models.Notification) error
 	MarkMailed(ctx context.Context, id uuid.UUID, to string) error
+	// ClaimOwed takes an unmailed entry for one sender: true only for the
+	// caller whose `seen` still matches the row's updated_at.
+	ClaimOwed(ctx context.Context, id uuid.UUID, seen time.Time) (bool, error)
+	// ListOwed returns unmailed entries under key that had an address,
+	// last touched before updatedBefore and created after createdAfter.
+	ListOwed(ctx context.Context, key string, updatedBefore, createdAfter time.Time, limit int) ([]models.Notification, error)
 	CountUnread(ctx context.Context, userID uuid.UUID) (int, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error)
 	MarkAllRead(ctx context.Context, userID uuid.UUID) error
@@ -57,6 +64,14 @@ func (s *pgNotificationStore) MarkMailed(ctx context.Context, id uuid.UUID, to s
 	return models.MarkNotificationMailed(ctx, s.db, id, to)
 }
 
+func (s *pgNotificationStore) ClaimOwed(ctx context.Context, id uuid.UUID, seen time.Time) (bool, error) {
+	return models.ClaimOwedNotification(ctx, s.db, id, seen)
+}
+
+func (s *pgNotificationStore) ListOwed(ctx context.Context, key string, updatedBefore, createdAfter time.Time, limit int) ([]models.Notification, error) {
+	return models.ListOwedNotifications(ctx, s.db, key, updatedBefore, createdAfter, limit)
+}
+
 func (s *pgNotificationStore) CountUnread(ctx context.Context, userID uuid.UUID) (int, error) {
 	return models.CountUnreadNotifications(ctx, s.db, userID)
 }
@@ -70,7 +85,7 @@ func (s *pgNotificationStore) MarkAllRead(ctx context.Context, userID uuid.UUID)
 }
 
 func (s *pgNotificationStore) PruneKeepingNewest(ctx context.Context, keep int) error {
-	return models.PruneNotificationsKeepingNewest(ctx, s.db, keep)
+	return models.PruneNotificationsKeepingNewest(ctx, s.db, keep, winbackKey)
 }
 
 // AccountLang mirrors release_subscription's pgStore.AccountLang (the same

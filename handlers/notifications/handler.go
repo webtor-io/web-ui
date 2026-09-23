@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/notification"
 	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -88,6 +90,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], ns *noti
 	// the streaming-error debug modals and the onboarding preview.
 	if gin.Mode() != gin.ReleaseMode {
 		gr.GET("/preview/tier-welcome", h.previewTierWelcome)
+		gr.GET("/preview/winback", h.previewWinBack)
 	}
 }
 
@@ -139,6 +142,51 @@ func (h *Handler) previewTierWelcome(c *gin.Context) {
 	}
 	// The subject is not part of the document; show it where a mail client
 	// would, above the body.
+	bar := fmt.Sprintf(`<p style="font:13px/1.4 monospace;color:#888;border-bottom:1px solid #ddd;padding-bottom:8px">Subject: %s</p>`, html.EscapeString(subject))
+	letter = strings.Replace(letter, "<body>", "<body>"+bar, 1)
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(letter))
+}
+
+// previewWinBack renders the winback letter as HTML, with the live discount
+// code from the catalog or a sample one when there is none (a dev machine
+// usually has no webhook).
+//
+//	?reason=trial    a cancelled trial (default: a declined card the provider gave up on)
+//	?tier=silver     the trial's tier, named for ?reason=trial only (default silver)
+//	?lang=ru         letter language (default: the request's language)
+//	?percent=50      override the code's discount
+//	?days=365        override the plan length the code discounts (30|365)
+func (h *Handler) previewWinBack(c *gin.Context) {
+	lang := c.Query("lang")
+	if lang == "" {
+		lang = i18n.GetLang(c)
+	}
+	d := payments.Discount{Code: "SAMPLE50", PercentOff: 50, PeriodDays: 30, ExpiresAt: time.Now().AddDate(0, 6, 0)}
+	if live := h.offers.Discount(time.Now()); live != nil {
+		d = *live
+	}
+	if v, err := strconv.Atoi(c.Query("percent")); err == nil {
+		d.PercentOff = v
+	}
+	if v, err := strconv.Atoi(c.Query("days")); err == nil {
+		d.PeriodDays = v
+	}
+	w := notification.WinBack{Reason: notification.WinBackPaymentFailed, Discount: d}
+	if c.Query("reason") == "trial" {
+		w.Reason = notification.WinBackTrialEnded
+		w.Tier = c.DefaultQuery("tier", "silver")
+	}
+	if t := h.offers.Catalog().TierNamed("free"); t != nil && t.DownloadRate != nil {
+		w.CapMbps = *t.DownloadRate
+	}
+	if promo := h.offers.Promo(); promo != nil {
+		w.CheckoutURL = h.offers.DiscountCheckout(promo.Tier, &d)
+	}
+	subject, letter, err := h.ns.PreviewWinBack(lang, w)
+	if err != nil {
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 	bar := fmt.Sprintf(`<p style="font:13px/1.4 monospace;color:#888;border-bottom:1px solid #ddd;padding-bottom:8px">Subject: %s</p>`, html.EscapeString(subject))
 	letter = strings.Replace(letter, "<body>", "<body>"+bar, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(letter))

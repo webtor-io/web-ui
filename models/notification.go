@@ -115,6 +115,41 @@ func MarkNotificationMailed(ctx context.Context, db pg.DBI, id uuid.UUID, to str
 	return nil
 }
 
+// ClaimOwedNotification hands an entry whose letter never left to exactly
+// one sender. It bumps updated_at only while the row is still unmailed and
+// nobody has touched it since the caller read it at `seen`, so of several
+// senders that read the same row, one gets true and mails it.
+func ClaimOwedNotification(ctx context.Context, db pg.DBI, id uuid.UUID, seen time.Time) (bool, error) {
+	res, err := db.Model((*Notification)(nil)).
+		Context(ctx).
+		Set("updated_at = now()").
+		Where("notification_id = ? AND mailed_at IS NULL AND updated_at = ?", id, seen).
+		Update()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to claim notification")
+	}
+	return res.RowsAffected() == 1, nil
+}
+
+// ListOwedNotifications returns entries under key whose letter never left
+// although there was an address to send it to: unmailed, with a "to",
+// untouched since updatedBefore (whoever wrote them is done) and created
+// after createdAfter (whatever they promise still holds). Oldest first.
+func ListOwedNotifications(ctx context.Context, db pg.DBI, key string, updatedBefore, createdAfter time.Time, limit int) ([]Notification, error) {
+	var ns []Notification
+	err := db.Model(&ns).
+		Context(ctx).
+		Where("key = ? AND mailed_at IS NULL AND \"to\" IS NOT NULL", key).
+		Where("updated_at < ? AND created_at > ?", updatedBefore, createdAfter).
+		Order("created_at ASC").
+		Limit(limit).
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list owed notifications")
+	}
+	return ns, nil
+}
+
 // CountUnreadNotifications counts a user's notifications that have not been
 // read yet. Backs the navbar badge, so it counts feed entries regardless of
 // whether they were ever mailed -- a notification with no deliverable
@@ -170,8 +205,17 @@ func MarkAllNotificationsRead(ctx context.Context, db pg.DBI, userID uuid.UUID) 
 // `ORDER BY created_at OFFSET keep`) would let one busy account's recent
 // notifications evict a quiet account's older, still-under-the-cap ones.
 // Rows with no user_id (pre-migration entries with no owner to bound a feed
-// for) are left untouched.
-func PruneNotificationsKeepingNewest(ctx context.Context, db pg.DBI, keep int) error {
+// for) are left untouched, and so are rows under a permanent key: an entry
+// that also records "this account has had this once, ever" (the winback
+// letter) must outlive the feed cap, or the letter could go out again.
+func PruneNotificationsKeepingNewest(ctx context.Context, db pg.DBI, keep int, permanentKeys ...string) error {
+	permanent := ""
+	args := []interface{}{}
+	if len(permanentKeys) > 0 {
+		permanent = "AND key NOT IN (?)"
+		args = append(args, pg.In(permanentKeys))
+	}
+	args = append(args, keep)
 	_, err := db.ExecContext(ctx, `
 		DELETE FROM notification
 		WHERE notification_id IN (
@@ -182,11 +226,11 @@ func PruneNotificationsKeepingNewest(ctx context.Context, db pg.DBI, keep int) e
 						ORDER BY created_at DESC, notification_id DESC
 					) AS rank
 				FROM notification
-				WHERE user_id IS NOT NULL
+				WHERE user_id IS NOT NULL `+permanent+`
 			) ranked
 			WHERE ranked.rank > ?
 		)
-	`, keep)
+	`, args...)
 	if err != nil {
 		return errors.Wrap(err, "failed to prune notifications")
 	}

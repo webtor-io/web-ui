@@ -33,6 +33,10 @@ const (
 	// pod that starts during a webhook blip should not sell nothing for
 	// five minutes.
 	retryInterval = 15 * time.Second
+	// DiscountLead is how long a code must stay honoured after it is handed
+	// out: a letter read two days late must not lead to a dead code, so a
+	// code this close to its end is no longer offered at all.
+	DiscountLead = 72 * time.Hour
 )
 
 // Source serves the storefront catalog — the payments client in production.
@@ -175,6 +179,42 @@ func (s *Service) TrialDays(tier string) int {
 		}
 	}
 	return 0
+}
+
+// Discount is the live discount code with the most time left, nil when the
+// catalog has none that is still honoured DiscountLead after now. No code, no
+// discount offer: nothing about a discount is configured outside the catalog.
+func (s *Service) Discount(now time.Time) *payments.Discount {
+	c := s.Catalog()
+	if c == nil {
+		return nil
+	}
+	var best *payments.Discount
+	for i := range c.Discounts {
+		d := &c.Discounts[i]
+		if d.Code == "" || d.PercentOff <= 0 || (d.PeriodDays != 30 && d.PeriodDays != 365) {
+			continue
+		}
+		if d.ExpiresAt.Before(now.Add(DiscountLead)) {
+			continue
+		}
+		if best == nil || d.ExpiresAt.After(best.ExpiresAt) {
+			best = d
+		}
+	}
+	return best
+}
+
+// DiscountCheckout is where a discount code is typed in: the provider's
+// checkout of the tier's plan for the code's period, without the trial — the
+// code overrides it, and a former trialist cannot start another one. "" when
+// the checkout cannot be built (no membership provider, unknown tier); the
+// caller then points at the storefront.
+func (s *Service) DiscountCheckout(tier string, d *payments.Discount) string {
+	if s == nil || s.checkout == nil || d == nil || tier == "" {
+		return ""
+	}
+	return s.checkout(tier, d.PeriodDays, false)
 }
 
 func (s *Service) offerFor(c *payments.Catalog, p payments.Price) *Offer {

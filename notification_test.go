@@ -69,6 +69,14 @@ func (j *memJournal) Create(_ context.Context, n *models.Notification) error {
 	return nil
 }
 
+func (j *memJournal) ListOwed(context.Context, string, time.Time, time.Time, int) ([]models.Notification, error) {
+	return nil, nil
+}
+
+func (j *memJournal) ClaimOwed(context.Context, uuid.UUID, time.Time) (bool, error) {
+	return false, nil
+}
+
 func (j *memJournal) MarkMailed(_ context.Context, id uuid.UUID, to string) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()

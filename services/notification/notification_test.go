@@ -57,6 +57,27 @@ type mockStore struct {
 	// accountLang answers AccountLang -- the language "stored" on the
 	// account a test pretends to have.
 	accountLang string
+
+	// claimOwed answers ClaimOwed; claimCalls counts the attempts.
+	claimOwed    bool
+	claimOwedErr error
+	claimCalls   int
+
+	// owed answers ListOwed; owedUpdatedBefore/owedCreatedAfter record the
+	// window it was asked for.
+	owed              []models.Notification
+	owedUpdatedBefore time.Time
+	owedCreatedAfter  time.Time
+}
+
+func (m *mockStore) ListOwed(_ context.Context, _ string, updatedBefore, createdAfter time.Time, _ int) ([]models.Notification, error) {
+	m.owedUpdatedBefore, m.owedCreatedAfter = updatedBefore, createdAfter
+	return m.owed, nil
+}
+
+func (m *mockStore) ClaimOwed(_ context.Context, _ uuid.UUID, _ time.Time) (bool, error) {
+	m.claimCalls++
+	return m.claimOwed, m.claimOwedErr
 }
 
 func (m *mockStore) GetLastMailedByKeyAndUser(_ context.Context, _ string, _ uuid.UUID) (*models.Notification, error) {
@@ -854,6 +875,14 @@ func (j *journalStore) Create(_ context.Context, n *models.Notification) error {
 	}
 	j.rows = append(j.rows, n)
 	return nil
+}
+
+func (j *journalStore) ListOwed(context.Context, string, time.Time, time.Time, int) ([]models.Notification, error) {
+	return nil, nil
+}
+
+func (j *journalStore) ClaimOwed(context.Context, uuid.UUID, time.Time) (bool, error) {
+	return false, nil
 }
 
 func (j *journalStore) MarkMailed(_ context.Context, id uuid.UUID, to string) error {

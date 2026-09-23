@@ -25,8 +25,15 @@ type Handler struct {
 	// billing feeds the tier-welcome message; zero when no provider is on.
 	billing notification.Billing
 	// offers is the storefront catalog: the tier's benefit lines and trial
-	// length in that message come from it.
+	// length in that message come from it, and so does the discount code of
+	// the winback letter.
 	offers *offer.Service
+	// winbackHoldout is the percent of eligible accounts kept out of the
+	// winback letter as a control group (winbackHeldOut).
+	winbackHoldout int
+	// winbackTrialEndedFrom: a cancelled trial earns the winback letter from
+	// this instant on; zero keeps that reason off.
+	winbackTrialEndedFrom time.Time
 	// ci follows the seeder's cache events (cached.go); nil leaves them unread.
 	ci   cacheIndexer
 	subs []*nats.Subscription
@@ -53,7 +60,25 @@ func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Cl
 		billing: billing,
 		offers:  offers,
 		done:    make(chan struct{}),
+
+		winbackHoldout:        c.Int(winbackHoldoutFlag),
+		winbackTrialEndedFrom: parseWinbackFrom(c.String(winbackTrialEndedFromFlag)),
 	}
+}
+
+// parseWinbackFrom reads WINBACK_TRIAL_ENDED_FROM. A value that does not
+// parse keeps the reason off and says so at startup, rather than guessing a
+// date the owner did not write.
+func parseWinbackFrom(v string) time.Time {
+	if v == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		log.WithError(err).WithField("value", v).Error("WINBACK_TRIAL_ENDED_FROM is not RFC 3339: the cancelled-trial winback letter stays off")
+		return time.Time{}
+	}
+	return t
 }
 
 func (h *Handler) Serve() error {

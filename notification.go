@@ -80,6 +80,12 @@ func sendExpiringNotifications(c *cli.Context) error {
 		}
 	}
 
+	if sent, err := ns.SendOwedWinBacks(ctx); err != nil {
+		log.WithError(err).WithField("sent", sent).Error("failed to send owed winback letters")
+	} else if sent > 0 {
+		log.WithField("sent", sent).Info("owed winback letters sent")
+	}
+
 	// Pruning runs after the sending work above, not before: pruning first
 	// could delete rows this run still needed (e.g. for the mailed-recently
 	// dedupe check inside Send).

@@ -36,6 +36,14 @@ func (s *captureStore) Create(_ context.Context, n *models.Notification) error {
 	s.created = n
 	return nil
 }
+func (s *captureStore) ListOwed(context.Context, string, time.Time, time.Time, int) ([]models.Notification, error) {
+	return nil, nil
+}
+
+func (s *captureStore) ClaimOwed(context.Context, uuid.UUID, time.Time) (bool, error) {
+	return false, nil
+}
+
 func (s *captureStore) MarkMailed(context.Context, uuid.UUID, string) error { return nil }
 func (s *captureStore) CountUnread(context.Context, uuid.UUID) (int, error) {
 	return 0, nil

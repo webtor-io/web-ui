@@ -1,0 +1,6 @@
+<p>{{ if .Trial }}{{ if .Tier }}{{ tp "email.winback.headingTrial" "Tier" .Tier }}{{ else }}{{ t "email.winback.headingTrialNoTier" }}{{ end }}{{ else }}{{ t "email.winback.headingNoTier" }}{{ end }}{{ if .Cap }} {{ tp "email.winback.capped" "Rate" .Cap }}{{ end }}</p>
+<p>{{ if .Year }}{{ tp "email.winback.offerYear" "Percent" .Percent "Date" .LastDay }}{{ else }}{{ tp "email.winback.offerMonth" "Percent" .Percent "Date" .LastDay }}{{ end }}</p>
+<p style="font-size:22px;letter-spacing:2px"><b>{{ .Code }}</b></p>
+<p><a href="{{ .URL }}">{{ tp "email.winback.cta" "Percent" .Percent }}</a></p>
+{{ if not .Trial }}<p>{{ t "email.winback.card" }}</p>
+{{ end }}<p>{{ t "email.tierWelcome.help" }} <a href="{{ .SupportURL }}">{{ t "email.tierWelcome.helpCta" }}</a></p>

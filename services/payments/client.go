@@ -84,13 +84,28 @@ type Tier struct {
 	EmbedNoAds   bool   `json:"embed_noads"`
 }
 
-// Catalog is the storefront as the webhook serves it: plans on sale and what
-// each tier grants.
+// Discount is a discount code the membership provider honours: PercentOff
+// off the first billing period of a new membership on any tier, until
+// ExpiresAt. PeriodDays is that plan length in Price.PeriodDays units (30 =
+// the first month, 365 = the first year). The code is typed in at the
+// provider's checkout.
+type Discount struct {
+	Code       string    `json:"code"`
+	PercentOff int       `json:"percent_off"`
+	PeriodDays int       `json:"period_days"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
+// Catalog is the storefront as the webhook serves it: plans on sale, what
+// each tier grants and the discount codes that are live.
 type Catalog struct {
 	Prices []Price
 	// Tiers is nil when the webhook predates the tier catalog — "unknown",
 	// as opposed to an empty list.
 	Tiers []Tier
+	// Discounts is nil when the webhook predates discount codes; either way
+	// there is no code to hand out.
+	Discounts []Discount
 }
 
 // TierNamed returns the facts of the tier with that name, nil when the
@@ -189,12 +204,13 @@ func (s *Client) Catalog(_ context.Context) (*Catalog, error) {
 			Prices []Price `json:"prices"`
 			// Pointer: a missing key (older webhook) stays nil, an empty
 			// table decodes to an empty slice.
-			Tiers *[]Tier `json:"tiers"`
+			Tiers     *[]Tier    `json:"tiers"`
+			Discounts []Discount `json:"discounts"`
 		}
 		if err := s.do(ctx, http.MethodGet, "/prices", nil, &out); err != nil {
 			return nil, err
 		}
-		c := &Catalog{Prices: out.Prices}
+		c := &Catalog{Prices: out.Prices, Discounts: out.Discounts}
 		if out.Tiers != nil {
 			c.Tiers = *out.Tiers
 			if c.Tiers == nil {

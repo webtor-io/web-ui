@@ -6,7 +6,7 @@ push) lives in a template, a locale file or a Go constant.
 
 ## The catalog
 
-`webhook GET /prices` is the storefront catalog. It has two lists:
+`webhook GET /prices` is the storefront catalog. It has three lists:
 
 - **`prices`** — the plans on sale, one per (tier, period): `amount_usd`, `available`,
   and the offer terms `trial_days` (> 0 = the plan starts with a free trial that long)
@@ -16,6 +16,14 @@ push) lives in a template, a locale file or a Go constant.
   `download_rate` (Mbit/s), `vault_points`, `site_noads`, `embed_noads`. These are the
   very columns claims-provider reads when it grants a user their claims, so an offer
   promises exactly what the plan delivers. `null` = unlimited.
+
+- **`discounts`** — the discount codes the membership provider honours right now:
+  `code`, `percent_off`, `period_days` (the plan length whose first billing period
+  is discounted, in `price.period_days` units: 30 = first month, 365 = first year
+  of a new membership, any tier) and `expires_at`. The code is typed in at the
+  provider's checkout — Patreon gives no link that carries it. Only live codes are
+  listed; an expired row stays in the webhook table as history. A missing key
+  (older webhook) means no code.
 
 Where a fact lives follows one line: **`tier` is what you get, `price` is how you buy
 it.** A trial is a property of a plan, not of a tier — Patreon fronts Silver *monthly*
@@ -112,6 +120,73 @@ the button offers the fix.
 - The trial plaque on `/donate` states what happens after the trial and where it is
   cancelled (`donate.patreon.trialAfter`): "how do I cancel" is the most common support
   request we get.
+
+## Discount codes and the winback letter
+
+A discount code is created at the provider (Patreon: 5–90% off the first month or
+year of a NEW membership, typed in at checkout, overrides the free trial, lives up
+to 180 days) and recorded in the webhook's `discount` table — the webhook README
+has the `INSERT`. Nothing about a discount lives in web-ui: no row, no offer.
+
+`offer.Service.Discount(now)` is the live code with the most time left, and only
+one still honoured `DiscountLead` (72 h) later — a letter read two days late must
+not lead to a dead code.
+
+The one surface today is the **winback letter** (`notification.SendWinBack`,
+`templates/notification/winback.html`, keys `email.winback.*`): why the plan is
+gone, the promo code on a line of its own ("enter it at checkout", valid through
+the last day), and a button to the full-price checkout of the promo plan for the
+code's plan length (`offer.DiscountCheckout`: Silver monthly today, no trial — the
+reader cannot start another; `/donate` when no checkout can be built).
+
+It goes out when a membership **ends without a single payment**
+(`handlers/event/user.go` `winbackReason`, on `user.updated`, lifetime support a
+known 0):
+
+- **Trial cancelled** — the trial's `members:delete`, which lands exactly when the
+  trial runs out (677 of 681 cancelled trials in 2026-07-20..08-31; the ~1.4% of
+  trials Patreon removes early get the same letter). Off unless
+  `WINBACK_TRIAL_ENDED_FROM` (RFC 3339) is set and passed; production turns it on
+  2026-10-08 00:00 UTC so these letters do not leak into the offer checks of
+  2026-10-01 and 10-08. The declined-card letters below start as soon as a code is
+  live — their end event comes once, so holding them back would lose them — and
+  the 10-08 check counts payments made after a membership had ended separately.
+- **Card declined until Patreon gave up** — `former_patron` with the last charge
+  `Declined`. About a quarter of such ends carry no charge status and are missed
+  rather than confused with a cancelled trial.
+
+Only the end counts: the codes are for people without a paid membership, and a
+declined card keeps the membership in Patreon's retry state for a median 31 days.
+It also keeps the discount away from the ~21% of declined members who had never
+paid (first decline 2026-07-20..08-31) and paid full price later on their own.
+
+Why: of the trials started 2026-07-15..09-07, 46% were cancelled during the trial
+and 60% of the rest ended on a declined card. Both groups used the site like the
+people who paid (a site account for ~93%, activity during the trial for 57–64%),
+and the provider gives nobody a second trial.
+
+**Once per account, ever**, whichever the reason. The letter does not go through
+`Send`, whose 24h feed guard would reuse a row another pod just wrote and mail it
+too. The row is the claim: the insert either succeeds — that call mails — or
+hits the unique index of migration 74 (`notification (user_id) WHERE key =
+'winback'`) because another pod got there first. Any earlier entry ends it for
+events. A row whose letter never left although it had an address (a failed send,
+a pod stopped mid-send) is mailed by the daily `notification send` cron
+(`SendOwedWinBacks`): rows 10 minutes to 48 hours old — the code in their body had
+72 h left when written, so it still holds — mailed as written by the one caller
+that wins `ClaimOwed` (an `updated_at` compare-and-set). The feed prune never
+deletes the row.
+
+**Control group.** `WINBACK_HOLDOUT` percent of eligible accounts get nothing
+(default 0 — everyone: at worst the letter gives half a first month to someone
+who would have come back anyway). The bucket is stable and SQL can recompute it:
+`('x' || substr(md5(user_id::text), 1, 7))::bit(28)::int % 100 < <holdout>` is
+held out, and held-out accounts are logged ("winback letter held out"). Without a
+holdout the effect is read before/after: money (`campaign_lifetime_support_cents
+> 0`) after the end of the membership, per reason.
+
+Preview (dev only): `/notifications/preview/winback?lang=ru` (`reason=trial`,
+`tier=`, `percent=`, `days=365`).
 
 ## Adding a surface
 
