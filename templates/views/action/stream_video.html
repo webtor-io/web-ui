@@ -394,7 +394,7 @@
             <div class="flex flex-wrap gap-2 items-center">
                 {{- with promoOffer }}
                 <div class="flex flex-col items-center gap-1">
-                    <a class="btn btn-sm btn-soft" href="{{ if .URL }}{{ .URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener"
+                    <a class="btn btn-sm btn-soft" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
                        data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}"
                        data-umami-event-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">

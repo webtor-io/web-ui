@@ -107,6 +107,12 @@ func TestBuildCards(t *testing.T) {
 	if d.TrialDays != 7 || d.TrialTier != "Silver" {
 		t.Errorf("patreon block trial: %d %q", d.TrialDays, d.TrialTier)
 	}
+	// Silver's is the promo plan's trial — the one /trial starts.
+	for _, c := range d.Cards {
+		if c.PromoTrial != (c.Name == "silver") {
+			t.Errorf("%s: PromoTrial=%v", c.Name, c.PromoTrial)
+		}
+	}
 	if strings.Contains(d.Cards[2].PatreonMonthURL, "is_free_trial") {
 		t.Errorf("gold has no trial: %q", d.Cards[2].PatreonMonthURL)
 	}
@@ -121,6 +127,10 @@ func TestBuildCards_RecommendedIsThePromoPlan(t *testing.T) {
 	for _, c := range d.Cards {
 		if c.Recommended != (c.Name == "gold") {
 			t.Errorf("%s: recommended=%v", c.Name, c.Recommended)
+		}
+		// Silver keeps its trial, but it is no longer the promo plan's.
+		if c.PromoTrial {
+			t.Errorf("%s: PromoTrial with the promo plan on gold annual", c.Name)
 		}
 	}
 }

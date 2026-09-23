@@ -27,6 +27,7 @@ func TestNoPeersModalRenders(t *testing.T) {
 		"tn":         helper.Tn,
 		"langPath":   func(lang, p string) string { return p },
 		"promoOffer": func() *offer.Offer { return promo },
+		"trialURL":   offer.TrialURL,
 	}).ParseFiles("../../templates/views/action/errors/no_peers.html")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -45,9 +46,9 @@ func TestNoPeersModalRenders(t *testing.T) {
 		want   []string
 		banned []string
 	}{
-		// A dead swarm sells Vault, straight at the promo plan's trial.
+		// A dead swarm sells Vault, at the promo plan's trial through /trial.
 		{"dead", trial, func() NoPeersData { d := base; d.Reason = "dead"; d.ElapsedSec = 60; return d },
-			[]string{"no active seeders", "donate-no-peers", "https://checkout.example/trial", "Save to Vault", "7 days free · cancel anytime", "Vault saves the torrent", "another torrent", "no-peers-retry", `reason: 'dead'`},
+			[]string{"no active seeders", "donate-no-peers", `href="/trial?from=no-peers"`, "Save to Vault", "7 days free · cancel anytime", "Vault saves the torrent", "another torrent", "no-peers-retry", `reason: 'dead'`},
 			[]string{"received from", "Mbps"}},
 		// Nothing to sell (no catalog): no button, no Vault promise, and the
 		// alternative stands on its own instead of dangling after an "or".

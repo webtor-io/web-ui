@@ -224,10 +224,11 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid bool, trialDays int,
 			continue
 		}
 		if !paid && paidOnlySteps[steps[i].Key] {
-			// A locked step points at /donate instead of its own section:
-			// following it to a page that would only show another upsell is a
-			// detour. The link is deliberately quiet in the template — the
-			// checklist is an onboarding aid first and an upsell second.
+			// A locked step points at /donate (or straight at the trial,
+			// below) instead of its own section: following it to a page that
+			// would only show another upsell is a detour. The link is
+			// deliberately quiet in the template — the checklist is an
+			// onboarding aid first and an upsell second.
 			// Its own analytics event keeps upsell clicks separable from
 			// genuine step completions.
 			steps[i].Locked = true
@@ -241,8 +242,15 @@ func build(p *models.OnboardingProgress, vaultEnabled, paid bool, trialDays int,
 			// payers retain at least as well as direct ones.
 			steps[i].CTAKey = "onboarding.proCta"
 			if trialDays > 0 {
+				// "Try free for 7 days" starts the trial, through /trial
+				// like every trial button (docs/offers.md) — not a detour
+				// via /donate to find it there. A full page load: async
+				// navigation cannot follow /trial's redirect to the
+				// provider's checkout.
 				steps[i].CTAKey = "offer.trialCta"
 				steps[i].CTACount = trialDays
+				steps[i].Path = offer.TrialPath(offer.FromOnboarding)
+				steps[i].Async = false
 			}
 			steps[i].UmamiEvent = "onboarding-pro-" + string(steps[i].Key)
 			continue

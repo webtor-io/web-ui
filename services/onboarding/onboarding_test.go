@@ -190,10 +190,11 @@ func TestFreeUserSeesLockedPaidSteps(t *testing.T) {
 	for _, s := range c.Steps {
 		if s.Locked {
 			locked[s.Key] = true
-			// Locked rows send the user to the plans page, not to a section
-			// that would only show them another upsell.
-			if s.Path != "/donate" || s.Fragment != "" {
-				t.Errorf("locked step %q must point at /donate: %+v", s.Key, s)
+			// Locked rows send the user to the trial (the plans page without
+			// one — TestLockedStepsFallBackToProCtaWithoutTrial), not to a
+			// section that would only show them another upsell.
+			if s.Path != offer.TrialPath(offer.FromOnboarding) || s.Fragment != "" {
+				t.Errorf("locked step %q must point at the trial: %+v", s.Key, s)
 			}
 			// Upsell clicks must stay separable from real step completions.
 			if s.UmamiEvent != "onboarding-pro-"+string(s.Key) {
@@ -260,17 +261,23 @@ func TestStepPathsMatchNavbarLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot read navbar: %v", err)
 	}
-	exempt := map[string]bool{}
+	exempt := map[string]bool{
+		// The trial is not a section of the site: /trial is handlers/trial's
+		// route (its tests serve it through the router, prefixes included).
+		offer.TrialPath(offer.FromOnboarding): true,
+	}
 
 	p, now := progress(time.Hour, false, false, false, false)
 	for _, paid := range []bool{true, false} {
-		for _, s := range build(p, withVault, paid, trialOn, now).Steps {
-			if s.Path == "" || exempt[s.Path] {
-				continue
-			}
-			want := `langPath $.Lang "` + s.Path + `"`
-			if !strings.Contains(string(nav), want) {
-				t.Errorf("step %q points at %q, which the navbar does not link — is it a real route?", s.Key, s.Path)
+		for _, trial := range []int{trialOn, noTrial} {
+			for _, s := range build(p, withVault, paid, trial, now).Steps {
+				if s.Path == "" || exempt[s.Path] {
+					continue
+				}
+				want := `langPath $.Lang "` + s.Path + `"`
+				if !strings.Contains(string(nav), want) {
+					t.Errorf("step %q points at %q, which the navbar does not link — is it a real route?", s.Key, s.Path)
+				}
 			}
 		}
 	}
@@ -294,7 +301,10 @@ func TestCounterExcludesLockedSteps(t *testing.T) {
 }
 
 // Locked rows keep the PRO badge either way (the template keys off Locked);
-// what changes with trial availability is only the invitation on the button.
+// what changes with trial availability is the invitation on the button and
+// where it leads: "Try free for 7 days" starts the trial, through /trial
+// (docs/offers.md), as a full page load — async navigation cannot follow the
+// redirect to the provider.
 func TestLockedStepsInviteToTrialWhenAvailable(t *testing.T) {
 	p, now := progress(time.Hour, false, false, false, false)
 	for _, s := range build(p, withVault, freeUser, trialOn, now).Steps {
@@ -304,8 +314,8 @@ func TestLockedStepsInviteToTrialWhenAvailable(t *testing.T) {
 		if s.CTAKey != "offer.trialCta" || s.CTACount != trialOn {
 			t.Errorf("step %s: expected trial CTA for %d days, got %s/%d", s.Key, trialOn, s.CTAKey, s.CTACount)
 		}
-		if s.Path != "/donate" {
-			t.Errorf("step %s: trial CTA must still lead to /donate, got %s", s.Key, s.Path)
+		if s.Path != "/trial?from=onboarding" || s.Fragment != "" || s.Async {
+			t.Errorf("step %s: trial CTA must lead to /trial?from=onboarding without async nav, got %s%s async=%v", s.Key, s.Path, s.Fragment, s.Async)
 		}
 	}
 }
@@ -320,6 +330,11 @@ func TestLockedStepsFallBackToProCtaWithoutTrial(t *testing.T) {
 		locked++
 		if s.CTAKey != "onboarding.proCta" {
 			t.Errorf("step %s: expected plans CTA without a trial, got %s", s.Key, s.CTAKey)
+		}
+		// Nothing to try: the plans, as before — /trial would be the
+		// plain checkout, or a 404 without a catalog.
+		if s.Path != "/donate" || !s.Async {
+			t.Errorf("step %s: without a trial the CTA must lead to /donate (async), got %s async=%v", s.Key, s.Path, s.Async)
 		}
 	}
 	if locked != 2 {

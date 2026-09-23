@@ -22,6 +22,22 @@ func i64p(v int64) *int64 { return &v }
 // with the real i18n bundle, the way serve.go does.
 func offerFuncs(t *testing.T, c *payments.Catalog, trialCheckout bool) template.FuncMap {
 	t.Helper()
+	checkout := func(tier string, period int, trial bool) string {
+		if trial && !trialCheckout {
+			return ""
+		}
+		if trial {
+			return "https://checkout.example/" + tier + "?trial"
+		}
+		return "https://checkout.example/" + tier
+	}
+	return offerFuncsWith(t, c, checkout)
+}
+
+// offerFuncsWith is offerFuncs with the checkout builder given — nil for a
+// deployment without the membership provider.
+func offerFuncsWith(t *testing.T, c *payments.Catalog, checkout offer.Checkout) template.FuncMap {
+	t.Helper()
 	locales, err := os.OpenRoot("../../locales")
 	if err != nil {
 		t.Fatalf("locales: %v", err)
@@ -32,15 +48,6 @@ func offerFuncs(t *testing.T, c *payments.Catalog, trialCheckout bool) template.
 	var src offer.Source
 	if c != nil {
 		src = catalogSource{c}
-	}
-	checkout := func(tier string, period int, trial bool) string {
-		if trial && !trialCheckout {
-			return ""
-		}
-		if trial {
-			return "https://checkout.example/" + tier + "?trial"
-		}
-		return "https://checkout.example/" + tier
 	}
 	offers := offer.New(src, checkout)
 	offers.Refresh(context.Background())
@@ -56,6 +63,7 @@ func offerFuncs(t *testing.T, c *payments.Catalog, trialCheckout bool) template.
 		"hasPlans":      oh.HasPlans,
 		"downloadPitch": oh.DownloadPitch,
 		"speedUp":       oh.SpeedUp,
+		"trialURL":      oh.TrialURL,
 	}
 }
 
@@ -90,7 +98,7 @@ func assertRender(t *testing.T, name, out string, want, banned []string) {
 }
 
 // The download nudge sells the promo plan to a free viewer in time, not in
-// adjectives, and links straight to its trial.
+// adjectives, and links to its trial through /trial.
 func TestDownloadNudgeRenders(t *testing.T) {
 	type ctx struct {
 		Lang string
@@ -109,9 +117,9 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		// the line under the button the risk remover.
 		{"free, movie", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
 			[]string{"Download speed is capped at 5\u00a0Mbps", "4.3\u00a0GB takes about 2\u00a0h 3\u00a0min. With a subscription — about 12\u00a0min",
-				"https://checkout.example/silver?trial", "Download up to 10× faster", "7 days free · cancel anytime",
+				`href="/trial?from=download-nudge"`, "Download up to 10× faster", "7 days free · cancel anytime",
 				`data-umami-event="donate-download"`, `data-umami-event-target="trial"`, "donate-download-shown", "eta: 1"},
-			[]string{"ads", "action.", "offer.", "Try free"}},
+			[]string{"ads", "action.", "offer.", "Try free", "checkout.example"}},
 		// Already whole on our side: the cap is the only brake, so the full
 		// speed-up is a fact, not a ceiling.
 		{"free, cached", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie, Cached: true},
@@ -128,7 +136,7 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		// Patreon cannot start the trial: the plan's own checkout, no trial line.
 		{"free, no trial checkout", prodCatalog(), false, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
 			[]string{"https://checkout.example/silver", "Download up to 10× faster", `data-umami-event-target="checkout"`},
-			[]string{"days free", "?trial"}},
+			[]string{"days free", "?trial", "/trial"}},
 		// Viewer rate unknown: no ratio to quote, the outcome without a number.
 		{"free, rate unknown", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", SizeBytes: movie},
 			[]string{"Download faster", "7 days free"},
@@ -171,10 +179,10 @@ func TestSlowDownloadUpsellRenders(t *testing.T) {
 		want, banned []string
 	}{
 		{"free capped", prodCatalog(), "free", true,
-			[]string{"https://checkout.example/silver?trial", "Watch without the speed cap", "7 days free · cancel anytime", `data-umami-event="donate-slow-download"`, `data-umami-event-target="trial"`},
-			[]string{"Upgrade plan", "Try free"}},
+			[]string{`href="/trial?from=limit-modal"`, "Watch without the speed cap", "7 days free · cancel anytime", `data-umami-event="donate-slow-download"`, `data-umami-event-target="trial"`},
+			[]string{"Upgrade plan", "Try free", "checkout.example"}},
 		{"paid capped", prodCatalog(), "bronze", true,
-			[]string{"Upgrade plan", `href="/donate"`}, []string{"Try free", "checkout.example"}},
+			[]string{"Upgrade plan", `href="/donate"`}, []string{"Try free", "checkout.example", "/trial"}},
 		{"not a cap", prodCatalog(), "free", false,
 			nil, []string{"donate-slow-download"}},
 		{"no storefront", nil, "free", true,

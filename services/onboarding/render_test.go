@@ -232,14 +232,21 @@ func TestRenderLockedStepsShowProBadgeAndQuietPlansLink(t *testing.T) {
 				t.Errorf("lang=%s: locked step must offer the plans link (%s)", lang, want)
 			}
 		}
-		if got := strings.Count(out, `href="[`+lang+`]/donate"`); got != 2 {
-			t.Errorf("lang=%s: expected 2 donate links, got %d", lang, got)
+		// "Try free for 7 days" starts the trial: through /trial, with the
+		// surface named, and as a full page load — async navigation cannot
+		// follow the redirect to the provider's checkout.
+		trialHref := `href="[` + lang + `]/trial?from=onboarding"`
+		if got := strings.Count(out, trialHref); got != 2 {
+			t.Errorf("lang=%s: expected 2 trial links, got %d:\n%s", lang, got, out)
+		}
+		if strings.Contains(out, `/donate"`) {
+			t.Errorf("lang=%s: with a trial the locked rows must not detour via /donate", lang)
 		}
 		// A real button, because a quiet text link got 0 clicks from 219 free
 		// users — but still not the pink accent, which belongs to the steps
 		// the user can actually complete.
 		for _, line := range strings.Split(out, "\n") {
-			if !strings.Contains(line, `href="[`+lang+`]/donate"`) {
+			if !strings.Contains(line, trialHref) {
 				continue
 			}
 			if strings.Contains(line, "text-w-pinkL") || strings.Contains(line, "btn-pink") {
@@ -248,6 +255,18 @@ func TestRenderLockedStepsShowProBadgeAndQuietPlansLink(t *testing.T) {
 			if !strings.Contains(line, "btn btn-xs btn-soft") {
 				t.Errorf("lang=%s: the upsell must be a button, not a text link: %s", lang, strings.TrimSpace(line))
 			}
+			if strings.Contains(line, "data-async-target") {
+				t.Errorf("lang=%s: the trial link must be a full page load: %s", lang, strings.TrimSpace(line))
+			}
+		}
+		// No trial to start: the plans, as before, loaded in place.
+		out = render(t, tmpl, lang, build(&models.OnboardingProgress{CreatedAt: now.Add(-time.Hour)}, true, false, noTrial, now))
+		donateHref := `href="[` + lang + `]/donate" data-async-target="main"`
+		if got := strings.Count(out, donateHref); got != 2 {
+			t.Errorf("lang=%s: without a trial expected 2 async donate links, got %d:\n%s", lang, got, out)
+		}
+		if strings.Contains(out, "/trial") {
+			t.Errorf("lang=%s: without a trial nothing may link to /trial", lang)
 		}
 		// The steps a free user can act on stay clickable.
 		for _, want := range []string{`data-umami-event="onboarding-library"`, `data-umami-event="onboarding-discover"`} {

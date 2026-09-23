@@ -215,6 +215,11 @@ type tierCard struct {
 	// to TrialURL.
 	TrialDays int
 	TrialURL  string
+	// PromoTrial: that trial is the promo plan's (is_promo on the monthly
+	// price). Then the plaque and the monthly Join go through /trial like
+	// every other button that starts it (offer.TrialURL, docs/offers.md);
+	// any other card's trial is a particular plan and stays a direct link.
+	PromoTrial bool
 
 	HasMonthly bool
 	MonthlyUSD string
@@ -312,6 +317,7 @@ func buildCards(cat *np.Catalog, patreonOn, cryptoOn bool) *donateData {
 					// The card's monthly Join starts the trial too: on
 					// Patreon a trial plan has no other checkout.
 					card.TrialDays, card.TrialURL, card.PatreonMonthURL = p.TrialDays, u, u
+					card.PromoTrial = p.IsPromo
 					if trialDays == 0 || (p.IsPromo && !trialIsPromo) {
 						trialDays, trialTier, trialIsPromo = p.TrialDays, p.TierName, p.IsPromo
 					}

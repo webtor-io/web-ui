@@ -69,16 +69,16 @@
         </form>
         {{- end }}
         {{- /* Under a plan cap a faster plan helps. A free viewer is sold the
-             promo plan (its trial when it has one) straight at checkout — the
-             button says what it gets them, the line under it that it is free
-             to try; a
+             promo plan — its trial through /trial when it has one, else
+             straight at checkout — the button says what it gets them, the
+             line under it that it is free to try; a
              paying one is sent to compare plans. Nothing to sell (no catalog)
              — no button. */}}
         {{- if .Data.IsRateLimited }}
         {{- $offer := promoOffer }}
         {{- if and $isFree $offer }}
         <div class="flex flex-col items-center gap-1">
-            <a class="btn btn-soft whitespace-nowrap" href="{{ if $offer.URL }}{{ $offer.URL }}{{ else }}{{ langPath $.Lang "/donate" }}{{ end }}" target="_blank" rel="noopener"
+            <a class="btn btn-soft whitespace-nowrap" href="{{ or (trialURL $.Lang "limit-modal" $offer) $offer.URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
                data-umami-event="donate-slow-download"
                data-umami-event-tier="{{ .Data.TierName }}"
                data-umami-event-target="{{ if $offer.TrialDays }}trial{{ else if $offer.URL }}checkout{{ else }}donate{{ end }}">

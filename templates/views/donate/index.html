@@ -26,6 +26,11 @@
                 </label>
                 <div class="grid md:grid-cols-3 gap-5 items-stretch">
                     {{ range .Cards }}
+                    {{- /* The promo plan's trial starts through /trial, like every
+                         other button that starts it (docs/offers.md); a card
+                         whose trial is not the promo plan's keeps its checkout. */}}
+                    {{- $trialHref := .TrialURL }}{{ $monthHref := .PatreonMonthURL }}
+                    {{- if .PromoTrial }}{{ with trialURL $.Lang "donate" promoOffer }}{{ $trialHref = . }}{{ $monthHref = . }}{{ end }}{{ end }}
                     <div class="relative rounded-2xl flex flex-col bg-w-card {{ if .Recommended }}max-md:order-first border-2 border-w-pink{{ else }}border border-w-line{{ end }}">
                         {{ if .Recommended }}
                         <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap bg-w-pink text-w-bg rounded-full px-4 py-1 text-xs font-bold tracking-widest uppercase">{{ t $.Lang "donate.crypto.recommended" }}</span>
@@ -48,7 +53,7 @@
                                 {{ end }}
                             </div>
                             {{ if .PatreonMonthURL }}
-                            <a href="{{ .PatreonMonthURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="1">{{ t $.Lang "donate.crypto.join" }}</a>
+                            <a href="{{ $monthHref }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 {{ if .HasAnnual }}group-has-[:checked]:hidden{{ end }}" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="1">{{ t $.Lang "donate.crypto.join" }}</a>
                             <a href="{{ .PatreonYearURL }}" target="_blank" rel="noopener" class="btn btn-pink w-full mb-2 hidden group-has-[:checked]:inline-flex" data-umami-event="donate-patreon-join" data-umami-event-tier="{{ .Name }}" data-umami-event-cadence="12">{{ t $.Lang "donate.crypto.join" }}</a>
                             {{ if $.Data.CryptoEnabled }}
                             {{ if .HasMonthly }}{{ if not .MonthlyUnavailable }}
@@ -74,7 +79,7 @@
                             {{ end }}
                             {{ if .TrialDays }}
                             <div class="mt-auto pt-5">
-                                <a href="{{ .TrialURL }}" target="_blank" rel="noopener" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ tn $.Lang "donate.patreon.trialBanner" .TrialDays }}</a>
+                                <a href="{{ $trialHref }}" target="_blank" rel="noopener" class="promo-outline w-full px-3 py-3 text-sm font-semibold" data-umami-event="donate-trial-plaque">{{ tn $.Lang "donate.patreon.trialBanner" .TrialDays }}</a>
                                 {{/* The trial starts the MONTHLY plan whatever the annual
                                      toggle shows, and "how do I cancel" is the single most
                                      common support request — so the card says the price it
