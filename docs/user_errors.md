@@ -77,8 +77,12 @@ Why these rules:
   anywhere in the pipeline (btmh-only magnets were already refused), so the
   answer is "use a magnet with a v1 infohash, or the file".
 
-Test tables: `TestResolveQueryHash_FormInputs` (services/common),
-`TestClassifyError_FormInput` (services/web).
+On the tool pages the submit button says `home.open` ("Open") and the field
+shows an arrow instead of the loupe; the home page keeps `home.search` for
+now. The Umami event stays `search` on both, with `page=<tool url>` on tool
+pages. Test tables: `TestResolveQueryHash_FormInputs` (services/common),
+`TestClassifyError_FormInput` (services/web), `TestIndexFormSaysOpenOnToolPagesOnly`
+(services/template).
 
 ## Streaming-chain classes (2026-09)
 

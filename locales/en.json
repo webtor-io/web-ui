@@ -47,6 +47,8 @@
     "home.placeholder": "Magnet link or infohash…",
     "home.search": "Search",
     "@home.search": "Homepage CTA button — imperative action ('start a search now'), not the noun 'a search'. Submits the magnet/infohash input.",
+    "home.open": "Open",
+    "@home.open": "Tool-page CTA button next to the magnet/infohash input (the homepage keeps home.search): the imperative verb 'open this magnet or torrent'. NOT the adjective 'open' (as in open-source) and NOT 'search'.",
     "home.or": "or",
     "home.dropzone": "Drop torrent file here",
     "home.dropzoneHint": "or click to browse",
