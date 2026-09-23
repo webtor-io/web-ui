@@ -1,19 +1,15 @@
 package web
 
 import (
-	"crypto/md5"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	h "github.com/dustin/go-humanize"
 	"github.com/webtor-io/web-ui/helpers"
 	"html/template"
-	"io"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -30,7 +26,6 @@ import (
 	"github.com/urfave/cli"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/job"
@@ -163,7 +158,7 @@ type Helper struct {
 	domain         string
 	demoMagnet     string
 	demoTorrent    string
-	ah             *AssetHashes
+	ah             *static.AssetHashes
 	useAbuseStore  bool
 	useSuperTokens bool
 	apiDocsURL     string
@@ -177,7 +172,7 @@ func NewHelper(c *cli.Context) *Helper {
 		assetsPath:     c.String(static.AssetsPathFlag),
 		useAbuseStore:  c.Bool(abuse_store.UseFlag),
 		domain:         c.String(common.DomainFlag),
-		ah:             NewAssetHashes(c.String(static.AssetsPathFlag)),
+		ah:             static.NewAssetHashes(c.String(static.AssetsPathFlag)),
 		useSuperTokens: c.String(auth.SupertokensHostFlag) != "",
 		apiDocsURL:     libapi.PublicEndpoint(c) + "/docs/index.html",
 	}
@@ -322,44 +317,6 @@ func (s *Helper) Pwd(in string) string {
 		pwd = "/"
 	}
 	return pwd
-}
-
-type AssetHashes struct {
-	*lazymap.LazyMap[string]
-	path string
-}
-
-func (s *AssetHashes) get(name string) (hash string, err error) {
-	f, err := os.Open(s.path + "/" + name)
-	if err != nil {
-		return "", err
-	}
-	md5Hash := md5.New()
-	if _, err := io.Copy(md5Hash, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(md5Hash.Sum(nil)), nil
-}
-
-func (s *AssetHashes) Get(name string) (string, error) {
-	return s.LazyMap.Get(name, func() (string, error) {
-		f, err := os.Open(s.path + "/" + name)
-		if err != nil {
-			return "", err
-		}
-		md5Hash := md5.New()
-		if _, err := io.Copy(md5Hash, f); err != nil {
-			return "", err
-		}
-		return hex.EncodeToString(md5Hash.Sum(nil)), nil
-	})
-}
-
-func NewAssetHashes(path string) *AssetHashes {
-	return &AssetHashes{
-		LazyMap: lazymap.New[string](&lazymap.Config{}),
-		path:    path,
-	}
 }
 
 func (s *Helper) Now() time.Time {

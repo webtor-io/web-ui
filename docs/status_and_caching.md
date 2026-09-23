@@ -1,6 +1,7 @@
 # Status codes and caching
 
-What the site answers for a URL that does not name a page. Since 2026-09-23.
+What the site answers for a URL that does not name a page, and how long the
+edge and browsers may keep the built assets. Since 2026-09-23.
 
 ## Resource URLs that name nothing: 404 with the home page
 
@@ -55,3 +56,42 @@ view answers 404 with `error/page` and `error.page_not_found` (it used to be a
 bare 500 from the template manager — `template.Manager.HasView` is the
 check). `/legal/terms` is a 301 to `/legal/tos` in the request's language.
 Aliases live in `handlers/legal/handler.go`.
+
+## `/assets`: Cache-Control from the hash
+
+`web.Helper.Asset` renders `/assets/<file>?<md5 of the file>` (release mode).
+The route (`handlers/static/assets.go`) compares the query with the md5 of
+the file it is about to serve (`static.AssetHashes`, the same type the helper
+uses):
+
+| Request | Cache-Control |
+|---|---|
+| query = current hash, answered 200/206/304 | `public, max-age=31536000, immutable` |
+| no query (lazy chunks, images, source maps) | `public, max-age=1800` |
+| query that is not the current hash | `no-store` |
+| any other status: 404, directory, 416, 500 after a panic | `no-store` |
+
+**Why compare and not just look for a query.** During a rollout a page from a
+new replica asks for `style.css?<new>`, and the request can land on an old
+replica that still has the old file. Marked immutable, the old bytes would be
+kept under the new URL for a year at the edge and in every browser that got
+them.
+
+**Why errors are `no-store`.** A 404 here can be a chunk the answering replica
+does not have yet; cached, it would outlive the rollout. The verdict
+is taken before the file server runs (it writes the headers with the status),
+and `cacheWriter` re-checks it on every `WriteHeader`: gin's static handler
+first sets 404 and lets the file server overwrite it with 200, so the value
+is re-applied rather than only cleared.
+
+**At the edge.** The edge takes the origin's `max-age` as its TTL and raises
+anything below its browser TTL (30 min) to 30 min for browsers, which is why
+the short value is 1800: for unhashed URLs browsers see what they saw before,
+and the edge keeps them 30 min. `no-store` is not cached. Before this change
+the origin sent no Cache-Control at all; the edge answered every asset with
+`max-age=1800` and kept it longer itself (ages up to 6,018 s observed on
+2026-09-23).
+
+Lazy chunks carry a content hash in their file name (`[name].[chunkhash].js`)
+and could be immutable too; they are not, because the route has no way to
+check that hash.

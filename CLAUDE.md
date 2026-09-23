@@ -48,7 +48,7 @@
 - **Go** 1.26 (module: `github.com/webtor-io/web-ui`)
 - **Node** 22.x for frontend assets
 - **npm** (not Yarn) — `package-lock.json` is present
-- Frontend assets: webpack → `assets/dist`, served at `/assets`
+- Frontend assets: webpack → `assets/dist`, served at `/assets` — `Cache-Control` is immutable for a year only when the query is the file's current md5 (`?<hash>` from `web.Helper.Asset`), 30 min without one, `no-store` for a stale hash and for every error (`handlers/static/assets.go`, `docs/status_and_caching.md`)
 - Public static files: `pub/` mounted at `/` and `/pub`
 
 ### Key Commands
