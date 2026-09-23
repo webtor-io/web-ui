@@ -150,6 +150,17 @@ func (s *Service) HasPlans() bool {
 	return c != nil && len(c.Prices) > 0
 }
 
+// FreeRateMbps is the free tier's speed cap, 0 when there is no cap to state:
+// no catalog, no free tier in it, or a free tier without a limit. Copy that
+// quotes the cap reads it here rather than typing the number into a locale.
+func (s *Service) FreeRateMbps() int {
+	t := s.Catalog().TierNamed("free")
+	if t == nil || t.DownloadRate == nil || *t.DownloadRate <= 0 {
+		return 0
+	}
+	return int(*t.DownloadRate)
+}
+
 // Promo is the plan in-app offers sell (is_promo), nil when there is none or
 // the catalog does not say what its tier grants — an upsell without its
 // numbers would have to invent them.

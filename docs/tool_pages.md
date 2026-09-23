@@ -35,7 +35,9 @@
 
 Дополнительные флаги: `Alt` (тёмный фон, секции чередуются), `Footer`/`Note`
 (закрывающий абзац), `Extra` (врезка под чеклистом), `Link` (кросс-ссылка на
-другой лендинг), `Icon` (глиф, если он не совпадает с именем бейджа).
+другой лендинг), `Icon` (глиф, если он не совпадает с именем бейджа), `Cap`
+(строка с лимитом бесплатного тарифа под сравнением — число из каталога,
+рендерится только при `hasPlans` и ненулевом `freeRateMbps`).
 
 Шестой тип секции — сигнал, что странице нужен свой партиал, а не ещё один
 флаг.
@@ -50,6 +52,66 @@
 
 Соглашение kebab-URL → camel-ключ проверяется тестом
 `TestAboutKeyFollowsTheURL`.
+
+## Title, Benefit и H1
+
+`Title` и `Benefit` — не поля одной страницы: каждый ключ рендерится в
+нескольких местах, и правка перевода меняет их все.
+
+| Ключ | Где виден |
+|---|---|
+| `Title` | начало `<title>` и `og:title` (`Title – Benefit`), `name` в JSON-LD `WebApplication`, анкор ссылки в футере (у гайдов — в отдельной колонке); у гайда ещё и H1 |
+| `Benefit` | хвост `<title>`, заголовок карточки в «related tools» на всех остальных tool-страницах; у не-гайда — H1, у гайда — строка под H1 |
+| `Description` | `<meta name="description">`, абзац под hero, текст карточки «related tools» |
+
+H1 рендерит `tool_heading` (`templates/partials/about/heading.html`), его
+вызывает hero в `templates/views/index.html`. У обычной tool-страницы H1 —
+`Benefit`. У гайда (`Tool.Guide`) H1 — `Title`, то есть вопрос («How to Open
+a .torrent File»), а `Benefit` уходит строкой под него. Причина: на этих
+страницах Google показывает в выдаче H1 вместо нашего `<title>`, и с
+`Benefit` в H1 там стоял обрывок («Without Installing a Torrent Client») без
+вопроса. Главная рендерит свой hero и `tool_heading` не использует.
+
+`Title` гайда в локали — формулировка местного запроса, а не перевод
+английского: DE «Torrent-Datei öffnen: So geht's», RU «Как открыть
+торрент-файл», PT «Como baixar torrent», ES «¿Cómo descargar un torrent?»,
+FR «Comment télécharger des torrents ?», PL «Jak pobierać torrenty» (сверено
+с GSC за 90 дней до 2026-09-21). Небрендовые запросы, по которым эти страницы
+стоят на позиции ≤3, — PL «torrenty», ES «descargar torrents», по 2–3 показа
+за 90 дней — новые Title тоже содержат; у снятых формулировок таких запросов
+не было. ES `/open-torrent-file` оставлен
+«¿Cómo abrir un archivo .torrent?»: он и есть главный местный запрос, а
+«abrir archivo torrent online» держит `/es/online-torrent-downloader` на
+позиции 1 — второй страницы под ту же фразу не нужно.
+
+## Общий FAQ и гайды
+
+FAQ в `templates/partials/about.html` один на главную и все tool-страницы.
+Четыре ответа ведут на гайды через `about_faq_guide_link`
+(`templates/partials/about/faq_guide_link.html`, вызов
+`withContext $ "<url гайда>"`). На самом гайде ссылка на него же не
+рендерится — это была ссылка на страницу, где читатель уже находится;
+ссылки на остальные гайды остаются. Новая ссылка из FAQ на гайд —
+только через этот шаблон.
+
+## /watch-torrents-ios: сравнение с µTorrent Lite
+
+Секция `utorrent` отвечает на «utorrent for iphone»: приложения uTorrent в
+App Store нет, у его авторов есть браузерная µTorrent Lite. Колонка Lite
+говорит только то, что написано на utorrent.com/lite и в справке BitTorrent
+(проверено 2026-09-23: Safari/Chrome, бесплатно и без рекламы, играет из
+памяти браузера, файлы в папку на устройстве не сохраняет, куски берёт у
+пиров сам браузер). Про iPhone их справка прямо говорит только об iPad —
+поэтому в тексте «для Safari и Chrome», без обещаний за них. Перед правкой
+колонки — перепроверить их страницу.
+
+Под сравнением — строка про лимит бесплатного тарифа (`utorrent.cap`, флаг
+секции `Cap`). Число в копирайт не вписано: это `{{.Rate}}` из каталога
+тарифов (`freeRateMbps`, `services/offer`), как у всех апселлов после
+39c417e. Строка рендерится, только когда есть что сказать: каталог
+загружен, в нём есть планы (`hasPlans`) и у free-тарифа конечный лимит. На
+деплое без каталога её нет вовсе — ни числа, ни «платного плана», которого
+там не купить.
 
 ## Как добавить страницу
 
@@ -69,6 +131,10 @@
 | `services/template.TestAboutCopyExistsInEveryLocale` | ключ, который страница реально рендерит, отсутствует в каком-то языке (на SEO-странице это выводит сырой ключ). Список ключей берётся из отрендеренной разметки, а не из догадки о том, что просит шаблон |
 | `services/template.TestAboutPartialsUseTheirOwnKeys` | страница рендерит чужой префикс |
 | `services/template.TestIndexFormSaysOpenOnToolPagesOnly` | поле ввода в hero: на tool-страницах кнопка `home.open` («Open»), стрелка вместо лупы и `data-umami-event-page=<url>`; на главной — прежние `home.search` и лупа. Событие Umami на обеих — `search`. Почему — `docs/user_errors.md`, «What the form accepts» |
+| `services/template.TestGuideHeadingIsTheQuestion` | у гайда H1 снова не вопрос (`Title`) или `Benefit` пропал из-под него |
+| `services/template.TestToolHeadingIsUnchangedOutsideGuides` | H1 обычной tool-страницы отличается от прежней разметки (`Benefit`, байт в байт) |
+| `services/template.TestFreeCapLineFollowsTheCatalog` | строка `Cap` рендерится без каталога, без планов или без лимита у free-тарифа, либо цитирует не число из каталога |
+| `services/template.TestFAQDoesNotLinkAGuideToItself` | FAQ на гайде ссылается на сам гайд, или пропала ссылка на другой гайд. Рендерит весь `about.html`, а не только секции |
 
 Снапшоты, которыми обложен рефакторинг 2026-08-15, сняты **до** него: все 18
 страниц после перехода на секции рендерятся байт-в-байт (с точностью до

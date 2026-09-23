@@ -1,0 +1,24 @@
+{{/*
+    The H1 of a tool page's hero, rendered with `withContext $ .Tool`.
+
+    A tool page's H1 is its Benefit ("Play It in Your Browser, No
+    Converter"): the Title names the tool and already opens the <title>.
+
+    A guide is the exception. Its Title is the reader's question ("How to
+    Open a .torrent File"), and Google shows the H1 in place of our <title>
+    on these pages — with the Benefit as the H1 the result read "Without
+    Installing a Torrent Client", a fragment with the question dropped. So
+    on a guide the question is the H1 and the Benefit is the line under it.
+*/}}
+{{ define "tool_heading" }}
+{{- if $.Data.Guide }}
+<h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-4 text-balance">
+    <span class="gradient-text">{{ t $.Ctx.Lang $.Data.Title }}</span>
+</h1>
+<p class="relative z-10 text-xl sm:text-2xl font-semibold tracking-tight text-w-text max-w-[680px] mb-5 text-balance">{{ t $.Ctx.Lang $.Data.Benefit }}</p>
+{{- else }}
+<h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance">
+    <span class="gradient-text">{{ t $.Ctx.Lang $.Data.Benefit }}</span>
+</h1>
+{{- end }}
+{{ end }}

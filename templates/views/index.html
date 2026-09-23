@@ -85,9 +85,7 @@
 
     <div class="relative w-full flex flex-col items-center">
         {{ template "hero_wave" }}
-        <h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance">
-            <span class="gradient-text">{{ t $.Lang .Tool.Benefit }}</span>
-        </h1>
+        {{ template "tool_heading" (withContext $ .Tool) }}
     </div>
 
     <p class="relative z-10 text-lg text-w-sub max-w-[560px] mb-12 leading-relaxed">

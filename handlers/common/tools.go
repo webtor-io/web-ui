@@ -87,12 +87,21 @@ var Tools = []Tool{
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Alt: true, Paras: []string{"text"}},
 		{Kind: AboutChecklist, Key: "devices", Badge: "devices", Accent: "pink", Items: 4},
 	}},
+	// iOS sessions download a file more often than they stream one (47% vs
+	// 19%), so the steps and the checklist cover both, and the free speed
+	// cap is stated (from the catalog) rather than left to be found. The
+	// comparison answers "utorrent for iphone": there is no uTorrent app in
+	// the App Store, and µTorrent Lite — its browser version — ranks next to
+	// this page on the core iOS queries (SERP snapshot 2026-09-21). Its
+	// column says only what its own page and help center say (checked
+	// 2026-09-23); recheck them before editing it.
 	{Url: "watch-torrents-ios", Title: "tool.watchTorrentsIos.title", Benefit: "tool.watchTorrentsIos.benefit", Description: "tool.watchTorrentsIos.description", Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
-		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
-		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Alt: true, Items: 4},
-		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
+		{Kind: AboutCompare, Key: "utorrent", Badge: "comparison", Accent: "cyan", Cols: []string{"webtor", "lite"}, Cap: "cap", Footer: true},
+		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Alt: true, Items: 4},
+		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Items: 4},
+		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Alt: true, Paras: []string{"text"}},
 	}},
 	// Question-shaped landings. GSC, 28 days: the "how to open/download a
 	// torrent file" queries bring ~7k impressions a month, land on the home

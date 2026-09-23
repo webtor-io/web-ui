@@ -41,9 +41,12 @@ membership provider. Change both together.
     `TrialDays`, `URL`), or nil.
   - `HasPlans()` — there is something to sell at all.
   - `TrialDays(tier)` — the trial on that tier's plan, for post-purchase copy.
-  - `FreeCapMbps()` — the free tier's download cap, 0 when the catalog quotes none;
-    the Stremio manifest description reads it (`docs/stremio.md`).
-  - `Helper` — `promoOffer`, `hasPlans`, `downloadPitch`, `speedUp` for templates.
+  - `FreeRateMbps()` — the free tier's speed cap, 0 when there is none to state (no
+    catalog, no free tier, or an uncapped one). For copy that quotes the cap — the
+    `/watch-torrents-ios` comparison (`docs/tool_pages.md`) — instead of a number typed
+    into eleven locales.
+  - `Helper` — `promoOffer`, `hasPlans`, `freeRateMbps`, `downloadPitch`, `speedUp` for
+    templates.
   - The catalog is refreshed in the background (`Start()`), and a failed refresh keeps
     the last good one. Nothing on the stream or download path ever waits on the webhook.
 - `handlers/donate` — `Checkout(c)` builds the provider checkout for a plan (trial
@@ -69,7 +72,7 @@ Two rules fall out of this:
 | Onboarding locked steps | free | trial length | `onboarding-pro-*` |
 | `/donate` cards | everyone | speed, Vault, trial plaque, RECOMMENDED | `donate-trial-plaque`, `donate-patreon-join` |
 | `/speedtest` plans | everyone | tiers and caps from the catalog | `donate-speedtest` |
-| Stremio manifest description | whoever installs the addon | the free plan's cap | — |
+| `/watch-torrents-ios` comparison (`about/sections.html`, `Cap`) | everyone | the free cap and that a plan raises it; only with `hasPlans` and a capped free tier | — |
 
 Each CTA carries `data-umami-event-target` = `trial` | `checkout` | `donate`, so the
 funnel is readable per step, and links to the plan's own checkout when there is one —

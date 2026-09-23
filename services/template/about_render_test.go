@@ -21,8 +21,14 @@ import (
 // handlers/common.
 func aboutTemplates(t *testing.T) *template.Template {
 	t.Helper()
+	return parseAboutTemplates(t, aboutFuncs(), "../../templates/partials/about/*.html")
+}
+
+// aboutFuncs are the stubs every about template needs: the translation funcs
+// echo their key, links stay unprefixed.
+func aboutFuncs() template.FuncMap {
 	echo := func(lang, key string, args ...interface{}) string { return key }
-	funcs := template.FuncMap{
+	return template.FuncMap{
 		"t":        echo,
 		"tp":       echo,
 		"tHTML":    func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) },
@@ -37,6 +43,9 @@ func aboutTemplates(t *testing.T) *template.Template {
 		// Only funcs the template manager actually registers (see
 		// web.Helper's methods) belong here: a stub for one that does not
 		// exist would let a template pass this test and panic at startup.
+		// offer.Helper: the free-plan cap line under a comparison.
+		"hasPlans":     func() bool { return true },
+		"freeRateMbps": func() int { return 5 },
 		"seq": func(from, to int) []int {
 			var out []int
 			for i := from; i <= to; i++ {
@@ -45,18 +54,27 @@ func aboutTemplates(t *testing.T) *template.Template {
 			return out
 		},
 	}
-	paths, err := filepath.Glob("../../templates/partials/about/*.html")
-	if err != nil || len(paths) == 0 {
-		t.Fatalf("no about partials found: %v", err)
-	}
-	tpl := template.New("about").Funcs(funcs)
-	for _, p := range paths {
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatalf("read %s: %v", p, err)
+}
+
+// parseAboutTemplates parses every file matched by the globs into one set,
+// the way the template manager parses partials at startup.
+func parseAboutTemplates(t *testing.T, funcs template.FuncMap, globs ...string) *template.Template {
+	t.Helper()
+	// Not named "about": about.html defines a template of that name.
+	tpl := template.New("about-set").Funcs(funcs)
+	for _, g := range globs {
+		paths, err := filepath.Glob(g)
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("no templates match %s: %v", g, err)
 		}
-		if _, err := tpl.Parse(string(b)); err != nil {
-			t.Fatalf("parse %s: %v", p, err)
+		for _, p := range paths {
+			b, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatalf("read %s: %v", p, err)
+			}
+			if _, err := tpl.Parse(string(b)); err != nil {
+				t.Fatalf("parse %s: %v", p, err)
+			}
 		}
 	}
 	// The CTAs the sections end with live outside this directory.

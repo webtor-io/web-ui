@@ -9,7 +9,8 @@ import (
 // Translate renders an i18n key with template data in a language.
 type Translate func(lang, key string, data map[string]any) string
 
-// Helper exposes offers to templates: promoOffer, hasPlans, downloadPitch.
+// Helper exposes offers to templates: promoOffer, hasPlans, freeRateMbps,
+// downloadPitch.
 type Helper struct {
 	s  *Service
 	tr Translate
@@ -28,6 +29,12 @@ func (h *Helper) PromoOffer() *Offer {
 // HasPlans: the storefront has plans — an "upgrade" link leads somewhere.
 func (h *Helper) HasPlans() bool {
 	return h.s.HasPlans()
+}
+
+// FreeRateMbps is the free plan's speed cap in Mbps, 0 when there is none to
+// state. Template usage: {{ with freeRateMbps }}…{{ end }}
+func (h *Helper) FreeRateMbps() int {
+	return h.s.FreeRateMbps()
 }
 
 // SpeedUp is how many times faster the promo plan downloads than rateMbps,

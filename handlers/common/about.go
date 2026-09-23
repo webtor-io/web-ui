@@ -61,6 +61,12 @@ type AboutSection struct {
 	// Extra is an i18n sub-key rendered as a cyan callout under a
 	// checklist — one page pairs its benefits with a note about indexers.
 	Extra string
+	// Cap is an i18n sub-key closing a comparison with the free plan's speed
+	// cap, quoted as {{.Rate}} from the storefront catalog. It renders only
+	// where there is a cap to state and a plan that lifts it (freeRateMbps,
+	// hasPlans) — a deployment without the catalog has neither, and a number
+	// typed into the copy would drift from the tier table.
+	Cap string
 	// CTA names the call-to-action template closing the steps section.
 	CTA string
 	// Link is a cross-link closing a prose section: one landing page points
