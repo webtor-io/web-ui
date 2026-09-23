@@ -36,6 +36,7 @@
     "home.description": "Téléchargeur de torrent en ligne et gratuit : diffusez et téléchargez des torrents directement dans le navigateur — sans appli, sans client, sans installation. Open source et privé.",
     "home.ogTitle": "Webtor.io — diffuser et télécharger des torrents dans le navigateur",
     "home.ogDescription": "Diffusez et téléchargez n'importe quel torrent directement dans le navigateur — gratuit, open source, sans installation. Votre lecteur torrent web sur tous vos appareils.",
+    "meta.ogImageAlt": "Webtor : diffusez et téléchargez des torrents dans votre navigateur, sans client à installer",
     "home.jsonLdDescription": "Lecteur torrent web gratuit pour diffuser et télécharger des torrents directement dans le navigateur, sans logiciel.",
     "home.badge": "Open-source · Aucune installation",
     "home.heading": "Diffusez et téléchargez",

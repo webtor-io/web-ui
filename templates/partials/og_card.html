@@ -1,0 +1,14 @@
+{{/* The brand share card: the preview every page shows when it has no image
+     of its own. The twitter:card lives here, next to the image it describes,
+     and not in the layout outside the "og" block: a page with its own card
+     (resource/get.html) overrides the whole block, and a second, unconditional
+     tag in the layout left it with two contradicting ones. See
+     docs/share_previews.md. */}}
+{{ define "og_card" }}
+    <meta property="og:image" content="{{ domain }}/og-card.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{ t $.Lang "meta.ogImageAlt" }}">
+    <meta name="twitter:card" content="summary_large_image">
+{{ end }}

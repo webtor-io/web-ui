@@ -38,6 +38,7 @@
     "home.description": "Torrent web app for streaming and torrent download right in your browser — no app, no client, no install. Free online torrent website with magnet links and .torrent files supported. Open-source and private.",
     "home.ogTitle": "Webtor.io — Stream & Download Torrents in Browser",
     "home.ogDescription": "Stream and download any torrent right in your browser — free, open-source, no app to install. Your private web torrent player, on any device.",
+    "meta.ogImageAlt": "Webtor — stream and download torrents in your browser, no client to install",
     "home.jsonLdDescription": "Free web-based torrent player to stream and download torrents directly in your browser, no software required.",
     "home.badge": "Open-source · No install needed",
     "home.heading": "Stream & download",

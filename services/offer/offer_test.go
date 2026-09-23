@@ -129,6 +129,33 @@ func TestTrialDays(t *testing.T) {
 	}
 }
 
+func TestFreeCapMbps(t *testing.T) {
+	uncapped := prodCatalog()
+	uncapped.Tiers[0].DownloadRate = nil
+	noFree := prodCatalog()
+	noFree.Tiers = noFree.Tiers[1:]
+	var nilSvc *Service
+	cases := []struct {
+		name string
+		svc  *Service
+		want int64
+	}{
+		{"production catalog", loaded(prodCatalog(), checkoutAll), 5},
+		{"no webhook configured", New(nil, checkoutAll), 0},
+		{"catalog not loaded yet", New(&fakeSource{c: prodCatalog()}, checkoutAll), 0},
+		{"free tier without a cap", loaded(uncapped, checkoutAll), 0},
+		{"no free tier in the catalog", loaded(noFree, checkoutAll), 0},
+		{"no service", nilSvc, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.svc.FreeCapMbps(); got != tc.want {
+				t.Errorf("FreeCapMbps() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestHasPlans(t *testing.T) {
 	cases := []struct {
 		name string

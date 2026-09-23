@@ -166,6 +166,16 @@ func (s *Service) Promo() *Offer {
 	return nil
 }
 
+// FreeCapMbps is the free plan's download cap in Mbit/s, 0 when the catalog
+// quotes none: no catalog, no free tier in it, or a free tier without a cap.
+func (s *Service) FreeCapMbps() int64 {
+	t := s.Catalog().TierNamed("free")
+	if t == nil || t.DownloadRate == nil {
+		return 0
+	}
+	return *t.DownloadRate
+}
+
 // TrialDays is the trial of the tier's plan that has one, 0 when none does —
 // for copy about a membership that may have started with it.
 func (s *Service) TrialDays(tier string) int {

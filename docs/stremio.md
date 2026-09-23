@@ -10,7 +10,7 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 
 | Route | Purpose |
 |-------|---------|
-| `GET /manifest.json` | Addon manifest (`resources: stream, catalog, meta`; `types: movie, series`) |
+| `GET /manifest.json` | Addon manifest (`resources: stream, catalog, meta`; `types: movie, series`) — see [Manifest text](#manifest-text) |
 | `GET /catalog/:type/*id` | The user's library as a Stremio catalog |
 | `GET /meta/:type/*id` | Series/movie meta. For series, `videos[]` is built from the library torrent's episodes (`Library.makeVideos`). The manifest declares no `idPrefixes`, so Stremio asks us about other addons' IDs too (`tmdb:series:76747`, `mx:…`): an ID we do not hold answers `null`, never an error — `parseLibraryID` takes season/episode only from a numeric tail, the rest is the series ID |
 | `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it |
@@ -21,6 +21,27 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 anchor rides in the Location header — the only way it survives a login
 round-trip — so anonymous-facing links (the tool-page CTA) point here instead
 of at `/profile#stremio`.
+
+## Manifest text
+
+The description is what Stremio shows on the addon card and what addon
+catalogues list (`services/stremio/manifest.go`). It says what the addon is:
+the user's Webtor library plus the Stremio addons they added to their profile,
+played through Webtor, with the torrent downloaded on Webtor's servers so the
+user's IP does not join the swarm. It promises no speed of its own: "watch
+them instantly" was dropped in 2026-09, because a stream starts once the swarm
+has delivered enough of the file.
+
+The one number it quotes is the free plan's cap, and only from the offer
+catalog: `Builder.WithFreeCap(offers.FreeCapMbps)` in `serve.go` appends
+"Speed depends on your plan: the free one streams at up to 5 Mbit/s." when the
+catalog lists a capped free tier. No catalog (self-hosted) — no sentence; see
+[offers.md](./offers.md).
+
+`manifestVersion` goes up whenever the text changes (0.0.2 → 0.1.0 with this
+one): Stremio keeps the manifest it installed, and the version is what makes
+clients and catalogues refetch it. The `stremioAddonsConfig` signature is
+issued for the addon by its catalogue and was left as it is.
 
 ## Install flow (profile block)
 

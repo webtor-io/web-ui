@@ -5,7 +5,7 @@ leak into search results or be visited by accident:
 
 | Flag | Env | Effect |
 |------|-----|--------|
-| `--staging` | `STAGING` | Forces `X-Robots-Tag: noindex` on **every** response: `IndexFollow` per-route opt-ins and the asset exemptions (favicons, `webtor.jpg`, `sitemap.xml`, `robots.txt`) are all suppressed. |
+| `--staging` | `STAGING` | Forces `X-Robots-Tag: noindex` on **every** response: `IndexFollow` per-route opt-ins and the asset exemptions (favicons, `og-card.png`, `webtor.jpg`, `sitemap.xml`, `robots.txt`) are all suppressed. |
 | `--redirect-domain` | `REDIRECT_DOMAIN` | Any request whose `Host` differs from the canonical host (taken from `DOMAIN`) gets a `302` to `REDIRECT_DOMAIN` + original request URI. Empty = disabled (production). |
 
 Implementation: `services/web/robots.go` (noindex), `services/web/redirect.go`

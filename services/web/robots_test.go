@@ -22,6 +22,8 @@ func TestNoindexDefault(t *testing.T) {
 	r.GET("/apple-touch-icon.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
 	r.GET("/manifest.webmanifest", func(c *gin.Context) { c.String(http.StatusOK, "{}") })
 	r.GET("/webtor.jpg", func(c *gin.Context) { c.String(http.StatusOK, "jpg") })
+	r.GET("/og-card.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
+	r.GET("/pub/og-card.png", func(c *gin.Context) { c.String(http.StatusOK, "png") })
 
 	cases := []struct {
 		path string
@@ -37,6 +39,10 @@ func TestNoindexDefault(t *testing.T) {
 		{"/apple-touch-icon.png", ""},
 		{"/manifest.webmanifest", ""},
 		{"/webtor.jpg", ""},
+		{"/og-card.png", ""},
+		// The og:image is the root path; the /pub/ copy is not advertised
+		// anywhere and keeps the default.
+		{"/pub/og-card.png", "noindex, follow"},
 	}
 	for _, tc := range cases {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
