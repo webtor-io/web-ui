@@ -302,6 +302,18 @@ embedded in `assets/src/styles/comfortaa.css`, Inter 4.1 downloaded once from
 its pinned release and checked against a SHA-256 — the site's embedded Inter
 is an ASCII subset) and encodes them with ffmpeg:
 
+The short way, from the web-ui root — it sets up the venv, renders all eleven
+clips and runs the test that checks them against the locales:
+
+```sh
+make paywall-clips
+make paywall-clips ARGS="--lang ru --frames /tmp/paywall-frames"   # one language, review frames
+make paywall-clips FFMPEG="docker run --rm -v $PWD:$PWD -w $PWD jrottenberg/ffmpeg:8-alpine"
+```
+
+A re-render with unchanged copy is byte-identical (checked 2026-09-23), so an
+unexpected diff in `pub/stremio/` means the copy or the renderer changed. By hand:
+
 ```sh
 python3 -m venv /tmp/paywall-venv
 /tmp/paywall-venv/bin/pip install -r scripts/stremio_paywall_video/requirements.txt
