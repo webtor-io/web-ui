@@ -37,7 +37,11 @@ cap does not apply to the addon. `LinkResolver.ResolveLink` first tries the
 streaming backends the user connected (TorBox, Real-Debrid — any signed-in
 user, for files cached there), then falls back to Webtor's servers, which need
 a paid plan (`requiresPayment`). So the description ends with "Playing through
-Webtor's servers needs a Webtor plan." — true whichever backend the user has.
+Webtor's servers needs a paid Webtor plan." — true whichever backend the user
+has. "Paid" is spelled out because Free is a plan too in Webtor's own words
+(/donate, llms.txt). The landing page (`tool.webtorStremioAddon.description`
+and the third benefit) and llms.txt say the same; none of them names a
+streaming backend.
 
 `manifestVersion` goes up whenever the text changes (0.0.2 → 0.1.0 with this
 one): Stremio keeps the manifest it installed, and the version is what makes
