@@ -118,6 +118,23 @@ func TestNoLocaleHasAnEmptyTranslation(t *testing.T) {
 	}
 }
 
+// TestUTorrentIsSpelledOneWay: the client is "uTorrent" in every locale,
+// its browser version "uTorrent Lite". The vendor's own "µTorrent" (a micro
+// sign, or a Greek mu that looks the same) mixed with "uTorrent" on one page
+// reads as a typo, and people search the ASCII spelling ("utorrent for
+// iphone"), which a search engine need not fold "µ" into. And the compare
+// column labels are set in CSS uppercase, which turns "µ" into a Greek
+// capital mu: "µTorrent Lite" rendered as "ΜTORRENT LITE", read as "MTORRENT".
+func TestUTorrentIsSpelledOneWay(t *testing.T) {
+	for lang, d := range localeFiles(t) {
+		for k, v := range d {
+			if strings.Contains(v, "\u00b5Torrent") || strings.Contains(v, "\u03bcTorrent") {
+				t.Errorf("locales/%s.json: %s spells it µTorrent; write uTorrent", lang, k)
+			}
+		}
+	}
+}
+
 // breakableUnit matches a number (or a template placeholder) followed by a
 // plain space and an abbreviated unit. The rule (docs/i18n.md, "Numbers and
 // units"): that space is a no-break space, U+00A0, so "43 s" and "1.0 MB"

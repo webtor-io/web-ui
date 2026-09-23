@@ -94,10 +94,10 @@ FAQ в `templates/partials/about.html` один на главную и все to
 ссылки на остальные гайды остаются. Новая ссылка из FAQ на гайд —
 только через этот шаблон.
 
-## /watch-torrents-ios: сравнение с µTorrent Lite
+## /watch-torrents-ios: сравнение с uTorrent Lite
 
 Секция `utorrent` отвечает на «utorrent for iphone»: приложения uTorrent в
-App Store нет, у его авторов есть браузерная µTorrent Lite. Колонка Lite
+App Store нет, у его авторов есть браузерная uTorrent Lite. Колонка Lite
 говорит только то, что написано на utorrent.com/lite и в справке BitTorrent
 (проверено 2026-09-23: Safari/Chrome, бесплатно и без рекламы, играет из
 памяти браузера, файлы в папку на устройстве не сохраняет, куски берёт у

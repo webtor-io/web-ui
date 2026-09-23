@@ -91,7 +91,7 @@ var Tools = []Tool{
 	// 19%), so the steps and the checklist cover both, and the free speed
 	// cap is stated (from the catalog) rather than left to be found. The
 	// comparison answers "utorrent for iphone": there is no uTorrent app in
-	// the App Store, and µTorrent Lite — its browser version — ranks next to
+	// the App Store, and uTorrent Lite — its browser version — ranks next to
 	// this page on the core iOS queries (SERP snapshot 2026-09-21). Its
 	// column says only what its own page and help center say (checked
 	// 2026-09-23); recheck them before editing it.
