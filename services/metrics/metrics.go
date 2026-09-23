@@ -65,6 +65,8 @@ type set struct {
 	panics    *prometheus.CounterVec
 	jobs      *prometheus.CounterVec
 	jobsInFly prometheus.Gauge
+	paywall   *prometheus.CounterVec
+	trial     *prometheus.CounterVec
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -95,6 +97,14 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "jobs_in_flight",
 			Help: "Async job scripts currently executing.",
 		}),
+		paywall: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Subsystem: "stremio", Name: "paywall_video_total",
+			Help: "Stremio playback clicks answered with the paywall clip instead of a stream, by clip language and method (HEAD is Stremio's pre-play probe).",
+		}, []string{"lang", "method"}),
+		trial: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Name: "trial_shortlink_total",
+			Help: "Visits to the /trial short link, by where it sent them (checkout, donate, none = nothing on sale) and campaign (paywall, none, other).",
+		}, []string{"target", "campaign"}),
 	}
 }
 
@@ -172,4 +182,36 @@ func JobStarted() {
 func JobFinished(queue, outcome string) {
 	std.jobsInFly.Dec()
 	std.jobs.WithLabelValues(queue, outcome).Inc()
+}
+
+// StremioPaywallVideo counts one playback click answered with the paywall
+// clip. lang is the clip's language — one of the locale codes a clip was
+// rendered for, never the account's raw setting — and method is the request
+// method, bounded like the HTTP series.
+func StremioPaywallVideo(lang, method string) {
+	std.paywall.WithLabelValues(lang, methodLabel(method)).Inc()
+}
+
+// Trial short-link targets and campaigns. Both are closed sets: the campaign
+// is read from a client-supplied utm_campaign, so anything but the one the
+// paywall clip prints collapses into "other".
+const (
+	TrialTargetCheckout = "checkout"
+	TrialTargetDonate   = "donate"
+	TrialTargetNone     = "none"
+)
+
+// TrialShortlink counts one visit to /trial.
+func TrialShortlink(target, utmCampaign string) {
+	std.trial.WithLabelValues(target, campaignLabel(utmCampaign)).Inc()
+}
+
+func campaignLabel(c string) string {
+	switch c {
+	case "":
+		return "none"
+	case "paywall":
+		return "paywall"
+	}
+	return "other"
 }

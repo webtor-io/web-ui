@@ -1,0 +1,4 @@
+pillow==12.3.0
+qrcode==8.2
+fonttools==4.65.0
+brotli==1.2.0

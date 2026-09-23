@@ -25,6 +25,19 @@ test:
 	@docker info >/dev/null 2>&1 || echo "WARNING: docker is not available -- Postgres-backed tests will FAIL (they t.Fatal on the docker dial, they do not skip). A cached green result from an earlier run with docker up can hide that: re-run with -count=1 after docker state changes."
 	go test -ldflags '$(PROTO_CONFLICT_LDFLAGS)' ./...
 
+# Re-render the Stremio paywall clips (pub/stremio/paywall-<lang>.mp4) from the
+# stremio.paywall.* locale keys, then run the test that checks them against the
+# locales (docs/stremio.md, "The paywall clip"). Needs python3 and ffmpeg.
+#   make paywall-clips
+#   make paywall-clips ARGS="--lang ru --frames /tmp/paywall-frames"
+#   make paywall-clips FFMPEG="docker run --rm -v $(CURDIR):$(CURDIR) -w $(CURDIR) jrottenberg/ffmpeg:8-alpine"
+PAYWALL_VENV ?= /tmp/paywall-venv
+paywall-clips:
+	test -x $(PAYWALL_VENV)/bin/python || python3 -m venv $(PAYWALL_VENV)
+	$(PAYWALL_VENV)/bin/pip install -q -r scripts/stremio_paywall_video/requirements.txt
+	$(if $(FFMPEG),FFMPEG="$(FFMPEG)") $(PAYWALL_VENV)/bin/python scripts/stremio_paywall_video/render.py $(ARGS)
+	go test -count=1 -ldflags '$(PROTO_CONFLICT_LDFLAGS)' ./handlers/stremio/ ./handlers/static/
+
 vet:
 	go vet ./...
 

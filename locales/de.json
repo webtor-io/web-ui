@@ -2022,5 +2022,10 @@
     "toast.verificationSent": "Bestätigungslink gesendet",
     "profile.email.resultTitle": "E-Mail-Bestätigung",
     "profile.email.backToProfile": "Zurück zum Profil",
-    "profile.email.tooOften": "Sie haben zu oft einen Bestätigungslink angefordert. Versuchen Sie es in ein paar Minuten erneut."
+    "profile.email.tooOften": "Sie haben zu oft einen Bestätigungslink angefordert. Versuchen Sie es in ein paar Minuten erneut.",
+    "stremio.paywall.title": "Dieser Stream läuft über die Webtor-Server",
+    "stremio.paywall.needsPlan": "Dafür brauchst du einen bezahlten Webtor-Plan",
+    "stremio.paywall.trial": "Starte eine kostenlose Testphase",
+    "stremio.paywall.open": "Scanne den Code oder öffne",
+    "stremio.paywall.sameAccount": "Nutze bei Patreon dieselbe E-Mail-Adresse oder dasselbe Patreon-Konto, mit dem du dich bei Webtor anmeldest – sonst wird der Plan nicht mit deinem Konto verknüpft."
 }

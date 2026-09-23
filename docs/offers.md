@@ -69,6 +69,7 @@ Two rules fall out of this:
 | Cap modal (`action/errors/slow_download.html`) | free capped / paid capped | "watch without the speed cap" / compare plans | `donate-slow-download` |
 | Grace popup (`action/stream_video.html`) | free, after the grace window | "keep watching at full speed" | `donate-grace` |
 | No peers, dead swarm (`action/errors/no_peers.html`) | free, when the plan has Vault | "save to Vault" — never Mbps | `donate-no-peers` |
+| Stremio paywall clip (`handlers/stremio/paywall.go`, `pub/stremio/paywall-<lang>.mp4`) | free, on a stream only Webtor's servers could play; only when the plan has a trial the checkout can start | "start a free trial" at `webtor.io/trial` (→ the plan's checkout) — no numbers, the clip is a static video | none: `stremio paywall video` / `trial shortlink` log lines and `webui_*` counters (docs/stremio.md) |
 | Onboarding locked steps | free | trial length | `onboarding-pro-*` |
 | `/donate` cards | everyone | speed, Vault, trial plaque, RECOMMENDED | `donate-trial-plaque`, `donate-patreon-join` |
 | `/speedtest` plans | everyone | tiers and caps from the catalog | `donate-speedtest` |

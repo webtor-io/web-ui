@@ -245,3 +245,32 @@ func TestMetricNames(t *testing.T) {
 		t.Errorf("metric %s missing", name)
 	}
 }
+
+// The paywall and trial counters take their labels from a request (the
+// method, a client-supplied utm_campaign): both must stay a closed set.
+func TestPaywallAndTrialLabelsAreBounded(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	old := std
+	std = s
+	defer func() { std = old }()
+
+	StremioPaywallVideo("ru", "GET")
+	StremioPaywallVideo("ru", "BREW")
+	TrialShortlink(TrialTargetCheckout, "paywall")
+	TrialShortlink(TrialTargetCheckout, "")
+	TrialShortlink(TrialTargetCheckout, "spring-sale")
+	TrialShortlink(TrialTargetCheckout, "../../etc")
+
+	if got := testutil.ToFloat64(s.paywall.WithLabelValues("ru", "other")); got != 1 {
+		t.Errorf("an unknown method must collapse into other: got %v", got)
+	}
+	for campaign, want := range map[string]float64{"paywall": 1, "none": 1, "other": 2} {
+		if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, campaign)); got != want {
+			t.Errorf("campaign %q: got %v, want %v", campaign, got, want)
+		}
+	}
+	if got := testutil.CollectAndCount(s.trial); got != 3 {
+		t.Errorf("client-chosen campaigns made %d series, want 3", got)
+	}
+}

@@ -2050,5 +2050,10 @@
     "toast.verificationSent": "Ověřovací odkaz odeslán",
     "profile.email.resultTitle": "Ověření e-mailu",
     "profile.email.backToProfile": "Zpět do profilu",
-    "profile.email.tooOften": "Ověřovací odkaz jste si vyžádali příliš mnohokrát. Zkuste to za pár minut."
+    "profile.email.tooOften": "Ověřovací odkaz jste si vyžádali příliš mnohokrát. Zkuste to za pár minut.",
+    "stremio.paywall.title": "Tento stream běží přes servery Webtoru",
+    "stremio.paywall.needsPlan": "K tomu potřebujete placený plán Webtor",
+    "stremio.paywall.trial": "Začněte zkušební období zdarma",
+    "stremio.paywall.open": "Naskenujte kód nebo otevřete",
+    "stremio.paywall.sameAccount": "Na Patreonu použijte stejný e-mail nebo účet Patreon, kterým se přihlašujete do Webtoru, jinak se plán k vašemu účtu nepřiřadí."
 }

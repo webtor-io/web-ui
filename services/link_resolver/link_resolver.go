@@ -84,11 +84,20 @@ func (s *LinkResolver) getUserEnabledBackends(ctx context.Context, userID uuid.U
 	return enabledBackends, nil
 }
 
+// ErrPlanRequired is ResolveLink's answer when none of the user's own
+// backends has the file and Webtor would have to serve it, but the account's
+// tier does not include that. It is the paywall, and nothing else: callers
+// that sell the plan (the Stremio resolve handler) tell it apart from a
+// failure with errors.Is. It used to be a nil result, which read the same as
+// "nothing to play".
+var ErrPlanRequired = errors.New("streaming through webtor requires a paid plan")
+
 // ResolveLink resolves a streaming link for the file at (hash, fileIdx).
 // All backends speak fileIdx directly: Webtor passes it through as a
 // numeric content_id to rest-api, RD/Torbox use it as the index into
 // their own torrent.Files slice. No path lookup is needed anywhere.
-// Returns nil if content is not available or user doesn't have access.
+// Returns ErrPlanRequired when the only way to play the file is Webtor and
+// the user's tier does not cover it.
 func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiClaims *api.Claims, userClaims *claims.Data, hash string, fileIdx int, requiresPayment bool) (*co.LinkResult, error) {
 	log.WithFields(log.Fields{
 		"hash":             hash,
@@ -132,7 +141,7 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 
 	// Fallback to webtor. Free users hit the paywall here.
 	if requiresPayment && !s.isPaidUser(userClaims) {
-		return nil, nil
+		return nil, ErrPlanRequired
 	}
 	url, cached, err := s.webtorBackend.ResolveLink(ctx, apiClaims, hash, fileIdx)
 	if err != nil {
