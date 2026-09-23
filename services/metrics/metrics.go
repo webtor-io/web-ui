@@ -16,6 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/webtor-io/web-ui/services/offer"
 )
 
 const namespace = "webui"
@@ -103,8 +105,8 @@ func newSet(r prometheus.Registerer) *set {
 		}, []string{"lang", "method"}),
 		trial: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace, Name: "trial_shortlink_total",
-			Help: "Visits to the /trial short link, by where it sent them (checkout, donate, none = nothing on sale) and campaign (paywall, none, other).",
-		}, []string{"target", "campaign"}),
+			Help: "Visits to the /trial short link, by where it sent them (checkout, donate, none = nothing on sale), campaign (paywall, none, other) and the site surface the link sat on (from: offer.TrialFroms, none, other).",
+		}, []string{"target", "campaign", "from"}),
 	}
 }
 
@@ -201,9 +203,11 @@ const (
 	TrialTargetNone     = "none"
 )
 
-// TrialShortlink counts one visit to /trial.
-func TrialShortlink(target, utmCampaign string) {
-	std.trial.WithLabelValues(target, campaignLabel(utmCampaign)).Inc()
+// TrialShortlink counts one visit to /trial. utmCampaign and from are the
+// raw query values; both are bounded here — from to a surface a link on the
+// site names (offer.TrialFroms), "none" without one, "other" for the rest.
+func TrialShortlink(target, utmCampaign, from string) {
+	std.trial.WithLabelValues(target, campaignLabel(utmCampaign), offer.TrialFromLabel(from)).Inc()
 }
 
 func campaignLabel(c string) string {

@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
+
+	"github.com/webtor-io/web-ui/services/offer"
 )
 
 func init() {
@@ -257,20 +259,45 @@ func TestPaywallAndTrialLabelsAreBounded(t *testing.T) {
 
 	StremioPaywallVideo("ru", "GET")
 	StremioPaywallVideo("ru", "BREW")
-	TrialShortlink(TrialTargetCheckout, "paywall")
-	TrialShortlink(TrialTargetCheckout, "")
-	TrialShortlink(TrialTargetCheckout, "spring-sale")
-	TrialShortlink(TrialTargetCheckout, "../../etc")
+	TrialShortlink(TrialTargetCheckout, "paywall", "")
+	TrialShortlink(TrialTargetCheckout, "", "")
+	TrialShortlink(TrialTargetCheckout, "spring-sale", "")
+	TrialShortlink(TrialTargetCheckout, "../../etc", "")
 
 	if got := testutil.ToFloat64(s.paywall.WithLabelValues("ru", "other")); got != 1 {
 		t.Errorf("an unknown method must collapse into other: got %v", got)
 	}
 	for campaign, want := range map[string]float64{"paywall": 1, "none": 1, "other": 2} {
-		if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, campaign)); got != want {
+		if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, campaign, "none")); got != want {
 			t.Errorf("campaign %q: got %v, want %v", campaign, got, want)
 		}
 	}
 	if got := testutil.CollectAndCount(s.trial); got != 3 {
 		t.Errorf("client-chosen campaigns made %d series, want 3", got)
+	}
+
+	// from is client-supplied too: a surface of offer.TrialFroms keeps its
+	// name, the rest — "none" typed in by hand included — is "other".
+	s.trial.Reset()
+	for _, from := range offer.TrialFroms {
+		TrialShortlink(TrialTargetCheckout, "", from)
+	}
+	for _, from := range []string{"reddit", "GRACE", "grace ", "none", "other", "../../etc", strings.Repeat("x", 4096)} {
+		TrialShortlink(TrialTargetCheckout, "", from)
+	}
+	TrialShortlink(TrialTargetCheckout, "", "")
+	for _, from := range offer.TrialFroms {
+		if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, "none", from)); got != 1 {
+			t.Errorf("from %q: got %v, want 1", from, got)
+		}
+	}
+	if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, "none", "other")); got != 7 {
+		t.Errorf("unknown from values: got %v in other, want 7", got)
+	}
+	if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, "none", "none")); got != 1 {
+		t.Errorf("no from: got %v in none, want 1", got)
+	}
+	if got, want := testutil.CollectAndCount(s.trial), len(offer.TrialFroms)+2; got != want {
+		t.Errorf("client-chosen from values made %d series, want %d", got, want)
 	}
 }

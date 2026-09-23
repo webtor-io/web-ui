@@ -5,10 +5,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/metrics/metricstest"
@@ -48,7 +52,7 @@ func serve(t *testing.T, o *offer.Offer, target string) *httptest.ResponseRecord
 }
 
 func TestTrialGoesStraightToTheCheckout(t *testing.T) {
-	for _, path := range []string{"/trial", "/ru/trial", "/trial?utm_source=stremio&utm_medium=video&utm_campaign=paywall"} {
+	for _, path := range []string{"/trial", "/ru/trial", "/trial?utm_source=stremio&utm_medium=video&utm_campaign=paywall", "/ru/trial?from=grace", "/trial?from=reddit"} {
 		t.Run(path, func(t *testing.T) {
 			w := serve(t, trialPlan, path)
 			if w.Code != http.StatusFound || w.Header().Get("Location") != checkout {
@@ -70,6 +74,10 @@ func TestTrialWithoutACheckoutGoesToDonate(t *testing.T) {
 		{"/trial", "/donate", map[string]string{"utm_source": "stremio", "utm_medium": "video", "utm_campaign": "paywall"}},
 		{"/ru/trial", "/ru/donate", map[string]string{"utm_source": "stremio", "utm_medium": "video", "utm_campaign": "paywall"}},
 		{"/trial?utm_source=newsletter&utm_content=b&other=x", "/donate", map[string]string{"utm_source": "newsletter", "utm_medium": "video", "utm_campaign": "paywall", "utm_content": "b"}},
+		// A button on the site is not the clip: no clip labels, its own utm
+		// (if any) only, and ?from itself is not passed on.
+		{"/ru/trial?from=grace", "/ru/donate", map[string]string{}},
+		{"/trial?from=reddit&utm_campaign=reddit-x", "/donate", map[string]string{"utm_campaign": "reddit-x"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
@@ -100,7 +108,7 @@ func TestTrialWithoutACheckoutGoesToDonate(t *testing.T) {
 // Nothing on sale — no catalog, as on a self-hosted instance: no trial to
 // point at, and the route is a plain 404, not the resource catch-all.
 func TestTrialWithoutAnOfferIs404(t *testing.T) {
-	for _, path := range []string{"/trial", "/ru/trial"} {
+	for _, path := range []string{"/trial", "/ru/trial", "/trial?from=grace"} {
 		w := serve(t, nil, path)
 		if w.Code != http.StatusNotFound {
 			t.Errorf("%s: status = %d, want 404", path, w.Code)
@@ -116,24 +124,101 @@ func TestTrialIsNoindex(t *testing.T) {
 }
 
 // The visit is the measurement (the provider drops utm parameters), so each
-// one is counted, by where it went and whether it came from the clip.
+// one is counted, by where it went, whether it came from the clip and which
+// button on the site it came from.
 func TestTrialVisitsAreCounted(t *testing.T) {
-	get := func(target, campaign string) float64 {
-		return metricstest.Counter(t, "webui_trial_shortlink_total", map[string]string{"target": target, "campaign": campaign})
+	get := func(target, campaign, from string) float64 {
+		return metricstest.Counter(t, "webui_trial_shortlink_total", map[string]string{"target": target, "campaign": campaign, "from": from})
 	}
-	checkoutPaywall, donateNone, none := get("checkout", "paywall"), get("donate", "none"), get("none", "none")
+	type series struct{ target, campaign, from string }
+	cases := []struct {
+		o    *offer.Offer
+		path string
+		want series
+	}{
+		// The clip's QR code, exactly as scripts/stremio_paywall_video prints
+		// it: still campaign=paywall, and no surface.
+		{trialPlan, "/ru/trial?" + PaywallUTM, series{"checkout", "paywall", "none"}},
+		{trialPlan, "/trial", series{"checkout", "none", "none"}},
+		{trialPlan, "/trial?from=" + offer.FromGrace, series{"checkout", "none", "grace"}},
+		{trialPlan, "/de/trial?from=" + offer.FromPromoBanner, series{"checkout", "none", "promo-banner"}},
+		{trialPlan, "/trial?from=reddit", series{"checkout", "none", "other"}},
+		{&offer.Offer{Tier: "silver"}, "/trial", series{"donate", "none", "none"}},
+		{&offer.Offer{Tier: "silver"}, "/trial?from=" + offer.FromDonate, series{"donate", "none", "donate"}},
+		{nil, "/trial", series{"none", "none", "none"}},
+	}
+	for _, c := range cases {
+		before := get(c.want.target, c.want.campaign, c.want.from)
+		serve(t, c.o, c.path)
+		if d := get(c.want.target, c.want.campaign, c.want.from) - before; d != 1 {
+			t.Errorf("%s: %v moved by %v, want 1", c.path, c.want, d)
+		}
+	}
+}
 
-	serve(t, trialPlan, "/trial?utm_campaign=paywall")
-	serve(t, &offer.Offer{Tier: "silver"}, "/trial")
-	serve(t, nil, "/trial")
+// ?from arrives from the client: whatever it holds, the counter gets a known
+// surface, none or other — never a new series per value.
+func TestTrialFromIsBounded(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		serve(t, trialPlan, "/trial?from=spam-"+strconv.Itoa(i))
+	}
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowed := map[string]bool{offer.TrialFromNone: true, offer.TrialFromOther: true}
+	for _, f := range offer.TrialFroms {
+		allowed[f] = true
+	}
+	for _, f := range families {
+		if f.GetName() != "webui_trial_shortlink_total" {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			for _, l := range m.GetLabel() {
+				if l.GetName() == "from" && !allowed[l.GetValue()] {
+					t.Errorf("from=%q became a label", l.GetValue())
+				}
+			}
+		}
+	}
+}
 
-	if d := get("checkout", "paywall") - checkoutPaywall; d != 1 {
-		t.Errorf("checkout/paywall moved by %v, want 1", d)
+// The log line names the surface like the counter does; an unknown one is
+// kept verbatim, cut short, so a hand-placed link can be found and named.
+func TestTrialLogsTheSurface(t *testing.T) {
+	hook := logtest.NewGlobal()
+	defer hook.Reset()
+	long := strings.Repeat("я", 40) // 80 bytes
+	cases := []struct {
+		path, from, raw string
+	}{
+		{"/trial?from=grace", "grace", ""},
+		{"/trial?" + PaywallUTM, "none", ""},
+		{"/trial?from=reddit-piracy", "other", "reddit-piracy"},
+		{"/trial?from=" + url.QueryEscape(long), "other", strings.Repeat("я", 32)},
 	}
-	if d := get("donate", "none") - donateNone; d != 1 {
-		t.Errorf("donate/none moved by %v, want 1", d)
-	}
-	if d := get("none", "none") - none; d != 1 {
-		t.Errorf("none/none moved by %v, want 1", d)
+	for _, c := range cases {
+		hook.Reset()
+		serve(t, trialPlan, c.path)
+		var e *log.Entry
+		for _, x := range hook.AllEntries() {
+			if x.Message == "trial shortlink" {
+				e = x
+			}
+		}
+		if e == nil {
+			t.Fatalf("%s: no trial shortlink line", c.path)
+		}
+		if e.Data["from"] != c.from {
+			t.Errorf("%s: from=%v, want %q", c.path, e.Data["from"], c.from)
+		}
+		raw, has := e.Data["from_raw"]
+		if c.raw == "" && has {
+			t.Errorf("%s: from_raw=%v for a known surface", c.path, raw)
+		}
+		if c.raw != "" && raw != c.raw {
+			t.Errorf("%s: from_raw=%q, want %q", c.path, raw, c.raw)
+		}
 	}
 }
