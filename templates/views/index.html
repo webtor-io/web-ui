@@ -131,11 +131,25 @@
         <!-- search -->
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="join w-full" data-async-target="main">
             <div class="join-item flex items-center bg-base-300 border border-w-line rounded-l-[14px] flex-1 h-12 focus-within:border-w-pink focus-within:shadow-[0_0_40px_rgba(232,67,147,0.12)] transition-all">
+                {{/* Tool pages say "Open" and show no loupe: the field takes a
+                     magnet or an infohash, and a search affordance is what
+                     brought titles into it (two thirds of refused inputs,
+                     2026-09-23). The home page keeps "Search" for now. The
+                     event name stays "search" so the series is continuous;
+                     the page prop follows the CTA partials. */}}
+                {{ if .Tool }}
+                <svg class="ml-4 shrink-0 text-w-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                {{ else }}
                 <svg class="ml-4 shrink-0 text-w-muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                {{ end }}
                 <input type="text" name="resource" value="{{ if has . "Args" }}{{ .Args.Query }}{{ end }}" placeholder="{{ t $.Lang "home.placeholder" }}" class="input bg-transparent border-0 focus:outline-none flex-1 text-base placeholder:text-w-muted font-sans" required />
             </div>
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />
+            {{ if .Tool }}
+            <button type="submit" class="btn join-item btn-pink px-7 h-12 rounded-r-[14px]" data-umami-event="search" data-umami-event-page="{{ .Tool.Url }}">{{ t $.Lang "home.open" }}</button>
+            {{ else }}
             <button type="submit" class="btn join-item btn-pink px-7 h-12 rounded-r-[14px]" data-umami-event="search">{{ t $.Lang "home.search" }}</button>
+            {{ end }}
         </form>
 
         <!-- divider -->

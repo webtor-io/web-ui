@@ -59,8 +59,8 @@ func TestResolveSharePath(t *testing.T) {
 		},
 		{
 			// Short hex runs inside ordinary URLs must not resolve: the
-			// lenient search-box heuristic (sv.SHA1R {5,40}) turned
-			// "facebook" into btih:faceb.
+			// search box's old lenient heuristic ({5,40}, first match)
+			// turned "facebook" into btih:faceb.
 			name: "shared url with incidental hex run",
 			url:  "https://www.facebook.com/story/123",
 			ok:   false,

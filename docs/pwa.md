@@ -35,8 +35,9 @@ Generated at `assets/dist/night/manifest.webmanifest`, served at
   `/{canonical magnet}` (the existing magnet GET flow); nothing streamable →
   `302 /`.
 - The bare-infohash fallback matches a **strict standalone 40-hex token**
-  (`bareInfohashR`), NOT the search box's lenient `common.SHA1R`
-  (`[0-9a-f]{5,40}`, first match). Share-sheet input is arbitrary text/URLs:
+  (`common.V1HashTokenR`, the rule the search form applies to a pasted URL),
+  NOT the lenient `[0-9a-f]{5,40}` first match the search box used until
+  2026-09 (see `docs/user_errors.md`, "What the form accepts"). Share-sheet input is arbitrary text/URLs:
   under the lenient regex nearly every shared link resolved to a bogus magnet
   (`facebook.com/story/123` → `btih:faceb`), the home fallback was dead code,
   and a v2-only `btmh` digest mid-string got truncated to a valid-looking but

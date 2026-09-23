@@ -1,8 +1,11 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/webtor-io/web-ui/services/common"
 )
 
 // UserError wraps an i18n key with the original error for logging.
@@ -36,6 +39,27 @@ func ClassifyError(err error) string {
 	msg := err.Error()
 
 	switch {
+	// --- what was pasted into the form. First, and by identity rather than
+	// by text: the query is part of the message ("wrong resource provided
+	// query=..."), so a title like "Unavailable" or a magnet named
+	// "...Access.Denied..." must not read as a backend outage or a ban ---
+
+	case errors.Is(err, common.ErrMagnetInvalid),
+		errors.Is(err, common.ErrMagnetNoHash):
+		return "error.magnet_invalid"
+
+	case errors.Is(err, common.ErrV2Only):
+		return "error.v2_hash"
+
+	case errors.Is(err, common.ErrQueryWebPage):
+		return "error.webpage_url"
+
+	case errors.Is(err, common.ErrQueryTorrentURL):
+		return "error.torrent_url"
+
+	case errors.Is(err, common.ErrQueryFreeText):
+		return "error.free_text"
+
 	case strings.Contains(msg, "PermissionDenied"),
 		strings.Contains(msg, "access is forbidden"),
 		strings.Contains(msg, "restricted by the rightholder"):
@@ -53,6 +77,15 @@ func ClassifyError(err error) string {
 		// Backend/auth-DB blip: claims-provider, SuperTokens core or the
 		// app DB is transiently unreachable. Transient, retry-able.
 		return "error.service_unavailable"
+
+	case strings.Contains(msg, "failed to parse magnet"):
+		// The link itself is broken (infohash cut short, wrong encoding):
+		// nothing on the network will change that. Above "wrong resource
+		// provided", which is how the form wraps it — below it, every broken
+		// magnet read "Invalid link or torrent file" instead. The typed
+		// ErrMagnetInvalid above covers our own parser; this covers the same
+		// text arriving from elsewhere (rest-api, magnet2torrent).
+		return "error.magnet_invalid"
 
 	case strings.Contains(msg, "wrong resource provided"),
 		strings.Contains(msg, "no resource provided"):
@@ -84,12 +117,8 @@ func ClassifyError(err error) string {
 	case strings.Contains(msg, "failed to validate"):
 		return "error.validation_failed"
 
-	// --- magnet resolution: before the chain, it is the step that precedes it ---
-
-	case strings.Contains(msg, "failed to parse magnet"):
-		// The link itself is broken (infohash cut short, wrong encoding):
-		// nothing on the network will change that.
-		return "error.magnet_invalid"
+	// --- magnet resolution: before the chain, it is the step that precedes
+	// it. A broken link ("failed to parse magnet") is matched further up ---
 
 	case strings.Contains(msg, "failed to magnetize"),
 		strings.Contains(msg, "magnet timeout"):
@@ -156,7 +185,8 @@ func StatusForErrKey(key string) int {
 		return http.StatusUnauthorized
 	case "error.service_unavailable", "error.upstream_unavailable":
 		return http.StatusServiceUnavailable
-	case "error.magnet_invalid", "error.turnstile_failed":
+	case "error.magnet_invalid", "error.turnstile_failed",
+		"error.free_text", "error.webpage_url", "error.torrent_url", "error.v2_hash":
 		return http.StatusBadRequest
 	case "error.magnet_no_metadata":
 		// Nothing answered upstream within the deadline: a gateway timeout,

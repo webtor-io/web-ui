@@ -2,20 +2,18 @@ package resource
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	sv "github.com/webtor-io/web-ui/services/common"
 )
 
-// bareInfohashR matches a standalone 40-hex v1 infohash token. Deliberately
-// stricter than the search box's sv.SHA1R ({5,40}, first match): share-sheet
-// input is arbitrary text and URLs, where a lenient match turns nearly any
-// shared link into a bogus magnet ("facebook.com/story/123" → btih:faceb) and
-// truncates v2-only btmh digests into syntactically-valid-but-nonexistent v1
-// hashes. The \b guards also reject hex runs embedded in longer hex strings.
-var bareInfohashR = regexp.MustCompile(`(?i)\b[0-9a-f]{40}\b`)
+// The bare-infohash fallback is sv.V1HashTokenR, a standalone 40-hex token —
+// the same rule the search form applies to a pasted URL. Share-sheet input is
+// arbitrary text and URLs, where the old lenient {5,40} first match turned
+// nearly any shared link into a bogus magnet ("facebook.com/story/123" →
+// btih:faceb) and truncated v2-only btmh digests into syntactically valid but
+// nonexistent v1 hashes.
 
 // share is the Web Share Target endpoint (manifest share_target): an
 // installed PWA receives shared text from the Android share sheet here.
@@ -41,7 +39,7 @@ func resolveSharePath(title, text, url string) (string, bool) {
 		}
 	}
 	for _, cand := range candidates {
-		if h := bareInfohashR.FindString(cand); h != "" {
+		if h := sv.V1HashTokenR.FindString(cand); h != "" {
 			return "/magnet:?xt=urn:btih:" + strings.ToLower(h), true
 		}
 	}

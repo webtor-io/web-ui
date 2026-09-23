@@ -68,6 +68,7 @@
 | `services/template.TestAboutSnapshots` | правка `sections.html` тихо меняет разметку всех 18 страниц. Снапшоты в `services/template/testdata/about/`; `go test ./services/template/ -run TestAbout -update` перезаписывает их — **читать диф, а не обновлять вслепую** |
 | `services/template.TestAboutCopyExistsInEveryLocale` | ключ, который страница реально рендерит, отсутствует в каком-то языке (на SEO-странице это выводит сырой ключ). Список ключей берётся из отрендеренной разметки, а не из догадки о том, что просит шаблон |
 | `services/template.TestAboutPartialsUseTheirOwnKeys` | страница рендерит чужой префикс |
+| `services/template.TestIndexFormSaysOpenOnToolPagesOnly` | поле ввода в hero: на tool-страницах кнопка `home.open` («Open»), стрелка вместо лупы и `data-umami-event-page=<url>`; на главной — прежние `home.search` и лупа. Событие Umami на обеих — `search`. Почему — `docs/user_errors.md`, «What the form accepts» |
 
 Снапшоты, которыми обложен рефакторинг 2026-08-15, сняты **до** него: все 18
 страниц после перехода на секции рендерятся байт-в-байт (с точностью до

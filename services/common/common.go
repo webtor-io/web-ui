@@ -1,6 +1,9 @@
 package common
 
 import (
+	"encoding/base32"
+	"encoding/hex"
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -12,38 +15,177 @@ import (
 	"github.com/urfave/cli"
 )
 
+// SHA1R is a sanity check that a resource id from the URL carries some hex
+// (handlers/resource/get.go); it is not a parser. What a person pastes into
+// the form goes through ResolveQueryHash, which is strict: a 5-hex run is how
+// "S01E02" and every URL with a numeric id used to become a bogus infohash.
 var SHA1R = regexp.MustCompile("(?i)[0-9a-f]{5,40}")
 
-// ResolveQueryHash resolves a user query (magnet URI, bare infohash or text
-// containing one) to a lowercase v1 infohash plus a magnet URI safe to pass
-// downstream. Hybrid magnets may list urn:btmh before urn:btih, and both
-// SHA1R first-match extraction and magnet2torrent's parser take the first xt,
-// so the magnet is rebuilt with the v1 hash only.
+// V1HashTokenR matches a standalone 40-hex v1 infohash inside a longer string:
+// the \b guards reject a run cut out of a longer hex string (a 64-hex v2
+// digest must not become its first 40 characters).
+var V1HashTokenR = regexp.MustCompile(`(?i)\b[0-9a-f]{40}\b`)
+
+// magnetInTextR finds a magnet pasted with something around it
+// ("url=magnet:?xt=…", a line copied from a forum); it runs to the first
+// whitespace.
+var magnetInTextR = regexp.MustCompile(`(?i)magnet:\?\S*`)
+
+// What ResolveQueryHash can say about a query it cannot use. Each one has its
+// own message: web.ClassifyError matches them with errors.Is, through every
+// wrapper, so a title that happens to contain "Unavailable" is not read as a
+// backend outage. ErrQueryFreeText keeps the wording the logs have always
+// carried for this case.
+var (
+	ErrMagnetInvalid   = errors.New("failed to parse magnet")
+	ErrMagnetNoHash    = errors.New("no infohash found in magnet")
+	ErrV2Only          = errors.New("v2-only infohash (btmh) is not supported, a v1 btih infohash is required")
+	ErrQueryWebPage    = errors.New("query is a link to a web page, not to a torrent")
+	ErrQueryTorrentURL = errors.New("query is a link to a .torrent file, which is not fetched")
+	ErrQueryFreeText   = errors.New("no infohash found in query")
+)
+
+// ResolveQueryHash resolves a user query to a lowercase v1 infohash plus a
+// magnet URI safe to pass downstream. It accepts, after trimming:
+//
+//   - a magnet URI, also one inside other text ("url=magnet:?…");
+//   - the whole query being a v1 infohash: 40 hex or 32 base32, any case;
+//   - an http(s) URL carrying a standalone 40-hex infohash (a resource page
+//     link, a .torrent cache that names files by hash).
+//
+// Everything else is refused with an error that says what it was (see the
+// Err* values above). Free text is never searched for a hash: that is what
+// turned "S01E02" into btih:01e02 and a dead-magnet card a minute later.
+//
+// Hybrid magnets may list urn:btmh before urn:btih, and magnet2torrent's
+// parser takes the first xt, so the magnet is rebuilt with the v1 hash only.
 func ResolveQueryHash(query string) (hash string, magnet string, err error) {
-	if strings.HasPrefix(query, "magnet:") {
-		// The /magnet route reassembles the URI as path + RawQuery, losing "?"
-		if !strings.HasPrefix(query, "magnet:?") {
-			query = "magnet:?" + strings.TrimPrefix(query, "magnet:")
-		}
-		m, err := metainfo.ParseMagnetV2Uri(query)
-		if err != nil {
-			return "", "", errors.Wrap(err, "failed to parse magnet")
-		}
-		if !m.InfoHash.Ok {
-			if m.V2InfoHash.Ok {
-				return "", "", errors.New("v2-only (btmh) magnets are not supported, use a magnet with a btih infohash or upload the .torrent file")
-			}
-			return "", "", errors.New("no infohash found in magnet")
-		}
-		m.V2InfoHash = g.Option[infohash_v2.T]{}
-		return m.InfoHash.Value.HexString(), m.String(), nil
+	query = strings.TrimSpace(query)
+	if hasPrefixFold(query, "magnet:") {
+		return resolveMagnet(query)
 	}
-	h := SHA1R.Find([]byte(query))
-	if h == nil {
-		return "", "", errors.New("no infohash found in query")
+	if m := magnetInTextR.FindString(query); m != "" {
+		return resolveMagnet(m)
 	}
-	hash = strings.ToLower(string(h))
-	return hash, "magnet:?xt=urn:btih:" + hash, nil
+	if h, ok := bareV1Hash(query); ok {
+		return h, "magnet:?xt=urn:btih:" + h, nil
+	}
+	if isV2Digest(query) {
+		return "", "", ErrV2Only
+	}
+	if isWebURL(query) {
+		if h := V1HashTokenR.FindString(query); h != "" {
+			h = strings.ToLower(h)
+			return h, "magnet:?xt=urn:btih:" + h, nil
+		}
+		if isTorrentFileURL(query) {
+			return "", "", ErrQueryTorrentURL
+		}
+		return "", "", ErrQueryWebPage
+	}
+	return "", "", ErrQueryFreeText
+}
+
+func resolveMagnet(query string) (hash string, magnet string, err error) {
+	// The /magnet route reassembles the URI as path + RawQuery, losing "?"
+	query = "magnet:?" + strings.TrimPrefix(query[len("magnet:"):], "?")
+	m, err := metainfo.ParseMagnetV2Uri(upperBase32Btih(query))
+	if err != nil {
+		return "", "", fmt.Errorf("%w: %w", ErrMagnetInvalid, err)
+	}
+	if !m.InfoHash.Ok {
+		if m.V2InfoHash.Ok {
+			return "", "", ErrV2Only
+		}
+		return "", "", ErrMagnetNoHash
+	}
+	m.V2InfoHash = g.Option[infohash_v2.T]{}
+	return m.InfoHash.Value.HexString(), m.String(), nil
+}
+
+// upperBase32Btih upper-cases a 32-character (base32) btih. The library
+// decodes it with base32.StdEncoding, which knows only the upper-case
+// alphabet, and some sites print it in lower case: on 2026-09-23, 17 such
+// magnets (35 submits) were refused as broken although they were not.
+func upperBase32Btih(query string) string {
+	u, err := url.Parse(query)
+	if err != nil {
+		return query
+	}
+	q := u.Query()
+	changed := false
+	for i, xt := range q["xt"] {
+		if h, ok := strings.CutPrefix(xt, "urn:btih:"); ok && len(h) == 32 && h != strings.ToUpper(h) {
+			q["xt"][i] = "urn:btih:" + strings.ToUpper(h)
+			changed = true
+		}
+	}
+	if !changed {
+		return query
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// bareV1Hash reports whether the whole string is a v1 infohash — 40 hex or
+// 32 base32, any case, optionally as a bare "urn:btih:" value — and returns
+// it as lowercase hex.
+func bareV1Hash(s string) (string, bool) {
+	s = trimPrefixFold(s, "urn:btih:")
+	switch len(s) {
+	case 40:
+		if _, err := hex.DecodeString(s); err == nil {
+			return strings.ToLower(s), true
+		}
+	case 32:
+		if b, err := base32.StdEncoding.DecodeString(strings.ToUpper(s)); err == nil && len(b) == 20 {
+			return hex.EncodeToString(b), true
+		}
+	}
+	return "", false
+}
+
+// isV2Digest reports whether the whole string is a v2 (SHA-256) infohash:
+// 64 hex, or the 68-hex multihash a btmh carries (1220 + digest).
+func isV2Digest(s string) bool {
+	s = trimPrefixFold(s, "urn:btmh:")
+	if len(s) == 68 && strings.HasPrefix(s, "1220") {
+		s = s[4:]
+	}
+	if len(s) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
+}
+
+func isWebURL(s string) bool {
+	return hasPrefixFold(s, "http://") || hasPrefixFold(s, "https://") || hasPrefixFold(s, "www.")
+}
+
+// isTorrentFileURL reports whether a web URL points at a .torrent file. The
+// form does not fetch it (the embed does, from its own settings); the person
+// is told to download the file and upload it.
+func isTorrentFileURL(s string) bool {
+	if hasPrefixFold(s, "www.") {
+		s = "http://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(u.Path), ".torrent")
+}
+
+func hasPrefixFold(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+}
+
+func trimPrefixFold(s, prefix string) string {
+	if hasPrefixFold(s, prefix) {
+		return s[len(prefix):]
+	}
+	return s
 }
 
 var (
