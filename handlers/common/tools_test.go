@@ -175,7 +175,7 @@ func TestStremioAddonLandingSaysThePlanIsPaid(t *testing.T) {
 
 // /watch-torrents-ios says only what its sources say. Safari's compact layout
 // hides Share behind ••• (Apple Support, 2026-09), so every locale names both
-// taps. µTorrent Lite's own page lists iPadOS, not iPhone, among the
+// taps. uTorrent Lite's own page lists iPadOS, not iPhone, among the
 // platforms it supports; the comparison quotes that list instead of offering
 // Lite as an iPhone app.
 func TestIOSGuideKeepsToItsSources(t *testing.T) {
