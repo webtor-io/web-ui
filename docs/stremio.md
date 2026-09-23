@@ -32,11 +32,12 @@ user's IP does not join the swarm. It promises no speed of its own: "watch
 them instantly" was dropped in 2026-09, because a stream starts once the swarm
 has delivered enough of the file.
 
-The one number it quotes is the free plan's cap, and only from the offer
-catalog: `Builder.WithFreeCap(offers.FreeCapMbps)` in `serve.go` appends
-"Speed depends on your plan: the free one streams at up to 5 Mbit/s." when the
-catalog lists a capped free tier. No catalog (self-hosted) — no sentence; see
-[offers.md](./offers.md).
+It quotes no plan numbers, and in particular not the site's free-plan cap: that
+cap does not apply to the addon. `LinkResolver.ResolveLink` first tries the
+streaming backends the user connected (TorBox, Real-Debrid — any signed-in
+user, for files cached there), then falls back to Webtor's servers, which need
+a paid plan (`requiresPayment`). So the description ends with "Playing through
+Webtor's servers needs a Webtor plan." — true whichever backend the user has.
 
 `manifestVersion` goes up whenever the text changes (0.0.2 → 0.1.0 with this
 one): Stremio keeps the manifest it installed, and the version is what makes

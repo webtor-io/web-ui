@@ -569,8 +569,7 @@ func serve(c *cli.Context) error {
 	torznabTitles := torznab.NewCinemetaTitles(torznabCl.HTTP(), c.String(torznab.UserAgentFlag))
 	torznabValidator := torznab.NewValidator(torznabCl)
 
-	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper, torznabCl, torznabTitles).
-		WithFreeCap(offers.FreeCapMbps)
+	sb := stremios.NewBuilder(c, pg, stremioAddonCl, sapi, requestURLMapper, torznabCl, torznabTitles)
 
 	// Setting AI Recommendations (Discover)
 	//
