@@ -588,153 +588,357 @@ input:-webkit-autofill:focus {
   padding-right: 0.08em;
 }
 
-/* Slow breathing of the hero backlight, plus a soft drift toward the pointer.
-   The animation touches `scale`/`opacity` only and the pointer offset lives on
-   `transform` — both are independent of the `translate` property, so Tailwind's
-   `-translate-x-1/2` (v4 emits it via `translate`) survives untouched. */
-.hero-glow {
-  /* A hint of warm amber in the innermost stop — at 6% alpha it never reads as
-     a colour of its own, it just keeps the core from looking like cold screen
-     light. The pink/violet body of the gradient is unchanged. */
-  background: radial-gradient(circle, rgba(255,186,120,0.06) 0%, rgba(232,67,147,0.1) 16%, rgba(108,92,231,0.05) 40%, transparent 70%);
-  /* Two animations on disjoint properties: a very slow size drift so the light
-     is never mechanically static, and a brightness track that mostly just
-     holds — the filament reads as burning steadily, with the odd short sag. */
-  /* the level the flicker track holds; also what stays when animations are off */
-  opacity: 0.72;
-  animation:
-    hero-glow-breathe 23s ease-in-out infinite,
-    hero-glow-flicker 9.7s linear infinite;
-  /* The pointer offset rides on `transform`, which composes after the
-     individual `translate`/`scale` properties — so it stacks on top of
-     Tailwind's -translate-x-1/2 and the breathing scale instead of
-     fighting them. --hx/--hy are published by lib/heroPointer. */
-  transform: translate3d(calc(var(--hx, 0) * 46px), calc(var(--hy, 0) * 34px), 0);
-  will-change: opacity, scale, transform;
-}
-/* Size only, and barely: the halo swells a few percent over 23s. Brightness is
-   left entirely to the flicker track below. */
-@keyframes hero-glow-breathe {
-  0%, 100% { scale: 1; }
-  47%      { scale: 1.05; }
-}
-/* Incandescent bulb on a slightly unstable mains: the level sits at 0.72 for
-   most of the cycle and only sags for a few tenths of a second at a time. The
-   dips are deliberately uneven — one lone sag, one double stutter, one short
-   surge — because an evenly spaced blink reads as a pulse animation. */
-@keyframes hero-glow-flicker {
-  0%, 11%       { opacity: 0.72; }
-  12%           { opacity: 0.6; }
-  13.2%         { opacity: 0.72; }
-  40%           { opacity: 0.72; }
-  40.8%         { opacity: 0.64; }
-  41.6%         { opacity: 0.71; }
-  42.6%         { opacity: 0.57; }
-  44%           { opacity: 0.72; }
-  67%           { opacity: 0.72; }
-  68%           { opacity: 0.8; }
-  69.5%         { opacity: 0.72; }
-  88%           { opacity: 0.72; }
-  88.9%         { opacity: 0.63; }
-  90%, 100%     { opacity: 0.72; }
-}
-/* Warm core on its own, non-harmonic flicker period. The nested opacity
-   multiplies with the parent's, so the two tracks never line up — the glow
-   keeps drifting slightly in colour temperature instead of just in size. */
-.hero-glow::after {
-  content: "";
-  position: absolute;
-  inset: 16%;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(255,183,110,0.08) 0%, rgba(232,67,147,0.05) 45%, transparent 72%);
-  animation: hero-glow-ember 13.3s linear infinite;
-  animation-delay: -4s;
-}
-@keyframes hero-glow-ember {
-  0%, 29%   { opacity: 0.9; }
-  30.2%     { opacity: 0.7; }
-  31.5%     { opacity: 0.9; }
-  74%       { opacity: 0.9; }
-  75%       { opacity: 0.72; }
-  75.8%     { opacity: 0.88; }
-  76.9%     { opacity: 0.66; }
-  78.5%     { opacity: 0.9; }
-  100%      { opacity: 0.9; }
-}
-
 .cta-glow {
   background: radial-gradient(circle, rgba(232,67,147,0.18) 0%, rgba(232,67,147,0.06) 40%, transparent 70%);
 }
 
-/* Ambient wave lines drifting behind the hero slogan. Each svg is 200%
-   wide and holds a path that is periodic across half its viewBox, so a
-   translateX(-50%) loop tiles seamlessly. Layers share one direction at
-   different speeds (negative delays de-phase them) to read as slow
-   current, not oscillation. */
+/* ===== Hero backdrop =====
+   Everything the hero draws behind its type, in paint order:
+
+     .hero-backdrop   section level — partials/hero_wave.html "hero_backdrop"
+       .hero-lamp       warm light behind logo and badge that spills pink/violet
+                        onto the wave band; ::after is the amber filament
+       .hero-film       warm vignette; ::before is the one film-grain layer
+       .hero-bloom      the veil bright type leaves on film (halation)
+       .hero-stars      soft stars above the headline; ::before holds the static ones
+     .hero-wave       inside the h1 wrapper — partials/hero_wave.html "hero_wave"
+                      vector waves + pixel dust, centred on the h1 by construction
+
+   plus halation on the type itself (.hero-logo, .hero-title).
+
+   Geometry hangs off the section's 120px top padding and the logo size
+   (clamp(4rem, 10vw, 6.5rem)), never off the headline text, so every locale
+   and every tool page gets the same backdrop. --hx/--hy (pointer offset from
+   the hero centre, -1..1) are published on the <section> by lib/heroPointer.
+
+   Motion: only opacity / transform / scale / translate animate, so all of it
+   runs on the compositor. Light changes are slow smooth breaths on pairwise
+   non-harmonic periods (lamp 27s + 23s swell, filament 17s, bloom 19s + 31s,
+   stars 21/29/37s). No flicker and no short sags: on a video site a light
+   that dips for a few tenths of a second reads as the stream buffering.
+   Negative delays of a quarter period start each breath at its mid level.
+
+   The backdrop was tuned with a 70% dimmer; that factor is baked into the
+   numbers below (".602 = .86 × .7"), there is no wrapper opacity group. */
+
+/* Height of the hero's first screen (logo → search box). The film's vignette
+   and bottom fade are laid out in it; the section itself is much taller
+   (dropzone, ribbons), so the backdrop cannot simply be inset:0.
+   The light that belongs behind the waves is not here: it lives in
+   .hero-band-light next to the wave band, so it stays behind the waves
+   whatever the headline's line count, locale or page. */
+.hero-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 866px;
+  pointer-events: none;
+}
+
+/* Lamp: the warm body behind logo and badge. (Its low pink/violet spill
+   across the wave band is .hero-band-light.) transform-origin keeps the
+   scale centre of the original 820px box, so the swell moves the light
+   exactly as before. */
+.hero-lamp {
+  position: absolute;
+  left: 50%;
+  top: -60px;
+  width: 2000px;
+  height: 680px;
+  margin-left: -1000px;
+  transform-origin: 50% 410px;
+  background:
+    radial-gradient(540px 330px at 50% 305px, rgba(255,162,112,.11) 0%, rgba(248,112,138,.085) 20%, rgba(232,67,147,.05) 44%, rgba(108,92,231,.02) 72%, rgba(108,92,231,0) 100%);
+  opacity: .602; /* .86 × .7 — the level the breath is centred on */
+  /* the logo offset rides on `translate`, the pointer on `transform`, the
+     swell on `scale`, the breath on `opacity` — independent properties */
+  transform: translate3d(calc(var(--hx, 0) * 46px), calc(var(--hy, 0) * 34px), 0);
+  animation:
+    hero-lamp-swell 23s ease-in-out infinite,
+    hero-lamp-breathe 27s ease-in-out -6.75s infinite;
+  will-change: opacity, scale, transform;
+}
+/* Filament: a small amber core just under the logo, breathing on its own
+   period. Its opacity multiplies with the lamp's, so the two drift slightly
+   in colour temperature instead of pulsing together. */
+.hero-lamp::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 152px;
+  width: 600px;
+  height: 240px;
+  margin-left: -300px;
+  background: radial-gradient(closest-side, rgba(255,188,124,.14) 0%, rgba(255,152,104,.075) 34%, rgba(242,104,128,.03) 66%, rgba(242,104,128,0) 100%);
+  opacity: .9;
+  animation: hero-filament-breathe 17s ease-in-out -4.25s infinite;
+}
+@keyframes hero-lamp-swell {
+  0%, 100% { scale: 1; }
+  47%      { scale: 1.05; }
+}
+/* ±3.5% around .602: felt as the light being alive, never seen as a change */
+@keyframes hero-lamp-breathe {
+  0%, 100% { opacity: .623; }
+  50%      { opacity: .581; }
+}
+@keyframes hero-filament-breathe {
+  0%, 100% { opacity: .94; }
+  50%      { opacity: .86; }
+}
+
+/* Film: warm vignette on the top corners and sides, faded out over the lower
+   third so the hero meets the rest of the page without a seam. Static. The
+   grain is the film's ::before, so it shares this fade. */
+.hero-film {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(64% 78% at 50% 34%, transparent 50%, rgba(12,7,4,.238) 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 97%);
+  mask-image: linear-gradient(180deg, #000 62%, transparent 97%);
+}
+/* The one grain layer. A static feTurbulence tile (~1.2 CSS px features),
+   two-tone from one noise channel: dark specks in the page colour, which only
+   show where there is light to take away, and sparse warm-white specks. Its
+   mask is a 72% floor everywhere plus two bumps where the lamp is
+   brightest (under the logo, and the spill on the band), so the texture is
+   ~1.4× stronger in the light than in the dark sky (fitted to the lamp grain
+   + film grain pair it replaces: same spread and bright tail per region). Never transformed: a
+   sub-pixel move would resample the grain into mush. */
+.hero-film::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='discrete' tableValues='.04 1'/%3E%3CfeFuncG type='discrete' tableValues='.055 .9'/%3E%3CfeFuncB type='discrete' tableValues='.1 .8'/%3E%3CfeFuncA type='table' tableValues='.5 .4 .3 .2 .1 0 .021 .046 .07 .085 .097'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E") 0 0 / 256px 256px repeat;
+  opacity: .7;
+  -webkit-mask-image:
+    linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+    radial-gradient(560px 320px at 50% 228px, #000, rgba(0,0,0,.55) 45%, transparent),
+    radial-gradient(760px 180px at 50% 395px, rgba(0,0,0,.4), transparent);
+  mask-image:
+    linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+    radial-gradient(560px 320px at 50% 228px, #000, rgba(0,0,0,.55) 45%, transparent),
+    radial-gradient(760px 180px at 50% 395px, rgba(0,0,0,.4), transparent);
+}
+
+/* Bloom: warm around the logo (centre y=167) and a faint pink/violet ambient
+   below it. (The wide low part under the h1 is .hero-band-light.) */
+.hero-bloom {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1200px;
+  height: 660px;
+  margin-left: -600px;
+  background:
+    radial-gradient(280px 110px at 50% 167px, rgba(255,132,88,.1), rgba(246,92,112,.05) 46%, rgba(232,67,147,.018) 74%, transparent),
+    radial-gradient(620px 340px at 50% 270px, rgba(232,67,147,.035), rgba(108,92,231,.016) 50%, transparent 85%);
+  opacity: .63; /* .9 × .7 */
+  transform: translate3d(calc(var(--hx, 0) * 14px), calc(var(--hy, 0) * 10px), 0);
+  animation:
+    hero-bloom-breathe 19s ease-in-out infinite,
+    hero-bloom-swell 31s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+/* uneven on purpose: an evenly spaced swell reads as a pulse (×.7 baked) */
+@keyframes hero-bloom-breathe {
+  0%, 100% { opacity: .63; }
+  38%      { opacity: .7; }
+  61%      { opacity: .574; }
+  80%      { opacity: .665; }
+}
+@keyframes hero-bloom-swell {
+  0%, 100% { scale: 1; }
+  52%      { scale: 1.035; }
+}
+
+/* Stars in the sky above the headline. The sky ends just above the h1 at any
+   logo size (h1 top = 208px + logo). Fourteen static stars are one painted
+   background; six breathe in three pairs, each star its own 7-8px element,
+   so a breath composites two tiny layers instead of a full-width one.
+   Breathing stars sit at --x/--y of the free width/height, the same
+   placement background-position percentages give the static ones. */
+.hero-stars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(196px + clamp(64px, 10vw, 104px));
+  transform: translate3d(calc(var(--hx, 0) * -5px), calc(var(--hy, 0) * -4px), 0);
+  will-change: transform;
+}
+.hero-stars::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(closest-side, rgba(255,238,222,.154), rgba(255,238,222,.057) 32%, rgba(255,238,222,0)) 3% 26% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(205,200,255,.126), rgba(205,200,255,.047) 32%, rgba(205,200,255,0)) 8% 64% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(253,190,214,.112), rgba(253,190,214,.041) 32%, rgba(253,190,214,0)) 12% 12% / 6px 6px no-repeat,
+    radial-gradient(closest-side, rgba(255,238,222,.14), rgba(255,238,222,.052) 32%, rgba(255,238,222,0)) 16% 44% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(205,200,255,.105), rgba(205,200,255,.039) 32%, rgba(205,200,255,0)) 24% 6% / 6px 6px no-repeat,
+    radial-gradient(closest-side, rgba(255,238,222,.126), rgba(255,238,222,.047) 32%, rgba(255,238,222,0)) 30% 30% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(255,238,222,.098), rgba(255,238,222,.036) 32%, rgba(255,238,222,0)) 47% 20% / 6px 6px no-repeat,
+    radial-gradient(closest-side, rgba(253,190,214,.098), rgba(253,190,214,.036) 32%, rgba(253,190,214,0)) 58% 5% / 6px 6px no-repeat,
+    radial-gradient(closest-side, rgba(205,200,255,.126), rgba(205,200,255,.047) 32%, rgba(205,200,255,0)) 67% 34% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(255,238,222,.154), rgba(255,238,222,.057) 32%, rgba(255,238,222,0)) 80% 16% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(255,238,222,.112), rgba(255,238,222,.041) 32%, rgba(255,238,222,0)) 86% 72% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(253,190,214,.112), rgba(253,190,214,.041) 32%, rgba(253,190,214,0)) 88% 46% / 6px 6px no-repeat,
+    radial-gradient(closest-side, rgba(205,200,255,.14), rgba(205,200,255,.052) 32%, rgba(205,200,255,0)) 95% 28% / 7px 7px no-repeat,
+    radial-gradient(closest-side, rgba(253,190,214,.091), rgba(253,190,214,.034) 32%, rgba(253,190,214,0)) 5% 90% / 6px 6px no-repeat;
+}
+.hero-stars i {
+  position: absolute;
+  left: calc((100% - var(--z)) * var(--x));
+  top: calc((100% - var(--z)) * var(--y));
+  width: var(--z);
+  height: var(--z);
+  background: radial-gradient(closest-side, rgb(var(--c) / var(--a)), rgb(var(--c) / calc(var(--a) * .37)) 30%, rgb(var(--c) / 0));
+  opacity: .5;
+  animation: hero-star-breathe var(--d) ease-in-out var(--t) infinite;
+}
+/* slow and never to zero: a breath, not a twinkle */
+@keyframes hero-star-breathe {
+  0%, 100% { opacity: .35; }
+  50%      { opacity: 1; }
+}
+
+/* Halation on the bright type: tight red-orange rim, mid halo, faint wide
+   bloom — static, em-based so it follows the clamp() font sizes. Highlights
+   print slightly warm, hence cream instead of white (contrast goes up).
+   Hooked on classes of the hero's own logo and h1; the navbar logo shares
+   none of them. */
+.hero-logo {
+  color: #fdf6ee;
+  text-shadow:
+    0 0 .04em rgba(255,92,52,.55),
+    0 0 .13em rgba(255,104,64,.32),
+    0 0 .4em rgba(255,120,84,.15);
+}
+.hero-title {
+  color: #fdf6ee;
+  text-shadow:
+    0 0 .05em rgba(255,90,54,.4),
+    0 0 .18em rgba(255,104,70,.18),
+    0 0 .5em rgba(255,116,84,.08);
+}
+/* background-clip:text would get the inherited text-shadow painted OVER its
+   fill, so the gradient line takes its halo from drop-shadow instead */
+.hero-title .gradient-text {
+  text-shadow: none;
+  filter: drop-shadow(0 0 .05em rgba(255,84,100,.4)) drop-shadow(0 0 .22em rgba(255,100,110,.14));
+}
+
+/* Band light: the lamp's low pink/violet spill and the bloom's wide warm
+   veil under the headline, anchored to the wave band (same centre: the h1
+   wrapper), so the lit part sits behind the waves at any line count, locale
+   or page. A sibling of .hero-wave, not a child: the band's headline-column
+   mask must not dim the light. Alphas carry the lamp's .602 and the bloom's
+   .63; it breathes on the lamp's period. */
+.hero-band-light {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2000px;
+  height: 420px;
+  margin: -210px 0 0 -1000px;
+  pointer-events: none;
+  background:
+    radial-gradient(540px 150px at 50% 50%, rgba(255,112,92,.0315), rgba(232,67,147,.0176) 42%, rgba(108,92,231,.0069) 72%, transparent),
+    radial-gradient(960px 200px at 50% 50%, rgba(232,67,147,.0361) 0%, rgba(200,80,185,.0289) 40%, rgba(108,92,231,.0144) 72%, rgba(108,92,231,0) 100%);
+  transform: translate3d(calc(var(--hx, 0) * 30px), calc(var(--hy, 0) * 22px), 0);
+  animation: hero-band-breathe 27s ease-in-out -6.75s infinite;
+  will-change: opacity, transform;
+}
+@keyframes hero-band-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .93; }
+}
+
+/* ===== Hero wave band =====
+   Waves and dust drifting behind the headline, one current, all to the left.
+   The band is centred on the h1 wrapper, so it follows the headline whatever
+   its line count or locale. Two masks, intersected:
+   - edge fade: transparent at the viewport edges, full from 22% to 78%;
+   - headline column: waves and dust drop to --hero-col-k within ±400px of
+     the centre (the h1 is at most 780px wide) and ramp back to full over
+     140px outside it.
+     This keeps the gradient line of the h1 above 3:1 (WCAG AA for large
+     text; measured worst p1 ≈3.3 over RU/EN/FR/DE, home and tool pages,
+     390–1440, pointer at the corners) while the band keeps its full
+     brightness on the sides. It is static and depends on the
+     viewport only, never on the headline text.
+   (-webkit-mask-composite is emitted by the Tailwind/Lightning build from
+   mask-composite, with the keywords mapped: intersect → source-in, etc.)
+   Heights are multiples of 3: the dust is pixel art on a 3px grid. */
 .hero-wave {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   width: 100vw;
-  height: 230px;
+  height: 231px;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  --hero-col-k: .6;
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent),
+    linear-gradient(90deg, #000 calc(50% - 540px), rgba(0,0,0,var(--hero-col-k)) calc(50% - 400px), rgba(0,0,0,var(--hero-col-k)) calc(50% + 400px), #000 calc(50% + 540px));
+  mask-image:
+    linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent),
+    linear-gradient(90deg, #000 calc(50% - 540px), rgba(0,0,0,var(--hero-col-k)) calc(50% - 400px), rgba(0,0,0,var(--hero-col-k)) calc(50% + 400px), #000 calc(50% + 540px));
+  mask-composite: intersect;
 }
+/* Below 1080px the column spans the whole viewport and the 200%/400%-wide
+   svgs pack the crests tighter against the smaller type, so it goes a
+   little darker. */
+@media (max-width: 1079px) {
+  .hero-wave { --hero-col-k: .45; }
+}
+
+/* Vector waves with a phosphor halo: each line is one path drawn twice (a
+   wide faint stroke under a thin bright one). No SVG filter — blur on a
+   200%-wide animated layer is what phones pay for. Each svg is 200% wide and
+   its path is periodic across half the viewBox (integer wave count, envelope
+   period = the half), so translateX(-50%) loops seamlessly. */
 .hero-wave svg {
   position: absolute;
   left: 0;
   top: 0;
   width: 200%;
   height: 100%;
+  overflow: visible;
   will-change: transform;
 }
-.hero-wave .wave-a {
-  opacity: 0.20;
-  animation: hero-wave-drift 38s linear infinite;
-}
-.hero-wave .wave-b {
-  opacity: 0.13;
-  top: 19%;
-  height: 70%;
-  animation: hero-wave-drift 61s linear infinite;
-  animation-delay: -23s;
-}
-.hero-wave .wave-c {
-  opacity: 0.10;
-  top: 31%;
-  height: 46%;
-  animation: hero-wave-drift 89s linear infinite;
-  animation-delay: -52s;
-}
-/* Pointer parallax for the band. The drift owns `transform`, so the offset
-   goes on the independent `translate` property — the two compose. Layers
-   shift against the cursor, nearest the most, which reads as looking around
-   a scene rather than as the layers sliding. The shifts stay well inside
-   .hero-wave's edge mask, so no seam is ever exposed. */
-.hero-wave .wave-a { translate: calc(var(--hx, 0) * -14px) calc(var(--hy, 0) * -10px); }
-.hero-wave .wave-b { translate: calc(var(--hx, 0) *  -9px) calc(var(--hy, 0) *  -7px); }
-.hero-wave .wave-c { translate: calc(var(--hx, 0) *  -5px) calc(var(--hy, 0) *  -4px); }
+/* top/height = each viewBox's crop of the 240-unit band (36+168, 54+132,
+   66+108), so a unit maps to the same pixel as in a full-height svg */
+.hero-wave .wave-1 { top: 15%;   height: 70%; opacity: .46; animation: hero-wave-drift 38s linear infinite; }
+.hero-wave .wave-2 { top: 22.5%; height: 55%; opacity: .26; animation: hero-wave-drift 61s linear -23s infinite; }
+.hero-wave .wave-3 { top: 27.5%; height: 45%; opacity: .17; animation: hero-wave-drift 89s linear -52s infinite; }
+/* Pointer parallax: the drift owns `transform`, the offset goes on the
+   independent `translate`, so the two compose. Layers shift against the
+   cursor, nearest the most; the shifts stay well inside the edge fade. */
+.hero-wave .wave-1 { translate: calc(var(--hx, 0) * -14px) calc(var(--hy, 0) * -10px); }
+.hero-wave .wave-2 { translate: calc(var(--hx, 0) *  -9px) calc(var(--hy, 0) *  -7px); }
+.hero-wave .wave-3 { translate: calc(var(--hx, 0) *  -5px) calc(var(--hy, 0) *  -4px); }
 @keyframes hero-wave-drift {
   to { transform: translateX(-50%); }
 }
 
-/* Dust carried by the same current as the waves, in three parallax depths.
-   Pure CSS on purpose — a canvas particle system would cost bundle size and
-   a rAF loop on phones for pure decoration.
-   Horizontal travel belongs to the track, not the particle: one shared drift
-   per depth, same direction as the waves, so each layer reads as one current
-   rather than a swarm. Parallax comes from speed, size and brightness. */
-.hero-particles {
+/* Pixel dust carried by the same current, in three depths: farther = slower
+   and dimmer. 3px squares (6px for the brightest near ones) on a 3px grid,
+   a plus-shaped halo on the two front layers, stepped bob. Each track is 200%
+   wide and holds its field twice, so the -50% loop tiles. Horizontal travel
+   and edge fading belong to the track and the masks, the particles only bob.
+   Pure CSS on purpose — a canvas would cost bundle size and a rAF loop on
+   phones for pure decoration. */
+.hero-dust {
   position: absolute;
   inset: 0;
-  /* vertical falloff; the horizontal one is inherited from .hero-wave's mask,
-     which is also what keeps the 200% tracks from overflowing the viewport */
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
 }
-.hero-particles-track {
+.hero-dust-track {
   position: absolute;
   left: 0;
   top: 0;
@@ -744,120 +948,176 @@ input:-webkit-autofill:focus {
   animation: hero-wave-drift var(--speed) linear infinite;
 }
 /* the slowest wave crosses in 89s, so even the near layer lags the current */
-.particles-near { --speed: 110s; translate: calc(var(--hx, 0) * -26px) calc(var(--hy, 0) * -18px); }
-.particles-mid  { --speed: 165s; translate: calc(var(--hx, 0) * -15px) calc(var(--hy, 0) * -11px); }
-.particles-far  { --speed: 240s; translate: calc(var(--hx, 0) *  -7px) calc(var(--hy, 0) *  -5px); }
-
-.hero-particle-field {
+.dust-near { --speed: 110s; translate: calc(var(--hx, 0) * -26px) calc(var(--hy, 0) * -18px); }
+.dust-mid  { --speed: 165s; translate: calc(var(--hx, 0) * -15px) calc(var(--hy, 0) * -11px); }
+.dust-far  { --speed: 240s; translate: calc(var(--hx, 0) *  -7px) calc(var(--hy, 0) *  -5px); }
+.hero-dust-field {
   position: absolute;
   top: 0;
   width: 50%;
   height: 100%;
 }
-.hero-particle-field + .hero-particle-field { left: 50%; }
-.hero-particles i {
+.hero-dust-field + .hero-dust-field { left: 50%; }
+.hero-dust i {
+  --s: 3px;
   position: absolute;
   left: var(--x);
   top: var(--y);
   width: var(--s);
   height: var(--s);
-  border-radius: 9999px;
   background: rgb(var(--c));
   opacity: var(--o);
 }
-/* Only the two front layers breathe. Leaving the dense far layer static keeps
-   half the particles painted into their track instead of each becoming its
-   own compositor layer — it is a backdrop, motion there would only add noise. */
-.particles-mid i,
-.particles-near i {
-  box-shadow: 0 0 calc(var(--s) * 3) rgb(var(--c) / 0.7);
-  animation: hero-particle-bob var(--d) ease-in-out infinite;
-  animation-delay: var(--t);
+/* Anything that sits or moves on the pixel grid is rounded to it, otherwise
+   sub-pixel offsets resample the pixel art into mush. The guard matters:
+   round() over var() is only checked at computed-value time, so without it
+   an older engine would drop left/top/translate to their initial values
+   instead of skipping the declaration. */
+@supports (left: round(nearest, 50%, 3px)) {
+  .hero-dust i {
+    left: round(nearest, var(--x), 3px);
+    top: round(nearest, var(--y), 3px);
+  }
+  .dust-near { translate: round(calc(var(--hx, 0) * -26px), 3px) round(calc(var(--hy, 0) * -18px), 3px); }
+  .dust-mid  { translate: round(calc(var(--hx, 0) * -15px), 3px) round(calc(var(--hy, 0) * -11px), 3px); }
+  .dust-far  { translate: round(calc(var(--hx, 0) *  -7px), 3px) round(calc(var(--hy, 0) *  -5px), 3px); }
 }
-@keyframes hero-particle-bob {
-  0%, 100% { transform: translate3d(0, calc(var(--b) * -1), 0); opacity: calc(var(--o) * 0.42); }
+/* Pixel-art halo on the two front layers: the square repeated one unit out
+   on each axis — a plus with the corners left empty, which is how glow is
+   drawn on a grid. The far layer stays static and paints into its track. */
+.dust-mid i,
+.dust-near i {
+  --h: rgb(var(--c) / var(--ha));
+  box-shadow: 3px 0 0 var(--h), -3px 0 0 var(--h), 0 3px 0 var(--h), 0 -3px 0 var(--h);
+  animation: hero-dust-bob var(--d) steps(var(--n)) var(--t) infinite;
+}
+.dust-mid i  { --ha: .22; }
+.dust-near i { --ha: .38; }
+@keyframes hero-dust-bob {
+  0%, 100% { transform: translate3d(0, calc(var(--b) * -1), 0); opacity: calc(var(--o) * .5); }
   50%      { transform: translate3d(0, var(--b), 0);            opacity: var(--o); }
 }
-
-/* Occasional twinkle on a hand-picked few. Rare by construction: the flare
-   occupies the last ~13% of a long cycle, so a marked particle is an ordinary
-   dot most of the time. The bob already owns `transform` and `opacity` on the
-   <i>, so the flare lives on pseudo-elements — both animations stay composited
-   and independent. --k is the cycle length, --kt a negative delay; picking them
-   pairwise non-harmonic is what keeps the field from blinking in unison. */
-.hero-particles i.spark::after {
-  content: "";
+/* Twinkle on a hand-picked few (class="spark", --k cycle, --kt delay): a
+   4-frame sprite in the last ~9% of the cycle — dot, small plus, big plus
+   with coloured tips, small plus in colour — then gone. The frames are laid
+   out on a strip (the inner <b>, one cell drawn as box-shadows at a 5-cell
+   pitch) behind a 5×5-cell window (the outer <b>), and the strip jumps from
+   frame to frame with step-end: a transform animation, so it runs on the
+   compositor instead of repainting box-shadows on the main thread. */
+.hero-dust .spark > b {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(var(--s) * 9);
-  height: calc(var(--s) * 9);
-  margin: calc(var(--s) * -4.5) 0 0 calc(var(--s) * -4.5);
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgb(255 255 255 / 0.75) 0%, rgb(var(--c) / 0.5) 34%, transparent 70%);
-  opacity: 0;
-  animation: hero-particle-spark var(--k) ease-out infinite;
-  animation-delay: var(--kt);
+  left: calc(var(--s) * -2);
+  top: calc(var(--s) * -2);
+  width: calc(var(--s) * 5);
+  height: calc(var(--s) * 5);
+  overflow: hidden;
 }
-/* Lens-style cross flare, near layer only — at 3-4px it reads as a highlight
-   catching the light; on the smaller mid dots the same streak just smears. */
-.particles-near i.spark::before {
-  content: "";
+.hero-dust .spark > b > b {
+  --w: rgba(255,240,225,.9);
+  --f: rgb(var(--c) / .55);
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(var(--s) * 11);
-  height: calc(var(--s) * 11);
-  margin: calc(var(--s) * -5.5) 0 0 calc(var(--s) * -5.5);
-  background:
-    linear-gradient(90deg, transparent, rgb(255 255 255 / 0.8), transparent),
-    linear-gradient(0deg, transparent, rgb(255 255 255 / 0.8), transparent);
-  background-size: 100% 1px, 1px 100%;
-  background-position: center center, center center;
-  background-repeat: no-repeat;
-  opacity: 0;
-  animation: hero-particle-flare var(--k) ease-out infinite;
-  animation-delay: var(--kt);
+  left: calc(var(--s) * 2);
+  top: calc(var(--s) * 2);
+  width: var(--s);
+  height: var(--s);
+  box-shadow:
+    /* frame 1: dot */
+    calc(var(--s) * 5) 0 0 #fff,
+    /* frame 2: small plus */
+    calc(var(--s) * 10) 0 0 #fff,
+    calc(var(--s) * 11) 0 0 var(--w), calc(var(--s) * 9) 0 0 var(--w),
+    calc(var(--s) * 10) var(--s) 0 var(--w), calc(var(--s) * 10) calc(var(--s) * -1) 0 var(--w),
+    /* frame 3: big plus, coloured tips */
+    calc(var(--s) * 15) 0 0 #fff,
+    calc(var(--s) * 16) 0 0 var(--w), calc(var(--s) * 14) 0 0 var(--w),
+    calc(var(--s) * 15) var(--s) 0 var(--w), calc(var(--s) * 15) calc(var(--s) * -1) 0 var(--w),
+    calc(var(--s) * 17) 0 0 var(--f), calc(var(--s) * 13) 0 0 var(--f),
+    calc(var(--s) * 15) calc(var(--s) * 2) 0 var(--f), calc(var(--s) * 15) calc(var(--s) * -2) 0 var(--f),
+    /* frame 4: small plus in colour */
+    calc(var(--s) * 20) 0 0 #fff,
+    calc(var(--s) * 21) 0 0 var(--f), calc(var(--s) * 19) 0 0 var(--f),
+    calc(var(--s) * 20) var(--s) 0 var(--f), calc(var(--s) * 20) calc(var(--s) * -1) 0 var(--f);
+  animation: hero-dust-twinkle var(--k) step-end var(--kt) infinite;
 }
-/* fast rise, slower bloom-and-fade — the shape of a catching highlight */
-@keyframes hero-particle-spark {
-  0%, 80%, 100% { opacity: 0; scale: 0.3; }
-  86%           { opacity: 1; scale: 1; }
-  93%           { opacity: 0; scale: 1.7; }
-}
-@keyframes hero-particle-flare {
-  0%, 82%, 100% { opacity: 0;   scale: 0.2; }
-  86%           { opacity: 0.9; scale: 1; }
-  92%           { opacity: 0;   scale: 1.4; }
+@keyframes hero-dust-twinkle {
+  0%        { transform: translateX(0); }
+  84%       { transform: translateX(calc(var(--s) * -5)); }
+  86%       { transform: translateX(calc(var(--s) * -10)); }
+  88%       { transform: translateX(calc(var(--s) * -15)); }
+  91%       { transform: translateX(calc(var(--s) * -20)); }
+  93%, 100% { transform: translateX(0); }
 }
 
 @media (max-width: 640px) {
-  .hero-wave { height: 170px; }
-  /* wider svg = longer visible period, otherwise ripples get too tight
-     on narrow screens; -50% self-translate stays seamless at any width */
+  .hero-backdrop { height: 894px; }
+  /* logo 64px at y 120-184; box trimmed like the desktop one (spill ends at 585) */
+  .hero-lamp {
+    width: 900px;
+    height: 600px;
+    margin-left: -450px;
+    transform-origin: 50% 380px;
+    background:
+      radial-gradient(300px 270px at 50% 262px, rgba(255,162,112,.11) 0%, rgba(248,112,138,.085) 20%, rgba(232,67,147,.05) 44%, rgba(108,92,231,.02) 72%, rgba(108,92,231,0) 100%);
+  }
+  .hero-lamp::after {
+    top: 172px;
+    width: 340px;
+    height: 150px;
+    margin-left: -170px;
+  }
+  .hero-film::before {
+    -webkit-mask-image:
+      linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+      radial-gradient(300px 250px at 50% 200px, #000, rgba(0,0,0,.55) 45%, transparent),
+      radial-gradient(420px 140px at 50% 375px, rgba(0,0,0,.35), transparent);
+    mask-image:
+      linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+      radial-gradient(300px 250px at 50% 200px, #000, rgba(0,0,0,.55) 45%, transparent),
+      radial-gradient(420px 140px at 50% 375px, rgba(0,0,0,.35), transparent);
+  }
+  .hero-bloom {
+    background:
+      radial-gradient(170px 76px at 50% 152px, rgba(255,132,88,.1), rgba(246,92,112,.05) 46%, rgba(232,67,147,.018) 74%, transparent),
+      radial-gradient(300px 320px at 50% 270px, rgba(232,67,147,.035), rgba(108,92,231,.016) 50%, transparent 85%);
+  }
+  /* one breathing pair is plenty on a phone-sized sky */
+  .hero-stars i:nth-child(n+3) { display: none; }
+  .hero-wave { height: 171px; }
+  .hero-band-light {
+    width: 900px;
+    margin-left: -450px;
+    background:
+      radial-gradient(230px 150px at 50% 50%, rgba(255,112,92,.0315), rgba(232,67,147,.0176) 42%, rgba(108,92,231,.0069) 72%, transparent),
+      radial-gradient(440px 150px at 50% 50%, rgba(232,67,147,.0361) 0%, rgba(200,80,185,.0289) 40%, rgba(108,92,231,.0144) 72%, rgba(108,92,231,0) 100%);
+  }
+  /* wider svg = longer visible period, otherwise ripples get too tight on
+     narrow screens; the -50% self-translate stays seamless at any width */
   .hero-wave svg { width: 400%; }
-  /* thin the two dense layers — same density feel on a much narrower band.
-     Applied inside both copies of a field identically, so tiling stays
-     seamless. The near layer is sparse already and carries the depth read. */
-  .particles-far i:nth-child(2n),
-  .particles-mid i:nth-child(2n) { display: none; }
-  /* every .spark sits on an odd index, so the thinning above never takes one */
+  /* Thin the two dense dust layers — same density feel on a much narrower
+     band. Identical in both copies of a field, so tiling stays seamless.
+     Every mid .spark sits on an odd index, so this never takes one. */
+  .dust-far i:nth-child(2n),
+  .dust-mid i:nth-child(2n) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-wave svg { animation: none; }
-  .hero-glow { animation: none; transform: none; }
-  .hero-glow::after { animation: none; opacity: 0.9; }
-  /* keep the dust, drop the motion */
-  .hero-particles-track,
-  .hero-particles i { animation: none; }
-  /* pseudo-element animations are separate from the <i>'s, so they need
-     killing explicitly — and a stopped flare is just a stale bright blob */
-  .hero-particles i.spark::before,
-  .hero-particles i.spark::after { display: none; }
-  .hero-wave .wave-a,
-  .hero-wave .wave-b,
-  .hero-wave .wave-c,
-  .hero-particles-track { translate: none; }
+  /* a static frame: every layer at its resting level, no parallax */
+  .hero-lamp,
+  .hero-bloom { animation: none; transform: none; }
+  .hero-lamp::after { animation: none; }
+  .hero-stars { transform: none; will-change: auto; }
+  .hero-stars i { animation: none; opacity: .6; }
+  .hero-stars::before { opacity: .6; }
+  .hero-band-light { animation: none; transform: none; will-change: auto; }
+  /* the per-layer selectors are needed: `.hero-wave svg` (0,1,1) would lose
+     to `.hero-wave .wave-1` (0,2,0) — the old hero kept its waves drifting
+     under reduced motion because of exactly that */
+  .hero-wave .wave-1,
+  .hero-wave .wave-2,
+  .hero-wave .wave-3,
+  .hero-dust-track { animation: none; translate: none; }
+  .hero-dust i { animation: none; }
+  /* a stopped sprite frame is just a stale bright blob */
+  .hero-dust .spark > b { display: none; }
 }
 
 .upload-dashed {

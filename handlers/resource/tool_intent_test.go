@@ -167,7 +167,7 @@ func TestProgressPageKeepsTheToolPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	stubTemplates(t, tpl, "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about")
+	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about")
 	j := &job.Job{ID: "j1", Queue: "load"}
 	render := func(instruction string) (title, main string) {
 		ctx := &w.Context{Lang: "en", Data: newPostData(j, &PostArgs{Instruction: instruction})}

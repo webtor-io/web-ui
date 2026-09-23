@@ -12,12 +12,12 @@
 */}}
 {{ define "tool_heading" }}
 {{- if $.Data.Guide }}
-<h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-4 text-balance">
+<h1 class="hero-title relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-4 text-balance">
     <span class="gradient-text">{{ t $.Ctx.Lang $.Data.Title }}</span>
 </h1>
 <p class="relative z-10 text-xl sm:text-2xl font-semibold tracking-tight text-w-text max-w-[680px] mb-5 text-balance">{{ t $.Ctx.Lang $.Data.Benefit }}</p>
 {{- else }}
-<h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance">
+<h1 class="hero-title relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance">
     <span class="gradient-text">{{ t $.Ctx.Lang $.Data.Benefit }}</span>
 </h1>
 {{- end }}

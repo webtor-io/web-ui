@@ -67,10 +67,10 @@
 {{ with .Data }}
 <!-- Hero Section -->
 <section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] pb-16 px-3 sm:px-6">
-    <div class="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] hero-glow pointer-events-none"></div>
+    {{ template "hero_backdrop" }}
 
     <!-- big logo -->
-    <div class="font-logo text-[clamp(4rem,10vw,6.5rem)] font-light tracking-tight leading-none mb-7 relative z-10">
+    <div class="hero-logo font-logo text-[clamp(4rem,10vw,6.5rem)] font-light tracking-tight leading-none mb-7 relative z-10">
         <a href="{{ langPath $.Lang "/" }}" data-async-target="main" class="no-underline">
             web<span class="text-w-pink">tor</span>
         </a>
@@ -100,7 +100,7 @@
 
     <div class="relative w-full flex flex-col items-center">
         {{ template "hero_wave" }}
-        <h1 class="relative z-10 text-[clamp(2.8rem,6vw,4.5rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
+        <h1 class="hero-title relative z-10 text-[clamp(2.8rem,6vw,4.5rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5">
             <span class="block text-balance">{{ t $.Lang "home.heading" }}</span>
             <span class="block text-balance gradient-text">{{ t $.Lang "home.headingAccent" }}</span>
         </h1>

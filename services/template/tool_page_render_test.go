@@ -73,7 +73,7 @@ func TestToolHeadingIsUnchangedOutsideGuides(t *testing.T) {
 		}
 		others++
 		t.Run(tool.Url, func(t *testing.T) {
-			want := fmt.Sprintf(`<h1 class="relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance"> <span class="gradient-text">%s</span> </h1>`, tool.Benefit)
+			want := fmt.Sprintf(`<h1 class="hero-title relative z-10 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold tracking-tighter leading-[1.1] max-w-[780px] mb-5 text-balance"> <span class="gradient-text">%s</span> </h1>`, tool.Benefit)
 			if got := renderHeading(t, tpl, tool); got != want {
 				t.Errorf("heading changed:\n got %s\nwant %s", got, want)
 			}

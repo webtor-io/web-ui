@@ -63,7 +63,7 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 	if _, err := tpl.ParseFiles("../../templates/partials/about/heading.html"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about"} {
+	for _, name := range []string{"hero_backdrop", "hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about"} {
 		if _, err := tpl.Parse(`{{ define "` + name + `" }}{{ end }}`); err != nil {
 			t.Fatal(err)
 		}
