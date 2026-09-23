@@ -1653,6 +1653,7 @@
     "time.years": "%v jaar geleden",
     "error.forbidden": "Deze content is geblokkeerd op verzoek van de rechthebbende.",
     "error.not_found": "Bron niet gevonden.",
+    "error.page_not_found": "Pagina niet gevonden.",
     "error.service_unavailable": "Oeps, er ging iets mis. Kom later terug.",
     "error.back_home": "Terug naar home",
     "error.invalid_resource": "Ongeldige link of torrent-bestand.",

@@ -1653,6 +1653,7 @@
     "time.years": "%v yıl önce",
     "error.forbidden": "Bu içerik hak sahibinin talebi üzerine engellenmiştir.",
     "error.not_found": "Kaynak bulunamadı.",
+    "error.page_not_found": "Sayfa bulunamadı.",
     "error.service_unavailable": "Hata oluştu, lütfen daha sonra tekrar deneyin.",
     "error.back_home": "Ana sayfaya dön",
     "error.invalid_resource": "Geçersiz bağlantı veya torrent dosyası.",

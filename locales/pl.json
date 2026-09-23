@@ -1671,6 +1671,7 @@
     "time.years": "%v lat temu",
     "error.forbidden": "Ta treść została zablokowana na żądanie właściciela praw.",
     "error.not_found": "Zasób nie został znaleziony.",
+    "error.page_not_found": "Nie znaleziono strony.",
     "error.service_unavailable": "Ups, coś poszło nie tak. Zajrzyj później.",
     "error.back_home": "Powrót do strony głównej",
     "error.invalid_resource": "Nieprawidłowy link lub plik torrent.",

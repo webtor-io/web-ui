@@ -1671,6 +1671,7 @@
     "time.years": "%v лет назад",
     "error.forbidden": "Этот контент заблокирован по запросу правообладателя.",
     "error.not_found": "Ресурс не найден.",
+    "error.page_not_found": "Страница не найдена.",
     "error.service_unavailable": "Ой, что-то пошло не так, зайдите позже",
     "error.back_home": "На главную",
     "error.invalid_resource": "Неверная ссылка или торрент-файл.",

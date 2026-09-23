@@ -47,3 +47,11 @@ with `error.not_found`, as it got that message before.
 The home page and the tool pages (`handlers/index`) set `X-Robots-Tag:
 noindex` when the query carries `err` — the state of one visit after a
 failed form, not a page. The canonical still points at the clean URL.
+
+## Legal pages
+
+`/legal/<name>` renders `templates/views/legal/<name>.html`; a name without a
+view answers 404 with `error/page` and `error.page_not_found` (it used to be a
+bare 500 from the template manager — `template.Manager.HasView` is the
+check). `/legal/terms` is a 301 to `/legal/tos` in the request's language.
+Aliases live in `handlers/legal/handler.go`.
