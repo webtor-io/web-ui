@@ -44,6 +44,8 @@ setting) goes through `common.ResolveQueryHash`. After trimming it accepts:
 |---|---|
 | a magnet URI, any case of `magnet:` | its btih; a 32-character base32 btih is upper-cased first (the library decodes only the upper-case alphabet: on 2026-09-23, 17 valid lower-case magnets were refused as broken, 35 submits) |
 | a magnet inside other text (`url=magnet:?…`) | the magnet, up to the first whitespace |
+
+The `url=magnet:?…` shape used to come from our own `/show` redirect (where extension builds up to 0.1.12 send a clicked magnet): it wrapped the magnet in a second `url=`. Since 2026-09-23 `/show` passes the magnet unchanged (`handlers/migration`, test `TestShowMagnetRedirectCarriesTheMagnetUnchanged`); the rule above stays for links already out there.
 | the whole input is 40 hex or 32 base32, any case (also as `urn:btih:…`) | that infohash |
 | an http(s)/`www.` URL with a standalone 40-hex token (`common.V1HashTokenR`) | that infohash — a resource-page link, a .torrent cache that names files by hash |
 

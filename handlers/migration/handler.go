@@ -23,7 +23,7 @@ func RegisterHandler(r *gin.Engine) {
 		if params.Get("magnet") != "" {
 			p := url.Values{}
 			p.Add("url", params.Get("magnet"))
-			c.Redirect(http.StatusMovedPermanently, "/ext/magnet?url="+p.Encode())
+			c.Redirect(http.StatusMovedPermanently, "/ext/magnet?"+p.Encode())
 			return
 		}
 		c.Redirect(http.StatusMovedPermanently, "/embed?"+params.Encode())

@@ -1,5 +1,5 @@
 import {makeDebug} from '../../lib/debug';
-import semver from 'semver'
+import {torrentBytes} from '../../lib/extTorrentBytes';
 const debug = await makeDebug('webtor:ext');
 
 function init() {
@@ -22,11 +22,12 @@ function fetch(downloadId) {
                 return;
             }
             if (event.data.torrent) {
-                if (event.data.ver && semver.gte('0.1.12', event.data.ver)) {
-                    resolve(new Blob([new Uint8Array(event.data.torrent)]));
+                const bytes = torrentBytes(event.data.torrent);
+                if (!bytes || bytes.length === 0) {
+                    debug('extension sent a torrent without bytes, ver=%s', event.data.ver);
                     return;
                 }
-                resolve(new Blob([new Uint8Array(event.data.torrent.data)]));
+                resolve(new Blob([bytes]));
             }
         });
         window.postMessage({downloadId}, '*');
