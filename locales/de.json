@@ -962,7 +962,7 @@
     "tool.watchTorrentsOnline.benefit": "Filme & Serien aus Torrents im Browser streamen",
     "tool.watchTorrentsOnline.description": "Schaue Torrent-Filme und Serien online ohne Download — spiele jeden Film-Torrent oder Magnet-Link direkt im Browser ab, ganz ohne Torrent-Client.",
     "tool.watchTorrentsIos.title": "Torrents auf iOS",
-    "tool.openTorrentFile.title": "Wie öffnet man eine .torrent-Datei?",
+    "tool.openTorrentFile.title": "Torrent-Datei öffnen: So geht's",
     "tool.openTorrentFile.benefit": "Ohne installierten Torrent-Client",
     "tool.openTorrentFile.description": "Eine .torrent-Datei braucht etwas, das sie öffnet, und das muss kein installierter Client sein. Zieh die Datei in Webtor.io und sieh, was drin ist, spiel das Video ab oder lade die Dateien herunter — in jedem Browser.",
     "tool.openTorrentFile.about.steps.title": "So öffnest du eine .torrent-Datei in drei Schritten",

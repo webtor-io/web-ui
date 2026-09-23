@@ -980,7 +980,7 @@
     "tool.watchTorrentsOnline.benefit": "Смотрите фильмы и сериалы с торрентов в браузере",
     "tool.watchTorrentsOnline.description": "Смотрите фильмы и сериалы с торрентов онлайн без скачивания — воспроизводите любой торрент или магнет-ссылку с фильмом прямо в браузере, торрент-клиент не нужен.",
     "tool.watchTorrentsIos.title": "Торренты на iOS",
-    "tool.openTorrentFile.title": "Как открыть файл .torrent",
+    "tool.openTorrentFile.title": "Как открыть торрент-файл",
     "tool.openTorrentFile.benefit": "Без установки торрент-клиента",
     "tool.openTorrentFile.description": "Файл .torrent нужно чем-то открыть, и это не обязательно установленный клиент. Загрузите файл в Webtor.io — увидите, что внутри, посмотрите видео или скачайте файлы прямо из браузера.",
     "tool.openTorrentFile.about.steps.title": "Как открыть файл .torrent за три шага",

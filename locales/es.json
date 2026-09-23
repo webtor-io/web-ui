@@ -991,7 +991,7 @@
     "tool.openTorrentFile.about.formats.item4": "Enlaces magnet, no solo archivos .torrent",
     "tool.openTorrentFile.about.safety.title": "¿Es seguro abrir así un archivo torrent?",
     "tool.openTorrentFile.about.safety.text": "El torrent lo descargan los servidores de <strong>Webtor.io</strong>, no tu ordenador, así que tu dirección IP nunca entra en el enjambre y nunca compartes. No se instala nada, y no queda nada en tu disco salvo que elijas descargarlo.",
-    "tool.howToDownloadTorrentFiles.title": "¿Cómo descargar los archivos de un torrent?",
+    "tool.howToDownloadTorrentFiles.title": "¿Cómo descargar un torrent?",
     "tool.howToDownloadTorrentFiles.benefit": "Directo desde el navegador, sin cliente",
     "tool.howToDownloadTorrentFiles.description": "No necesitas un cliente BitTorrent para sacar los archivos de un torrent. Ábrelo con Webtor.io, elige el archivo que quieras y descárgalo por enlace directo — uno solo o todos.",
     "tool.howToDownloadTorrentFiles.about.steps.title": "Cómo descargar los archivos de un torrent en tres pasos",

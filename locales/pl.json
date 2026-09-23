@@ -1009,7 +1009,7 @@
     "tool.openTorrentFile.about.formats.item4": "Linki magnet, nie tylko pliki .torrent",
     "tool.openTorrentFile.about.safety.title": "Czy takie otwieranie pliku torrent jest bezpieczne?",
     "tool.openTorrentFile.about.safety.text": "Torrent pobierają serwery <strong>Webtor.io</strong>, a nie twój komputer, więc twój adres IP nigdy nie trafia do roju i nigdy nie seedujesz. Nic się nie instaluje i nic nie zostaje na dysku, dopóki sam czegoś nie pobierzesz.",
-    "tool.howToDownloadTorrentFiles.title": "Jak pobrać pliki z torrenta",
+    "tool.howToDownloadTorrentFiles.title": "Jak pobierać torrenty",
     "tool.howToDownloadTorrentFiles.benefit": "Prosto z przeglądarki, bez klienta",
     "tool.howToDownloadTorrentFiles.description": "Żeby wyciągnąć pliki z torrenta, klient BitTorrent nie jest potrzebny. Otwórz torrent w Webtor.io, wybierz plik, który chcesz, i pobierz go bezpośrednim linkiem — jeden plik albo wszystkie.",
     "tool.howToDownloadTorrentFiles.about.steps.title": "Jak pobrać pliki z torrenta w trzech krokach",

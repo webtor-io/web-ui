@@ -1,0 +1,15 @@
+{{/*
+    "Read the step-by-step guide →" under a FAQ answer, rendered with
+    `withContext $ "<guide url, no slash>"`.
+
+    The FAQ in about.html is shared by the home page and every tool page,
+    the guides included, so on a guide the link to that same guide pointed
+    at the page the reader was already on. It is left out there; every
+    other page, the home page among them, keeps it.
+*/}}
+{{ define "about_faq_guide_link" }}
+{{- $tool := $.Ctx.Data.Tool }}
+{{- if not (and $tool (eq $tool.Url $.Data)) }}
+<a href="{{ langPath $.Ctx.Lang (printf "/%s" $.Data) }}" data-async-target="main" class="inline-block mt-2 text-[0.92rem] text-w-cyan hover:underline">{{ t $.Ctx.Lang "about.faq.guideLink" }} →</a>
+{{- end }}
+{{ end }}
