@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/api"
 )
@@ -273,7 +275,7 @@ func (s *Handler) get(c *gin.Context) {
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
 	if err != nil {
-		web.RedirectWithErrorAndPath(c, "/", err)
+		s.notFound(c, err)
 		return
 	}
 	if !s.useDirectLinks && !s.hasAccessPermission(c, args) {
@@ -291,7 +293,7 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 	if d == nil {
-		web.RedirectWithErrorAndPath(c, "/", errors.New("resource not found"))
+		s.notFound(c, errors.New("resource not found"))
 		return
 	}
 
@@ -352,6 +354,42 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
+}
+
+// notFound answers a resource URL that names nothing: the ID is not one at
+// all (/wp-login.php, /library, an apple-touch-icon probe -- anything without
+// a run of five hex digits, error.invalid_resource), or rest-api has no
+// torrent under it (a share link whose torrent is gone, a mistyped hash,
+// error.not_found).
+//
+// Both used to redirect to /?err=, so every such URL answered with a 200 home
+// page and none of the stale hash links in search indexes could ever leave
+// them. Now the URL itself answers 404 with that same page -- the reason above
+// the form -- so a person still gets the message and the form while a crawler
+// gets a status it can act on. The X-Robots-Tag is the route's default
+// "noindex, follow" (web.NoindexDefault; resource pages are not in the
+// sitemap), which is why nothing here sets one.
+//
+// Only these two outcomes come here. A refused resource (banned or
+// stoplisted: rest-api answers 403, error.forbidden) keeps its redirect -- it
+// has its own policy -- and so does a failure on our side (rest-api or the
+// database did not answer), which says nothing about whether the URL is dead.
+// A banned hash whose torrent has already left the store is indistinguishable
+// from an unknown one: rest-api answers 404 for both, and so it lands here.
+func (s *Handler) notFound(c *gin.Context, err error) {
+	key := web.ClassifyError(err)
+	log.WithError(err).
+		WithField("err_key", key).
+		WithField("surface", "page").
+		WithField("path", c.Request.URL.Path).
+		Info("user error shown")
+	if web.WantsJSON(c) {
+		c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": key})
+		return
+	}
+	// The home page's own renderer: the "index" view is registered by
+	// handlers/index, which this handler's POST already renders too.
+	index.Render(c, s.tb, s.pg, http.StatusNotFound, &index.Data{}, key)
 }
 
 func (s *Handler) prepareRateForm(d *GetData) *RateForm {

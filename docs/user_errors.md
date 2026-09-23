@@ -15,7 +15,10 @@ How an `error` becomes the sentence a person reads, and which sentences exist.
   (`service_unavailable`, `upstream_unavailable`) answer 503.
 
 Render points: the job progress log (`jobs/jobs.go` errorFormatter), the error
-page (`services/web/middleware.go`), redirects with `?err=` (`services/web/helper.go`).
+page (`services/web/middleware.go`), redirects with `?err=` (`services/web/helper.go`),
+and the 404 home page of a resource URL that names nothing
+(`handlers/resource/get.go` `notFound`: `error.invalid_resource` /
+`error.not_found`, see `docs/status_and_caching.md`).
 Every render logs one structured line — `user error shown` with `err_key` and
 `surface=job|page` — so the distribution, and the share still landing in
 `error.generic`, can be read off Loki:
