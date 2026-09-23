@@ -423,6 +423,7 @@
     "resource.close": "Sluiten",
     "resource.linkCopied": "Link gekopieerd!",
     "resource.copyMagnet": "Magnetlink kopiëren",
+    "resource.toolIntent.magnetToTorrent": "Of download de bestanden direct — geen torrent client nodig",
     "resource.reportProblem": "Een probleem met deze torrent melden",
     "resource.magnetCopied": "Magnetlink gekopieerd!",
     "resource.content": "Inhoud",

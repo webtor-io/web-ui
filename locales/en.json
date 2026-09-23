@@ -459,6 +459,7 @@
     "resource.close": "Close",
     "resource.linkCopied": "Link copied!",
     "resource.copyMagnet": "Copy magnet link",
+    "resource.toolIntent.magnetToTorrent": "Or download the files directly — no torrent client needed",
     "resource.reportProblem": "Report a problem with this torrent",
     "resource.magnetCopied": "Magnet link copied!",
     "resource.content": "Content",

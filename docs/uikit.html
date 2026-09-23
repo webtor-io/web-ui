@@ -332,6 +332,25 @@
         </button>
       </div>
     </div>
+
+    <h3 class="text-base font-bold mt-8 mb-3">Tool-intent line (resource header, arrival from a tool page)</h3>
+    <p class="desc">Under the .torrent/magnet pair when the torrent was submitted on a tool page (<code>?tool=&lt;slug&gt;</code>, <code>partials/resource/tool_intent.html</code>, <code>docs/tool_pages.md</code>). From <code>/magnet-to-torrent</code>: a <code>text-sm text-w-sub</code> sentence and a <code>btn-sm btn-soft-cyan</code> link to <code>#content</code> &mdash; cyan because it is a tool&rsquo;s secondary action, not the page&rsquo;s primary one; <code>md:justify-end</code> so on desktop it sits under the right-aligned pair it answers, flush left below <code>md</code>. With JS the link presses the page&rsquo;s own archive or file download button (<code>lib/toolIntent.js</code>); it keeps no form of its own. Umami <code>tool-intent-direct</code> + <code>tool</code>. From <code>/torrent-to-magnet</code> the magnet half of the pair instead shows its label and its hover green at rest (<code>border-green-400 text-green-400</code>).</p>
+    <div class="uikit-row flex-col items-stretch gap-3">
+      <div class="flex items-stretch md:ml-auto">
+        <a class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap">.torrent</a>
+        <button class="btn btn-sm btn-ghost border border-green-400 text-green-400 whitespace-nowrap rounded-l-none -ml-px relative hover:z-[1] hover:border-green-400 hover:text-green-400 px-2.5">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3L6 15"/><path d="m5 8 4 4"/><path d="m12 15 4 4"/></svg>
+          <span>Copy magnet link</span>
+        </button>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2 md:justify-end text-sm text-w-sub">
+        <span>Or download the files directly &mdash; no torrent client needed</span>
+        <a class="btn btn-sm btn-soft-cyan whitespace-nowrap">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+          Download
+        </a>
+      </div>
+    </div>
   </div>
 
   <hr class="uikit-divider">

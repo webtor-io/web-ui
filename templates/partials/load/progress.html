@@ -10,8 +10,19 @@
      this very partial (data-async-layout) and the new job's log takes over
      in place — the streaming buttons do the same with #log-<item>.
      Called with the root context ($): .Lang and .Data.Job, like the
-     release-subscribe banner — a view's dot is its Data. */}}
+     release-subscribe banner — a view's dot is its Data.
+
+     The `tool` input carries the tool page the submit came from to the
+     resource page: the div-host redirect turns the host's hidden inputs into
+     query params, so the job's redirect lands on /<hash>?tool=<slug>. It is
+     added here and not in jobs/load.go on purpose — a load job is keyed by
+     infohash + language and its log is replayed to everyone who loads the
+     same torrent, so a slug baked into the stored redirect would follow the
+     first visitor's page to all the others. See docs/tool_pages.md. */}}
 <div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main">
+    {{- with .Data }}{{ if has . "Tool" }}{{ with .Tool }}
+    <input type="hidden" name="tool" value="{{ .Url }}" />
+    {{- end }}{{ end }}{{ end }}
     <div class="log-target"></div>
     <div class="pt-3 justify-end flex hidden alert-close-wrapper">
         <a class="closeable-close close">{{ t .Lang "home.gotIt" }}</a>

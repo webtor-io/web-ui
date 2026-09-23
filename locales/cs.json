@@ -423,6 +423,7 @@
     "resource.close": "Zavřít",
     "resource.linkCopied": "Odkaz zkopírován!",
     "resource.copyMagnet": "Kopírovat magnet odkaz",
+    "resource.toolIntent.magnetToTorrent": "Nebo si stáhni rovnou soubory — bez torrent klienta",
     "resource.reportProblem": "Nahlásit problém s tímto torrentem",
     "resource.magnetCopied": "Magnet odkaz zkopírován!",
     "resource.content": "Obsah",

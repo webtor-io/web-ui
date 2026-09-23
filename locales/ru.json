@@ -423,6 +423,7 @@
     "resource.close": "Закрыть",
     "resource.linkCopied": "Ссылка скопирована!",
     "resource.copyMagnet": "Скопировать magnet-ссылку",
+    "resource.toolIntent.magnetToTorrent": "Или скачайте сами файлы — без торрент-клиента",
     "resource.reportProblem": "Сообщить о проблеме с этой раздачей",
     "resource.magnetCopied": "Magnet-ссылка скопирована!",
     "resource.content": "Содержимое",

@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 // The magnet card has two faces: a dead magnet offers the ten-minute retry
@@ -67,14 +69,7 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 // and failed at request time. Render it the way index.html and the retry
 // layout do.
 func TestLoadProgressPartialRenders(t *testing.T) {
-	tpl, err := template.New("progress.html").Funcs(template.FuncMap{
-		"t":             func(lang, key string, args ...interface{}) string { return key },
-		"makeJobLogURL": func(lang string, j interface{}) string { return "/" + lang + "/queue/load/job/x/log" },
-		"asset":         func(p string) template.HTML { return template.HTML("<script src=\"" + p + "\"></script>") },
-	}).ParseFiles("../templates/partials/load/progress.html")
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	tpl := progressPartial(t)
 	type postData struct{ Job interface{} }
 	ctx := struct {
 		Lang string
@@ -93,4 +88,62 @@ func TestLoadProgressPartialRenders(t *testing.T) {
 	if strings.Contains(out, "<form") {
 		t.Error("the host must be a div: cards inside carry their own forms")
 	}
+	// Data without a Tool field (anything but PostData and index.Data): no
+	// input, and no template error either — hence the `has` guard.
+	if strings.Contains(out, `name="tool"`) {
+		t.Errorf("a host rendered without a tool must not carry one:\n%s", out)
+	}
+}
+
+// The tool page a submit came from rides to the resource page as a hidden
+// input of the log host: progressLog.js's div-host redirect turns the host's
+// hidden inputs into query params (/<hash>?tool=<slug>). The slug cannot go
+// into the job's own redirect — the log is shared by everyone who loads the
+// same torrent in the same language.
+func TestLoadProgressPartialCarriesTheTool(t *testing.T) {
+	tpl := progressPartial(t)
+	type postData struct {
+		Job  interface{}
+		Tool *common.Tool
+	}
+	render := func(d postData) string {
+		ctx := struct {
+			Lang string
+			Data postData
+		}{Lang: "en", Data: d}
+		var buf bytes.Buffer
+		if err := tpl.ExecuteTemplate(&buf, "load/progress", &ctx); err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return buf.String()
+	}
+	out := render(postData{Job: struct{}{}, Tool: common.ToolByURL("magnet-to-torrent")})
+	host := strings.Index(out, "data-async-progress-log=")
+	input := strings.Index(out, `<input type="hidden" name="tool" value="magnet-to-torrent" />`)
+	closeHost := strings.Index(out, "alert-close-wrapper")
+	if input < 0 {
+		t.Fatalf("the host does not carry the tool:\n%s", out)
+	}
+	// Inside the host div, which is what progressLog.js reads
+	// (this.el.querySelectorAll('input[type=hidden]')).
+	if !(host < input && input < closeHost) {
+		t.Errorf("the tool input must sit inside the log host:\n%s", out)
+	}
+	if home := render(postData{Job: struct{}{}}); strings.Contains(home, `name="tool"`) {
+		t.Errorf("the home page's submit must not carry a tool:\n%s", home)
+	}
+}
+
+func progressPartial(t *testing.T) *template.Template {
+	t.Helper()
+	tpl, err := template.New("progress.html").Funcs(template.FuncMap{
+		"t":             func(lang, key string, args ...interface{}) string { return key },
+		"makeJobLogURL": func(lang string, j interface{}) string { return "/" + lang + "/queue/load/job/x/log" },
+		"asset":         func(p string) template.HTML { return template.HTML("<script src=\"" + p + "\"></script>") },
+		"has":           (&web.Helper{}).Has,
+	}).ParseFiles("../templates/partials/load/progress.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	return tpl
 }

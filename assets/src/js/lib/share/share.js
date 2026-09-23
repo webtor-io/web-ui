@@ -10,6 +10,11 @@
 export function shareResource(opts = {}) {
     const location = opts.location || 'header';
     const u = new URL(opts.url || window.location.href);
+    // ?tool= says which tool page THIS visitor submitted the torrent on
+    // (partials/load/progress → partials/resource/tool_intent). It is not
+    // the recipient's: passed on, it would show them a tool's line and file
+    // their clicks under a tool they never saw.
+    u.searchParams.delete('tool');
     u.searchParams.set('utm_source', 'webtor');
     u.searchParams.set('utm_medium', 'share');
     u.searchParams.set('utm_campaign', 'resource_share');
@@ -96,7 +101,10 @@ export function copyMagnet(el) {
     let uri = 'magnet:?xt=urn:btih:' + hash;
     if (el.dataset.magnetName) uri += '&dn=' + encodeURIComponent(el.dataset.magnetName);
     const onCopied = () => {
-        if (window.umami) window.umami.track('copy-magnet');
+        // data-tool: the tool page the torrent was submitted on (resource
+        // page header, views/resource/get.html) — the same prop the
+        // .torrent button carries, so the two can be compared per tool.
+        if (window.umami) window.umami.track('copy-magnet', el.dataset.tool ? { tool: el.dataset.tool } : undefined);
         const msg = el.dataset.copiedText || 'Magnet link copied';
         if (window.toast) window.toast.success(msg);
     };
