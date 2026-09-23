@@ -422,6 +422,7 @@
     "resource.close": "Kapat",
     "resource.linkCopied": "Link kopyalandı!",
     "resource.copyMagnet": "Magnet bağlantısını kopyala",
+    "resource.toolIntent.magnetToTorrent": "Ya da dosyaları doğrudan indir — torrent istemcisi gerekmez",
     "resource.reportProblem": "Bu torrentle ilgili sorun bildir",
     "resource.magnetCopied": "Magnet bağlantısı kopyalandı!",
     "resource.content": "İçerik",

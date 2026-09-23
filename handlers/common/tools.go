@@ -188,3 +188,20 @@ var Tools = []Tool{
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
 }
+
+// ToolByURL returns the tool page registered at url ("magnet-to-torrent", no
+// leading slash), or nil. It is the whitelist for every request value that
+// names a tool — the tool page's hidden `instruction` field, the `tool` query
+// parameter on a resource page — so a forged value selects nothing and is
+// never echoed back into a page.
+func ToolByURL(url string) *Tool {
+	if url == "" {
+		return nil
+	}
+	for i := range Tools {
+		if Tools[i].Url == url {
+			return &Tools[i]
+		}
+	}
+	return nil
+}

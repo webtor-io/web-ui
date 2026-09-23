@@ -2,6 +2,7 @@ import av from '../../lib/av';
 import { waitForElement } from '../../lib/waitForElement';
 import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import { initStickyStatus } from '../../lib/stickyStatus';
+import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
 // at the longest fitting prefix (shared findTextCut from lib/textClamp)
@@ -45,6 +46,9 @@ function initPlotClamp() {
 }
 av( async function() {
     initPlotClamp();
+    // The line under the .torrent button for a visitor from a tool page
+    // (partials/resource/tool_intent) — before the #action early return.
+    initToolIntent(this);
     // Before the early return below: the status mirror is for every visit to
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);

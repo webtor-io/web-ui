@@ -121,3 +121,20 @@ func camelName(url string) string {
 	}
 	return out
 }
+
+// TestToolByURL: every registered page resolves to itself, and nothing else
+// resolves at all — the lookup is the whitelist for request values that name
+// a tool, so near-misses (a leading slash, other case, a path) must not pass.
+func TestToolByURL(t *testing.T) {
+	for _, tool := range Tools {
+		got := ToolByURL(tool.Url)
+		if got == nil || got.Url != tool.Url {
+			t.Errorf("ToolByURL(%q) = %v, want the /%s entry", tool.Url, got, tool.Url)
+		}
+	}
+	for _, v := range []string{"", "/magnet-to-torrent", "Magnet-To-Torrent", "magnet-to-torrent/", "magnet-to-torrent?x=1", "../magnet-to-torrent", "home"} {
+		if got := ToolByURL(v); got != nil {
+			t.Errorf("ToolByURL(%q) = /%s, want nil", v, got.Url)
+		}
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -37,6 +38,12 @@ type GetArgs struct {
 	PWD      string
 	File     string
 	FileIdx  *int
+	// FromTool is the tool page the visitor submitted this torrent on
+	// (?tool=<slug>, added to the load job's redirect by the log host in
+	// partials/load/progress). nil for any other arrival and for a slug that
+	// is not in common.Tools. It only adds a line and analytics props to the
+	// page header — never a canonical, a robots header or a link.
+	FromTool *common.Tool
 	Claims   *api.Claims
 	User     *auth.User
 }
@@ -69,6 +76,7 @@ func (s *Handler) bindGetArgs(c *gin.Context) (*GetArgs, error) {
 		PWD:      c.Query("pwd"),
 		File:     c.Query("file"),
 		FileIdx:  fileIdx,
+		FromTool: common.ToolByURL(c.Query("tool")),
 		Claims:   api.GetClaimsFromContext(c),
 		User:     auth.GetUserFromContext(c),
 	}, nil

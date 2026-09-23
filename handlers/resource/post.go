@@ -137,9 +137,25 @@ func (s *Handler) post(c *gin.Context) {
 		return
 	}
 
-	s.tb.Build("index").HTML(http.StatusAccepted, web.NewContext(c).WithData(PostData{
-		Job:         loadJob,
-		Args:        args,
-		Instruction: args.Instruction,
-	}))
+	s.tb.Build("index").HTML(http.StatusAccepted, web.NewContext(c).WithData(newPostData(loadJob, args)))
+}
+
+// newPostData is the page a submit answers with: the view it was submitted
+// from, now carrying the load job's log.
+//
+// A tool page's forms send the page's path in the hidden `instruction` field.
+// Without the Tool the answer rendered the home page's H1 and <title> under
+// the tool's URL (the POST answers 202, so the address bar does not move) —
+// someone who came to convert a magnet saw the page change its mind. The
+// Tool also puts the tool's slug into the log host (partials/load/progress),
+// which is how it reaches the resource page after the redirect. The value is
+// looked up in common.Tools, so a forged one is dropped, Instruction included:
+// an unknown instruction used to render neither the home body nor a tool's.
+func newPostData(j *job.Job, args *PostArgs) PostData {
+	d := PostData{Job: j, Args: args}
+	if t := common.ToolByURL(args.Instruction); t != nil {
+		d.Tool = t
+		d.Instruction = t.Url
+	}
+	return d
 }

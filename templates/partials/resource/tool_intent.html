@@ -1,0 +1,36 @@
+{{/* The resource page's answer to the tool page the torrent was submitted on
+     (?tool=<slug>; docs/tool_pages.md, «Намерение tool-страницы после сабмита»).
+
+     /magnet-to-torrent (Umami, the 2026-09 SEO review): 38.7% of its
+     sessions download only the .torrent and 23.5% download files; the
+     .torrent-only sessions made 0 paid clicks, the file downloaders 8.1 per
+     1000. The line offers the other road — the files themselves, over HTTP —
+     right under the .torrent button, without taking the .torrent away. It
+     says nothing about speed: the download job's own card prices the wait
+     (downloadPitch).
+
+     The button is a link to #content: without JS the browser scrolls to the
+     file card and the file list, where the real download buttons are. With
+     JS, lib/toolIntent.js presses the page's own button instead — the
+     directory archive if there is a list, the file's download otherwise — so
+     this line never keeps a copy of those forms that could drift from them.
+     tool-intent-direct (+ tool) counts the presses; the download that follows
+     is counted by the real button's own event, as any other.
+
+     Called with the view context ($): .Data = GetData. Renders nothing for
+     any other arrival, any other tool, or a torrent with nothing to download. */}}
+{{ define "resource/tool_intent" }}
+{{- with .Data }}{{ with .Args }}{{ with .FromTool }}
+{{- if and (eq .Url "magnet-to-torrent") (or $.Data.List $.Data.Item) }}
+<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 md:justify-end text-sm text-w-sub" data-tool-intent="{{ .Url }}">
+    <span>{{ t $.Lang "resource.toolIntent.magnetToTorrent" }}</span>
+    <a href="#content" class="btn btn-sm btn-soft-cyan whitespace-nowrap" data-tool-intent-direct data-umami-event="tool-intent-direct" data-umami-event-tool="{{ .Url }}">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        {{ t $.Lang "resource.download" }}
+    </a>
+</div>
+{{- end }}
+{{- end }}{{ end }}{{ end }}
+{{- end }}

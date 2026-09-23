@@ -42,13 +42,7 @@ func (s *Handler) index(c *gin.Context) {
 	instruction := strings.TrimPrefix(c.Request.URL.Path, "/")
 
 	// Find the matching tool based on the current URL
-	var currentTool *common.Tool
-	for i := range common.Tools {
-		if common.Tools[i].Url == instruction {
-			currentTool = &common.Tools[i]
-			break
-		}
-	}
+	currentTool := common.ToolByURL(instruction)
 
 	data := &Data{
 		Instruction: instruction,
