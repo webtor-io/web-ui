@@ -150,23 +150,25 @@ func NewHelper(secret string) *Helper {
 	return &Helper{secret: secret}
 }
 
-// TorrentFileURL is the download link for the resource's .torrent file,
-// signed for a few hours so the URL cannot be planted on a torrent index as a
-// permanent host (see torrent_link.go).
-// StatusToken is the credential the status badge sends when it opens the
-// stream; empty when no session secret is configured (the stream then
-// checks nothing, as before).
-func (s *Helper) StatusToken(r *ExtendedResource) string {
+// StatusToken is the credential a page hands to whatever opens the status
+// stream for resourceID — the badge on the resource page, the progress rows
+// on /vault. Every page that opens the stream must render one: the handler
+// refuses the stream without it. Empty when no session secret is configured
+// (the stream then checks nothing, as before).
+func (s *Helper) StatusToken(resourceID string) string {
 	if s.secret == "" {
 		return ""
 	}
-	tok, err := SignStatusToken(s.secret, r.ID, time.Now())
+	tok, err := SignStatusToken(s.secret, resourceID, time.Now())
 	if err != nil {
 		return ""
 	}
 	return tok
 }
 
+// TorrentFileURL is the download link for the resource's .torrent file,
+// signed for a few hours so the URL cannot be planted on a torrent index as a
+// permanent host (see torrent_link.go).
 func (s *Helper) TorrentFileURL(r *ExtendedResource) string {
 	plain := "/" + r.ID + ".torrent"
 	if s.secret == "" {

@@ -103,7 +103,7 @@ func TestStatusToken(t *testing.T) {
 	if err := CheckTorrentFileToken(secret, tok, hash, now); err == nil {
 		t.Fatal("status token fetched the .torrent")
 	}
-	if got := NewHelper("").StatusToken(&ExtendedResource{ResourceResponse: &ra.ResourceResponse{ID: hash}}); got != "" {
+	if got := NewHelper("").StatusToken(hash); got != "" {
 		t.Fatalf("no secret must mean no token, got %q", got)
 	}
 }

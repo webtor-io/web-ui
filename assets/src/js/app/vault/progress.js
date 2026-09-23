@@ -119,7 +119,34 @@ function renderBadge(status, savedLabel) {
     return `<span class="${config.classes}">${inner}</span>`;
 }
 
-function attachRow(row) {
+// The status stream takes a page-issued, hash-bound token that lives an hour
+// (handlers/resource/torrent_link.go); a vaulting is watched for longer. When
+// a stream is refused, reload the table the async way: this.reload()
+// (lib/async.js asyncLayout) re-fetches /vault with X-Layout
+// "vault/pledges_table", swaps in rows with fresh tokens and re-runs this
+// init. At most once per RELOAD_MIN_MS per view, so a dead stream never
+// becomes a loop.
+const RELOAD_MIN_MS = 60 * 1000;
+
+function renew(root) {
+    if (root._vaultProgressGone || typeof root.reload !== 'function') return;
+    const last = root._vaultProgressReloadAt || 0;
+    if (Date.now() - last < RELOAD_MIN_MS) return;
+    root._vaultProgressReloadAt = Date.now();
+    // loadAsyncView only destroys views *inside* the target; this view is the
+    // target, so close our own streams before the swap re-inits it.
+    closeAll(root);
+    root.reload();
+}
+
+function closeAll(root) {
+    if (root._vaultProgressSources) {
+        root._vaultProgressSources.forEach((s) => s.close());
+        root._vaultProgressSources = null;
+    }
+}
+
+function attachRow(root, row) {
     const resourceId = row.dataset.resourceId;
     const csrf = row.dataset.csrf;
     if (!resourceId || !csrf) return null;
@@ -127,7 +154,9 @@ function attachRow(row) {
     const savedLabel = row.dataset.vaultSavedLabel || '';
     const badge = row.querySelector('[data-vault-progress-badge]');
 
-    const url = `${langPath(`/${resourceId}/status`)}?_csrf=${encodeURIComponent(csrf)}`;
+    let url = `${langPath(`/${resourceId}/status`)}?_csrf=${encodeURIComponent(csrf)}`;
+    const statusToken = row.dataset.statusToken || '';
+    if (statusToken) url += `&token=${encodeURIComponent(statusToken)}`;
     const source = new EventSource(url);
 
     source.onmessage = (e) => {
@@ -144,27 +173,31 @@ function attachRow(row) {
             source.close();
         }
     };
+    source.onerror = () => {
+        // A refused stream (403 — token expired) closes the EventSource for
+        // good; network blips reconnect on their own with the same URL.
+        if (statusToken && source.readyState === EventSource.CLOSED) renew(root);
+    };
 
     return source;
 }
 
 av(async function () {
     const root = this;
+    root._vaultProgressGone = false;
     const rows = root.querySelectorAll('[data-vault-progress]');
     if (!rows.length) return;
 
     const sources = [];
     rows.forEach((row) => {
-        const s = attachRow(row);
+        const s = attachRow(root, row);
         if (s) sources.push(s);
     });
     root._vaultProgressSources = sources;
 }, function () {
     const root = this;
-    if (root._vaultProgressSources) {
-        root._vaultProgressSources.forEach((s) => s.close());
-        root._vaultProgressSources = null;
-    }
+    root._vaultProgressGone = true;
+    closeAll(root);
 });
 
 export {};

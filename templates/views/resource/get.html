@@ -17,7 +17,7 @@
      then the view re-inits (lib/async.js asyncLayout, lib/loadAsyncView.js). Same route,
      same edge challenge. Called with the view context ($): .Data = GetData. */}}
 {{ define "resource/status_inner" }}
-<div id="torrent-status-badge" data-status-token="{{ .Data.Resource | statusToken }}">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
+<div id="torrent-status-badge" data-status-token="{{ statusToken .Data.Resource.ID }}">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
 {{ "resource/status.js" | asset }}
 {{ end }}
 {{/* The status where the eye cannot lose it (owner, 2026-09-19). Measured:

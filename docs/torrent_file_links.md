@@ -45,6 +45,17 @@ view's built-in `reload()` (`lib/async.js`, any element with
 and the view re-inits — at most once a minute. A person's edge challenge clearance
 lets that fetch through; a client that never loaded the page cannot renew.
 
+Every page that opens the stream must render the token — the handler cannot
+tell a page that forgot it from a bot. There are two: the resource page
+(`#torrent-status`, `resource/status.js`) and `/vault`, whose live-progress
+rows each carry `data-status-token` (`vault/progress.js`, template function
+`statusToken <infohash>`). `/vault` was left out on 2026-09-07 and its rows
+spun forever until 2026-09-24; `handlers/vault/render_test.go` now checks that
+every progress row carries a token the stream accepts. Renewal there works the
+same way: the pledges table sits in `#vault-pledges` with
+`data-async-layout` = `{{ template "vault/pledges_table" $ }}`, and a refused
+stream reloads the table with fresh tokens, at most once a minute.
+
 # Live and cold status
 
 Since 2026-09-09 the seeder answers stats without loading a torrent nobody is

@@ -1,3 +1,82 @@
+{{/* The pledges table. The wrapper around it is an async-layout target:
+     vault/progress.js calls this.reload() when the status streams are refused
+     (their tokens live an hour, a vaulting can take longer), which re-fetches
+     /vault with X-Layout = data-async-layout, swaps this table in with fresh
+     tokens and re-inits the script (lib/async.js asyncLayout). Called with the
+     view context ($). */}}
+{{ define "vault/pledges_table" }}
+<div class="bg-base-200/50 rounded-xl overflow-hidden">
+  <table class="table w-full table-fixed text-sm">
+    <colgroup>
+      <col class="w-8">
+      <col>
+      <col class="w-24">
+      {{/* Status: wide enough for the longest badge label on one line
+           ("Caching paused", "Waiting for seeders"); badges never wrap. */}}
+      <col class="w-36 sm:w-44">
+    </colgroup>
+    <thead>
+      <tr class="border-b border-w-line">
+        <th></th>
+        <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.name" }}</th>
+        <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.vp" }}</th>
+        <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.status" }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Data.Pledges }}
+        {{ if .Resource }}
+        <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors"{{ if .ShowProgress }} data-vault-progress data-resource-id="{{ .ResourceID }}" data-csrf="{{ $.CSRF }}" data-status-token="{{ statusToken .ResourceID }}" data-vault-saved-label="{{ t $.Lang "vault.pledges.saved" }}"{{ end }}>
+          <td class="text-center">
+            {{ if .Resource.Vaulted }}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
+                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+              </svg>
+            {{ else if .ShowProgress }}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon>
+                <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+              </svg>
+            {{ end }}
+          </td>
+          <td class="text-left">
+            <a href="{{ langPath $.Lang (printf "/%s" .ResourceID) }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
+              {{ .Resource.Name }}
+            </a>
+          </td>
+          <td class="text-center {{ if .IsFrozen }}text-w-cyan{{ else }}text-w-sub{{ end }}">
+            {{ if .IsFrozen }}
+              <span class="inline-flex items-center gap-1 whitespace-nowrap">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" aria-label="{{ t $.Lang "vault.pledges.frozen" }}"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
+                {{ printf "%.2f" .Amount }}
+              </span>
+            {{ else }}
+              {{ printf "%.2f" .Amount }}
+            {{ end }}
+          </td>
+          <td class="text-center">
+            {{ if not .Funded }}
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="badge badge-sm whitespace-nowrap bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
+                {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
+              </div>
+            {{ else if .ShowProgress }}
+              <span data-vault-progress-badge>
+                <span class="badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
+                  <span class="loading loading-dots loading-xs"></span>
+                </span>
+              </span>
+            {{ else }}
+              <span class="badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "vault.pledges.saved" }}</span>
+            {{ end }}
+          </td>
+        </tr>
+        {{ end }}
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ "vault/progress.js" | asset }}
+{{ end }}
 {{ define "title" }}{{ t $.Lang "vault.dashboard.title" }}{{ end }}
 {{ define "main" }}
 <section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
@@ -75,75 +154,8 @@
     <!-- Pledges Table -->
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
       {{ if .Data.Pledges }}
-        <div class="bg-base-200/50 rounded-xl overflow-hidden">
-          <table class="table w-full table-fixed text-sm">
-            <colgroup>
-              <col class="w-8">
-              <col>
-              <col class="w-24">
-              {{/* Status: wide enough for the longest badge label on one line
-                   ("Caching paused", "Waiting for seeders"); badges never wrap. */}}
-              <col class="w-36 sm:w-44">
-            </colgroup>
-            <thead>
-              <tr class="border-b border-w-line">
-                <th></th>
-                <th class="text-left text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.name" }}</th>
-                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.vp" }}</th>
-                <th class="text-center text-w-muted text-xs font-semibold tracking-wider uppercase">{{ t $.Lang "vault.pledges.status" }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{ range .Data.Pledges }}
-                {{ if .Resource }}
-                <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors"{{ if .ShowProgress }} data-vault-progress data-resource-id="{{ .ResourceID }}" data-csrf="{{ $.CSRF }}" data-vault-saved-label="{{ t $.Lang "vault.pledges.saved" }}"{{ end }}>
-                  <td class="text-center">
-                    {{ if .Resource.Vaulted }}
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
-                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-                      </svg>
-                    {{ else if .ShowProgress }}
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon>
-                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-                      </svg>
-                    {{ end }}
-                  </td>
-                  <td class="text-left">
-                    <a href="{{ langPath $.Lang (printf "/%s" .ResourceID) }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
-                      {{ .Resource.Name }}
-                    </a>
-                  </td>
-                  <td class="text-center {{ if .IsFrozen }}text-w-cyan{{ else }}text-w-sub{{ end }}">
-                    {{ if .IsFrozen }}
-                      <span class="inline-flex items-center gap-1 whitespace-nowrap">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" aria-label="{{ t $.Lang "vault.pledges.frozen" }}"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
-                        {{ printf "%.2f" .Amount }}
-                      </span>
-                    {{ else }}
-                      {{ printf "%.2f" .Amount }}
-                    {{ end }}
-                  </td>
-                  <td class="text-center">
-                    {{ if not .Funded }}
-                      <div class="flex flex-col items-center gap-0.5">
-                        <span class="badge badge-sm whitespace-nowrap bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
-                        {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
-                      </div>
-                    {{ else if .ShowProgress }}
-                      <span data-vault-progress-badge>
-                        <span class="badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
-                          <span class="loading loading-dots loading-xs"></span>
-                        </span>
-                      </span>
-                    {{ else }}
-                      <span class="badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "vault.pledges.saved" }}</span>
-                    {{ end }}
-                  </td>
-                </tr>
-                {{ end }}
-              {{ end }}
-            </tbody>
-          </table>
+        <div id="vault-pledges" data-async-layout="{{`{{ template "vault/pledges_table" $ }}`}}">
+          {{ template "vault/pledges_table" . }}
         </div>
       {{ else if .Data.IsFree }}
         <div class="bg-base-200/50 rounded-xl p-4 flex items-center gap-4 flex-wrap">
@@ -216,5 +228,4 @@
     </div>
   </div>
 </section>
-{{ "vault/progress.js" | asset }}
 {{ end }}
