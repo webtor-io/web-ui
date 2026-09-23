@@ -9,26 +9,51 @@ import (
 
 const catalogID = "Webtor.io"
 
+// manifestVersion goes up whenever what the manifest says changes: Stremio
+// keeps the manifest it installed, and a new version is what makes clients
+// and addon catalogues pick up the new text.
+const manifestVersion = "0.1.0"
+
+// manifestDescription says what the addon is without promising speed: how
+// fast a stream starts depends on the swarm, and how fast it plays on the
+// plan, which the manifest can only quote from the catalog.
+const manifestDescription = "Your Webtor library in Stremio, plus the Stremio addons you add to your Webtor profile, played through Webtor. " +
+	"Torrents download on Webtor's servers, not on your device, so your IP address never joins the swarm."
+
 type Manifest struct {
 	domain string
 	u      *auth.User
 	ht     bool
+	// freeMbps is the free plan's download cap from the offer catalog, 0
+	// when there is none to quote (no catalog: nothing is sold, and a
+	// deployment without plans has no cap to warn about).
+	freeMbps int64
 }
 
-func NewManifest(domain string, u *auth.User, hasToken bool) *Manifest {
+func NewManifest(domain string, u *auth.User, hasToken bool, freeMbps int64) *Manifest {
 	return &Manifest{
-		domain: domain,
-		u:      u,
-		ht:     hasToken,
+		domain:   domain,
+		u:        u,
+		ht:       hasToken,
+		freeMbps: freeMbps,
 	}
+}
+
+// Description is the manifest's description: what the addon does, plus the
+// free plan's cap when the catalog quotes one.
+func (s *Manifest) Description() string {
+	if s.freeMbps <= 0 {
+		return manifestDescription
+	}
+	return fmt.Sprintf("%s Speed depends on your plan: the free one streams at up to %d\u00a0Mbit/s.", manifestDescription, s.freeMbps)
 }
 
 func (s *Manifest) GetManifest(c context.Context) (*ManifestResponse, error) {
 	m := &ManifestResponse{
 		Id:          "org.stremio.webtor.io",
-		Version:     "0.0.2",
+		Version:     manifestVersion,
 		Name:        "Webtor.io",
-		Description: "Stream your personal torrent library from Webtor directly in Stremio. Add torrents to your Webtor account and watch them instantly — no downloading, no setup, just click and play.",
+		Description: s.Description(),
 		Types:       []string{"movie", "series"},
 		Catalogs: []CatalogItem{
 			{"movie", catalogID},

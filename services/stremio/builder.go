@@ -30,6 +30,7 @@ type Builder struct {
 	tn               *tn.Client
 	titles           tn.TitleResolver
 	tnCache          *lazymap.LazyMap[*StreamsResponse]
+	freeCap          func() int64
 }
 
 func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, requestURLMapper *rum.RequestURLMapper, tnClient *tn.Client, titles tn.TitleResolver) *Builder {
@@ -60,8 +61,19 @@ func NewBuilder(c *cli.Context, pg *cs.PG, cl *http.Client, rapi *api.Api, reque
 	}
 }
 
+// WithFreeCap tells the manifest where to read the free plan's download cap
+// (Mbit/s, 0 = none to quote). Without it the manifest quotes no speed.
+func (s *Builder) WithFreeCap(f func() int64) *Builder {
+	s.freeCap = f
+	return s
+}
+
 func (s *Builder) BuildManifestService(u *auth.User, hasToken bool) (ManifestService, error) {
-	return NewManifest(s.domain, u, hasToken), nil
+	var freeMbps int64
+	if s.freeCap != nil {
+		freeMbps = s.freeCap()
+	}
+	return NewManifest(s.domain, u, hasToken, freeMbps), nil
 }
 
 func (s *Builder) BuildCatalogService(u *auth.User) (CatalogService, error) {
