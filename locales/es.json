@@ -36,6 +36,7 @@
     "home.description": "Sitio web de torrents online y gratuito para transmitir y descargar torrents directamente en el navegador — sin app, sin cliente, sin instalar. Código abierto y privado.",
     "home.ogTitle": "Webtor.io — Streaming y descarga de torrents en el navegador",
     "home.ogDescription": "Transmite y descarga cualquier torrent directamente en el navegador — gratis, código abierto, sin instalar nada. Tu reproductor de torrents web en cualquier dispositivo.",
+    "meta.ogImageAlt": "Webtor: transmite y descarga torrents en tu navegador sin instalar ningún cliente",
     "home.jsonLdDescription": "Reproductor de torrents web gratuito para transmitir y descargar torrents directamente en el navegador, sin software.",
     "home.badge": "Código abierto · Sin instalación",
     "home.heading": "Transmite y descarga",

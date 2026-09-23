@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -196,14 +197,34 @@ func newResult(body []byte) *Result {
 	}
 }
 
+// defaultOGCacheID keys the rendered banner by the banner file's bytes.
+// A fixed key outlived the artwork: the S3 copy rendered from the previous
+// pub/webtor.jpg kept being served after the file was redrawn, because
+// nothing ever expires it.
+var defaultOGCacheID = sync.OnceValue(func() string {
+	return bannerCacheID(defaultOGBannerPath)
+})
+
+// bannerCacheID is "default-" plus a digest of the file, or plain "default"
+// when the file cannot be read — Fetch then fails with the real error, and
+// nothing is cached under either key.
+func bannerCacheID(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "default"
+	}
+	sum := sha256.Sum256(b)
+	return fmt.Sprintf("default-%x", sum[:8])
+}
+
 // defaultOGSource returns the brand banner wrapped as a Source so it
 // flows through the same render+cache pipeline as real artwork. CacheID
 // is stable across resources so the rendered banner is cached once and
-// reused for every OG fallback site-wide.
+// reused for every OG fallback site-wide, and changes with the banner.
 func (s *Service) defaultOGSource() *Source {
 	return &Source{
 		Kind:    sourceDefault,
-		CacheID: "default",
+		CacheID: defaultOGCacheID(),
 		Fetch: func(ctx context.Context) (image.Image, error) {
 			f, err := os.Open(defaultOGBannerPath)
 			if err != nil {

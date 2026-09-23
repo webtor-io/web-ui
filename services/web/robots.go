@@ -16,9 +16,11 @@ const stagingCtxKey = "webStaging"
 // which overrides the header (last c.Header() call wins before flush).
 // sitemap.xml and robots.txt are exempted — search engines consume them
 // as directives, not as pages to index. Favicons, PWA manifest, and the
-// og:image are also exempted: Google's favicon crawler honors
+// share images are also exempted: Google's favicon crawler honors
 // X-Robots-Tag on image responses and will drop the site icon from
-// search results otherwise.
+// search results otherwise. /og-card.png is the og:image of every page
+// without a card of its own; /webtor.jpg is the embed creative and the
+// artwork of last resort behind a resource page's card.
 //
 // With staging=true every response gets noindex — no IndexFollow
 // opt-ins, no asset exemptions — so a staging host can never enter the
@@ -46,7 +48,7 @@ func isIndexableAsset(path string) bool {
 	case "/sitemap.xml", "/robots.txt",
 		"/favicon.ico", "/favicon.svg",
 		"/manifest.webmanifest",
-		"/webtor.jpg":
+		"/og-card.png", "/webtor.jpg":
 		return true
 	}
 	if strings.HasPrefix(path, "/favicon-") ||

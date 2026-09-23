@@ -19,7 +19,7 @@
     <meta property="og:url" content="{{ canonicalURL $.Lang "/" }}">
     {{ end }}
     {{ end }}
-    <meta property="og:image" content="{{ domain }}/assets/night/favicon.svg">
+    {{ template "og_card" . }}
 {{ end }}
 {{ define "head_extra" }}
     {{ with .Data }}{{ if .Tool }}
