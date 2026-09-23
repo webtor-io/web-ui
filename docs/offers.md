@@ -62,22 +62,113 @@ Two rules fall out of this:
 
 ## Surfaces
 
-| Surface | Shown to | Says | Umami |
-|---|---|---|---|
-| Promo banner (`partials/extend.html`, deployment-provided) | not paying | the plan's speed and trial | `promo` |
-| Download ready (`action/download_file.html`) | free | the limit, this file's wait, "up to 10× faster" | `donate-download`, `donate-download-shown` |
-| Cap modal (`action/errors/slow_download.html`) | free capped / paid capped | "watch without the speed cap" / compare plans | `donate-slow-download` |
-| Grace popup (`action/stream_video.html`) | free, after the grace window | "keep watching at full speed" | `donate-grace` |
-| No peers, dead swarm (`action/errors/no_peers.html`) | free, when the plan has Vault | "save to Vault" — never Mbps | `donate-no-peers` |
-| Stremio paywall clip (`handlers/stremio/paywall.go`, `pub/stremio/paywall-<lang>.mp4`) | free, on a stream only Webtor's servers could play; only when the plan has a trial the checkout can start | "start a free trial" at `webtor.io/trial` (→ the plan's checkout) — no numbers, the clip is a static video | none: `stremio paywall video` / `trial shortlink` log lines and `webui_*` counters (docs/stremio.md) |
-| Onboarding locked steps | free | trial length | `onboarding-pro-*` |
-| `/donate` cards | everyone | speed, Vault, trial plaque, RECOMMENDED | `donate-trial-plaque`, `donate-patreon-join` |
-| `/speedtest` plans | everyone | tiers and caps from the catalog | `donate-speedtest` |
-| `/watch-torrents-ios` comparison (`about/sections.html`, `Cap`) | everyone | the free cap and that a plan raises it; only with `hasPlans` and a capped free tier | — |
+| Surface | Shown to | Says | Umami | `/trial?from=` |
+|---|---|---|---|---|
+| Promo banner (`partials/extend.html`, deployment-provided) | not paying | the plan's speed and trial | `promo` | `promo-banner` |
+| Download ready (`action/download_file.html`) | free | the limit, this file's wait, "up to 10× faster" | `donate-download`, `donate-download-shown` | `download-nudge` |
+| Cap modal (`action/errors/slow_download.html`) | free capped / paid capped | "watch without the speed cap" / compare plans | `donate-slow-download` | `limit-modal` (free only; the paid "compare plans" goes to `/donate`) |
+| Grace popup (`action/stream_video.html`) | free, after the grace window | "keep watching at full speed" | `donate-grace` | `grace` |
+| No peers, dead swarm (`action/errors/no_peers.html`) | free, when the plan has Vault | "save to Vault" — never Mbps | `donate-no-peers` | `no-peers` |
+| Stremio paywall clip (`handlers/stremio/paywall.go`, `pub/stremio/paywall-<lang>.mp4`) | free, on a stream only Webtor's servers could play; only when the plan has a trial the checkout can start | "start a free trial" at `webtor.io/trial` (→ the plan's checkout) — no numbers, the clip is a static video | none: `stremio paywall video` / `trial shortlink` log lines and `webui_*` counters (docs/stremio.md) | none — the QR code carries `utm_campaign=paywall` (counted as `campaign="paywall"`, `from="none"`); the clips are not re-rendered for this |
+| Onboarding locked steps (`partials/onboarding_checklist.html`, `services/onboarding`) | free | trial length | `onboarding-pro-*` | `onboarding` |
+| `/donate` cards | everyone | speed, Vault, trial plaque, RECOMMENDED | `donate-trial-plaque`, `donate-patreon-join` | `donate` — the promo card's trial plaque and its **monthly** Join only |
+| `/speedtest` plans | everyone | tiers and caps from the catalog | `donate-speedtest` | — (links `/donate`, starts no trial) |
+| `/watch-torrents-ios` comparison (`about/sections.html`, `Cap`) | everyone | the free cap and that a plan raises it; only with `hasPlans` and a capped free tier | — | — |
 
 Each CTA carries `data-umami-event-target` = `trial` | `checkout` | `donate`, so the
-funnel is readable per step, and links to the plan's own checkout when there is one —
-`/donate` is the fallback, not the default.
+funnel is readable per step. Where it leads follows the same three cases: a CTA that
+starts the promo plan's trial links to **`/trial?from=<surface>`** (next section);
+without a trial the checkout can start, to the plan's own checkout; without a
+checkout, to `/donate`. `/donate` is the fallback, not the default.
+
+No letter starts a trial today: the winback letter sells a discount on a particular
+plan (a direct checkout, below), the welcome letter manages a membership already
+bought.
+
+## The trial link: `/trial?from=`
+
+Every button that starts the **promo plan's** free trial links to `/trial` on our own
+site (`handlers/trial`, docs/stremio.md "`/trial`"), which redirects to the very
+checkout the button used to link to. The hop is a measurement on our side of the
+provider, which drops utm parameters: the server records the visit whatever blocks
+analytics in the browser, and a signed-in one carries `user_hash`, so it joins the
+account that later shows up with a plan. Each visit logs `trial shortlink` with `from`
+and counts `webui_trial_shortlink_total{target,campaign,from}`; the Umami click
+events stay as they were.
+
+Only the promo plan's trial goes through `/trial`, because `/trial` always sends to the
+promo plan (`offer.Promo()`, read at click time). Links that name a particular plan, or
+no plan, stay as they are: the other `/donate` cards (a trial on a non-promo card
+included), every annual Join, the Patreon block's link to the Patreon page
+(`/donate/patreon`), the winback letter's discount checkout, "Manage in Patreon" in the
+welcome letter, and every "compare plans" / "upgrade" link to `/donate` (the paid cap
+modal, `/speedtest`, Vault, profile sections, the AI-subtitles and Discover AI locks).
+
+**The surfaces are a closed list**, `offer.TrialFroms` (`services/offer/trial_link.go`):
+`promo-banner`, `download-nudge`, `limit-modal`, `grace`, `no-peers`, `onboarding`,
+`donate`. The query string is client-supplied, so anything else is counted as `other`
+(its raw value, cut to 64 bytes, goes to the log line as `from_raw` — that is how a link
+placed by hand in a post or a listing shows up), and a visit without `from` — the
+Stremio clip, a typed `webtor.io/trial` — as `none`.
+
+**Only when `/trial` will start a trial.** A surface links to `/trial` only while the
+promo plan has a trial the checkout can start (`offer.StartsTrial`: `TrialDays > 0`,
+which `offerFor` sets only together with the trial checkout). Otherwise `/trial` would
+lead to the plain checkout — the surface links there itself — or, without a catalog
+(self-hosted), be a 404. So a deployment without a storefront renders exactly what it
+rendered before.
+
+In a template the link is one call, and it reads the same offer as the rest of the
+button, so the link, the umami target and the "7 days free" line never disagree:
+
+```
+href="{{ or (trialURL $.Lang "grace" $offer) $offer.URL (langPath $.Lang "/donate") }}"
+```
+
+`trialURL lang from offer` returns `<lang prefix>/trial?from=<from>`, or `""` without a
+startable trial; an unknown `from` is a render **error**, not `other`, so a typo fails
+the surface's render test. Go code that hands a template a language-agnostic path uses
+`offer.TrialPath(offer.FromOnboarding)` (the onboarding steps: the link is a full page
+load there, since async navigation cannot follow the redirect to the provider). A letter,
+when one starts a trial, uses the absolute form `domain + i18n.LangPath(lang,
+offer.TrialPath(from))` with a new `email-<kind>` surface.
+
+On `/donate` the card's trial is the promo plan's only when `is_promo` is on its monthly
+price (`tierCard.PromoTrial`), and the page also asks `trialURL` with `promoOffer`: the
+cards come from the payments client and the offers from their own background refresh, so
+while the two disagree the card keeps its direct trial checkout.
+
+Measuring (Prometheus, the counter never carries user data):
+
+```promql
+# trial-link visits per surface, 7 days
+sum by (from) (increase(webui_trial_shortlink_total[7d]))
+# ... and where they went (checkout / donate / none)
+sum by (from, target) (increase(webui_trial_shortlink_total{from!="none"}[7d]))
+# the Stremio clip, as before
+sum(increase(webui_trial_shortlink_total{campaign="paywall"}[7d]))
+```
+
+From the log line (a signed-in visit also carries `user_hash`, joinable to the account
+as in docs/stremio.md):
+
+```logql
+sum by (from, target) (count_over_time({namespace="webtor",app="web-ui"} |= "trial shortlink" | logfmt [7d]))
+```
+
+A click on the button and a visit to `/trial` are not the same count: Umami counts the
+click (`data-umami-event`) in the browser and misses visitors who block it; the counter
+counts the arrival on the server. Compare each over time, not one against the other.
+
+The guard: every surface is rendered with a trial, with a checkout that cannot start
+one, without the membership provider and without a catalog, in every language, and each
+element whose umami target is `trial` must link to `/trial` naming its surface
+(`jobs/scripts/trial_links_render_test.go`, `services/template/trial_links_render_test.go`
+— the promo banner when the deployment's `extend.html` is present —,
+`handlers/donate/render_test.go`, `services/onboarding/render_test.go`; the link parser is
+`services/offer/offertest`). `TestTrialTargetsTakeTheirLinkFromTrialURL` also reads every
+template's source: a link whose target can be `trial` must take its href from
+`trialURL`, and every `trialURL` must name a listed surface.
 
 `downloadPitch` prices a download in time: best case at the viewer's cap next to best
 case on the plan ("4.3 GB takes about 2 h 3 min. With a subscription — about 12 min").
@@ -198,9 +289,12 @@ Preview (dev only): `/notifications/preview/winback?lang=ru` (`reason=trial`,
 ## Adding a surface
 
 1. `{{ with promoOffer }}` — no offer, no markup.
-2. Link `.URL` (fallback `/donate`); the button names the outcome for this surface,
-   `offer.trialNote` goes under it when `.TrialDays` (see "The button").
+2. Name the surface in `offer.TrialFroms` (a `From*` constant) and in the table above,
+   and link `{{ or (trialURL $.Lang "<surface>" $offer) $offer.URL (langPath $.Lang
+   "/donate") }}`; the button names the outcome for this surface, `offer.trialNote` goes
+   under it when `.TrialDays` (see "The button").
 3. Add `data-umami-event` + `tier` + `target`, and an impression event if the click rate
    is going to be read.
-4. Cover it in a render test with a catalog, without one, and with a trial the checkout
-   cannot start (`jobs/scripts/offer_render_test.go`).
+4. Cover it in a render test with a catalog, without one, with a trial the checkout
+   cannot start and without a checkout (`jobs/scripts/trial_links_render_test.go`,
+   `jobs/scripts/offer_render_test.go`).

@@ -299,12 +299,14 @@ hex of `md5(user_id)`, which SQL can recompute as `left(md5(user_id::text),
 ### `/trial`
 
 `handlers/trial`. `GET /trial` (and `/<lang>/trial`, via the i18n prefix
-routing) is the short link the clip prints:
+routing) is the short link the clip prints. Since 2026-09 it is also where
+every button on the site that starts the promo plan's trial links, as
+`/trial?from=<surface>` (docs/offers.md, "The trial link"):
 
 | Catalog | Answer |
 |---|---|
 | promo plan with a direct checkout (`Offer.URL`) | `302` to it — Patreon's trial checkout when the plan has a trial. The visit's utm parameters are not passed on: Patreon drops them |
-| promo plan, no direct checkout (`USE_PATREON=false`) | `302` to `/<lang>/donate?utm_source=stremio&utm_medium=video&utm_campaign=paywall`; utm parameters the visit brought win over these, anything else is dropped |
+| promo plan, no direct checkout (`USE_PATREON=false`) | `302` to `/<lang>/donate?utm_source=stremio&utm_medium=video&utm_campaign=paywall`; utm parameters the visit brought win over these, anything else is dropped. A visit with `?from` is a button on the site, not the clip: it gets only its own utm parameters (`/<lang>/donate` bare without any). The site's buttons link here only while the plan has a startable trial, so they reach this row only from a page rendered before the catalog changed |
 | no promo plan | `404` |
 
 Registered before the resource catch-all (`/:resource_id`, which answers
@@ -314,10 +316,14 @@ The QR code encodes `https://webtor.io/<lang>/trial?` + `trial.PaywallUTM`
 (no prefix for English).
 
 Every visit logs `trial shortlink` (Info) with `target` (`checkout`, `donate`,
-`none`), `lang`, the three utm values and, when the phone is signed in,
-`user_hash`; and counts `webui_trial_shortlink_total{target,campaign}`
-(`campaign`: `paywall`, `none`, `other`). This line is the measurement of the
-click: nothing from the clip survives the trip through Patreon.
+`none`), `lang`, `from` (a surface of `offer.TrialFroms`, `none`, `other` —
+with the raw value, cut to 64 bytes, as `from_raw`), the three utm values
+and, when the visitor is signed in, `user_hash`; and counts
+`webui_trial_shortlink_total{target,campaign,from}` (`campaign`: `paywall`,
+`none`, `other`). This line is the measurement of the click: nothing from
+the clip survives the trip through Patreon. The clip's visits are
+`campaign="paywall"`, `from="none"` — the QR code carries no `from`, and
+the clips were not re-rendered for it.
 
 ### Rendering the clips
 
@@ -405,7 +411,9 @@ Loki (`{namespace="webtor",app="web-ui"}`) has the first two steps, the
 
    Prometheus has both steps without the hashes:
    `sum(increase(webui_stremio_paywall_video_total{method="GET"}[7d]))`,
-   `sum by (target, campaign) (increase(webui_trial_shortlink_total[7d]))`.
+   `sum by (target, campaign) (increase(webui_trial_shortlink_total{from="none"}[7d]))`
+   (`from="none"` leaves out the site's own trial buttons, which share the
+   counter since 2026-09).
    A phone that scanned the code is usually not the account that clicked, so
    step 2 is a count, not a per-account join.
 

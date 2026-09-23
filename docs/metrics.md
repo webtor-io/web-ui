@@ -21,7 +21,7 @@ The collectors live in `services/metrics`, on the default registry, namespace
 | `webui_jobs_total` | counter | `job`, `outcome` | Async job script runs, `outcome` ∈ `ok` / `error` / `rejected` |
 | `webui_jobs_in_flight` | gauge | — | Job scripts currently executing |
 | `webui_stremio_paywall_video_total` | counter | `lang`, `method` | Stremio playback clicks answered with the paywall clip (`lang` of the clip; `HEAD` is Stremio's pre-play probe, not a view) — docs/stremio.md |
-| `webui_trial_shortlink_total` | counter | `target`, `campaign` | Visits to `/trial`: `target` ∈ `checkout` / `donate` / `none` (nothing on sale), `campaign` ∈ `paywall` / `none` / `other` from `utm_campaign` |
+| `webui_trial_shortlink_total` | counter | `target`, `campaign`, `from` | Visits to `/trial`: `target` ∈ `checkout` / `donate` / `none` (nothing on sale), `campaign` ∈ `paywall` / `none` / `other` from `utm_campaign`, `from` ∈ the site surfaces of `offer.TrialFroms` / `none` / `other` from `?from` (docs/offers.md, "The trial link") |
 
 ### Label rules
 
@@ -42,6 +42,13 @@ value would be a series kept for the life of the process.
   for (the English fallback included), never the account's raw setting;
   `campaign` on the trial counter collapses every `utm_campaign` but
   `paywall` and the empty one into `other` — the value is client-supplied.
+  So is `from`: the surfaces the site's own trial links name
+  (`offer.TrialFroms`: `promo-banner`, `download-nudge`, `limit-modal`,
+  `grace`, `no-peers`, `onboarding`, `donate`) keep their name, a visit
+  without the parameter is `none`, anything else `other`. Both are bounded
+  inside `metrics.TrialShortlink`, which takes the raw query values — at
+  most 3 × 3 × 9 = 81 series. A new surface is a new
+  entry in `offer.TrialFroms`, never a value passed through.
 - `rejected` is a torrent-store stoplist block — working as intended, so an
   error-rate alert on `outcome="error"` does not fire on a burst of blocked
   hashes.
