@@ -19,8 +19,11 @@ the hidden `instruction` field stays empty, so a dead path never becomes a
 tool instruction. The X-Robots-Tag is the route's default `noindex, follow`
 (resource pages are not in the sitemap). JSON clients get
 `404 {"status":"error","message":<key>}`; the async navigation renders the
-404 body like any other (`async.js` does not look at the status). Each answer
-logs `user error shown` with `err_key` and `surface=page`.
+404 body like any other (`async.js` does not look at the status). The answer
+is `Cache-Control: private, no-store`: it is the home page of whoever asked,
+signed-in navbar and continue-watching row included, and some of these URLs
+end in a static extension an edge may cache 404s for. Each answer logs
+`user error shown` with `err_key` and `surface=page`.
 
 **Why.** Both cases used to be `302 /?err=…`, i.e. a 200 home page with
 `index, follow`. A search engine cannot drop a URL that answers 200: in
@@ -54,8 +57,9 @@ failed form, not a page. The canonical still points at the clean URL.
 `/legal/<name>` renders `templates/views/legal/<name>.html`; a name without a
 view answers 404 with `error/page` and `error.page_not_found` (it used to be a
 bare 500 from the template manager — `template.Manager.HasView` is the
-check). `/legal/terms` is a 301 to `/legal/tos` in the request's language.
-Aliases live in `handlers/legal/handler.go`.
+check). `/legal/terms` is a 301 to `/legal/tos` in the request's language,
+and so is the bare `/legal` (without its own route the resource catch-all
+took it for a torrent id). Aliases live in `handlers/legal/handler.go`.
 
 ## `/assets`: Cache-Control from the hash
 

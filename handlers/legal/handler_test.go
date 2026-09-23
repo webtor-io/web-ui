@@ -58,6 +58,9 @@ func newLegalRouter(t *testing.T) *gin.Engine {
 	tm := template.NewManager[*web.Context](re)
 	tm.MustRegisterViews("error/*")
 	RegisterHandler(r, tm)
+	// serve.go registers the resource handler after this one; its catch-all
+	// is what a legal URL without a route of its own falls into.
+	r.GET("/:resource_id", func(c *gin.Context) { c.String(http.StatusNotFound, "[resource]") })
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +82,17 @@ func TestLegalPages(t *testing.T) {
 		{path: "/legal/terms", status: http.StatusMovedPermanently, location: "/legal/tos"},
 		// The i18n middleware has stripped /ru and set the language.
 		{path: "/legal/terms", lang: "ru", status: http.StatusMovedPermanently, location: "/ru/legal/tos"},
+		// The bare section names the terms; the resource catch-all used to
+		// take it for a torrent id.
+		{path: "/legal", status: http.StatusMovedPermanently, location: "/legal/tos"},
+		{path: "/legal", lang: "ru", status: http.StatusMovedPermanently, location: "/ru/legal/tos"},
 		// Unknown names were a bare 500 from the template manager.
 		{path: "/legal/nope", status: http.StatusNotFound, body: "[error][err=error.page_not_found]"},
 		{path: "/legal/", status: http.StatusNotFound, body: "[error][err=error.page_not_found]"},
 		{path: "/legal/tos/", status: http.StatusNotFound, body: "[error][err=error.page_not_found]"},
 		{path: "/legal/../index", status: http.StatusNotFound, body: "[error][err=error.page_not_found]"},
+		// ...and the catch-all still gets everything else.
+		{path: "/legals", status: http.StatusNotFound, body: "[resource]"},
 	}
 	for _, tc := range cases {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)

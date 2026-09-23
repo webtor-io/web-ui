@@ -29,9 +29,17 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
 	}
 
 	r.GET("/legal/*template", h.get)
+	// The bare /legal is not a page either, and without its own route the
+	// resource catch-all took it as a torrent id: a 404 home page saying
+	// "Invalid link or torrent file." The terms are what it names.
+	r.GET("/legal", h.index)
 }
 
 type Data struct {
+}
+
+func (s *Handler) index(c *gin.Context) {
+	c.Redirect(http.StatusMovedPermanently, web.LangURL(i18n.GetLang(c), "/legal/tos"))
 }
 
 func (s *Handler) get(c *gin.Context) {
