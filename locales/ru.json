@@ -91,6 +91,8 @@
     "about.features.discover.text": "Единый каталог из ваших аддонов Stremio. Поиск по названию, фильтр по жанрам и запуск просмотра через Webtor в один клик.",
     "about.features.chrome.title": "Расширение для Chrome",
     "about.features.chrome.text": "Установите расширение — каждая торрент- или магнет-ссылка будет автоматически открываться в Webtor.",
+    "ext.download.failed": "Расширение не передало файл — обновите расширение или загрузите .torrent-файл вручную.",
+    "ext.download.upload": "Загрузить .torrent-файл",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Встройте торрент-плеер на свой сайт с помощью нашего JavaScript SDK с открытым кодом.",
     "about.faq.badge": "FAQ",

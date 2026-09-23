@@ -1,38 +1,7 @@
 import {makeDebug} from '../../lib/debug';
-import {torrentBytes} from '../../lib/extTorrentBytes';
+import {receiveTorrent} from '../../lib/extDownload';
 const debug = await makeDebug('webtor:ext');
 
-function init() {
-    return new Promise((resolve) => {
-        if (window.__webtorInjected) return resolve();
-        debug('wait for initialization');
-        window.addEventListener('message', (event) => {
-            if (event.source !== window)
-                return;
-
-            if (event.data.webtorInjected) return resolve();
-        });
-    });
-}
-function fetch(downloadId) {
-    debug('request downloadId=%d', downloadId);
-    return new Promise((resolve) => {
-        window.addEventListener('message', (event) => {
-            if (event.source !== window) {
-                return;
-            }
-            if (event.data.torrent) {
-                const bytes = torrentBytes(event.data.torrent);
-                if (!bytes || bytes.length === 0) {
-                    debug('extension sent a torrent without bytes, ver=%s', event.data.ver);
-                    return;
-                }
-                resolve(new Blob([bytes]));
-            }
-        });
-        window.postMessage({downloadId}, '*');
-    });
-}
 function send(data) {
     const form = document.createElement('form');
     form.setAttribute('method', 'post');
@@ -60,6 +29,22 @@ function send(data) {
     form.setAttribute('action', '/');
     form.submit();
 }
-await init();
-const data = await fetch(window._downloadID)
-send(data);
+
+// The page's own message (templates/views/ext/download.html): the extension
+// did not hand the file over, update it or upload the .torrent here.
+function showFallback() {
+    const show = () => {
+        const el = document.getElementById('ext-fallback');
+        if (el) el.hidden = false;
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show, {once: true});
+    else show();
+}
+
+try {
+    debug('request downloadId=%d', window._downloadID);
+    send(new Blob([await receiveTorrent(window, window._downloadID)]));
+} catch (e) {
+    debug('no torrent from the extension: %s', e.message);
+    showFallback();
+}

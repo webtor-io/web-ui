@@ -91,6 +91,8 @@
     "about.features.discover.text": "Stremio addonlarından oluşan birleşik kataloğa göz at. Başlığa göre ara, türe göre filtrele ve tek tıkla Webtor üzerinden streaming başlat.",
     "about.features.chrome.title": "Chrome eklentisi",
     "about.features.chrome.text": "Eklentiyi yükle ve tıkladığın her torrent veya magnet linki otomatik olarak Webtor'da açılsın.",
+    "ext.download.failed": "Eklenti dosyayı aktarmadı — eklentiyi güncelleyin ya da .torrent dosyasını kendiniz yükleyin.",
+    "ext.download.upload": ".torrent dosyasını yükle",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Açık kaynak JavaScript SDK'mızla torrent streaming oynatıcısını kendi sitende göm.",
     "about.faq.badge": "SSS",

@@ -91,6 +91,8 @@
     "about.features.discover.text": "Blader door een verenigde catalogus samengesteld uit je Stremio-addons. Zoek op titel, filter op genre en start streaming via Webtor met één klik.",
     "about.features.chrome.title": "Chrome-extensie",
     "about.features.chrome.text": "Installeer de extensie en elke torrent of magnetlink waarop je klikt opent automatisch in Webtor.",
+    "ext.download.failed": "De extensie heeft het bestand niet doorgegeven — werk de extensie bij of upload het .torrent-bestand zelf.",
+    "ext.download.upload": "Het .torrent-bestand uploaden",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Embed de torrent streaming-speler op je eigen site met onze open-source JavaScript SDK.",
     "about.faq.badge": "FAQ",

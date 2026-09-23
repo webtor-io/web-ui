@@ -91,6 +91,8 @@
     "about.features.discover.text": "Przeglądaj zunifikowany katalog złożony z twoich addonów Stremio. Szukaj po tytule, filtruj po gatunku i uruchamiaj streaming przez Webtor jednym kliknięciem.",
     "about.features.chrome.title": "Rozszerzenie Chrome",
     "about.features.chrome.text": "Zainstaluj rozszerzenie i każdy link torrent lub magnet, na który klikniesz, otworzy się automatycznie w Webtor.",
+    "ext.download.failed": "Rozszerzenie nie przekazało pliku — zaktualizuj je albo wgraj plik .torrent ręcznie.",
+    "ext.download.upload": "Wgraj plik .torrent",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Osadź odtwarzacz strumieniowy torrentów na własnej stronie dzięki naszemu open-source SDK JavaScript.",
     "about.faq.badge": "FAQ",

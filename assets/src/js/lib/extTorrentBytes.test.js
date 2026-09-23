@@ -20,3 +20,26 @@ test('anything else yields no bytes instead of an empty file', () => {
     assert.equal(torrentBytes({}), null);
     assert.equal(torrentBytes({ data: undefined }), null);
 });
+
+// A message's data may be built in another realm: the extension's world or a
+// frame. `instanceof ArrayBuffer` is false there, and the bytes read as none.
+test('bytes made in another realm are still bytes', async () => {
+    const vm = await import('node:vm');
+    const other = vm.createContext({});
+    const foreignBuffer = vm.runInContext(`new Uint8Array(${JSON.stringify(bytes)}).buffer`, other);
+    assert.equal(foreignBuffer instanceof ArrayBuffer, false, 'the fixture must come from another realm');
+    assert.deepEqual(Array.from(torrentBytes(foreignBuffer)), bytes);
+    assert.deepEqual(Array.from(torrentBytes({ data: foreignBuffer })), bytes);
+    const foreignView = vm.runInContext(`new Uint8Array(${JSON.stringify(bytes)})`, other);
+    assert.deepEqual(Array.from(torrentBytes(foreignView)), bytes);
+    const foreignArray = vm.runInContext(JSON.stringify(bytes), other);
+    assert.deepEqual(Array.from(torrentBytes({ data: foreignArray })), bytes);
+});
+
+test('a view gives its own bytes, whatever its element type', () => {
+    const buf = new Uint8Array([0, ...bytes, 0]).buffer;
+    assert.deepEqual(Array.from(torrentBytes(new Uint8Array(buf, 1, bytes.length))), bytes);
+    assert.deepEqual(Array.from(torrentBytes(new DataView(buf, 1, bytes.length))), bytes);
+    const wide = new Uint16Array([0x0164, 0x3a38]); // little-endian: 64 01 38 3a
+    assert.deepEqual(Array.from(torrentBytes(wide)), Array.from(new Uint8Array(wide.buffer)));
+});

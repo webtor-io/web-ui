@@ -91,6 +91,8 @@
     "about.features.discover.text": "Navegue por um catálogo unificado montado a partir dos seus addons Stremio. Busque por título, filtre por gênero e comece o streaming pelo Webtor com um clique.",
     "about.features.chrome.title": "Extensão Chrome",
     "about.features.chrome.text": "Instale a extensão e todo torrent ou link magnet em que você clicar abre automaticamente no Webtor.",
+    "ext.download.failed": "A extensão não passou o arquivo — atualize a extensão ou envie o arquivo .torrent manualmente.",
+    "ext.download.upload": "Enviar o arquivo .torrent",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Incorpore o player de streaming torrent no seu próprio site com nosso SDK JavaScript open-source.",
     "about.faq.badge": "FAQ",

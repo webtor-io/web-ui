@@ -91,6 +91,8 @@
     "about.features.discover.text": "Procházej sjednocený katalog sestavený ze tvých Stremio addonů. Hledej podle názvu, filtruj podle žánru a spusť streaming přes Webtor jedním kliknutím.",
     "about.features.chrome.title": "Rozšíření pro Chrome",
     "about.features.chrome.text": "Nainstaluj rozšíření a každý torrent nebo magnet link na který klikneš se automaticky otevře ve Webtoru.",
+    "ext.download.failed": "Rozšíření soubor nepředalo — aktualizuj ho, nebo nahraj soubor .torrent ručně.",
+    "ext.download.upload": "Nahrát soubor .torrent",
     "about.features.sdk.title": "Embed SDK",
     "about.features.sdk.text": "Vlož torrent streaming přehrávač na svůj web pomocí našeho open-source JavaScript SDK.",
     "about.faq.badge": "FAQ",

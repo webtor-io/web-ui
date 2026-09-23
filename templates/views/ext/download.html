@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ .Lang }}">
     <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>loading torrent | webtor.io</title>
         <script>
             window._CSRF = "{{ .CSRF }}";
@@ -9,4 +11,19 @@
         </script>
         {{ "ext/download.js" | asset }}
     </head>
+    <body style="font-family: system-ui, sans-serif; margin: 0; padding: 16px;">
+        {{/* Shown by ext/download.js when the extension does not hand the
+             file over within its deadline, or hands over none: the page
+             used to stay blank for good. The form is the home page's upload,
+             so the torrent can still be opened by hand. */}}
+        <div id="ext-fallback" hidden style="max-width: 560px; margin: 15vh auto 0; line-height: 1.5;">
+            <p>{{ t .Lang "ext.download.failed" }}</p>
+            <form action="{{ langPath .Lang "/" }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="{{ .CSRF }}">
+                <input type="hidden" name="_sessionID" value="{{ .SessionID }}">
+                <input type="file" name="resource" accept=".torrent,application/x-bittorrent" required>
+                <button type="submit">{{ t .Lang "ext.download.upload" }}</button>
+            </form>
+        </div>
+    </body>
 </html>
