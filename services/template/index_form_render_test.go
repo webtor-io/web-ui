@@ -2,6 +2,7 @@ package template
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"os"
 	"reflect"
@@ -26,11 +27,14 @@ type indexData struct {
 
 // renderIndexMain executes views/index.html's "main" with the translation
 // funcs echoing their key, and the sub-templates it pulls in stubbed out.
-func renderIndexMain(t *testing.T, tool *hc.Tool) string {
+func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{}) string {
 	t.Helper()
 	echo := func(lang, key string, args ...interface{}) string { return key }
 	funcs := template.FuncMap{
-		"t":        echo,
+		"t": echo,
+		"tn": func(lang, key string, count int, args ...interface{}) string {
+			return fmt.Sprintf("tn(%s,%d,%v)", key, count, args)
+		},
 		"langPath": func(lang, p string) string { return p },
 		// Same semantics as web.Helper.Has.
 		"has": func(obj any, field string) bool {
@@ -67,6 +71,11 @@ func renderIndexMain(t *testing.T, tool *hc.Tool) string {
 	ctx := map[string]interface{}{
 		"Lang": "en",
 		"Data": &indexData{Tool: tool},
+	}
+	for _, e := range extra {
+		for k, v := range e {
+			ctx[k] = v
+		}
 	}
 	var buf bytes.Buffer
 	if err := tpl.ExecuteTemplate(&buf, "main", ctx); err != nil {
@@ -122,4 +131,29 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The error above the form quotes its numbers when it has them
+// (error.hash_length: how many characters were pasted, how many a full
+// infohash has) and is a plain message otherwise.
+func TestIndexErrorQuotesItsNumbers(t *testing.T) {
+	type errArgs struct{ Count, Full int }
+	page := renderIndexMain(t, nil, map[string]interface{}{
+		"ErrKey":  "error.hash_length",
+		"ErrArgs": &errArgs{Count: 39, Full: 40},
+	})
+	if !strings.Contains(page, `<pre class="error">tn(error.hash_length,39,[Full 40])</pre>`) {
+		t.Errorf("hash_length rendered without its numbers:\n%s", errorBlock(page))
+	}
+	page = renderIndexMain(t, nil, map[string]interface{}{"ErrKey": "error.free_text"})
+	if !strings.Contains(page, `<pre class="error">error.free_text</pre>`) {
+		t.Errorf("a plain message changed:\n%s", errorBlock(page))
+	}
+}
+
+func errorBlock(page string) string {
+	if i := strings.Index(page, `id="index-error"`); i >= 0 {
+		return page[i:min(len(page), i+300)]
+	}
+	return "(no error block)"
 }

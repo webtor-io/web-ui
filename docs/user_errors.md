@@ -44,37 +44,60 @@ setting) goes through `common.ResolveQueryHash`. After trimming it accepts:
 |---|---|
 | a magnet URI, any case of `magnet:` | its btih; a 32-character base32 btih is upper-cased first (the library decodes only the upper-case alphabet: on 2026-09-23, 17 valid lower-case magnets were refused as broken, 35 submits) |
 | a magnet inside other text (`url=magnet:?…`) | the magnet, up to the first whitespace |
+| a magnet that does not parse | tried once more percent-decoded (`magnet:?xt%3Durn:btih:…%26dn%3D…`, a magnet that was itself a query value: `/magnet2torrent?magnet=…`), then the input's standalone 40-hex token (`magnet://?xt=…`, `magnet:? xt=…`, a word joiner after the hash); only then `error.magnet_invalid`. A btmh-only magnet stays `error.v2_hash` |
+| the whole input is 40 hex or 32 base32, any case (also as `urn:btih:…`) | that infohash |
+| a standalone 40-hex token anywhere (`common.V1HashTokenR`, the share target's rule) | that infohash — a resource-page link with or without a scheme, a .torrent cache that names files by hash, `Info Hash: <hash>`, `<name> <hash>` |
 
 The `url=magnet:?…` shape used to come from our own `/show` redirect (where extension builds up to 0.1.12 send a clicked magnet): it wrapped the magnet in a second `url=`. Since 2026-09-23 `/show` passes the magnet unchanged (`handlers/migration`, test `TestShowMagnetRedirectCarriesTheMagnetUnchanged`); the rule above stays for links already out there.
-| the whole input is 40 hex or 32 base32, any case (also as `urn:btih:…`) | that infohash |
-| an http(s)/`www.` URL with a standalone 40-hex token (`common.V1HashTokenR`) | that infohash — a resource-page link, a .torrent cache that names files by hash |
 
 Everything else is refused, and says what it was:
 
 | Key | Error (`common.`) | Input | Share of the 1 126 submits refused on 2026-09-23, replayed through the new rules |
 |---|---|---|---|
-| `error.free_text` | `ErrQueryFreeText` ("no infohash found in query", the old wording) | anything that is not a link or a whole hash: titles, site names, a hash with a name next to it, a truncated bare hash | 66.5% |
+| `error.free_text` | `ErrQueryFreeText` ("no infohash found in query", the old wording) | anything that is not a link, a whole hash or a text with a 40-hex token: titles, site names, a name next to a cut hash | 66.5% |
 | `error.webpage_url` | `ErrQueryWebPage` | an http(s) URL without a 40-hex token, not to a `.torrent` | 19.5% |
 | `error.torrent_url` | `ErrQueryTorrentURL` | an http(s) URL whose path ends in `.torrent` and carries no hash | 2.0% |
-| `error.magnet_invalid` | `ErrMagnetInvalid`, `ErrMagnetNoHash` | a magnet that does not parse or has no `xt` (cut short, a line break inside) | 7.6% |
+| `error.magnet_invalid` | `ErrMagnetInvalid`, `ErrMagnetNoHash` | a magnet that does not parse or has no `xt` (cut short, a line break inside the hash), with no 40-hex token to fall back on | 5.3% |
+| `error.hash_length` | `*HashLengthError` (`errors.Is` `ErrHashLength`) | the whole input is hash characters, but not as many as a hash has: 16+ hex with a digit and a letter, or 24–40 base32 in one case with two digits 2–7; the message quotes both numbers ("it has 39 characters, a full one has 40") | 0 (the old rule accepted these and failed in the load job, so they were not in that day's refusals) |
 | `error.v2_hash` | `ErrV2Only` | a 64-hex SHA-256 digest (or the 68-hex `1220…` multihash, `urn:btmh:`), a btmh-only magnet | 0 |
 
-The other 4.3% of those refused submits are now accepted: lower-case base32
-magnets, magnets pasted after `url=`, a hash with a trailing space.
+The other 6.6% of those refused submits are now accepted: lower-case base32
+magnets, magnets pasted after `url=`, a hash with a trailing space, and
+(since the fallback of a magnet that does not parse) 26 submits whose hash
+was readable: `magnet://?xt=…`, a typo in `urn:btih`, text after the hash.
+
+`error.hash_length` is the one message with numbers. `web.ErrArgsOf(err)`
+returns them, `RedirectWithErrorAndPath` puts them next to `?err=` as
+`err_count` and `err_full` (and drops stale ones from the return URL),
+`web.ErrArgsFromQuery` reads them back for the home and tool pages (only a
+count of 1–1000 and a full length of 40 or 32 pass), and the page renders
+`tn` with them (plural forms in the locale files). The job log formats it the
+same way (`jobs/jobs.go`). A page that shows `ErrKey` with a plain `t` would
+print `<no value>` for the count, so a new render point for this key needs
+`ErrArgs` too.
 
 Why these rules:
 
-- **Free text is never searched for a hash.** The old rule took the first run
-  of 5–40 hex anywhere (`[0-9a-f]{5,40}`): "S01E02" became `btih:01e02`, a
-  URL with a numeric id became its digits, and ~490 such inputs a day
-  (2026-09-23, "encoded length 5…35" in the log) reached the load job and
-  ended on the "This magnet link is broken" card. `common.SHA1R` still exists
-  as a sanity check of the resource id in `GET /:resource_id`, not as a parser.
-- **A URL keeps the 40-hex extraction**, with the share target's `\b` guards:
-  a link to a resource page or to a hash-named .torrent worked before, and a
-  standalone 40-hex token in a URL is rarely anything else (a file checksum
-  would be one — it then ends on the dead-magnet card, as it did before). Text next to a hash ("Name <hash>") is
-  refused by design — the field wants the link or the hash alone.
+- **Nothing shorter than 40 hex is cut out of a longer string.** The old rule
+  took the first run of 5–40 hex anywhere (`[0-9a-f]{5,40}`): "S01E02" became
+  `btih:01e02`, a URL with a numeric id became its digits, and ~490 such
+  inputs a day (2026-09-23, "encoded length 5…35" in the log) reached the load
+  job and ended on the "This magnet link is broken" card. `common.SHA1R` still
+  exists as a sanity check of the resource id in `GET /:resource_id`, not as a
+  parser.
+- **A standalone 40-hex token is taken wherever it stands**, with the share
+  target's `\b` guards: a link to a resource page or to a hash-named .torrent,
+  `webtor.io/<hash>` without a scheme, `Info Hash: <hash>`, a name next to the
+  hash. Production has always accepted these, and `/share` does too; the
+  guards are what keep the fragments out — a token cannot be cut from
+  "S01E02", a numeric id, a 41-hex run or a 64-hex v2 digest. A token that is
+  not an infohash (a file checksum) ends on the dead-magnet card, as it always
+  did.
+- **A hash of the wrong length is told so.** A 39- or 41-character hash is a
+  copying slip, and "Webtor doesn't search by title" answered the wrong
+  question. The shape is kept narrow (see `hashLength`): no word is 16 hex
+  letters long, a long plain number is not a hash, and a run-together title
+  rarely has two of the digits 2–7 and none of 0, 1, 8, 9.
 - **A `.torrent` link is not fetched.** The form never did (it only worked when
   the URL carried the hash); the embed does fetch `torrentUrl`, through its
   own restricted client. The message says so and asks for the file.

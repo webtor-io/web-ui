@@ -268,3 +268,37 @@ func TestResourceGet_FixtureHashesAreHashes(t *testing.T) {
 		}
 	}
 }
+
+// A pasted infohash one character short is a form error like the others -- a
+// redirect back to the form -- and its numbers go with it, for the sentence
+// "it has 39 characters, a full one has 40".
+func TestPostHashOfTheWrongLengthSaysSo(t *testing.T) {
+	restAPI, seen := fakeRestAPI(t)
+	r := newResourceRouter(t, restAPI)
+
+	const sintel = "08ada5a7a6183aae1e09d831df6748d566095a10"
+	for _, tc := range []struct{ query, count, full string }{
+		{sintel[:39], "39", "40"},
+		{sintel + "f", "41", "40"},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("resource="+tc.query))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Return-Url", "/magnet-to-torrent")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusFound {
+			t.Fatalf("%s: status %d, want 302", tc.query, w.Code)
+		}
+		loc, err := url.Parse(w.Header().Get("Location"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := loc.Query()
+		if loc.Path != "/magnet-to-torrent" || q.Get("err") != "error.hash_length" || q.Get("err_count") != tc.count || q.Get("err_full") != tc.full {
+			t.Errorf("%s: Location %q, want /magnet-to-torrent?err=error.hash_length&err_count=%s&err_full=%s", tc.query, loc, tc.count, tc.full)
+		}
+	}
+	if s := seen(); len(s) != 0 {
+		t.Errorf("rest-api asked for %v: a refused input must not reach it", s)
+	}
+}

@@ -57,6 +57,9 @@ func ClassifyError(err error) string {
 	case errors.Is(err, common.ErrQueryTorrentURL):
 		return "error.torrent_url"
 
+	case errors.Is(err, common.ErrHashLength):
+		return "error.hash_length"
+
 	case errors.Is(err, common.ErrQueryFreeText):
 		return "error.free_text"
 
@@ -171,6 +174,24 @@ func ClassifyError(err error) string {
 	}
 }
 
+// ErrArgs are the numbers a user-facing message quotes, for the one key that
+// has any: error.hash_length says how many characters were pasted (Count,
+// which also picks the plural form) and how many a full infohash has (Full).
+type ErrArgs struct {
+	Count int
+	Full  int
+}
+
+// ErrArgsOf returns the numbers the message for err quotes, or nil when it
+// quotes none.
+func ErrArgsOf(err error) *ErrArgs {
+	var hl *common.HashLengthError
+	if errors.As(err, &hl) {
+		return &ErrArgs{Count: hl.Len, Full: hl.Full}
+	}
+	return nil
+}
+
 // StatusForErrKey maps a user-facing error key to the HTTP status the
 // centralized ErrorHandler should return. Defaults to 500; the transient
 // backend/auth failures map to 503 so clients and Cloudflare treat them as
@@ -186,7 +207,8 @@ func StatusForErrKey(key string) int {
 	case "error.service_unavailable", "error.upstream_unavailable":
 		return http.StatusServiceUnavailable
 	case "error.magnet_invalid", "error.turnstile_failed",
-		"error.free_text", "error.webpage_url", "error.torrent_url", "error.v2_hash":
+		"error.free_text", "error.webpage_url", "error.torrent_url", "error.v2_hash",
+		"error.hash_length":
 		return http.StatusBadRequest
 	case "error.magnet_no_metadata":
 		// Nothing answered upstream within the deadline: a gateway timeout,

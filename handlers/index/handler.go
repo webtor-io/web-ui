@@ -53,18 +53,21 @@ func (s *Handler) index(c *gin.Context) {
 		web.Noindex(c)
 	}
 	errKey := ""
+	var errArgs *web.ErrArgs
 	if c.Query("status") == "error" && c.Query("err") != "" {
 		errKey = c.Query("err")
+		errArgs = web.ErrArgsFromQuery(c.Request.URL.Query())
 	}
 
 	Render(c, s.tb, s.pg, http.StatusOK, &Data{
 		Instruction: instruction,
 		Tool:        currentTool,
-	}, errKey)
+	}, errKey, errArgs)
 }
 
 // Render answers with the home page (or a tool page, when data.Tool is set)
-// under the given status, errKey (when set) shown above the form. GET / is its
+// under the given status, errKey (when set) shown above the form with the
+// numbers in errArgs (nil for a message that quotes none). GET / is its
 // 200; a resource URL that names nothing is its 404 (handlers/resource), which
 // is the same page a visitor used to reach through a redirect to /?err=, now
 // at the URL they asked for.
@@ -72,7 +75,7 @@ func (s *Handler) index(c *gin.Context) {
 // tb must be able to build "index": this package registers the view, so a
 // caller from another package relies on RegisterHandler having run, the same
 // way handlers/resource's POST already does.
-func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status int, data *Data, errKey string) {
+func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status int, data *Data, errKey string, errArgs *web.ErrArgs) {
 	// Continue-watching is home-page only: tool pages are SEO landings and
 	// carry their own CTA.
 	if data.Tool == nil {
@@ -93,7 +96,7 @@ func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status
 	}
 
 	if errKey != "" {
-		ctx = ctx.WithErrKey(errKey)
+		ctx = ctx.WithErrKey(errKey).WithErrArgs(errArgs)
 	}
 
 	tb.Build("index").HTML(status, ctx)

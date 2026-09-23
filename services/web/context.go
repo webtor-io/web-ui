@@ -79,10 +79,13 @@ const (
 type OnboardingResolver func() *models.OnboardingChecklist
 
 type Context struct {
-	Data         any
-	CSRF         string
-	SessionID    string
-	ErrKey       string
+	Data      any
+	CSRF      string
+	SessionID string
+	ErrKey    string
+	// ErrArgs are the numbers the ErrKey message quotes, nil for a message
+	// that quotes none (every key but error.hash_length).
+	ErrArgs      *ErrArgs
 	User         *auth.User
 	Claims       *claims.Data
 	TierUpdated  bool
@@ -123,10 +126,19 @@ func (c *Context) WithErrKey(key string) *Context {
 	return &nc
 }
 
+// WithErrArgs sets the numbers the error message quotes (e.g. read back from
+// the query by ErrArgsFromQuery).
+func (c *Context) WithErrArgs(args *ErrArgs) *Context {
+	nc := *c
+	nc.ErrArgs = args
+	return &nc
+}
+
 // WithErr classifies the error into an i18n key and logs the original.
 func (c *Context) WithErr(err error) *Context {
 	nc := *c
 	nc.ErrKey = ClassifyError(err)
+	nc.ErrArgs = ErrArgsOf(err)
 	return &nc
 }
 

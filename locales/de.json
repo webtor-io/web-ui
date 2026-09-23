@@ -1700,6 +1700,10 @@
     "error.webpage_url": "Das ist ein Link zu einer Webseite, nicht zu einem Torrent. Öffne die Seite und kopiere dort den Magnet-Link, um ihn hier einzufügen — oder lade die .torrent-Datei herunter und dann hier hoch.",
     "error.torrent_url": "Das ist ein Link zu einer .torrent-Datei auf einer anderen Website, und solche Links kann Webtor nicht öffnen. Lade die Datei herunter und dann hier hoch.",
     "error.v2_hash": "Das ist ein BitTorrent-v2-Infohash, Webtor öffnet Torrents aber über ihren v1-Infohash (40 Zeichen). Nimm einen Magnet-Link mit v1-Infohash — Hybrid-Torrents haben beide — oder lade die .torrent-Datei hoch.",
+    "error.hash_length": {
+        "one": "Das sieht nach einem Infohash aus, hat aber {{.Count}} Zeichen — ein vollständiger hat {{.Full}}. Kopiere den ganzen Infohash oder Magnet-Link oder lade die .torrent-Datei hoch.",
+        "other": "Das sieht nach einem Infohash aus, hat aber {{.Count}} Zeichen — ein vollständiger hat {{.Full}}. Kopiere den ganzen Infohash oder Magnet-Link oder lade die .torrent-Datei hoch."
+    },
     "error.turnstile_failed": "Wir konnten nicht bestätigen, dass Sie kein Roboter sind. Versuchen Sie es erneut – wenn es weiter fehlschlägt, deaktivieren Sie Inhaltsblocker für diese Seite oder melden Sie sich an. Wenn Sie den Link in einer App (Telegram, Facebook …) geöffnet haben, öffnen Sie ihn stattdessen in Ihrem normalen Browser.",
     "action.turnstileCheck": "Wir prüfen, dass Sie kein Roboter sind",
     "error.support_infohash_required": "Bitte gib Infohash, Magnet oder Link des Torrents an – sonst wissen wir nicht, welchen du meinst.",

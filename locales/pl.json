@@ -1718,6 +1718,12 @@
     "error.webpage_url": "To link do strony internetowej, a nie do torrenta. Otwórz tę stronę, skopiuj z niej link magnet albo pobierz plik .torrent, a potem wklej link lub wgraj plik tutaj.",
     "error.torrent_url": "To link do pliku .torrent na innej stronie, a Webtor nie otwiera takich plików z linku. Pobierz plik, a potem wgraj go tutaj.",
     "error.v2_hash": "To infohash BitTorrent v2, a Webtor otwiera torrenty po infohashu v1 (40 znaków). Użyj linku magnet z infohashem v1 — torrenty hybrydowe mają oba — albo wgraj plik .torrent.",
+    "error.hash_length": {
+        "one": "Wygląda na infohash, ale ma {{.Count}} znak — pełny ma ich {{.Full}}. Skopiuj cały infohash albo link magnet lub wgraj plik .torrent.",
+        "few": "Wygląda na infohash, ale ma {{.Count}} znaki — pełny ma ich {{.Full}}. Skopiuj cały infohash albo link magnet lub wgraj plik .torrent.",
+        "many": "Wygląda na infohash, ale ma {{.Count}} znaków — pełny ma ich {{.Full}}. Skopiuj cały infohash albo link magnet lub wgraj plik .torrent.",
+        "other": "Wygląda na infohash, ale ma {{.Count}} znaku — pełny ma ich {{.Full}}. Skopiuj cały infohash albo link magnet lub wgraj plik .torrent."
+    },
     "error.turnstile_failed": "Nie udało się potwierdzić, że nie jesteś robotem. Spróbuj ponownie — jeśli nadal nie działa, wyłącz blokowanie treści dla tej strony lub zaloguj się. Jeśli link został otwarty w aplikacji (Telegram, Facebook…), otwórz go w zwykłej przeglądarce.",
     "action.turnstileCheck": "Sprawdzamy, czy nie jesteś robotem",
     "error.support_infohash_required": "Podaj infohash, magnet lub link do torrenta — bez tego nie wiemy, o który torrent chodzi.",

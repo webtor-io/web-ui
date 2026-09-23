@@ -397,7 +397,7 @@ func (s *Handler) notFound(c *gin.Context, err error) {
 	}
 	// The home page's own renderer: the "index" view is registered by
 	// handlers/index, which this handler's POST already renders too.
-	index.Render(c, s.tb, s.pg, http.StatusNotFound, &index.Data{}, key)
+	index.Render(c, s.tb, s.pg, http.StatusNotFound, &index.Data{}, key, nil)
 }
 
 func (s *Handler) prepareRateForm(d *GetData) *RateForm {

@@ -102,6 +102,9 @@ func (s *Jobs) errorFormatter(c *web.Context) job.ErrorFormatter {
 		// distribution of keys (and how much lands in error.generic) can be
 		// read off Loki: {app="web-ui"} |= "user error shown".
 		log.WithError(err).WithField("err_key", key).WithField("surface", "job").Info("user error shown")
+		if a := web.ErrArgsOf(err); a != nil {
+			return i18n.TranslateWithLocalizerPlural(loc, key, a.Count, map[string]any{"Full": a.Full})
+		}
 		return i18n.TranslateWithLocalizer(loc, key)
 	}
 }

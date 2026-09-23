@@ -2,11 +2,19 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/i18n"
 )
 
 func TestClassifyError_ResolutionNotSupported(t *testing.T) {
@@ -93,6 +101,12 @@ func TestClassifyError_FormInput(t *testing.T) {
 		{"Unavailable connection refused", "error.free_text"},
 		{"PermissionDenied unauthorized", "error.free_text"},
 		{"magnet:?xt=urn:btih:5e4bd524&dn=Service.Unavailable", "error.magnet_invalid"},
+		// Nothing but hash characters, not as many as a hash has: told so,
+		// not "Webtor doesn't search by title".
+		{hash[:39], "error.hash_length"},
+		{hash + "a", "error.hash_length"},
+		{"BCW2LJ5GDA5K4HQJ3AY56Z2I2VTASWQ", "error.hash_length"},
+		{"Sintel " + hash[:39], "error.free_text"},
 	}
 	en := englishMessages(t)
 	for _, tc := range cases {
@@ -112,7 +126,11 @@ func TestClassifyError_FormInput(t *testing.T) {
 		}
 	}
 	// A usable input is not an error at all.
-	for _, q := range []string{hash, "magnet:?xt=urn:btih:" + hash, "https://torrents.example/" + hash} {
+	for _, q := range []string{
+		hash, "magnet:?xt=urn:btih:" + hash, "https://torrents.example/" + hash,
+		"Info Hash: " + hash, "Sintel " + hash, hash + " Sintel", "webtor.io/" + hash,
+		"magnet2torrentmagnet=magnet:?xt%3Durn:btih:" + hash + "%26dn%3DSintel",
+	} {
 		if _, _, err := common.ResolveQueryHash(q); err != nil {
 			t.Errorf("%q: %v", q, err)
 		}
@@ -144,4 +162,85 @@ func englishMessages(t *testing.T) map[string]any {
 		t.Fatal(err)
 	}
 	return m
+}
+
+// error.hash_length quotes two numbers, so they travel with the key: out of
+// the error (ErrArgsOf), through the redirect's query next to ?err=, and back
+// (ErrArgsFromQuery) for the page that renders the message.
+func TestHashLengthArgsSurviveTheRedirect(t *testing.T) {
+	const hash = "08ada5a7a6183aae1e09d831df6748d566095a10"
+	_, _, err := common.ResolveQueryHash(hash[:39])
+	err = errors.Wrap(errors.Wrapf(err, "wrong resource provided query=%v", hash[:39]), "wrong args provided")
+	if got := ErrArgsOf(err); got == nil || *got != (ErrArgs{Count: 39, Full: 40}) {
+		t.Fatalf("ErrArgsOf through the wrappers: %+v, want 39 of 40", got)
+	}
+	if got := ErrArgsOf(errors.Wrap(common.ErrQueryFreeText, "wrong args provided")); got != nil {
+		t.Fatalf("a message without numbers got %+v", got)
+	}
+
+	gin.SetMode(gin.TestMode)
+	redirect := func(returnURL string, err error) url.Values {
+		t.Helper()
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+		RedirectWithErrorAndPath(c, returnURL, err)
+		// A POST redirect has no body, so only gin knows the status yet.
+		loc, perr := url.Parse(w.Header().Get("Location"))
+		if c.Writer.Status() != http.StatusFound || perr != nil {
+			t.Fatalf("status %d, Location %q", c.Writer.Status(), w.Header().Get("Location"))
+		}
+		return loc.Query()
+	}
+	q := redirect("/magnet-to-torrent", err)
+	if q.Get("err") != "error.hash_length" || q.Get("err_count") != "39" || q.Get("err_full") != "40" {
+		t.Fatalf("query %v, want err=error.hash_length err_count=39 err_full=40", q)
+	}
+	if got := ErrArgsFromQuery(q); got == nil || *got != (ErrArgs{Count: 39, Full: 40}) {
+		t.Fatalf("ErrArgsFromQuery(%v) = %+v", q, got)
+	}
+	// The form sits on the page that showed the previous error; submitting a
+	// title from there must not keep the hash's numbers.
+	q = redirect("/?status=error&err=error.hash_length&err_count=39&err_full=40&from=%2F", errors.Wrap(common.ErrQueryFreeText, "x"))
+	if q.Get("err") != "error.free_text" || q.Has("err_count") || q.Has("err_full") {
+		t.Fatalf("query %v: stale numbers kept", q)
+	}
+
+	// The URL is anyone's to write: only numbers an infohash can have pass.
+	for _, raw := range []string{"", "err_count=39", "err_full=40", "err_count=0&err_full=40",
+		"err_count=-3&err_full=40", "err_count=1001&err_full=40", "err_count=39&err_full=41", "err_count=x&err_full=40"} {
+		v, _ := url.ParseQuery(raw)
+		if got := ErrArgsFromQuery(v); got != nil {
+			t.Errorf("%q: got %+v, want nil", raw, got)
+		}
+	}
+	if got := ErrArgsFromQuery(url.Values{"err_count": {"31"}, "err_full": {"32"}}); got == nil || got.Full != 32 {
+		t.Errorf("base32: got %+v", got)
+	}
+}
+
+// The message itself, in every locale: both numbers in it, the plural form
+// the count asks for, and no "<no value>" (what a missing number renders as).
+func TestHashLengthMessageInEveryLocale(t *testing.T) {
+	root, err := os.OpenRoot("../../locales")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = root.Close() }()
+	svc := i18n.New(root.FS())
+	for _, lang := range i18n.SupportedLangs {
+		for _, a := range []ErrArgs{{16, 40}, {21, 40}, {22, 40}, {31, 32}, {39, 40}, {41, 40}, {42, 40}, {45, 40}} {
+			msg := i18n.TranslateWithLocalizerPlural(svc.Localizer(lang), "error.hash_length", a.Count, map[string]any{"Full": a.Full})
+			if msg == "error.hash_length" || strings.Contains(msg, "<no value>") ||
+				!strings.Contains(msg, fmt.Sprint(a.Count)) || !strings.Contains(msg, fmt.Sprint(a.Full)) {
+				t.Errorf("%s %d/%d: %q", lang, a.Count, a.Full, msg)
+			}
+		}
+	}
+	ru := svc.Localizer("ru")
+	for n, want := range map[int]string{41: "41 символ ", 42: "42 символа ", 39: "39 символов ", 12: "12 символов ", 22: "22 символа "} {
+		if msg := i18n.TranslateWithLocalizerPlural(ru, "error.hash_length", n, map[string]any{"Full": 40}); !strings.Contains(msg, want) {
+			t.Errorf("ru %d: %q, want %q", n, msg, want)
+		}
+	}
 }

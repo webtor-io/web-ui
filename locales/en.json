@@ -1762,6 +1762,10 @@
     "error.webpage_url": "This is a link to a web page, not to a torrent. Open that page, copy its magnet link or download its .torrent file, then paste or upload it here.",
     "error.torrent_url": "This is a link to a .torrent file on another site, and Webtor can't open those by link. Download the file, then upload it here.",
     "error.v2_hash": "This is a BitTorrent v2 infohash, and Webtor opens torrents by their v1 infohash (40 characters). Use a magnet link that has a v1 infohash — hybrid torrents have both — or upload the .torrent file.",
+    "error.hash_length": {
+        "one": "This looks like an infohash, but it has {{.Count}} character — a full one has {{.Full}}. Copy the whole infohash or magnet link, or upload the .torrent file.",
+        "other": "This looks like an infohash, but it has {{.Count}} characters — a full one has {{.Full}}. Copy the whole infohash or magnet link, or upload the .torrent file."
+    },
     "error.turnstile_failed": "We couldn't confirm you're not a robot. Try again — if it keeps failing, disable content blockers for this site or sign in. If you opened this link inside an app (Telegram, Facebook…), open it in your regular browser instead.",
     "action.turnstileCheck": "Checking that you are not a robot",
     "error.support_infohash_required": "Please add the torrent's infohash, magnet or link — without it we can't tell which torrent you mean.",

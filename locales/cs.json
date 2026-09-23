@@ -1718,6 +1718,12 @@
     "error.webpage_url": "Tohle je odkaz na webovou stránku, ne na torrent. Otevři tu stránku, zkopíruj z ní magnet odkaz nebo stáhni soubor .torrent a pak odkaz vlož nebo soubor nahraj sem.",
     "error.torrent_url": "Tohle je odkaz na soubor .torrent na jiném webu a Webtor takové soubory z odkazu otevřít neumí. Stáhni soubor a pak ho sem nahraj.",
     "error.v2_hash": "Tohle je infohash BitTorrentu v2, ale Webtor otevírá torrenty podle infohashe v1 (40 znaků). Použij magnet odkaz s infohashem v1 — hybridní torrenty mají oba — nebo nahraj soubor .torrent.",
+    "error.hash_length": {
+        "one": "Vypadá to jako infohash, ale má {{.Count}} znak, zatímco úplný infohash jich má {{.Full}}. Zkopíruj celý infohash nebo magnet odkaz, případně nahraj soubor .torrent.",
+        "few": "Vypadá to jako infohash, ale má {{.Count}} znaky, zatímco úplný infohash jich má {{.Full}}. Zkopíruj celý infohash nebo magnet odkaz, případně nahraj soubor .torrent.",
+        "many": "Vypadá to jako infohash, ale má {{.Count}} znaku, zatímco úplný infohash jich má {{.Full}}. Zkopíruj celý infohash nebo magnet odkaz, případně nahraj soubor .torrent.",
+        "other": "Vypadá to jako infohash, ale má {{.Count}} znaků, zatímco úplný infohash jich má {{.Full}}. Zkopíruj celý infohash nebo magnet odkaz, případně nahraj soubor .torrent."
+    },
     "error.turnstile_failed": "Nepodařilo se ověřit, že nejste robot. Zkuste to znovu – pokud to nepomůže, vypněte pro tento web blokování obsahu nebo se přihlaste. Pokud jste odkaz otevřeli uvnitř aplikace (Telegram, Facebook…), otevřete ho v běžném prohlížeči.",
     "action.turnstileCheck": "Ověřujeme, že nejste robot",
     "error.support_infohash_required": "Uveďte infohash, magnet nebo odkaz na torrent — bez toho nepoznáme, o který torrent jde.",

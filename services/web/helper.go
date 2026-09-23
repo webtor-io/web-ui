@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,10 +60,15 @@ func wantsJSON(c *gin.Context) bool {
 
 func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
 	errKey := ClassifyError(serr)
+	args := ErrArgsOf(serr)
 	log.WithError(serr).WithField("error_key", errKey).WithField("path", path).Warn("redirect with error")
 
 	if wantsJSON(c) {
-		c.JSON(http.StatusOK, gin.H{"status": "error", "message": errKey})
+		body := gin.H{"status": "error", "message": errKey}
+		if args != nil {
+			body["count"], body["full"] = args.Count, args.Full
+		}
+		c.JSON(http.StatusOK, body)
 		return
 	}
 	u, err := url.Parse(path)
@@ -74,8 +80,37 @@ func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
 	q.Set("status", "error")
 	q.Set("err", errKey)
 	q.Set("from", c.Request.URL.Path)
+	// The return URL is the page the form was on, which may itself be the
+	// answer to an earlier error: its numbers must not outlive their key.
+	q.Del(errCountParam)
+	q.Del(errFullParam)
+	if args != nil {
+		q.Set(errCountParam, strconv.Itoa(args.Count))
+		q.Set(errFullParam, strconv.Itoa(args.Full))
+	}
 	u.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, u.String())
+}
+
+// The numbers of an ErrArgs travel next to ?err= in the redirect.
+const (
+	errCountParam = "err_count"
+	errFullParam  = "err_full"
+)
+
+// ErrArgsFromQuery reads back what RedirectWithErrorAndPath put next to
+// ?err=, or nil. The URL is anyone's to write, so only what an infohash can
+// be passes: a count of 1 to 1000 characters, a full length of 40 or 32.
+func ErrArgsFromQuery(q url.Values) *ErrArgs {
+	n, err := strconv.Atoi(q.Get(errCountParam))
+	if err != nil || n < 1 || n > 1000 {
+		return nil
+	}
+	full, err := strconv.Atoi(q.Get(errFullParam))
+	if err != nil || (full != 40 && full != 32) {
+		return nil
+	}
+	return &ErrArgs{Count: n, Full: full}
 }
 
 func RedirectWithError(c *gin.Context, serr error) {

@@ -1700,6 +1700,10 @@
     "error.webpage_url": "Dit is een link naar een webpagina, niet naar een torrent. Open die pagina, kopieer de magnetlink of download het .torrent-bestand, en plak of upload het daarna hier.",
     "error.torrent_url": "Dit is een link naar een .torrent-bestand op een andere site, en zulke links kan Webtor niet openen. Download het bestand en upload het daarna hier.",
     "error.v2_hash": "Dit is een BitTorrent v2-infohash, maar Webtor opent torrents via hun v1-infohash (40 tekens). Gebruik een magnetlink met een v1-infohash — hybride torrents hebben ze allebei — of upload het .torrent-bestand.",
+    "error.hash_length": {
+        "one": "Dit lijkt een infohash, maar hij heeft {{.Count}} teken, terwijl een volledige infohash er {{.Full}} heeft. Kopieer de hele infohash of magnetlink, of upload het .torrent-bestand.",
+        "other": "Dit lijkt een infohash, maar hij heeft {{.Count}} tekens, terwijl een volledige infohash er {{.Full}} heeft. Kopieer de hele infohash of magnetlink, of upload het .torrent-bestand."
+    },
     "error.turnstile_failed": "We konden niet bevestigen dat je geen robot bent. Probeer het opnieuw; blijft het mislukken, schakel dan contentblokkers voor deze site uit of log in. Heb je de link in een app geopend (Telegram, Facebook…), open hem dan in je gewone browser.",
     "action.turnstileCheck": "We controleren of je geen robot bent",
     "error.support_infohash_required": "Voeg de infohash, magnet of link van de torrent toe — anders weten we niet welke torrent je bedoelt.",

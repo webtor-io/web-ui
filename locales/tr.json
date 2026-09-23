@@ -1700,6 +1700,10 @@
     "error.webpage_url": "Bu bir torrent değil, bir web sayfasının bağlantısı. O sayfayı açın, magnet bağlantısını kopyalayın ya da .torrent dosyasını indirin; ardından buraya yapıştırın veya yükleyin.",
     "error.torrent_url": "Bu, başka bir sitedeki .torrent dosyasının bağlantısı; Webtor bu dosyaları bağlantıdan açamaz. Dosyayı indirin, ardından buraya yükleyin.",
     "error.v2_hash": "Bu bir BitTorrent v2 infohash'i; Webtor ise torrentleri v1 infohash'iyle (40 karakter) açar. v1 infohash'i olan bir magnet bağlantısı kullanın — hibrit torrentlerde ikisi de vardır — ya da .torrent dosyasını yükleyin.",
+    "error.hash_length": {
+        "one": "Bu bir infohash gibi görünüyor ama {{.Count}} karakterden oluşuyor; tam bir infohash {{.Full}} karakterdir. Infohash'i veya magnet bağlantısını eksiksiz kopyalayın ya da .torrent dosyasını yükleyin.",
+        "other": "Bu bir infohash gibi görünüyor ama {{.Count}} karakterden oluşuyor; tam bir infohash {{.Full}} karakterdir. Infohash'i veya magnet bağlantısını eksiksiz kopyalayın ya da .torrent dosyasını yükleyin."
+    },
     "error.turnstile_failed": "Robot olmadığınızı doğrulayamadık. Tekrar deneyin; sorun sürerse bu site için içerik engelleyicileri kapatın veya oturum açın. Bağlantıyı bir uygulama içinde (Telegram, Facebook…) açtıysanız, normal tarayıcınızda açın.",
     "action.turnstileCheck": "Robot olmadığınız doğrulanıyor",
     "error.support_infohash_required": "Torrentin infohash'ini, magnet'ini veya bağlantısını ekleyin — yoksa hangi torrenti kastettiğinizi bilemeyiz.",

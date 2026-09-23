@@ -25,7 +25,7 @@ func newHomeRouter(t *testing.T) *gin.Engine {
 	dir := t.TempDir()
 	files := map[string]string{
 		"templates/layouts/main.html": `{{ template "main" . }}`,
-		"templates/views/index.html":  `{{ define "main" }}[err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/views/index.html":  `{{ define "main" }}[err={{ .ErrKey }}][args={{ with .ErrArgs }}{{ .Count }}/{{ .Full }}{{ end }}][instruction={{ .Data.Instruction }}]{{ end }}`,
 	}
 	for name, body := range files {
 		p := filepath.Join(dir, name)
@@ -91,6 +91,29 @@ func TestHomeWithErrIsNoindex(t *testing.T) {
 		}
 		if !strings.Contains(w.Body.String(), tc.wantInBod) {
 			t.Errorf("%s: body %q, want it to contain %q", tc.target, w.Body.String(), tc.wantInBod)
+		}
+	}
+}
+
+// error.hash_length comes back with its numbers next to ?err= (see
+// web.RedirectWithErrorAndPath); the page reads them only alongside an error
+// it shows, and only when they are numbers an infohash can have.
+func TestHomeErrorCarriesItsNumbers(t *testing.T) {
+	r := newHomeRouter(t)
+	tool := "/" + common.Tools[0].Url
+	cases := []struct{ target, want string }{
+		{"/?status=error&err=error.hash_length&err_count=39&err_full=40&from=%2F", "[err=error.hash_length][args=39/40]"},
+		{tool + "?status=error&err=error.hash_length&err_count=31&err_full=32&from=%2F", "[err=error.hash_length][args=31/32]"},
+		{"/?status=error&err=error.free_text&from=%2F", "[err=error.free_text][args=]"},
+		// forged or stray numbers are dropped
+		{"/?status=error&err=error.hash_length&err_count=39&err_full=7&from=%2F", "[args=]"},
+		{"/?status=error&err=error.hash_length&err_count=100000&err_full=40&from=%2F", "[args=]"},
+		{"/?err_count=39&err_full=40", "[err=][args=]"},
+	}
+	for _, tc := range cases {
+		w := get(r, tc.target)
+		if !strings.Contains(w.Body.String(), tc.want) {
+			t.Errorf("%s: body %q, want it to contain %q", tc.target, w.Body.String(), tc.want)
 		}
 	}
 }
