@@ -1,54 +1,79 @@
 # Webtor.io
 
-> Webtor is a free online torrent streaming platform. It lets users watch videos, listen to audio, and download files from torrents directly in the browser — no software installation required.
+> Webtor plays, streams and downloads torrents in the browser. A user pastes a magnet link or opens a .torrent file; Webtor's servers download the torrent and serve its files over HTTPS, so video plays and files download without a torrent client on the user's device. Webtor works only with the torrents and magnet links its users bring: it is not a torrent index or a search engine.
 
-## What Webtor Does
+## What Webtor does
 
-- Streams video and audio from torrent files or magnet links in the browser
-- Transcodes content on-the-fly to HLS for universal playback
-- Supports subtitles (SRT, ASS, VTT) with automatic charset detection
-- Provides a download option for any file in a torrent
-- Offers an embeddable player via JavaScript SDK for third-party websites
-- Works without registration for basic usage
+- Plays video and audio from a torrent or magnet link in the browser. Formats the browser cannot play (MKV, AVI and others) are transcoded to HLS on the fly.
+- Downloads any single file of a torrent by a direct HTTPS link, or a folder or the whole torrent as one TAR or ZIP archive.
+- Shows subtitles: tracks inside the file, subtitle files the user uploads, and subtitles looked up on OpenSubtitles.
+- Converts a magnet link to a .torrent file and back.
+- Works as a cloud torrent client: the download happens on Webtor's servers, not on the user's device.
+- Works without registration for playing and downloading.
 
-## Discover
+Playback starts once enough of the file has arrived from the swarm. How long that takes depends on the torrent's seeders; a torrent that nobody seeds cannot be played or downloaded.
 
-Webtor has a built-in content discovery feature at https://webtor.io/discover — browse and search for movies, TV shows, and other content. Find something interesting, click, and start streaming instantly.
+## What Webtor is not
 
-## Library
+- Not a torrent index or search engine: Webtor has no catalogue of torrents and does not search for them.
+- Not a content host: nothing is published on Webtor. Torrent data is fetched from the BitTorrent network when a user opens a torrent and cached only temporarily, unless a paying user saves the torrent to Vault.
+- Not an anonymity service. Connections to Webtor use HTTPS, and the user's IP address does not join the swarm, because Webtor's servers do the downloading. Webtor itself sees which torrents and files a user requests.
 
-Registered users get a personal Library where all watched and saved content is stored. Access it at https://webtor.io/library — resume playback, manage your collection, and keep track of what you've watched.
+## With an account
 
-## WebDAV
+- [Library](https://webtor.io/lib/): torrents the user has saved, with playback progress.
+- [Discover](https://webtor.io/discover): a catalogue of movie and series metadata. The streams listed for a title come from the Stremio addons and Torznab indexers the user has connected; Webtor does not supply them.
+- [Stremio addon](https://webtor.io/webtor-stremio-addon): the user's library in Stremio, plus the user's own Stremio addons played through Webtor. The torrent downloads on Webtor's servers, so the user's device never joins the swarm.
+- [WebDAV](https://webtor.io/instructions/webdav) and [S3](https://webtor.io/instructions/s3) access to the library, for players such as VLC, Infuse or Kodi and for file managers (paid plans).
+- Vault (paid plans): keeps a torrent stored on Webtor so it stays available when the swarm is gone.
+- [New release emails](https://webtor.io/torrent-rss-alternative): an email when a new release of a followed movie or season appears on the user's own indexers and Stremio addons.
 
-Webtor exposes torrent content as a WebDAV mount. This means you can connect any WebDAV-compatible app (VLC, Infuse, nPlayer, Kodi, file managers) to stream or browse torrent files as if they were on a network drive.
+## Plans
 
-## Stremio Integration
+Prices as of September 2026; the current ones are on https://webtor.io/donate. Memberships are managed through Patreon.
 
-Webtor works as a Stremio addon. Users can install the Webtor addon inside Stremio to stream torrent content through the Stremio app on any device. It also supports other Stremio community addons for content discovery — configure addon sources in your Webtor profile at https://webtor.io/profile.
+- Free: no registration needed; downloads and streams at up to 5 Mbit/s.
+- Bronze: $2 a month or $18 a year; up to 20 Mbit/s, 50 GB of Vault.
+- Silver: $5 a month or $45 a year; up to 50 Mbit/s, 250 GB of Vault; the monthly plan starts with a 7-day free trial.
+- Gold: $15 a month or $135 a year; up to 100 Mbit/s, 1 TB of Vault.
 
-## How to Use
+The site shows no third-party ads on any plan.
 
-1. Go to https://webtor.io
-2. Upload a .torrent file, paste a magnet link, or paste an infohash
-3. Browse the torrent contents and click any file to stream or download
+## Tools
 
-## API
+- [Torrent → Direct Download](https://webtor.io/torrent-to-ddl): direct HTTPS download links for the files of a torrent.
+- [Torrent → ZIP](https://webtor.io/torrent-to-zip): a torrent's files as one archive.
+- [Magnet to Direct Download](https://webtor.io/magnet-to-ddl): direct HTTPS download links for the files behind a magnet link.
+- [Magnet → Torrent](https://webtor.io/magnet-to-torrent): a .torrent file from a magnet link.
+- [Torrent → Magnet](https://webtor.io/torrent-to-magnet): the magnet link and info hash of a .torrent file.
+- [Torrent → Stream](https://webtor.io/torrent-to-stream): a torrent's video as an HLS stream.
+- [Torrent → MP4](https://webtor.io/torrent-to-mp4): why a .torrent file needs no converter, and how to play or download the video inside it.
+- [Watch torrents online](https://webtor.io/watch-torrents-online): playing a torrent's video in the browser without downloading it first.
+- [Watch torrents on iOS](https://webtor.io/watch-torrents-ios): playing and downloading torrents on iPhone and iPad without an app.
+- [How to open a .torrent file](https://webtor.io/open-torrent-file): opening a .torrent file without installing a client.
+- [How to download torrented files](https://webtor.io/how-to-download-torrent-files): getting the files out of a torrent from the browser.
+- [How to open torrents on a PC](https://webtor.io/open-torrents-on-pc): opening torrents on Windows without installing a client.
+- [Online torrent downloader](https://webtor.io/online-torrent-downloader): downloading torrents and magnet links in the browser.
+- [Stream torrent online](https://webtor.io/stream-torrent-online): streaming a torrent or magnet link in the browser.
+- [Online torrent player](https://webtor.io/torrent-player): a browser player for the video files of a torrent.
+- [Web torrent client](https://webtor.io/web-torrent-client): streaming and downloading torrents from any device's browser.
+- [Cloud torrent client](https://webtor.io/cloud-torrent-client): torrents downloaded on Webtor's servers; the user's device never joins the swarm.
+- [Stremio online](https://webtor.io/stremio-addons-online): a web player for the user's Stremio addon catalogues, for devices where the Stremio app cannot play torrents.
+- [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet.
+- [Torrent RSS alternative](https://webtor.io/torrent-rss-alternative): email alerts for new releases found on the user's own indexers and Stremio addons.
 
-Webtor provides a REST API for developers:
-- Documentation: https://webtor.io/api
-- Embed SDK (npm): @webtor/embed-sdk-js
+## Developers
 
-## Premium Features
-
-- Faster streaming speeds (up to 50 Mbps)
-- No ads
-- Vault storage (save files for instant access later)
-- 7-day free trial available at https://webtor.io/donate
+- [API](https://webtor.io/api): JSON API for the library, Vault and torrent resources, with Swagger docs.
+- [Embed SDK](https://github.com/webtor-io/embed-sdk-js): a player for third-party websites (npm: @webtor/embed-sdk-js).
+- [RapidAPI](https://rapidapi.com/paveltatarsky-Dx4aX7s_XBt/api/webtor/): the torrent API on RapidAPI.
+- [Source code](https://github.com/webtor-io): Webtor is open source, and a self-hosted image is available.
 
 ## Links
 
-- Website: https://webtor.io
-- Blog: https://blog.webtor.io
-- GitHub: https://github.com/webtor-io
-- Chrome Extension: available in Chrome Web Store (search "Webtor")
+- [Website](https://webtor.io)
+- [About](https://webtor.io/about)
+- [Blog](https://blog.webtor.io)
+- [Reddit](https://www.reddit.com/r/webtor/)
+- [Chrome extension](https://chromewebstore.google.com/detail/webtorio-watch-torrents-o/ngkpdaefpmokglfnmienfiaioffjodam)
+- [DMCA](https://webtor.io/legal/dmca)

@@ -1,7 +1,7 @@
-# Share previews and the embed creative
+# Share previews, the embed creative and llms.txt
 
 What a link to webtor.io looks like when it is pasted into a chat or a social
-network.
+network, and what the site says about itself to crawlers that read `llms.txt`.
 
 ## Which image a page shares
 
@@ -88,3 +88,28 @@ cookies, will too. Harmless at their volume (one static file per preview
 fetch), but a changed image can still be served from an edge copy until it
 expires: purge `/pub/webtor.jpg` and `/webtor.jpg` after replacing the
 creative.
+
+## `pub/llms.txt`
+
+Served at `/llms.txt` (plain text, `noindex` like any page not in the
+sitemap). It is what language models read as the site's own description, so it
+follows the same rules as the site copy:
+
+- Webtor plays, streams and downloads the torrents and magnet links users
+  bring; it does not find or index content, and keeps torrent data only in a
+  temporary cache or in the Vault of a paying user. Discover is a metadata
+  catalogue, and its streams come from the user's own Stremio addons and
+  Torznab indexers.
+- No "instantly": a stream starts once the swarm has delivered enough of the
+  file, and a torrent nobody seeds does not play.
+- Limits are named: the speed of each plan, what a paid plan adds, that
+  Webtor sees which torrents a user opens even though the user's IP does not
+  join the swarm.
+
+The plan numbers are copied from the live catalog (`webhook GET /prices`,
+shown on `/donate`) with the date next to them. The file is static, so a
+change in the catalog or in `handlers/common/tools.go` means editing it too:
+`handlers/static/pub_test.go` (`TestLLMsTxtKeepsToTheFacts`) fails when a tool
+page is missing from it or when a banned phrase ("instantly", "search for
+movies", "/library", "no ads") comes back. The numbers themselves are not
+checked against the catalog.
