@@ -384,7 +384,14 @@ func (s *Handler) get(c *gin.Context) {
 // database did not answer), which says nothing about whether the URL is dead.
 // A banned hash whose torrent has already left the store is indistinguishable
 // from an unknown one: rest-api answers 404 for both, and so it lands here.
+//
+// The page is the home page of whoever asked, signed-in navbar and continue-
+// watching row included, so it is private, no-store: some of these URLs end
+// in a static extension (/apple-touch-icon-precomposed.png), and an edge
+// cache that keeps 404s for those would hand one person's page to the next.
+// The redirect this replaced carried nothing personal.
 func (s *Handler) notFound(c *gin.Context, err error) {
+	c.Header("Cache-Control", "private, no-store")
 	key := web.ClassifyError(err)
 	log.WithError(err).
 		WithField("err_key", key).

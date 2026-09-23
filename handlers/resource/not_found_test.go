@@ -162,6 +162,10 @@ func TestResourceGet_NamesNothing_Is404HomePage(t *testing.T) {
 		if got := w.Header().Get("X-Robots-Tag"); !strings.HasPrefix(got, "noindex") {
 			t.Errorf("%s: X-Robots-Tag %q, want noindex", tc.path, got)
 		}
+		// The home page of whoever asked: never kept by a shared cache.
+		if got := w.Header().Get("Cache-Control"); got != "private, no-store" {
+			t.Errorf("%s: Cache-Control %q, want private, no-store", tc.path, got)
+		}
 		body := w.Body.String()
 		if !strings.Contains(body, "[home][err="+tc.key+"]") {
 			t.Errorf("%s: body %q, want the home page with %s", tc.path, body, tc.key)
@@ -215,6 +219,9 @@ func TestResourceGet_NamesNothing_JSON(t *testing.T) {
 	}
 	if got["status"] != "error" || got["message"] != "error.not_found" {
 		t.Errorf("body %v, want status=error message=error.not_found", got)
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != "private, no-store" {
+		t.Errorf("Cache-Control %q, want private, no-store", cc)
 	}
 }
 
