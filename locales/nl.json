@@ -1994,5 +1994,10 @@
     "toast.verificationSent": "Verificatielink verzonden",
     "profile.email.resultTitle": "E-mailverificatie",
     "profile.email.backToProfile": "Terug naar profiel",
-    "profile.email.tooOften": "Je hebt te vaak een verificatielink aangevraagd. Probeer het over een paar minuten opnieuw."
+    "profile.email.tooOften": "Je hebt te vaak een verificatielink aangevraagd. Probeer het over een paar minuten opnieuw.",
+    "stremio.paywall.title": "Deze stream loopt via de servers van Webtor",
+    "stremio.paywall.needsPlan": "Daarvoor heb je een betaald Webtor-plan nodig",
+    "stremio.paywall.trial": "Start een gratis proefperiode",
+    "stremio.paywall.open": "Scan de code of open",
+    "stremio.paywall.sameAccount": "Gebruik op Patreon hetzelfde e-mailadres of Patreon-account waarmee je bij Webtor inlogt, anders wordt het plan niet aan je account gekoppeld."
 }

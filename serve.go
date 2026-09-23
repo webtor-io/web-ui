@@ -45,6 +45,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/support"
 	"github.com/webtor-io/web-ui/handlers/tests"
 	"github.com/webtor-io/web-ui/handlers/torznab_indexer"
+	"github.com/webtor-io/web-ui/handlers/trial"
 	ush "github.com/webtor-io/web-ui/handlers/user_subtitle"
 	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
@@ -500,6 +501,10 @@ func serve(c *cli.Context) error {
 		vh.RegisterHandler(r, v, tm, pg)
 	}
 
+	// Setting the /trial short link (the Stremio paywall clip's QR code).
+	// Before ResourceHandler: its /:resource_id would take "trial" as an id.
+	trial.RegisterHandler(r, offers)
+
 	// Setting ResourceHandler
 	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en)
 
@@ -608,8 +613,12 @@ func serve(c *cli.Context) error {
 	// Setting LinkResolver
 	linkResolver := lr.New(cl, pg, sapi, cacheIndex)
 
-	// Setting Stremio
-	stremio.RegisterHandler(c, r, ats, sb, pg, linkResolver)
+	// Setting Stremio (offers: a free viewer's click on a stream only Webtor
+	// can serve plays the paywall clip when a plan with a trial is on sale)
+	err = stremio.RegisterHandler(c, r, ats, sb, pg, linkResolver, offers)
+	if err != nil {
+		return err
+	}
 
 	// Setting Handler
 	err = stremio_addon_url.RegisterHandler(c, av, r, pg)

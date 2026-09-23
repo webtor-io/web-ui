@@ -2002,5 +2002,10 @@
     "toast.verificationSent": "Link de verificação enviado",
     "profile.email.resultTitle": "Verificação de e-mail",
     "profile.email.backToProfile": "Voltar ao perfil",
-    "profile.email.tooOften": "Você pediu o link de verificação vezes demais. Tente novamente em alguns minutos."
+    "profile.email.tooOften": "Você pediu o link de verificação vezes demais. Tente novamente em alguns minutos.",
+    "stremio.paywall.title": "Esta transmissão passa pelos servidores do Webtor",
+    "stremio.paywall.needsPlan": "Para assistir, você precisa de um plano pago do Webtor",
+    "stremio.paywall.trial": "Comece um teste grátis",
+    "stremio.paywall.open": "Escaneie o código ou abra",
+    "stremio.paywall.sameAccount": "No Patreon, use o mesmo e-mail ou a mesma conta do Patreon com que você entra no Webtor — senão o plano não será vinculado à sua conta."
 }

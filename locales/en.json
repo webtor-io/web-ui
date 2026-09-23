@@ -2073,5 +2073,15 @@
     "toast.verificationSent": "Verification link sent",
     "profile.email.resultTitle": "Email verification",
     "profile.email.backToProfile": "Back to profile",
-    "profile.email.tooOften": "You have asked for a verification link too many times. Try again in a few minutes."
+    "profile.email.tooOften": "You have asked for a verification link too many times. Try again in a few minutes.",
+    "@stremio.paywall.title": "Stremio paywall clip, screen 1, headline. The clip plays in the Stremio player (often a TV) in place of a stream a free account cannot play: Webtor would have to serve it from its own servers. Rendered into pub/stremio/paywall-<lang>.mp4 by scripts/stremio_paywall_video — changing any stremio.paywall.* text means re-rendering the clips (a test fails until you do). No numbers (trial length, speed, price): the clip is static and the terms live in the offer catalog. Do not mention connecting one's own streaming backend.",
+    "stremio.paywall.title": "This stream plays through Webtor's servers",
+    "@stremio.paywall.needsPlan": "Stremio paywall clip, screen 1, second line under the headline (drawn in the pink-to-purple gradient). Says a paid Webtor plan is required to watch this stream.",
+    "stremio.paywall.needsPlan": "To watch it, you need a paid Webtor plan",
+    "@stremio.paywall.trial": "Stremio paywall clip, screen 2, headline: an invitation to start the free trial of the plan. No trial length — the clip is static.",
+    "stremio.paywall.trial": "Start a free trial",
+    "@stremio.paywall.open": "Stremio paywall clip, screen 2: the line right above the big 'webtor.io/trial' address and next to the QR code. Must read naturally when followed by a web address.",
+    "stremio.paywall.open": "Scan the code or open",
+    "@stremio.paywall.sameAccount": "Stremio paywall clip, screen 2, small print at the bottom. The plan is linked to the Webtor account by the Patreon account the user signed in with, or else by email — a trial started under another email stays unlinked. Keep both options (same email / same Patreon account).",
+    "stremio.paywall.sameAccount": "On Patreon, use the same email or Patreon account you sign in to Webtor with, or the plan won't be linked to your account."
 }

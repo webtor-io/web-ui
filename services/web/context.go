@@ -154,8 +154,7 @@ func NewContext(c *gin.Context) *Context {
 	if lang == i18n.DefaultLang {
 		suggest = i18n.SuggestLang(c)
 	}
-	us, _ := c.Get(userSettingsContextKey)
-	settings, _ := us.(*models.UserSettings)
+	settings := GetUserSettings(c)
 
 	return &Context{
 		CSRF:                sess.CSRF,
@@ -183,6 +182,16 @@ func NewContext(c *gin.Context) *Context {
 // than direct c.Set) so the context-key constant stays internal.
 func SetUserSettings(c *gin.Context, us *models.UserSettings) {
 	c.Set(userSettingsContextKey, us)
+}
+
+// GetUserSettings is what the middleware stored for this request: nil for
+// an anonymous request or when the row could not be read. For handlers that
+// answer without a page (the Stremio resolve redirect reads the account's
+// language here) and have no use for a whole web.Context.
+func GetUserSettings(c *gin.Context) *models.UserSettings {
+	us, _ := c.Get(userSettingsContextKey)
+	settings, _ := us.(*models.UserSettings)
+	return settings
 }
 
 // SetOnboardingResolver registers how to build the checklist for this request.

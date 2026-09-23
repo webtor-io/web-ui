@@ -1,6 +1,7 @@
 package stremio
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -18,6 +20,9 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	sv "github.com/webtor-io/web-ui/services/common"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
+	co "github.com/webtor-io/web-ui/services/link_resolver/common"
+	"github.com/webtor-io/web-ui/services/metrics"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -28,15 +33,36 @@ type Handler struct {
 	pg     *cs.PG
 	lr     *lr.LinkResolver
 	secret string
+	// res is lr as the resolve handler sees it — narrowed so the paywall
+	// branch is testable without a database behind it. The stream handler
+	// keeps the concrete type the stream builder takes.
+	res    resolver
+	offers promoSource
+	clips  *paywallClips
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *cs.PG, lr *lr.LinkResolver) {
+// resolver is what /resolve needs from the LinkResolver.
+type resolver interface {
+	ResolveLink(ctx context.Context, userID uuid.UUID, apiClaims *api.Claims, userClaims *claims.Data, hash string, fileIdx int, requiresPayment bool) (*co.LinkResult, error)
+	PickEpisodeFileIdx(ctx context.Context, apiClaims *api.Claims, hash string, season, episode int) (int, error)
+	PickPrimaryFileIdx(ctx context.Context, apiClaims *api.Claims, hash string) (int, error)
+}
+
+func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *stremio.Builder, pg *cs.PG, lr *lr.LinkResolver, offers *offer.Service) error {
+	clips, err := loadPaywallClips(paywallDir, c.String(sv.DomainFlag))
+	if err != nil {
+		return err
+	}
+	log.WithField("langs", strings.Join(clips.Langs(), ",")).Info("stremio paywall clips loaded")
 	h := &Handler{
 		at:     at,
 		b:      b,
 		pg:     pg,
 		lr:     lr,
+		res:    lr,
 		secret: c.String(sv.SessionSecretFlag),
+		offers: offers,
+		clips:  clips,
 	}
 
 	gr := r.Group("/stremio")
@@ -62,6 +88,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, at *at.AccessToken, b *strem
 	// this the probe 404s, Stremio treats the next episode's stream as dead
 	// and falls back to the source-selection screen instead of binge-playing.
 	grapi.Match([]string{http.MethodGet, http.MethodHead}, "/resolve/*data", h.resolve)
+	return nil
 }
 
 func (s *Handler) generateUrl(c *gin.Context) {
@@ -244,7 +271,7 @@ func (s *Handler) resolve(c *gin.Context) {
 		// The token names the episode the user picked, so the file is
 		// chosen by name inside the torrent — the alternative, "the
 		// biggest video", plays episode one of every season pack.
-		fileIdx, err = s.lr.PickEpisodeFileIdx(c.Request.Context(), apiClaims, hash, season, episode)
+		fileIdx, err = s.res.PickEpisodeFileIdx(c.Request.Context(), apiClaims, hash, season, episode)
 		if err != nil {
 			log.WithError(err).
 				WithField("hash", hash).
@@ -253,7 +280,7 @@ func (s *Handler) resolve(c *gin.Context) {
 			return
 		}
 	} else {
-		fileIdx, err = s.lr.PickPrimaryFileIdx(c.Request.Context(), apiClaims, hash)
+		fileIdx, err = s.res.PickPrimaryFileIdx(c.Request.Context(), apiClaims, hash)
 		if err != nil {
 			log.WithError(err).
 				WithField("hash", hash).
@@ -264,7 +291,13 @@ func (s *Handler) resolve(c *gin.Context) {
 	}
 
 	// Step 5: Resolve link using LinkResolver
-	linkResult, err := s.lr.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, fileIdx, true)
+	linkResult, err := s.res.ResolveLink(c.Request.Context(), user.ID, apiClaims, userClaims, hash, fileIdx, true)
+	if errors.Is(err, lr.ErrPlanRequired) {
+		// Step 6: Webtor would have to serve this, and the tier does not
+		// include that.
+		s.paywall(c, user, hash, fileIdx)
+		return
+	}
 	if err != nil {
 		log.WithError(err).
 			WithField("hash", hash).
@@ -285,4 +318,35 @@ func (s *Handler) resolve(c *gin.Context) {
 
 	// Step 8: Redirect to destination URL
 	c.Redirect(http.StatusFound, linkResult.URL)
+}
+
+// paywall answers a free viewer's click on a stream only Webtor can serve.
+// With something on sale it redirects to the paywall clip, which the player
+// plays like any other stream: Stremio shows the video instead of an error.
+// HEAD — Stremio's probe before auto-playing the next episode — gets the
+// same redirect, so binge lands on the clip too rather than on the
+// source-selection screen. Without an offer or a clip it is the 404 the
+// addon has always answered.
+func (s *Handler) paywall(c *gin.Context, user *auth.User, hash string, fileIdx int) {
+	var o *offer.Offer
+	if s.offers != nil {
+		o = s.offers.Promo()
+	}
+	target, lang, ok := s.clips.pick(o, web.GetUserSettings(c).GetLang())
+	if !ok {
+		log.WithField("hash", hash).
+			WithField("file_idx", fileIdx).
+			Warn("no URL generated for resolve")
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	log.WithFields(log.Fields{
+		"hash":      hash,
+		"file_idx":  fileIdx,
+		"lang":      lang,
+		"user_hash": auth.LogHash(user.ID),
+		"method":    c.Request.Method,
+	}).Info("stremio paywall video")
+	metrics.StremioPaywallVideo(lang, c.Request.Method)
+	c.Redirect(http.StatusFound, target)
 }

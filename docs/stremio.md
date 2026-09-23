@@ -13,7 +13,7 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 | `GET /manifest.json` | Addon manifest (`resources: stream, catalog, meta`; `types: movie, series`) |
 | `GET /catalog/:type/*id` | The user's library as a Stremio catalog |
 | `GET /meta/:type/*id` | Series/movie meta. For series, `videos[]` is built from the library torrent's episodes (`Library.makeVideos`). The manifest declares no `idPrefixes`, so Stremio asks us about other addons' IDs too (`tmdb:series:76747`, `mx:…`): an ID we do not hold answers `null`, never an error — `parseLibraryID` takes season/episode only from a numeric tail, the rest is the series ID |
-| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it |
+| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it. A free account on a stream only Webtor could serve gets the [paywall clip](#the-paywall-clip) instead |
 | `GET /stream/:type/*id` | Streams for a movie/episode (the pipeline below) |
 
 `GET /configure` (Stremio's standard config entry): anonymous → login with
@@ -209,6 +209,204 @@ P2P addons (e.g. Torrentio without debrid) play via Stremio's torrent engine and
 skip the HTTP HEAD probe, so they binge even when an HTTP addon does not — a
 useful tell when debugging: if Torrentio binges and webtor doesn't, suspect the
 playback URL (HEAD reachability / non-404), not the bingeGroup.
+
+## The paywall clip
+
+A free account's click on a stream that only Webtor's own servers could play
+(no enabled debrid backend of the user has the file cached, and Webtor's
+backend needs a paid tier) used to end in a `404` from `/resolve`, which the
+Stremio player shows as a bare playback error. Measured 2026-09-16..23: 354
+such clicks a week, from 74 addon tokens — people who installed the addon
+and pressed play. The click now plays a 12-second clip instead:
+
+1. "This stream plays through Webtor's servers" / "To watch it, you need a
+   paid Webtor plan";
+2. "Start a free trial", **webtor.io/trial** in large type with a QR code (a
+   TV cannot follow a link, a phone can), and the small print "On Patreon, use
+   the same email or Patreon account you sign in to Webtor with, or the plan
+   won't be linked to your account".
+
+The small print is there because of how a tier reaches an account:
+claims-provider looks the membership up by the Patreon ID when the Webtor
+account signed in or was linked through Patreon, and otherwise by email. A
+trial started under another email leaves the addon account free.
+
+### When it plays
+
+`LinkResolver.ResolveLink` names the paywall: it returns
+`link_resolver.ErrPlanRequired` exactly when it falls through the user's own
+backends to Webtor's and the tier does not include it. Before this it was a
+`nil` result, the same as "nothing to play". `resolve` (step 6,
+`handlers/stremio/paywall.go`) then redirects to the clip — `302` to
+`<DOMAIN>/pub/stremio/paywall-<lang>.mp4?v=<digest>` — when all of these hold,
+and answers the old `404` (and logs the old `no URL generated for resolve`)
+otherwise:
+
+- **The promo plan has a trial the checkout can start** (`offer.Promo()` non-nil
+  and `TrialDays > 0`). No catalog (self-hosted) — nothing to sell, no clip.
+  A plan without a startable trial — no clip either: the clip is static and
+  says "start a free trial", so it follows the rule `offer.Offer` follows for
+  every trial it quotes (docs/offers.md: a trial nobody can start is not
+  offered). Production today: Silver monthly, 7-day trial.
+- **A clip exists** for the account's language (`user_settings.lang`, read
+  through `web.GetUserSettings`), or for English, which is the fallback for a
+  missing or unrendered language. The clips are listed once at startup
+  ("stremio paywall clips loaded" with the languages).
+
+`HEAD` gets the same redirect as `GET`: it is Stremio's probe before
+auto-playing the next episode (see the binge contract above), and a probe that
+reached the clip plays the clip rather than bouncing to source selection.
+Paid accounts, debrid hits, a result with no URL (`404`) and resolver errors
+(`500`) are untouched.
+
+`?v=` is the first 8 hex of the file's SHA-256, read at startup: a re-rendered
+clip is a new URL for every cache on the way, CDN included. Without it a
+changed file could be served from an edge copy of the old one until that
+expired, and whether a `pub/` file is edge-cached at all depends on the
+cookies of whoever fetched it first.
+
+Every redirect logs `stremio paywall video` (Info) with `hash`, `file_idx`,
+`lang` (of the clip), `method` and `user_hash` — `auth.LogHash`, the first 16
+hex of `md5(user_id)`, which SQL can recompute as `left(md5(user_id::text),
+16)` — and counts `webui_stremio_paywall_video_total{lang,method}`.
+
+### `/trial`
+
+`handlers/trial`. `GET /trial` (and `/<lang>/trial`, via the i18n prefix
+routing) is the short link the clip prints:
+
+| Catalog | Answer |
+|---|---|
+| promo plan with a direct checkout (`Offer.URL`) | `302` to it — Patreon's trial checkout when the plan has a trial. The visit's utm parameters are not passed on: Patreon drops them |
+| promo plan, no direct checkout (`USE_PATREON=false`) | `302` to `/<lang>/donate?utm_source=stremio&utm_medium=video&utm_campaign=paywall`; utm parameters the visit brought win over these, anything else is dropped |
+| no promo plan | `404` |
+
+Registered before the resource catch-all (`/:resource_id`, which answers
+`/trial` today with a redirect to the home page and `error.invalid_resource`).
+Not in the sitemap, and `noindex` like every page the sitemap does not list.
+The QR code encodes `https://webtor.io/<lang>/trial?` + `trial.PaywallUTM`
+(no prefix for English).
+
+Every visit logs `trial shortlink` (Info) with `target` (`checkout`, `donate`,
+`none`), `lang`, the three utm values and, when the phone is signed in,
+`user_hash`; and counts `webui_trial_shortlink_total{target,campaign}`
+(`campaign`: `paywall`, `none`, `other`). This line is the measurement of the
+click: nothing from the clip survives the trip through Patreon.
+
+### Rendering the clips
+
+`scripts/stremio_paywall_video/render.py` draws both screens from the
+`stremio.paywall.*` keys of each `locales/<lang>.json` (Pillow, the site's
+night palette, the logo polygons of `logo-night.svg`, the Comfortaa wordmark
+embedded in `assets/src/styles/comfortaa.css`, Inter 4.1 downloaded once from
+its pinned release and checked against a SHA-256 — the site's embedded Inter
+is an ASCII subset) and encodes them with ffmpeg:
+
+```sh
+python3 -m venv /tmp/paywall-venv
+/tmp/paywall-venv/bin/pip install -r scripts/stremio_paywall_video/requirements.txt
+# from the web-ui root; ffmpeg on PATH, or in Docker:
+FFMPEG="docker run --rm -v $PWD:$PWD -w $PWD jrottenberg/ffmpeg:8-alpine" \
+    /tmp/paywall-venv/bin/python scripts/stremio_paywall_video/render.py \
+    [--lang ru] [--frames /tmp/paywall-frames]
+```
+
+The encode is the subset every Stremio player decodes in hardware — ExoPlayer
+(Android, Android TV), libmpv (desktop), AVPlayer (Apple TV, iOS): H.264 High
+@ level 3.1, 1280×720, yuv420p, BT.709, 25 fps, keyframe every 5 s; a silent
+48 kHz stereo AAC-LC track (some TV players will not start a video without
+audio); `moov` first (`+faststart`); 12 s (4.5 s screen 1, 0.5 s cross-fade,
+7 s screen 2). About 290–340 KB per language, 3.5 MB for all 11; the script
+refuses a file over 600 KB. With the same ffmpeg image the output is
+byte-for-byte reproducible.
+
+Each clip records a SHA-256 of the five texts and the QR link it was drawn
+from (`comment` tag, `webtor-paywall-src:<hex>`).
+`handlers/stremio/paywall_clips_test.go` recomputes it from the locale files
+and `trial.PaywallUTM`, so **a copy edit or a utm change without a re-render
+fails the build**; the same file checks that every locale has a clip and the
+five keys, the container layout (ftyp, moov before mdat), codec, profile,
+level, size, the audio track and the 10–14 s duration, and the copy rules
+below. The served file (`video/mp4`, byte ranges, `noindex`) is checked in
+`handlers/static/paywall_clip_test.go`.
+
+Copy rules for `stremio.paywall.*`: **no numbers** — trial length, speed and
+price are the catalog's, and a static clip cannot follow them; **no mention of
+connecting one's own debrid backend** (owner's decision, 2026-09-23); no
+"instantly". The test enforces the first two and the obvious spellings of the
+third.
+
+Known limit: the dark glow bands slightly in 8-bit video (visible as faint
+rings on a bright screen). Dithering it away quadrupled the size; `aq-mode=3`
+is what the encode does instead.
+
+### Measuring it: saw the clip → opened /trial → got a plan within 7 days
+
+Loki (`{namespace="webtor",app="web-ui"}`) has the first two steps, the
+`web_ui` database the third.
+
+1. **Saw the clip** — clicks and distinct accounts per week (`GET` only: the
+   `HEAD` binge probe is not a view):
+
+   ```logql
+   sum(count_over_time({namespace="webtor",app="web-ui"} |= "stremio paywall video" | logfmt | method="GET" [7d]))
+   count(sum by (user_hash) (count_over_time({namespace="webtor",app="web-ui"} |= "stremio paywall video" | logfmt | method="GET" [7d])))
+   ```
+
+   For step 3, export `user_hash` with its first `time` (`query_range` over
+   `... | logfmt | method="GET" | line_format "{{.time}} {{.user_hash}}"`).
+   Before this change the same clicks were the `Warn` "no URL generated for
+   resolve"; that line now stands only for the cases that still 404.
+
+2. **Opened /trial** — from the clip's QR code (`utm_campaign=paywall`) versus
+   typed (`webtor.io/trial` carries no utm):
+
+   ```logql
+   sum by (target, utm_campaign) (count_over_time({namespace="webtor",app="web-ui"} |= "trial shortlink" | logfmt [7d]))
+   ```
+
+   Prometheus has both steps without the hashes:
+   `sum(increase(webui_stremio_paywall_video_total{method="GET"}[7d]))`,
+   `sum by (target, campaign) (increase(webui_trial_shortlink_total[7d]))`.
+   A phone that scanned the code is usually not the account that clicked, so
+   step 2 is a count, not a per-account join.
+
+3. **Got a plan within 7 days of the first view** — `web_ui` DB. The step from
+   free to a paid tier, a trial included (a trial grants the tier), writes the
+   welcome notification `tier-welcome-<tier>` with the account's `user_id`
+   and the time (`handlers/event/user.go`, on the webhook's `user.updated`
+   event).
+   `public."user".tier` is the tier now, without a date:
+
+   ```sql
+   SET statement_timeout = '60s';
+   WITH v(user_hash, first_seen) AS (VALUES
+       ('1677cad08bd5b077', timestamptz '2026-09-24 19:05:00+00')  -- from step 1
+   )
+   SELECT count(DISTINCT v.user_hash)                                   AS viewers,
+          count(DISTINCT u.user_id) FILTER (WHERE n.user_id IS NOT NULL) AS got_a_plan_7d,
+          count(DISTINCT u.user_id) FILTER (WHERE u.tier NOT IN ('', 'free')) AS paid_tier_now
+     FROM v
+     LEFT JOIN public."user" u ON left(md5(u.user_id::text), 16) = v.user_hash
+     LEFT JOIN public.notification n
+            ON n.user_id = u.user_id
+           AND n.key LIKE 'tier-welcome-%'
+           AND n.created_at >= v.first_seen
+           AND n.created_at <  v.first_seen + interval '7 days';
+   ```
+
+   `got_a_plan_7d` is a lower bound: the welcome is written only when the
+   event finds the account still free, and a page request that syncs the
+   tier first (`services/claims`) leaves no row. `paid_tier_now` is the
+   cross-check, without the 7-day window.
+
+   Money (the first charge after the trial) is in the webhook database: the
+   member's first event with `patron_status = 'active_patron'` and
+   `is_free_trial = 'false'`, matched by email — read it at day 7 + 7.
+
+Blind spot, by construction: a viewer who starts the trial under another
+email and never links Patreon shows up as a Patreon trial with no account to
+join, which is exactly the case the small print is there to prevent.
 
 ## Where the bolt comes from
 

@@ -2020,5 +2020,10 @@
     "toast.verificationSent": "Ссылка для подтверждения отправлена",
     "profile.email.resultTitle": "Подтверждение почты",
     "profile.email.backToProfile": "Вернуться в профиль",
-    "profile.email.tooOften": "Вы слишком часто запрашивали ссылку для подтверждения. Попробуйте через несколько минут."
+    "profile.email.tooOften": "Вы слишком часто запрашивали ссылку для подтверждения. Попробуйте через несколько минут.",
+    "stremio.paywall.title": "Этот поток идёт через серверы Webtor",
+    "stremio.paywall.needsPlan": "Для этого нужен платный тариф Webtor",
+    "stremio.paywall.trial": "Начните бесплатный пробный период",
+    "stremio.paywall.open": "Отсканируйте код или откройте",
+    "stremio.paywall.sameAccount": "На Patreon используйте тот же email или аккаунт Patreon, с которым входите в Webtor, — иначе тариф не привяжется к вашему аккаунту."
 }

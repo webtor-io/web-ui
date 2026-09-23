@@ -1994,5 +1994,10 @@
     "toast.verificationSent": "Enlace de verificación enviado",
     "profile.email.resultTitle": "Verificación de correo",
     "profile.email.backToProfile": "Volver al perfil",
-    "profile.email.tooOften": "Has solicitado el enlace de verificación demasiadas veces. Inténtalo de nuevo en unos minutos."
+    "profile.email.tooOften": "Has solicitado el enlace de verificación demasiadas veces. Inténtalo de nuevo en unos minutos.",
+    "stremio.paywall.title": "Esta transmisión pasa por los servidores de Webtor",
+    "stremio.paywall.needsPlan": "Para verla necesitas un plan de pago de Webtor",
+    "stremio.paywall.trial": "Empieza una prueba gratis",
+    "stremio.paywall.open": "Escanea el código o abre",
+    "stremio.paywall.sameAccount": "En Patreon, usa el mismo correo o la misma cuenta de Patreon con la que entras en Webtor; si no, el plan no se vinculará a tu cuenta."
 }

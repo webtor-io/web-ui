@@ -20,6 +20,8 @@ The collectors live in `services/metrics`, on the default registry, namespace
 | `webui_panics_total` | counter | `route` | Handler panics recovered by `web.RecoverToLog` |
 | `webui_jobs_total` | counter | `job`, `outcome` | Async job script runs, `outcome` ∈ `ok` / `error` / `rejected` |
 | `webui_jobs_in_flight` | gauge | — | Job scripts currently executing |
+| `webui_stremio_paywall_video_total` | counter | `lang`, `method` | Stremio playback clicks answered with the paywall clip (`lang` of the clip; `HEAD` is Stremio's pre-play probe, not a view) — docs/stremio.md |
+| `webui_trial_shortlink_total` | counter | `target`, `campaign` | Visits to `/trial`: `target` ∈ `checkout` / `donate` / `none` (nothing on sale), `campaign` ∈ `paywall` / `none` / `other` from `utm_campaign` |
 
 ### Label rules
 
@@ -36,6 +38,10 @@ value would be a series kept for the life of the process.
   (standard verbs plus the WebDAV set); anything else is `other`.
 - `job` is the queue name: `load`, `enrich`, `embded`, `payment`, and the
   action names (`stream-video`, `stream-audio`, `download`, `preview-image`).
+- `lang` on the paywall counter is one of the locale codes a clip was rendered
+  for (the English fallback included), never the account's raw setting;
+  `campaign` on the trial counter collapses every `utm_campaign` but
+  `paywall` and the empty one into `other` — the value is client-supplied.
 - `rejected` is a torrent-store stoplist block — working as intended, so an
   error-rate alert on `outcome="error"` does not fire on a burst of blocked
   hashes.
