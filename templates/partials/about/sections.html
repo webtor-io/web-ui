@@ -154,6 +154,9 @@
             {{ end }}
         </div>
 
+        {{ if $.Data.Cap }}{{ if hasPlans }}{{ with freeRateMbps }}
+        <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">{{ tp $.Ctx.Lang ($.Data.FieldKey $.Data.Cap) "Rate" . }}</p>
+        {{ end }}{{ end }}{{ end }}
         {{ if $.Data.Footer }}
         <p class="text-[1.05rem] text-w-sub max-w-[600px] leading-relaxed mt-6">{{ tHTML $.Ctx.Lang ($.Data.FieldKey "footer") }}</p>
         {{ end }}

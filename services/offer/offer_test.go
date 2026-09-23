@@ -304,3 +304,38 @@ func TestDiscountCheckout(t *testing.T) {
 		t.Errorf("no provider: %q", got)
 	}
 }
+
+func TestFreeRateMbps(t *testing.T) {
+	cases := []struct {
+		name string
+		svc  *Service
+		want int
+	}{
+		{"no webhook configured", New(nil, checkoutAll), 0},
+		{"catalog not loaded yet", New(&fakeSource{c: prodCatalog()}, checkoutAll), 0},
+		{"production catalog", loaded(prodCatalog(), checkoutAll), 5},
+		// A nil rate is unlimited, not zero: there is no cap to quote.
+		{"free tier without a cap", loaded(func() *payments.Catalog {
+			c := prodCatalog()
+			c.Tiers[0].DownloadRate = nil
+			return c
+		}(), checkoutAll), 0},
+		{"no free tier listed", loaded(func() *payments.Catalog {
+			c := prodCatalog()
+			c.Tiers = c.Tiers[1:]
+			return c
+		}(), checkoutAll), 0},
+		{"webhook predates the tier catalog", loaded(func() *payments.Catalog {
+			c := prodCatalog()
+			c.Tiers = nil
+			return c
+		}(), checkoutAll), 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.svc.FreeRateMbps(); got != tc.want {
+				t.Errorf("FreeRateMbps() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
