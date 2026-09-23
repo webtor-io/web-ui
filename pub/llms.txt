@@ -15,7 +15,7 @@ Playback starts once enough of the file has arrived from the swarm. How long tha
 
 ## What Webtor is not
 
-- Not a torrent index or search engine: Webtor has no catalogue of torrents and does not search for them.
+- Not a torrent index or search engine: Webtor keeps no index or catalogue of torrents of its own. It plays the torrents and magnet links its users bring, including those from sources a user connects to their account (their own Stremio addons or Torznab indexers).
 - Not a content host: nothing is published on Webtor. Torrent data is fetched from the BitTorrent network when a user opens a torrent and cached only temporarily, unless a paying user saves the torrent to Vault.
 - Not an anonymity service. Connections to Webtor use HTTPS, and the user's IP address does not join the swarm, because Webtor's servers do the downloading. Webtor itself sees which torrents and files a user requests.
 
@@ -23,7 +23,7 @@ Playback starts once enough of the file has arrived from the swarm. How long tha
 
 - [Library](https://webtor.io/lib/): torrents the user has saved, with playback progress.
 - [Discover](https://webtor.io/discover): a catalogue of movie and series metadata. The streams listed for a title come from the Stremio addons and Torznab indexers the user has connected; Webtor does not supply them.
-- [Stremio addon](https://webtor.io/webtor-stremio-addon): the user's library in Stremio, plus the user's own Stremio addons played through Webtor. The torrent downloads on Webtor's servers, so the user's device never joins the swarm.
+- [Stremio addon](https://webtor.io/webtor-stremio-addon) (paid plans): the user's library in Stremio, plus the user's own Stremio addons played through Webtor. The torrent downloads on Webtor's servers, so the user's device never joins the swarm.
 - [WebDAV](https://webtor.io/instructions/webdav) and [S3](https://webtor.io/instructions/s3) access to the library, for players such as VLC, Infuse or Kodi and for file managers (paid plans).
 - Vault (paid plans): keeps a torrent stored on Webtor so it stays available when the swarm is gone.
 - [New release emails](https://webtor.io/torrent-rss-alternative): an email when a new release of a followed movie or season appears on the user's own indexers and Stremio addons.
@@ -37,7 +37,7 @@ Prices as of September 2026; the current ones are on https://webtor.io/donate. M
 - Silver: $5 a month or $45 a year; up to 50 Mbit/s, 250 GB of Vault; the monthly plan starts with a 7-day free trial.
 - Gold: $15 a month or $135 a year; up to 100 Mbit/s, 1 TB of Vault.
 
-The site shows no third-party ads on any plan.
+As of September 2026, the site shows no third-party ads.
 
 ## Tools
 
@@ -59,7 +59,7 @@ The site shows no third-party ads on any plan.
 - [Web torrent client](https://webtor.io/web-torrent-client): streaming and downloading torrents from any device's browser.
 - [Cloud torrent client](https://webtor.io/cloud-torrent-client): torrents downloaded on Webtor's servers; the user's device never joins the swarm.
 - [Stremio online](https://webtor.io/stremio-addons-online): a web player for the user's Stremio addon catalogues, for devices where the Stremio app cannot play torrents.
-- [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet.
+- [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet (paid plans).
 - [Torrent RSS alternative](https://webtor.io/torrent-rss-alternative): email alerts for new releases found on the user's own indexers and Stremio addons.
 
 ## Developers

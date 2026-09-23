@@ -18,10 +18,12 @@ const manifestVersion = "0.1.0"
 // fast a stream starts depends on the swarm. It quotes no free-plan cap
 // either: the site's free cap does not apply here, because streams the
 // addon plays through Webtor's servers need a paid plan (a user's own
-// streaming backend is tried first — see services/link_resolver).
+// streaming backend is tried first — see services/link_resolver). "Paid"
+// is spelled out: Free is a plan too, in Webtor's own words (/donate,
+// llms.txt), and "needs a Webtor plan" read as "an account will do".
 const manifestDescription = "Your Webtor library in Stremio, plus the Stremio addons you add to your Webtor profile, played through Webtor. " +
 	"Torrents download on Webtor's servers, not on your device, so your IP address never joins the swarm. " +
-	"Playing through Webtor's servers needs a Webtor plan."
+	"Playing through Webtor's servers needs a paid Webtor plan."
 
 type Manifest struct {
 	domain string

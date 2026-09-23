@@ -138,3 +138,37 @@ func TestToolByURL(t *testing.T) {
 		}
 	}
 }
+
+// The Stremio addon landing must not read as free: streams through Webtor's
+// servers need a paid plan (handlers/stremio, requiresPayment), and "no
+// debrid subscription is needed" said the opposite. The description (meta,
+// og and the lead under the H1) and the benefit line say so in every locale;
+// by the owner's decision no key of the page names a debrid service.
+func TestStremioAddonLandingSaysThePlanIsPaid(t *testing.T) {
+	paid := map[string]string{
+		"en": "paid", "ru": "платн", "es": "de pago", "de": "bezahlt", "fr": "payante", "pt": "pago",
+		"it": "a pagamento", "pl": "płatn", "tr": "ücretli", "nl": "betaald", "cs": "placen",
+	}
+	for lang, d := range locales(t) {
+		stem, ok := paid[lang]
+		if !ok {
+			t.Errorf("%s: no word for \"paid\" in this test", lang)
+			continue
+		}
+		for _, k := range []string{"tool.webtorStremioAddon.description", "tool.webtorStremioAddon.about.benefits.item3"} {
+			if !strings.Contains(strings.ToLower(d[k]), stem) {
+				t.Errorf("%s: %s does not say the plan is paid: %q", lang, k, d[k])
+			}
+		}
+		for k, v := range d {
+			if !strings.HasPrefix(k, "tool.webtorStremioAddon.") {
+				continue
+			}
+			for _, banned := range []string{"debrid", "torbox"} {
+				if strings.Contains(strings.ToLower(v), banned) {
+					t.Errorf("%s: %s names %q: %q", lang, k, banned, v)
+				}
+			}
+		}
+	}
+}

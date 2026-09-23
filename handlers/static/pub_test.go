@@ -91,9 +91,19 @@ func TestLLMsTxtKeepsToTheFacts(t *testing.T) {
 	}
 	text := string(b)
 	lower := strings.ToLower(text)
-	for _, banned := range []string{"instantly", "search for movies", "/library", "no ads"} {
+	// "on any plan": the ads are off as an experiment, not for good.
+	// "does not search for them": subscriptions do query the indexers and
+	// addons a user connected.
+	for _, banned := range []string{"instantly", "search for movies", "/library", "no ads", "on any plan", "does not search for them"} {
 		if strings.Contains(lower, banned) {
 			t.Errorf("pub/llms.txt says %q", banned)
+		}
+	}
+	// Streams the addon plays through Webtor need a paid plan; the addon's
+	// lines say so the way WebDAV, S3 and Vault do.
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "(https://webtor.io/webtor-stremio-addon)") && !strings.Contains(line, "(paid plans)") {
+			t.Errorf("pub/llms.txt: the addon line does not say paid plans: %q", line)
 		}
 	}
 	for _, tool := range hc.Tools {

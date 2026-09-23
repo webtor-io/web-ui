@@ -184,7 +184,7 @@ func TestManifestDescriptionKeepsToTheFacts(t *testing.T) {
 			t.Errorf("description says %q: %q", banned, d)
 		}
 	}
-	if !strings.Contains(d, "needs a webtor plan") {
-		t.Errorf("description should say that playing through Webtor needs a plan: %q", d)
+	if !strings.Contains(d, "needs a paid webtor plan") {
+		t.Errorf("description should say that playing through Webtor needs a paid plan: %q", d)
 	}
 }

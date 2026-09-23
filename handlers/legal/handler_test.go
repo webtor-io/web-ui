@@ -130,3 +130,25 @@ func TestLegalNotFoundKeyIsTranslated(t *testing.T) {
 		}
 	}
 }
+
+// The DMCA page states what Webtor does with content, and a rights holder
+// reads it against the rest of the site. "It does not index or search for
+// content" was contradicted by the release subscriptions, which query the
+// indexers and addons a user connected; the page now says what is true: no
+// index or catalogue of Webtor's own, content from users and from the
+// sources they connected, cached temporarily, kept longer only in Vault.
+func TestDMCAStatesWhatWebtorDoes(t *testing.T) {
+	b, err := os.ReadFile("../../templates/views/legal/dmca.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(b)
+	if strings.Contains(text, "does not index or search") {
+		t.Error("dmca.html still says Webtor does not search for content")
+	}
+	for _, want := range []string{"index or catalogue of content of its own", "Stremio addons", "Torznab indexers", "temporarily", "Vault"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("dmca.html does not say %q", want)
+		}
+	}
+}
