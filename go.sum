@@ -601,6 +601,8 @@ github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b h1:SHXZg
 github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b/go.mod h1:o9TAux7A8g2Pl2r3Bp45u4bhWyDYrujfKyJAbGQaxA4=
 github.com/webtor-io/common-services v0.0.0-20260323152956-4a4e97f013f7 h1:Kuvd4Xk3anrvOw8O9GNsJZuPSCiqKFrLGcjajBCEl3I=
 github.com/webtor-io/common-services v0.0.0-20260323152956-4a4e97f013f7/go.mod h1:jSGKiO/KVhavntTXhPXzjvt3sMMbCIYaCnxMhOklvEQ=
+github.com/webtor-io/common-services v0.0.0-20260924165121-39d5e0fb95a0 h1:nMpTNUlZO/0SsA4CHMKKoGenUbknPq7M7osWe7bQF0s=
+github.com/webtor-io/common-services v0.0.0-20260924165121-39d5e0fb95a0/go.mod h1:jSGKiO/KVhavntTXhPXzjvt3sMMbCIYaCnxMhOklvEQ=
 github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158 h1:lf2kNtRMP+iqfBUoRrP6ZJGBOno75G/+7xjxAYMexq8=
 github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158/go.mod h1:fzmO7jNO+4ZVk12WHBuqCow2M8iJQFgJ8WWeGS6Rr6U=
 github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4 h1:IzqyT2MZFfDc4Dat89c3BV8vmIbiMl5sDg84uSIyQGA=

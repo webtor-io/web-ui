@@ -5,10 +5,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	cs "github.com/webtor-io/common-services"
 )
 
 // A pod receiving SIGTERM must finish the requests it is already serving:
@@ -16,11 +18,13 @@ import (
 func TestCloseDrainsInFlightRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	started := make(chan struct{})
+	var finished atomic.Bool
 	r := gin.New()
 	r.GET("/slow", func(c *gin.Context) {
 		close(started)
 		time.Sleep(300 * time.Millisecond)
 		c.String(http.StatusOK, "done")
+		finished.Store(true)
 	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -30,7 +34,7 @@ func TestCloseDrainsInFlightRequests(t *testing.T) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	_ = ln.Close()
 
-	s := &Web{host: "127.0.0.1", port: port, shutdownTimeout: 5 * time.Second, r: r}
+	s := &Web{host: "127.0.0.1", port: port, gs: cs.NewGracefulServer(5 * time.Second), r: r}
 	served := make(chan error, 1)
 	go func() { served <- s.Serve() }()
 
@@ -60,6 +64,11 @@ func TestCloseDrainsInFlightRequests(t *testing.T) {
 
 	<-started
 	s.Close()
+	// serve() closes Redis, NATS and the rest right after Close returns, so
+	// the handler must be done by then, not merely left running.
+	if !finished.Load() {
+		t.Fatal("Close returned while a request was still in flight")
+	}
 
 	got := <-res
 	if got.err != nil || got.body != "done" {

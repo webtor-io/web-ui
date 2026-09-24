@@ -1,29 +1,27 @@
 package web
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	cs "github.com/webtor-io/common-services"
 
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	webHostFlag         = "host"
-	webPortFlag         = "port"
-	shutdownTimeoutFlag = "shutdown-timeout"
-	StagingFlag         = "staging"
-	RedirectDomainFlag  = "redirect-domain"
+	webHostFlag        = "host"
+	webPortFlag        = "port"
+	StagingFlag        = "staging"
+	RedirectDomainFlag = "redirect-domain"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
+	f = cs.RegisterShutdownFlags(f)
 	return append(f,
 		cli.StringFlag{
 			Name:   webHostFlag,
@@ -36,12 +34,6 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Usage:  "http listening port",
 			Value:  8080,
 			EnvVar: "WEB_PORT",
-		},
-		cli.DurationFlag{
-			Name:   shutdownTimeoutFlag,
-			Usage:  "how long to let in-flight requests finish on SIGTERM; keep below terminationGracePeriodSeconds minus the preStop sleep",
-			Value:  20 * time.Second,
-			EnvVar: "WEB_SHUTDOWN_TIMEOUT",
 		},
 		cli.BoolFlag{
 			Name:   StagingFlag,
@@ -57,13 +49,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type Web struct {
-	host            string
-	port            int
-	shutdownTimeout time.Duration
-	mu              sync.Mutex
-	srv             *http.Server
-	r               *gin.Engine
-	handler         http.Handler
+	host    string
+	port    int
+	gs      *cs.GracefulServer
+	r       *gin.Engine
+	handler http.Handler
 }
 
 func (s *Web) Serve() error {
@@ -77,41 +67,18 @@ func (s *Web) Serve() error {
 	if h == nil {
 		h = s.r
 	}
-	srv := &http.Server{Handler: h}
-	s.mu.Lock()
-	s.srv = srv
-	s.mu.Unlock()
-	err = srv.Serve(ln)
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-	return err
+	return s.gs.Serve(&http.Server{Handler: h}, ln)
 }
 
-// Close drains the server: it stops accepting, closes idle keep-alive
-// connections and waits for in-flight requests up to the shutdown timeout,
-// then cuts whatever is still open (long-lived streams). Closing the
+// Close drains the server (cs.GracefulServer): in-flight requests get up to
+// WEB_SHUTDOWN_TIMEOUT, long-lived streams are cut after it. Closing the
 // listener alone let the process exit mid-response, and the ingress answered
 // 502 on every request a terminating pod was still serving.
 //
 // It must run before the dependencies the handlers use are closed, so
 // serve() calls it explicitly rather than leaving it to defer order.
 func (s *Web) Close() {
-	s.mu.Lock()
-	srv := s.srv
-	s.srv = nil
-	s.mu.Unlock()
-	if srv == nil {
-		return
-	}
-	log.WithField("timeout", s.shutdownTimeout).Info("closing web")
-	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.WithError(err).Warn("web shutdown timed out, closing remaining connections")
-		_ = srv.Close()
-	}
-	log.Info("web closed")
+	s.gs.Close()
 }
 
 // Use wraps the Gin engine with an HTTP-level middleware.
@@ -129,9 +96,9 @@ func New(c *cli.Context, r *gin.Engine) (*Web, error) {
 	r.UseRawPath = true
 
 	return &Web{
-		host:            c.String(webHostFlag),
-		port:            c.Int(webPortFlag),
-		shutdownTimeout: c.Duration(shutdownTimeoutFlag),
-		r:               r,
+		host: c.String(webHostFlag),
+		port: c.Int(webPortFlag),
+		gs:   cs.NewGracefulServer(cs.ShutdownTimeout(c)),
+		r:    r,
 	}, nil
 }

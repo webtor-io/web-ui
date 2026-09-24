@@ -23,7 +23,7 @@ require (
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
 	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
-	github.com/webtor-io/common-services v0.0.0-20260323152956-4a4e97f013f7
+	github.com/webtor-io/common-services v0.0.0-20260924165121-39d5e0fb95a0
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
 	github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4
 	github.com/webtor-io/rest-api v1.0.1-0.20260702182913-e2204030bcdf
