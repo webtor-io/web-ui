@@ -28,6 +28,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Value:  "",
 			EnvVar: "WEB_ASSETS_HOST",
 		},
+		cli.StringFlag{
+			Name:   IndexNowKeyFlag,
+			Usage:  "IndexNow key of this host, served as /<key>.txt (docs/indexnow.md); unset — no key file",
+			EnvVar: "INDEXNOW_KEY",
+		},
 	)
 }
 
@@ -35,6 +40,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine) error {
 	assetsPath := c.String(AssetsPathFlag)
 	pubPath := "pub"
 
+	if err := registerIndexNowKey(r, c.String(IndexNowKeyFlag)); err != nil {
+		return err
+	}
 	registerAssets(r, assetsPath)
 	r.Static("/pub", pubPath)
 
