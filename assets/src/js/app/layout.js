@@ -61,7 +61,7 @@ hideProgress();
 
 if (window._umami) {
     try {
-        const { eventDefaults } = await import('../lib/trackContext');
+        const { eventDefaults, firstTouch } = await import('../lib/trackContext');
         const umami = (await import('../lib/umami')).init(window, {
             ...window._umami,
             defaultData: eventDefaults,
@@ -73,8 +73,10 @@ if (window._umami) {
         // anon → auth → Patreon → return, so the resulting distinct_id ties the
         // whole funnel together. umami.identify hashes it to a UUID under the
         // hood (Umami v2 validation requirement) — see lib/umami.js.
+        // The first touch goes with it as session data, not on every event
+        // (docs/analytics.md).
         if (window._sessionID) {
-            umami.identify(window._sessionID);
+            umami.identify(window._sessionID, firstTouch());
         }
     } catch (e) {
         // Analytics chunk failed to load (stale bundle after deploy, flaky

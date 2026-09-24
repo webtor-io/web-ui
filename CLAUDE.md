@@ -197,7 +197,8 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
 
 ### Optional Integrations
 
-- Umami analytics: `USE_UMAMI`, `UMAMI_WEBSITE_ID`, `UMAMI_HOST_URL`
+- Umami analytics: `USE_UMAMI`, `UMAMI_WEBSITE_ID`, `UMAMI_HOST_URL`. What rides along — event defaults, the first touch as session data (`ft_source` etc.), and that `/` is stored with an empty `url_path`: `docs/analytics.md`
+- IndexNow: `INDEXNOW_KEY` — serves `/<key>.txt` so Bing/Yandex accept URL submissions for the host; unset — no file. Submitting: `docs/indexnow.md`
 - GeoIP: `USE_GEOIP_API`, `GEOIP_API_SERVICE_HOST/PORT`
 - Claims (user tiers): `USE_CLAIMS`, `CLAIMS_PROVIDER_SERVICE_HOST/PORT`
 - Stremio addon: `STREMIO_ADDON_USER_AGENT`, `STREMIO_ADDON_PROXY`
