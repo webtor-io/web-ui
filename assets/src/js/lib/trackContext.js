@@ -78,8 +78,9 @@ export function computeFirstTouch(href, referrer, now) {
 // first page load that runs analytics and never overwritten. It rides on
 // umami.identify as session data, so a conversion on a later visit (search →
 // leave → come back directly → pay) can still be put down to the channel that
-// brought the visitor. Browsers that were here before it shipped record their
-// next visit instead — ft_day tells those apart.
+// brought the visitor. Browsers that were here before it shipped (2026-09-24)
+// record their next visit instead, and ft_day cannot tell those apart: every
+// record starts on or after that day.
 export function firstTouch(win = window, now = new Date()) {
     try {
         const ls = win.localStorage;

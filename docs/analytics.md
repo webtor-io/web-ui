@@ -33,7 +33,12 @@ real one is lost.
 
 Limits:
 - Browsers that visited before 2026-09-24 record their next visit, not their
-  real first one. Compare channels only for `ft_day` from 2026-09-24 on.
+  real first one, and nothing marks them: every `ft_day` is 2026-09-24 or
+  later. Early on this understates how often the first touch differs from the
+  paying visit; the share of such browsers falls as new visitors come in.
+- Whether the first touch earns its keep is checked on 2026-10-16 (claudeclaw
+  `job-ft-check-1016`): if it differs from the paying visit's source in fewer
+  than 10% of paying sessions, it adds nothing and goes.
 - Per browser, not per person: another device or a cleared storage is a new
   first touch.
 - Nothing is recorded when the analytics chunk does not load (blocked,
