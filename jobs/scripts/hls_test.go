@@ -1,8 +1,18 @@
 package scripts
 
 import (
+	"context"
+	"flag"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 func TestParseMasterVideoVariantURL(t *testing.T) {
@@ -139,5 +149,82 @@ func TestResolveURL_RootRelative(t *testing.T) {
 	want := "https://example.com/other/path.m3u8"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// directAPI is an api.Api that sends Download straight to the URL it is
+// given. The flag is set explicitly: flags read their env vars on Apply, and
+// a shell with USE_INTERNAL_TORRENT_HTTP_PROXY set would rewrite the host.
+func directAPI(t *testing.T) *api.Api {
+	t.Helper()
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range api.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--use-internal-torrent-http-proxy=false"}); err != nil {
+		t.Fatal(err)
+	}
+	return api.New(cli.NewContext(cli.NewApp(), fs, nil), http.DefaultClient)
+}
+
+// One poll of the session video playlist, per answer. Only the restart cap
+// ends the buffering; the transient answers must keep it polling, because
+// the next poll is what restarts FFmpeg (504) or reaches the transcoder
+// again (thp's empty 503, a misrouted 404). The bodies are written the way
+// the services write them: http.Error, text plus a newline.
+func TestPollSessionPlaylist(t *testing.T) {
+	const playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4.000000,\nv0-0.ts\n#EXTINF:4.000000,\nv0-1.ts\n"
+	cases := []struct {
+		name     string
+		status   int
+		body     string
+		terminal bool
+		segments int
+	}{
+		{name: "restart cap: 503 with its text", status: http.StatusServiceUnavailable, body: "transcoder restart limit reached", terminal: true},
+		{name: "thp stub: 503, empty body", status: http.StatusServiceUnavailable, body: ""},
+		{name: "FFmpeg died: 504 playlist timeout", status: http.StatusGatewayTimeout, body: "playlist timeout"},
+		{name: "misrouted: 404 session not found", status: http.StatusNotFound, body: "session not found"},
+		{name: "200 with segments", status: http.StatusOK, body: playlist, segments: 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.status == http.StatusOK {
+					_, _ = w.Write([]byte(tc.body))
+					return
+				}
+				if tc.body == "" {
+					w.WriteHeader(tc.status)
+					return
+				}
+				http.Error(w, tc.body, tc.status)
+			}))
+			defer srv.Close()
+
+			segments, endList, err := pollSessionPlaylist(context.Background(), directAPI(t), srv.URL+"/session/s1/v0.m3u8")
+			if !tc.terminal {
+				if err != nil {
+					t.Fatalf("err=%v, want nil: this answer must keep the buffer polling", err)
+				}
+				if len(segments) != tc.segments || endList {
+					t.Fatalf("segments=%d endList=%v, want %d and false", len(segments), endList, tc.segments)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("err=nil: the restart cap must end the buffering, not poll to the deadline")
+			}
+			// The shape action.go hands the job: its wrapper around ours.
+			wrapped := errors.Wrap(err, "failed to buffer session HLS")
+			if got := web.ClassifyError(wrapped); got != "error.transcode_failed" {
+				t.Fatalf("ClassifyError(%q)=%s, want error.transcode_failed", wrapped, got)
+			}
+			// ErrorWrapperScript turns a deadline into the no-peers modal;
+			// this must not look like one.
+			if errors.Is(errors.Cause(wrapped), context.DeadlineExceeded) {
+				t.Fatalf("%v reads as the buffer deadline", wrapped)
+			}
+		})
 	}
 }

@@ -154,6 +154,16 @@ func ClassifyError(err error) string {
 		// >1080p is matched above. The 415 body is in the message for logs.
 		return "error.transcode_failed"
 
+	case strings.Contains(msg, "transcoder restart limit reached"):
+		// The session started, but FFmpeg died on the source six times in
+		// a row without a segment and content-transcoder stopped restarting
+		// it (a 503 on the playlist, jobs/scripts/hls.go
+		// pollSessionPlaylist): a broken subtitle mapping, some AVI and m4b
+		// files. A retry dies the same way, so the file's wording — not
+		// stream_stalled's "no data from the torrent", and not the no-peers
+		// modal the buffer deadline used to end on (~48 a day, 2026-09).
+		return "error.transcode_failed"
+
 	case strings.Contains(msg, "transcoder session creation failed"):
 		// Any other status: the converter itself failed to start. Not the
 		// file's fault as far as we know — retry-able, download still works.

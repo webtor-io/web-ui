@@ -513,7 +513,10 @@ func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Cla
 	return
 }
 
-func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, error) {
+// Download GETs u through torrent-http-proxy. The body comes back whatever
+// the status, and the status comes back with it: which non-200 answers are
+// worth asking again is the caller's call (jobs/scripts/hls.go).
+func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, int, error) {
 	return s.DownloadWithRange(ctx, u, 0, -1)
 }
 
@@ -605,11 +608,11 @@ func (s *Api) DeleteTranscoderSession(ctx context.Context, baseURL string, sessi
 	return nil
 }
 
-func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, error) {
+func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end int) (io.ReadCloser, int, error) {
 	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
 		log.WithError(err).Error("failed to make new request")
-		return nil, err
+		return nil, 0, err
 	}
 	if start != 0 || end != -1 {
 		startStr := strconv.Itoa(start)
@@ -622,10 +625,9 @@ func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end in
 	res, err := s.cl.Do(req)
 	if err != nil {
 		log.WithError(err).Error("failed to do request")
-		return nil, err
+		return nil, 0, err
 	}
-	b := res.Body
-	return b, nil
+	return res.Body, res.StatusCode, nil
 }
 
 type OpenSubtitleTrack struct {

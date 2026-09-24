@@ -123,7 +123,7 @@ pages. Test tables: `TestResolveQueryHash_FormInputs` (services/common),
 | `error.upstream_unavailable` | `failed to retrieve resource / stream url / download link`, `stats returned status`, `warmup returned status` | rest-api / thp / seeder did not answer | retry in a minute (ours to fix) |
 | `error.probe_failed` | `failed to get probe data` | content-prober could not read the media | download instead |
 | `error.resolution_not_supported` | `over 1080p is not supported` | transcoder refuses >1080p non-h264 | download instead |
-| `error.transcode_failed` | `transcoder session creation failed status=415` | transcoder refused the source (codec, container) | download instead |
+| `error.transcode_failed` | `transcoder session creation failed status=415`; `transcoder restart limit reached` (a 503 on the session playlist, `jobs/scripts/hls.go` `pollSessionPlaylist`) | transcoder refused the source (codec, container), or FFmpeg died on it six times in a row without a segment and the transcoder stopped restarting it (broken subtitle mapping, some AVI/m4b; ~49 sessions a day in 2026-09, which until then polled to the buffer deadline and got the no-peers modal) | download instead |
 | `error.transcode_unavailable` | any other `transcoder session creation failed` | the converter itself failed to start | retry, or download |
 | `error.stream_stalled` | `session buffer timeout exceeded`, playlist fetch/parse failures, `no video variant`, `too many failed auto-restarts` | session produced no playable segments in time | retry in a minute, or download |
 

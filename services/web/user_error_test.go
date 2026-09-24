@@ -47,6 +47,7 @@ func TestClassifyError_GenericTranscoderFailure(t *testing.T) {
 func TestClassifyError_StreamingChain(t *testing.T) {
 	cases := map[string]string{
 		"failed to buffer session HLS: failed to create transcoder session: transcoder session creation failed status=415 body=unsupported codec hevc": "error.transcode_failed",
+		"failed to buffer session HLS: transcoder restart limit reached status=503":                                                                    "error.transcode_failed",
 		"failed to buffer session HLS: session buffer timeout exceeded: context deadline exceeded":                                                     "error.stream_stalled",
 		"failed to fetch session video playlist: Get \"http://x\": EOF":                                                                                "error.stream_stalled",
 		"no video variant found in master playlist":                                                                                                    "error.stream_stalled",
