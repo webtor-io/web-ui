@@ -109,6 +109,13 @@ func TestEmbeddedSubtitleVisible(t *testing.T) {
 		{"hdmv_pgs_subtitle", "", false, false, false},
 		{"dvd_subtitle", "", false, true, false},
 		{"dvb_subtitle", "", false, true, false},
+		// Not bitmaps, but the transcoder has no text output for them
+		// either: hidden, slot kept.
+		{"", "", false, true, false},
+		{"hdmv_text_subtitle", "", false, true, false},
+		{"dvb_teletext", "", false, true, false},
+		{"eia_608", "", true, true, false},
+		{"mov_text", "", true, true, false},
 		// Forced tracks are now visible and flagged, not hidden.
 		{"subrip", "Forced", true, true, true},
 		{"subrip", "eng forced narrative", true, true, true},

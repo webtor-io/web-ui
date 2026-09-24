@@ -400,17 +400,48 @@ var bitmapSubtitleCodecs = map[string]bool{
 // not a digit": separators match, letters on either side do not.
 var forcedTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])forced($|[^a-z0-9])`)
 
+// textSubtitleCodecs mirrors content-transcoder's list of the same name
+// (services/hls.go): the subtitle codecs it converts to webvtt. Any other
+// non-PGS stream still has its s<N> slot in the HLS group, but the
+// transcoder never produces a playlist for it -- only an empty one. Offered
+// in the picker, such a track shows nothing, can win the default, and can
+// be picked as a translation source that holds a live job for the whole
+// film. Codec-less streams, hdmv_text_subtitle and dvb_teletext are the
+// ones that used to get through (not bitmaps, so not caught above).
+var textSubtitleCodecs = map[string]bool{
+	"subrip":     true,
+	"srt":        true,
+	"ass":        true,
+	"ssa":        true,
+	"webvtt":     true,
+	"mov_text":   true,
+	"text":       true,
+	"microdvd":   true,
+	"subviewer":  true,
+	"subviewer1": true,
+	"sami":       true,
+	"realtext":   true,
+	"mpl2":       true,
+	"pjs":        true,
+	"jacosub":    true,
+	"vplayer":    true,
+	"stl":        true,
+	"eia_608":    true,
+}
+
 // embeddedSubtitleVisible reports whether an embedded subtitle stream
 // is offered in the picker, whether it occupies an index in the
 // transcoder's HLS subtitle group (see content-transcoder
 // services/hls.go: everything but hdmv_pgs is included), and whether
 // it is a "forced" (signs-only) track by title until content-prober
-// exposes ffprobe's disposition flags.
+// exposes ffprobe's disposition flags. Only codecs the transcoder
+// converts are visible (textSubtitleCodecs); the slot does not depend
+// on that.
 func embeddedSubtitleVisible(codecName, title string) (visible bool, countsForHLS bool, forced bool) {
 	if codecName == "hdmv_pgs_subtitle" {
 		return false, false, false
 	}
-	if bitmapSubtitleCodecs[codecName] {
+	if bitmapSubtitleCodecs[codecName] || !textSubtitleCodecs[codecName] {
 		return false, true, false
 	}
 	return true, true, forcedTitleRe.MatchString(title)
