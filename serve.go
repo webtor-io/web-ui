@@ -685,6 +685,10 @@ func serve(c *cli.Context) error {
 	if err != nil {
 		log.WithError(err).Error("got server error")
 	}
+	// Drain HTTP before the deferred closes run: defers go in reverse, so
+	// Redis, NATS and the rest would otherwise be gone while the last
+	// requests are still being served.
+	web.Close()
 	return err
 }
 

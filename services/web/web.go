@@ -1,9 +1,12 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -13,10 +16,11 @@ import (
 )
 
 const (
-	webHostFlag        = "host"
-	webPortFlag        = "port"
-	StagingFlag        = "staging"
-	RedirectDomainFlag = "redirect-domain"
+	webHostFlag         = "host"
+	webPortFlag         = "port"
+	shutdownTimeoutFlag = "shutdown-timeout"
+	StagingFlag         = "staging"
+	RedirectDomainFlag  = "redirect-domain"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -33,6 +37,12 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Value:  8080,
 			EnvVar: "WEB_PORT",
 		},
+		cli.DurationFlag{
+			Name:   shutdownTimeoutFlag,
+			Usage:  "how long to let in-flight requests finish on SIGTERM; keep below terminationGracePeriodSeconds minus the preStop sleep",
+			Value:  20 * time.Second,
+			EnvVar: "WEB_SHUTDOWN_TIMEOUT",
+		},
 		cli.BoolFlag{
 			Name:   StagingFlag,
 			Usage:  "mark deployment as staging: forces X-Robots-Tag noindex on every response",
@@ -47,17 +57,18 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type Web struct {
-	host    string
-	port    int
-	ln      net.Listener
-	r       *gin.Engine
-	handler http.Handler
+	host            string
+	port            int
+	shutdownTimeout time.Duration
+	mu              sync.Mutex
+	srv             *http.Server
+	r               *gin.Engine
+	handler         http.Handler
 }
 
 func (s *Web) Serve() error {
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	ln, err := net.Listen("tcp", addr)
-	s.ln = ln
 	if err != nil {
 		return errors.Wrap(err, "failed to web listen to tcp connection")
 	}
@@ -66,17 +77,41 @@ func (s *Web) Serve() error {
 	if h == nil {
 		h = s.r
 	}
-	return http.Serve(s.ln, h)
+	srv := &http.Server{Handler: h}
+	s.mu.Lock()
+	s.srv = srv
+	s.mu.Unlock()
+	err = srv.Serve(ln)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
+// Close drains the server: it stops accepting, closes idle keep-alive
+// connections and waits for in-flight requests up to the shutdown timeout,
+// then cuts whatever is still open (long-lived streams). Closing the
+// listener alone let the process exit mid-response, and the ingress answered
+// 502 on every request a terminating pod was still serving.
+//
+// It must run before the dependencies the handlers use are closed, so
+// serve() calls it explicitly rather than leaving it to defer order.
 func (s *Web) Close() {
-	log.Info("closing web")
-	defer func() {
-		log.Info("web closed")
-	}()
-	if s.ln != nil {
-		_ = s.ln.Close()
+	s.mu.Lock()
+	srv := s.srv
+	s.srv = nil
+	s.mu.Unlock()
+	if srv == nil {
+		return
 	}
+	log.WithField("timeout", s.shutdownTimeout).Info("closing web")
+	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.WithError(err).Warn("web shutdown timed out, closing remaining connections")
+		_ = srv.Close()
+	}
+	log.Info("web closed")
 }
 
 // Use wraps the Gin engine with an HTTP-level middleware.
@@ -94,8 +129,9 @@ func New(c *cli.Context, r *gin.Engine) (*Web, error) {
 	r.UseRawPath = true
 
 	return &Web{
-		host: c.String(webHostFlag),
-		port: c.Int(webPortFlag),
-		r:    r,
+		host:            c.String(webHostFlag),
+		port:            c.Int(webPortFlag),
+		shutdownTimeout: c.Duration(shutdownTimeoutFlag),
+		r:               r,
 	}, nil
 }
