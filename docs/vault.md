@@ -158,6 +158,8 @@ Syncs user balance with claims system. Uses `SELECT FOR UPDATE` in transaction.
 
 Same as `UpdateUserVP` but only if user already has a `user_vp` record. Returns `nil, nil` if not found. Used in automated event processing.
 
+Only two things call it: the `user.updated` event and a visit to `/vault`. The per-request claims middleware syncs `user.tier` but **not** the balance, so a membership that ends without an event keeps its VP until the reaper's resync (below).
+
 #### GetUserStats
 
 Returns `UserStats`:
@@ -245,6 +247,8 @@ Selects resources where:
 - `funded_at < now - VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD AND vaulted = false`
 
 For each: removes pledges (returns VP), sends notifications, deletes resource. Partial failures logged and skipped.
+
+Before that, each run resyncs balances — see "Balance resync (reaper)".
 
 ## HTTP Endpoints
 
@@ -478,3 +482,17 @@ content from the Vault, failed on the foreign key, and left the row saying
 `vaulted = true` — every hour, for the one resource it happened to
 (2026-08-29 → 09-21). The message is "expired", not "transfer timeout": the
 content was stored, its funding went away.
+
+## Balance resync (reaper)
+
+`user_vp.total` follows claims only through `UpdateUserVP`, which runs on `user.updated` or on `/vault`. A membership can end with neither: the 2026-07-13 `patreon.member` matview fix took bronze from expired trials without publishing anything, a `billing.member` runs out by date, a Patreon member ages out of the matview's `pledge_cadence + 5 days` window. On 2026-09-25 that was 117 accounts without a membership holding 1562 VP (~1.5 TB of the Vault's 25 TB), most of them untouched since spring.
+
+So every `vault reap` run first calls `reaper.resyncUserVP`: for each user with a funded pledge (`GetUserVPsWithFundedPledges`) it compares the balance with the claims and calls `UpdateUserVP` where they differ. The defunded pledges then go the ordinary way — resource marked expired now, reaped with the "expired" letter after `VAULT_RESOURCE_EXPIRE_PERIOD`, un-expired by `fundPledge` if the tier comes back first.
+
+Two guards, because a lowered balance ends in content deleted from S3:
+
+- **A claims error skips the user** — never read as "free". A failed lookup is not an absent membership.
+- **`VAULT_VP_RESYNC_MAX_DROPS`** (default 200): if one run would lower more balances than that, it changes nothing and logs `balance resync would lower more balances than allowed` at error level. That many at once is a broken claims source (an emptied matview, a dropped view), not a wave of cancellations. Raises don't count. After a deliberate mass change, raise the limit for one run.
+
+Every run logs `balance resync done` with `checked` / `changed` / `lowered`.
+

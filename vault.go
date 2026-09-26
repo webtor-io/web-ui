@@ -13,6 +13,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/notification"
@@ -23,6 +24,24 @@ import (
 type reaperVault interface {
 	RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) error
 	RemoveResource(ctx context.Context, resourceID string) error
+	UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels.UserVP, error)
+}
+
+// reaperClaims answers what Vault balance a user's claims grant right now.
+type reaperClaims interface {
+	Points(user *auth.User) (*float64, error)
+}
+
+type claimsPoints struct {
+	cl *claims.Claims
+}
+
+func (c *claimsPoints) Points(user *auth.User) (*float64, error) {
+	d, err := c.cl.Get(&claims.Request{Email: user.Email, PatreonUserID: user.PatreonUserID})
+	if err != nil {
+		return nil, err
+	}
+	return vault.PointsFromClaims(d), nil
 }
 
 type reaperNotification interface {
@@ -34,6 +53,7 @@ type reaperStore interface {
 	GetExpiredResources(ctx context.Context, expirePeriod time.Duration, abandonedExpirePeriod time.Duration, transferTimeoutPeriod time.Duration) ([]vaultModels.Resource, error)
 	GetResourcePledgesWithUsers(ctx context.Context, resourceID string) ([]vaultModels.Pledge, error)
 	GetGhostResources(ctx context.Context) ([]vaultModels.Resource, error)
+	GetUserVPsWithFundedPledges(ctx context.Context) ([]vaultModels.UserVP, error)
 }
 
 // pgReaperStore wraps *pg.DB to implement reaperStore
@@ -49,6 +69,10 @@ func (s *pgReaperStore) GetResourcePledgesWithUsers(ctx context.Context, resourc
 	return vaultModels.GetResourcePledgesWithUsers(ctx, s.db, resourceID)
 }
 
+func (s *pgReaperStore) GetUserVPsWithFundedPledges(ctx context.Context) ([]vaultModels.UserVP, error) {
+	return vaultModels.GetUserVPsWithFundedPledges(ctx, s.db)
+}
+
 func (s *pgReaperStore) GetGhostResources(ctx context.Context) ([]vaultModels.Resource, error) {
 	return vaultModels.GetGhostResources(ctx, s.db)
 }
@@ -57,6 +81,8 @@ type reaper struct {
 	store                 reaperStore
 	vault                 reaperVault
 	notification          reaperNotification
+	claims                reaperClaims
+	maxVPDrops            int
 	expirePeriod          time.Duration
 	abandonedExpirePeriod time.Duration
 	transferTimeoutPeriod time.Duration
@@ -85,7 +111,15 @@ func configureVault(c *cli.Command) {
 	c.Subcommands = []cli.Command{reapCmd}
 }
 
+const vaultVPResyncMaxDropsFlag = "vault-vp-resync-max-drops"
+
 func configureVaultReap(c *cli.Command) {
+	c.Flags = append(c.Flags, cli.IntFlag{
+		Name:   vaultVPResyncMaxDropsFlag,
+		Usage:  "the most balances one reap may lower; more than that is taken for a claims failure and nothing is changed",
+		Value:  200,
+		EnvVar: "VAULT_VP_RESYNC_MAX_DROPS",
+	})
 	c.Flags = cs.RegisterPGFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
 	c.Flags = claims.RegisterClientFlags(c.Flags)
@@ -165,6 +199,8 @@ func initializeReaper(c *cli.Context) (*reaper, error) {
 		store:                 &pgReaperStore{db: db},
 		vault:                 vaultService,
 		notification:          notificationService,
+		claims:                &claimsPoints{cl: claimsService},
+		maxVPDrops:            c.Int(vaultVPResyncMaxDropsFlag),
 		expirePeriod:          c.Duration(vault.VaultResourceExpirePeriodFlag),
 		abandonedExpirePeriod: c.Duration(vault.VaultResourceAbandonedExpirePeriodFlag),
 		transferTimeoutPeriod: c.Duration(vault.VaultResourceTransferTimeoutPeriodFlag),
@@ -181,6 +217,10 @@ func (r *reaper) Close() {
 }
 
 func (r *reaper) run(ctx context.Context) {
+	// First, so the pledges it defunds start their expire period now and
+	// not an hour later.
+	r.resyncUserVP(ctx)
+
 	resources, err := r.store.GetExpiredResources(ctx, r.expirePeriod, r.abandonedExpirePeriod, r.transferTimeoutPeriod)
 	if err != nil {
 		log.WithError(err).Warn("failed to get expired resources")
@@ -196,6 +236,95 @@ func (r *reaper) run(ctx context.Context) {
 	// Clean up ghost resources — funded_vp > 0 but no funded pledges
 	// (caused by user account deletion cascading pledges but not updating resource)
 	r.reapGhostResources(ctx)
+}
+
+// resyncUserVP brings the balance of everyone holding funded pledges back in
+// line with their claims. A balance changes only on user.updated or a visit
+// to /vault, and a membership can end without either: the 2026-07-13 matview
+// fix took bronze from expired trials without an event, a billing membership
+// runs out by date, a Patreon member ages out of the matview's window. Those
+// accounts kept their Vault space for months (117 of them, 1.5 TB on
+// 2026-09-25). UpdateUserVP defunds what no longer fits, and the pledges go
+// the ordinary way: expired now, reaped after the expire period, restored if
+// the tier comes back before that.
+//
+// A lost balance ends in content deleted from S3, so the run is checked
+// before it is applied: if claims would lower more than maxVPDrops balances
+// at once, that is a broken claims source (an emptied matview, a dropped
+// view) and not a wave of cancellations, and nothing is changed. A user whose
+// claims cannot be fetched is skipped, never read as free.
+func (r *reaper) resyncUserVP(ctx context.Context) {
+	if r.claims == nil {
+		return
+	}
+	vps, err := r.store.GetUserVPsWithFundedPledges(ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to get user balances for resync")
+		return
+	}
+	var stale []*auth.User
+	drops := 0
+	for i := range vps {
+		vp := &vps[i]
+		if vp.User == nil {
+			continue
+		}
+		u := &auth.User{
+			ID:            vp.User.UserID,
+			Email:         vp.User.Email,
+			PatreonUserID: vp.User.PatreonUserID,
+		}
+		points, err := r.claims.Points(u)
+		if err != nil {
+			log.WithError(err).WithField("user_id", u.ID).Warn("failed to get claims for balance resync, skipping user")
+			continue
+		}
+		if pointsEqual(vp.Total, points) {
+			continue
+		}
+		if pointsLowered(vp.Total, points) {
+			drops++
+		}
+		stale = append(stale, u)
+	}
+	if drops > r.maxVPDrops {
+		log.WithField("drops", drops).
+			WithField("max_drops", r.maxVPDrops).
+			WithField("checked", len(vps)).
+			Error("balance resync would lower more balances than allowed, claims look broken; nothing changed")
+		return
+	}
+	for _, u := range stale {
+		vp, err := r.vault.UpdateUserVP(ctx, u)
+		if err != nil {
+			log.WithError(err).WithField("user_id", u.ID).Warn("failed to resync user balance")
+			continue
+		}
+		l := log.WithField("user_id", u.ID)
+		if vp != nil && vp.Total != nil {
+			l = l.WithField("total", *vp.Total)
+		}
+		l.Info("resynced user balance")
+	}
+	log.WithField("checked", len(vps)).
+		WithField("changed", len(stale)).
+		WithField("lowered", drops).
+		Info("balance resync done")
+}
+
+func pointsEqual(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// pointsLowered: nil is unlimited, so any number is lower than it.
+func pointsLowered(from, to *float64) bool {
+	if to == nil {
+		return false
+	}
+	return from == nil || *to < *from
 }
 
 func (r *reaper) reapGhostResources(ctx context.Context) {

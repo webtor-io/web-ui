@@ -8,6 +8,7 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/notification"
 )
@@ -21,6 +22,12 @@ type mockReaperStore struct {
 	pledgesWithUsersErr map[string]error
 	ghostResources      []vaultModels.Resource
 	ghostResourcesErr   error
+	userVPs             []vaultModels.UserVP
+	userVPsErr          error
+}
+
+func (m *mockReaperStore) GetUserVPsWithFundedPledges(_ context.Context) ([]vaultModels.UserVP, error) {
+	return m.userVPs, m.userVPsErr
 }
 
 func (m *mockReaperStore) GetExpiredResources(_ context.Context, _ time.Duration, _ time.Duration, _ time.Duration) ([]vaultModels.Resource, error) {
@@ -54,6 +61,13 @@ type mockReaperVault struct {
 	removeResourceErr  error
 	removeResourceIDs  []string
 	removePledgeErrMap map[uuid.UUID]error
+	updateUserVPIDs    []uuid.UUID
+	updateUserVPErr    error
+}
+
+func (m *mockReaperVault) UpdateUserVP(_ context.Context, user *auth.User) (*vaultModels.UserVP, error) {
+	m.updateUserVPIDs = append(m.updateUserVPIDs, user.ID)
+	return &vaultModels.UserVP{UserID: user.ID}, m.updateUserVPErr
 }
 
 func (m *mockReaperVault) RemovePledge(_ context.Context, pledge *vaultModels.Pledge) error {
@@ -1011,5 +1025,143 @@ func TestReapGhostResources_NoPledges(t *testing.T) {
 	newTestReaper(store, v, n).reapGhostResources(context.Background())
 	if len(v.removeResourceIDs) != 1 || len(n.calls) != 0 {
 		t.Fatalf("removed %v, notified %+v", v.removeResourceIDs, n.calls)
+	}
+}
+
+// --- Tests for resyncUserVP ---
+
+type mockReaperClaims struct {
+	points map[uuid.UUID]*float64
+	errs   map[uuid.UUID]error
+}
+
+func (m *mockReaperClaims) Points(user *auth.User) (*float64, error) {
+	if err, ok := m.errs[user.ID]; ok {
+		return nil, err
+	}
+	return m.points[user.ID], nil
+}
+
+func vpPtr(v float64) *float64 { return &v }
+
+func makeUserVP(total *float64) (uuid.UUID, vaultModels.UserVP) {
+	id := uuid.NewV4()
+	return id, vaultModels.UserVP{UserID: id, Total: total, User: &models.User{UserID: id, Email: id.String() + "@example.com"}}
+}
+
+func newResyncReaper(vps []vaultModels.UserVP, cl *mockReaperClaims, maxDrops int) (*reaper, *mockReaperVault) {
+	v := &mockReaperVault{}
+	r := newTestReaper(&mockReaperStore{userVPs: vps}, v, &mockReaperNotification{})
+	r.claims = cl
+	r.maxVPDrops = maxDrops
+	return r, v
+}
+
+func TestResyncUserVP_UpdatesOnlyChangedBalances(t *testing.T) {
+	lapsed, lapsedVP := makeUserVP(vpPtr(50))
+	paying, payingVP := makeUserVP(vpPtr(250))
+	upgraded, upgradedVP := makeUserVP(vpPtr(50))
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{
+		lapsed:   vpPtr(0),
+		paying:   vpPtr(250),
+		upgraded: vpPtr(1000),
+	}}
+	r, v := newResyncReaper([]vaultModels.UserVP{lapsedVP, payingVP, upgradedVP}, cl, 10)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 2 || v.updateUserVPIDs[0] != lapsed || v.updateUserVPIDs[1] != upgraded {
+		t.Fatalf("expected updates for lapsed and upgraded only, got %v", v.updateUserVPIDs)
+	}
+}
+
+func TestResyncUserVP_TooManyDropsChangesNothing(t *testing.T) {
+	var vps []vaultModels.UserVP
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{}}
+	for i := 0; i < 3; i++ {
+		id, vp := makeUserVP(vpPtr(250))
+		vps = append(vps, vp)
+		cl.points[id] = vpPtr(0)
+	}
+	r, v := newResyncReaper(vps, cl, 2)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 0 {
+		t.Fatalf("expected no updates over the drop limit, got %d", len(v.updateUserVPIDs))
+	}
+}
+
+func TestResyncUserVP_DropsAtTheLimitApply(t *testing.T) {
+	var vps []vaultModels.UserVP
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{}}
+	for i := 0; i < 2; i++ {
+		id, vp := makeUserVP(vpPtr(250))
+		vps = append(vps, vp)
+		cl.points[id] = vpPtr(0)
+	}
+	r, v := newResyncReaper(vps, cl, 2)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 2 {
+		t.Fatalf("expected 2 updates at the limit, got %d", len(v.updateUserVPIDs))
+	}
+}
+
+func TestResyncUserVP_RaisesDoNotCountAsDrops(t *testing.T) {
+	var vps []vaultModels.UserVP
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{}}
+	for i := 0; i < 3; i++ {
+		id, vp := makeUserVP(vpPtr(50))
+		vps = append(vps, vp)
+		cl.points[id] = vpPtr(250)
+	}
+	r, v := newResyncReaper(vps, cl, 0)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 3 {
+		t.Fatalf("expected raises to apply with a zero drop limit, got %d", len(v.updateUserVPIDs))
+	}
+}
+
+func TestResyncUserVP_UnlimitedToFiniteIsADrop(t *testing.T) {
+	id, vp := makeUserVP(nil)
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{id: vpPtr(1000)}}
+	r, v := newResyncReaper([]vaultModels.UserVP{vp}, cl, 0)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 0 {
+		t.Fatalf("expected unlimited -> 1000 to count as a drop, got %d updates", len(v.updateUserVPIDs))
+	}
+}
+
+func TestResyncUserVP_ClaimsErrorSkipsUser(t *testing.T) {
+	failing, failingVP := makeUserVP(vpPtr(250))
+	lapsed, lapsedVP := makeUserVP(vpPtr(250))
+	cl := &mockReaperClaims{
+		points: map[uuid.UUID]*float64{lapsed: vpPtr(0)},
+		errs:   map[uuid.UUID]error{failing: fmt.Errorf("claims unavailable")},
+	}
+	r, v := newResyncReaper([]vaultModels.UserVP{failingVP, lapsedVP}, cl, 10)
+
+	r.resyncUserVP(context.Background())
+
+	if len(v.updateUserVPIDs) != 1 || v.updateUserVPIDs[0] != lapsed {
+		t.Fatalf("expected only the lapsed user updated, got %v", v.updateUserVPIDs)
+	}
+}
+
+func TestRun_ResyncBeforeReap(t *testing.T) {
+	id, vp := makeUserVP(vpPtr(250))
+	cl := &mockReaperClaims{points: map[uuid.UUID]*float64{id: vpPtr(0)}}
+	r, v := newResyncReaper([]vaultModels.UserVP{vp}, cl, 10)
+
+	r.run(context.Background())
+
+	if len(v.updateUserVPIDs) != 1 {
+		t.Fatalf("expected run to resync balances, got %d updates", len(v.updateUserVPIDs))
 	}
 }

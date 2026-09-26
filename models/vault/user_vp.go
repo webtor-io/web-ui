@@ -20,6 +20,22 @@ type UserVP struct {
 	User *models.User `pg:"rel:has-one,fk:user_id"`
 }
 
+// GetUserVPsWithFundedPledges returns the balances, with their users, of
+// everyone who holds at least one funded pledge -- the accounts whose balance
+// keeps content in the Vault.
+func GetUserVPsWithFundedPledges(ctx context.Context, db *pg.DB) ([]UserVP, error) {
+	var vps []UserVP
+	err := db.Model(&vps).
+		Context(ctx).
+		Relation("User").
+		Where("EXISTS (SELECT 1 FROM vault.pledge p WHERE p.user_id = user_vp.user_id AND p.funded)").
+		Select()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user vault points with funded pledges")
+	}
+	return vps, nil
+}
+
 // GetUserVP returns user vault points
 func GetUserVP(ctx context.Context, db *pg.DB, userID uuid.UUID) (*UserVP, error) {
 	vp := &UserVP{}

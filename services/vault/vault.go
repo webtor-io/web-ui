@@ -116,12 +116,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 		return nil, errors.Wrap(err, "failed to get claims")
 	}
 
-	// Extract vault points from claims (optional field)
-	var claimsPoints *float64
-	if claimsData.Claims != nil && claimsData.Claims.Vault != nil && claimsData.Claims.Vault.Points != nil {
-		points := float64(*claimsData.Claims.Vault.Points)
-		claimsPoints = &points
-	}
+	claimsPoints := PointsFromClaims(claimsData)
 
 	//p := float64(0)
 	//claimsPoints = &p
@@ -243,6 +238,15 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 	}
 
 	return result, nil
+}
+
+// PointsFromClaims is the Vault balance the claims grant; nil means unlimited.
+func PointsFromClaims(d *claims.Data) *float64 {
+	if d == nil || d.Claims == nil || d.Claims.Vault == nil || d.Claims.Vault.Points == nil {
+		return nil
+	}
+	points := float64(*d.Claims.Vault.Points)
+	return &points
 }
 
 // UpdateUserVPIfExists updates user vault points only if user already has a record in Vault
