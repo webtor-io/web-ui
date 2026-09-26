@@ -5,6 +5,7 @@
 import Hls from 'hls.js';
 import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
 import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
+import { createLoaderRestart } from './loader-restart.js';
 
 const HLS_CONFIG = {
     autoStartLoad: true,
@@ -66,7 +67,9 @@ export function createHls(videoEl, sourceUrl, onReady) {
     return hls;
 }
 
-function setupHlsEvents(hls) {
+// Exported for the tests (loader-restart.test.js), with the loader restart's
+// options: the error handling every instance goes through.
+export function setupHlsEvents(hls, restartOpts) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
             hls.startLevel = 1;
@@ -93,11 +96,14 @@ function setupHlsEvents(hls) {
             }
         } else {
             console.warn('HLS non-fatal error:', data.type, data.details);
-            if (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'bufferStalledError') {
-                setTimeout(() => hls.startLoad(), 5000);
-            }
         }
     });
+
+    // A stall (the non-fatal bufferStalledError) restarts the loader only
+    // when nothing is loading: at the plan's cap the segment the player
+    // waits for is still arriving, and startLoad() would abort it
+    // (loader-restart.js).
+    return createLoaderRestart(hls, Hls, restartOpts);
 }
 
 /**
