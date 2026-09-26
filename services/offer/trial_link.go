@@ -31,12 +31,13 @@ const (
 	FromOnboarding    = "onboarding"     // locked onboarding steps (partials/onboarding_checklist.html)
 	FromDonate        = "donate"         // /donate: the promo card's trial plaque and its monthly Join
 	FromStatusBar     = "status-bar"     // the plan box under the resource page's transfer status (services/statusview)
+	FromPlayerLabel   = "player-label"   // the card behind the player's buffering label at the cap, "Buffering | lock 5 Mbps" (lib/player/BufferingLabel.jsx; link built in services/statusview)
 )
 
 // TrialFroms lists every known surface, in the order of the table in
 // docs/offers.md.
 var TrialFroms = []string{
-	FromPromoBanner, FromDownloadNudge, FromLimitModal, FromStatusBar, FromGrace, FromNoPeers, FromOnboarding, FromDonate,
+	FromPromoBanner, FromDownloadNudge, FromLimitModal, FromStatusBar, FromPlayerLabel, FromGrace, FromNoPeers, FromOnboarding, FromDonate,
 }
 
 // Labels for a ?from outside TrialFroms.

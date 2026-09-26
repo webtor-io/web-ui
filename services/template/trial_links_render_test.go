@@ -268,13 +268,14 @@ func TestTrialTargetsTakeTheirLinkFromTrialURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The public templates call trialURL for every surface but the three
+	// The public templates call trialURL for every surface but the four
 	// that are not a template call: onboarding (a path set in Go,
-	// services/onboarding), the status bar (a link built in Go and carried
-	// over the status SSE, services/statusview) and
-	// the promo banner, whose template the deployment provides.
+	// services/onboarding), the status bar and the player's buffering label
+	// (links built in Go and carried over the status SSE,
+	// services/statusview) and the promo banner, whose template the
+	// deployment provides.
 	for _, f := range offer.TrialFroms {
-		if f == offer.FromOnboarding || f == offer.FromStatusBar || f == offer.FromPromoBanner {
+		if f == offer.FromOnboarding || f == offer.FromStatusBar || f == offer.FromPlayerLabel || f == offer.FromPromoBanner {
 			continue
 		}
 		if !used[f] {

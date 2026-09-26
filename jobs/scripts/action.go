@@ -167,6 +167,12 @@ func needsFullMeasure(lowerBound float64, bitrate int64, quickSize int, fullSize
 	return lowerBound*8 < float64(bitrate)
 }
 
+// swarmTooSlow says whether a measured swarm speed (bytes a second) fails
+// the file's bitrate: the BT-slow modal. An unmeasured swarm (0) does not.
+func swarmTooSlow(bytesPerSec float64, bitrate int64) bool {
+	return bytesPerSec > 0 && bytesPerSec*8 < float64(bitrate)
+}
+
 // halfCapped keeps a warm-up range within half the file, so a small file is
 // not "warmed up" in its entirety before it plays.
 func halfCapped(size int, fileSize int) int {
@@ -301,6 +307,38 @@ func episodeTag(ref *models.VideoRef) string {
 	return fmt.Sprintf("S%02dE%02d", ref.Season, ref.Episode)
 }
 
+// capGateBitrate is what the bandwidth gate (streamContent, Step 3) holds the
+// plan's cap against, in bits a second: what the player pulls
+// (playedBitrate: the video and one audio track, as the transcoder or
+// nginx-vod serve them), because that is what thp caps -- the same number
+// the transfer status's "…and this file needs N" and its over-the-cap mark
+// are made of (setStatusMarks), so the cap modal's "file needs" and the
+// status say one thing. The file's own rate counts every dub and commentary
+// besides: a 3.5 Mbps H.264 with two 1.5 Mbps DTS dubs reads 6.6 as a file,
+// and at a 5 Mbps cap the gate showed the cap modal, "file needs 6.6", for a
+// transcoded stream of 3.6. Where what the player pulls is not known
+// (re-encoded video, tags that disagree with the file, no per-track numbers)
+// it falls back to the file's rate, as the cap was always held: an unknown
+// stream is no reason to skip the check.
+//
+// The swarm is not held against it: see getVideoBitrate.
+func capGateBitrate(mp *api.MediaProbe, transcoded bool) int64 {
+	if bps := playedBitrate(mp, transcoded); bps > 0 {
+		return bps
+	}
+	return getVideoBitrate(mp)
+}
+
+// getVideoBitrate is the file's own bitrate: the container's, or the sum of
+// its streams' where the container has none. It is what the bandwidth gate
+// holds the SWARM against (needsFullMeasure, swarmTooSlow, the BT-slow
+// modal): the warm-up measures file bytes the seeder fetched from its peers,
+// and to play the file the seeder has to fetch all of it, every dub
+// included -- the transcoder's ffmpeg reads every interleaved Matroska block
+// whatever it maps, and nginx-vod's ranges land inside whole pieces. Held
+// against the played stream instead, the two-DTS-dub file above (6.6 as a
+// file, 3.6 played) passed a 4.8 Mbps swarm at once, and the viewer stalled
+// on a swarm that cannot keep up with the file.
 func getVideoBitrate(mp *api.MediaProbe) int64 {
 	if mp.Format.BitRate != "" {
 		br, err := strconv.ParseInt(mp.Format.BitRate, 10, 64)
@@ -695,6 +733,10 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// BT-slow path: when probe is needed (non-cached), we compare measured
 	// download speed against required bitrate. Even under grace mode this is
 	// kept — grace rate won't help if the user's own internet is the bottleneck.
+	// Two rates: the swarm is held against the file's own (fileRate,
+	// getVideoBitrate -- the seeder fetches every track), the plan's cap
+	// against what the player pulls (streamRate, capGateBitrate -- what thp
+	// caps, the rate the transfer status's "…and this file needs N" states).
 	//
 	// Cap-modal path (cached content + plan cap below bitrate): kept under
 	// flag-off, skipped under graceMode. Under grace, THP delivers the first
@@ -704,17 +746,19 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	// On forceSlow we emit Skip instead of running the gate — the user already
 	// opted into slow playback.
 	if sc.MediaProbe != nil {
-		bitrate := getVideoBitrate(sc.MediaProbe)
-		if bitrate > 0 {
+		fileRate := getVideoBitrate(sc.MediaProbe)
+		// Falls back to fileRate, so it is known whenever fileRate is.
+		streamRate := capGateBitrate(sc.MediaProbe, seMeta.Transcode)
+		if streamRate > 0 {
 			if s.forceSlow {
 				j.Skip(s.t("job.checkingBandwidth"))
 			} else if effectiveCache && !graceMode {
 				j.InProgress(s.t("job.checkingBandwidth"))
-				if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
+				if sdd, limited := checkCachedRateLimit(c, streamRate); limited {
 					return &SlowDownloadError{Data: sdd}
 				}
 				j.Done()
-			} else if !effectiveCache && downloadSpeed > 0 {
+			} else if !effectiveCache && downloadSpeed > 0 && fileRate > 0 {
 				// The quick warm-up gave a lower bound. A swarm that clears
 				// the bitrate even on that plays at once -- that is the
 				// whole saving. One that does not is either slow or merely
@@ -723,7 +767,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 				// full range. Those viewers wait what everyone waited before
 				// 2026-09-19, and no longer. The budget is what is left of
 				// the warm-up deadline, so a crawl is not given it twice.
-				if needsFullMeasure(downloadSpeed, int64(bitrate), warmupSize, fullMeasureSize) {
+				if needsFullMeasure(downloadSpeed, fileRate, warmupSize, fullMeasureSize) {
 					left := time.Duration(s.warmup.TimeoutMin)*time.Minute - quickElapsed
 					if left < 30*time.Second {
 						left = 30 * time.Second
@@ -744,7 +788,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 						// swarm speed to judge, only the plan cap -- the
 						// cached branch above, arrived at late.
 						if !graceMode {
-							if sdd, limited := checkCachedRateLimit(c, bitrate); limited {
+							if sdd, limited := checkCachedRateLimit(c, streamRate); limited {
 								return &SlowDownloadError{Data: sdd}
 							}
 						}
@@ -758,13 +802,13 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 						downloadSpeed = measured
 					}
 					// warmUp wrote and closed the "checking bandwidth" line.
-					if downloadSpeed > 0 && downloadSpeed*8 < float64(bitrate) {
-						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+					if swarmTooSlow(downloadSpeed, fileRate) {
+						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, fileRate)}
 					}
 				} else {
 					j.InProgress(s.t("job.checkingBandwidth"))
-					if downloadSpeed*8 < float64(bitrate) {
-						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, bitrate)}
+					if swarmTooSlow(downloadSpeed, fileRate) {
+						return &SlowDownloadError{Data: buildSlowDownloadData(c, downloadSpeed, fileRate)}
 					}
 					j.Done()
 				}

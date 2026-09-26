@@ -672,8 +672,237 @@ video::cue {
     to { transform: rotate(360deg); }
 }
 
-.wt-player-overlay--loading svg {
+/* The buffering label (BufferingLabel.jsx; docs/player.md "Buffering
+   label"), where the spinner was and with its visibility: a pill that says
+   "Buffering". At the plan's cap (the transfer status's word, lib/
+   transferStatus.js playerLabel) it is the lock -- a button with the
+   viewer's cap -- that opens the status's own stream plan box (.tx-pbox,
+   style.css, docs/uikit.html §21) over the video: inside the player, so a
+   fullscreen player keeps it. Owner's mockups, variant A (2026-09-26).
+
+   The overlay is the card's size container: .tx-pbox's own @container
+   rules lay the card out by the player's width (below 670 px the compact
+   box: the text over a full-width 44 px button), the ones below by its
+   height. */
+.wt-buffering {
+    container-type: size;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+/* A control now: over the controls (20), under the catch-up pill (40), the
+   offer card (41) and the resume prompt (50). */
+.wt-buffering--cap {
+    z-index: 35;
+}
+.wt-buffering-pill {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(10, 14, 26, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+}
+/* The lock takes clicks; the plain pill lets them through to the picture,
+   as the spinner did (the overlay is pointer-events:none). */
+button.wt-buffering-pill {
+    pointer-events: auto;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+button.wt-buffering-pill:hover,
+button.wt-buffering-pill[aria-expanded="true"] {
+    border-color: rgba(232, 67, 147, 0.55);
+    background: rgba(232, 67, 147, 0.18);
+}
+button.wt-buffering-pill:focus-visible {
+    outline: 2px solid #fd79a8;
+    outline-offset: 2px;
+}
+.wt-buffering-spin {
+    flex: none;
+    width: 14px;
+    height: 14px;
     animation: wt-spin 1s linear infinite;
+}
+.wt-buffering-sep {
+    flex: none;
+    width: 1px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.2);
+}
+/* The plan's colour: the cap is the pink of the status's chain. */
+.wt-buffering-cap {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #fd79a8;
+    font-weight: 600;
+}
+.wt-buffering-cap svg {
+    flex: none;
+    width: 13px;
+    height: 13px;
+}
+.wt-buffering-chev {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin-left: -3px;
+    color: #fd79a8;
+}
+/* Fullscreen with a mouse: the same pill, larger. */
+@media (pointer: fine) {
+    .wt-player--fullscreen .wt-buffering-pill {
+        height: 40px;
+        padding: 0 16px;
+        gap: 10px;
+        font-size: 15px;
+    }
+    .wt-player--fullscreen .wt-buffering-spin {
+        width: 16px;
+        height: 16px;
+    }
+    .wt-player--fullscreen .wt-buffering-cap svg {
+        width: 15px;
+        height: 15px;
+    }
+    .wt-player--fullscreen .wt-buffering-chev {
+        width: 14px;
+        height: 14px;
+    }
+}
+/* Touch: the lock is a real target, 44 px, the words alone 36 -- a phone
+   turned sideways (fullscreen) included. */
+@media (pointer: coarse) {
+    .wt-buffering-pill {
+        height: 36px;
+        padding: 0 14px;
+    }
+    button.wt-buffering-pill {
+        height: 44px;
+    }
+}
+
+/* The card: the stream box as the status draws it, over the video. */
+.wt-cap-card.tx-pbox {
+    position: relative;
+    flex: 0 1 auto;
+    width: min(500px, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 16px 48px 16px 16px;
+    border-color: rgba(232, 67, 147, 0.32);
+    background: rgba(12, 17, 30, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+    text-align: left;
+    cursor: default;
+    pointer-events: auto;
+}
+.wt-cap-card-text {
+    min-width: 0;
+}
+/* Wraps rather than runs out of the card in a narrow player or a long
+   language. */
+.wt-cap-card .tx-sbtn {
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+}
+.wt-cap-card-x {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+.wt-cap-card-x:hover {
+    color: #f1f5f9;
+    background: rgba(255, 255, 255, 0.06);
+}
+.wt-cap-card-x svg {
+    width: 16px;
+    height: 16px;
+}
+@media (pointer: coarse) {
+    .wt-cap-card-x {
+        top: 2px;
+        right: 2px;
+        width: 44px;
+        height: 44px;
+    }
+}
+/* Wide (desktop, fullscreen, a phone turned sideways): text and button side
+   by side. */
+@container (min-width: 670px) {
+    .wt-cap-card.tx-pbox {
+        width: min(640px, 100%);
+    }
+}
+/* Narrow: the button full width, under the close button's column as well
+   (the text keeps clear of the close button; the button, below it, need
+   not). */
+@container (max-width: 669px) {
+    .wt-cap-card.tx-pbox {
+        padding: 14px 48px 14px 14px;
+    }
+    .wt-cap-card .tx-pr {
+        width: calc(100% + 34px);
+        margin-right: -34px;
+    }
+}
+/* A short player (a phone's 16:9 is ~200 px tall): the card takes the
+   pill's place while it is open, and tightens. */
+@container (max-height: 280px) {
+    .wt-buffering--open .wt-buffering-pill {
+        display: none;
+    }
+    .wt-cap-card.tx-pbox {
+        gap: 8px;
+        padding: 10px 44px 10px 12px;
+    }
+    .wt-cap-card .tx-pr {
+        width: calc(100% + 32px);
+        margin-right: -32px;
+    }
+    .wt-cap-card .tx-pt {
+        font-size: 13px;
+        line-height: 17px;
+    }
+    .wt-cap-card .tx-ps {
+        font-size: 11.5px;
+        line-height: 15px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wt-buffering-spin {
+        animation: none;
+    }
 }
 
 /* Resume prompt buttons */

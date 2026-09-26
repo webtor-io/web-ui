@@ -12,6 +12,38 @@ Implemented in `jobs/scripts/action.go` (`warmUp`, `piecesCoverRange`).
 Bandwidth-check is `checkCachedRateLimit` / `buildSlowDownloadData` in the
 same file.
 
+The two branches hold their speed against different rates (2026-09-26):
+
+- **The swarm** (BT-slow: `needsFullMeasure`, `swarmTooSlow`, `buildSlowDownloadData`)
+  against the **file's own rate** (`getVideoBitrate`: the container's, every dub and
+  commentary track included). The warm-up measures file bytes the seeder fetched from its
+  peers, and to play the file the seeder has to fetch all of it: the transcoder's ffmpeg
+  reads every interleaved Matroska block whatever it maps, and nginx-vod's ranges land
+  inside whole pieces. Held against the played stream, a 4.8 Mbps swarm would start a
+  3.5 Mbps H.264 with two 1.5 Mbps DTS dubs — a 6.6 Mbps file, 3.6 played — with no full
+  measure, and the viewer would stall on a swarm that cannot keep up with the file; under
+  grace (free viewers) the swarm is the only gate left. The status has no "file needs" line for a swarm stall, so there is nothing for this
+  number to disagree with.
+- **The plan's cap** (`checkCachedRateLimit`, the cached branch and the late `hit` one)
+  against **what the player pulls** (`capGateBitrate` → `playedBitrate`,
+  `jobs/scripts/status_bitrate.go`: the video and one audio track, as the transcoder or
+  nginx-vod serve them), because that is what thp caps — the same number the transfer
+  status's "…and this file needs N" and its over-the-cap mark are made of, so the cap
+  modal and the status say one thing. The file's rate is the fallback only where the
+  played stream is not known (re-encoded video, stale tags, no per-track numbers). Before,
+  the cap was held against the file's rate too: the two-dub file above "needed 6.6" and
+  got the cap modal at a 5 Mbps cap for a transcoded stream of 3.6.
+
+`TestGateBitrate_WhichRateEachBranchReads` holds this wiring (streamContent itself has no
+test harness). The modal's title says which gate fired: the plan's cap (`IsRateLimited`,
+`action.slow.title.rateLimited`, "Not enough speed for smooth playback") or the swarm
+(`action.slow.title.bandwidth`).
+
+Known gap: the modal counts a megabit as 10^6 bits (`buildSlowDownloadData`,
+`parseRateLimit`), the status and thp's limiter as 2^20 (`statusview.mbit`) — the same
+stream reads 9.1 in the modal and 8.7 in the status (the owner's 1080p file of
+`status_stall_test.go`).
+
 ## Three paths
 
 | Path | Trigger | Behaviour |

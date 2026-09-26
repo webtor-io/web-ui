@@ -13,16 +13,16 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@babel/core": "^7.28.5",
-    "@babel/preset-env": "^7.28.5",
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
     "@open-iframe-resizer/core": "^2.1.0",
     "@tailwindcss/postcss": "^4.3.3",
     "babel-loader": "^10.0.0",
-    "copy-webpack-plugin": "^13.0.1",
+    "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^7.1.2",
     "daisyui": "^5.4.3",
     "debug": "4.4.3",
-    "favicons": "^7.2.0",
+    "favicons": "^7.3.1",
     "favicons-webpack-plugin": "^6.0.1",
     "hls.js": "^1.6.14",
     "jsdom": "27.0.1",
@@ -36,13 +36,18 @@
     "stylelint-config-standard": "^39.0.1",
     "supertokens-web-js": "^0.16.0",
     "tailwindcss": "^4.3.3",
-    "terser-webpack-plugin": "^5.3.14",
-    "webpack": "^5.102.1",
+    "terser-webpack-plugin": "^5.6.1",
+    "webpack": "^5.111.1",
     "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.2"
+    "webpack-dev-server": "^5.2.6"
   },
   "dependencies": {
-    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-react": "^7.29.7",
     "preact": "^10.28.4"
+  },
+  "overrides": {
+    "sockjs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

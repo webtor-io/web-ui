@@ -243,6 +243,25 @@ type Plan struct {
 	// line while a player inside its free grace window buffers -- the
 	// grace window is not the cap, so nothing is sold there.
 	Cap string `json:"cap"`
+	// Player is what the page's player says of the cap on its buffering
+	// label (lib/player/Player.jsx, via lib/transferStatus.js playerLabel):
+	// the lock with the viewer's cap, and the card it opens.
+	Player PlayerLabel `json:"player"`
+}
+
+// PlayerLabel is the plan as the player's buffering label shows it. The card
+// behind the label is the stream box (Plan.Stream.Box) -- its words, its
+// button's label and note, the player's own "…and this file needs N" -- and
+// only its link is its own: the same destination through the player's own
+// /trial surface (offer.FromPlayerLabel), so the two surfaces count apart.
+type PlayerLabel struct {
+	// Rate is the viewer's cap as the lock says it: "5 Mbps" (a paying
+	// viewer's own cap, "20 Mbps"). Set with every plan.
+	Rate string `json:"rate,omitempty"`
+	// URL is the card's button, set exactly when Stream.Box is: nothing
+	// faster on sale (top tier, no catalog) or the box not due yet -- no
+	// URL, and the label stays the plain "Buffering".
+	URL string `json:"url,omitempty"`
 }
 
 // Variant is either a plan box with its button or, with nothing to sell
@@ -1046,6 +1065,9 @@ func (b *builder) plan() *Plan {
 	capN := FormatNumber(b.in.Lang, Quantize(b.cap))
 	capLine := CapLine(b.in.Loc, b.in.Lang, b.paid(), b.cap)
 	p := &Plan{Fact: b.td("resource.status.streamSmooth", map[string]any{"Cap": capLine}), Cap: capLine}
+	if c := Quantize(b.cap); c > 0 {
+		p.Player.Rate = b.speed(c)
+	}
 	if !b.v.PlanBox {
 		return p
 	}
@@ -1056,6 +1078,15 @@ func (b *builder) plan() *Plan {
 		p.Download.Hint = title
 		p.Stream.Hint = needs
 		return p
+	}
+	// The player's card: the stream box's destination through its own
+	// surface. Only a trial link names its surface; a checkout or /donate
+	// is the same link from anywhere.
+	p.Player.URL = c.URL
+	if c.Target == "trial" {
+		// FromPlayerLabel is a known surface: TrialURL cannot fail on it,
+		// and the promo that made c.URL a trial link makes this one too.
+		p.Player.URL, _ = offer.TrialURL(b.in.Lang, offer.FromPlayerLabel, b.promo)
 	}
 	dl, st := c, c
 	if b.paid() {

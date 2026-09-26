@@ -405,51 +405,51 @@
     {{/* data-upsell-surface: one offer on screen at a time -- the resource
          status keeps its plan box's button down while this is up
          (lib/transferStatus.js upsellElsewhere). */}}
-    {{/* A decision over the paused film (lib/player/grace-hold.js): centred
-         on the video, the frame dimmed behind it, like any dialog. #grace-cta
-         is what Player.jsx shows and hides (the `hidden` class), so it only
-         covers the player; the centring lives on the inner layer -- `flex`
-         next to `hidden` on one element would fight over display. Sized by
-         the player, not the window (@container): below 32rem of player width
-         (a phone's 16:9 is ~200 px tall) the card drops the paragraph and
-         takes small buttons, so both answers stay in view; wider, the full
-         card. max-h-full + scroll is the last resort, not the layout. */}}
-    <div id="grace-cta" data-upsell-surface="grace" class="absolute inset-0 hidden z-modal">
-        <div class="@container w-full h-full flex items-center justify-center p-3 bg-black/50">
-            <div role="dialog" aria-labelledby="grace-cta-title"
-                 class="relative w-full max-w-[27rem] max-h-full overflow-y-auto rounded-2xl border border-w-line/60 bg-w-card/95 backdrop-blur-md shadow-2xl px-4 py-4 @lg:px-6 @lg:py-6 text-center">
-                <button type="button" class="grace-cta-close absolute top-1.5 right-1.5 w-9 h-9 inline-flex items-center justify-center rounded-lg text-w-muted hover:text-base-content hover:bg-white/5" aria-label="{{ t $.Lang "action.grace.dismiss" }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
+    {{/* A decision over the paused film (lib/player/grace-hold.js), made the
+         way the player's other popups are: a native <dialog> opened with
+         showModal() (Player.jsx), like #subtitles and #embed above. It joins
+         the top layer, so nothing clips it -- the player's rounded
+         overflow:hidden frame and the page's cards cut the old absolutely
+         placed card (owner, 2026-09-26) -- it is centred on the screen with
+         the page dimmed behind it, and it shows over a fullscreen player
+         without taking the viewer out of fullscreen. Esc is the close
+         (Player.jsx maps `cancel` to the answer "dismiss"); focus starts on
+         the card itself (no ring on a button the viewer did not reach by
+         keyboard; Tab reaches both answers). No backdrop
+         form: a click beside it is not an answer. */}}
+    <dialog class="modal" id="grace-cta" data-upsell-surface="grace" aria-labelledby="grace-cta-title">
+        <div class="modal-box relative w-[calc(100%-2rem)] max-w-[27rem] rounded-2xl border border-w-line/60 bg-w-card shadow-2xl px-4 py-5 sm:px-6 sm:py-6 text-center outline-none" tabindex="-1" autofocus>
+            <button type="button" class="grace-cta-close absolute top-1.5 right-1.5 w-9 h-9 inline-flex items-center justify-center rounded-lg text-w-muted hover:text-base-content hover:bg-white/5" aria-label="{{ t $.Lang "action.grace.dismiss" }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h4 id="grace-cta-title" class="font-semibold text-base sm:text-lg leading-snug text-base-content px-7">{{ t $.Lang "action.grace.title" }}</h4>
+            <p class="mt-1.5 text-sm leading-relaxed text-w-sub">{{ t $.Lang "action.grace.body" }}</p>
+            {{- /* Owner, 2026-09-26: "continue at N Mbps" first, the offer
+                 under it, its trial note last -- the note closes the card
+                 and sits with the button it qualifies. */}}
+            <div class="mt-5 flex flex-col items-stretch gap-2">
+                <button type="button" class="grace-cta-continue btn btn-ghost w-full h-auto min-h-11 py-2 px-3 text-[13px] sm:text-sm leading-snug border border-w-line text-w-sub hover:text-base-content hover:border-w-line"
+                        data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
+                    {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
                 </button>
-                <h4 id="grace-cta-title" class="font-semibold text-sm @lg:text-lg leading-snug text-base-content px-7">{{ t $.Lang "action.grace.title" }}</h4>
-                <p class="hidden @lg:block mt-1.5 text-sm leading-relaxed text-w-sub">{{ t $.Lang "action.grace.body" }}</p>
-                {{- /* Owner, 2026-09-26: "continue at N Mbps" first, the offer
-                     under it, its trial note last -- the note closes the card
-                     and sits with the button it qualifies. */}}
-                <div class="mt-3 @lg:mt-5 flex flex-col items-stretch gap-2">
-                    <button type="button" class="grace-cta-continue btn btn-ghost btn-sm @lg:btn-md w-full border border-w-line text-w-sub hover:text-base-content hover:border-w-line"
-                            data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
-                        {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
-                    </button>
-                    {{- with promoOffer }}
-                    <a class="btn btn-soft btn-sm @lg:btn-md w-full" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
-                       data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}"
-                       data-umami-event-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
-                        </svg>
-                        {{ t $.Lang "offer.keepFullSpeed" }}
-                    </a>
-                    {{- if .TrialDays }}
-                    <span class="-mt-0.5 text-[11px] leading-tight text-w-muted">{{ tn $.Lang "offer.trialNote" .TrialDays }}</span>
-                    {{- end }}
-                    {{- end }}
-                </div>
+                {{- with promoOffer }}
+                <a class="btn btn-soft w-full h-auto min-h-11 py-2 px-3 text-[13px] sm:text-sm leading-snug" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
+                   data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}"
+                   data-umami-event-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-balance">{{ t $.Lang "offer.keepFullSpeed" }}</span>
+                </a>
+                {{- if .TrialDays }}
+                <span class="-mt-0.5 text-[11px] leading-tight text-w-muted">{{ tn $.Lang "offer.trialNote" .TrialDays }}</span>
+                {{- end }}
+                {{- end }}
             </div>
         </div>
-    </div>
+    </dialog>
     {{ end }}
 </div>
 {{ end }}

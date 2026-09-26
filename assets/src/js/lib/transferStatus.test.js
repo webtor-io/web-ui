@@ -17,7 +17,7 @@ global.document = dom.window.document;
 
 const {
     present, applyView, bindBlock, paintBar, mirrorBlock, initDetails, upsellElsewhere, createCtaWatch, safeHref, ctaProps,
-    playing, holesMask, NAVBAR_H,
+    playing, holesMask, NAVBAR_H, playerLabel,
 } = await import('./transferStatus.js');
 
 function page() {
@@ -894,4 +894,88 @@ test('impression: the two boxes of one block (under the bar, in the details) see
     t.mock.timers.tick(1000);
     assert.equal(tracked.length, 1, 'one offer on screen, one impression');
     watch.stop();
+});
+
+// ---- the player's buffering label (playerLabel) ----------------------------
+//
+// The lock on the player's "Buffering" says the stall is the plan's cap. It
+// is drawn exactly where the card's block sells the stream box at a stall,
+// and the card behind it is that box with the player's own link.
+
+test('player label: the lock and the card at a real stall at the cap, the box\'s words, the player\'s own link', () => {
+    const view = byDesign.tier_dl.status.view;
+    const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+    const label = playerLabel(view, { player: 'buffering', stallSub });
+    assert.ok(label, 'the lock');
+    assert.equal(label.rate.replaceAll('\u00a0', ' '), '5 Мбит/с', 'the viewer\'s cap, as the status says it');
+    const box = present(view, { player: 'buffering', stallSub }).box;
+    assert.equal(label.title, box.title, 'the stream box\'s title');
+    assert.equal(label.title, 'Видео подгружается медленнее, чем играет');
+    assert.equal(label.sub, stallSub, 'the player\'s own line, as the box has it');
+    assert.equal(label.cta.label, box.cta.label);
+    assert.equal(label.cta.label, 'Смотреть без ограничения скорости');
+    assert.equal(label.cta.note, '7 дней бесплатно · отмена в любой момент');
+    assert.equal(label.cta.url, '/ru/trial?from=player-label', 'its own surface, not the status bar\'s');
+    assert.equal(box.cta.url, '/ru/trial?from=status-bar');
+    assert.deepEqual(label.props, { ctx: 'stream', location: 'player', auth: view.auth, state: 'stream_stall', tier: 'free', target: 'trial' });
+    // The status's own line when the stream job had none.
+    assert.equal(playerLabel(view, { player: 'buffering' }).sub, view.plan.stream.box.sub);
+    assert.equal(view.plan.stream.box.sub.replaceAll('\u00a0', ' '), 'Без подписки — до 5 Мбит/с');
+    // Cached and Vault at the cap: the same.
+    assert.ok(playerLabel(byDesign.cached_tier.status.view, { player: 'buffering' }));
+    assert.ok(playerLabel(byDesign.vaulted_tier.status.view, { player: 'buffering' }));
+});
+
+test('player label: plain wherever the status does not sell the stream box at a stall', () => {
+    const view = byDesign.tier_dl.status.view;
+    const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+    const cases = {
+        // Not a real stall (yet): the verdict is the player's, not the label's.
+        'playing, the box due for a file over the cap': [view, { player: 'playing', overCap: true, stallSub }],
+        'playing': [view, { player: 'playing' }],
+        'no player': [view, { player: 'none' }],
+        'no verdict': [view, {}],
+        // The grace window is not the cap.
+        'inside the grace window': [view, { player: 'buffering', inGrace: true, stallSub }],
+        // One offer at a time: the grace popup up or on its way.
+        'another offer on screen': [view, { player: 'buffering', upsellElsewhere: true, stallSub }],
+        // The popup's answer stands for a file over the cap until a real stall spends it.
+        'an answered offer, not spent': [view, { player: 'buffering', overCap: true, offerAnswered: true, stallSub }],
+        // The cap's first seconds: the pink link, no box -- no card.
+        'the box not due yet': [byDesign.tier_fact.status.view, { player: 'buffering', stallSub }],
+        // Not the cap at all: the swarm, a wait, a cache that answers.
+        'the swarm': [byDesign.swarm.status.view, { player: 'buffering' }],
+        'waiting for data': [byDesign.stalled.status.view, { player: 'buffering' }],
+        'flowing under the cap': [byDesign.active.status.view, { player: 'buffering' }],
+        'cached, not capped': [byDesign.cached_flow.status.view, { player: 'buffering' }],
+    };
+    for (const [name, [v, env]] of Object.entries(cases)) {
+        assert.equal(playerLabel(v, env), null, name);
+    }
+    // Nothing faster on sale: the server sends no box and no link.
+    const top = structuredClone(view);
+    top.plan.stream = { hint: 'Ваша подписка — до 100 Мбит/с' };
+    top.plan.download = { hint: 'Скорость скачивания ограничена: 100 Мбит/с' };
+    delete top.plan.player.url;
+    assert.equal(playerLabel(top, { player: 'buffering' }), null, 'top tier');
+    // A link that is not ours or https never becomes the card's button.
+    const bad = structuredClone(view);
+    bad.plan.player.url = 'javascript:alert(1)';
+    assert.equal(playerLabel(bad, { player: 'buffering' }), null);
+    // A server from before the label: nothing to say.
+    const old = structuredClone(view);
+    delete old.plan.player;
+    assert.equal(playerLabel(old, { player: 'buffering' }), null);
+    // No cap to say on the lock: no lock.
+    const norate = structuredClone(view);
+    delete norate.plan.player.rate;
+    assert.equal(playerLabel(norate, { player: 'buffering' }), null, 'no rate');
+    // A paying viewer at their own cap: their number.
+    const paid = structuredClone(view);
+    paid.plan.player = { rate: '20\u00a0Мбит/с', url: '/ru/donate' };
+    paid.tier = 'bronze';
+    const l = playerLabel(paid, { player: 'buffering' });
+    assert.equal(l.rate, '20\u00a0Мбит/с');
+    assert.equal(l.cta.url, '/ru/donate');
+    assert.equal(l.props.tier, 'bronze');
 });

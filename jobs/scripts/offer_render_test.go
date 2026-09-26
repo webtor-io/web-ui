@@ -163,6 +163,49 @@ func TestDownloadNudgeRenders(t *testing.T) {
 	}
 }
 
+// The modal's title says which of the two it is: the plan's cap on a file
+// already on our side (checkCachedRateLimit) is "not enough speed for smooth
+// playback" -- not "download speed is too low", which is the swarm's
+// (buildSlowDownloadData).
+func TestSlowDownloadTitle(t *testing.T) {
+	type ctx struct {
+		Lang string
+		Data *SlowDownloadData
+	}
+	tpl, err := template.New("slow_download.html").Funcs(offerFuncs(t, prodCatalog(), true)).
+		ParseFiles("../../templates/views/action/errors/slow_download.html", "../../templates/partials/icons.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	cases := []struct {
+		lang         string
+		limited      bool
+		want, banned string
+	}{
+		{"en", true, "Not enough speed for smooth playback", "Download speed is too low for streaming"},
+		{"en", false, "Download speed is too low for streaming", "Not enough speed for smooth playback"},
+		{"ru", true, "Не хватает скорости для плавного просмотра", "Скорость скачивания слишком низкая для стриминга"},
+		{"ru", false, "Скорость скачивания слишком низкая для стриминга", "Не хватает скорости для плавного просмотра"},
+	}
+	for _, c := range cases {
+		d := &SlowDownloadData{MeasuredSpeedMbps: 5, RequiredSpeedMbps: 9, IsRateLimited: c.limited, TierName: "free"}
+		if c.limited {
+			d.RateLimitMbps = 5
+		}
+		out := renderModal(t, tpl, c.lang, &ctx{Lang: c.lang, Data: d})
+		assertRender(t, c.lang, out, []string{c.want}, []string{c.banned})
+	}
+	// Every language has both titles.
+	for _, lang := range i18n.SupportedLangs {
+		for _, limited := range []bool{true, false} {
+			d := &SlowDownloadData{IsRateLimited: limited, TierName: "free"}
+			if o := renderModal(t, tpl, lang, &ctx{Lang: lang, Data: d}); strings.Contains(o, "action.slow.") {
+				t.Errorf("lang=%s limited=%v: unresolved key", lang, limited)
+			}
+		}
+	}
+}
+
 // Under a plan cap: a free viewer is sold the promo plan's trial, a paying
 // one is sent to compare plans, and nothing is sold without a storefront.
 func TestSlowDownloadUpsellRenders(t *testing.T) {
