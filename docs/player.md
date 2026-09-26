@@ -119,6 +119,61 @@ presses stop and is flushed on teardown):
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
 
+## Codec support — `codec-support.js`
+
+One Umami event, `codec-support`, that answers a transcoder question: what share of the people
+who watch could play HEVC or AV1 as it is, if content-transcoder passed it through (fMP4 HLS,
+`-c:v copy`) instead of re-encoding it to H.264. About a quarter of fresh sources are HEVC 1080p+
+or AV1; their re-encode is slower than realtime and most of the transcoder's CPU.
+
+**When.** After the first `playing` of a `<video>` the player renders (`whenPlaying`; an element
+already playing when the player mounts counts at once), so the count is of viewers, not visitors.
+Never for the audio player. The probe and the send wait for an idle callback (10 s deadline; 2 s
+timer where there is none). At most once per browser per 7 days (`localStorage`
+`wt-codec-support`, the time of the last send, written when it is sent); once per page (a flag on
+`window`) where storage is unavailable, so a next-episode move does not report twice. Without
+`window.umami` nothing is sent and nothing is remembered. Embeds report too: the player is the
+same, and the embed page runs Umami — without `eventDefaults` (no `tier`/`lang`), and with the
+week counted per embedding site, since third-party storage is partitioned.
+
+**Payload** (booleans unless stated; every browser API is wrapped — an old browser or a throwing
+one answers `false`):
+
+| key | what |
+|---|---|
+| `mse` | `mse` (MediaSource), `mms` (ManagedMediaSource only — iPhone, iOS 17.1+), `none` |
+| `hvc` / `hev` | MSE `isTypeSupported` HEVC Main 1080p, `hvc1.1.6.L120.90` / `hev1…` |
+| `hvc10` | HEVC Main10 1080p, `hvc1.2.4.L120.90` |
+| `hvc4k` | HEVC Main 4K, `hvc1.1.6.L153.90` |
+| `av1` / `av1_10` / `av1_4k` | AV1 8-bit 1080p `av01.0.08M.08` / 10-bit `av01.0.08M.10` / 4K `av01.0.12M.08` |
+| `n_hls` | the element plays HLS itself (`canPlayType('application/vnd.apple.mpegurl')`) |
+| `n_hvc` | the element plays HEVC in MP4 itself — what native HLS (iOS) would need |
+| `mc` | `navigator.mediaCapabilities.decodingInfo` exists |
+| `mc_hvc`, `mc_hvc_sm`, `mc_hvc_pe` | its answer for HEVC Main 1080p over MSE: supported, smooth, powerEfficient |
+| `mc_av1`, `mc_av1_sm`, `mc_av1_pe` | the same for AV1 8-bit 1080p (3 s timeout → `false`) |
+| `src` | the source's video codec: `h264` / `hevc` / `av1` / `other` / `unknown` (no probe on the page) |
+| `tc` | a transcoder session serves this stream (`data-session-id`) |
+| `pl` | how the player plays it: `hlsjs`, `native` (the element's own HLS — iOS always), `direct` |
+| `emb` | inside the embed |
+
+For example: `{mse: 'mse', hvc: true, hev: true, hvc10: true, hvc4k: true, av1: true,
+av1_10: true, av1_4k: true, n_hls: false, n_hvc: true, mc: true, mc_hvc: true, mc_hvc_sm: true,
+mc_hvc_pe: true, mc_av1: true, mc_av1_sm: true, mc_av1_pe: false, src: 'hevc', tc: true,
+pl: 'hlsjs', emb: false}` plus the usual `tier`, `is_authed`, `user_id`, `lang`, `is_referral` on
+the site (`docs/analytics.md`).
+
+`src` comes from `data-video-codecs` on the `<video>` (`stream_video.html`): every video stream of
+the job's media probe, cover pictures included (`mjpeg`/`png`… are skipped client-side). The probe
+does not carry the profile or bit depth, so a 10-bit HEVC source cannot be told from an 8-bit one:
+read `hvc10` as what a 10-bit passthrough would need.
+
+**Reading it.** `isTypeSupported` can say yes to a codec the machine decodes in software at a
+fraction of realtime; `mc_*_pe` (a hardware decoder) is the conservative answer. The share that
+matters is among re-encoded viewers — `tc` and `src` in (`hevc`, `av1`) — split by `pl`: through
+hls.js the MSE keys decide, through native HLS `n_hvc`. `src`/`tc`/`pl` describe the stream of the
+browser's first play *that week*, so the split by source is a sample of browsers, not of plays; the
+capability keys do not depend on it.
+
 ## Next episode / next track — `next-item.js`, `next-item-go.js`
 
 Design, numbers and the owner's decisions: `docs/superpowers/specs/2026-09-20-next-episode-design.md`.

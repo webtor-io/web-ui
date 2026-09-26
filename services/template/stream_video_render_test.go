@@ -181,6 +181,39 @@ func TestStreamVideoRenders(t *testing.T) {
 	if !strings.Contains(notReady.String(), `data-subtitles-not-ready="true"`) {
 		t.Error(`SubtitlesNotReady must reach the picker as data-subtitles-not-ready="true"`)
 	}
+
+	// data-video-codecs carries the source's video codecs to the
+	// codec-support event (lib/player/codec-support.js), which is how that
+	// event tells the viewers the transcoder re-encodes for (HEVC, AV1) from
+	// the rest. Absent without a probe -- "unknown", not "no video" -- and
+	// every video stream in order when there is one, a cover picture
+	// included (the client skips it).
+	if strings.Contains(html, "data-video-codecs") {
+		t.Error("data-video-codecs must not render without a media probe")
+	}
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[
+		{"codec_type":"video","codec_name":"hevc","width":1920,"height":1080},
+		{"codec_type":"audio","codec_name":"eac3","tags":{"language":"eng"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng"}},
+		{"codec_type":"video","codec_name":"mjpeg"}
+	]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+	data.MediaProbe = &mp
+	var probed bytes.Buffer
+	if err := tpl.ExecuteTemplate(&probed, "main", map[string]interface{}{
+		"Data": data,
+		"Lang": "en",
+		"User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	if out := probed.String(); !strings.Contains(out, `data-video-codecs="hevc mjpeg "`) {
+		tag := out[strings.Index(out, "<video"):]
+		t.Errorf(`the probe's video streams must reach the player as data-video-codecs="hevc mjpeg ", got %q`,
+			tag[:strings.Index(tag, ">")+1])
+	}
 }
 
 // TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a

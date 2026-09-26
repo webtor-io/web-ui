@@ -58,6 +58,10 @@ globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.win
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.MouseEvent = dom.window.MouseEvent;
 globalThis.__SUPPORTED_LOCALES__ = ['en'];
+// jsdom has no requestIdleCallback, and the codec-support report waits for
+// one (2 s without it). A prompt stand-in keeps a report inside the test
+// whose `playing` caused it, instead of landing in a later test's events.
+dom.window.requestIdleCallback = (fn) => setTimeout(fn, 0);
 
 // The one media API these tests need and jsdom does not implement, taught
 // to the prototypes so every <track> in the document has it — including the
@@ -892,6 +896,67 @@ test('subtitle-resolved reports a finished lookup as such', async (t) => {
     const ev = p.events.find((e) => e.name === 'subtitle-resolved');
     assert.ok(ev, 'the engagement gate must emit subtitle-resolved');
     assert.equal(ev.data.notReady, false);
+});
+
+// ---- the codec-support measurement -------------------------------------
+//
+// codec-support.js has the rules; these check the player hands it the right
+// moment and the right stream. The page flag and the weekly stamp are reset
+// first: an earlier test's `playing` may have used up this page's report.
+
+const codecEvents = (p) => p.events.filter((e) => e.name === 'codec-support');
+const freshBrowser = () => {
+    delete window.__wtCodecSupport;
+    window.localStorage.removeItem('wt-codec-support');
+};
+
+test('codec-support goes out on the first frame, not on mount, with the source codec', async (t) => {
+    t.after(() => destroyPlayer());
+    freshBrowser();
+    const p = await mountPlayer((page) => {
+        // As stream_video.html writes it: every video stream of the probe,
+        // a cover picture among them.
+        page.video.setAttribute('data-video-codecs', 'mjpeg hevc ');
+    });
+    p.video.dispatchEvent(new dom.window.Event('loadedmetadata'));
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    p.video.dispatchEvent(new dom.window.Event('play'));
+    await settle();
+    assert.equal(codecEvents(p).length, 0, 'mounted, loaded and asked to play is not watching');
+
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    const got = codecEvents(p);
+    assert.equal(got.length, 1);
+    assert.equal(got[0].data.src, 'hevc');
+    assert.equal(got[0].data.tc, false, 'no data-session-id: not a transcoder session');
+    assert.equal(got[0].data.pl, 'direct', 'no HLS source in this harness');
+    assert.equal(got[0].data.emb, false);
+    assert.equal(got[0].data.mse, 'none', 'jsdom has no MSE; the probe ran against the page');
+
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.equal(codecEvents(p).length, 1, 'a replayed `playing` is not a second viewer');
+});
+
+test('codec-support: a page without a probe reports the source as unknown', async (t) => {
+    t.after(() => destroyPlayer());
+    freshBrowser();
+    const p = await mountPlayer();
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    const got = codecEvents(p);
+    assert.equal(got.length, 1);
+    assert.equal(got[0].data.src, 'unknown');
+});
+
+test('codec-support: the audio player does not report', async (t) => {
+    t.after(() => destroyPlayer());
+    freshBrowser();
+    const p = await mountPlayer(null, { tag: 'audio' });
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.equal(codecEvents(p).length, 0);
 });
 
 test('a stopped run keeps its count, loses its spinner, and is reported', async (t) => {

@@ -23,6 +23,10 @@
            {{ else if .ExportTag.Poster }}poster="{{ .ExportTag.Poster }}" {{ end }}
            {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
            {{ else if .MediaProbe }}data-duration="{{ .MediaProbe | getDurationSec }}" {{ end }}
+           {{/* The source's video codecs, as the job's media probe saw them
+                (a cover picture is one too): read only by the codec-support
+                event (lib/player/codec-support.js). Absent = no probe. */}}
+           {{ if .MediaProbe }}data-video-codecs="{{ range .MediaProbe.Streams }}{{ if eq .CodecType "video" }}{{ .CodecName }} {{ end }}{{ end }}"{{ end }}
            {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
            {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
            {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
