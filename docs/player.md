@@ -148,6 +148,7 @@ one answers `false`):
 | `av1` / `av1_10` / `av1_4k` | AV1 8-bit 1080p `av01.0.08M.08` / 10-bit `av01.0.08M.10` / 4K `av01.0.12M.08` |
 | `n_hls` | the element plays HLS itself (`canPlayType('application/vnd.apple.mpegurl')`) |
 | `n_hvc` | the element plays HEVC in MP4 itself — what native HLS (iOS) would need |
+| `n_av1` | the same for AV1 (`av01.0.08M.08`) |
 | `mc` | `navigator.mediaCapabilities.decodingInfo` exists |
 | `mc_hvc`, `mc_hvc_sm`, `mc_hvc_pe` | its answer for HEVC Main 1080p over MSE: supported, smooth, powerEfficient |
 | `mc_av1`, `mc_av1_sm`, `mc_av1_pe` | the same for AV1 8-bit 1080p (3 s timeout → `false`) |
@@ -157,20 +158,23 @@ one answers `false`):
 | `emb` | inside the embed |
 
 For example: `{mse: 'mse', hvc: true, hev: true, hvc10: true, hvc4k: true, av1: true,
-av1_10: true, av1_4k: true, n_hls: false, n_hvc: true, mc: true, mc_hvc: true, mc_hvc_sm: true,
+av1_10: true, av1_4k: true, n_hls: false, n_hvc: true, n_av1: true, mc: true, mc_hvc: true, mc_hvc_sm: true,
 mc_hvc_pe: true, mc_av1: true, mc_av1_sm: true, mc_av1_pe: false, src: 'hevc', tc: true,
 pl: 'hlsjs', emb: false}` plus the usual `tier`, `is_authed`, `user_id`, `lang`, `is_referral` on
 the site (`docs/analytics.md`).
 
 `src` comes from `data-video-codecs` on the `<video>` (`stream_video.html`): every video stream of
-the job's media probe, cover pictures included (`mjpeg`/`png`… are skipped client-side). The probe
-does not carry the profile or bit depth, so a 10-bit HEVC source cannot be told from an 8-bit one:
-read `hvc10` as what a 10-bit passthrough would need.
+the job's media probe, cover pictures included (`mjpeg`/`png`… are skipped client-side). ffprobe
+reports the profile and `pix_fmt`, but `api.MediaProbe` does not decode them, so a 10-bit HEVC
+source cannot be told from an 8-bit one here: read `hvc10` as what a 10-bit passthrough would need,
+and weight `hvc`/`hvc10` by the Main10 share of HEVC sources measured on the server side (the
+capability keys do not depend on the source).
 
 **Reading it.** `isTypeSupported` can say yes to a codec the machine decodes in software at a
 fraction of realtime; `mc_*_pe` (a hardware decoder) is the conservative answer. The share that
 matters is among re-encoded viewers — `tc` and `src` in (`hevc`, `av1`) — split by `pl`: through
-hls.js the MSE keys decide, through native HLS `n_hvc`. `src`/`tc`/`pl` describe the stream of the
+hls.js the MSE keys decide, through native HLS `n_hvc` / `n_av1` (iOS always plays HLS natively,
+even where it has a ManagedMediaSource). `src`/`tc`/`pl` describe the stream of the
 browser's first play *that week*, so the split by source is a sample of browsers, not of plays; the
 capability keys do not depend on it.
 

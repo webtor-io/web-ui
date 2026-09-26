@@ -54,14 +54,14 @@ test('Chrome-like: MSE says HEVC and AV1, the hardware answers per codec', async
     });
     const got = await probeCodecSupport({
         MediaSource: mediaSource([MSE_TYPES.hvc, MSE_TYPES.hev, MSE_TYPES.hvc10, MSE_TYPES.av1, MSE_TYPES.av1_10, MSE_TYPES.av1_4k]),
-        canPlayType: canPlay({ [MSE_TYPES.hvc]: 'probably' }),
+        canPlayType: canPlay({ [MSE_TYPES.hvc]: 'probably', [MSE_TYPES.av1]: 'probably' }),
         mediaCapabilities: mc,
     });
     assert.deepEqual(got, {
         mse: 'mse',
         hvc: true, hev: true, hvc10: true, hvc4k: false,
         av1: true, av1_10: true, av1_4k: true,
-        n_hls: false, n_hvc: true,
+        n_hls: false, n_hvc: true, n_av1: true,
         mc: true,
         mc_hvc: true, mc_hvc_sm: true, mc_hvc_pe: true,
         mc_av1: true, mc_av1_sm: true, mc_av1_pe: false,
@@ -81,7 +81,7 @@ test('Chrome-like: MSE says HEVC and AV1, the hardware answers per codec', async
 test('Firefox-like: AV1 only, no native HLS, HEVC decodingInfo says no', async () => {
     const got = await probeCodecSupport({
         MediaSource: mediaSource([MSE_TYPES.av1, MSE_TYPES.av1_10]),
-        canPlayType: canPlay({}),
+        canPlayType: canPlay({ [MSE_TYPES.av1]: 'probably' }),
         mediaCapabilities: capabilities({
             [MSE_TYPES.av1]: { supported: true, smooth: true, powerEfficient: true },
         }),
@@ -90,7 +90,7 @@ test('Firefox-like: AV1 only, no native HLS, HEVC decodingInfo says no', async (
         mse: 'mse',
         hvc: false, hev: false, hvc10: false, hvc4k: false,
         av1: true, av1_10: true, av1_4k: false,
-        n_hls: false, n_hvc: false,
+        n_hls: false, n_hvc: false, n_av1: true,
         mc: true,
         mc_hvc: false, mc_hvc_sm: false, mc_hvc_pe: false,
         mc_av1: true, mc_av1_sm: true, mc_av1_pe: true,
@@ -111,6 +111,7 @@ test('Safari on iPhone: ManagedMediaSource only, native HLS and HEVC', async () 
     assert.equal(got.av1, false);
     assert.equal(got.n_hls, true);
     assert.equal(got.n_hvc, true);
+    assert.equal(got.n_av1, false, 'no AV1 decoder on this iPhone');
     assert.equal(got.mc_hvc_pe, true);
 });
 
@@ -130,7 +131,7 @@ test('no MSE, no mediaCapabilities: every answer is false', async () => {
         mse: 'none',
         hvc: false, hev: false, hvc10: false, hvc4k: false,
         av1: false, av1_10: false, av1_4k: false,
-        n_hls: false, n_hvc: false,
+        n_hls: false, n_hvc: false, n_av1: false,
         mc: false,
         ...ALL_FALSE_MC,
     });
@@ -153,6 +154,7 @@ test('throwing APIs answer false, never throw', async () => {
     for (const k of Object.keys(MSE_TYPES)) assert.equal(got[k], false, k);
     assert.equal(got.n_hls, false);
     assert.equal(got.n_hvc, false);
+    assert.equal(got.n_av1, false);
     assert.equal(got.mc, true);
     for (const [k, v] of Object.entries(ALL_FALSE_MC)) assert.equal(got[k], v, k);
 
@@ -399,6 +401,35 @@ test('the default scheduler uses requestIdleCallback with the window as this', a
     assert.equal(events.length, 0);
     await idleArgs.fn();
     assert.deepEqual(events, [{ name: EVENT, data: { src: 'h264' } }]);
+});
+
+test('a requestIdleCallback that throws: the timer instead, and no throw', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const events = [];
+    const win = {
+        umami: { track: (name, data) => events.push({ name, data }) },
+        requestIdleCallback() { throw new TypeError('Illegal invocation'); },
+    };
+    let scheduled;
+    assert.doesNotThrow(() => {
+        scheduled = reportCodecSupport({ src: 'hevc' }, { win, storage: null, probe: async () => ({}) });
+    });
+    assert.equal(scheduled, true);
+    assert.equal(events.length, 0);
+    t.mock.timers.tick(2000);
+    // The timer's callback awaits the probe: let it settle.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    assert.deepEqual(events, [{ name: EVENT, data: { src: 'hevc' } }]);
+});
+
+// The player calls the reporter synchronously from a useEffect when the
+// element already plays at mount; a throw there would cancel the player's
+// later effects (Preact drops them), player_ready among them.
+test('the reporter never throws, whatever its dependencies do', () => {
+    const win = { umami: { track() {} } };
+    const boom = () => { throw new Error('boom'); };
+    assert.doesNotThrow(() => reportCodecSupport({}, { win, storage: null, schedule: boom }));
+    assert.equal(reportCodecSupport({}, { win: { umami: { track() {} } }, storage: null, now: boom }), false);
 });
 
 // ---- the playback gate ---------------------------------------------------

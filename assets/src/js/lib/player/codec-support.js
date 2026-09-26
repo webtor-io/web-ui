@@ -57,6 +57,10 @@ const isFn = (v) => typeof v === 'function';
 //   n_hls  the element plays HLS itself (Safari, iOS).
 //   n_hvc  the element plays HEVC in MP4 itself — what a native-HLS
 //          passthrough would need.
+//   n_av1  the same for AV1. iOS plays every HLS stream natively
+//          (hls-manager.js skips hls.js there even with a
+//          ManagedMediaSource), so for iPhone and iPad viewers these two,
+//          not the MSE answers, are the passthrough question.
 export function probeStatic(env = {}) {
     const MS = safe(() => env.MediaSource);
     const MMS = safe(() => env.ManagedMediaSource);
@@ -71,6 +75,7 @@ export function probeStatic(env = {}) {
     };
     out.n_hls = canPlay(HLS_TYPE);
     out.n_hvc = canPlay(MSE_TYPES.hvc);
+    out.n_av1 = canPlay(MSE_TYPES.av1);
     return out;
 }
 
@@ -175,11 +180,13 @@ function lastSent(storage) {
     return Number.isFinite(ts) ? ts : 0;
 }
 
+// An idle callback where there is one; a timer where there is none, or where
+// the one there is throws (a polyfill, a patched window).
 function defaultSchedule(win) {
     return (fn) => {
         const ric = safe(() => win.requestIdleCallback);
-        if (isFn(ric)) ric.call(win, fn, { timeout: 10000 });
-        else setTimeout(fn, 2000);
+        if (isFn(ric) && safe(() => { ric.call(win, fn, { timeout: 10000 }); return true; }) === true) return;
+        setTimeout(fn, 2000);
     };
 }
 
@@ -193,7 +200,19 @@ const umamiOf = (win) => {
 // stream (src, tc, pl, emb — see docs/player.md). Returns whether a report was
 // scheduled. Without window.umami it does nothing and remembers nothing, so a
 // page where analytics loads late is not written off for a week.
+//
+// Never throws. The player calls it from a useEffect when the element is
+// already playing at mount, and Preact drops a component's remaining pending
+// effects after one of them throws — player_ready among them.
 export function reportCodecSupport(extra = {}, deps = {}) {
+    try {
+        return report(extra, deps);
+    } catch (e) {
+        return false;
+    }
+}
+
+function report(extra, deps) {
     const win = deps.win || (typeof window !== 'undefined' ? window : null);
     if (!win) return false;
     const storage = 'storage' in deps ? deps.storage : storageOf(win);
