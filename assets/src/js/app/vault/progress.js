@@ -1,5 +1,17 @@
 import av from '../../lib/av';
 import { langPath } from '../../lib/i18n';
+import { applyBadge, bindBadge } from '../../lib/statusBadge';
+import { debugQuery } from '../../lib/statusDebug';
+
+// The Vault page's live rows (views/vault/index.html "vault/pledges_table"):
+// one status stream per pledge being vaulted -- the resource page's
+// endpoint, without session=1, so the server sends the status and the badge
+// alone (handlers/resource/status.go present) -- drawn into the row. The
+// status cell is the transfer status's own badge (partials/status/badge.html),
+// the server's words, colour and icon for every state, updated in place by
+// its one renderer (lib/statusBadge.js); what is the Vault page's own stays
+// here: the row's fill and percent, "Saved" for a vaulted torrent, the first
+// cell's pulse, the token's renewal.
 
 // rgba colors mirror the w-cyan / w-purple / green-500 tokens at low alpha
 const TINTS = {
@@ -18,42 +30,6 @@ const MIN_VISIBLE_PCT = 2;
 // portion (translateX(-100%) would clip it off the left edge of the row), so
 // it flips to the right side of the gradient edge instead.
 const FLIP_PCT = 10;
-
-// whitespace-nowrap on every badge: the status column is narrow and a
-// two-word label ("Waiting for seeders", "Caching paused") must not fold
-// into two lines inside a fixed-height badge.
-const BADGE_CONFIG = {
-    idle: {
-        classes: 'badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5',
-        icon: '<span class="loading loading-dots loading-xs"></span>',
-    },
-    caching: {
-        classes: 'badge badge-sm whitespace-nowrap bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>',
-    },
-    cached: {
-        classes: 'badge badge-sm whitespace-nowrap bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-    },
-    vaulting: {
-        // no leading icon: the row gradient + first-cell pulse already signal progress
-        classes: 'badge badge-sm whitespace-nowrap bg-w-purple/10 border-w-purple/30 text-w-purpleL',
-        icon: '',
-    },
-    vault_waiting: {
-        classes: 'badge badge-sm whitespace-nowrap bg-w-purple/10 border-w-purple/30 text-w-purpleL',
-        icon: '',
-    },
-    vault_failed: {
-        classes: 'badge badge-sm whitespace-nowrap bg-warning/10 border-warning/30 text-warning',
-        icon: '',
-    },
-    vaulted: {
-        // status column = torrent state only; frozen-ness lives on the VP cell
-        classes: 'badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400',
-        icon: '',
-    },
-};
 
 function ensureIndicator(row) {
     let el = row.querySelector('[data-vault-progress-pct]');
@@ -108,15 +84,24 @@ function settleVaultedIcon(row) {
     if (icon) icon.classList.remove('vault-pulse');
 }
 
-function renderBadge(status, savedLabel) {
-    const config = BADGE_CONFIG[status.state] || BADGE_CONFIG.idle;
-    // For the vaulted state we override the server label ('В Vault'/'Vaulted') with
-    // the vault-page label ('Сохранён'/'Saved') passed via data-vault-saved-label.
-    const label = (status.state === 'vaulted' && savedLabel) ? savedLabel : (status.label || '');
-    // status.label is a server-translated i18n string (closed set of state keys);
-    // safe to interpolate as HTML.
-    const inner = [config.icon, label].filter(Boolean).join(' ');
-    return `<span class="${config.classes}">${inner}</span>`;
+// rowBadge is the badge the row draws for a status: the server's, and for a
+// vaulted torrent this page's word for a finished pledge ("Сохранён"/"Saved",
+// data-vault-saved-label) in place of the resource page's ("В Vault") -- the
+// badge the page renders for a pledge already vaulted, so a row that finishes
+// looks as the finished ones do.
+//
+// A message without `badge` is a server from before it (a rolling deploy, a
+// rollback). Vaulted is still the finished pledge's pill -- the stream closes
+// on it, and nothing would ever repaint the row. Any other state leaves the
+// badge as it is (undefined: applyBadge writes nothing): the row's fill and
+// percent still move, and a badge made up here from `state` would be a
+// tone/icon/words statusview never sends.
+const SAVED = { tone: 'vault', icon: 'vault' };
+
+function rowBadge(status, savedLabel) {
+    const b = status.badge;
+    if (status.state !== 'vaulted' || !savedLabel) return b;
+    return { ...(b || SAVED), label: savedLabel };
 }
 
 // The status stream takes a page-issued, hash-bound token that lives an hour
@@ -152,9 +137,11 @@ function attachRow(root, row) {
     if (!resourceId || !csrf) return null;
 
     const savedLabel = row.dataset.vaultSavedLabel || '';
-    const badge = row.querySelector('[data-vault-progress-badge]');
+    const badge = bindBadge(row.querySelector('[data-tx-badge]'));
 
-    let url = `${langPath(`/${resourceId}/status`)}?_csrf=${encodeURIComponent(csrf)}`;
+    // Dev-only preview (lib/statusDebug.js): the page's debug_status/… ride
+    // along, so every state can be looked at here too.
+    let url = `${langPath(`/${resourceId}/status`)}?_csrf=${encodeURIComponent(csrf)}${debugQuery(window.location.search)}`;
     const statusToken = row.dataset.statusToken || '';
     if (statusToken) url += `&token=${encodeURIComponent(statusToken)}`;
     const source = new EventSource(url);
@@ -167,7 +154,7 @@ function attachRow(root, row) {
             return;
         }
         applyRowFill(row, status);
-        if (badge) badge.innerHTML = renderBadge(status, savedLabel);
+        applyBadge(badge, rowBadge(status, savedLabel));
         if (status.state === 'vaulted') {
             settleVaultedIcon(row);
             source.close();

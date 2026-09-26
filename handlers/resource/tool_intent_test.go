@@ -89,7 +89,7 @@ func resourceTemplates(t *testing.T) *template.Template {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	stubTemplates(t, tpl, "resource/status", "resource/piece_bar", "promo", "vault/button", "library/button",
+	stubTemplates(t, tpl, "resource/status", "promo", "vault/button", "library/button",
 		"user_video_status/movie_button", "user_video_status/series_button", "user_video_status/rate_button",
 		"resource/release_subscribe_banner", "get_ads", "vault/pledge-modal", "user_video_status/rate-modal", "get_extra")
 	return tpl

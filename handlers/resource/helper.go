@@ -9,6 +9,7 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/pagination"
+	"github.com/webtor-io/web-ui/services/statusview"
 	w "github.com/webtor-io/web-ui/services/web"
 )
 
@@ -164,6 +165,16 @@ func (s *Helper) StatusToken(resourceID string) string {
 		return ""
 	}
 	return tok
+}
+
+// StatusBadge is a status pill the page draws itself, in the transfer
+// status's own badge element (partials/status/badge.html): the Vault page's
+// pledge states ("Saved", "Expiring") and its rows' badge before their first
+// status message. tone and icon are the element's (style.css .tx-badge
+// [data-tone], #tx-b-* in status/badge_symbols). Placed without an id: a
+// page carries many.
+func (s *Helper) StatusBadge(tone, icon, label string) statusview.BadgeEl {
+	return statusview.Badge{Tone: tone, Icon: icon, Label: label}.El("")
 }
 
 // TorrentFileURL is the download link for the resource's .torrent file,

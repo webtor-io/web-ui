@@ -129,6 +129,43 @@ func TestTrialDays(t *testing.T) {
 	}
 }
 
+// "Upgrade" is offered only toward a plan that downloads faster. In the live
+// catalog gold (100) is the fastest plan on sale; sparkling is unlimited but
+// has no price, so it does not count.
+func TestFasterOnSale(t *testing.T) {
+	unavailable := false
+	soldOut := prodCatalog()
+	for i := range soldOut.Prices {
+		if soldOut.Prices[i].TierName == "gold" {
+			soldOut.Prices[i].Available = &unavailable
+		}
+	}
+	unlimited := prodCatalog()
+	unlimited.Prices = append(unlimited.Prices, payments.Price{TierID: 6, TierName: "sparkling", PeriodDays: 30})
+	noTiers := prodCatalog()
+	noTiers.Tiers = nil
+	cases := []struct {
+		name string
+		svc  *Service
+		rate float64
+		want bool
+	}{
+		{"free viewer", loaded(prodCatalog(), nil), 5, true},
+		{"bronze viewer", loaded(prodCatalog(), nil), 20, true},
+		{"silver viewer", loaded(prodCatalog(), nil), 50, true},
+		{"gold viewer: nothing faster", loaded(prodCatalog(), nil), 100, false},
+		{"silver viewer, gold not on sale", loaded(soldOut, nil), 50, false},
+		{"gold viewer, an unlimited plan on sale", loaded(unlimited, nil), 100, true},
+		{"tiers unknown: no claim", loaded(noTiers, nil), 5, false},
+		{"no webhook", New(nil, nil), 5, false},
+	}
+	for _, c := range cases {
+		if got := c.svc.FasterOnSale(c.rate); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestHasPlans(t *testing.T) {
 	cases := []struct {
 		name string
@@ -150,7 +187,7 @@ func TestHasPlans(t *testing.T) {
 
 func TestPitch(t *testing.T) {
 	silver := &Offer{Tier: "silver", RateMbps: 50}
-	format := func(sec float64) string { k, d := durationParts(sec); return k + " " + fmt.Sprint(d) }
+	format := func(k string, d map[string]any) string { return k + " " + fmt.Sprint(d) }
 	const gb = int64(1) << 30
 	cases := []struct {
 		name  string
@@ -161,8 +198,9 @@ func TestPitch(t *testing.T) {
 		slow  string
 		fast  string
 	}{
-		// 4.3 GiB at 5 Mbps ≈ 2 h 3 min; at 50 Mbps ≈ 12 min.
-		{"typical movie", silver, 43 * gb / 10, 5, false, "offer.eta.hMin map[H:2 M:3]", "offer.eta.min map[M:12]"},
+		// 4.3 GiB at 5 Mbps ≈ 1 h 57 min; at 50 Mbps ≈ 12 min. A cap's
+		// megabit is thp's, 2^20 bits: at 10^6 this read 2 h 3 min.
+		{"typical movie", silver, 43 * gb / 10, 5, false, "offer.eta.hMin map[H:1 M:57]", "offer.eta.min map[M:12]"},
 		// Every file shows the difference, a small one too — in seconds, not
 		// rounded up to a minute.
 		{"small file", silver, 123 << 20, 5, false, "offer.eta.min map[M:3]", "offer.eta.sec map[S:20]"},
@@ -171,7 +209,7 @@ func TestPitch(t *testing.T) {
 		{"user rate unlimited", silver, 4 * gb, 0, true, "", ""},
 		{"plan not faster", silver, 4 * gb, 50, true, "", ""},
 		{"unlimited plan", &Offer{Tier: "sparkling"}, 4 * gb, 5, true, "", ""},
-		{"multi-day", silver, 200 * gb, 5, false, "offer.eta.dH map[D:3 H:23]", "offer.eta.hMin map[H:9 M:33]"},
+		{"multi-day", silver, 200 * gb, 5, false, "offer.eta.dH map[D:3 H:19]", "offer.eta.hMin map[H:9 M:6]"},
 	}
 	for _, c := range cases {
 		p := pitch(c.o, c.size, c.rate, format)
@@ -337,5 +375,42 @@ func TestFreeRateMbps(t *testing.T) {
 				t.Errorf("FreeRateMbps() = %d, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+// The wait is priced at the cap thp applies: a "5M" rate claim is 5·2^20
+// bits a second (bytefmt), so a GiB takes 1638.4 s, not 1717.99.
+func TestTransferSecondsUsesTheCapsMegabit(t *testing.T) {
+	if got := transferSeconds(1<<30, 5); got != 1638.4 {
+		t.Errorf("1 GiB at 5 Mbps: %v s", got)
+	}
+}
+
+// The ETA is one sentence, rendered once for the nudge and the status's plan
+// box alike, and a duration ending in an abbreviation does not end it twice.
+func TestPitchETA(t *testing.T) {
+	silver := &Offer{Tier: "silver", RateMbps: 50}
+	tr := func(k string, d map[string]any) string {
+		switch k {
+		case "action.download.eta":
+			return fmt.Sprintf("%v dauert etwa %v. Mit Abo etwa %v", d["Size"], d["Slow"], d["Fast"])
+		case "offer.eta.min":
+			return fmt.Sprintf("%v Min.", d["M"])
+		}
+		return fmt.Sprintf("%v Std. %v Min.", d["H"], d["M"])
+	}
+	p := pitch(silver, 1288490189, 5, tr)
+	if p == nil || p.ETA != "1.2\u00a0GB dauert etwa 33 Min. Mit Abo etwa 3 Min." {
+		t.Fatalf("%+v", p)
+	}
+	for in, want := range map[string]string{
+		"34 Min.. Mit":  "34 Min. Mit",
+		"2 дн..":        "2 дн.",
+		"wait... more":  "wait... more",
+		"3 min. With a": "3 min. With a",
+	} {
+		if got := oneStop(in); got != want {
+			t.Errorf("oneStop(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

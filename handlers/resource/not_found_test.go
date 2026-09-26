@@ -125,7 +125,7 @@ func newResourceRouter(t *testing.T, restAPI *httptest.Server) *gin.Engine {
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
-	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, nil, nil, nil)
+	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, nil, nil, nil, nil)
 	index.RegisterHandler(r, tm, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)

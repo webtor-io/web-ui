@@ -1,7 +1,9 @@
 {{ define "main" }}
 {{ $isFree := eq .Data.TierName "free" }}
 
-<div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
+{{/* data-upsell-surface: while this is on screen the resource status keeps
+     its plan box's button down -- one offer at a time (lib/transferStatus.js). */}}
+<div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40" data-upsell-surface="limit-modal">
     <div class="flex items-start gap-3 flex-wrap">
         <div class="flex items-start gap-3 flex-1 min-w-[200px]">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">

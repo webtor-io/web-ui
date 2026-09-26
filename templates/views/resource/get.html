@@ -11,13 +11,17 @@
      the visit, and an unlabelled icon is easy to miss: it shows its label
      (the same resource.copyMagnet as its title) and the green it otherwise
      gets on hover. */}}
-{{/* The status badge block. The outer div is an async-layout target: status.js calls
-     this.reload() when the stream token expires, which re-fetches the page URL with
-     X-Layout = data-async-layout and swaps the inner partial (fresh badge + fresh token) in,
-     then the view re-inits (lib/async.js asyncLayout, lib/loadAsyncView.js). Same route,
-     same edge challenge. Called with the view context ($): .Data = GetData. */}}
+{{/* The transfer status block (partials/resource/status.html). The outer div is an
+     async-layout target: status.js calls this.reload() when the stream token expires,
+     which re-fetches the page URL with X-Layout = data-async-layout and swaps the inner
+     partial (fresh block + fresh token) in, then the view re-inits (lib/async.js
+     asyncLayout, lib/loadAsyncView.js). Same route, same edge challenge. Called with the
+     view context ($): .Data = GetData. data-status-file is the file the plan box's
+     download ETA prices (the whole torrent without one). */}}
 {{ define "resource/status_inner" }}
-<div id="torrent-status-badge" data-status-token="{{ statusToken .Data.Resource.ID }}">{{ template "resource/status" (withContext . .Data.TorrentStatus) }}</div>
+<div id="torrent-status-block" data-status-token="{{ statusToken .Data.Resource.ID }}"{{ with .Data }}{{ if and (has . "Item") .Item }} data-status-file="{{ .Item.PathStr }}"{{ end }}{{ end }}>
+{{- with .Data }}{{ if and (has . "StatusView") .StatusView }}{{ template "resource/status" (withContext $ .StatusView) }}{{ end }}{{ end }}
+</div>
 {{ "resource/status.js" | asset }}
 {{ end }}
 {{/* The status where the eye cannot lose it (owner, 2026-09-19). Measured:
@@ -28,28 +32,26 @@
 
      A fixed bar rather than `sticky`: it belongs to the page, not to the card
      it mirrors, and it must not reflow anything when it appears. It carries
-     the same badge and the same piece bar, painted by the same SSE into these
-     hosts (resource/status.js paints every [data-status-badge-for] and
-     [data-piece-bar-for]). Hidden until the real status scrolls out of view,
-     and only while a transfer is actually moving -- see stickyStatus.js. */}}
+     the very same block (owner, 2026-09-24: no compact variant, no torrent
+     name): resource/status.js clones the card's .tx into
+     [data-status-mirror-for] once and updates both from the same stream.
+     Hidden until the card's block scrolls out of view, and only while bytes
+     move somewhere on the chain or the plan binds (view.sticky) -- see
+     stickyStatus.js. */}}
 {{ define "resource/status_sticky" }}
 <div id="torrent-status-sticky" hidden
      {{/* Same glass as the navbar above it (nav.html + .navbar-redesign:
           rgba(10,14,26,.9) with backdrop-blur-xl): the two bars touch, and a
           denser one below read as a second, opaque strip (owner). */}}
-     class="fixed inset-x-0 top-[72px] z-sticky px-3 sm:px-6 py-2 bg-w-bg/90 backdrop-blur-xl border-b border-w-line
+     class="fixed inset-x-0 top-[72px] z-sticky px-3 sm:px-6 pt-3 pb-3.5 bg-w-bg/90 backdrop-blur-xl border-b border-w-line
             transition-transform duration-200 -translate-y-full motion-reduce:transition-none"
      {{/* aria-live is switched OFF explicitly: role="status" implies
-          "polite", and the badge is repainted by every SSE message (the MB/s
-          figure changes each second) -- a live region would read that out
-          for as long as the bar is up. The header badge it mirrors is not
-          live either. */}}
+          "polite", and the block is updated by every SSE message (the speeds
+          change each second) -- a live region would read that out for as
+          long as the bar is up. The card's block it mirrors is not live
+          either. */}}
      role="status" aria-live="off">
-    <div class="max-w-5xl mx-auto flex items-center gap-2 min-w-0">
-        <div data-status-badge-for="{{ .Data.Resource.ID }}" class="shrink-0"></div>
-        <span class="text-xs text-w-muted truncate" title="{{ .Data.Resource.Name }}">{{ .Data.Resource.Name }}</span>
-    </div>
-    <div class="max-w-5xl mx-auto mt-1.5 piece-bar-slot" data-piece-bar-for="{{ .Data.Resource.ID }}"></div>
+    <div class="max-w-[900px] mx-auto" data-status-mirror-for="{{ .Data.Resource.ID }}"></div>
 </div>
 {{ end }}
 {{/* The "Content" section: the picked file's card and the file browser.
@@ -60,7 +62,10 @@
      replay it against another page's data (services/web/has_guard_test.go). */}}
 {{ with .Data }}
     {{ if and (has . "Item") .Item }}
-    <div id="file" class="scroll-mt-36" data-async-layout="{{`{{ template "file" . }}`}}">
+    {{- /* data-status-file: the file picked, for the status's plan box -- the
+         status stream lives outside #content and reprices its download ETA
+         when a file link swaps this (app/resource/status.js). */}}
+    <div id="file" class="scroll-mt-36" data-status-file="{{ .Item.PathStr }}" data-async-layout="{{`{{ template "file" . }}`}}">
       {{ template "file" $ }}
     </div>
     {{ end }}
@@ -72,7 +77,7 @@
 {{ end }}
 {{ end }}
 {{ define "resource/status_container" }}
-<div id="torrent-status" class="shrink-0 -translate-y-px" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
+<div id="torrent-status" class="min-w-0" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
     {{ template "resource/status_inner" . }}
 </div>
 {{ end }}
@@ -214,8 +219,13 @@
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
-        <div class="relative flex gap-3 sm:gap-5">
-            <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
+        {{/* Poster | the column; the status block between the column's top
+             (title .. description) and its actions (owner, 2026-09-24). On a
+             phone the column is ~215px and the chain does not fit, so there
+             the block spans the whole card under the poster row -- one block,
+             moved by the grid, never a second copy. */}}
+        <div class="relative grid grid-cols-[100px_minmax(0,1fr)] sm:grid-cols-[140px_minmax(0,1fr)] grid-rows-[auto_1fr] sm:grid-rows-[auto_auto_1fr] gap-x-3 sm:gap-x-5 gap-y-3.5 sm:gap-y-3">
+            <div class="col-[1/2] row-[1/3] sm:row-[1/4] self-stretch w-full aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
                 <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                     <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ . | getEnrichedTitle }}</div>
                 </div>
@@ -233,7 +243,7 @@
                 </div>
                 {{ end }}
             </div>
-            <div class="flex-1 min-w-0">
+            <div class="col-[2/3] row-start-1 min-w-0 [&>*:last-child]:mb-0">
                 <div class="flex items-center gap-2">
                     <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug break-words line-clamp-2 text-balance" title="{{ . | getEnrichedTitle }}">{{ . | getEnrichedTitle }}</h1>
                     <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
@@ -268,15 +278,13 @@
                 {{/* Clamped to 3 lines via max-h in em (3 × leading-relaxed 1.625). resource/get.js cuts the text at the fitting prefix and appends a clickable inline "…" when it overflows; the expanded text ends with an inline "↑" that collapses it back. Without JS the plot stays clamped with no toggle. */}}
                 <p data-plot-clamp class="text-sm text-w-sub leading-relaxed overflow-hidden max-h-[4.875em] mb-4">{{ $plot }}</p>
                 {{ end }}
-                <div class="flex items-center gap-2 mb-3">
-                    {{ if .TorrentStatus }}
-                    {{ template "resource/status_container" $ }}
-                    {{ end }}
-                    <span class="text-xs text-w-muted truncate" title="{{ .Resource.Name }}">{{ .Resource.Name }}</span>
-                </div>
-                {{ if .TorrentStatus }}
-                <div class="piece-bar-slot mb-3 -mt-1" data-piece-bar-for="{{ .Resource.ID }}">{{ template "resource/piece_bar" (withContext $ .TorrentStatus) }}</div>
-                {{ end }}
+            </div>
+            {{ if .TorrentStatus }}
+            <div class="col-[1/-1] row-start-3 sm:col-[2/3] sm:row-start-2 min-w-0 pt-3 border-t border-white/[.06] sm:pt-0 sm:border-t-0">
+                {{ template "resource/status_container" $ }}
+            </div>
+            {{ end }}
+            <div class="col-[2/3] row-start-2 sm:row-start-3 min-w-0">
                 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
                     <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
                         {{ if .Vault }}
@@ -309,14 +317,16 @@
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
-        <div class="relative flex gap-3 sm:gap-5">
+        {{/* The same grid as the enriched header's: the status block between
+             the title and the actions, under the poster row on a phone. */}}
+        <div class="relative grid grid-cols-[100px_minmax(0,1fr)] sm:grid-cols-[140px_minmax(0,1fr)] grid-rows-[auto_1fr] sm:grid-rows-[auto_auto_1fr] gap-x-3 sm:gap-x-5 gap-y-3.5 sm:gap-y-3">
             <!-- Poster slot: shows the per-resource thumbnail when one
                  exists (generated during stream/download), otherwise the
                  onerror handler hides the <img> and the gradient
                  placeholder underneath shows through. Same picture as
                  the OG share preview, so a visitor arriving via a
                  shared link sees consistent artwork. -->
-            <div class="shrink-0 w-[100px] sm:w-[140px] aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
+            <div class="col-[1/2] row-[1/3] sm:row-[1/4] self-stretch w-full aspect-[2/3] rounded-xl overflow-hidden border border-w-line/30 shadow-lg relative">
                 <div class="absolute inset-0 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 flex items-center justify-center">
                     <div class="text-center font-bold text-sm p-3 line-clamp-3 drop-shadow-sm">{{ .Resource.Name }}</div>
                 </div>
@@ -328,21 +338,22 @@
                 </div>
                 {{ end }}
             </div>
-            <div class="flex-1 min-w-0">
+            <div class="col-[2/3] row-start-1 min-w-0">
                 <div class="flex items-center gap-2">
-                    <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug mb-2 break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+                    <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
                     <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
                         </svg>
                     </button>
                 </div>
-                {{ if .TorrentStatus }}
-                <div class="mb-4">
-                    {{ template "resource/status_container" $ }}
-                    <div class="piece-bar-slot mt-2" data-piece-bar-for="{{ .Resource.ID }}">{{ template "resource/piece_bar" (withContext $ .TorrentStatus) }}</div>
-                </div>
-                {{ end }}
+            </div>
+            {{ if .TorrentStatus }}
+            <div class="col-[1/-1] row-start-3 sm:col-[2/3] sm:row-start-2 min-w-0 pt-3 border-t border-white/[.06] sm:pt-0 sm:border-t-0">
+                {{ template "resource/status_container" $ }}
+            </div>
+            {{ end }}
+            <div class="col-[2/3] row-start-2 sm:row-start-3 min-w-0">
                 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
                     <div id="pledge-button" class="shrink-0" data-async-layout="{{`{{ template "vault/button" (withContext $ .Data.VaultButton) }}`}}" data-async-get="">
                         {{ if .Vault }}

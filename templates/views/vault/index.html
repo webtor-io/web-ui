@@ -11,9 +11,13 @@
       <col class="w-8">
       <col>
       <col class="w-24">
-      {{/* Status: wide enough for the longest badge label on one line
-           ("Caching paused", "Waiting for seeders"); badges never wrap. */}}
-      <col class="w-36 sm:w-44">
+      {{/* Status: the transfer status's badge (partials/status/badge.html),
+           which says the percent and the swarm too ("Vaulting 64% (9
+           seeders)"). It never wraps: what does not fit ends in an ellipsis
+           (style.css .tx-badge), the whole text in its title, so the column
+           is as wide as the common labels need on a wide screen and no
+           wider than a phone allows -- where most states are cut. */}}
+      <col class="w-36 sm:w-60 md:w-72">
     </colgroup>
     <thead>
       <tr class="border-b border-w-line">
@@ -54,19 +58,24 @@
             {{ end }}
           </td>
           <td class="text-center">
+            {{- /* Every pill here is the one badge element: the pledge's own
+                 states in its tones, the live row's badge the stream fills
+                 in place (vault/progress.js, lib/statusBadge.js). Until its
+                 first message -- seconds: the stream waits for the seeder's
+                 first answer -- the live row says what statusview says of a
+                 torrent nothing has been asked about yet (Torrent.Pending):
+                 "checking", cyan dots and "Checking activity…", a badge of
+                 the same size as every other (handlers/vault
+                 TestVaultRowsDrawTheStatusBadge holds it to statusview's). */}}
             {{ if not .Funded }}
               <div class="flex flex-col items-center gap-0.5">
-                <span class="badge badge-sm whitespace-nowrap bg-w-pink/10 border-w-pink/30 text-w-pinkL">{{ t $.Lang "vault.pledges.expiring" }}</span>
+                {{- template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}
                 {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
               </div>
             {{ else if .ShowProgress }}
-              <span data-vault-progress-badge>
-                <span class="badge badge-sm whitespace-nowrap bg-base-200/50 border-w-line/30 text-w-muted gap-1.5">
-                  <span class="loading loading-dots loading-xs"></span>
-                </span>
-              </span>
+              {{- template "status/badge" (statusBadge "cyan" "dots" (t $.Lang "resource.status.checking")) }}
             {{ else }}
-              <span class="badge badge-sm whitespace-nowrap bg-green-500/10 border-green-500/30 text-green-400">{{ t $.Lang "vault.pledges.saved" }}</span>
+              {{- template "status/badge" (statusBadge "vault" "vault" (t $.Lang "vault.pledges.saved")) }}
             {{ end }}
           </td>
         </tr>
@@ -154,6 +163,10 @@
     <!-- Pledges Table -->
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
       {{ if .Data.Pledges }}
+        {{- /* The badge's icons, once for the page: the table's rows and the
+             status guide under it use them. Outside the table, which the
+             async reload swaps. */}}
+        {{- template "status/badge_sprite" }}
         <div id="vault-pledges" data-async-layout="{{`{{ template "vault/pledges_table" $ }}`}}">
           {{ template "vault/pledges_table" . }}
         </div>
@@ -206,11 +219,11 @@
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.frozenDesc" }}</dd>
             </div>
             <div class="flex items-start gap-3">
-              <span class="badge badge-sm bg-w-pink/10 border-w-pink/30 text-w-pinkL mt-0.5 shrink-0">{{ t $.Lang "vault.pledges.expiring" }}</span>
+              <span class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}</span>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.expiringDesc" }}</dd>
             </div>
             <div class="flex items-start gap-3">
-              <span class="badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 mt-0.5 shrink-0">{{ t $.Lang "vault.pledges.saved" }}</span>
+              <span class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "vault" "vault" (t $.Lang "vault.pledges.saved")) }}</span>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.claimableDesc" }}</dd>
             </div>
           </dl>

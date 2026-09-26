@@ -18,23 +18,30 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/metrics"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 type Handler struct {
-	api            *api.Api
-	jobs           *j.Jobs
-	tb             template.Builder[*web.Context]
-	pg             *cs.PG
-	vault          *vault.Vault
+	api   *api.Api
+	jobs  *j.Jobs
+	tb    template.Builder[*web.Context]
+	pg    *cs.PG
+	vault *vault.Vault
+	// statusVault is vault for the status stream, nil without one (a nil
+	// *vault.Vault in the interface would not be nil).
+	statusVault    statusVault
 	enricher       *enrich.Enricher
 	useDirectLinks bool
 	secret         string
+	// offers sells the way out of a plan cap in the status's plan box
+	// (services/statusview); nil-safe — no catalog, nothing sold.
+	offers *offer.Service
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher, offers *offer.Service) {
 	secret := c.String(common.SessionSecretFlag)
 	helper := NewHelper(secret)
 	h := &Handler{
@@ -46,6 +53,10 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		enricher:       en,
 		useDirectLinks: c.BoolT(common.UseDirectLinks),
 		secret:         secret,
+		offers:         offers,
+	}
+	if v != nil {
+		h.statusVault = v
 	}
 	r.POST("/", h.post)
 	r.GET("/share", h.share)

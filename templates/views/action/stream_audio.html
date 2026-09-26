@@ -13,6 +13,10 @@
        {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
        {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
        {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
+       {{- if .StatusStallSub }} data-status-stall-sub="{{ .StatusStallSub }}"{{ end }}
+       {{- if .StatusFitsCap }} data-status-fits-cap{{ end }}
+       {{- if .StatusOverCap }} data-status-over-cap{{ end }}
+       {{- if .StatusAnswered }} data-offer-answered="continue-slow"{{ end }}
        controls
        autoplay
        data-settings="{{ .Settings | json }}">

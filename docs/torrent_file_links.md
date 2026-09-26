@@ -29,7 +29,7 @@ rest-api's `.torrent` endpoint are separate code paths and unchanged.
 
 # Status stream token
 
-`GET /<infohash>/status` (the badge's SSE) additionally requires
+`GET /<infohash>/status` (the transfer status's SSE) additionally requires
 `token=<jwt>` since 2026-09-07: same signing, audience `torrent-status`,
 subject = infohash, lifetime 1 hour, minted at page render into
 `data-status-token` on `#torrent-status`. The CSRF check stays. Reason: one
@@ -41,7 +41,7 @@ skipped and the attribute is empty.
 Renewal: when the stream is refused (token expired), `status.js` calls the
 view's built-in `reload()` (`lib/async.js`, any element with
 `data-async-layout`): the page URL is re-fetched with `X-Layout: {{ template
-"resource/status_inner" $ }}`, the inner partial (badge + token) is swapped in
+"resource/status_inner" $ }}`, the inner partial (the status block + token) is swapped in
 and the view re-inits — at most once a minute. A person's edge challenge clearance
 lets that fetch through; a client that never loaded the page cannot renew.
 
@@ -62,6 +62,6 @@ Since 2026-09-09 the seeder answers stats without loading a torrent nobody is
 streaming (`live: false` in the event; see torrent-web-seeder README, "Stats
 look but do not touch"). web-ui reads `live`; a missing field (older seeder)
 counts as live. For a cold reply `judgeSwarm` says "paused" straight away and
-never "checking" or "no seeders" — there is no swarm to judge. The badge opens
+never "checking" or "no seeders" — there is no swarm to judge. The status opens
 its stream immediately again; the visibility/interaction deferral of
 2026-09-07 was removed with it.

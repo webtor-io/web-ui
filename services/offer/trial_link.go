@@ -30,12 +30,13 @@ const (
 	FromNoPeers       = "no-peers"       // no peers, dead swarm: save to Vault (action/errors/no_peers.html)
 	FromOnboarding    = "onboarding"     // locked onboarding steps (partials/onboarding_checklist.html)
 	FromDonate        = "donate"         // /donate: the promo card's trial plaque and its monthly Join
+	FromStatusBar     = "status-bar"     // the plan box under the resource page's transfer status (services/statusview)
 )
 
 // TrialFroms lists every known surface, in the order of the table in
 // docs/offers.md.
 var TrialFroms = []string{
-	FromPromoBanner, FromDownloadNudge, FromLimitModal, FromGrace, FromNoPeers, FromOnboarding, FromDonate,
+	FromPromoBanner, FromDownloadNudge, FromLimitModal, FromStatusBar, FromGrace, FromNoPeers, FromOnboarding, FromDonate,
 }
 
 // Labels for a ?from outside TrialFroms.

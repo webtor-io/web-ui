@@ -8,7 +8,7 @@ global.document = dom.window.document;
 // jsdom has no IntersectionObserver: a fake that hands the callback back, so
 // the test can say "the status went off the top" the way a scroll would.
 const NAVBAR_H = 72;   // the sticky bar's own offset, and the observer's rootMargin
-const STATUS_H = 44;   // the real #torrent-status: badge + piece bar
+const STATUS_H = 44;   // a short #torrent-status: the chain and the piece bar
 let observers = [];
 global.IntersectionObserver = class {
     constructor(cb, opts) { this.cb = cb; this.opts = opts; this.targets = []; observers.push(this); }
@@ -35,15 +35,14 @@ global.IntersectionObserver = class {
 dom.window.IntersectionObserver = global.IntersectionObserver;
 global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
 
-const { initStickyStatus } = await import('./stickyStatus.js');
+const { initStickyStatus, stickyBottom } = await import('./stickyStatus.js');
 
 function page() {
     observers = [];
     document.body.innerHTML = `
         <div id="torrent-status" data-resource-id="res"></div>
         <div id="torrent-status-sticky" hidden class="-translate-y-full">
-            <div data-status-badge-for="res"></div>
-            <div data-piece-bar-for="res"></div>
+            <div data-status-mirror-for="res"></div>
         </div>`;
     const stop = initStickyStatus(document, { slideMs: 0, holdMs: 30 });
     return { stop, bar: document.querySelector('#torrent-status-sticky'), io: observers[0] };
@@ -230,5 +229,44 @@ test('a one-second gap in the data does not blink the bar; a lasting one takes i
     status({ resourceId: 'res', state: 'cached', moving: false });
     await settle();
     assert.equal(p.bar.hidden, true, 'cached ends it at once');
+    p.stop();
+});
+
+// Its details popover lives in the top layer, anchored to the bar's chain:
+// the bar sliding away closes it, or it would hang there unanchored and
+// come back open with the bar.
+test('the bar sliding away closes its details', async () => {
+    const p = page();
+    p.bar.querySelector('[data-status-mirror-for]').innerHTML = '<div data-tx><div data-tx-details popover></div></div>';
+    const details = p.bar.querySelector('[data-tx-details]');
+    let closes = 0;
+    details.addEventListener('tx-close', () => { closes++; });
+    p.io.fire(false, -120);
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    await settle();
+    assert.equal(p.bar.hidden, false);
+    assert.equal(closes, 0);
+    status({ resourceId: 'res', state: 'noseed', moving: false });
+    await settle();
+    assert.equal(p.bar.hidden, true);
+    assert.equal(closes, 1);
+    p.stop();
+});
+
+// Where the fixed furniture ends once the card has scrolled away: the bar
+// mirrors the whole block, plan box included, so it is measured -- the
+// file-pick scroll lands under it, not behind it.
+test('stickyBottom: the navbar, plus the bar when something moves', async () => {
+    const p = page();
+    Object.defineProperty(p.bar, 'offsetHeight', { configurable: true, get: () => (p.bar.hidden ? 0 : 181) });
+    assert.equal(stickyBottom(document), NAVBAR_H, 'nothing moves: the bar will not be up');
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    await settle();
+    assert.equal(p.bar.hidden, true, 'the card is still on screen');
+    assert.equal(stickyBottom(document), NAVBAR_H + 181, 'measured while hidden');
+    assert.equal(p.bar.hidden, true, 'and left hidden');
+    status({ resourceId: 'res', state: 'cached', moving: false });
+    await settle();
+    assert.equal(stickyBottom(document), NAVBAR_H);
     p.stop();
 });

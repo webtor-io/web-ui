@@ -1,7 +1,7 @@
 import av from '../../lib/av';
 import { waitForElement } from '../../lib/waitForElement';
 import { findTextCut, trimTextCut } from '../../lib/textClamp';
-import { initStickyStatus } from '../../lib/stickyStatus';
+import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
@@ -56,15 +56,19 @@ av( async function() {
     // Picking a file swaps #content only (views/resource/get.html), so this
     // view is not re-run and nothing scrolls. The card that just changed is
     // ABOVE the list the viewer clicked in -- bring it into view, under the
-    // navbar and the sticky status (#file carries the scroll margin). Only
-    // when it is actually out of sight: a short list needs no movement.
+    // navbar and the sticky status. The sticky status mirrors the whole
+    // status block, plan box included, so it is measured (stickyBottom), not
+    // assumed: a fixed scroll margin sized for the old one-line badge left
+    // the file's name and buttons under it. Only when the card is actually
+    // out of sight: a short list needs no movement.
     const onContentSwap = (e) => {
         if (!e.detail || !e.detail.target || e.detail.target.id !== 'content') return;
         const file = document.getElementById('file');
         if (!file) return;
+        const top = stickyBottom(document) + 12;
         const r = file.getBoundingClientRect();
-        if (r.top >= 72 && r.top < window.innerHeight / 2) return;
-        file.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        if (r.top >= top && r.top < window.innerHeight / 2) return;
+        window.scrollTo({ top: window.scrollY + r.top - top, behavior: 'smooth' });
     };
     window.addEventListener('async', onContentSwap);
     this._contentSwapStop = () => window.removeEventListener('async', onContentSwap);

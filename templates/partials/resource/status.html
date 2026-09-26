@@ -1,120 +1,146 @@
+{{/* The transfer status: where the viewer's bytes come from and what caps
+     them -- the chain "swarm ▸ cache ▸ you" while something moves (only who
+     takes part), the badge the page had before the chain while nothing does,
+     the piece bar under either, then the hint or the plan box.
+     docs/transfer_status.html renders every state (the design as approved:
+     docs/transfer_status.approved.html); style.css ".tx" holds its classes.
+
+     Called with (withContext $ .StatusView): .Data is the *statusview.View
+     the server built (handlers/resource initialView on the page, the same
+     shape as `view` on every /status stream message), .Ctx the request.
+
+     STABLE DOM. Every slot is rendered here once -- the chain (three nodes,
+     two segments) and the badge in one row, the bar, the hint and its Vault
+     link, the plan box, four detail rows -- and app/resource/status.js only
+     moves text, attributes and cell fills into them. A slot with nothing to
+     show is `hidden`, never removed: re-creating the block on every message
+     restarted every animation once a second and dropped clicks on the button
+     (lib/transferStatus.js; the JS test proves no node is added or removed
+     across all the design's states, chain and badge alike). Which of the
+     chain and the badge shows is the block's data-mode: both stay laid out
+     in the same grid cell (.tx-head), so the row is as tall either way and a
+     switch never moves the card.
+
+     Without JS this is the whole status: the view of the page render, and the
+     chain opens its details through the Popover API's own attributes. The
+     page cannot know what its player does, so a plan-limited state shows its
+     download variant here; the script picks between download, stream and
+     "plays fine" (lib/transferStatus.js present). */}}
 {{ define "resource/status" }}
-{{ if .Data }}
-{{ if eq .Data.State "idle" }}
-<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-0.5">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.idle" }}</span>
-        {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
-    </span>
+{{- $lang := .Ctx.Lang }}
+{{- /* The icons, once per block render: nodes and segments <use> them, so
+     changing a node's icon is changing an attribute. Outside .tx on purpose:
+     the sticky bar clones .tx, and a second copy of these ids would be
+     invalid. */}}
+<svg class="tx-sprite absolute size-0 overflow-hidden" aria-hidden="true" focusable="false">
+    <symbol id="tx-i-swarm" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M8 8.5l2.8 6.2M16 8.5l-2.8 6.2M8.5 7h7"/></g></symbol>
+    <symbol id="tx-i-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5H7z"/></symbol>
+    <symbol id="tx-i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    {{- /* Vault's own "three layers" (partials/nav.html), not a bolt: the bolt
+         is the speed upsell's and only the plan box wears it. */}}
+    <symbol id="tx-i-vault" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></g></symbol>
+    <symbol id="tx-i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></g></symbol>
+    <symbol id="tx-i-pause" viewBox="0 0 12 12"><rect x="3" y="2" width="2" height="8" rx=".5" fill="currentColor"/><rect x="7" y="2" width="2" height="8" rx=".5" fill="currentColor"/></symbol>
+    <symbol id="tx-i-head" viewBox="0 0 8 10"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M1.5 1.5L6 5l-4.5 3.5"/></symbol>
+    <symbol id="tx-i-bolt" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z"/></symbol>
+    <symbol id="tx-i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></symbol>
+    {{- /* The badge's icons: the status badge's own (partials/status/badge.html),
+         in this sprite so the page has them once. */}}
+    {{- template "status/badge_symbols" }}
+</svg>
+{{- with .Data }}
+{{- /* The page's own pick, the download variant (see above): its key, and the
+     plan's line as a hint when there is no button to go with it. */}}
+{{- $key := .Key }}{{ if eq .Key "tier" }}{{ $key = "tier_dl" }}{{ end }}
+{{- $hint := .Hint }}{{ $hintTone := "" }}
+{{- with .Plan }}{{ with .Download.Hint }}{{ $hint = . }}{{ $hintTone = "plan" }}{{ end }}{{ end }}
+<div class="tx" data-tx data-key="{{ $key }}" data-mode="{{ .Mode }}"{{ if .Sticky }} data-sticky{{ end }}>
+    <div class="tx-head">
+    {{- /* The chain is the button that opens the details. Its name is the
+         popover's title, fixed: from its content it would be the chain's
+         live numbers, a new name every second, re-announced by a screen
+         reader with focus on it. The same numbers are in the details. Its
+         description is the badge's words -- the state as text, which the
+         badge, invisible in this mode, cannot say itself (a description is
+         read out with the button, not again on every change). In the
+         badge's mode the chain stays laid out, invisible (and so neither
+         focusable nor read): the row keeps its height. */}}
+    <button type="button" class="tx-chain" data-tx-toggle popovertarget="tx-details" aria-expanded="false" aria-label="{{ .Details.Title }}" aria-describedby="tx-bdesc" title="{{ .Details.Title }}">
+        {{- template "resource/status_node" (index .Nodes 0) }}
+        {{- template "resource/status_seg" (index .Segs 0) }}
+        {{- template "resource/status_node" (index .Nodes 1) }}
+        {{- template "resource/status_seg" (index .Segs 1) }}
+        {{- template "resource/status_node" (index .Nodes 2) }}
+    </button>
+    {{- template "status/badge" (.Badge.El "tx-bdesc") }}
+    </div>
+    {{- /* The piece bar's slot, always 6px: the cells arrive with the stream
+         (status `pieces`), the hairline divider stands in until then and
+         whenever nothing moves. */}}
+    <div class="tx-bar" data-tx-bar data-mode="divider" data-tone="{{ .Bar.Tone }}"><div class="tx-pbar" data-tx-cells role="img"></div><div class="tx-pdiv"></div></div>
+    {{- /* The hint, and where pieces nobody has are the story, the way to
+         have them fetched anyway: Vault, which the page offers the way its
+         own button does -- the pledge form for a signed-in viewer, the login
+         first for anyone else -- and only where Vault is configured. */}}
+    <p class="tx-hint" data-tx-hint data-tone="{{ $hintTone }}"{{ if not $hint }} hidden{{ end }}><span data-tx-htext>{{ $hint }}</span>
+        {{- if $.Ctx.Vault }}{{ $page := langPath $lang $.Ctx.Path }}
+        {{- if $.Ctx.User | hasAuth }}<a class="tx-vlink" data-tx-vault href="{{ $page }}?pledge-form=true" data-async-target="#pledge-modal" data-async-push-state="false" data-umami-event="vault-clicked" data-umami-event-location="status"{{ if not .Vault }} hidden{{ end }}>
+        {{- else }}<a class="tx-vlink" data-tx-vault href="{{ langPath $lang "/login" }}?from=vault&return-url={{ $page }}" data-async-target="main" data-umami-event="vault-clicked-anonymous" data-umami-event-location="status"{{ if not .Vault }} hidden{{ end }}>
+        {{- end }}<svg aria-hidden="true"><use href="#tx-i-vault"></use></svg><span>{{ t $lang "resource.status.vaultLink" }}</span></a>
+        {{- end }}</p>
+    {{- template "resource/status_pbox" $ }}
+    {{- /* "Where the bottleneck is". popover="auto": opens from the chain,
+         closes on Esc and on a press outside with no script at all; the
+         script only places it under the chain (lib/transferStatus.js). */}}
+    <div class="tx-details" id="tx-details" data-tx-details popover role="dialog" aria-label="{{ .Details.Title }}">
+        <div class="tx-dh">
+            <div class="tx-dt">{{ .Details.Title }}</div>
+            <button type="button" class="tx-dx" data-tx-close popovertarget="tx-details" popovertargetaction="hide" aria-label="{{ t $lang "resource.close" }}"><svg aria-hidden="true"><use href="#tx-i-close"></use></svg></button>
+        </div>
+        {{- range .Details.Rows }}
+        <div class="tx-row" data-tx-row data-key="{{ .Key }}"{{ if not .Show }} hidden{{ end }}>
+            <div class="tx-rl"><div class="tx-rlabel"><span data-tx-rlabel>{{ .Label }}</span><span class="tx-tag" data-tx-rtag{{ if not .Tag }} hidden{{ end }}>{{ .Tag }}</span></div><div class="tx-rsub" data-tx-rsub>{{ .Sub }}</div></div>
+            <div class="tx-rv" data-tx-rv>{{ .Value }}</div>
+        </div>
+        {{- end }}
+        <div class="tx-dplan" data-tx-dplan{{ if not (and .Plan .Plan.Download.Box) }} hidden{{ end }}>{{ template "resource/status_pbox" $ }}</div>
+    </div>
 </div>
-{{ else if and (eq .Data.State "caching") .Data.Checking }}
-<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-sub gap-1.5 px-3 py-0.5">
-    <span class="loading loading-dots loading-xs"></span>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.checking" }}</span>
-    </span>
-</div>
-{{ else if and (eq .Data.State "caching") .Data.NoSeeders }}
-<div class="badge badge-sm bg-error/10 border-error/30 text-error gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.noSeedersHint" }}">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.noSeeders" }} · {{ printf "%.0f" .Data.Progress }}%</span>
-    </span>
-</div>
-{{ else if and (eq .Data.State "caching") .Data.Paused }}
-<div class="badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.cachingPausedHint" }}">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.cachingPaused" }} {{ printf "%.0f" .Data.Progress }}%</span>
-        {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
-    </span>
-</div>
-{{ else if eq .Data.State "caching" }}
-<div class="badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5 px-3 py-0.5">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.caching" }} {{ printf "%.0f" .Data.Progress }}%{{ if .Data.RateLabel }} · {{ .Data.RateLabel }}{{ end }}</span>
-        {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
-    </span>
-</div>
-{{ else if eq .Data.State "cached" }}
-<div class="badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-0.5">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.cached" }}</span>
-    </span>
-</div>
-{{ else if eq .Data.State "vaulting" }}
-<div class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-0.5">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.vaulting" }} {{ printf "%.0f" .Data.Progress }}%{{ if .Data.RateLabel }} · {{ .Data.RateLabel }}{{ end }}</span>
-        {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
-    </span>
-</div>
-{{ else if eq .Data.State "vault_waiting" }}
-<div class="badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.vault_waitingHint" }}">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.vault_waiting" }}</span>
-    </span>
-</div>
-{{ else if eq .Data.State "vault_failed" }}
-<div class="badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.vault_failedHint" }}{{ if .Data.Detail }} — {{ .Data.Detail }}{{ end }}">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.vault_failed" }}{{ if gt .Data.Progress 0.0 }} {{ printf "%.0f" .Data.Progress }}%{{ end }}</span>
-        {{ if .Data.Swarm }}<span class="opacity-70">({{ .Data.Swarm }})</span>{{ end }}
-    </span>
-</div>
-{{ else if eq .Data.State "unknown" }}
-<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-0.5" title="{{ t .Ctx.Lang "resource.status.unknownHint" }}">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.unknown" }}</span>
-    </span>
-</div>
-{{ else if eq .Data.State "vaulted" }}
-<div class="badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-0.5">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-    </svg>
-    <span class="badge-text">
-        <span>{{ t .Ctx.Lang "resource.status.vaulted" }}</span>
-    </span>
-</div>
-{{ end }}
-{{ end }}
+{{- end }}
 {{ end }}
 
-{{ define "resource/piece_bar" }}
-{{/* Piece bar under the status badge — the picture torrent clients paint:
-     which parts of the torrent the seeder holds (filled), is fetching (pulsing),
-     or lacks — only while a transfer is moving; complete content shows the
-     divider. Data arrives over the same status SSE and is painted by
-     resource/status.js into every [data-piece-bar-for=<id>] host. Colour
-     follows the badge: purple while Vault works, cyan while the seeder caches. */}}
-{{/* The slot is always 6px tall so the header never jumps. Server-side it is
-     the hairline divider; the JS paints a bar over it only while a transfer
-     is moving (caching, vaulting) and paints the divider back when it ends. */}}
-<div class="piece-bar-divider" aria-hidden="true"></div>
-{{ end }}
+{{/* One stop on the chain. Called with a statusview.Node. The name and value
+     are the wide chain's; the short number and the caption the compact one's
+     (style.css `@container`). */}}
+{{ define "resource/status_node" }}
+<span class="tx-node" data-tx-node data-kind="{{ .Kind }}" data-tone="{{ .Tone }}"{{ if .Dim }} data-dim{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-pill"><svg class="tx-ic" aria-hidden="true"><use href="#tx-i-{{ .Icon }}"></use></svg><b class="tx-nm">{{ .Name }}</b><span class="tx-val">{{ .Value }}</span><span class="tx-short">{{ .Short }}</span></span><span class="tx-cap">{{ .Caption }}</span></span>
+{{- end }}
+
+{{/* One link of the chain, towards the viewer. Called with a statusview.Seg.
+     The line, the label and the arrowhead are the animated parts; they are
+     never replaced, only the segment's attributes change. */}}
+{{ define "resource/status_seg" }}
+<span class="tx-seg" data-tx-seg data-tone="{{ .Tone }}"{{ if .On }} data-moving{{ end }}{{ if .Dots }} data-dots{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="tx-spd">{{ .Speed }}</span><i class="tx-note">{{ with .Note }}· {{ . }}{{ end }}</i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
+{{- end }}
+
+{{/* The plan box: bolt, title and ETA; the button and the trial note under
+     it. Called with the block's own (withContext $ view). Rendered twice per
+     block -- under the bar and in the details -- and hidden unless the plan
+     binds and there is something faster to sell. The click is Umami's own
+     (data-umami-event); the impression is counted by the script when the
+     button has been at least half on screen for a second. */}}
+{{ define "resource/status_pbox" }}
+{{- $v := .Data }}{{ $box := false }}
+{{- with $v.Plan }}{{ with .Download.Box }}{{ $box = . }}{{ end }}{{ end }}
+{{- $key := $v.Key }}{{ if eq $v.Key "tier" }}{{ $key = "tier_dl" }}{{ end }}
+<div class="tx-pbox" data-tx-pbox{{ if not $box }} hidden{{ end }}>
+    <div class="tx-pl"><svg class="tx-bolt" aria-hidden="true"><use href="#tx-i-bolt"></use></svg><div class="min-w-0"><div class="tx-pt" data-tx-pt>{{ if $box }}{{ $box.Title }}{{ end }}</div><div class="tx-ps" data-tx-ps>{{ if $box }}{{ $box.Sub }}{{ end }}</div></div></div>
+    <div class="tx-pr">
+        <a class="tx-sbtn" data-tx-cta{{ if $box }} href="{{ $box.CTA.URL }}"{{ end }} target="_blank" rel="noopener"
+           data-umami-event="donate-status-bar" data-umami-event-ctx="download" data-umami-event-location="card"
+           data-umami-event-auth="{{ $v.Auth }}" data-umami-event-state="{{ $key }}" data-umami-event-tier="{{ $v.Tier }}"
+           data-umami-event-target="{{ if $box }}{{ $box.CTA.Target }}{{ end }}"><svg aria-hidden="true"><use href="#tx-i-bolt"></use></svg><span data-tx-cta-label>{{ if $box }}{{ $box.CTA.Label }}{{ end }}</span></a>
+        <span class="tx-pn" data-tx-pn>{{ if $box }}{{ $box.CTA.Note }}{{ end }}</span>
+    </div>
+</div>
+{{- end }}

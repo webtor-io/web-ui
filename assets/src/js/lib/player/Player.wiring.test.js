@@ -129,6 +129,8 @@ const {
 // the globals.
 const { Hls, initDefaultTracks } = await import('./hls-manager.js');
 const { createSessionSeeker } = await import('./session-seek.js');
+const { createGraceHold } = await import('./grace-hold.js');
+const { createPlayerActivity } = await import('../playerActivity.js');
 const { catchUpTiming } = await import('./subtitle-catchup.js');
 
 // ---- the harness ----------------------------------------------------
@@ -1746,6 +1748,458 @@ test('a session seek kicks the translation poll and unthrottles the next reload'
     assert.ok(heads() >= 2, `the seek must kick a HEAD at once, not wait for the next 3 s tick \u2014 got ${heads()} HEADs`);
     assert.ok(track().getAttribute('src').includes('rev=9'),
         'the reload for the new count must not wait out the 15 s throttle either');
+});
+
+// The element carries its movie-time offset (data-run-offset) for code
+// outside the player -- the transfer status's grace window
+// (lib/playerActivity.js inGrace) reads it on the restarting source's own
+// events. Written when the seek's answer arrives, before the source is
+// reloaded, not on the next render: the restart's emptied/loadstart/waiting
+// otherwise read the new element clock (0) against the old offset.
+test('a session seek puts its offset on the element before the source restarts', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    p.video.dataset.sessionId = 's1';
+    p.video.dataset.sessionSeekUrl = '/session/seek';
+    p.video.setAttribute('data-duration', '3600');
+    p.setResponse((url, params) => ({
+        ok: true, status: 200,
+        // The seek's POST answers where the new run starts; the mount's
+        // GET, that the first run starts at 0.
+        json: async () => ({ offset: params && params.method === 'POST' ? 1470 : 0 }),
+    }));
+    await initPlayer(p.container);
+    await settle();
+    assert.equal(p.video.dataset.runOffset, '0');
+    let atRestart = null;
+    p.video.load = function load() { atRestart = this.dataset.runOffset; };
+    if (window.hlsPlayer) {
+        const orig = window.hlsPlayer.loadSource;
+        window.hlsPlayer.loadSource = (...a) => { atRestart = p.video.dataset.runOffset; return orig && orig.apply(window.hlsPlayer, a); };
+    }
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(atRestart, '1470', 'the offset on the element when the source restarts');
+    assert.equal(p.video.dataset.runOffset, '1470');
+});
+
+// The grace popup goes up as the film leaves the free window, and the
+// element says so (data-grace-cta-shown): until it does, the transfer status
+// counts the popup as on its way (lib/playerActivity.js graceOfferDue) and
+// keeps its own plan box down -- the popup comes from a render effect, a
+// frame or more after the element's clock crosses.
+test('the grace popup, once up, is marked on the element', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => {
+        page.video.dataset.graceDurationSec = '30';
+        const cta = document.createElement('div');
+        cta.id = 'grace-cta';
+        cta.className = 'hidden';
+        cta.setAttribute('data-upsell-surface', 'grace');
+        page.container.appendChild(cta);
+    });
+    await playPast(p, 29);
+    assert.ok(document.getElementById('grace-cta').classList.contains('hidden'), 'inside the window: no popup');
+    assert.equal('graceCtaShown' in p.video.dataset, false);
+    await playPast(p, 31);
+    assert.equal(document.getElementById('grace-cta').classList.contains('hidden'), false, 'past it: the popup');
+    assert.equal('graceCtaShown' in p.video.dataset, true, 'and the element says it is up');
+});
+
+// The viewer's answer to the popup -- "continue at N Mbps" or its close --
+// goes on the element too (data-grace-cta-answered): they have just been told
+// of the cap, and the transfer status sells the way out again only at the
+// player's first real stall (lib/playerActivity.js offerAnswered), not the
+// moment the popup closes. The trial link is no answer: it opens a new tab
+// and the popup stays.
+for (const [button, answer] of [['.grace-cta-continue', 'continue'], ['.grace-cta-close', 'dismiss']]) {
+    test(`the grace popup answered "${answer}" is marked on the element`, async (t) => {
+        t.after(() => destroyPlayer());
+        const p = await mountPlayer((page) => {
+            page.video.dataset.graceDurationSec = '30';
+            const cta = document.createElement('div');
+            cta.id = 'grace-cta';
+            cta.className = 'hidden';
+            cta.setAttribute('data-upsell-surface', 'grace');
+            cta.innerHTML = '<button type="button" class="grace-cta-close"></button>'
+                + '<a class="btn" href="/trial?from=grace" target="_blank">trial</a>'
+                + '<button type="button" class="grace-cta-continue"></button>';
+            page.container.appendChild(cta);
+        });
+        await playPast(p, 31);
+        const cta = document.getElementById('grace-cta');
+        assert.equal(cta.classList.contains('hidden'), false, 'the popup is up');
+        assert.equal('graceCtaAnswered' in p.video.dataset, false, 'shown is not answered');
+        cta.querySelector('a').addEventListener('click', (e) => e.preventDefault());
+        cta.querySelector('a').click();
+        assert.equal('graceCtaAnswered' in p.video.dataset, false, 'the trial link is not an answer');
+        assert.equal(cta.classList.contains('hidden'), false);
+        cta.querySelector(button).click();
+        assert.equal(cta.classList.contains('hidden'), true, 'closed');
+        assert.equal(p.video.dataset.graceCtaAnswered, answer);
+        assert.ok(p.events.some((e) => e.name === 'grace-soft-cta-click' && e.data.action === answer), 'Umami as before');
+    });
+}
+
+// ---- the grace popup holds the film (grace-hold.js) ---------------------
+//
+// Owner, 2026-09-26: the film stops when the popup comes up, and goes on with
+// the answer -- only if the popup stopped it. hls.js keeps filling the buffer
+// meanwhile, and the transfer status keeps reading the player as playing
+// (lib/playerActivity.js: the page's pause, data-grace-cta-hold, not the
+// viewer's).
+
+// gracePopup puts the popup on the page as stream_video.html renders it: the
+// close, the trial link (a new tab), "continue at N Mbps".
+function gracePopup(page, sec = 30) {
+    page.video.dataset.graceDurationSec = String(sec);
+    const cta = document.createElement('div');
+    cta.id = 'grace-cta';
+    cta.className = 'hidden';
+    cta.setAttribute('data-upsell-surface', 'grace');
+    cta.innerHTML = '<button type="button" class="grace-cta-close"></button>'
+        + '<a class="btn" href="/trial?from=grace" target="_blank">trial</a>'
+        + '<button type="button" class="grace-cta-continue"></button>';
+    page.container.appendChild(cta);
+}
+const graceCta = () => document.getElementById('grace-cta');
+const popupUp = () => !graceCta().classList.contains('hidden');
+const graceClick = (p) => p.events.find((e) => e.name === 'grace-soft-cta-click');
+const keydown = (key) => document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key, bubbles: true }));
+
+for (const [button, answer] of [['.grace-cta-continue', 'continue'], ['.grace-cta-close', 'dismiss']]) {
+    test(`the grace popup stops the film, and "${answer}" plays it again`, async (t) => {
+        t.after(() => destroyPlayer());
+        const p = await mountPlayer((page) => gracePopup(page));
+        const log = playback(p.video);
+        const activity = createPlayerActivity(document);
+        t.after(() => activity.stop());
+        await playPast(p, 31);
+        assert.ok(popupUp(), 'the popup is up');
+        assert.equal(p.video.paused, true, 'and the film stopped with it');
+        assert.equal(log.pause, 1);
+        assert.ok('graceCtaHold' in p.video.dataset, 'the page’s pause, on the element');
+        assert.equal(activity.streaming(), true, 'the status keeps the viewer on the chain: not their pause');
+        assert.equal(activity.state(), 'playing');
+        assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: true });
+        await settle();
+        assert.equal(p.video.paused, true, 'it stays stopped');
+
+        graceCta().querySelector(button).click();
+        await settle();
+        assert.equal(popupUp(), false);
+        assert.equal(p.video.dataset.graceCtaAnswered, answer);
+        assert.equal(log.play, 1, 'the answer starts it');
+        assert.equal(p.video.paused, false, 'and nothing pauses it again');
+        assert.equal('graceCtaHold' in p.video.dataset, false);
+        assert.deepEqual(graceClick(p).data, { action: answer, via: 'button', paused: true });
+    });
+}
+
+// The popup comes up a frame after the clock crosses (a render effect): a
+// viewer who paused in between paused it themselves, and the answer leaves
+// their pause alone.
+test('a film the viewer had paused stays paused after the answer', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    const log = playback(p.video);
+    p.video.paused = false;
+    p.video.currentTime = 31;
+    // After the player's clock has read 0:31 in this frame, before the
+    // effect that puts the popup up runs in the next one.
+    await new Promise((resolve) => requestAnimationFrame(() => { p.video.pause(); resolve(); }));
+    await settle();
+    assert.ok(popupUp(), 'fixture: the popup came up over a film the viewer paused');
+    assert.equal(log.pause, 1, 'their pause, and no other');
+    assert.equal('graceCtaHold' in p.video.dataset, false, 'not the page’s pause');
+    assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: false });
+
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(popupUp(), false);
+    assert.equal(p.video.dataset.graceCtaAnswered, 'continue');
+    assert.equal(log.play, 0, 'nothing starts it');
+    assert.equal(p.video.paused, true);
+    assert.equal(graceClick(p).data.paused, false);
+});
+
+// The trial link opens a new tab and the popup stays: no answer, and the
+// film does not start behind it.
+test('the trial link starts nothing behind the popup', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    const log = playback(p.video);
+    await playPast(p, 31);
+    const a = graceCta().querySelector('a');
+    a.addEventListener('click', (e) => e.preventDefault());
+    a.click();
+    await settle();
+    assert.ok(popupUp());
+    assert.equal(p.video.paused, true);
+    assert.equal(log.play, 0);
+    assert.ok('graceCtaHold' in p.video.dataset);
+    assert.equal('graceCtaAnswered' in p.video.dataset, false);
+    assert.equal(graceClick(p), undefined);
+});
+
+// Play while the popup is up (space here; the big button, a click on the
+// picture and the headset go through the same toggle) is the answer
+// "continue": it says what the button says, and a Play that did nothing
+// would read as a broken player. It plays, whoever paused the film.
+test('Play while the popup is up is the answer "continue"', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    const log = playback(p.video);
+    await playPast(p, 31);
+    assert.equal(p.video.paused, true, 'fixture: held');
+    keydown(' ');
+    await settle();
+    assert.equal(popupUp(), false, 'answered');
+    assert.equal(p.video.dataset.graceCtaAnswered, 'continue');
+    assert.equal(log.play, 1);
+    assert.equal(p.video.paused, false);
+    assert.deepEqual(graceClick(p).data, { action: 'continue', via: 'play', paused: true });
+    keydown(' ');
+    await settle();
+    assert.equal(p.video.paused, true, 'from here on space is play/pause as ever');
+    assert.equal(p.events.filter((e) => e.name === 'grace-soft-cta-click').length, 1, 'one answer');
+});
+
+// Whatever else starts the film while the popup is up -- the embed's
+// player_play here; the subtitle catch-up letting go is another -- is put
+// back on its `play` event, and counted as playback the answer resumes.
+test('whatever else starts the film behind the popup is put back until the answer', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    const log = playback(p.video);
+    await playPast(p, 31);
+    window.dispatchEvent(new dom.window.CustomEvent('player_play'));
+    await settle();
+    assert.equal(log.play, 1, 'fixture: something played it');
+    assert.equal(p.video.paused, true, 'put back');
+    graceCta().querySelector('.grace-cta-close').click();
+    await settle();
+    assert.equal(p.video.paused, false, 'the answer starts it');
+});
+
+test('in fullscreen the popup leaves it, and the film stops', async (t) => {
+    let exited = 0;
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => document.body });
+    document.exitFullscreen = () => { exited++; return Promise.resolve(); };
+    t.after(() => {
+        destroyPlayer();
+        delete document.fullscreenElement;
+        delete document.exitFullscreen;
+    });
+    const p = await mountPlayer((page) => gracePopup(page));
+    playback(p.video);
+    await playPast(p, 31);
+    assert.equal(exited, 1, 'out of fullscreen: the popup lives outside it');
+    assert.ok(popupUp());
+    assert.equal(p.video.paused, true);
+});
+
+// A session seek past the window: the timeline shows the target at once, so
+// the popup comes up as the seek starts, and the seek's play() -- when the
+// transcoder's new run is ready -- would start the film behind it. The seek
+// asks the hold first (session-seek.js holdPlayback), loads the new run
+// without playing it, and lets go when it can play; the answer starts it.
+test('a session seek past the window: the new run waits for the answer', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    gracePopup(p, 10);
+    p.video.dataset.sessionId = 's1';
+    p.video.dataset.sessionSeekUrl = '/session/seek';
+    p.video.setAttribute('data-duration', '3600');
+    let releasePost = null;
+    p.setResponse((url, params) => {
+        if (params && params.method === 'POST' && String(url).startsWith('/session/seek')) {
+            return new Promise((resolve) => {
+                releasePost = () => resolve({ ok: true, status: 200, json: async () => ({ offset: 15 }) });
+            });
+        }
+        return { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ offset: 0 }) };
+    });
+    await initPlayer(p.container);
+    await settle();
+    const log = playback(p.video);
+    p.video.load = () => {};
+    const posts = () => p.calls.filter((c) => c.params && c.params.method === 'POST' && String(c.url).startsWith('/session/seek')).length;
+    p.video.paused = false;
+    keydown('ArrowRight'); // 0:00 -> 0:15, past the 10 s window
+    await settle();
+    assert.ok(popupUp(), 'the popup came up with the seek');
+    assert.equal(p.video.paused, true, 'the film stopped');
+    // The transcoder answers: the new run is loaded -- and not played.
+    releasePost();
+    await settle();
+    assert.equal(log.play, 0, 'the seek did not start the film behind the popup');
+    assert.equal(p.video.paused, true);
+    assert.ok('graceCtaHold' in p.video.dataset);
+    keydown('ArrowRight');
+    await settle();
+    assert.equal(posts(), 1, 'still seeking: nothing else is sought yet');
+    // The new run can play: the seek lets go, paused under the popup.
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await settle();
+    assert.equal(log.play, 0, 'still not played');
+    // ...and the element's `autoplay`, which the reload re-arms, starts it by
+    // itself (Chrome, live, 2026-09-26): put back.
+    p.video.play();
+    await settle();
+    assert.equal(p.video.paused, true, 'autoplay put back');
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(log.play, 2, 'the answer starts it');
+    assert.equal(p.video.paused, false);
+    assert.equal(graceClick(p).data.paused, true);
+    keydown('ArrowRight');
+    await settle();
+    assert.equal(posts(), 2, 'the held seek had let go: seeking works again');
+});
+
+// The same through hls.js (the seeker pauses the old run itself there, and
+// starts the new one only if the film was playing): a seek that lands paused
+// never asks the hold, and the answer leaves the film paused.
+test('a held seek through hls.js settles paused on canplay; one that lands paused stays paused', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({}); });
+    const log = playback(p.video);
+    const hold = createGraceHold(p.video);
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        holdPlayback: () => hold.holds(),
+    });
+    p.video.paused = false;
+    const seeking = seeker.seek(120);
+    hold.start(); // the popup, up as the seek starts
+    await flush();
+    await flush();
+    assert.equal(log.play, 0, 'loaded, not played');
+    assert.equal(seeker.isSeeking(), true);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await flush();
+    assert.equal(seeker.isSeeking(), false, 'settled when it could play');
+    await seeking;
+    assert.equal(p.video.paused, true);
+    assert.equal(hold.release(), true);
+    assert.equal(p.video.paused, false, 'the answer starts it');
+    await settle();
+
+    p.video.pause();
+    const again = createGraceHold(p.video);
+    again.start();
+    seeker.seek(600);
+    await flush();
+    await flush();
+    assert.equal(again.held(), false, 'a seek that lands paused does not ask');
+    assert.equal(again.release(), false);
+    assert.equal(p.video.paused, true, 'and stays paused');
+});
+
+// The popup comes up after the seek's play() went out (the hold's pause
+// aborts it, and the seek retries at canplay): the retry asks the hold, and
+// the seek settles paused instead of playing behind it.
+test('a seek whose play() the popup aborted settles paused at canplay', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({}); });
+    let plays = 0;
+    p.video.pause = () => { p.video.paused = true; };
+    p.video.play = () => { plays++; return Promise.reject(new dom.window.DOMException('interrupted by a call to pause()', 'AbortError')); };
+    const hold = createGraceHold(p.video);
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        holdPlayback: () => hold.holds(),
+    });
+    p.video.paused = false;
+    const seeking = seeker.seek(120);
+    await flush();
+    await flush();
+    assert.equal(plays, 1, 'fixture: the new run was started before the popup');
+    hold.start();
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await flush();
+    assert.equal(plays, 1, 'the retry asked the hold and did not play');
+    assert.equal(seeker.isSeeking(), false, 'settled');
+    await seeking;
+    assert.equal(hold.held(), true, 'the answer will start it');
+});
+
+// A refused seek restarts the old run it paused -- not behind the popup.
+test('a refused seek does not restart the film behind the popup', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({}); });
+    const log = playback(p.video);
+    let refuse = null;
+    p.setResponse(() => new Promise((resolve) => { refuse = () => resolve({ ok: false, status: 503 }); }));
+    const hold = createGraceHold(p.video);
+    const seeker = createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+        holdPlayback: () => hold.holds(),
+    });
+    p.video.paused = false;
+    const seeking = seeker.seek(120); // pauses the playing film for the POST
+    hold.start(); // the popup, up while the POST is out
+    await flush();
+    refuse();
+    await seeking;
+    assert.equal(seeker.isSeeking(), false);
+    assert.equal(log.play, 0, 'not restarted behind the popup');
+    assert.equal(p.video.paused, true);
+    assert.equal(hold.held(), true, 'the answer restarts it');
+});
+
+// The player goes while the popup holds the film (a teardown; "Next" below):
+// the answer given after that starts nothing, and the next player is free.
+test('the player goes while the popup holds: nothing resumes, the next one starts free', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    const log = playback(p.video);
+    await playPast(p, 31);
+    assert.equal(p.video.paused, true, 'fixture: held');
+    const old = p.video;
+    destroyPlayer();
+    assert.equal('graceCtaHold' in old.dataset, false);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(log.play, 0, 'the film that went does not start');
+
+    const q = await mountPlayer((page) => gracePopup(page));
+    const qlog = playback(q.video);
+    await playPast(q, 10);
+    q.video.pause();
+    q.video.play();
+    await settle();
+    assert.equal(qlog.pause, 1);
+    assert.equal(q.video.paused, false, 'nothing holds the new film inside its window');
+});
+
+test('Next while the popup holds: the answer does not start the film being left', async (t) => {
+    t.after(() => { destroyPlayer(); window.sessionStorage.clear(); });
+    const p = await mountPlayer((page) => {
+        gracePopup(page);
+        Object.assign(page.video.dataset, { nextItemId: 'i2', nextPath: 'S01/e02.mkv', nextKind: 'episode', nextLabel: 'E02' });
+        // What canMoveOn looks for: the start form and #content.
+        const form = document.createElement('form');
+        form.setAttribute('action', 'https://webtor.io/stream-video');
+        form.innerHTML = '<input type="hidden" name="resource-id" value="res"><input type="hidden" name="item-id" value="i1">';
+        page.container.appendChild(form);
+        const content = document.createElement('div');
+        content.id = 'content';
+        page.container.appendChild(content);
+    });
+    const log = playback(p.video);
+    await playPast(p, 31);
+    assert.equal(p.video.paused, true, 'fixture: held');
+    keydown('n');
+    await settle();
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(log.play, 0, 'the viewer said next');
+    assert.equal(p.video.paused, true);
 });
 
 test('kick() is a no-op with no translation running \u2014 a seek with nothing playing does not throw', async (t) => {

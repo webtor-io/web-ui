@@ -33,13 +33,18 @@ Not done on purpose: restoring the busy state across a page reload.
 
 A fixed bar under the navbar (`resource/status_sticky` in `views/resource/get.html`,
 rendered at the top of `main`, outside the cards — inside one it sat under
-`overflow-hidden`). It mirrors the header badge and piece bar: `resource/status.js`
-paints every `[data-status-badge-for]` / `[data-piece-bar-for]` from the same SSE and
-broadcasts a `torrent-status` event `{resourceId, state, moving}`.
+`overflow-hidden`). It carries the very same transfer status block as the card
+(docs/transfer_status.html; no compact variant, no torrent name): `resource/status.js`
+clones the card's `.tx` into `[data-status-mirror-for]` once (`mirrorBlock`, ids
+suffixed `-sticky`), writes every SSE message into both, and broadcasts a
+`torrent-status` event `{resourceId, state, moving}`.
 
 Shown only when **both** hold: the real `#torrent-status` has gone under the navbar
-(IntersectionObserver with `rootMargin: -72px`), and a transfer is moving (`caching`,
-`vaulting`, `vault_waiting` — `cached`/`vaulted` are answers, not progress).
+(IntersectionObserver with `rootMargin: -72px`), and something moves: `moving` is the
+view's `sticky` — the chain is up (bytes from the swarm, bytes to the viewer, the plan's
+cap binding, or the viewer waiting for data; the chain gives way to the badge only 10 s
+after the last movement). The badge — nothing moves — has no sticky bar. The mirror keeps
+its last picture through a 1-second `unknown`/`idle` gap (up to 8 s).
 
 - "Gone upwards" is `bottom <= rootBounds.top`, **not** `top < 0`: the observer fires at
   the crossing, when the top is still ~+28 px, and never again — `top < 0` worked on a
@@ -48,7 +53,7 @@ Shown only when **both** hold: the real `#torrent-status` has gone under the nav
   reloads itself when its token expires).
 - It slides out (`SLIDE_MS`) before `hidden` lands; state is tracked in a variable, not
   read back from `bar.hidden`.
-- `aria-live="off"`: the badge repaints every second.
+- `aria-live="off"`: the block is updated every second.
 - The player has `isolation: isolate` (`player.css`) so its internal z-indexes (up to 41)
   do not compete with `z-navbar` (30) and `z-sticky` (20).
 - Browser automation cannot verify it: a hidden tab runs neither IO nor rAF.

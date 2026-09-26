@@ -2,6 +2,7 @@ package offer
 
 import (
 	"math"
+	"regexp"
 
 	"github.com/webtor-io/web-ui/helpers"
 )
@@ -45,6 +46,13 @@ func (h *Helper) SpeedUp(rateMbps int) int {
 	return speedUp(h.s.Promo(), rateMbps)
 }
 
+// SpeedUp is Helper.SpeedUp for Go code that already holds the offer it
+// quotes (the resource status, services/statusview), so its button and its
+// ETA read one snapshot of the catalog.
+func SpeedUp(o *Offer, rateMbps int) int {
+	return speedUp(o, rateMbps)
+}
+
 func speedUp(o *Offer, rateMbps int) int {
 	if o == nil || o.RateMbps <= 0 || rateMbps <= 0 {
 		return 0
@@ -56,12 +64,15 @@ func speedUp(o *Offer, rateMbps int) int {
 }
 
 // Pitch is the download nudge in numbers: this file at the user's cap and at
-// the promo plan's.
+// the promo plan's. ETA is the sentence (action.download.eta) in the
+// viewer's language, the one way both the nudge and the status's plan box
+// say it.
 type Pitch struct {
 	Size     string
 	Slow     string
 	Fast     string
 	FastRate int
+	ETA      string
 }
 
 // DownloadPitch prices a download in time, for any file whose size is known:
@@ -75,31 +86,56 @@ func (h *Helper) DownloadPitch(lang string, sizeBytes int64, rateMbps int) *Pitc
 	if o == nil {
 		return nil
 	}
-	return pitch(o, sizeBytes, rateMbps, func(sec float64) string { return h.duration(lang, sec) })
+	return pitch(o, sizeBytes, rateMbps, func(key string, data map[string]any) string { return h.tr(lang, key, data) })
 }
 
-func pitch(o *Offer, sizeBytes int64, rateMbps int, format func(float64) string) *Pitch {
+// PitchWith is DownloadPitch for Go code that already holds the offer: tr
+// renders the duration keys (offer.eta.*) in the viewer's language. nil for
+// a nil offer, and whenever DownloadPitch would be nil.
+func PitchWith(o *Offer, sizeBytes int64, rateMbps int, tr func(key string, data map[string]any) string) *Pitch {
+	if o == nil || tr == nil {
+		return nil
+	}
+	return pitch(o, sizeBytes, rateMbps, tr)
+}
+
+func pitch(o *Offer, sizeBytes int64, rateMbps int, tr func(key string, data map[string]any) string) *Pitch {
 	if sizeBytes <= 0 || rateMbps <= 0 || o.RateMbps <= rateMbps {
 		return nil
 	}
-	slow := transferSeconds(sizeBytes, rateMbps)
-	return &Pitch{
+	format := func(sec float64) string {
+		key, data := durationParts(sec)
+		return tr(key, data)
+	}
+	p := &Pitch{
 		Size:     helpers.Bytes(uint64(sizeBytes)),
-		Slow:     format(slow),
+		Slow:     format(transferSeconds(sizeBytes, rateMbps)),
 		Fast:     format(transferSeconds(sizeBytes, o.RateMbps)),
 		FastRate: o.RateMbps,
 	}
+	p.ETA = oneStop(tr("action.download.eta", map[string]any{"Size": p.Size, "Slow": p.Slow, "Fast": p.Fast}))
+	return p
 }
+
+// doubleStop is a sentence's full stop right after an abbreviation's
+// ("34 Min.." in German, "2 дн.." in Russian): the ETA sentence ends after
+// {{.Slow}}, and in de, pl and ru a duration can end in an abbreviated unit.
+// Not an ellipsis: the character before it is not a stop.
+var doubleStop = regexp.MustCompile(`([^.])\.\.(\s|$)`)
+
+// oneStop keeps one of the two stops, as those orthographies do.
+func oneStop(s string) string { return doubleStop.ReplaceAllString(s, "$1.$2") }
+
+// rateBits is how many bits a second one Mbps of a cap is: thp's limiter
+// reads the rate claim with bytefmt, whose "M" is 2^20 (5M = 5·2^20 bit/s,
+// the same megabit services/statusview labels speeds in). Pricing at 10^6
+// quoted every wait about 5% longer than the cap delivers.
+const rateBits = 1 << 20
 
 // transferSeconds is the best case at a cap: the swarm may deliver slower,
 // never faster, which is why the copy says "about".
 func transferSeconds(sizeBytes int64, rateMbps int) float64 {
-	return float64(sizeBytes) * 8 / (float64(rateMbps) * 1e6)
-}
-
-func (h *Helper) duration(lang string, sec float64) string {
-	key, data := durationParts(sec)
-	return h.tr(lang, key, data)
+	return float64(sizeBytes) * 8 / (float64(rateMbps) * rateBits)
 }
 
 // durationParts picks the two most significant units, rounded to the nearest

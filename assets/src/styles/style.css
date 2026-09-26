@@ -38,66 +38,862 @@ html {
   @apply bg-base-300/50 border border-w-line rounded-2xl p-4 sm:p-6 mb-6;
 }
 
-/* Status badge on the resource page. DaisyUI badges are one fixed-height
-   nowrap line, which "Caching 51% · 2.3 MB/s (4 seeders · 9 leechers)" does
-   not fit on a phone. The icon stays left, vertically centred; .badge-text
-   holds the label and the swarm line — stacked, left-aligned, on phones; one
-   row from sm like any other badge. */
-#torrent-status .badge {
-  height: auto;
-  min-height: 1.25rem;
-  line-height: 1.3;
-  text-align: left;
-  justify-content: flex-start;
-  @apply py-1;
-}
-#torrent-status .badge-text {
+/* ===== Transfer status (resource page): swarm ▸ cache ▸ you =====
+   Where the viewer's bytes come from and what caps them: the chain while
+   something moves (only who takes part), the old badge while nothing does,
+   the piece bar, then the hint or the plan box. One block, in the film card
+   and -- cloned -- in the sticky bar (views/resource/get.html,
+   partials/resource/status.html, app/resource/status.js). docs/
+   transfer_status.html renders every state with these classes; the design
+   as approved (2026-09-24, revised 2026-09-25) is transfer_status.approved
+   .html, and the living page has to keep rendering with them.
+
+   Chain or badge is the block's data-mode. Both sit in one grid cell
+   (.tx-head) and stay laid out; the one not shown is only invisible. The
+   row is therefore as tall as the chain in either mode -- the source node
+   is on every chain -- and switching never moves the card.
+
+   Stable DOM: the server renders every slot once and the script only moves
+   text, attributes and cell fills into them, so the one sweep per segment
+   runs on between status messages instead of restarting every second.
+
+   Colour means cause and rides on data-tone: flow (cyan, data flowing),
+   plan (pink, the plan's cap -- the only place a CTA appears), swarm and
+   pause (amber), vault (purple), off (grey, dashed); on nodes cached (green),
+   vault, err (no seeders), warn (Vault retrying).
+
+   The block is its own size container: the chain needs ~670px laid out in a
+   row in its longest language, so below that -- a phone, the card's column on a tablet, the sticky
+   bar on a phone -- the compact chain below takes over, whatever the
+   viewport. */
+.tx {
+  /* What the speed label masks the line with: the card's colour behind the
+     block (the sticky bar and the popover set their own). */
+  --tx-bg: #121827;
+  position: relative;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
 }
-@media (min-width: 640px) {
-  #torrent-status .badge-text {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.375rem;
+#torrent-status-sticky .tx {
+  --tx-bg: #0b0f1b;
+}
+/* The chain's row, shared with the badge: one grid cell for both. */
+.tx-head {
+  display: grid;
+  /* One track as wide as the block, not as the chain's content: an auto
+     track grew to a long chain and pushed it past the card. */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.tx-head > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+/* visibility, not display: the hidden one keeps the row's height, and is
+   neither focusable nor read out. */
+.tx[data-mode="badge"] .tx-chain,
+.tx:not([data-mode="badge"]) .tx-badge {
+  visibility: hidden;
+}
+/* The chain is the button that opens the details: a <button> of spans. */
+.tx-chain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+.tx-chain:focus-visible {
+  outline: 2px solid #00cec9;
+  outline-offset: 3px;
+}
+
+/* Nodes: a pill (icon, name, value) -- and, in the compact chain, the short
+   number in the pill and the caption under it. */
+.tx-node {
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  color: #cbd5e1;
+}
+/* The swarm's value is the chain's longest ("12 peers · 0 seeders") and the
+   one that grows with the swarm: where even the full chain's width is not
+   enough (four-digit peers), it gives way with an ellipsis rather than push
+   the viewer's node out of the row. */
+.tx-node[data-kind="swarm"] {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tx-node[data-kind="swarm"] .tx-pill {
+  max-width: 100%;
+}
+.tx-node[data-kind="swarm"] .tx-val {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: #111827;
+  white-space: nowrap;
+}
+.tx-ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.tx-nm {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+.tx-val:empty,
+.tx-short,
+.tx-cap {
+  display: none;
+}
+.tx-node[data-tone="cached"] .tx-pill,
+.tx-node[data-tone="cached"] .tx-nm {
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #4ade80;
+}
+.tx-node[data-tone="vault"] .tx-pill {
+  border-color: rgba(162, 155, 254, 0.45);
+  color: #a29bfe;
+}
+.tx-node[data-tone="vault"] .tx-nm {
+  color: #c4bfff;
+}
+.tx-node[data-tone="err"] .tx-pill {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #f87171;
+}
+.tx-node[data-tone="warn"] .tx-pill {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fbbf24;
+}
+.tx-node[data-dim] {
+  opacity: 0.5;
+}
+
+/* The badge: the one the page had before the chain (git 5d55b26e), one
+   element; its colours are the old badge's utility classes, per tone
+   ("checking" now cyan, "In Vault" purple, the muted tone lighter and
+   outlined: the approved design). Its size is the approved pill's too,
+   2 + 18 + 2 px and the border: 24px, as tall as a chain node -- DaisyUI's
+   badge-sm pinned it to 20px. */
+.tx-badge {
+  align-self: center;
+  justify-self: start;
+  max-width: 100%;
+  height: auto;
+  line-height: 18px;
+}
+.tx-badge:focus {
+  outline: none;
+}
+.tx-badge:focus-visible {
+  outline: 2px solid #00cec9;
+  outline-offset: 2px;
+}
+.tx-badge .badge-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tx-bi {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.tx-bdots,
+.tx-badge[data-icon="dots"] .tx-bi {
+  display: none;
+}
+.tx-badge[data-icon="dots"] .tx-bdots {
+  display: inline-block;
+}
+.tx-badge[data-pulse] .tx-bi {
+  @apply animate-pulse;
+}
+.tx-bx:empty {
+  display: none;
+}
+.tx-badge[data-tone="muted"] {
+  background-color: rgba(17, 24, 39, 0.5);
+  border-color: rgba(51, 65, 85, 0.35);
+  @apply text-w-sub;
+}
+.tx-badge[data-tone="cyan"] {
+  @apply bg-w-cyan/10 border-w-cyan/30 text-w-cyan;
+}
+.tx-badge[data-tone="warn"] {
+  @apply bg-warning/10 border-warning/30 text-warning;
+}
+.tx-badge[data-tone="err"] {
+  @apply bg-error/10 border-error/30 text-error;
+}
+.tx-badge[data-tone="ok"] {
+  @apply bg-green-500/10 border-green-500/30 text-green-400;
+}
+.tx-badge[data-tone="vault"] {
+  @apply bg-w-purple/10 border-w-purple/30 text-w-purpleL;
+}
+/* Not a transfer state: the Vault page's own "Expiring" (a pledge that lost
+   its backing), drawn with the same element in the pink it always had -- the
+   dashboard's Expiring count is pink too. statusview never sends it. */
+.tx-badge[data-tone="pink"] {
+  @apply bg-w-pink/10 border-w-pink/30 text-w-pinkL;
+}
+
+/* Segments: the arrow towards the viewer, the speed on the line. */
+.tx-seg {
+  --c: 0, 206, 201;
+  flex: 1 1 0;
+  min-width: 96px;
+  display: flex;
+  align-items: center;
+  color: #00cec9;
+}
+.tx-seg[data-tone="plan"] {
+  --c: 253, 121, 168;
+  color: #fd79a8;
+}
+.tx-seg[data-tone="swarm"],
+.tx-seg[data-tone="pause"] {
+  --c: 251, 191, 36;
+  color: #fbbf24;
+}
+.tx-seg[data-tone="vault"] {
+  --c: 162, 155, 254;
+  color: #a29bfe;
+}
+.tx-seg[data-tone="off"] {
+  --c: 100, 116, 139;
+  color: #94a3b8;
+}
+.tx-trk {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 0;
+}
+.tx-ln {
+  position: absolute;
+  left: 0;
+  right: 3px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background-color: rgba(var(--c), 0.25);
+}
+.tx-seg[data-tone="off"] .tx-ln {
+  background: repeating-linear-gradient(90deg, rgba(100, 116, 139, 0.6) 0 3px, rgba(100, 116, 139, 0) 3px 7px);
+}
+.tx-seg[data-tone="pause"] .tx-ln {
+  background: repeating-linear-gradient(90deg, rgba(251, 191, 36, 0.45) 0 3px, rgba(251, 191, 36, 0) 3px 7px);
+}
+.tx-sp {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25em;
+  min-width: 9ch;
+  padding: 0 6px;
+  background: var(--tx-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tx-seg[data-tone="off"] .tx-sp {
+  font-weight: 500;
+}
+.tx-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: normal;
+  font-weight: 500;
+  opacity: 0.85;
+}
+/* A label never wider than its line: where the column is too narrow for
+   the whole chain (the card's ~690px column and "0 Mbps · needed pieces
+   missing" twice) the note gives way with an ellipsis -- the speed stays,
+   and the compact chain drops the notes altogether anyway. */
+.tx-sp {
+  max-width: 100%;
+  overflow: hidden;
+}
+.tx-spd {
+  flex: none;
+}
+.tx-note:empty,
+.tx-spd:empty {
+  display: none;
+}
+/* 12px on a 12-unit grid with whole-pixel bars: at 11px from a 24-unit
+   grid the two bars landed on different sub-pixel phases and one read
+   blurred, the glyph crooked. */
+.tx-pz {
+  display: none;
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+.tx-seg[data-tone="pause"] .tx-pz {
+  display: block;
+}
+.tx-dots {
+  display: none;
+  align-items: center;
+  gap: 3px;
+}
+.tx-seg[data-dots] .tx-dots {
+  display: inline-flex;
+}
+.tx-seg[data-dots] .tx-spd,
+.tx-seg[data-dots] .tx-note {
+  display: none;
+}
+.tx-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: tx-dot 1.2s ease-in-out infinite;
+}
+.tx-dots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.tx-dots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.tx-hd {
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 8px;
+  height: 10px;
+  margin-top: -5px;
+}
+.tx-seg[data-tone="off"] .tx-hd {
+  opacity: 0.5;
+}
+/* Motion: one sweep per flowing segment -- a 30%-wide gradient crossing the
+   line in 1.8 s -- and the label and the arrowhead brightening a little as
+   it passes under them (50% and ~90% of the same cycle). No glow. */
+.tx-seg[data-moving] .tx-ln {
+  background-image: linear-gradient(90deg, rgba(var(--c), 0), rgb(var(--c)), rgba(var(--c), 0));
+  background-size: 30% 100%;
+  background-repeat: no-repeat;
+  animation: tx-sweep 1.8s linear infinite;
+}
+.tx-seg[data-moving] .tx-sp {
+  animation: tx-lit 1.8s linear infinite;
+}
+.tx-seg[data-moving] .tx-hd {
+  animation: tx-head 1.8s linear infinite;
+}
+@keyframes tx-sweep {
+  from {
+    background-position: -43% 0;
+  }
+  to {
+    background-position: 143% 0;
+  }
+}
+@keyframes tx-lit {
+  0%,
+  30% {
+    filter: none;
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+  70%,
+  100% {
+    filter: none;
+  }
+}
+@keyframes tx-head {
+  0%,
+  78% {
+    filter: none;
+  }
+  90% {
+    filter: brightness(1.18);
+  }
+  100% {
+    filter: none;
+  }
+}
+@keyframes tx-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
-/* Piece bar (resource page, under the status badge): a grid of cells, one per
-   bucket of torrent pieces. Colour comes from the container's text colour so
-   the bar follows the badge palette; --fill (0..1) on each cell is how much of
-   the bucket the seeder holds; .is-active pulses for cells being fetched. */
-.piece-bar-slot {
-  height: 6px;
+/* Piece bar: one cell per bucket of pieces; --fill (0..1) is how much of the
+   bucket the seeder holds, .a pulses for the ones being fetched. The slot is
+   always 6px, so the block never jumps between the bar and the divider. */
+.tx-bar {
   display: flex;
   align-items: center;
+  height: 6px;
+  color: #00cec9;
 }
-.piece-bar-slot > .piece-bar {
-  width: 100%;
+.tx-bar[data-tone="vault"] {
+  color: #a29bfe;
 }
-.piece-bar-divider {
-  width: 100%;
-  height: 1px;
-  @apply bg-w-line/50;
-}
-.piece-bar {
-  display: grid;
+.tx-pbar {
+  display: none;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
   height: 6px;
-  border-radius: 3px;
   overflow: hidden;
+  border-radius: 3px;
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
-.piece-bar > span {
+.tx-bar[data-mode="pieces"] .tx-pbar {
+  display: grid;
+}
+.tx-bar[data-mode="pieces"] .tx-pdiv {
+  display: none;
+}
+.tx-pbar > span {
   background: currentColor;
   opacity: var(--fill, 0);
 }
-.piece-bar > span.is-active {
+.tx-pbar > span.a {
   opacity: 0.45;
-  @apply animate-pulse;
+  animation: tx-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+/* Cells holding a piece nobody connected has: the red-tinted 135° hatch,
+   and whatever of a cell is complete here drawn over it (the seeder merges
+   its runs past 512, so a hatched run may cover complete pieces). The hatch
+   is one layer under the cells, as wide as the bar, shown only where the
+   missing cells are (--tx-holes, a mask lib/transferStatus.js paintBar
+   builds from them; data-holes while there are any). Painted per cell, the
+   stripes started over in every cell and met only where a cell happened to
+   be one stripe period wide -- the docs' 128 cells at 690px; the page's 256
+   read as a row of blocks with no diagonal in it, and a gradient shifted
+   per cell still broke at every cell edge, each snapped to its own pixel. */
+.tx-pbar::before {
+  content: "";
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: repeating-linear-gradient(135deg, rgba(248, 113, 113, 0.7) 0 2px, rgba(248, 113, 113, 0.15) 2px 4px);
+  -webkit-mask-image: var(--tx-holes);
+  mask-image: var(--tx-holes);
+}
+.tx-pbar[data-holes]::before {
+  display: block;
+}
+.tx-pbar > span.m {
+  animation: none;
+}
+@keyframes tx-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.12;
+  }
+}
+.tx-pdiv {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* The line under the bar. Pinkish when it is the plan's cap said without a
+   button (nothing faster on sale, or another offer already on screen). The
+   Vault link follows the words where pieces nobody has are the story. */
+.tx-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: #94a3b8;
+}
+.tx-hint[data-tone="plan"] {
+  color: #fbcfe8;
+}
+/* The link wraps: "Save to Vault — it finishes the download on its own" is
+   340px in English, wider than the block on most phones (viewport - 58px),
+   where nowrap had the card's edge cut it mid-word. */
+.tx-vlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #a29bfe;
+  font-weight: 600;
+  text-decoration: none;
+}
+.tx-vlink:hover {
+  color: #c4bfff;
+}
+.tx-vlink svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+/* Plan box: bolt, title and ETA on the left; the button with the trial note
+   under it on the right (action/download_file.html's pattern). */
+.tx-pbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(26, 34, 53, 0.35);
+}
+.tx-pl {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 240px;
+}
+.tx-bolt {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  color: #fd79a8;
+}
+.tx-pt {
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+.tx-ps {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 17px;
+  color: #94a3b8;
+}
+.tx-ps:empty,
+.tx-pn:empty {
+  display: none;
+}
+.tx-pr {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.tx-sbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(232, 67, 147, 0.28);
+  border-radius: 8px;
+  background: rgba(232, 67, 147, 0.14);
+  color: #fd79a8;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tx-sbtn:hover {
+  background: rgba(232, 67, 147, 0.22);
+  color: #fd79a8;
+}
+.tx-sbtn svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.tx-pn {
+  font-size: 11px;
+  line-height: 13px;
+  color: #64748b;
+  text-align: center;
+}
+
+/* "Where the bottleneck is": a popover (top layer -- the card's
+   overflow:hidden would cut it) placed under the chain by the script; without
+   a script the browser centres it. */
+.tx-details {
+  width: min(520px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 18px 20px;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: #111827;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  color: #f1f5f9;
+  text-align: left;
+}
+/* The browser centres a popover with margin:auto; preflight's margin:0 would
+   pin it to the top-left corner. The script replaces both when it places it. */
+.tx-details[popover] {
+  margin: auto;
+}
+.tx-dh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+.tx-dt {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.tx-dx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.tx-dx:hover {
+  color: #f1f5f9;
+}
+.tx-dx svg {
+  width: 16px;
+  height: 16px;
+}
+.tx-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid #1a2235;
+}
+.tx-rl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tx-rlabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+.tx-rsub {
+  font-size: 12px;
+  color: #64748b;
+}
+.tx-rsub:empty {
+  display: none;
+}
+.tx-rv {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tx-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(232, 67, 147, 0.16);
+  color: #fd79a8;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tx-dplan {
+  padding-top: 14px;
+  border-top: 1px solid #1a2235;
+}
+.tx-dplan .tx-pr {
+  width: 100%;
+}
+.tx-dplan .tx-sbtn {
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}
+/* A browser without the Popover API: in flow under the chain, opened by the
+   script with .is-open (it is cut by the card's edge there, but usable). */
+@supports not selector(:popover-open) {
+  .tx-details,
+  .tx-details[popover] {
+    display: none;
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 30;
+    margin: 0;
+  }
+  .tx-details.is-open {
+    display: block;
+  }
+}
+
+/* The compact chain: the number in the pill and the caption under it, the
+   speed above its line, no note; the plan box's button full width, 44px.
+   670px: the longest full chain -- "missing" with three-digit peers, in
+   German, Spanish or Portuguese -- needs 665 (a width sweep of every chain
+   state in all 11 languages, 2026-09-25); at the old 600 it ran up to 64px
+   past its row, the viewer's node cut off by the card or past the sticky
+   bar's edge. */
+@container (max-width: 669px) {
+  .tx-chain {
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .tx-node {
+    gap: 2px;
+    font-size: 11px;
+    line-height: 14px;
+    color: #94a3b8;
+  }
+  /* As tall with a number as with the icon alone ("in cache", Vault): the
+     row's height is the chain's in either mode, whatever node it has. */
+  .tx-pill {
+    gap: 4px;
+    min-height: 22px;
+    padding: 3px 7px;
+    color: #cbd5e1;
+    font-weight: 600;
+  }
+  .tx-ic {
+    width: 13px;
+    height: 13px;
+  }
+  .tx-nm,
+  .tx-val,
+  .tx-note {
+    display: none;
+  }
+  .tx-short:not(:empty) {
+    display: inline;
+  }
+  .tx-cap {
+    display: block;
+  }
+  .tx-seg {
+    min-width: 0;
+  }
+  .tx-trk {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    height: auto;
+    padding-bottom: 12px;
+  }
+  .tx-ln {
+    top: auto;
+    bottom: 4px;
+    margin-top: 0;
+  }
+  .tx-hd {
+    top: auto;
+    bottom: 0;
+    margin-top: 0;
+  }
+  .tx-sp {
+    min-width: 0;
+    padding: 0;
+    background: none;
+    font-size: 11px;
+  }
+  .tx-pl {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  .tx-pr {
+    width: 100%;
+  }
+  .tx-sbtn {
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* No sweep: the line is simply filled. Nothing pulses. */
+  .tx-seg[data-moving] .tx-ln {
+    animation: none;
+    background-image: none;
+    background-color: rgba(var(--c), 0.6);
+  }
+  .tx-seg[data-moving] .tx-sp,
+  .tx-seg[data-moving] .tx-hd {
+    animation: none;
+  }
+  .tx-dots i {
+    animation: none;
+    opacity: 0.6;
+  }
+  .tx-pbar > span.a,
+  .tx-badge[data-pulse] .tx-bi {
+    animation: none;
+  }
+  /* DaisyUI's loading dots move by SMIL inside a mask, out of reach of
+     `animation`: "checking" shows its three dots still instead. */
+  .tx-badge[data-icon="dots"] .tx-bdots {
+    display: none;
+  }
+  .tx-badge[data-icon="dots"] .tx-bi {
+    display: inline-block;
+  }
 }
 
 .w-card-frame {

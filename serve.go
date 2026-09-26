@@ -506,7 +506,7 @@ func serve(c *cli.Context) error {
 	trial.RegisterHandler(r, offers)
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers)
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm, pg)

@@ -41,13 +41,13 @@ func isFreeTier(c *web.Context) bool {
 //
 // Must be called BEFORE Api.ExportResourceContent so the rules ride along
 // inside that request's X-Token header.
+//
+// The grace token carries the primary's sessionID and domain
+// (api.NewGraceClaims): thp limits grace segments per session and counts
+// them in the viewer's /session-stats. Needs thp with the (session, rate)
+// limiter key and grace-aware stats first (docs/grace_token.md "Session").
 func (s *ActionScript) applyGraceRules(sc *StreamContent, hash string, c *web.Context) {
-	graceTok, err := s.api.SignClaims(api.GraceClaims{
-		Rate: s.grace.Rate,
-		Role: "grace",
-		Hash: hash,
-		Kind: "grace",
-	})
+	graceTok, err := s.api.SignClaims(api.NewGraceClaims(c.ApiClaims, hash, s.grace.Rate))
 	if err != nil {
 		log.WithError(err).Warn("failed to sign grace token")
 		return

@@ -54,7 +54,23 @@ waiting single that turns out not to be half of a double is delivered late, not 
 
 space / `k` play-pause · ←/→ ∓15 s · ↑/↓ volume · `f` fullscreen · `m` mute · `<`/`>` speed ·
 `g`/`h` subtitles earlier/later. Speed and delay keys answer with a toast (`.wt-player-toast`) —
-they have no other face.
+they have no other face. While the grace popup is up, Play (space/`k`, the big button, a click
+on the picture, the headset) is its answer "continue" — below.
+
+## The grace popup holds the film — `grace-hold.js`
+
+The free grace window's popup (`#grace-cta`, docs/grace_token.md) stops the film when it comes up
+and the answer resumes it — only if the popup was what stopped it (owner, 2026-09-26). The hold
+pauses a playing element and pauses back anything that starts it behind the popup (on the `play`
+event: the element's `autoplay`, re-armed by a seek's reload; the subtitle catch-up; the embed's
+`player_play`); a session seek asks it before starting its new run (`holdPlayback`), loads the run
+without playing it and lets go at `canplay`. "Continue"
+and the close resume held playback; a film the viewer had paused, or a seek that landed paused,
+stays paused. Play while the popup is up answers "continue" and plays whoever paused (`via: play`
+in `grace-soft-cta-click`) — not a dead key. The trial link resumes nothing. Next, a teardown or the
+next file drop the hold without resuming. While it holds playback the element carries
+`data-grace-cta-hold`, and the resource page's transfer status reads the player as playing, not
+as a viewer's pause (`lib/playerActivity.js`).
 
 ## Loading spinner — `stall-watch.js`
 
@@ -72,6 +88,62 @@ double tap). `usePlayerState` samples the element every animation frame:
   and stands. Without one (audio, old browsers): the clock advancing on every sample for
   `RECOVER_MS` (250 ms).
 - While the watchdog says "stalled", `canplay` / `playing` do not take the spinner down.
+
+## Loader restart on a stall — `loader-restart.js`
+
+hls.js reports a stall once (the non-fatal `bufferStalledError`, its gap-controller). The player
+used to answer every report with `setTimeout(() => hls.startLoad(), 5000)` — and
+`StreamController.startLoad()` calls `stopLoad()` first, which **aborts the fragment in flight**
+and drops it from the fragment tracker. At the plan's cap a stall is exactly the moment the needed
+segment is still arriving, so every stall threw it away 5 s in and fetched it again from byte 0.
+Recorded in Chrome 154 at 5M (2026-09-25/26): 48 aborts after one seek; the owner's session had 37
+of 59 video segments requested 2–9 times and played at ~0.43× real time where the cap alone
+allows ~0.56×; one run skipped the aborted segment for good, left a 4 s hole in the video buffer and
+froze for the remaining 215 s.
+
+Nobody recorded why the restart was there: it came with the mediaelement.js player (f65afdea,
+2024-03-31, next to a commented-out `recoverMediaError()`, hls.js 1.5.6 from a CDN with default
+retries) and was carried into the Preact player (9f80e0ba). A `startLoad()` can only fix a loader
+that is not loading what the playhead needs — stopped, or left in `ERROR` by a fatal error — so
+that is all it is kept for. The restart now needs **5 s straight** (`RESTART_AFTER_MS`, checked
+every second) of:
+
+- the element starving: playing, not seeking, `readyState` below `HAVE_FUTURE_DATA`;
+- **nothing in flight** in any stream controller (`hls.inFlightFragments`: main, alternate audio,
+  subtitles) — hls.js's own reading (gap-controller `inFlight()`): a fragment in any state but
+  `IDLE`/`STOPPED`/`ENDED`/`ERROR`, which counts a scheduled retry;
+- the buffered ranges unchanged.
+
+With nothing in flight `stopLoad()` has nothing to abort.
+
+**A request that stopped receiving bytes** is in flight but not arriving: headers in, then no byte
+(a dead path, a response stuck upstream). hls.js cuts a request without headers at 10 s (its TTFB),
+but after the headers only its 120 s load timeout is left (xhr-loader re-arms it at the headers;
+progress never does). Reproduced in Chrome 154: a segment hung at 30% of its body froze the picture
+for 106–108 s, where the old 5 s `startLoad()` had it playing in 5. So a fragment in
+`FRAG_LOADING` **past its headers** (`frag.stats.loading.first > 0`) counts as arriving only while
+`frag.stats.loaded` grows — `frag.stats` is the loader's live `LoadStats`
+(`fragment-loader.ts`: `frag.stats = loader.stats`; a retry is a new loader, new stats). With every
+in-flight load in that state and **not one byte for 10 s** (`NO_BYTES_MS`) — still starving, the
+buffer unchanged — the loader is restarted, which aborts the dead request and asks again. Before
+its headers a load stays hls.js's (its TTFB fires first). 10 s is hls.js's own "no byte yet" bound,
+and 33× the longest gap measured at the cap: Chrome at 5M against prod thp, an over-cap 1080p file
+with a session seek, HTTP/2 — 4085 gaps between body chunks, p99 0.22 s, max 0.30 s; every segment
+after the seek requested once, no restart at 9 stall reports. A/B on a local server (Chrome 154,
+same hls.js): hung at 30% after headers — old hack 5.0 s frozen, nothing-in-flight rule alone 106 s,
+this rule 10.1 s; body in 5 chunks 7 s apart — the old hack aborted it mid-body, this rule let it
+finish (1 request); no headers for 30 s — left to hls.js's TTFB (7.8 s frozen, the old hack 5.1 s).
+
+Everything else is hls.js's: a fragment that errors or times out is retried by its load policy
+(`fragLoadingMaxRetry` in `HLS_CONFIG`, TTFB 10 s, 120 s a load), playlists likewise, holes and
+nudges by the gap-controller; the fatal handler restarts loading after a network error, and after a
+media error hls.js 1.6's `recoverMediaError()` restarts it at the playhead itself (1.5.6's did not).
+Disarmed by `STALL_RESOLVED`, a pause, the end, `MANIFEST_LOADING` (a session seek's reload),
+detaching and destroying.
+
+Not covered: on HTTP/2 (the stream host negotiates h2) a re-request shares the connection, so a
+hang of the browser↔edge connection itself is not cured by asking again — only hangs further
+upstream are; how often requests hang in production is not measured.
 
 ## Subtitle delay — `cue-offset.js`, `player-prefs.js`
 

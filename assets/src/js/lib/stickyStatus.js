@@ -6,11 +6,12 @@
 // bar, and both live in the page header: scroll down to the files and they are
 // gone. 59% of streaming sessions pressed Watch more than once.
 //
-// So when the real status leaves the viewport and a transfer is moving, a
+// So when the real status leaves the viewport and something is moving, a
 // mirror of it appears under the navbar, full width. It carries no state of
-// its own: the badge and the bar are painted into it by the status view's own
-// SSE (resource/status.js paints every [data-status-badge-for] and
-// [data-piece-bar-for]), and this module only decides when it is on screen.
+// its own: it is a copy of the card's status block, updated by the status
+// view's own SSE (resource/status.js clones the block into
+// [data-status-mirror-for] and writes every message into both), and this
+// module only decides when it is on screen.
 //
 // Two conditions, both required:
 //   - the real status is out of view (IntersectionObserver, not a scroll
@@ -19,8 +20,10 @@
 //     with browser automation: a hidden tab runs neither IntersectionObserver
 //     nor requestAnimationFrame, so the bar never appears there and the tab's
 //     silence proves nothing;
-//   - the transfer is moving (`caching`, `vaulting`, …) -- a finished or idle
-//     torrent has nothing to report and the bar would be furniture.
+//   - something is moving (the `moving` of the torrent-status event, the
+//     view's `sticky`): bytes from the swarm, bytes to the viewer, or the
+//     plan's cap binding -- a finished or idle torrent that nobody is
+//     receiving has nothing to report, and the bar would be furniture.
 
 // The navbar the mirror sits under (`top-[72px]` in the markup); the same
 // number shrinks the observer's root so the status counts as gone when it
@@ -61,9 +64,18 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs =
             // frame slides from nowhere.
             requestAnimationFrame(() => { if (shown) bar.classList.remove('-translate-y-full'); });
         } else {
+            // Its details popover sits in the top layer, anchored to a chain
+            // that is leaving: closed with it, or it would stay open,
+            // unanchored, and come back open with the bar.
+            const Ev = bar.ownerDocument.defaultView.CustomEvent;
+            for (const d of bar.querySelectorAll('[data-tx-details]')) d.dispatchEvent(new Ev('tx-close'));
             bar.classList.add('-translate-y-full');
             hideTimer = setTimeout(() => { hideTimer = null; if (!shown) bar.hidden = true; }, slideMs);
         }
+    };
+    const setMoving = (now) => {
+        moving = now;
+        bar.toggleAttribute('data-moving', now);
     };
 
     const io = new IntersectionObserver((entries) => {
@@ -101,12 +113,12 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs =
         const now = !!e.detail.moving;
         if (now || !HOLD.has(e.detail.state)) {
             if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-            moving = now;
+            setMoving(now);
             apply();
             return;
         }
         if (!moving || stopTimer) return;
-        stopTimer = setTimeout(() => { stopTimer = null; moving = false; apply(); }, holdMs);
+        stopTimer = setTimeout(() => { stopTimer = null; setMoving(false); apply(); }, holdMs);
     };
     document.addEventListener('torrent-status', onStatus);
 
@@ -131,4 +143,19 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs =
         document.removeEventListener('torrent-status', onStatus);
         window.removeEventListener('async', onSwap);
     };
+}
+
+// stickyBottom is where what is fixed at the top of the page ends once the
+// status block has scrolled away: the navbar, and under it the sticky status
+// whenever something moves -- it will be up by the time a scroll lands. The
+// bar mirrors the whole block (plan box included), so its height is measured,
+// not assumed: unhidden and hidden again in the same task, nothing painted.
+export function stickyBottom(root = document) {
+    const bar = root.querySelector('#torrent-status-sticky');
+    if (!bar || !bar.hasAttribute('data-moving')) return NAVBAR_H;
+    const was = bar.hidden;
+    bar.hidden = false;
+    const h = bar.offsetHeight;
+    bar.hidden = was;
+    return NAVBAR_H + h;
 }

@@ -5,6 +5,7 @@ import { useHls } from './hooks/useHls';
 import { useWatchHistory } from './hooks/useWatchHistory';
 import { useSubtitleTranslation } from './hooks/useSubtitleTranslation';
 import { createSessionSeeker } from './session-seek';
+import { createGraceHold } from './grace-hold';
 import { Hls } from './hls-manager';
 import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } from './cue-offset';
 import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, savePrefs } from './player-prefs';
@@ -98,6 +99,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const isSession = !!sessionId;
     const graceDurationSec = videoEl.dataset.graceDurationSec ? parseInt(videoEl.dataset.graceDurationSec, 10) : 0;
     const graceShownRef = useRef(false);
+    // The grace popup holds the film until the viewer answers it
+    // (grace-hold.js), and the answer while it is up -- the popup's own
+    // buttons or Play (togglePlay) -- goes through graceAnswerRef.
+    const graceHoldRef = useRef(null);
+    if (!graceHoldRef.current) graceHoldRef.current = createGraceHold(videoEl);
+    const graceAnswerRef = useRef(null);
+    useEffect(() => () => graceHoldRef.current.dispose(), []);
     // streamStarted is tracked via a ref, not state — the value is only
     // read to gate the one-shot Umami event below, never to drive UI, so
     // a re-render on transition would be pure overhead.
@@ -198,7 +206,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const seekOffsetRef = useRef(0);
     seekOffsetRef.current = seekOffset;
     // And onto the element, for the code outside this component that needs
-    // movie time (activateSubtitle's first request for a translation).
+    // movie time (activateSubtitle's first request for a translation, the
+    // transfer status's grace window: lib/playerActivity.js inGrace).
     if (videoEl) videoEl.dataset.runOffset = String(seekOffset);
     // The keyboard handler is declared before the toggle wrapper it must
     // call (see togglePlay below), so it goes through this.
@@ -462,12 +471,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     onSeekOffsetChange: (offset) => {
                         setSeekOffset(offset);
                         // Now, not on the next render: the kick below polls
-                        // with it, and the answer is judged against it.
+                        // with it, and the answer is judged against it --
+                        // and the element's copy is read by code outside
+                        // this component (the transfer status's grace window,
+                        // lib/playerActivity.js inGrace) on the source
+                        // restart's own events, before any render.
                         seekOffsetRef.current = offset;
+                        videoEl.dataset.runOffset = String(offset);
                         kickTranslationPoll();
                     },
                     onSeekingChange: onSessionSeekingChange,
                     trackContainer,
+                    // The grace popup up: the new run is loaded, not played,
+                    // until the viewer answers it (grace-hold.js).
+                    holdPlayback: () => graceHoldRef.current.holds(),
                 });
             }
             if (sessionSeekerRef.current) {
@@ -572,21 +589,51 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // search globally. CTA is a per-page singleton (one player per action page).
     // If the user is in fullscreen, exit first — the CTA lives outside the
     // fullscreen element and would be invisible otherwise.
+    // The film stops while the popup is up (owner, 2026-09-26) and goes on
+    // with the answer -- only if it was the popup that stopped it
+    // (grace-hold.js). A session seek past the window puts the popup up as
+    // it starts (the timeline shows the target at once): the seek has paused
+    // the film itself, and its new run is loaded, not played, until the
+    // answer (session-seek.js holdPlayback).
     useEffect(() => {
         if (!graceDurationSec || graceShownRef.current) return;
         if (state.currentTime < graceDurationSec) return;
         const el = document.querySelector('#grace-cta');
         if (!el) return;
         graceShownRef.current = true;
+        // Up from here on (closed later or not): the transfer status has
+        // counted it as on its way since the element crossed the window
+        // (lib/playerActivity.js graceOfferDue) and now reads the popup
+        // itself.
+        videoEl.dataset.graceCtaShown = '';
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(() => {});
         }
+        const hold = graceHoldRef.current;
+        hold.start();
         el.classList.remove('hidden');
-        if (window.umami) window.umami.track('grace-soft-cta-shown');
-        const hide = (action) => {
+        // `paused`: the popup stopped a playing film. A seek's run held
+        // behind it is known only at the answer (its `paused` below).
+        if (window.umami) window.umami.track('grace-soft-cta-shown', { paused: hold.held() });
+        // `via`: the popup's own button, or Play (the key, the big button,
+        // a click on the picture, the headset) -- the answer "continue".
+        const hide = (action, via = 'button') => {
+            if (graceAnswerRef.current !== hide) return;
+            graceAnswerRef.current = null;
+            // The viewer's answer, on the element: they have just been told
+            // of the cap, so the transfer status sells the way out again
+            // only once they hit it -- this player's first real stall
+            // (lib/playerActivity.js offerAnswered), not the moment the
+            // popup closes. On the element, so the next file, a reload or
+            // another grace window starts without it. Before the film goes
+            // on: its first events are read against it.
+            videoEl.dataset.graceCtaAnswered = action;
             el.classList.add('hidden');
-            if (window.umami) window.umami.track('grace-soft-cta-click', { action });
+            const paused = hold.held();
+            hold.release({ play: via === 'play' });
+            if (window.umami) window.umami.track('grace-soft-cta-click', { action, via, paused });
         };
+        graceAnswerRef.current = hide;
         const closeBtn = el.querySelector('.grace-cta-close');
         if (closeBtn) closeBtn.addEventListener('click', () => hide('dismiss'), { once: true });
         const contBtn = el.querySelector('.grace-cta-continue');
@@ -892,6 +939,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // Leaving for the next file: the film was paused on purpose
         // (goNext), and a stray space or tap must not start it again.
         if (nextLoadingRef.current) return;
+        // The grace popup is up and holds the film: Play is the answer
+        // "continue", and plays -- whoever paused it. Not a dead key: a
+        // Play that does nothing reads as a broken player, and pressing it
+        // says what "Continue at N Mbps" says.
+        if (graceHoldRef.current.isActive() && graceAnswerRef.current) {
+            graceAnswerRef.current('continue', 'play');
+            return;
+        }
         if (cancelPreHold()) return;
         state.togglePlay();
     }, [cancelPreHold, state.togglePlay]);
@@ -1059,6 +1114,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // The pause also saves that position (useWatchHistory).
         const video = videoRef.current;
         if (video && !video.paused) video.pause();
+        // The grace popup's hold goes too: its answer, given while the next
+        // file loads, must not start this one again.
+        graceHoldRef.current.dispose();
         nextGoRef.current.go(how);
     }, []);
     // Any sign of a viewer ends the "is anyone there" streak.

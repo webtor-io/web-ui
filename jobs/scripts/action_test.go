@@ -39,32 +39,27 @@ func TestParseRateLimit(t *testing.T) {
 	}
 }
 
-func TestIsRateLimited(t *testing.T) {
-	// cap=10Mbit/s => 1_250_000 B/s
-	cap := int64(10_000_000)
-	if !isRateLimited(1_200_000, cap) {
-		t.Error("1.2MB/s against 10Mbit/s cap should count as rate-limited (≥90%)")
-	}
-	if isRateLimited(1_000_000, cap) {
-		t.Error("1.0MB/s (80% of cap) should not count as rate-limited")
-	}
-}
-
-func TestBuildSlowDownloadData_RateLimited(t *testing.T) {
+// The warm-up measures the swarm (what the seeder fetched from its peers), not
+// the viewer's link: a swarm at the plan's cap that still falls short of the
+// file is the swarm's shortfall, and a faster plan would not fix it -- the
+// modal says so and sells nothing (owner, 2026-09-26). Before, a swarm within
+// 90% of the cap read as "rate-limited" and got the trial button.
+func TestBuildSlowDownloadData_SwarmAtTheCapIsNotTheCap(t *testing.T) {
 	c := ctxWith("10M", "free")
-	// measured speed = 1.2 MB/s ≈ 9.6 Mbit/s (saturates 10Mbit cap)
-	sdd := buildSlowDownloadData(c, 1_200_000, 8_000_000)
-	if !sdd.IsRateLimited {
-		t.Fatal("expected IsRateLimited=true")
+	// The swarm gave 1.2 MB/s ≈ 9.6 Mbit/s: 96% of the 10 Mbit/s cap, and
+	// short of a 12 Mbit/s file.
+	sdd := buildSlowDownloadData(c, 1_200_000, 12_000_000)
+	if sdd.IsRateLimited {
+		t.Fatal("a swarm at the cap is still the swarm: IsRateLimited must be false")
 	}
-	if !almostEqual(sdd.RateLimitMbps, 10) {
-		t.Errorf("RateLimitMbps = %v, want 10", sdd.RateLimitMbps)
+	if sdd.RateLimitMbps != 0 {
+		t.Errorf("RateLimitMbps = %v, want 0 (the cap is not what this modal speaks of)", sdd.RateLimitMbps)
 	}
 	if !almostEqual(sdd.MeasuredSpeedMbps, 9.6) {
 		t.Errorf("MeasuredSpeedMbps = %v, want 9.6", sdd.MeasuredSpeedMbps)
 	}
-	if !almostEqual(sdd.RequiredSpeedMbps, 8) {
-		t.Errorf("RequiredSpeedMbps = %v, want 8 (= bitrate)", sdd.RequiredSpeedMbps)
+	if !almostEqual(sdd.RequiredSpeedMbps, 12) {
+		t.Errorf("RequiredSpeedMbps = %v, want 12 (= bitrate)", sdd.RequiredSpeedMbps)
 	}
 	if sdd.TierName != "free" {
 		t.Errorf("TierName = %q, want free", sdd.TierName)

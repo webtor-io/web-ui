@@ -2,7 +2,9 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -116,12 +118,18 @@ func TestResolveStatus_Vaulted_API(t *testing.T) {
 func TestResolveStatus_VaultFailed(t *testing.T) {
 	db := &vaultModels.Resource{Funded: true, Vaulted: false}
 	apiRes := &vault.Resource{Status: vault.StatusFailed}
-	apiRes.Error = "seeder pod unreachable"
+	apiRes.Error = "unexpected status 502 downloading url=http://thp.internal:8080/abc?token=T&api-key=K"
 	status := resolveStatus(db, apiRes, nil)
-	// Funded, last transfer attempt failed: say so (the system retries), and
-	// carry the API's reason for the tooltip. This used to hide as "vaulting".
-	if status.State != "vault_failed" || status.Detail != "seeder pod unreachable" {
-		t.Errorf("expected vault_failed with detail, got %+v", status)
+	// Funded, last transfer attempt failed: say so (the system retries). This
+	// used to hide as "vaulting".
+	if status.State != "vault_failed" {
+		t.Errorf("expected vault_failed, got %+v", status)
+	}
+	// The Vault worker's raw error quotes the URL it fetched, token and
+	// api-key included: it goes to nobody's browser.
+	b, _ := json.Marshal(status)
+	if strings.Contains(string(b), "token=") || strings.Contains(string(b), "thp.internal") {
+		t.Errorf("the Vault error went out on the status: %s", b)
 	}
 }
 
@@ -143,6 +151,36 @@ func TestResolveStatus_VaultWaitingForSeeders(t *testing.T) {
 	// Progress already made → not waiting even if the swarm emptied.
 	if st := resolveStatus(db, &vault.Resource{Status: vault.StatusProcessing, StoredSize: 50, TotalSize: 100}, &TorrentStatsData{Total: 100}); st.State != "vaulting" {
 		t.Errorf("progress > 0 must stay vaulting, got %+v", st)
+	}
+	// The whole file in the cache → Vault takes it from there: not "no
+	// seeders online". Those are the stats the loop sets for cached
+	// content (the export has no stat item), with nobody in them.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}); st.State != "vaulting" || st.Progress != 0 {
+		t.Errorf("queued, cached: must read vaulting 0%%, got %+v", st)
+	}
+	// Some of it cached, nobody around: still waiting for seeders.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Completed: 40}); st.State != "vault_waiting" {
+		t.Errorf("queued, partly cached, empty swarm: got %+v", st)
+	}
+}
+
+// Nothing cached yet: idle, with the swarm the seeder reports -- the
+// approved "Waiting (14 seeders)" -- and the availability it knows, so the
+// pieces nobody has can be the story before a single one is cached.
+func TestResolveStatus_IdleCarriesTheSwarm(t *testing.T) {
+	st := resolveStatus(nil, nil, &TorrentStatsData{Total: 100, Seeders: 14, Leechers: 2, Peers: 16})
+	if st.State != "idle" || st.Seeders != 14 || st.Leechers != 2 || !st.swarmKnown {
+		t.Errorf("idle with a swarm: %+v", st)
+	}
+	holes := &TorrentStatsData{Total: 100, Peers: 12, Fill: []byte{0, 0}, Active: []byte{0}, Holes: []byte{1},
+		AvailabilityKnown: true, Availability: 0.73, WantedMissing: 5, ReaderMissing: 3}
+	st = resolveStatus(nil, nil, holes)
+	if st.State != "idle" || !st.availKnown || !st.holes || st.readerMissing != 3 || st.Missing == "" || st.Pieces == "" {
+		t.Errorf("idle with holes: %+v", st)
+	}
+	// Vault's word still outranks it.
+	if st := resolveStatus(&vaultModels.Resource{Vaulted: true}, nil, holes); st.State != "vaulted" {
+		t.Errorf("vaulted: %+v", st)
 	}
 }
 
@@ -391,10 +429,18 @@ func TestBarPolicy(t *testing.T) {
 	if st := resolveStatus(nil, nil, stats); st.State != "caching" || st.Pieces == "" {
 		t.Errorf("caching must draw the bar: %+v", st)
 	}
+	// An idle seeder whose pieces nobody else has: the bar is where they
+	// are hatched.
+	holes := &TorrentStatsData{Total: 100, Peers: 12, Fill: []byte{0, 0}, Active: []byte{0}, Holes: []byte{2}, AvailabilityKnown: true}
+	if st := resolveStatus(nil, nil, holes); st.State != "idle" || st.Pieces == "" || st.Missing == "" {
+		t.Errorf("idle with holes draws the bar: %+v", st)
+	}
 	db := &vaultModels.Resource{Funded: true}
-	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{0, 0}, Active: []byte{0}})
-	if waiting.State != "vault_waiting" || waiting.Pieces != "" {
-		t.Errorf("waiting for seeders must not draw a bar: %+v", waiting)
+	// Vault waiting for seeders: the purple bar over what the cache holds,
+	// as the approved design (2026-09-25) draws it.
+	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{255, 0}, Active: []byte{0}})
+	if waiting.State != "vault_waiting" || waiting.Pieces == "" {
+		t.Errorf("waiting for seeders draws the cache's pieces: %+v", waiting)
 	}
 	failed := resolveStatus(db, &vault.Resource{Status: vault.StatusFailed, StoredSize: 30, TotalSize: 100}, &TorrentStatsData{Total: 100, Completed: 30, Fill: []byte{255, 0}, Active: []byte{0}})
 	if failed.State != "vault_failed" || failed.Pieces == "" {

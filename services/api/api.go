@@ -131,7 +131,48 @@ type EventData struct {
 	// or from disk for a torrent nobody is streaming (false). Seeders
 	// before 2026-09-09 do not send it: nil reads as live.
 	Live *bool `json:"live"`
+	// The swarm's availability over the same pieces, at the same positions
+	// (torrent-web-seeder StatReply fields 9-14; a seeder without them sends
+	// none, which reads as AvailabilityKnown false and nothing missing).
+	//
+	// Availability is the share of the pieces complete here or claimed by a
+	// connected peer, a lower bound until AvailabilityKnown: a peer is
+	// connected before its bitfield arrives, so an early union paints holes
+	// that are not there. Missing are the pieces neither complete here nor
+	// claimed by anyone connected, as sorted runs -- merged past 512 runs,
+	// so a run may also cover complete pieces: completion is drawn over it.
+	// The stream is stateful for them like for pieces: MissingUnchanged
+	// says this frame leaves Missing out because it did not change, while a
+	// frame that carries them (MissingUnchanged false) replaces them, null
+	// or [] meaning none. WantedMissing counts the wanted, incomplete pieces
+	// nobody connected has; ReaderMissing those of them an open reader is on
+	// or reads ahead into. All of it is empty unless AvailabilityKnown.
+	Availability      float64      `json:"availability"`
+	AvailabilityKnown bool         `json:"availability_known"`
+	Missing           []PieceRange `json:"missing"`
+	MissingUnchanged  bool         `json:"missing_unchanged"`
+	WantedMissing     int          `json:"wanted_missing"`
+	ReaderMissing     int          `json:"reader_missing"`
 }
+
+// StatTerminated is EventData.Status for the seeder's StatReply_TERMINATED:
+// the pod got SIGTERM (a deploy rotates every seeder pod) and says so on
+// every stats stream it holds, just before it ends them. The frame carries
+// nothing else -- every counter zero -- so it is not stats at all
+// (torrent-web-seeder services/stat.go StatStream).
+const StatTerminated = 3
+
+// PieceRange is a half-open run [Start, End) of piece positions.
+type PieceRange struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
+// statsMaxLine caps one line of the seeder's stats stream. The first frame
+// lists every piece of the torrent: ~405 KB at 8k pieces, ~3.2 MB at 64k,
+// ~13 MB at 256k. A line past the cap ends the stream, and at the old 1 MB a
+// torrent of ~20k pieces or more never got a status at all.
+const statsMaxLine = 16 << 20
 
 type ExtSubtitle struct {
 	Srclang string `json:"srclang"`
@@ -193,6 +234,13 @@ type MediaProbe struct {
 			Language     string    `json:"language"`
 			VendorId     string    `json:"vendor_id"`
 			Title        string    `json:"title"`
+			// The stream's average bitrate as mkvmerge's statistics tags
+			// record it: in a Matroska file ffprobe leaves a video
+			// stream's bit_rate empty, and these are all there is (BPS-eng
+			// is older mkvmerge's spelling). A tool that remuxed the file
+			// later may have copied them unchanged -- stale.
+			BPS    string `json:"BPS,omitempty"`
+			BPSEng string `json:"BPS-eng,omitempty"`
 		} `json:"tags"`
 		Index         int    `json:"index,omitempty"`
 		Channels      int    `json:"channels,omitempty"`
@@ -486,12 +534,22 @@ func (s *Api) ExportResourceContent(ctx context.Context, c *Claims, infohash str
 	return s.ExportResourceContentWithArchiveFormat(ctx, c, infohash, itemID, imdbID, "", nil)
 }
 
+// ExportResourceContentStandardDomain is ExportResourceContent with every URL
+// on the standard domain (use-premium-domain=false), whatever the viewer's
+// role: for URLs web-ui reads event streams from on its own side — the
+// premium edge buffers them. rest-api already pins the stat URL there; this
+// pins the rest, from which the status derives the viewer's session stream.
+func (s *Api) ExportResourceContentStandardDomain(ctx context.Context, c *Claims, infohash string, itemID string) (*ra.ExportResponse, error) {
+	q := url.Values{}
+	q.Set("use-premium-domain", "false")
+	return s.exportResourceContent(ctx, c, infohash, itemID, q)
+}
+
 // ExportResourceContentWithArchiveFormat additionally forwards the archive
 // format ("tar" or "zip") that rest-api uses to name directory downloads
 // (empty keeps the rest-api default, zip) and the optional selection of
 // file/folder paths the archive should be limited to.
 func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Claims, infohash string, itemID string, imdbID string, archiveFormat string, paths []string) (e *ra.ExportResponse, err error) {
-	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	q := url.Values{}
 	if imdbID != "" {
 		q.Add("imdb-id", imdbID)
@@ -502,15 +560,17 @@ func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Cla
 	for _, p := range paths {
 		q.Add("paths", p)
 	}
+	return s.exportResourceContent(ctx, c, infohash, itemID, q)
+}
+
+func (s *Api) exportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, q url.Values) (*ra.ExportResponse, error) {
+	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
-	e = &ra.ExportResponse{}
-	err = s.doRequest(ctx, c, u, "GET", nil, e)
-	// if e.Source.ID == nil
-	// 	e = nil
-	// }
-	return
+	e := &ra.ExportResponse{}
+	err := s.doRequest(ctx, c, u, "GET", nil, e)
+	return e, err
 }
 
 // Download GETs u through torrent-http-proxy. The body comes back whatever
@@ -817,46 +877,106 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 			close(ch)
 			_ = b.Close()
 		}()
-		scanner := bufio.NewScanner(b)
-		// 4KB initial, grow on demand up to 1MB for large torrent stats.
-		// Pre-allocating the full 1MB per stream was ~300MB of off-heap arenas
-		// across all live status SSE streams; the scanner auto-grows when needed.
-		scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
-		scanner.Split(bufio.ScanLines)
-
+		// 4 KB read buffer for the life of the stream. Pre-allocating even
+		// 1 MB per stream was ~300 MB of off-heap arenas across all live
+		// status SSE streams; and a bufio.Scanner, which grows its buffer
+		// for the longest line and never gives it back, kept the first
+		// frame's size (4 MB at 64k pieces) for as long as the page stayed
+		// open. A longer line is put together in a buffer of its own and
+		// dropped once decoded (statsLines).
+		lines := statsLines{r: bufio.NewReaderSize(b, statsReadBuf), max: statsMaxLine}
 		t := ""
-		for scanner.Scan() {
-			if ctx.Err() != nil {
-				log.WithError(ctx.Err()).Error("context error")
-				break
-			}
-			if scanner.Err() != nil {
-				log.WithError(scanner.Err()).Error("scanner error")
-				break
-			}
-			line := scanner.Text()
-			if strings.HasPrefix(line, "event: ") {
-				t = strings.TrimSpace(strings.TrimPrefix(line, "event: "))
+		for {
+			line, err := lines.next()
+			if err == errStatsLineTooLong {
+				// One frame lost, not the stream: the frames after it are
+				// whole in everything but the pieces, which come as diffs
+				// the status loop's piece map folds in (a partial bar
+				// beats no status at all).
+				log.WithField("max", statsMaxLine).Warn("stats stream: frame over the line cap skipped")
 				continue
 			}
-			if t == "statupdate" && strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
-				var event EventData
-				err := json.Unmarshal([]byte(data), &event)
-				if err != nil {
-					log.WithError(err).Errorf("failed to unmarshal data=%v line=%v", data, line)
-					continue
+			if err != nil {
+				if err != io.EOF && ctx.Err() == nil {
+					log.WithError(err).Warn("stats stream: read failed")
 				}
-				select {
-				case ch <- event:
-					continue
-				case <-ctx.Done():
-					return
-				}
+				return
+			}
+			if ctx.Err() != nil {
+				return
+			}
+			if rest, ok := bytes.CutPrefix(line, []byte("event: ")); ok {
+				t = string(bytes.TrimSpace(rest))
+				continue
+			}
+			data, ok := bytes.CutPrefix(line, []byte("data: "))
+			if t != "statupdate" || !ok {
+				continue
+			}
+			var event EventData
+			if err := json.Unmarshal(data, &event); err != nil {
+				log.WithError(err).WithField("bytes", len(data)).Error("failed to unmarshal a stats frame")
+				continue
+			}
+			select {
+			case ch <- event:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
 	return ch, nil
+}
+
+// statsReadBuf is the stats stream's read buffer: every frame after the
+// first is the pieces that changed and fits it.
+const statsReadBuf = 4096
+
+var errStatsLineTooLong = errors.New("stats line over the cap")
+
+// statsLines reads an event stream a line at a time without keeping what a
+// long line needed: a line that fits the reader's buffer is returned in
+// place (valid until the next call), a longer one is put together in a
+// slice of its own that the next call lets go. A line longer than max is
+// read to its end and dropped (errStatsLineTooLong), the stream goes on.
+type statsLines struct {
+	r   *bufio.Reader
+	max int
+}
+
+func (l statsLines) next() ([]byte, error) {
+	line, err := l.r.ReadSlice('\n')
+	if err == nil || (err == io.EOF && len(line) > 0) {
+		return trimEOL(line), nil
+	}
+	if err != bufio.ErrBufferFull {
+		return nil, err
+	}
+	long := append(make([]byte, 0, 2*len(line)), line...)
+	for {
+		line, err = l.r.ReadSlice('\n')
+		if long != nil && len(long)+len(line) > l.max {
+			long = nil
+		}
+		if long != nil {
+			long = append(long, line...)
+		}
+		switch {
+		case err == bufio.ErrBufferFull:
+			continue
+		case err != nil && err != io.EOF:
+			return nil, err
+		case long == nil:
+			return nil, errStatsLineTooLong
+		}
+		return trimEOL(long), nil
+	}
+}
+
+// trimEOL drops a line's "\n" or "\r\n".
+func trimEOL(b []byte) []byte {
+	b = bytes.TrimSuffix(b, []byte("\n"))
+	return bytes.TrimSuffix(b, []byte("\r"))
 }
 
 // Warmup opens the seeder's ?warmup SSE stream for the byte range

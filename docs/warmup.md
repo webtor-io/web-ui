@@ -149,7 +149,7 @@ has arrived, the seconds left before the no-peers verdict
 (`job.warmupCountdown`, "43 s"), so a silent swarm shows a moving countdown
 rather than a frozen spinner; once bytes flow, the percent of the warm-up
 range received. Seeders, leechers and throughput are not repeated in the
-line — the resource badge and the piece bar carry them (docs/vault.md), and
+line — the resource page's transfer chain and piece bar carry them (docs/vault.md), and
 the no-peers card gets the counts when they matter. An earlier version spelt
 out "6 seeders · 0 leechers · waiting for data, 43 s left" and wrapped onto
 three lines on phones. The line is rewritten on every stats event and on

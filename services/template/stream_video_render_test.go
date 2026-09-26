@@ -214,6 +214,44 @@ func TestStreamVideoRenders(t *testing.T) {
 		t.Errorf(`the probe's video streams must reach the player as data-video-codecs="hevc mjpeg ", got %q`,
 			tag[:strings.Index(tag, ">")+1])
 	}
+
+	// The stream job's word on the file against the viewer's cap reaches
+	// the player element, where the transfer status reads it
+	// (lib/playerActivity.js fitsCap / overCap): over the cap -- the stream
+	// box as soon as it is due; under it -- no line while it plays. Neither
+	// attribute without its flag: an unknown bitrate is neither.
+	player := func(sc *scripts.StreamContent) string {
+		t.Helper()
+		var b bytes.Buffer
+		if err := tpl.ExecuteTemplate(&b, "main", map[string]interface{}{"Data": sc, "Lang": "en", "User": nil}); err != nil {
+			t.Fatalf("failed to render stream_video.html: %v", err)
+		}
+		s := b.String()
+		i := strings.Index(s, `<video class="player"`)
+		if i < 0 {
+			t.Fatal("no player element")
+		}
+		return s[i : i+strings.Index(s[i:], ">")]
+	}
+	if tag := player(data); strings.Contains(tag, "data-status-over-cap") || strings.Contains(tag, "data-status-fits-cap") {
+		t.Errorf("bitrate unknown, yet marked: %s", tag)
+	}
+	data.StatusOverCap = true
+	if tag := player(data); !strings.Contains(tag, " data-status-over-cap") || strings.Contains(tag, "data-status-fits-cap") {
+		t.Errorf("over the cap, not marked so: %s", tag)
+	}
+	data.StatusOverCap, data.StatusFitsCap = false, true
+	if tag := player(data); strings.Contains(tag, "data-status-over-cap") || !strings.Contains(tag, " data-status-fits-cap") {
+		t.Errorf("under the cap, not marked so: %s", tag)
+	}
+	// "Watch as is" on the slow-download modal is an answered offer.
+	if tag := player(data); strings.Contains(tag, "data-offer-answered") {
+		t.Errorf("no force-slow run, yet marked answered: %s", tag)
+	}
+	data.StatusAnswered = true
+	if tag := player(data); !strings.Contains(tag, ` data-offer-answered="continue-slow"`) {
+		t.Errorf("force-slow run, not marked answered: %s", tag)
+	}
 }
 
 // TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a

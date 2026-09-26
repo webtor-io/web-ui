@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
 	us "github.com/webtor-io/web-ui/services/user_subtitle"
@@ -87,6 +88,38 @@ type StreamContent struct {
 	// The job queue has no per-run "do not cache": the key is computed
 	// before the script runs and the TTL is set at enqueue time.
 	SubtitlesNotReady bool
+	// StatusStallSub is the resource status's plan-box line for this very
+	// stream while its player buffers under the viewer's cap: "Without a
+	// subscription — up to 5 Mbps, and this file needs 8 Mbps"
+	// (statusview.StallSub). The status stream cannot know what the player
+	// pulls; this job probed the file (playedBitrate: one video and one
+	// audio track, as the player gets them). The page prefers this line over
+	// the status's own, which lacks the second half. "" without a cap.
+	StatusStallSub string
+	// StatusFitsCap: the played stream needs no more than the viewer's cap,
+	// with statusview.FitsMargin to spare (statusview.FitsCap), so it plays
+	// smoothly at the cap and the status says nothing under the bar while
+	// it plays. Only that: a real stall of it while thp's limiter holds the
+	// requests still gets the stream box -- the estimate is not proof (the
+	// page's present, lib/transferStatus.js).
+	StatusFitsCap bool
+	// StatusOverCap: the played stream needs more than the viewer's cap
+	// (statusview.OverCap). At the cap its player stalls once the buffer
+	// runs out, so the status shows the stream box as soon as it is due,
+	// while the player still plays. Neither this nor StatusFitsCap: what
+	// the player pulls is not known (playedBitrate 0: re-encoded video, no
+	// per-track numbers, stale ones) or is under the cap by less than
+	// statusview.FitsMargin; the fact while it plays, the box at a real
+	// stall.
+	StatusOverCap bool
+	// StatusAnswered: this run is the slow-download modal's "watch as is"
+	// (force-slow) -- the viewer was just told the stream will be slower
+	// than the file needs and chose to watch anyway. The player element
+	// carries it (data-offer-answered) and the status treats it as an
+	// answered offer, like the grace popup's "continue at N Mbps": a file
+	// over the cap is not sold again until the player really stalls
+	// (lib/playerActivity.js offerAnswered).
+	StatusAnswered bool
 }
 
 const (
@@ -299,21 +332,22 @@ func parseRateLimit(rate string) int64 {
 	return n * 1_000_000
 }
 
-func isRateLimited(measuredBytesPerSec float64, rateLimitBitsPerSec int64) bool {
-	return measuredBytesPerSec*8 >= float64(rateLimitBitsPerSec)*0.9
-}
-
+// buildSlowDownloadData is the slow-download modal's data for a swarm that
+// delivers less than the file needs: measuredBytesPerSec is what the seeder
+// fetched from its peers during the warm-up, not what reaches the viewer, so
+// it is never the plan's cap (IsRateLimited stays false). The swarm is the
+// bottleneck there whatever the plan: a faster one would still get at most
+// the swarm's speed, and under grace (the first minutes at 50M for a free
+// viewer) the cap is not even in play. It used to call a swarm within 90% of
+// the cap "rate-limited" and sell a faster plan on it -- 674 modals a week
+// in 2026-09 for free viewers, 4 trial clicks from them (owner, 2026-09-26:
+// the modal promised slow video to viewers grace gave full speed). The cap
+// variant is checkCachedRateLimit's alone.
 func buildSlowDownloadData(c *web.Context, measuredBytesPerSec float64, bitrate int64) SlowDownloadData {
 	sdd := SlowDownloadData{
 		MeasuredSpeedMbps: measuredBytesPerSec * 8 / 1_000_000,
 		RequiredSpeedMbps: float64(bitrate) / 1_000_000,
 		BitrateMbps:       float64(bitrate) / 1_000_000,
-	}
-	if c.ApiClaims != nil && c.ApiClaims.Rate != "" {
-		if rateLimitBps := parseRateLimit(c.ApiClaims.Rate); rateLimitBps > 0 && isRateLimited(measuredBytesPerSec, rateLimitBps) {
-			sdd.IsRateLimited = true
-			sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
-		}
 	}
 	if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil {
 		sdd.TierName = c.Claims.Context.Tier.Name
@@ -339,7 +373,10 @@ func checkCachedRateLimit(c *web.Context, bitrate int64) (SlowDownloadData, bool
 	if float64(rateLimitBps) >= float64(bitrate) {
 		return SlowDownloadData{}, false
 	}
-	return buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate), true
+	sdd := buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate)
+	sdd.IsRateLimited = true
+	sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
+	return sdd, true
 }
 
 // exportMeta returns an export item's meta, or a zero meta when the item is
@@ -394,6 +431,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		Settings:       settings,
 		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
+		StatusAnswered: s.forceSlow,
 	}
 	// Dev-only short-circuit: render the slow_download / no_peers error
 	// modals without any rest-api work. Wired from the resource-page hash
@@ -641,6 +679,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	} else {
 		sc.MediaProbe = mp
 		sc.CreditsAt = creditsFromChapters(mp)
+		s.setStatusMarks(sc, c, mp, seMeta.Transcode)
 		log.Infof("got media probe %+v", mp)
 	}
 	j.Done()
@@ -1422,6 +1461,48 @@ type ActionScript struct {
 	debug         string
 	archiveFormat string
 	selectedPaths []string
+}
+
+// setStatusMarks puts on sc what the transfer status needs to know of the
+// probed file against the viewer's cap (StatusStallSub, StatusFitsCap,
+// StatusOverCap), which the player element carries to the page. The rate
+// compared is what the player pulls (playedBitrate), not the file's own.
+func (s *ActionScript) setStatusMarks(sc *StreamContent, c *web.Context, mp *api.MediaProbe, transcoded bool) {
+	bps := playedBitrate(mp, transcoded)
+	sc.StatusStallSub = s.statusStallSub(c, bps)
+	sc.StatusFitsCap = statusFitsCap(c, bps)
+	sc.StatusOverCap = statusOverCap(c, bps)
+}
+
+// statusStallSub is StreamContent.StatusStallSub for the viewer of c: their
+// cap from the claims, worded for whether they pay, and what the played
+// stream needs, bps bits a second (0 unknown; the part the status stream
+// cannot know). The render it lands in is cached per role, language and
+// session (Action), so the wording is theirs.
+func (s *ActionScript) statusStallSub(c *web.Context, bps int64) string {
+	if c == nil || c.ApiClaims == nil || s.i18n == nil {
+		return ""
+	}
+	return statusview.StallSub(s.i18n.Localizer(c.Lang), c.Lang, !isFreeTier(c),
+		statusview.RateMbps(c.ApiClaims.Rate), statusview.BitsToMbps(float64(bps)))
+}
+
+// statusFitsCap is StreamContent.StatusFitsCap for the viewer of c and a
+// played stream of bps bits a second.
+func statusFitsCap(c *web.Context, bps int64) bool {
+	if c == nil || c.ApiClaims == nil {
+		return false
+	}
+	return statusview.FitsCap(statusview.RateMbps(c.ApiClaims.Rate), statusview.BitsToMbps(float64(bps)))
+}
+
+// statusOverCap is StreamContent.StatusOverCap for the viewer of c and a
+// played stream of bps bits a second.
+func statusOverCap(c *web.Context, bps int64) bool {
+	if c == nil || c.ApiClaims == nil {
+		return false
+	}
+	return statusview.OverCap(statusview.RateMbps(c.ApiClaims.Rate), statusview.BitsToMbps(float64(bps)))
 }
 
 func (s *ActionScript) t(key string) string {

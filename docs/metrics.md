@@ -44,10 +44,10 @@ value would be a series kept for the life of the process.
   `paywall` and the empty one into `other` — the value is client-supplied.
   So is `from`: the surfaces the site's own trial links name
   (`offer.TrialFroms`: `promo-banner`, `download-nudge`, `limit-modal`,
-  `grace`, `no-peers`, `onboarding`, `donate`) keep their name, a visit
-  without the parameter is `none`, anything else `other`. Both are bounded
-  inside `metrics.TrialShortlink`, which takes the raw query values — at
-  most 3 × 3 × 9 = 81 series. A new surface is a new
+  `status-bar`, `grace`, `no-peers`, `onboarding`, `donate`) keep their
+  name, a visit without the parameter is `none`, anything else `other`. Both
+  are bounded inside `metrics.TrialShortlink`, which takes the raw query
+  values — at most 3 × 3 × 10 = 90 series. A new surface is a new
   entry in `offer.TrialFroms`, never a value passed through.
 - `rejected` is a torrent-store stoplist block — working as intended, so an
   error-rate alert on `outcome="error"` does not fire on a burst of blocked

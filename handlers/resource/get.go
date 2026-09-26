@@ -15,6 +15,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -107,14 +108,20 @@ type GetData struct {
 	VaultPledgeRemoveForm *VaultPledgeRemoveForm
 	Vault                 bool
 	TorrentStatus         *TorrentStatus
-	Movie                 *models.Movie
-	Series                *models.Series
-	WatchedPaths          map[string]bool
-	MovieStatus           *models.MovieStatus
-	SeriesStatus          *models.SeriesStatus
-	PathActions           map[string]*PathAction
-	RateForm              *RateForm
-	ReleaseSubBanner      *ReleaseSubscribeBanner
+	// StatusView is the transfer status as the page first renders it
+	// (services/statusview): the Vault database's word only, the viewer's
+	// own link not drawn — the status stream (?session=1) sends the same
+	// shape a second later. Render with {{ .StatusView | json }} to seed the
+	// client, or read its fields directly.
+	StatusView       *statusview.View
+	Movie            *models.Movie
+	Series           *models.Series
+	WatchedPaths     map[string]bool
+	MovieStatus      *models.MovieStatus
+	SeriesStatus     *models.SeriesStatus
+	PathActions      map[string]*PathAction
+	RateForm         *RateForm
+	ReleaseSubBanner *ReleaseSubscribeBanner
 	// ResourceMetadata carries per-torrent classification (is_adult /
 	// is_sport) and the parsed-name snapshot. Nil when classification
 	// hasn't run for this resource yet — templates treat nil as "no
@@ -321,6 +328,7 @@ func (s *Handler) get(c *gin.Context) {
 
 	// Prepare initial torrent status (vault DB only, no SSE)
 	d.TorrentStatus = s.prepareInitialStatus(ctx, args.ID)
+	d.StatusView = s.initialView(c, d.TorrentStatus)
 
 	// Prepare vault button state. The vault button is a non-critical UI
 	// element (and is also re-fetched async), so if its state can't be

@@ -1,220 +1,198 @@
 import av from '../../lib/av';
+import {
+    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playing, present, upsellElsewhere,
+} from '../../lib/transferStatus';
+import { createPlayerActivity } from '../../lib/playerActivity';
+import { debugQuery } from '../../lib/statusDebug';
 
-const BADGE_CONFIG = {
-    idle: {
-        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-    },
-    caching: {
-        classes: 'badge badge-sm bg-w-cyan/10 border-w-cyan/30 text-w-cyan gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>',
-    },
-    cached: {
-        classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-    },
-    vaulting: {
-        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>',
-    },
-    caching_checking: {
-        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-sub gap-1.5 px-3 py-2',
-        icon: '<span class="loading loading-dots loading-xs"></span>',
-    },
-    caching_noseeders: {
-        classes: 'badge badge-sm bg-error/10 border-error/30 text-error gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-    },
-    caching_paused: {
-        classes: 'badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>',
-    },
-    vault_waiting: {
-        classes: 'badge badge-sm bg-w-purple/10 border-w-purple/30 text-w-purpleL gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3 animate-pulse"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
-    },
-    vault_failed: {
-        classes: 'badge badge-sm bg-warning/10 border-warning/30 text-warning gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>',
-    },
-    unknown: {
-        classes: 'badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" /></svg>',
-    },
-    vaulted: {
-        classes: 'badge badge-sm bg-green-500/10 border-green-500/30 text-green-400 gap-1.5 px-3 py-2',
-        icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>',
-    },
-};
+// The transfer status view (#torrent-status, views/resource/get.html): one
+// status stream per page, drawn into the card's block and into its copy in
+// the sticky bar -- the chain while something moves, the badge while nothing
+// does (the view's mode; the server holds the swarm on the chain through
+// the gaps between its pieces, services/statusview Hold, and the page keeps
+// the viewer on it while its own player streams, lib/transferStatus.js
+// playing). The server
+// renders the block with the page (partials/resource/status.html); every
+// stream message carries the whole `view`
+// (services/statusview), and lib/transferStatus.js writes it into the same
+// nodes -- nothing here builds markup.
 
-// Piece bar. Cells come base64-packed from the server (0..255 fill per cell,
-// plus a bitset of cells being fetched); the colour is the badge's, and the
-// whole thing is one grid of spans — cheap enough at 256 cells to rebuild on
-// every status message.
-const BAR_COLOR = {
-    cached: 'text-green-400',
-    vaulted: 'text-green-400',
-    vaulting: 'text-w-purpleL',
-    vault_waiting: 'text-w-purpleL',
-    vault_failed: 'text-w-purpleL',
-    caching: 'text-w-cyan',
-    idle: 'text-w-cyan',
-    unknown: 'text-w-cyan',
-};
-
-function decodeBytes(b64) {
-    try {
-        const bin = atob(b64);
-        const out = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-        return out;
-    } catch (e) {
-        return null;
-    }
-}
-
-const BAR_DIVIDER = '<div class="piece-bar-divider" aria-hidden="true"></div>';
-
-function renderBar(status) {
-    // No bar to draw (idle, unknown, waiting): keep the slot's height with a
-    // hairline so the header does not jump when a transfer starts or ends.
-    if (!status.pieces) return BAR_DIVIDER;
-    const fill = decodeBytes(status.pieces);
-    if (!fill || !fill.length) return BAR_DIVIDER;
-    const active = status.active ? decodeBytes(status.active) : null;
-    const color = BAR_COLOR[status.state] || 'text-w-cyan';
-    const title = status.pieces_label || '';
-    let cells = '';
-    for (let i = 0; i < fill.length; i++) {
-        const isActive = active && (active[i >> 3] & (1 << (i & 7)));
-        cells += `<span style="--fill:${(fill[i] / 255).toFixed(2)}"${isActive ? ' class="is-active"' : ''}></span>`;
-    }
-    return `<div class="piece-bar ${color}" role="img" aria-label="${title}" title="${title}">${cells}</div>`;
-}
-
-// A transfer that is actually moving -- the states that paint a piece bar and
-// the only ones the sticky mirror is for (stickyStatus.js). "cached" and
-// "vaulted" are answers, not progress.
-const MOVING = new Set(['caching', 'vaulting', 'vault_waiting']);
-
-// The badge goes to every host that asked for it: the one in the header (the
-// view's own, which also carries the status token) and any mirror, today the
-// sticky bar. Same shape as paintBars below.
-// The sticky mirror keeps its last picture through a status that is only a
-// gap in the data: `unknown` (stats briefly unavailable) and `idle` (a missed
-// stats event) come and go within a second mid-transfer, and repainting the
-// bar for them read as a blink -- badge text flipping, piece bar collapsing to
-// a hairline and back (owner, 2026-09-20). stickyStatus.js holds the bar up
-// through the same two states and takes it down if they last.
+// A status that is only a gap in the data: the seeder's stats briefly
+// unavailable (`unknown`) or a missed stats event (`idle`), both gone a second
+// later mid-transfer. The sticky bar keeps its last picture through them for
+// up to GAP_HOLD_MS -- repainting it read as a blink (owner, 2026-09-20) --
+// and stickyStatus.js holds the bar itself up for as long.
 const isGap = (status) => status.state === 'unknown' || status.state === 'idle';
-const inSticky = (host) => !!host.closest('#torrent-status-sticky');
+const GAP_HOLD_MS = 8000;
 
-function paintBadges(badge, resourceId, status, html) {
-    badge.innerHTML = html;
-    document.querySelectorAll(`[data-status-badge-for="${resourceId}"]`).forEach((host) => {
-        if (isGap(status) && inSticky(host)) return;
-        host.innerHTML = html;
-    });
-    // Broadcast rather than reach into the sticky bar from here: this view
-    // owns the stream, not the page furniture that mirrors it.
-    document.dispatchEvent(new CustomEvent('torrent-status', {
-        detail: { resourceId, state: status.state, moving: MOVING.has(status.state) },
-    }));
-}
+// A plan box's wording depends on time as well as on messages (the minute
+// after a stall, the player leaving its grace window, another offer coming
+// and going): while one can be up, the
+// last status is drawn again every TICK_MS. Writes only what changed.
+const TICK_MS = 1000;
 
-function paintBars(resourceId, status) {
-    const html = renderBar(status);
-    document.querySelectorAll(`[data-piece-bar-for="${resourceId}"]`).forEach((host) => {
-        if (isGap(status) && inSticky(host)) return;
-        host.innerHTML = html;
-    });
-}
-
-function renderLoading() {
-    return '<div class="badge badge-sm bg-base-200/50 border-w-line/30 text-w-muted gap-1.5 px-3 py-2"><span class="loading loading-dots loading-xs"></span></div>';
-}
-
-function renderBadge(status) {
-    // Paused caching is the same state with a different face: amber, a pause
-    // glyph, no throughput (there is none), and the server's "paused" label.
-    const checking = status.state === 'caching' && status.checking;
-    const noSeeders = status.state === 'caching' && status.no_seeders && !checking;
-    const paused = status.state === 'caching' && status.paused && !noSeeders && !checking;
-    const config = BADGE_CONFIG[checking ? 'caching_checking' : noSeeders ? 'caching_noseeders' : paused ? 'caching_paused' : status.state];
-    if (!config) return '';
-
-    let label = status.label || '';
-    let peers = '';
-    if (noSeeders) {
-        label = `${label} · ${Math.round(status.progress)}%`;
-    } else if (checking) {
-        // Nothing but the label: no percent, no swarm — we are not claiming
-        // anything yet.
-    } else if (status.state === 'caching' || status.state === 'vaulting' || (status.state === 'vault_failed' && status.progress > 0)) {
-        label = `${label} ${Math.round(status.progress)}%`;
-        // Swarm throughput, server-formatted ("2.3 MB/s"); absent when nothing moves.
-        if (status.rate_label && !paused) label = `${label} · ${status.rate_label}`;
-    }
-    // Swarm suffix ("12 seeders · 3 leechers") arrives translated from the
-    // server; empty for terminal states and when nothing is known.
-    if (status.swarm && !checking) {
-        peers = `<span class="opacity-70">(${status.swarm})</span>`;
-    }
-
-    // Built as a node, not a string: `detail` is the Vault API's error text
-    // (arbitrary upstream content) and goes into the title attribute through
-    // the DOM property, which the serializer escapes properly. Icon is our
-    // constant markup; label and swarm are server-translated strings.
-    const el = document.createElement('div');
-    el.className = config.classes;
-    // Icon, then a text column (label / swarm) — see #torrent-status .badge-text.
-    el.innerHTML = `${config.icon}<span class="badge-text"><span>${label}</span>${peers}</span>`;
-    if (status.state === 'vault_failed' && status.detail) {
-        el.title = String(status.detail);
-    }
-    if (paused && status.paused_hint) {
-        el.title = String(status.paused_hint);
-    }
-    if (noSeeders && status.no_seeders_hint) {
-        el.title = String(status.no_seeders_hint);
-    }
-    return el.outerHTML;
-}
+// Engines without scroll anchoring (Safari before 27) move everything under
+// the card when its block grows or shrinks -- the plan box coming and going
+// -- even while the block is scrolled away, so a playing video jumps. There
+// the page makes up for it itself (render).
+const anchoring = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('overflow-anchor', 'auto');
 
 av(async function() {
     const container = this;
     const resourceId = container.dataset.resourceId;
-    if (!resourceId) return;
-
-    const badge = container.querySelector('#torrent-status-badge');
-    if (!badge) return;
+    const inner = container.querySelector('#torrent-status-block');
+    const card = inner && inner.querySelector('[data-tx]');
+    if (!resourceId || !card) return;
     container._statusGone = false;
 
-    // Show loading state until first SSE message arrives
-    badge.innerHTML = renderLoading();
+    const blocks = [{ refs: bindBlock(card), location: 'card' }];
+    const mirrorHost = document.querySelector(`[data-status-mirror-for="${resourceId}"]`);
+    if (mirrorHost) blocks.push({ refs: bindBlock(mirrorBlock(card, mirrorHost)), location: 'sticky' });
+    // The copy's Vault link was never bound by the page's async links (it
+    // did not exist then): a press on it is a press on the card's, which
+    // opens the pledge form (or the login) in place -- not a page load
+    // under a playing video.
+    const cardVault = blocks[0].refs.vault;
+    const stickyVault = blocks[1] && blocks[1].refs.vault;
+    const onStickyVault = (e) => {
+        e.preventDefault();
+        cardVault.click();
+    };
+    if (cardVault && stickyVault) stickyVault.addEventListener('click', onStickyVault);
+    const detailsStops = blocks.map((b) => initDetails(b.refs, window, { topInset: NAVBAR_H }));
+    const ctaWatch = createCtaWatch({ umami: window.umami });
+    for (const b of blocks) for (const box of b.refs.boxes) ctaWatch.watch(box.cta);
+
+    let last = null; // the last status message
+    let steady = null; // the last one that was not a gap
+    let gapSince = 0;
+    let ticker = null;
+    const render = () => {
+        if (!last || !last.view) return;
+        // What the page's player adds to the view (lib/transferStatus.js
+        // present): what it is doing, the stream job's word on its file
+        // against the cap, whether it is still inside its free grace window
+        // (by movie time -- nothing is sold there), another offer on screen
+        // or on its way (the grace popup the player is about to put up as it
+        // leaves the window: one signal with inGrace, so no box comes up in
+        // the frames between the two), and the viewer's answer to that popup
+        // while their player has not yet stalled at the cap it told them of.
+        const env = {
+            player: activity.state(),
+            stallSub: activity.stallSub(),
+            fitsCap: activity.fitsCap(),
+            overCap: activity.overCap(),
+            inGrace: activity.inGrace(),
+            upsellElsewhere: upsellElsewhere(document) || activity.graceOfferDue(),
+            offerAnswered: activity.offerAnswered(),
+        };
+        // While it streams, the viewer stays on the chain through the gaps
+        // between its HLS segments, where the proxy counts no request of
+        // theirs open: the server's view with them at their last reading
+        // (playing). Inside the grace window too: grace segments carry the
+        // viewer's session and are counted like any other request of theirs.
+        const streaming = activity.streaming();
+        const shown = (status) => (streaming ? playing(status.view) : status.view);
+        const held = isGap(last) && steady && steady.view && Date.now() - gapSince < GAP_HOLD_MS;
+        // Scrolled away above the viewport, on an engine that does not
+        // anchor: whatever the block gains or loses in height, the page
+        // scrolls by, so nothing under it moves.
+        let before = null;
+        if (!anchoring()) {
+            const r = container.getBoundingClientRect();
+            if (r.bottom <= 0) before = r.height;
+        }
+        for (const b of blocks) {
+            const status = b.location === 'sticky' && held ? steady : last;
+            const view = shown(status);
+            applyView(b.refs, view, present(view, env), b.location);
+            paintBar(b.refs, view, status);
+        }
+        if (before !== null) {
+            const d = container.getBoundingClientRect().height - before;
+            if (d) window.scrollBy(0, d);
+        }
+        ctaWatch.refresh();
+        // Broadcast rather than reach into the sticky bar from here: this
+        // view owns the stream, not the page furniture that shows it.
+        // `moving`: the chain is up -- something moves, or the viewer waits
+        // (the badge has no sticky bar).
+        document.dispatchEvent(new CustomEvent('torrent-status', {
+            detail: { resourceId, state: last.state, moving: !!shown(last).sticky },
+        }));
+        // The view the player keeps changes with the player's own time too
+        // (a paused buffer that stopped growing): drawn again every second
+        // while there is one.
+        const tick = !!last.view.plan || held || !!last.view.playing;
+        if (tick && !ticker) ticker = setInterval(render, TICK_MS);
+        if (!tick && ticker) {
+            clearInterval(ticker);
+            ticker = null;
+        }
+    };
+    const activity = createPlayerActivity(document, { onChange: render });
+
+    const onStatus = (status) => {
+        if (isGap(status)) {
+            if (!last || !isGap(last)) gapSince = Date.now();
+        } else {
+            steady = status;
+        }
+        last = status;
+        render();
+    };
+
+    // Picking another file swaps #content and nothing above it: the stream
+    // (and the file its download ETA prices) stays. A file that differs from
+    // the one on the stream reopens it on the new one -- a second of the
+    // viewer's link not drawn, against a plan box quoting another file's
+    // wait. Set below, once the stream exists.
+    let onSwap = null;
+
+    const teardown = () => {
+        if (onSwap) window.removeEventListener('async', onSwap);
+        if (stickyVault) stickyVault.removeEventListener('click', onStickyVault);
+        detailsStops.forEach((stop) => stop());
+        ctaWatch.stop();
+        activity.stop();
+        if (ticker) {
+            clearInterval(ticker);
+            ticker = null;
+        }
+    };
 
     const csrfToken = container.dataset.csrf;
-    if (!csrfToken) return;
+    if (!csrfToken) {
+        container._statusTeardown = teardown;
+        return;
+    }
 
     const lang = document.documentElement.lang;
     const langPrefix = lang && lang !== 'en' ? `/${lang}` : '';
-    // Dev-only badge override (handlers/resource/status.go debugStatus): the
-    // page URL's debug_status/seeders/leechers/peers/progress ride along to
-    // the SSE endpoint; the server ignores them in release mode.
-    const dbg = new URLSearchParams(window.location.search);
-    let extra = '';
-    for (const k of ['debug_status', 'seeders', 'leechers', 'peers', 'progress', 'debug_pieces', 'rate', 'paused', 'noseeders', 'checking']) {
-        if (dbg.has(k)) extra += `&${k}=${encodeURIComponent(dbg.get(k))}`;
-    }
+    // Dev-only preview (lib/statusDebug.js): the page URL's params ride
+    // along to the stream; the server ignores them in release.
+    let extra = debugQuery(window.location.search);
     // Page-issued, hash-bound, short-lived (handlers/resource/torrent_link.go).
-    const statusToken = badge.dataset.statusToken || '';
+    const statusToken = inner.dataset.statusToken || '';
     if (statusToken) extra += `&token=${encodeURIComponent(statusToken)}`;
-    const url = `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}${extra}`;
+    // The file the plan box's download ETA prices: the page's, then the one
+    // a file link picks (onSwap).
+    let file = inner.dataset.statusFile || '';
+    // session=1: this page draws the chain, so the server builds the view and
+    // follows the viewer's own thp session for it (the Vault dashboard's rows
+    // open the same endpoint without it).
+    const url = () => `${langPrefix}/${resourceId}/status?_csrf=${encodeURIComponent(csrfToken)}&session=1${extra}` +
+        (file ? `&file=${encodeURIComponent(file)}` : '');
+    // A final message (the server has nothing left to say: a vaulted
+    // torrent whose viewer's link cannot be followed) closes the stream for
+    // good -- left to itself EventSource would reconnect to the same answer
+    // every few seconds.
+    let finished = false;
 
     // The token lives an hour; a long download or vaulting is watched for
     // longer. When the stream is refused, reload this view the async way:
     // this.reload() (lib/async.js asyncLayout) re-fetches the page URL with
-    // X-Layout "resource/status_inner", swaps in the fresh badge with the
+    // X-Layout "resource/status_inner", swaps in the fresh block with the
     // fresh token, and re-runs this init. Same URL, so the edge's challenge
     // clearance a person already holds lets it through and a client that
     // never loaded the page stops right here. At most once per
@@ -222,8 +200,8 @@ av(async function() {
     const RELOAD_MIN_MS = 60 * 1000;
     const renew = () => {
         if (!statusToken || typeof container.reload !== 'function') return;
-        const last = container._statusReloadAt || 0;
-        if (Date.now() - last < RELOAD_MIN_MS) return;
+        const lastReload = container._statusReloadAt || 0;
+        if (Date.now() - lastReload < RELOAD_MIN_MS) return;
         container._statusReloadAt = Date.now();
         // loadAsyncView only destroys views *inside* the target; this view is
         // the target, so drop our own listeners before the swap re-inits it.
@@ -232,20 +210,27 @@ av(async function() {
     };
 
     const open = () => {
-        if (container._statusSource || container._statusGone) return;
-        const source = new EventSource(url);
+        if (container._statusSource || container._statusGone || finished) return;
+        const source = new EventSource(url());
         container._statusSource = source;
+        // Keep-alive every 5 s: a chance to redraw for what changed without
+        // a message (the player, another offer on screen).
+        source.addEventListener('ping', render);
+        // "vaulted" does not end this stream (it ends the Vault dashboard's):
+        // vaulted content is served through the proxy too, and the viewer's
+        // own link keeps changing -- until the server says it is final.
         source.onmessage = (e) => {
+            let status;
             try {
-                const status = JSON.parse(e.data);
-                paintBadges(badge, resourceId, status, renderBadge(status));
-                paintBars(resourceId, status);
-                if (status.state === 'vaulted') {
-                    source.close();
-                    container._statusSource = null;
-                }
+                status = JSON.parse(e.data);
             } catch (err) {
-                // Ignore parse errors
+                return;
+            }
+            onStatus(status);
+            if (status.final) {
+                finished = true;
+                source.close();
+                if (container._statusSource === source) container._statusSource = null;
             }
         };
         source.onerror = () => {
@@ -259,11 +244,24 @@ av(async function() {
         };
     };
 
+    onSwap = (e) => {
+        if (!e.detail || !e.detail.target || e.detail.target.id !== 'content') return;
+        const picked = document.getElementById('file');
+        const next = picked && picked.dataset.statusFile;
+        if (!next || next === file) return;
+        file = next;
+        const source = container._statusSource;
+        if (!source || finished) return;
+        source.close();
+        container._statusSource = null;
+        open();
+    };
+    window.addEventListener('async', onSwap);
+
     // Opened at once: since 2026-09-09 a stream for a torrent nobody is
     // streaming is answered from disk without loading it (torrent-web-seeder
-    // cold stats), so there is nothing left to defer. The teardown hook is
-    // kept for renew(), which reloads this view.
-    container._statusTeardown = null;
+    // cold stats), so there is nothing left to defer.
+    container._statusTeardown = teardown;
     open();
 
 }, function() {
@@ -279,4 +277,4 @@ av(async function() {
     }
 });
 
-export {}
+export {};

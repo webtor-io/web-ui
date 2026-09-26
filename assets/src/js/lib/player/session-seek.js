@@ -34,7 +34,14 @@ function captureFrame(videoEl) {
     }
 }
 
-export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange, trackContainer }) {
+// `holdPlayback` is asked right before the seek would start playback (the new
+// run, or the old one again after a refused seek): true means the page holds
+// the film for now -- the grace popup, until the viewer answers it
+// (Player.jsx, grace-hold.js) -- and the seek does not play. It settles once
+// the new run can play, paused under the popup; the holder starts it with the
+// answer. Asking is the seek saying it would play: the holder counts it as
+// playback to resume, and a seek that lands paused never asks.
+export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange, trackContainer, holdPlayback }) {
     let isSeeking = false;
     let seekOffset = 0;
     const isNative = !hls; // native HLS (iOS) — no HLS.js instance
@@ -126,8 +133,17 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // wiping the tracks, so settling is safe), and if that is
             // refused too the seek settles paused, with the play button.
             let onPlayRejected = () => {};
+            // Held (holdPlayback): the seek settles when the new run can
+            // play, not on the `playing` that nothing is going to cause.
+            let held = false;
+            let onHeld = () => {};
             const startPlayback = () => {
                 if (typeof videoEl.play !== 'function') return;
+                if (holdPlayback && holdPlayback()) {
+                    held = true;
+                    onHeld();
+                    return;
+                }
                 const r = videoEl.play();
                 if (r && typeof r.catch === 'function') r.catch((err) => onPlayRejected(err));
             };
@@ -183,8 +199,14 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 function onCanPlay() {
                     videoEl.removeEventListener('canplay', onCanPlay);
                     if (settled) return;
-                    startPlayback();
+                    // The retry of a refused play() -- which the hold may
+                    // take over by now (the popup came up meanwhile).
+                    if (!held) startPlayback();
+                    if (held) onPlaying();
                 }
+                onHeld = () => {
+                    if (!settled) videoEl.addEventListener('canplay', onCanPlay);
+                };
                 onPlayRejected = () => {
                     if (settled) return;
                     if (retried) {
@@ -219,13 +241,18 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                     resolve();
                 }
                 videoEl.addEventListener('playing', onPlaying);
+                // Held already, above (the new run was loaded, not played).
+                if (held) onHeld();
             });
         } catch (e) {
             console.error('Session seek failed:', e);
             if (freezeFrame) freezeFrame.remove();
             setIsSeeking(false);
-            // A refused seek moves nothing, the pause above included.
-            if (playAfter && !isNative && videoEl.paused && typeof videoEl.play === 'function') {
+            // A refused seek moves nothing, the pause above included -- but
+            // not behind a hold (holdPlayback, asked last): its answer
+            // starts the film.
+            if (playAfter && !isNative && videoEl.paused && typeof videoEl.play === 'function'
+                && !(holdPlayback && holdPlayback())) {
                 const r = videoEl.play();
                 if (r && typeof r.catch === 'function') r.catch(() => {});
             }

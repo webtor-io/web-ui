@@ -150,6 +150,31 @@ func (s *Service) HasPlans() bool {
 	return c != nil && len(c.Prices) > 0
 }
 
+// FasterOnSale answers "is there a plan on sale that downloads faster than
+// rateMbps": an available price whose tier is unlimited or has a higher cap.
+// A top-tier viewer gets false — an "upgrade" link that leads to nothing
+// faster sells nothing. A tier the catalog does not describe is not counted:
+// its speed would have to be invented.
+func (s *Service) FasterOnSale(rateMbps float64) bool {
+	c := s.Catalog()
+	if c == nil {
+		return false
+	}
+	for _, p := range c.Prices {
+		if !p.IsAvailable() {
+			continue
+		}
+		t := c.Tier(p.TierID)
+		if t == nil {
+			continue
+		}
+		if t.DownloadRate == nil || float64(*t.DownloadRate) > rateMbps {
+			return true
+		}
+	}
+	return false
+}
+
 // FreeRateMbps is the free tier's speed cap, 0 when there is no cap to state:
 // no catalog, no free tier in it, or a free tier without a limit. Copy that
 // quotes the cap reads it here rather than typing the number into a locale.

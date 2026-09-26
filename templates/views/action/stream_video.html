@@ -30,6 +30,22 @@
            {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
            {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
            {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
+           {{- /* The resource status's plan-box line while this player buffers
+                under the viewer's cap, with the file's bitrate the status
+                stream cannot know (jobs/scripts StreamContent.StatusStallSub,
+                read by lib/playerActivity.js). Trimmed: without it the tag is
+                byte-for-byte what it was. */}}
+           {{- if .StatusStallSub }} data-status-stall-sub="{{ .StatusStallSub }}"{{ end }}
+           {{- if .StatusFitsCap }} data-status-fits-cap{{ end }}
+           {{- /* The file needs more than the viewer's cap: the status shows
+                the stream box as soon as it is due, not at the first stall
+                (StreamContent.StatusOverCap). */}}
+           {{- if .StatusOverCap }} data-status-over-cap{{ end }}
+           {{- /* The viewer chose "watch as is" on the slow-download modal:
+                an answered offer, like the grace popup's -- the status sells
+                nothing more until the player really stalls
+                (StreamContent.StatusAnswered). */}}
+           {{- if .StatusAnswered }} data-offer-answered="continue-slow"{{ end }}
            {{ if .Settings | hasControls }}controls{{ end }}
            {{ if .Settings.Width }}width="{{ .Settings.Width }}"{{ end }}
            {{ if .Settings.Height }}height="{{ .Settings.Height }}"{{ end }}
@@ -386,35 +402,51 @@
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
     {{ if .GraceDurationSec }}
-    <div id="grace-cta" class="absolute bottom-20 left-1/2 -translate-x-1/2 hidden z-modal w-[calc(100%-2rem)] max-w-sm">
-        <div class="relative rounded-xl border border-w-line/60 bg-w-card/95 backdrop-blur-md shadow-2xl p-4">
-            <button type="button" class="grace-cta-close absolute top-2 right-2 text-w-muted hover:text-base-content" aria-label="{{ t $.Lang "action.grace.dismiss" }}">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-            </button>
-            <h4 class="font-semibold text-base text-base-content pr-6 mb-1">{{ t $.Lang "action.grace.title" }}</h4>
-            <p class="text-sm text-w-sub mb-3">{{ t $.Lang "action.grace.body" }}</p>
-            <div class="flex flex-wrap gap-2 items-center">
-                {{- with promoOffer }}
-                <div class="flex flex-col items-center gap-1">
-                    <a class="btn btn-sm btn-soft" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
+    {{/* data-upsell-surface: one offer on screen at a time -- the resource
+         status keeps its plan box's button down while this is up
+         (lib/transferStatus.js upsellElsewhere). */}}
+    {{/* A decision over the paused film (lib/player/grace-hold.js): centred
+         on the video, the frame dimmed behind it, like any dialog. #grace-cta
+         is what Player.jsx shows and hides (the `hidden` class), so it only
+         covers the player; the centring lives on the inner layer -- `flex`
+         next to `hidden` on one element would fight over display. Sized by
+         the player, not the window (@container): below 32rem of player width
+         (a phone's 16:9 is ~200 px tall) the card drops the paragraph and
+         takes small buttons, so both answers stay in view; wider, the full
+         card. max-h-full + scroll is the last resort, not the layout. */}}
+    <div id="grace-cta" data-upsell-surface="grace" class="absolute inset-0 hidden z-modal">
+        <div class="@container w-full h-full flex items-center justify-center p-3 bg-black/50">
+            <div role="dialog" aria-labelledby="grace-cta-title"
+                 class="relative w-full max-w-[27rem] max-h-full overflow-y-auto rounded-2xl border border-w-line/60 bg-w-card/95 backdrop-blur-md shadow-2xl px-4 py-4 @lg:px-6 @lg:py-6 text-center">
+                <button type="button" class="grace-cta-close absolute top-1.5 right-1.5 w-9 h-9 inline-flex items-center justify-center rounded-lg text-w-muted hover:text-base-content hover:bg-white/5" aria-label="{{ t $.Lang "action.grace.dismiss" }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <h4 id="grace-cta-title" class="font-semibold text-sm @lg:text-lg leading-snug text-base-content px-7">{{ t $.Lang "action.grace.title" }}</h4>
+                <p class="hidden @lg:block mt-1.5 text-sm leading-relaxed text-w-sub">{{ t $.Lang "action.grace.body" }}</p>
+                {{- /* Owner, 2026-09-26: "continue at N Mbps" first, the offer
+                     under it, its trial note last -- the note closes the card
+                     and sits with the button it qualifies. */}}
+                <div class="mt-3 @lg:mt-5 flex flex-col items-stretch gap-2">
+                    <button type="button" class="grace-cta-continue btn btn-ghost btn-sm @lg:btn-md w-full border border-w-line text-w-sub hover:text-base-content hover:border-w-line"
+                            data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
+                        {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
+                    </button>
+                    {{- with promoOffer }}
+                    <a class="btn btn-soft btn-sm @lg:btn-md w-full" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
                        data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}"
                        data-umami-event-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4" aria-hidden="true">
                             <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
                         </svg>
                         {{ t $.Lang "offer.keepFullSpeed" }}
                     </a>
                     {{- if .TrialDays }}
-                    <span class="text-[11px] text-w-muted leading-tight text-center">{{ tn $.Lang "offer.trialNote" .TrialDays }}</span>
+                    <span class="-mt-0.5 text-[11px] leading-tight text-w-muted">{{ tn $.Lang "offer.trialNote" .TrialDays }}</span>
+                    {{- end }}
                     {{- end }}
                 </div>
-                {{- end }}
-                <button type="button" class="grace-cta-continue btn btn-sm btn-ghost text-w-sub hover:text-base-content"
-                        data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
-                    {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
-                </button>
             </div>
         </div>
     </div>

@@ -16,8 +16,12 @@ import (
 	csrf "github.com/utrack/gin-csrf"
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
+	uclaims "github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/ratemeter"
+	"github.com/webtor-io/web-ui/services/statusview"
 	vault "github.com/webtor-io/web-ui/services/vault"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
@@ -35,15 +39,17 @@ type TorrentStatus struct {
 	// empty when nothing is known. Formatted server-side so the JS renderer
 	// never has to carry locale strings.
 	Swarm string `json:"swarm"`
-	// Detail is the Vault API's own error text for vault_failed — technical,
-	// shown as a tooltip, never as the label.
-	Detail string `json:"detail,omitempty"`
 	// Pieces is the piece bar: PieceBuckets bytes, base64, one per bucket,
 	// 0..255 = share of the bucket's pieces the seeder holds. Active is a
 	// base64 bitset of buckets with pieces the seeder is fetching right now.
 	// Empty when nothing is known and for complete content (see barStates).
-	Pieces      string `json:"pieces,omitempty"`
-	Active      string `json:"active,omitempty"`
+	Pieces string `json:"pieces,omitempty"`
+	Active string `json:"active,omitempty"`
+	// Missing is a base64 bitset of the buckets holding a piece nobody
+	// connected has and we do not have either -- the bar hatches them
+	// (pieceMap.holes). Only once the seeder knows (availability_known), and
+	// only while the bar is drawn.
+	Missing     string `json:"missing,omitempty"`
 	PiecesDone  int    `json:"pieces_done,omitempty"`
 	PiecesTotal int    `json:"pieces_total,omitempty"`
 	PiecesLabel string `json:"pieces_label,omitempty"`
@@ -69,7 +75,59 @@ type TorrentStatus struct {
 	// call it caching, paused or dead. The badge stays neutral until the
 	// verdict is earned.
 	Checking bool `json:"checking,omitempty"`
+	// View is the transfer status as the resource page draws it — the
+	// chain "swarm ▸ cache ▸ you", the bar's mode, the hint or the plan
+	// box, the details popover — built by services/statusview and already
+	// localized. Only on the resource page's stream (?session=1), which
+	// also follows the viewer's own thp session; the Vault dashboard's rows
+	// read state, progress and Badge.
+	View *statusview.View `json:"view,omitempty"`
+	// Badge is the view's badge alone, built the same way with no viewer
+	// (present): what the Vault dashboard's rows draw, in the very element
+	// the resource page's badge is (partials/status/badge.html,
+	// lib/statusBadge.js). Only on the dashboard's stream (no ?session=1);
+	// the page's has it in View.
+	Badge *statusview.Badge `json:"badge,omitempty"`
+	// Final: the last message of this stream. Nothing on it can change any
+	// more — a vaulted torrent whose viewer's link cannot be followed (no
+	// thp to ask, a final answer, the retries spent) — so the server ends
+	// it, and the page closes its EventSource on this rather than letting it
+	// reconnect to the same answer every few seconds.
+	Final bool `json:"final,omitempty"`
+	// swarmKnown: the seeder reported the swarm (withSwarm); zero seeders
+	// then mean zero, not "not asked".
+	swarmKnown bool
+	// The seeder's availability for the view (statusview.Torrent): not sent
+	// as such -- the view says what it means.
+	availKnown    bool
+	availability  float64
+	holes         bool
+	wantedMissing int
+	readerMissing int
+	// cachePct is the share of the torrent in the cache, 0..100, from the
+	// seeder's numbers -- a Vault state's own Progress is Vault's.
+	cachePct float64
+	// swarmStill: none of the swarm's bytes arrived within movingFor (the
+	// status loop's word). The view then gets no swarm rate: the smoothed
+	// one outlives the bytes by seconds, decaying a tick at a time.
+	swarmStill bool
+	// settling: the stream has watched the swarm for less than settleAfter
+	// and not seen it move yet (statusview.Torrent.Settling).
+	settling bool
 }
+
+// movingFor: the swarm moves while its bytes arrive -- Completed grew at most
+// this long ago, which is the status sent on the stats event itself (and a
+// tick close enough to it that the rate meter has not re-sampled: it waits
+// half a second between samples). The seeder's counter grows a verified
+// piece at a time, so between two pieces nothing arrives for a while; the
+// view's hold (statusview.Hold) keeps the swarm on the chain as it last
+// moved through such a gap, for HoldFor from its last piece. Judged by the
+// smoothed rate instead, the swarm "moved" for 13 s after its last byte at
+// 38 Mbps (the rate decays by 0.6 a tick), and the hold came on top of that:
+// the badge 14-22 s after the last byte, and a chain showing a pause or a
+// dash for the last ten of them.
+const movingFor = 500 * time.Millisecond
 
 // settleAfter is the observation window before any verdict: a piece boundary
 // can make a live download look still for a second; five seconds of no
@@ -131,7 +189,9 @@ const recentActivity = 60 * time.Second
 // of it, and bytes moving within recentActivity — and only a few times. The
 // seeder unloads idle torrents on its own; a stream that closes after a quiet
 // spell is that, and reopening it would start a seeder pod nobody asked for
-// just to draw a badge. Such a torrent falls back to idle, as it always did.
+// just to draw a badge. Such a torrent falls back to idle, as it always did
+// -- unless it is complete: the seeder closes the stream at 100% too, and
+// that one stays cached (statusLoop).
 func shouldReconnect(stats *TorrentStatsData, attempts int, sinceProgress time.Duration) bool {
 	if stats == nil || attempts >= 5 {
 		return false
@@ -183,6 +243,20 @@ type TorrentStatsData struct {
 	// Live is false for a cold reply: the seeder read the numbers from
 	// disk and did not join the swarm, so an empty swarm means nothing.
 	Live bool
+	// Holes is the bucketed bitset of pieces nobody connected has
+	// (pieceMap.holes), nil when there are none or the seeder does not know;
+	// the rest is the seeder's availability as the last frame said it
+	// (api.EventData).
+	Holes             []byte
+	AvailabilityKnown bool
+	Availability      float64
+	WantedMissing     int
+	ReaderMissing     int
+}
+
+// whole: every byte of the torrent is in the cache.
+func (s *TorrentStatsData) whole() bool {
+	return s.Total > 0 && int64(s.Completed) >= s.Total
 }
 
 // withSwarm copies the swarm counters and the piece bar from a stats event
@@ -190,6 +264,7 @@ type TorrentStatsData struct {
 func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 	if stats != nil {
 		t.Seeders, t.Leechers, t.Peers = stats.Seeders, stats.Leechers, stats.Peers
+		t.swarmKnown = true
 		if len(stats.Fill) > 0 {
 			t.Pieces = base64.StdEncoding.EncodeToString(stats.Fill)
 			t.Active = base64.StdEncoding.EncodeToString(stats.Active)
@@ -197,22 +272,39 @@ func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 			t.PiecesTotal = stats.PiecesTotal
 		}
 		t.Rate = stats.Rate
+		if stats.Total > 0 {
+			t.cachePct = float64(stats.Completed) / float64(stats.Total) * 100
+		}
+		// Nothing of the availability is read unless the seeder knows it:
+		// before that its union is a lower bound, holes that are not there.
+		if stats.AvailabilityKnown {
+			t.availKnown, t.availability = true, stats.Availability
+			t.wantedMissing, t.readerMissing = stats.WantedMissing, stats.ReaderMissing
+			if hasActive(stats.Holes) {
+				t.holes = true
+				t.Missing = base64.StdEncoding.EncodeToString(stats.Holes)
+			}
+		}
 	}
 	return t
 }
 
-// barStates are the states in which the piece bar is drawn: something is
-// moving — caching, a Vault transfer, or one that failed mid-way with pieces
-// already stored. Complete content (cached, vaulted) draws nothing: a static
-// full bar told the user nothing the badge did not, and an idle seeder that
-// merely knows its pieces drew an empty bar that vanished when its stats
-// channel closed. Everything else shows the hairline divider.
-var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true}
+// barStates are the states in which the piece bar is drawn: the torrent is
+// on its way -- caching, a Vault transfer, one that failed mid-way with
+// pieces already stored, or Vault waiting for seeders over what the cache
+// holds (the approved design, 2026-09-25, draws its purple bar). Complete
+// content (cached, vaulted) draws nothing: a static full bar told the user
+// nothing the badge did not. An idle seeder that merely knows its pieces
+// draws nothing either -- it drew an empty bar that vanished when its stats
+// channel closed -- unless pieces nobody connected has are the story: the
+// bar is where they are hatched. Everything else shows the hairline
+// divider.
+var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true, "vault_waiting": true}
 
 // withBarPolicy strips the piece bar from states that must not show one.
 func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
-	if !barStates[t.State] {
-		t.Pieces, t.Active, t.PiecesDone, t.PiecesTotal, t.PiecesLabel = "", "", 0, 0, ""
+	if !barStates[t.State] && !(t.State == "idle" && t.holes) {
+		t.Pieces, t.Active, t.Missing, t.PiecesDone, t.PiecesTotal, t.PiecesLabel = "", "", "", 0, 0, ""
 		t.Rate = 0
 	}
 	return t
@@ -226,12 +318,23 @@ func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
 type pieceMap struct {
 	complete []bool
 	active   []bool
+	// missing are the seeder's runs of pieces no connected peer has, kept
+	// across frames the same way (api.EventData.Missing); availKnown is
+	// the last frame's availability_known.
+	missing    []api.PieceRange
+	availKnown bool
 }
 
 // apply folds one stats event into the map. The first event sizes it (a
 // stream always opens with the full list); positions past the end grow it,
-// so a diff-only stream still builds a usable, if partial, picture.
+// so a diff-only stream still builds a usable, if partial, picture. The
+// missing runs are replaced by every frame that carries them -- null or []
+// is "none" -- and kept by one that says they did not change.
 func (m *pieceMap) apply(ev api.EventData) {
+	m.availKnown = ev.AvailabilityKnown
+	if !ev.MissingUnchanged {
+		m.missing = append(m.missing[:0], ev.Missing...)
+	}
 	if len(ev.Pieces) == 0 {
 		return
 	}
@@ -304,6 +407,40 @@ func (m *pieceMap) buckets() (fill, active []byte) {
 	return fill, active
 }
 
+// holes folds the missing runs into the same cells as buckets: a cell's bit
+// is set when it holds a piece nobody connected has that is not complete
+// here either -- past 512 runs the seeder merges them, so a run may cover
+// complete pieces, and completion is drawn over the hatch. Runs past the map
+// are clamped, never grown into. nil when there is nothing to hatch or the
+// seeder does not know yet (availability_known: until the peers' bitfields
+// are in, the union paints holes that are not there).
+func (m *pieceMap) holes() []byte {
+	n := len(m.complete)
+	if !m.availKnown || n == 0 || len(m.missing) == 0 {
+		return nil
+	}
+	cells := PieceBuckets
+	if n < cells {
+		cells = n
+	}
+	bits := make([]byte, (cells+7)/8)
+	any := false
+	for _, r := range m.missing {
+		for pos := max(r.Start, 0); pos < min(r.End, n); pos++ {
+			if m.complete[pos] {
+				continue
+			}
+			c := pos * cells / n
+			bits[c/8] |= 1 << uint(c%8)
+			any = true
+		}
+	}
+	if !any {
+		return nil
+	}
+	return bits
+}
+
 // resolveStatus is a pure function that determines the combined torrent status
 // from vault DB state, vault API state, and torrent seeding stats.
 // Priority: vaulted > vaulting > cached > caching > idle.
@@ -322,19 +459,19 @@ func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resou
 		vaultState.withSwarm(stats)
 		// Funded, nothing stored, and the seeder sees nobody: the transfer is
 		// not slow, it is waiting for a swarm that is not there. Saying so is
-		// the difference between "stuck at 0%" and "no seeders yet".
-		if vaultState.State == "vaulting" && vaultState.Progress == 0 && stats != nil && stats.Seeders == 0 && stats.Peers == 0 {
+		// the difference between "stuck at 0%" and "no seeders yet". Not for
+		// content whole in the cache: Vault takes it from there, no swarm
+		// needed (a cached torrent's stats are the synthetic "cached" ones,
+		// with nobody in them).
+		if vaultState.State == "vaulting" && vaultState.Progress == 0 && stats != nil && stats.Seeders == 0 && stats.Peers == 0 && !stats.whole() {
 			vaultState.State = "vault_waiting"
 		}
 		return vaultState
 	}
-	if cachingState.State == "cached" {
-		return cachingState
-	}
-	if cachingState.State == "caching" {
-		return cachingState
-	}
-	return &TorrentStatus{State: "idle"}
+	// Cached, caching, or idle -- idle with the swarm the seeder reports,
+	// when it does: who is there ("Waiting (14 seeders)"), and whether they
+	// have the pieces at all.
+	return cachingState
 }
 
 func resolveVaultState(dbResource *vaultModels.Resource, apiResource *vault.Resource) *TorrentStatus {
@@ -361,9 +498,11 @@ func resolveVaultState(dbResource *vaultModels.Resource, apiResource *vault.Reso
 	default:
 		// Failed (or unknown): still funded and the system retries, but the
 		// user deserves to know the last attempt did not go through — this
-		// used to render as "Vaulting N%" forever. The API's error text
-		// travels as Detail for the tooltip.
-		return &TorrentStatus{State: "vault_failed", Progress: apiResource.GetProgress(), Detail: apiResource.Error}
+		// used to render as "Vaulting N%" forever. The API's error text is
+		// not passed on: it is the Vault worker's raw error, which quotes
+		// the URL it fetched (token and api-key included), and nothing on
+		// the page shows it.
+		return &TorrentStatus{State: "vault_failed", Progress: apiResource.GetProgress()}
 	}
 }
 
@@ -388,10 +527,10 @@ func resolveCachingState(stats *TorrentStatsData) *TorrentStatus {
 
 // prepareInitialStatus computes the initial status for SSR (vault DB only, no SSE connection).
 func (s *Handler) prepareInitialStatus(ctx context.Context, resourceID string) *TorrentStatus {
-	if s.vault == nil {
+	if s.statusVault == nil {
 		return &TorrentStatus{State: "idle"}
 	}
-	dbResource, err := s.vault.GetResource(ctx, resourceID)
+	dbResource, err := s.statusVault.GetResource(ctx, resourceID)
 	if err != nil {
 		log.WithError(err).Warn("failed to get vault resource for initial status")
 		return &TorrentStatus{State: "idle"}
@@ -422,6 +561,17 @@ func (s *Handler) status(c *gin.Context) {
 		}
 	}
 	claims := api.GetClaimsFromContext(c)
+	// Read before the loop's goroutine starts: it must not touch c.
+	env := s.viewEnv(c, claims)
+	// The chain and the viewer's own link are asked for by the resource
+	// page, which draws them (?session=1); the Vault dashboard's rows open
+	// this stream too and would each hold a thp stream nobody looks at.
+	env.withView = c.Query("session") == "1"
+	// The file the page is on, whose size the download ETA prices; the
+	// whole torrent without one.
+	if f := c.Query("file"); len(f) <= maxFileParam {
+		env.file = f
+	}
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache,no-store,no-transform")
@@ -435,7 +585,7 @@ func (s *Handler) status(c *gin.Context) {
 	// Channel for status updates from background goroutine
 	statusCh := make(chan *TorrentStatus, 10)
 
-	if dbg := debugStatus(c); dbg != nil {
+	if dbg := debugStatus(c, env); dbg != nil {
 		go func() {
 			defer close(statusCh)
 			select {
@@ -445,7 +595,7 @@ func (s *Handler) status(c *gin.Context) {
 			<-ctx.Done()
 		}()
 	} else {
-		go s.statusLoop(ctx, claims, resourceID, statusCh)
+		go s.statusLoop(ctx, claims, resourceID, statusCh, env)
 	}
 
 	c.Stream(func(w io.Writer) bool {
@@ -461,32 +611,227 @@ func (s *Handler) status(c *gin.Context) {
 			if !ok {
 				return false
 			}
-			loc := i18n.GetLocalizer(c)
-			status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
-			if status.Paused {
-				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPaused")
-				status.PausedHint = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPausedHint")
-			}
-			if status.NoSeeders {
-				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.noSeeders")
-				status.NoSeedersHint = i18n.TranslateWithLocalizer(loc, "resource.status.noSeedersHint")
-			}
-			if status.Checking {
-				status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.checking")
-				// No claims while checking: no swarm suffix either.
-				status.Swarm = ""
-			}
-			status.Swarm = swarmLabel(loc, status)
-			if status.PiecesTotal > 0 {
-				status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
-			}
-			if status.Rate >= 1024 {
-				status.RateLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.rate", map[string]any{"Speed": helpers.Bytes(uint64(status.Rate))})
-			}
+			// Localized and built in the loop (present), so its dedup
+			// compares what the page would see.
 			c.SSEvent("message", status)
-			return status.State != "vaulted"
+			return !endsStream(status, env)
 		}
 	})
+}
+
+// maxFileParam bounds ?file: it is only forwarded to rest-api as a list path.
+const maxFileParam = 4096
+
+// endsStream: "vaulted" is final for the Vault dashboard's rows, which close
+// on it. The resource page keeps listening while the viewer's own link can
+// still change — vaulted content is served through thp like any other — and
+// until the status is Final (statusLoop).
+func endsStream(st *TorrentStatus, env *viewEnv) bool {
+	return st.Final || (st.State == "vaulted" && !env.withView)
+}
+
+// viewEnv is what presenting a status needs about the request: read from the
+// gin context once, in the handler, because the status loop runs on its own
+// goroutine and must not touch the context.
+type viewEnv struct {
+	lang     string
+	loc      *goi18n.Localizer
+	tier     string
+	signedIn bool
+	// claimCap is the cap in the viewer's own claims, Mbps; 0 — none.
+	claimCap float64
+	offers   statusview.Offers
+	// withView: the resource page's stream — build the view and follow the
+	// viewer's thp session.
+	withView bool
+	file     string
+	// debug: a debugStatus preview — the plan box falls back to a sample
+	// offer on an instance without a catalog, so it can be reviewed.
+	debug bool
+	// hold keeps the swarm on this stream's chain through the gaps between
+	// its pieces, and the viewer through a lost stream to thp
+	// (statusview.Hold): the chain gives way to the badge statusview.HoldFor
+	// after the swarm last moved -- and at once when the viewer leaves with
+	// nothing else moving: they are on it while a request of theirs is open
+	// (statusview.Viewer.Present), not while a speed is held.
+	hold statusview.Hold
+}
+
+func (s *Handler) viewEnv(c *gin.Context, claims *api.Claims) *viewEnv {
+	e := &viewEnv{
+		lang:     i18n.GetLang(c),
+		loc:      i18n.GetLocalizer(c),
+		tier:     uclaims.GetFromContext(c).GetContext().GetTier().GetName(),
+		signedIn: auth.GetUserFromContext(c).HasAuth(),
+	}
+	// Only a real catalog: a nil *offer.Service in the interface would be
+	// a non-nil Offers.
+	if s.offers != nil {
+		e.offers = s.offers
+	}
+	if claims != nil {
+		e.claimCap = statusview.RateMbps(claims.Rate)
+	}
+	return e
+}
+
+// sampleOffers stands in for an empty catalog in a debugStatus preview: the
+// promo plan as production sells it, so the plan box can be looked at. Its
+// /trial link is a 404 on such an instance — it is there to be seen.
+type sampleOffers struct{ statusview.Offers }
+
+func (o sampleOffers) Promo() *offer.Offer {
+	if o.Offers != nil {
+		if p := o.Offers.Promo(); p != nil {
+			return p
+		}
+	}
+	return &offer.Offer{Tier: "silver", PeriodDays: 30, RateMbps: 50, TrialDays: 7}
+}
+
+func (o sampleOffers) FasterOnSale(r float64) bool {
+	return (o.Offers != nil && o.Offers.FasterOnSale(r)) || r < 50
+}
+
+// present localizes a status and, for the resource page, builds its view
+// from the viewer's reading as it is at now -- and last, their last reading
+// on the chain while they read gone (statusview.Meter.Last), for the view the
+// page's own player keeps (View.Playing). The loop calls it before
+// comparing with the last message, so a second that would look the same
+// sends nothing -- and, since it ticks every second, the one second the
+// swarm's hold runs out does send the badge.
+//
+// The Vault dashboard's rows get the view's badge alone (Badge), built from
+// the same status with no viewer: they draw no viewer, and the reading is
+// never followed for them. The swarm's hold is theirs too, so a row does not
+// blink "waiting for missing pieces" in the gaps between a transfer's pieces.
+func (e *viewEnv) present(st *TorrentStatus, viewer, last statusview.Viewer, sizeBytes int64, bitrateMbps float64, now time.Time) {
+	localizeStatus(e.loc, st)
+	vt := st.viewTorrent(false)
+	moving := 0.0
+	if statusview.SwarmMoving(vt) {
+		moving = vt.RateBps
+	}
+	held := e.hold.Swarm(moving, now)
+	if !e.withView {
+		b := e.build(st, statusview.Viewer{}, statusview.Viewer{}, 0, 0, false, held).Badge
+		st.Badge = &b
+		return
+	}
+	st.View = e.build(st, viewer, last, sizeBytes, bitrateMbps, false, held)
+}
+
+// viewer is the viewer's reading the view draws at now: the session
+// stream's, and through a stream to thp lost and being reopened the last one
+// that had the viewer on the chain (statusview.Hold.Viewer) -- a pod
+// rotation or an ingress reload is a gap in the readings, not a viewer who
+// left.
+func (e *viewEnv) viewer(w *sessionWatch, now time.Time) statusview.Viewer {
+	return e.hold.Viewer(w.reading(now), w.reconnecting(), now)
+}
+
+// last is the viewer's last reading on the chain while the session stream
+// says they left (statusview.Meter.Last): HLS closes its request between two
+// segments, and the page keeps them on the chain while its own player plays.
+func (e *viewEnv) last(w *sessionWatch, now time.Time) statusview.Viewer {
+	return w.meter.Last(now)
+}
+
+// initialView is the view the page renders before its status stream opens:
+// the Vault database's word only (prepareInitialStatus), an idle status read
+// as "not asked yet", the viewer's link not drawn. No reading, so no plan
+// box: the size the ETA would price does not matter yet.
+func (s *Handler) initialView(c *gin.Context, st *TorrentStatus) *statusview.View {
+	if st == nil {
+		return nil
+	}
+	return s.viewEnv(c, api.GetClaimsFromContext(c)).build(st, statusview.Viewer{}, statusview.Viewer{}, 0, 0, true, 0)
+}
+
+// build is the view of st. last: the viewer's last reading on the chain
+// (statusview.Input.LastViewer); heldBps: the swarm's rate as the hold keeps
+// it (statusview.Input.HeldBps).
+func (e *viewEnv) build(st *TorrentStatus, viewer, last statusview.Viewer, sizeBytes int64, bitrateMbps float64, pending bool, heldBps float64) *statusview.View {
+	offers := e.offers
+	if e.debug {
+		offers = sampleOffers{offers}
+	}
+	return statusview.Build(statusview.Input{
+		Lang:         e.lang,
+		Loc:          e.loc,
+		Torrent:      st.viewTorrent(pending),
+		Viewer:       viewer,
+		LastViewer:   last,
+		Tier:         e.tier,
+		SignedIn:     e.signedIn,
+		ClaimCapMbps: e.claimCap,
+		Offers:       offers,
+		SizeBytes:    sizeBytes,
+		BitrateMbps:  bitrateMbps,
+		HeldBps:      heldBps,
+	})
+}
+
+// viewTorrent is the torrent side of a status for statusview. pending: the
+// page is rendering and no stats were asked for yet. A still swarm has no
+// rate here (swarmStill), whatever the smoothed one still says.
+func (t *TorrentStatus) viewTorrent(pending bool) statusview.Torrent {
+	rate := t.Rate
+	if t.swarmStill {
+		rate = 0
+	}
+	return statusview.Torrent{
+		State:             t.State,
+		Pending:           pending,
+		Progress:          t.Progress,
+		Seeders:           t.Seeders,
+		Leechers:          t.Leechers,
+		Peers:             t.Peers,
+		SwarmKnown:        t.swarmKnown,
+		RateBps:           rate,
+		Checking:          t.Checking,
+		Paused:            t.Paused,
+		NoSeeders:         t.NoSeeders,
+		Pieces:            t.Pieces != "",
+		AvailabilityKnown: t.availKnown,
+		Availability:      t.availability,
+		Missing:           t.holes,
+		WantedMissing:     t.wantedMissing,
+		ReaderMissing:     t.readerMissing,
+		Settling:          t.settling,
+		CacheProgress:     t.cachePct,
+	}
+}
+
+// rateLabelFloor: the swarm rate gets a label from 1 KB/s.
+const rateLabelFloor = 1024
+
+// localizeStatus fills the translated labels the Vault dashboard's rows and
+// the page's older readers use.
+func localizeStatus(loc *goi18n.Localizer, status *TorrentStatus) {
+	status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
+	if status.Paused {
+		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPaused")
+		status.PausedHint = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPausedHint")
+	}
+	if status.NoSeeders {
+		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.noSeeders")
+		status.NoSeedersHint = i18n.TranslateWithLocalizer(loc, "resource.status.noSeedersHint")
+	}
+	if status.Checking {
+		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.checking")
+	}
+	status.Swarm = swarmLabel(loc, status)
+	if status.Checking {
+		// No claims while checking: no swarm suffix either.
+		status.Swarm = ""
+	}
+	if status.PiecesTotal > 0 {
+		status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
+	}
+	if status.Rate >= rateLabelFloor {
+		status.RateLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.rate", map[string]any{"Speed": helpers.Bytes(uint64(status.Rate))})
+	}
 }
 
 // swarmLabel is the badge suffix: seeders and leechers when the seeder splits
@@ -508,13 +853,21 @@ func swarmLabel(loc *goi18n.Localizer, st *TorrentStatus) string {
 	return ""
 }
 
-// debugStatus is the dev-only override for the status badge: with
+// debugStatus is the dev-only override for the status: with
 // ?debug_status=<state> (plus optional seeders, leechers, peers, progress) the
 // SSE stream emits exactly that status once instead of consulting the seeder
-// and Vault, so every badge variant can be reviewed on any resource page. The
-// JS client forwards these params from the page URL. Inert under
-// GIN_MODE=release, like the other debug switches.
-func debugStatus(c *gin.Context) *TorrentStatus {
+// and Vault, so every variant can be reviewed on any resource page. The
+// viewer's own link: user_rate (bytes/s) makes it flow, viewer=zero reads
+// nothing flowing (not drawn: nothing goes to them), viewer_stalled=1
+// stalled, plan_limited=1 at the plan's cap (plan_rate, a rate claim,
+// default 5M); without any of them it is unknown and not drawn. bitrate
+// (Mbps) is what the stalled player's file needs. The swarm's availability:
+// availability=0.73 says the seeder knows it (that share of the file is
+// there), debug_missing=holes paints the pieces nobody has (hatched), and
+// wanted_missing / reader_missing count the wanted ones and the ones an open
+// reader waits on. The JS client forwards these params from the page URL.
+// Inert under GIN_MODE=release, like the other debug switches.
+func debugStatus(c *gin.Context, env *viewEnv) *TorrentStatus {
 	if gin.Mode() == gin.ReleaseMode {
 		return nil
 	}
@@ -525,9 +878,16 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 		return nil
 	}
 	n := func(k string) int { v, _ := strconv.Atoi(c.Query(k)); return v }
-	p, _ := strconv.ParseFloat(c.Query("progress"), 64)
-	r, _ := strconv.ParseFloat(c.Query("rate"), 64)
-	st := &TorrentStatus{State: state, Progress: p, Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: r, Paused: state == "caching" && c.Query("paused") == "1", NoSeeders: state == "caching" && c.Query("noseeders") == "1", Checking: state == "caching" && c.Query("checking") == "1"}
+	f := func(k string) float64 { v, _ := strconv.ParseFloat(c.Query(k), 64); return v }
+	st := &TorrentStatus{State: state, Progress: f("progress"), Seeders: n("seeders"), Leechers: n("leechers"), Peers: n("peers"), Rate: f("rate"), Paused: state == "caching" && c.Query("paused") == "1", NoSeeders: state == "caching" && c.Query("noseeders") == "1", Checking: state == "caching" && c.Query("checking") == "1"}
+	st.swarmKnown = c.Query("seeders") != "" || c.Query("peers") != "" || st.NoSeeders
+	if c.Query("availability") != "" {
+		st.availKnown, st.availability = true, f("availability")
+		st.wantedMissing, st.readerMissing = n("wanted_missing"), n("reader_missing")
+		if holes := debugHoles(c.Query("debug_missing")); holes != nil {
+			st.holes, st.Missing = true, base64.StdEncoding.EncodeToString(holes)
+		}
+	}
 	if fill, active, total := debugPieces(c.Query("debug_pieces")); fill != nil {
 		st.Pieces = base64.StdEncoding.EncodeToString(fill)
 		st.Active = base64.StdEncoding.EncodeToString(active)
@@ -538,7 +898,48 @@ func debugStatus(c *gin.Context) *TorrentStatus {
 			}
 		}
 	}
-	return st.withBarPolicy()
+	st.withBarPolicy()
+	env.debug = true
+	env.present(st, debugViewer(c), statusview.Viewer{}, debugSizeBytes, f("bitrate"), time.Now())
+	return st
+}
+
+// debugSizeBytes is the preview's file, the design's "1.2 GB".
+const debugSizeBytes = 1288490189
+
+// debugViewer is the viewer's reading debugStatus asks for: on the chain
+// (a request open) flowing, at the cap (plan_limited=1 long enough for the
+// plan box, plan_limited=fact its first seconds) or waiting; viewer=zero --
+// known, no request of theirs open.
+func debugViewer(c *gin.Context) statusview.Viewer {
+	capMbps := statusview.RateMbps(c.DefaultQuery("plan_rate", "5M"))
+	ur, _ := strconv.ParseFloat(c.Query("user_rate"), 64)
+	switch pl := c.Query("plan_limited"); {
+	case pl == "1" || pl == "fact":
+		return statusview.Viewer{Known: true, Present: true, Mbps: statusview.Quantize(capMbps), Limited: true, PlanBox: pl == "1", CapMbps: capMbps}
+	case c.Query("viewer_stalled") == "1":
+		return statusview.Viewer{Known: true, Present: true, Stalled: true, CapMbps: capMbps}
+	case ur > 0:
+		return statusview.Viewer{Known: true, Present: true, Mbps: statusview.Quantize(statusview.BytesToMbps(ur)), CapMbps: capMbps}
+	case c.Query("viewer") == "zero":
+		return statusview.Viewer{Known: true, CapMbps: capMbps}
+	}
+	return statusview.Viewer{}
+}
+
+// debugHoles paints the pieces nobody connected has for the dev override:
+// holes -- the design's two runs, 47-61% and 75-88% of the bar.
+func debugHoles(pattern string) []byte {
+	if pattern != "holes" {
+		return nil
+	}
+	bits := make([]byte, PieceBuckets/8)
+	for _, r := range [][2]float64{{0.47, 0.61}, {0.75, 0.88}} {
+		for c := int(r[0] * PieceBuckets); c < int(r[1]*PieceBuckets); c++ {
+			bits[c/8] |= 1 << uint(c%8)
+		}
+	}
+	return bits
 }
 
 // debugPieces paints synthetic piece bars for the dev override:
@@ -590,8 +991,25 @@ func debugPieces(pattern string) (fill, active []byte, total int) {
 	return fill, active, PieceBuckets * 4
 }
 
+// statusVault is what the status reads from Vault (*vault.Vault): the
+// resource's row in the database, and the Vault API's transfer for a funded
+// one.
+type statusVault interface {
+	GetResource(ctx context.Context, resourceID string) (*vaultModels.Resource, error)
+	GetVaultAPIResource(ctx context.Context, resourceID string) (*vault.Resource, error)
+}
+
+// The loop asks Vault every vaultPollEvery ticks (a second each), and every
+// vaultedPollEvery once the torrent is vaulted.
+const (
+	vaultPollEvery   = 2
+	vaultedPollEvery = 30
+)
+
 // statusLoop runs in a background goroutine, computing status updates and sending them to the channel.
-func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID string, out chan<- *TorrentStatus) {
+// For the resource page (env.withView) it also follows the viewer's own thp
+// session stream and puts the view on every status.
+func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID string, out chan<- *TorrentStatus, env *viewEnv) {
 	defer close(out)
 
 	var statsCh <-chan api.EventData
@@ -617,16 +1035,21 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	var lastDBResource *vaultModels.Resource
 	var lastAPIResource *vault.Resource
 
-	type statsResult struct {
-		ch  <-chan api.EventData
-		msg string
-	}
-	statsChResult := make(chan statsResult, 1)
+	statsChResult := make(chan statsConn, 1)
+
+	// The viewer's own link (thp /session-stats), opened once the export
+	// response says which node serves them — cached content included — and
+	// the first status is out. Each open mints its own token.
+	sess := newSessionWatch(resourceID, s.api.SessionStats, realAfter, func() (sessionToken, error) {
+		return sessionStatsToken(s.api.SignClaims, claims, resourceID, time.Now())
+	})
+	defer sess.stop()
+	// sizeBytes prices the download ETA: the page's file, else the torrent.
+	var sizeBytes int64
 
 	// Start stats connection attempt (single attempt, no retry to avoid starting idle seeders)
 	go func() {
-		ch, msg := s.tryConnectStats(ctx, claims, resourceID)
-		statsChResult <- statsResult{ch: ch, msg: msg}
+		statsChResult <- s.tryConnectStats(ctx, claims, resourceID, env.file)
 	}()
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -642,9 +1065,9 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		delay := time.Duration(1<<uint(reconnects)) * time.Second // 2, 4, 8, 16, 32 s
 		log.WithField("resourceID", resourceID).WithField("attempt", reconnects).WithField("in", delay).Info("status: stats stream closed mid-download, reconnecting")
 		time.AfterFunc(delay, func() {
-			ch, msg := s.tryConnectStats(ctx, claims, resourceID)
+			res := s.tryConnectStats(ctx, claims, resourceID, env.file)
 			select {
-			case statsChResult <- statsResult{ch: ch, msg: msg}:
+			case statsChResult <- res:
 			case <-ctx.Done():
 			}
 		})
@@ -672,6 +1095,20 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		if statsStale || status.Paused || status.NoSeeders || status.Checking || status.Rate < 512 {
 			status.Rate = 0
 		}
+		now := time.Now()
+		// The chain's swarm moves while its bytes arrive, not while the
+		// smoothed rate is still decaying from them (movingFor).
+		status.swarmStill = lastProgressAt.IsZero() || now.Sub(lastProgressAt) >= movingFor
+		// The first piece can arrive before the rate meter has an interval
+		// to measure it over: settled once the swarm moved, or the window
+		// is over.
+		status.settling = !firstStatsAt.IsZero() && now.Sub(firstStatsAt) < settleAfter && !env.hold.Moved()
+		env.present(status, env.viewer(sess, now), env.last(sess, now), sizeBytes, 0, now)
+		// A vaulted torrent's page stream stays open for the viewer's own
+		// link; once that link cannot come, nothing is left to say.
+		if env.withView && status.State == "vaulted" && sess.dead() {
+			status.Final = true
+		}
 		data, _ := json.Marshal(status)
 		jsonStr := string(data)
 		if jsonStr == lastJSON {
@@ -683,18 +1120,18 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		case <-ctx.Done():
 			return false
 		}
-		return status.State != "vaulted"
+		return !endsStream(status, env)
 	}
 
 	// Fetch vault state before first send to avoid idle→vaulted flicker
-	if s.vault != nil {
+	if s.statusVault != nil {
 		var err error
-		lastDBResource, err = s.vault.GetResource(ctx, resourceID)
+		lastDBResource, err = s.statusVault.GetResource(ctx, resourceID)
 		if err != nil {
 			log.WithError(err).Warn("failed to get vault resource for initial status")
 		}
 		if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
-			lastAPIResource, err = s.vault.GetVaultAPIResource(ctx, resourceID)
+			lastAPIResource, err = s.statusVault.GetVaultAPIResource(ctx, resourceID)
 			if err != nil {
 				log.WithError(err).Warn("failed to get vault api resource for initial status")
 			}
@@ -712,6 +1149,9 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case res := <-statsChResult:
 			statsCh = res.ch
+			if res.size > 0 {
+				sizeBytes = res.size
+			}
 			log.WithField("resourceID", resourceID).WithField("connected", res.ch != nil).WithField("msg", res.msg).Info("status: stats connection result")
 			// If export says content is cached (no torrent_client_stat), mark as cached
 			if res.ch != nil {
@@ -737,8 +1177,35 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				}
 				initialSent = true
 			}
+			// After the first status: for the Vault dashboard a torrent
+			// vaulted at load has ended the stream just above, before
+			// asking thp for anything.
+			if env.withView {
+				sess.start(ctx, res.session)
+			}
+
+		case r := <-sess.results:
+			sess.opened(ctx, r)
+
+		case ev, ok := <-sess.ch:
+			sess.event(ctx, ev, ok, time.Now())
+			if !sendStatus() {
+				return
+			}
 
 		case ev, ok := <-statsCh:
+			if ok && ev.Status == api.StatTerminated {
+				// The seeder pod is going away and says so with every
+				// counter zero; the stream ends right after. Read as stats,
+				// it was a torrent with nothing stored: "idle", and the close
+				// then reconnected to nothing (shouldReconnect wants
+				// something stored) -- a deploy mid-download read "idle"
+				// for good. Skipped, the close goes through shouldReconnect
+				// with the real progress, and the new pod picks the
+				// download up.
+				log.WithField("resourceID", resourceID).Debug("status: seeder terminating")
+				continue
+			}
 			if ok {
 				pieces.apply(ev)
 				fill, active := pieces.buckets()
@@ -755,17 +1222,22 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 					lastProgressAt = now
 				}
 				lastStats = &TorrentStatsData{
-					Live:        ev.Live == nil || *ev.Live,
-					Rate:        rps,
-					Total:       ev.Total,
-					Completed:   ev.Completed,
-					Seeders:     ev.Seeders,
-					Leechers:    ev.Leechers,
-					Peers:       ev.Peers,
-					Fill:        fill,
-					Active:      active,
-					PiecesDone:  pieces.done(),
-					PiecesTotal: len(pieces.complete),
+					Live:              ev.Live == nil || *ev.Live,
+					Rate:              rps,
+					Total:             ev.Total,
+					Completed:         ev.Completed,
+					Seeders:           ev.Seeders,
+					Leechers:          ev.Leechers,
+					Peers:             ev.Peers,
+					Fill:              fill,
+					Active:            active,
+					PiecesDone:        pieces.done(),
+					PiecesTotal:       len(pieces.complete),
+					Holes:             pieces.holes(),
+					AvailabilityKnown: ev.AvailabilityKnown,
+					Availability:      ev.Availability,
+					WantedMissing:     ev.WantedMissing,
+					ReaderMissing:     ev.ReaderMissing,
 				}
 				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Debug("status: got stats event")
 			} else {
@@ -774,10 +1246,18 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				// forget it only when there is nothing worth reconnecting for.
 				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")
 				statsCh = nil
-				if shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
+				switch {
+				case shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)):
 					statsStale = true
 					scheduleReconnect()
-				} else {
+				case lastStats != nil && lastStats.whole():
+					// The seeder closes the stream once the torrent is
+					// complete: nothing is left to reconnect for, and nothing
+					// to forget either -- the torrent is in the cache.
+					// Forgotten, it read "idle" ("Webtor ожидает" on 5461f58a…,
+					// 2026-09-25). Nothing moves on it any more.
+					lastStats.Rate, lastStats.Active = 0, nil
+				default:
 					lastStats = nil
 				}
 			}
@@ -787,8 +1267,14 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case <-ticker.C:
 
-			if s.vault != nil && vaultTick%2 == 0 {
-				dbRes, err := s.vault.GetResource(ctx, resourceID)
+			// Vaulted is final on this page (the stream stays open only for
+			// the viewer's link): the database is asked far less often.
+			every := vaultPollEvery
+			if lastDBResource != nil && lastDBResource.Vaulted {
+				every = vaultedPollEvery
+			}
+			if s.statusVault != nil && vaultTick%every == 0 {
+				dbRes, err := s.statusVault.GetResource(ctx, resourceID)
 				if err != nil {
 					log.WithError(err).Warn("failed to get vault resource for status")
 				} else {
@@ -796,7 +1282,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				}
 				lastAPIResource = nil
 				if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
-					apiRes, err := s.vault.GetVaultAPIResource(ctx, resourceID)
+					apiRes, err := s.statusVault.GetVaultAPIResource(ctx, resourceID)
 					if err != nil {
 						log.WithError(err).Warn("failed to get vault api resource for status")
 					} else {
@@ -821,10 +1307,24 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	}
 }
 
+// statsConn is one attempt at the stats stream: the stream (nil when not
+// connected), why not ("cached", or what failed), where the viewer's
+// /session-stats stream is (from the same export response; zero when there
+// was none) and the size the download ETA prices (0 unknown).
+type statsConn struct {
+	ch      <-chan api.EventData
+	msg     string
+	session sessionTarget
+	size    int64
+}
+
 // tryConnectStats attempts to establish an SSE connection to the torrent-http-proxy
 // for real-time torrent-level stats. Gets the root content ID from the list response,
-// then uses ExportResourceContent to get the stat URL for the whole torrent.
-func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resourceID string) (<-chan api.EventData, string) {
+// then uses ExportResourceContent to get the stat URL for the whole torrent. The
+// same export response yields the viewer's /session-stats location — no extra
+// call; it is asked for standard-domain URLs, since the premium edge buffers
+// an event stream. file is the page's path, whose size prices the ETA.
+func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resourceID string, file string) statsConn {
 	connCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -836,27 +1336,29 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	if err != nil {
 		msg := fmt.Sprintf("list failed: %v", err)
 		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return nil, msg
+		return statsConn{msg: msg}
 	}
 
 	// Use root item ID (ListResponse embeds ListItem with ID)
 	rootID := list.ID
 	if rootID == "" {
-		return nil, "empty root ID"
+		return statsConn{msg: "empty root ID"}
 	}
+	size := s.priceSize(connCtx, claims, resourceID, file, list.Size)
 
 	// Get torrent-level export using root content ID
-	exportResp, err := s.api.ExportResourceContent(connCtx, claims, resourceID, rootID, "")
+	exportResp, err := s.api.ExportResourceContentStandardDomain(connCtx, claims, resourceID, rootID)
 	if err != nil {
 		msg := fmt.Sprintf("export failed: %v", err)
 		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return nil, msg
+		return statsConn{msg: msg, size: size}
 	}
+	sess := sessionStatsTarget(exportResp, resourceID)
 
 	statItem, ok := exportResp.ExportItems["torrent_client_stat"]
 	if !ok || statItem.URL == "" {
 		// No stat URL means content is cached (rest-api skips torrent_client_stat for cached content)
-		return nil, "cached"
+		return statsConn{msg: "cached", session: sess, size: size}
 	}
 
 	// Check stats URL is accessible before opening SSE
@@ -867,12 +1369,26 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	if err != nil {
 		// 404 from seeder means content is available (cached/vaulted)
 		if err.Error() == "cached" {
-			return nil, "cached"
+			return statsConn{msg: "cached", session: sess, size: size}
 		}
 		msg := fmt.Sprintf("stats SSE failed: %v", err)
 		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return nil, msg
+		return statsConn{msg: msg, session: sess, size: size}
 	}
 	log.WithField("resourceID", resourceID).Info("status: connected to torrent stats SSE")
-	return ch, "connected"
+	return statsConn{ch: ch, msg: "connected", session: sess, size: size}
+}
+
+// priceSize is the size the download ETA prices: the page's file (or folder)
+// when it names one rest-api knows, else the whole torrent. A failed lookup
+// only costs the ETA its precision.
+func (s *Handler) priceSize(ctx context.Context, claims *api.Claims, resourceID, file string, rootSize int64) int64 {
+	if file == "" || file == "/" {
+		return rootSize
+	}
+	l, err := s.api.ListResourceContentCached(ctx, claims, resourceID, &api.ListResourceContentArgs{Path: file, Output: api.OutputList, Limit: 1})
+	if err != nil || l == nil || l.Size <= 0 {
+		return rootSize
+	}
+	return l.Size
 }
