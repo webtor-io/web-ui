@@ -150,6 +150,38 @@ export function present(view, env = {}) {
     return { ...out, key, ctx, hint: hint || '', hintTone: 'plan' };
 }
 
+// playerLabel is what the page's player says on its buffering label
+// (lib/player/BufferingLabel.jsx; carried there by lib/playerLabel.js): null
+// -- the plain "Buffering" -- or the lock with the viewer's cap and the card
+// behind it. The lock says "this stall is the plan's cap", so it is drawn
+// exactly where the status itself sells the stream box at a stall: the
+// player stalled for real (the verdict 'buffering'), the server's verdict at
+// the cap with the box due and something faster on sale, no other offer on
+// screen or on its way (the grace popup), outside the free grace window, no
+// answered offer standing -- present() decides all of it, and this only
+// asks it (its stream_stall is the player's 'buffering' and nothing else).
+// A swarm or network stall has no plan, and a cap that has not held long
+// enough for the box has no card: the plain label either way. The card is
+// that very box -- its words, the player's own "…and this file needs N" --
+// with the link of the player's own surface (plan.player.url, built by the
+// server: /trial?from=player-label).
+export function playerLabel(view, env = {}) {
+    const own = view && view.plan && view.plan.player;
+    if (!own || !own.rate) return null;
+    const pres = present(view, env);
+    const url = safeHref(own.url);
+    if (pres.key !== 'stream_stall' || !pres.box || !url) return null;
+    const cta = pres.box.cta || {};
+    return {
+        rate: own.rate,
+        title: pres.box.title || '',
+        sub: pres.box.sub || '',
+        cta: { label: cta.label || '', note: cta.note || '', url },
+        // The status box's props, for the card's own events.
+        props: { ctx: pres.ctx, location: 'player', auth: view.auth || '', state: pres.key, tier: view.tier || '', target: cta.target || '' },
+    };
+}
+
 // playing is a view as the page shows it while its own player streams
 // (lib/playerActivity.js streaming): the server's whole view with the viewer
 // on the chain at their last reading (view.playing, sent only while the

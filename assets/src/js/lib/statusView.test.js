@@ -496,6 +496,82 @@ test('a file marked "fits": nothing while it plays, the stream box at a real sta
     fire('ended');
 });
 
+// The player's buffering label (lib/playerLabel.js): the status tells the
+// player's bundle, through window, whether a stall now is the plan's cap --
+// only where the card's own block sells the stream box at the stall, and only
+// when that changes.
+test('the player\'s label: the lock at a real stall at the cap, plain otherwise', (t) => {
+    // Clear of every other test's stall minute (STALL_WINDOW_MS).
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 20 * 60 * 1000 });
+    freshVideo();
+    const popup = document.getElementById('grace-cta');
+    t.after(() => {
+        for (const k of GRACE_KEYS) delete video.dataset[k];
+        popup.classList.add('hidden');
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    const labels = [];
+    const onLabel = (e) => labels.push(e.detail);
+    document.addEventListener('tx-player-label', onLabel);
+    t.after(() => document.removeEventListener('tx-player-label', onLabel));
+    const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+    video.dataset.statusStallSub = stallSub;
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 300 });
+    fire('loadstart');
+    fire('playing');
+    source.message(S.tier_dl);
+    assert.equal(window._txPlayerLabel || null, null, 'playing: plain');
+    // A wait that has not lasted is not a stall.
+    setVideo({ readyState: 1 });
+    fire('waiting');
+    source.ping();
+    assert.equal(window._txPlayerLabel || null, null, 'a hiccup: plain');
+    t.mock.timers.tick(1500);
+    source.ping();
+    const label = window._txPlayerLabel;
+    assert.ok(label, 'a real stall at the cap: the lock');
+    assert.equal(label.rate.replaceAll('\u00a0', ' '), '5 Мбит/с');
+    assert.equal(label.sub, stallSub, 'the player\'s own line');
+    assert.equal(label.cta.url, '/ru/trial?from=player-label');
+    assert.equal(card().querySelector('[data-tx-cta]').getAttribute('href'), '/ru/trial?from=status-bar', 'the block keeps its own link');
+    assert.equal(labels.filter(Boolean).length, 1, 'told once');
+    source.ping();
+    source.message(S.tier_dl);
+    assert.equal(labels.filter(Boolean).length, 1, 'the same label is not told again');
+    // The grace popup on screen: one offer at a time.
+    popup.classList.remove('hidden');
+    source.ping();
+    assert.equal(window._txPlayerLabel, null, 'the popup up: plain');
+    popup.classList.add('hidden');
+    source.ping();
+    assert.ok(window._txPlayerLabel, 'the popup gone: the lock again');
+    // Not the cap: the swarm, or the box not due.
+    source.message(S.swarm);
+    assert.equal(window._txPlayerLabel, null, 'the swarm: plain');
+    source.message(S.tier_fact);
+    assert.equal(window._txPlayerLabel, null, 'the cap before the box is due: plain');
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel);
+    // A gap in the data (the seeder's stats a second away): the label holds
+    // with the sticky bar's picture -- a card the viewer opened stays open --
+    // for up to the sticky bar's hold, and goes after it.
+    source.message(S.status_unknown);
+    assert.equal(card().getAttribute('data-key'), 'status_unknown', 'fixture: the card says the gap');
+    assert.ok(window._txPlayerLabel, 'a gap: the lock holds');
+    assert.equal(labels.filter((l) => l === null).length, 2, 'and nobody was told otherwise');
+    t.mock.timers.tick(8000);
+    source.ping();
+    assert.equal(window._txPlayerLabel, null, 'a gap that lasts: plain');
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel);
+    // Inside the grace window by movie time: plain.
+    video.dataset.graceDurationSec = '1200';
+    video.dataset.runOffset = '0';
+    source.ping();
+    assert.equal(window._txPlayerLabel, null, 'inside the grace window: plain');
+});
+
 // Engines without scroll anchoring move everything under the card when its
 // block changes height, even with the card scrolled away: the page scrolls
 // by the difference itself there -- and leaves it to the engine elsewhere.
@@ -568,8 +644,11 @@ test('a final message closes the stream for good', () => {
 });
 
 test('leaving the page closes the stream and stops listening to the player', () => {
+    source.message(S.stream_stall);
+    window._txPlayerLabel = { rate: '5 Мбит/с' };
     destroy.call(target);
     assert.equal(source.closed, true);
+    assert.equal(window._txPlayerLabel, null, 'no status, no word on the cap: the player\'s label goes plain');
     const before = card().getAttribute('data-key');
     setVideo({ paused: false, ended: false, readyState: 1 });
     fire('waiting');

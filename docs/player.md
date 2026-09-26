@@ -74,6 +74,7 @@ as a viewer's pause (`lib/playerActivity.js`).
 
 ## Loading spinner — `stall-watch.js`
 
+(Since 2026-09-26 the spinner is the buffering label, below; what shows and hides it is this.)
 The spinner follows the **clock and the frames**, not the media events. After a seek past the
 buffer `waiting` may never fire, and `seeked` / `canplay` fire when the first fragment is in —
 well before the picture moves again (first seconds of a film, buffer shorter than the 10 s of a
@@ -88,6 +89,54 @@ double tap). `usePlayerState` samples the element every animation frame:
   and stands. Without one (audio, old browsers): the clock advancing on every sample for
   `RECOVER_MS` (250 ms).
 - While the watchdog says "stalled", `canplay` / `playing` do not take the spinner down.
+
+## Buffering label — `BufferingLabel.jsx`, `buffering-label.js`
+
+Owner, 2026-09-26 (the canvas "Плеер: буферизация вместо спиннера", variant A). Where the spinner
+was, and exactly when it was shown (a stall of the playing film, a start, a session seek, the
+translation hold, the next file loading, a moved-to player before its first frame), the player
+shows a compact pill: a small spinner and `player.buffering` ("Buffering"; 32 px, 36 px on touch,
+40 px in fullscreen with a mouse). The plain pill is a status line (`role="status"`) and takes no
+clicks: they go through to the picture, as they went through the spinner.
+
+**At the plan's cap the pill is the lock**: a button "Buffering | [lock] 5 Mbps ›" with the viewer's
+own cap (a paying viewer's own, "20 Mbps"), 44 px on touch. It opens the transfer status's stream
+plan card over the video — `.tx-pbox`, the status's own box (bolt, "the video loads slower than it
+plays", the stream job's `data-status-stall-sub` line, the button `offer.watchUncapped` and the
+trial note) with a close ×, inside the player so a fullscreen player keeps it. Sized by the player
+(the overlay is a size container): side by side from 670 px of player width, the text over a
+full-width button below it, and in a player under 280 px tall (a phone's 16:9 is ~200 px) the card
+takes the pill's place and tightens. It closes on its ×, on the lock, when the film plays again
+(and does not come back by itself at the next stall — that is the lock's to say), and when the
+status takes its word back.
+
+**Whether the stall is the cap is the transfer status's word, not the player's.** The status on
+the same page (`app/resource/status.js`) asks `lib/transferStatus.js` `playerLabel` on every draw:
+the label exists exactly where its own block sells the stream box at a stall — `present()` says
+`stream_stall` with a box (the server's verdict at the cap with the box due, something faster on
+sale, a real stall of at least 1.5 s, not inside the grace window, not while the grace popup is up
+or on its way, no answered offer standing) and the server sent the player's own link
+(`plan.player`, below). It publishes it on `window` with an event (`lib/playerLabel.js`: two bundles,
+two module copies — CLAUDE.md, shared JS state), only when it changes, from the view the sticky bar
+keeps through a one-second gap in the data (an open card does not close on a blip), and takes it back
+on teardown. No status on the page (an embed): no label, the plain pill always. A swarm or network
+stall has no plan: the plain pill.
+
+The player adds only what it knows at this very moment (`capLock`, the label can be a second old):
+the wait on screen is the playing film stalling — not a start, a session seek, the translation hold
+or the next file — and by its own clock the film is past its free grace window. The grace popup has
+no clause of its own: it holds the film paused, and a paused film shows no pill.
+
+**One source of truth.** The card has no copy of its own: its title, line, button label and note are
+the stream box's as `present()` made them, and its link is the server's `plan.player.url` — the
+stream box's destination through the player's own `/trial` surface, `offer.FromPlayerLabel`
+(`/trial?from=player-label`; a checkout or `/donate` link is the box's own), built in
+`services/statusview` next to the box's `status-bar` link, so the two count apart in
+`webui_trial_shortlink_total{from}`. `plan.player.rate` is the lock's number (`speed()`, a no-break
+space before the unit). Events: `player-label-lock-shown` (the lock drawn, once per player and set
+of props), `donate-player-label-shown` (the card opened: on screen because the viewer asked),
+`donate-player-label` (its button, Umami's own click), with the status box's props and `location`
+`player`.
 
 ## Loader restart on a stall — `loader-restart.js`
 
@@ -187,6 +236,8 @@ presses stop and is flushed on teardown):
 | `player-tap-seek` | `dir: forward\|back`, `seconds` | a streak of double taps ended (900 ms) |
 | `subtitle-delay` | `delay`, `source: dialog\|key` | the delay settled (2 s) |
 | `player-media-session` | `action: play\|pause\|seek` | first use of each action per player |
+| `player-label-lock-shown` | the status box's props, `location: player` | the buffering label's lock drawn, once per player (see "Buffering label") |
+| `donate-player-label-shown` | the same | the lock opened the plan card |
 | `stream-start` | + `rate`, `subtitleDelay` | what the stream started with (remembered settings make no change event) |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
@@ -305,11 +356,11 @@ one subtitle file.
   read as the saved position being ignored, and the question is the viewer's to answer.
   `resumeAt()` remains for the settings restart: a file ≥90% finished restarts from the top.
 - While the next file loads (not prewarmed: a stream start like any other, up to a minute) the
-  player says so: spinner overlay, a spinner in the Next button, the card's kicker reads "Loading
+  player says so: the buffering label, a spinner in the Next button, the card's kicker reads "Loading
   the next one…". Between the two players the stage keeps its height
   (`.wt-player-stage--switching`) — an empty block has none, and the page jumped.
 - A player mounted by a move is **loading, not paused** (`awaitStart`): until its first frame it
-  shows the spinner, not the big Play button — both at once was two answers. Ends with `playing`,
+  shows the buffering label, not the big Play button — both at once was two answers. Ends with `playing`,
   with the resume prompt (a question only the viewer can answer), or after 10 s (autoplay refused:
   Play is what they need). The empty stage shows the player's own spinner (`--empty`, the same SVG
   as `LoadingSpinner`), removed as soon as a player is in it.

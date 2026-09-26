@@ -38,6 +38,9 @@ import {
 } from './track-dialog.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
+import { BufferingPill, CapCard } from './BufferingLabel';
+import { capLock } from './buffering-label';
+import { currentPlayerLabel, onPlayerLabel } from '../playerLabel';
 import { init as initI18n, t, tf } from './i18n';
 import { getLang } from '../i18n';
 import { shareResource } from '../share/share';
@@ -587,8 +590,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // The popup is server-rendered by the action template (stream_video.html)
     // as a sibling of the player container, NOT inside containerRef — so we
     // search globally. CTA is a per-page singleton (one player per action page).
-    // If the user is in fullscreen, exit first — the CTA lives outside the
-    // fullscreen element and would be invisible otherwise.
+    // A native <dialog> since 2026-09-26, opened with showModal() like the
+    // captions dialog: the top layer shows it over a fullscreen player, so
+    // the viewer is no longer taken out of fullscreen for it.
     // The film stops while the popup is up (owner, 2026-09-26) and goes on
     // with the answer -- only if it was the popup that stopped it
     // (grace-hold.js). A session seek past the window puts the popup up as
@@ -606,12 +610,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // (lib/playerActivity.js graceOfferDue) and now reads the popup
         // itself.
         videoEl.dataset.graceCtaShown = '';
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
-        }
         const hold = graceHoldRef.current;
         hold.start();
-        el.classList.remove('hidden');
+        // A native <dialog> (stream_video.html), opened like the captions
+        // and embed dialogs: showModal() puts it in the top layer, over a
+        // fullscreen player too, so the viewer is not taken out of
+        // fullscreen for it, and nothing on the page clips it. Anything
+        // else (jsdom, a page rendered before the dialog markup) is shown
+        // by its class, as the popup used to be.
+        const modal = typeof el.showModal === 'function';
+        if (modal) {
+            if (!el.open) el.showModal();
+        } else {
+            // A plain element lives outside the fullscreen element and would
+            // stay invisible there: leave fullscreen first, as before.
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+            el.classList.remove('hidden');
+        }
         // `paused`: the popup stopped a playing film. A seek's run held
         // behind it is known only at the answer (its `paused` below).
         if (window.umami) window.umami.track('grace-soft-cta-shown', { paused: hold.held() });
@@ -628,7 +645,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // another grace window starts without it. Before the film goes
             // on: its first events are read against it.
             videoEl.dataset.graceCtaAnswered = action;
-            el.classList.add('hidden');
+            if (modal) {
+                if (el.open) el.close();
+            } else {
+                el.classList.add('hidden');
+            }
             const paused = hold.held();
             hold.release({ play: via === 'play' });
             if (window.umami) window.umami.track('grace-soft-cta-click', { action, via, paused });
@@ -638,6 +659,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (closeBtn) closeBtn.addEventListener('click', () => hide('dismiss'), { once: true });
         const contBtn = el.querySelector('.grace-cta-continue');
         if (contBtn) contBtn.addEventListener('click', () => hide('continue'), { once: true });
+        // Esc closes a modal dialog on its own; here it is the close button:
+        // the answer "dismiss", and the film goes on.
+        if (modal) {
+            el.addEventListener('cancel', (e) => {
+                e.preventDefault();
+                hide('dismiss');
+            }, { once: true });
+        }
     }, [state.currentTime, graceDurationSec]);
 
     // Keyboard shortcuts
@@ -1289,6 +1318,50 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         };
     }, []);
 
+    // ---- the buffering label (BufferingLabel.jsx, buffering-label.js) ----
+    //
+    // Where the spinner was, with its visibility: "Buffering". At the plan's
+    // cap it is the lock, the button that opens the status's stream plan
+    // card over the video. Whether the cap is why is the transfer status's
+    // word (lib/transferStatus.js playerLabel), carried here from the
+    // status's bundle by lib/playerLabel.js -- none in an embed; capLock adds
+    // what only the player knows at this very moment.
+    const [capLabel, setCapLabel] = useState(() => currentPlayerLabel());
+    // Read again on subscribing: a label published between the first render
+    // and this effect would otherwise wait for the next change.
+    useEffect(() => {
+        setCapLabel(currentPlayerLabel());
+        return onPlayerLabel(setCapLabel);
+    }, []);
+    const [capCardOpen, setCapCardOpen] = useState(false);
+    const bufferingShown = showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading));
+    const lock = bufferingShown ? capLock({
+        label: capLabel, playing: state.playing, loading: state.loading, seeking: sessionSeeking, preHolding, nextLoading,
+        awaitingStart, graceSec: graceDurationSec, movieTime: state.currentTime,
+    }) : null;
+    // The card goes with the lock -- playback resumed (or paused, sought,
+    // left for the next file), the cap's verdict gone -- and does not come
+    // back by itself with the next stall: that is the lock's to say.
+    useEffect(() => { if (!lock && capCardOpen) setCapCardOpen(false); }, [!!lock, capCardOpen]);
+    // The lock's impression, once per player and set of props: a film at
+    // the cap stalls again and again, and one lock seen is one lock seen.
+    const lockSeenRef = useRef(new Set());
+    useEffect(() => {
+        if (!lock) return;
+        const key = JSON.stringify(lock.props || {});
+        if (lockSeenRef.current.has(key)) return;
+        lockSeenRef.current.add(key);
+        track('player-label-lock-shown', lock.props);
+    }, [lock]);
+    // Opening the card is its button's impression: on screen because the
+    // viewer asked for it (the status box's counts half on screen for 1 s).
+    const toggleCapCard = useCallback(() => {
+        if (!lock) return;
+        if (!capCardOpen) track('donate-player-label-shown', lock.props);
+        setCapCardOpen(!capCardOpen);
+    }, [lock, capCardOpen]);
+    const closeCapCard = useCallback(() => setCapCardOpen(false), []);
+
     const handleVideoClick = useCallback((e) => {
         if (!isVideo || sessionSeekingRef.current || showResumePromptRef.current) return;
         if (e.target.closest('.wt-player-controls')) return;
@@ -1430,10 +1503,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 );
             })()}
 
-            {/* Loading spinner (only when playing + buffering, or seeking) */}
-            {showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading)) && (
-                <div class="wt-player-overlay wt-player-overlay--loading">
-                    <LoadingSpinner />
+            {/* The buffering label, where the spinner was (a stall of the
+                playing film, a start, a seek, a hold); at the plan's cap the
+                lock and the card it opens (capLock above). */}
+            {bufferingShown && (
+                <div class={`wt-player-overlay wt-buffering${lock ? ' wt-buffering--cap' : ''}${lock && capCardOpen ? ' wt-buffering--open' : ''}`}>
+                    <BufferingPill label={lock} open={!!lock && capCardOpen} onToggle={toggleCapCard} />
+                    {lock && capCardOpen && <CapCard label={lock} onClose={closeCapCard} />}
                 </div>
             )}
 

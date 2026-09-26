@@ -1,8 +1,9 @@
 import av from '../../lib/av';
 import {
-    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playing, present, upsellElsewhere,
+    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playerLabel, playing, present, upsellElsewhere,
 } from '../../lib/transferStatus';
 import { createPlayerActivity } from '../../lib/playerActivity';
+import { publishPlayerLabel } from '../../lib/playerLabel';
 import { debugQuery } from '../../lib/statusDebug';
 
 // The transfer status view (#torrent-status, views/resource/get.html): one
@@ -113,6 +114,13 @@ av(async function() {
             if (d) window.scrollBy(0, d);
         }
         ctaWatch.refresh();
+        // The player's buffering label: the lock and its card only where
+        // the block sells the stream box at a stall (the same env). From the
+        // view the sticky bar keeps through a one-second gap in the data:
+        // the lock would blink off there, and a card the viewer opened would
+        // close under them. Carried over to the player's bundle on window
+        // (lib/playerLabel.js); published only when it changes.
+        publishPlayerLabel(playerLabel(shown(held ? steady : last), env));
         // Broadcast rather than reach into the sticky bar from here: this
         // view owns the stream, not the page furniture that shows it.
         // `moving`: the chain is up -- something moves, or the viewer waits
@@ -150,6 +158,8 @@ av(async function() {
     let onSwap = null;
 
     const teardown = () => {
+        // No status, no word on the cap: the player's label goes plain.
+        publishPlayerLabel(null);
         if (onSwap) window.removeEventListener('async', onSwap);
         if (stickyVault) stickyVault.removeEventListener('click', onStickyVault);
         detailsStops.forEach((stop) => stop());

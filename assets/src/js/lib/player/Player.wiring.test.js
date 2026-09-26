@@ -4040,3 +4040,284 @@ test('cues a reload puts back are shifted by the run that is playing now', async
     assert.equal(el.track.cues.length, 1, 'the viewer keeps the line they had');
     assert.equal(el.track.cues[0].startTime, 10, 'at 100 - 90 s: the run that is playing starts at 90');
 });
+
+// ---- the buffering label (BufferingLabel.jsx, buffering-label.js) ---------
+//
+// Owner, 2026-09-26: the spinner is a pill that says "Buffering". At the
+// plan's cap -- the transfer status's word, published on window by
+// lib/playerLabel.js -- it is the lock, a button with the viewer's cap that
+// opens the status's own stream plan card over the video. The label here is
+// the one the status builds from the server's own message (the Go-generated
+// fixture the status tests run on), not a hand-written look-alike.
+
+const { publishPlayerLabel } = await import('../playerLabel.js');
+const { playerLabel } = await import('../transferStatus.js');
+const STALL_SUB = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+const CAP_LABEL = playerLabel(
+    JSON.parse(readFileSync(path.join(HERE, '../__fixtures__/transfer-status-states.json'), 'utf8'))
+        .find((s) => s.design === 'tier_dl').status.view,
+    { player: 'buffering', stallSub: STALL_SUB },
+);
+
+const bufferingPill = (p) => p.container.querySelector('.wt-buffering-pill');
+const lockButton = (p) => p.container.querySelector('button.wt-buffering-pill--cap');
+const capCard = (p) => p.container.querySelector('.wt-cap-card');
+
+// filmClock moves the element's clock while the film plays -- what the
+// player's stall watchdog (stall-watch.js) reads as playback -- and stands
+// it still for a stall. jsdom's clock does not move on its own.
+function filmClock(p) {
+    let timer = null;
+    return {
+        run() { if (!timer) timer = setInterval(() => { p.video.currentTime += 0.05; }, 10); },
+        stop() { clearInterval(timer); timer = null; },
+    };
+}
+// The film starts (`play`, the first frame's `playing`) at `at` s.
+async function filmPlays(p, clock, at = 300) {
+    p.video.paused = false;
+    p.video.currentTime = at;
+    clock.run();
+    p.video.dispatchEvent(new dom.window.Event('play'));
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+}
+// The data runs out: `waiting`, and the clock stands.
+async function filmStalls(p, clock) {
+    clock.stop();
+    p.video.dispatchEvent(new dom.window.Event('waiting'));
+    await settle();
+}
+// It comes back: `playing`, and the clock runs for longer than the watchdog
+// asks of a recovery (RECOVER_MS).
+async function filmResumes(p, clock) {
+    clock.run();
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await wait(400);
+}
+// The page's player: with controls (the label is part of them), as
+// stream_video.html renders it.
+async function mountLabelled(t, prepare) {
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('controls', '');
+        if (prepare) prepare(page);
+    });
+    const clock = filmClock(p);
+    t.after(() => {
+        clock.stop();
+        publishPlayerLabel(null);
+        destroyPlayer();
+    });
+    return { p, clock, log: playback(p.video) };
+}
+
+test('the spinner is a pill that says Buffering, with the spinner\'s visibility', async (t) => {
+    assert.ok(CAP_LABEL && CAP_LABEL.cta.url, 'fixture: the status\'s label at a stall at the cap');
+    const { p, clock } = await mountLabelled(t);
+    assert.equal(bufferingPill(p), null, 'paused: nothing');
+    await filmPlays(p, clock);
+    assert.equal(bufferingPill(p), null, 'playing: nothing');
+    await filmStalls(p, clock);
+    const pill = bufferingPill(p);
+    assert.ok(pill, 'a stall: the pill');
+    assert.equal(pill.tagName, 'SPAN', 'no status word on the cap: the plain pill, not a control');
+    assert.equal(pill.textContent, 'player.buffering');
+    assert.ok(pill.querySelector('svg.wt-buffering-spin'), 'its own small spinner');
+    assert.equal(p.container.querySelector('.wt-buffering .animate-spin'), null, 'the big spinner is gone');
+    assert.equal(lockButton(p), null);
+    await filmResumes(p, clock);
+    assert.equal(bufferingPill(p), null, 'playing again: gone');
+});
+
+test('the lock only with the status\'s word on the cap, and only while the film stalls', async (t) => {
+    const { p, clock, log } = await mountLabelled(t);
+    await filmPlays(p, clock);
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.equal(bufferingPill(p), null, 'the word alone, the film playing: nothing');
+    await filmStalls(p, clock);
+    const lock = lockButton(p);
+    assert.ok(lock, 'a stall at the cap: the lock');
+    assert.equal(lock.querySelector('.wt-buffering-cap').textContent, CAP_LABEL.rate, 'the viewer\'s own cap');
+    assert.equal(lock.textContent.replaceAll(' ', ' '), 'player.buffering5 Мбит/с');
+    assert.equal(lock.getAttribute('aria-expanded'), 'false');
+    assert.ok(lock.querySelector('.wt-buffering-chev'), 'the chevron: there is more');
+    assert.deepEqual(p.events.filter((e) => e.name === 'player-label-lock-shown').map((e) => e.data), [CAP_LABEL.props]);
+    // The word goes (the swarm, not the cap; the cap let go): plain again.
+    publishPlayerLabel(null);
+    await settle();
+    assert.equal(lockButton(p), null);
+    assert.equal(bufferingPill(p).tagName, 'SPAN', 'a swarm or network stall: the plain pill');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p));
+    assert.equal(p.events.filter((e) => e.name === 'player-label-lock-shown').length, 1, 'one lock seen is one lock seen');
+    assert.equal(log.play + log.pause, 0, 'nothing played or paused the film');
+});
+
+test('a player mounted after the status has spoken reads its word', async (t) => {
+    publishPlayerLabel(CAP_LABEL);
+    const { p, clock } = await mountLabelled(t);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p));
+});
+
+// The status draws every second: a word published between the player's
+// first render and its subscription is read again on subscribing, not lost
+// until the next change.
+test('a word published while the player mounts is not lost', async (t) => {
+    const p = mount();
+    p.video.setAttribute('controls', '');
+    const clock = filmClock(p);
+    t.after(() => {
+        clock.stop();
+        publishPlayerLabel(null);
+        destroyPlayer();
+    });
+    await initPlayer(p.container);
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    playback(p.video);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p));
+});
+
+test('the lock opens the status\'s stream plan card over the video, with the player\'s own link', async (t) => {
+    const { p, clock, log } = await mountLabelled(t);
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    click(lockButton(p));
+    await settle();
+    const card = capCard(p);
+    assert.ok(card, 'the card');
+    assert.ok(card.classList.contains('tx-pbox'), 'the status\'s own box');
+    assert.ok(p.container.querySelector('.wt-player').contains(card), 'inside the player: a fullscreen player keeps it');
+    assert.equal(card.querySelector('.tx-pt').textContent, 'Видео подгружается медленнее, чем играет');
+    assert.equal(card.querySelector('.tx-ps').textContent, STALL_SUB, 'the stream job\'s line');
+    const a = card.querySelector('a.tx-sbtn');
+    assert.equal(a.getAttribute('href'), '/ru/trial?from=player-label', 'the trial through the player\'s own surface');
+    assert.equal(a.getAttribute('target'), '_blank');
+    assert.equal(a.textContent, 'Смотреть без ограничения скорости');
+    assert.equal(card.querySelector('.tx-pn').textContent, CAP_LABEL.cta.note);
+    assert.equal(a.getAttribute('data-umami-event'), 'donate-player-label');
+    assert.equal(a.getAttribute('data-umami-event-location'), 'player');
+    assert.equal(a.getAttribute('data-umami-event-target'), 'trial');
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true');
+    assert.equal(lockButton(p).querySelector('.wt-buffering-chev'), null, 'open: the chevron goes');
+    assert.deepEqual(p.events.filter((e) => e.name === 'donate-player-label-shown').map((e) => e.data), [CAP_LABEL.props]);
+    // The clicks are the card's: the film is neither toggled nor sought.
+    a.addEventListener('click', (e) => e.preventDefault());
+    click(a);
+    click(card);
+    await settle();
+    assert.equal(log.play + log.pause, 0, 'nothing played or paused the film');
+    // The lock again closes it; the close button too.
+    click(lockButton(p));
+    await settle();
+    assert.equal(capCard(p), null);
+    click(lockButton(p));
+    await settle();
+    click(capCard(p).querySelector('.wt-cap-card-x'));
+    await settle();
+    assert.equal(capCard(p), null, 'closed');
+    assert.ok(lockButton(p), 'the lock stays while the film stalls');
+    assert.equal(log.play + log.pause, 0);
+});
+
+test('the card closes when the film plays again, and does not come back by itself', async (t) => {
+    const { p, clock } = await mountLabelled(t);
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    click(lockButton(p));
+    await settle();
+    assert.ok(capCard(p), 'fixture: open');
+    await filmResumes(p, clock);
+    assert.equal(capCard(p), null, 'playing: closed');
+    assert.equal(bufferingPill(p), null);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'the next stall: the lock');
+    assert.equal(capCard(p), null, 'and only the lock');
+});
+
+test('the card closes when the status takes its word back', async (t) => {
+    const { p, clock } = await mountLabelled(t);
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    click(lockButton(p));
+    await settle();
+    assert.ok(capCard(p), 'fixture: open');
+    publishPlayerLabel(null);
+    await settle();
+    assert.equal(capCard(p), null);
+    assert.equal(bufferingPill(p).tagName, 'SPAN');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.equal(capCard(p), null, 'the word back: the lock, closed');
+});
+
+// The status takes its word back inside the grace window; a word a second
+// old (a session seek back into the window) is the player's to refuse.
+test('inside the free grace window by movie time: the plain pill, whatever the word', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => { page.video.dataset.graceDurationSec = '600'; });
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock, 30);
+    await filmStalls(p, clock);
+    assert.ok(bufferingPill(p), 'a stall');
+    assert.equal(lockButton(p), null, 'inside the window: no lock');
+    await filmResumes(p, clock);
+    // Past the window (no popup on this page to put up).
+    p.video.currentTime = 700;
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'past it: the lock');
+});
+
+test('no lock while the grace popup holds the film; a stall at the cap after the answer is the lock', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => gracePopup(page, 30));
+    publishPlayerLabel(CAP_LABEL); // a word the status has not taken back yet
+    await filmPlays(p, clock, 31);
+    assert.ok(popupUp(), 'fixture: the popup is up');
+    assert.equal(p.video.paused, true, 'fixture: and holds the film');
+    await filmStalls(p, clock);
+    assert.equal(lockButton(p), null, 'no lock behind the popup');
+    assert.equal(capCard(p), null);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(p.video.paused, false, 'fixture: the answer plays it');
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'past the window, the popup answered: the lock');
+});
+
+// (The next file loading and the translation hold: buffering-label.test.js.)
+test('a session seek waits under the plain pill, even at the cap', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        page.video.dataset.sessionId = 's1';
+        page.video.dataset.sessionSeekUrl = '/session/seek';
+        page.video.setAttribute('data-duration', '3600');
+    });
+    let releasePost = null;
+    p.setResponse((url, params) => {
+        if (params && params.method === 'POST' && String(url).startsWith('/session/seek')) {
+            return new Promise((resolve) => {
+                releasePost = () => resolve({ ok: true, status: 200, json: async () => ({ offset: 900 }) });
+            });
+        }
+        return { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ offset: 0 }) };
+    });
+    p.video.load = () => {};
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'fixture: the lock');
+    keydown('ArrowRight');
+    await settle();
+    assert.ok(bufferingPill(p), 'the seek waits under the pill');
+    assert.equal(lockButton(p), null, 'a session seek is not the cap');
+    releasePost();
+    await settle();
+});
