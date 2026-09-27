@@ -25,6 +25,16 @@
 // player's first real stall); the player playing anything else -> the fact
 // without a button, or nothing for a file under the cap with room to spare;
 // no player -> the download box.
+//
+// THE BOX STAYS (owner, 2026-09-27: "the rest of the page keeps jumping up
+// and down"). What present() picks is this second's; what the block draws of
+// the plan box is keepBox()'s: once a box has been up on this page view it
+// stays -- through the cap's end, a pause, the viewer leaving, the download
+// ending, the variant rules -- with the last words it had, until the viewer
+// closes it (its ×, 24 h in this browser) or the offer turns false (no
+// seeders, Vault failing). One offer at a time is keepBox's too: another
+// offer on screen keeps a box from coming up and takes an up one's button
+// down in place, never the box.
 // The player is also what keeps the viewer on the chain between two HLS
 // segments, where the proxy honestly counts no request of theirs open: the
 // server sends the view with them still there next to its own, and
@@ -76,10 +86,6 @@ export function safeHref(url) {
 //                   nothing is sold -- though the server's verdict can be on
 //                   there (hls.js fetches the segments past the window ahead,
 //                   at the cap)
-//   upsellElsewhere another offer is on screen (the grace popup, the cap
-//                   modal, the download nudge), or the grace popup is on its
-//                   way (playerActivity graceOfferDue): one offer at a time,
-//                   so the box gives way to its line
 //   offerAnswered   the viewer answered an offer about the cap (the grace
 //                   popup's "continue at N Mbps" or its close, the
 //                   slow-download modal's "watch as is") and the player has
@@ -94,6 +100,8 @@ export function safeHref(url) {
 // tier_dl / stream_ok / stream_stall / stream_over; cached_tier and
 // vaulted_tier keep theirs for a download), the analytics context, the hint
 // or the box, and the viewer segment's tone when it is not the server's.
+// Another offer on screen is not present()'s to weigh: keepBox's (one offer
+// at a time, below).
 export function present(view, env = {}) {
     const out = { key: view.key, ctx: '', hint: view.hint || '', hintTone: '', box: null, viewerTone: '', vault: !!view.vault };
     const plan = view.plan;
@@ -140,11 +148,11 @@ export function present(view, env = {}) {
     // says the cap, nothing is sold, and no line stands in for the box --
     // the block grows once, by the box, not by a line and then the box.
     if (!box && !variant.hint) return { ...out, key, ctx, hint: '' };
-    if (box && safeHref(box.cta && box.cta.url) && !env.upsellElsewhere) {
+    if (box && safeHref(box.cta && box.cta.url)) {
         return { ...out, key, ctx, hint: '', box: { ...box, sub: stall || box.sub || '', cta: { ...box.cta } } };
     }
-    // No button -- nothing faster on sale, or another offer already on
-    // screen: the cap is still said, as the line under the bar.
+    // No button -- nothing faster on sale: the cap is still said, as the
+    // line under the bar.
     let hint = stall || variant.hint || '';
     if (!hint && box) hint = stream ? box.sub || box.title : box.title;
     return { ...out, key, ctx, hint: hint || '', hintTone: 'plan' };
@@ -262,6 +270,152 @@ export function upsellElsewhere(doc = document) {
     return false;
 }
 
+// ---- the plan box stays (owner, 2026-09-27) ----
+//
+// The ~80px box came after 8 s of a steady cap and went 10 s after it, on a
+// pause, a stall, the viewer leaving, a variant rule -- and every time
+// everything under the card moved. Now a box that has been up on this page
+// view stays until the viewer closes it; the server's timing is unchanged
+// (the box due after 8 s at the cap -- a short burst still brings none), only
+// its going is the page's. Its words are the last it was sent with, and while
+// the server sends a box the words follow it in place (the ETA, download or
+// stream). The page view: a reload starts over; so does picking another file,
+// whose stream prices another file (app/resource/status.js, at the swap: the
+// memory reset, the box down, and no box from the old stream's word until
+// the new one speaks -- taken, it would put the old file's box back here as a
+// fresh one).
+// The status token's renewal re-renders the block and keeps it (the memory
+// lives on the container).
+
+// BOX_GOES: the states whose offer would be false, where an up box goes --
+// no seeders (the red badge: nothing comes faster from a swarm that is not
+// there) and Vault failing the torrent.
+export const BOX_GOES = new Set(['noseed', 'vault_failed']);
+
+// BOX_QUIET_HINTS: the states whose hint is not drawn above an up box -- they
+// name no cause, only that nobody downloads it now (paused) or that the data
+// has a gap (status_unknown), and they flip with the player's buffer bursts.
+export const BOX_QUIET_HINTS = new Set(['paused', 'status_unknown']);
+
+// The viewer's × on the box: none again in this browser for DISMISS_MS, on
+// any torrent (the same key for all). A timestamp in localStorage, like the
+// promo banner's (lib/promoBanner.js); no server state. The pink "cap" on the
+// chain, the grace popup and the player's lock are not the box: they stay.
+export const DISMISS_KEY = 'status-plan-box-dismissed';
+export const DISMISS_MS = 24 * 60 * 60 * 1000;
+
+// storage is the window's localStorage, or null where reading it throws (a
+// sandboxed frame, storage blocked).
+function storage(win) {
+    try {
+        return (win && win.localStorage) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// dismissedAt is when the box was last closed in this browser, 0 for never
+// (or unreadable).
+export function dismissedAt(win = window) {
+    try {
+        const s = storage(win);
+        const n = Number(s ? s.getItem(DISMISS_KEY) : 0);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+// boxDismissed: the viewer closed a plan box in this browser less than
+// DISMISS_MS ago -- the stored close, or this page's own where storage keeps
+// nothing (mem.dismissedAt). A close stamped in the future (a clock set
+// back) does not count.
+export function boxDismissed(mem, now, win = window) {
+    const at = Math.max((mem && mem.dismissedAt) || 0, dismissedAt(win));
+    const age = now - at;
+    return at > 0 && age >= 0 && age < DISMISS_MS;
+}
+
+// dismissBox records the viewer's close at now: the box goes from this page
+// view (mem) and none comes up in this browser for DISMISS_MS.
+export function dismissBox(mem, now, win = window) {
+    mem.box = null;
+    mem.dismissedAt = now;
+    try {
+        const s = storage(win);
+        if (s) s.setItem(DISMISS_KEY, String(now));
+    } catch (e) {
+        /* this page remembers it (mem) */
+    }
+}
+
+// newBoxMemory is a page view's memory of its plan box: the box last drawn
+// ({ box, key, ctx, auth, tier } -- its words, and the state, context and
+// viewer it was drawn for: its props), and this page's own close.
+export function newBoxMemory() {
+    return { box: null, dismissedAt: 0 };
+}
+
+// keepBox is what the block draws of the plan box, given what present()
+// picked now (pres, for view) and what this page view has drawn before (mem,
+// updated here):
+//   dismissed  the viewer closed a box in this browser within DISMISS_MS
+//              (boxDismissed): none comes up
+//   elsewhere  another offer is on screen (the grace popup, the cap modal,
+//              the download nudge), or the grace popup is on its way
+//              (playerActivity graceOfferDue) -- one offer at a time: a box
+//              does not come up then (and no line stands in for it -- it
+//              would turn into the box a moment later, the block growing
+//              twice), and an up box stays with its button and trial note
+//              down in place (`quiet`: hidden by visibility, so the box keeps
+//              its height; no href, so no impression and no click)
+// An up box stays whatever this second says, with the last words it had --
+// and in place of any line of the plan's (the fact, the cap): the box is the
+// plan's line, and a line above it would move it. A hint of another cause
+// (the view has no plan) stands above it as it would without it -- except
+// the ones that only say the viewer's side went quiet (BOX_QUIET_HINTS): they
+// came and went with every burst of the player's buffer, moving the page
+// under a box that stayed put (Chrome check 2026-09-27). It goes
+// only where the offer turns false (BOX_GOES), or at the viewer's close (not
+// here: dismissBox). The returned boxKey and boxCtx are the drawn box's state
+// and context -- its props, which the block's current key may have left.
+export function keepBox(mem, pres, view, { dismissed = false, elsewhere = false } = {}) {
+    if (BOX_GOES.has(view && view.key)) {
+        mem.box = null;
+        return { ...pres, box: null };
+    }
+    const fresh = pres.box ? { box: pres.box, key: pres.key, ctx: pres.ctx, auth: (view && view.auth) || '', tier: (view && view.tier) || '' } : null;
+    if (mem.box) {
+        if (fresh) mem.box = fresh;
+        const plan = !!(view && view.plan) || BOX_QUIET_HINTS.has(view && view.key);
+        return {
+            ...pres,
+            box: mem.box.box,
+            boxKey: mem.box.key,
+            boxCtx: mem.box.ctx,
+            quiet: !!elsewhere,
+            hint: plan ? '' : pres.hint,
+            hintTone: plan ? '' : pres.hintTone,
+        };
+    }
+    if (!fresh) return pres;
+    if (dismissed || elsewhere) return { ...pres, box: null, hint: '', hintTone: '' };
+    mem.box = fresh;
+    return { ...pres, boxKey: fresh.key, boxCtx: fresh.ctx, quiet: false };
+}
+
+// applyKeptBox writes the box a page view keeps into a bound block that has
+// had no message yet: the status token's renewal renders the block afresh
+// -- with no box, the page render does not know the viewer -- and the box
+// that was up must not go for the second before the first message.
+export function applyKeptBox(refs, mem, location) {
+    const k = mem && mem.box;
+    if (!k) return;
+    const pres = { key: k.key, ctx: k.ctx, box: k.box, boxKey: k.key, boxCtx: k.ctx, quiet: false };
+    for (const b of refs.boxes) applyBox(b, pres, k, location);
+    hide(refs.detailsPlan, false);
+}
+
 // ---- writing into the DOM, only what changed (lib/inPlace.js) ----
 
 // bindBlock finds the block's slots once. Cached on the element: a block is
@@ -304,6 +458,8 @@ export function bindBlock(block) {
             cta: el.querySelector('[data-tx-cta]'),
             label: el.querySelector('[data-tx-cta-label]'),
             note: el.querySelector('[data-tx-pn]'),
+            // The viewer's ×, the page's wiring (app/resource/status.js).
+            close: el.querySelector('[data-tx-pclose]'),
         })),
         details: one('[data-tx-details]'),
         detailsPlan: one('[data-tx-dplan]'),
@@ -324,19 +480,31 @@ function applyBox(b, pres, view, location) {
     hide(b.el, !box);
     if (!box) return;
     const cta = box.cta || {};
+    // Another offer on screen: the button and its note down in place
+    // (style.css: visibility, the box keeps its height), and no href -- no
+    // click, no impression (createCtaWatch counts only a button with one).
+    const quiet = !!pres.quiet;
+    attr(b.el, 'data-quiet', quiet);
     text(b.title, box.title || '');
     text(b.sub, box.sub || '');
     text(b.label, cta.label || '');
     text(b.note, cta.note || '');
-    attr(b.cta, 'href', safeHref(cta.url) || null);
-    // The click is Umami's own (data-umami-event on the <a>); the impression
-    // (createCtaWatch) reads the same props.
-    attr(b.cta, 'data-umami-event-ctx', pres.ctx);
-    attr(b.cta, 'data-umami-event-location', location);
-    attr(b.cta, 'data-umami-event-auth', view.auth || '');
-    attr(b.cta, 'data-umami-event-state', pres.key);
-    attr(b.cta, 'data-umami-event-tier', view.tier || '');
-    attr(b.cta, 'data-umami-event-target', cta.target || '');
+    attr(b.cta, 'href', quiet ? null : safeHref(cta.url) || null);
+    // The click is Umami's own (data-umami-event on the <a>, and on the ×
+    // its dismiss); the impression (createCtaWatch) reads the same props. A
+    // box kept up past its state says the state it was drawn in (keepBox
+    // boxKey/boxCtx).
+    const props = {
+        ctx: pres.boxCtx || pres.ctx,
+        location,
+        auth: view.auth || '',
+        state: pres.boxKey || pres.key,
+        tier: view.tier || '',
+        target: cta.target || '',
+    };
+    for (const el of [b.cta, b.close]) {
+        for (const k of PROPS) attr(el, `data-umami-event-${k}`, props[k]);
+    }
 }
 
 // applyView writes a view, as present() refined it, into a bound block.

@@ -1,7 +1,9 @@
 import av from '../../lib/av';
 import {
-    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playerCause, playerLabel, playing, present, upsellElsewhere,
+    NAVBAR_H, applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
+    paintBar, playerCause, playerLabel, playing, present, upsellElsewhere,
 } from '../../lib/transferStatus';
+import { hide } from '../../lib/inPlace';
 import { createPlayerActivity } from '../../lib/playerActivity';
 import { publishPlayerLabel } from '../../lib/playerLabel';
 import { debugQuery } from '../../lib/statusDebug';
@@ -33,9 +35,10 @@ const GAP_HOLD_MS = 8000;
 const TICK_MS = 1000;
 
 // Engines without scroll anchoring (Safari before 27) move everything under
-// the card when its block grows or shrinks -- the plan box coming and going
-// -- even while the block is scrolled away, so a playing video jumps. There
-// the page makes up for it itself (render).
+// the card when its block grows or shrinks -- the plan box coming, closed by
+// the viewer, or gone with another file -- even while the block is scrolled
+// away, so a playing video jumps. There the page makes up for it itself
+// (steadily).
 const anchoring = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('overflow-anchor', 'auto');
 
 av(async function() {
@@ -46,7 +49,16 @@ av(async function() {
     if (!resourceId || !card) return;
     container._statusGone = false;
 
+    // The plan box this page view has drawn, and the viewer's close of it
+    // (lib/transferStatus.js keepBox): on the container, which the status
+    // token's renewal keeps while it swaps the block and runs this again --
+    // a box that is up stays up through it. A reload is a new container.
+    const mem = container._txBox || (container._txBox = newBoxMemory());
     const blocks = [{ refs: bindBlock(card), location: 'card' }];
+    // The fresh block of a renewal has no box yet (the page renders none: the
+    // viewer is not known then) -- the kept one goes in before the copy is
+    // made and before the first message, so the block never loses it.
+    applyKeptBox(blocks[0].refs, mem, 'card');
     const mirrorHost = document.querySelector(`[data-status-mirror-for="${resourceId}"]`);
     if (mirrorHost) blocks.push({ refs: bindBlock(mirrorBlock(card, mirrorHost)), location: 'sticky' });
     // The copy's Vault link was never bound by the page's async links (it
@@ -68,6 +80,28 @@ av(async function() {
     let steady = null; // the last one that was not a gap
     let gapSince = 0;
     let ticker = null;
+    // Another file was picked and the stream reopened on it (onSwap), and
+    // the new stream has not yet said anything but a gap: `last` and
+    // `steady` are the old stream's word. The block and the player's label
+    // are still drawn from it with this second's player, as before; the plan
+    // box is not -- it priced the old file, and keepBox would take it as this
+    // page view's.
+    let swapped = false;
+    // Scrolled away above the viewport, on an engine that does not anchor:
+    // whatever the block gains or loses in height while `write` runs, the
+    // page scrolls by, so nothing under it moves.
+    const steadily = (write) => {
+        let before = null;
+        if (!anchoring()) {
+            const r = container.getBoundingClientRect();
+            if (r.bottom <= 0) before = r.height;
+        }
+        write();
+        if (before !== null) {
+            const d = container.getBoundingClientRect().height - before;
+            if (d) window.scrollBy(0, d);
+        }
+    };
     const render = () => {
         if (!last || !last.view) return;
         // What the page's player adds to the view (lib/transferStatus.js
@@ -94,25 +128,22 @@ av(async function() {
         // viewer's session and are counted like any other request of theirs.
         const streaming = activity.streaming();
         const shown = (status) => (streaming ? playing(status.view) : status.view);
-        const held = isGap(last) && steady && steady.view && Date.now() - gapSince < GAP_HOLD_MS;
-        // Scrolled away above the viewport, on an engine that does not
-        // anchor: whatever the block gains or loses in height, the page
-        // scrolls by, so nothing under it moves.
-        let before = null;
-        if (!anchoring()) {
-            const r = container.getBoundingClientRect();
-            if (r.bottom <= 0) before = r.height;
-        }
-        for (const b of blocks) {
-            const status = b.location === 'sticky' && held ? steady : last;
-            const view = shown(status);
-            applyView(b.refs, view, present(view, env), b.location);
-            paintBar(b.refs, view, status);
-        }
-        if (before !== null) {
-            const d = container.getBoundingClientRect().height - before;
-            if (d) window.scrollBy(0, d);
-        }
+        const now = Date.now();
+        const held = isGap(last) && steady && steady.view && now - gapSince < GAP_HOLD_MS;
+        // The plan box: what present() picks this second, folded into what
+        // this page view has drawn -- an up box stays until the viewer
+        // closes it, and another offer on screen keeps a box from coming up
+        // and takes an up one's button down (keepBox).
+        const keep = { dismissed: boxDismissed(mem, now, window), elsewhere: env.upsellElsewhere };
+        steadily(() => {
+            for (const b of blocks) {
+                const status = b.location === 'sticky' && held ? steady : last;
+                const view = shown(status);
+                const pres = present(view, env);
+                applyView(b.refs, view, keepBox(mem, swapped ? { ...pres, box: null } : pres, view, keep), b.location);
+                paintBar(b.refs, view, status);
+            }
+        });
         ctaWatch.refresh();
         // The player's buffering label: the lock and its card whenever the
         // view says the viewer is held at the cap with the stream box due,
@@ -136,8 +167,9 @@ av(async function() {
         }));
         // The view the player keeps changes with the player's own time too
         // (a paused buffer that stopped growing): drawn again every second
-        // while there is one.
-        const tick = !!last.view.plan || held || !!last.view.playing;
+        // while there is one. A box kept up follows other offers coming and
+        // going (its button) the same way.
+        const tick = !!last.view.plan || held || !!last.view.playing || !!mem.box;
         if (tick && !ticker) ticker = setInterval(render, TICK_MS);
         if (!tick && ticker) {
             clearInterval(ticker);
@@ -146,11 +178,48 @@ av(async function() {
     };
     const activity = createPlayerActivity(document, { onChange: render });
 
+    // Both copies of the box down, and the details' plan line with them,
+    // where no message draws the block: the viewer's × before the first one,
+    // another file picked (onSwap).
+    const dropBoxes = () => {
+        steadily(() => {
+            for (const b of blocks) {
+                for (const box of b.refs.boxes) hide(box.el, true);
+                hide(b.refs.detailsPlan, true);
+            }
+        });
+        ctaWatch.refresh();
+    };
+
+    // The viewer's × on the box, in the card's block or its copy in the
+    // sticky bar: gone from both, and none in this browser for a day, on any
+    // torrent (lib/transferStatus.js dismissBox). The click itself is
+    // Umami's (data-umami-event="donate-status-bar-dismiss" on the ×, the
+    // box's props). Focus on the × goes to what stays of its block: the
+    // chain while it is up, the badge otherwise.
+    const onDismiss = (e) => {
+        e.preventDefault();
+        const block = e.currentTarget.closest('[data-tx]');
+        const focused = !!block && block.contains(document.activeElement);
+        dismissBox(mem, Date.now(), window);
+        render();
+        // Before the first message there is nothing to render from.
+        dropBoxes();
+        if (focused) {
+            const refs = blocks.find((b) => b.refs.block === block);
+            const to = refs && (block.getAttribute('data-mode') === 'badge' ? refs.refs.badge && refs.refs.badge.el : refs.refs.toggle);
+            if (to) to.focus({ preventScroll: true });
+        }
+    };
+    const closes = blocks.flatMap((b) => b.refs.boxes.map((box) => box.close).filter(Boolean));
+    for (const x of closes) x.addEventListener('click', onDismiss);
+
     const onStatus = (status) => {
         if (isGap(status)) {
             if (!last || !isGap(last)) gapSince = Date.now();
         } else {
             steady = status;
+            swapped = false;
         }
         last = status;
         render();
@@ -160,12 +229,22 @@ av(async function() {
     // (and the file its download ETA prices) stays. A file that differs from
     // the one on the stream reopens it on the new one -- a second of the
     // viewer's link not drawn, against a plan box quoting another file's
-    // wait. Set below, once the stream exists.
+    // wait. A box kept up goes with the old stream: the new file is a new
+    // page view for it, as a reload would be (the owner's call, 2026-09-27:
+    // no carrying it across); its close stays. It goes with the swap, the
+    // page's own update, and no box is drawn from the old stream's word
+    // (`swapped`): that word priced the old file, and the ticker, a
+    // keep-alive or the new player draw from it long before the new stream
+    // speaks (the server waits for the seeder's stats) -- keepBox took the
+    // old box back as this page view's, and a gap as the new stream's first
+    // word brought it back in the sticky bar from `steady` (review
+    // 2026-09-27). Set below, once the stream exists.
     let onSwap = null;
 
     const teardown = () => {
         // No status, no word on the cap: the player's label goes plain.
         publishPlayerLabel(null);
+        for (const x of closes) x.removeEventListener('click', onDismiss);
         if (onSwap) window.removeEventListener('async', onSwap);
         if (stickyVault) stickyVault.removeEventListener('click', onStickyVault);
         detailsStops.forEach((stop) => stop());
@@ -266,6 +345,9 @@ av(async function() {
         const next = picked && picked.dataset.statusFile;
         if (!next || next === file) return;
         file = next;
+        swapped = true;
+        mem.box = null;
+        dropBoxes();
         const source = container._statusSource;
         if (!source || finished) return;
         source.close();

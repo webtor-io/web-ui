@@ -586,16 +586,19 @@ grace segments are the viewer's requests like any other (below).
 **The plan's cap** has transitions of its own ("Your speed and the plan
 limit" below): the pink link after 3 of thp's events at the cap over its
 whole five-second window, off at the verdict's first miss; the plan box after
-8 s of a steady cap, and gone only 10 s after the cap was last seen — through
+8 s of a steady cap, and sent until 10 s after the cap was last seen — through
 a dip it stays, so the ~80 px box does not come and go with the bucket's
 sawtooth or a slow second of the swarm, and a small file's few seconds at the
-cap show the pink link and no box. Neither comes up on the first seconds of a
+cap show the pink link and no box. **Once up on the page, the box stays**
+until the viewer closes it (owner, 2026-09-27; `lib/transferStatus.js`
+`keepBox`, below): the server's sending it or not decides only when it comes
+and what it says. Neither comes up on the first seconds of a
 new stream to thp (every token rotation, every reopen, a web-ui rollout
 reconnecting every page), whose events average over the 1–4 s thp's ring
 holds so far and read a player's segment fetched at the cap as the cap; nor
 does the box rise on the window's tail after the viewer's requests closed.
-The viewer leaving takes both at once (no viewer on the chain, no plan);
-coming back within the 10 s the box is up again at once.
+The viewer leaving takes the pink link at once (no viewer on the chain, no
+plan) and the server's box with it; the page keeps the box it drew.
 
 The viewer is also held through a lost stream to thp (`Hold.Viewer`,
 `sessionWatch.reconnecting`) — a gap in the data, not a departure: a pod
@@ -868,7 +871,8 @@ under the piece bar.
   use 0.76, throttled 0.72 — raise it for the second before the viewer left
   (`TestMeter_TheTailRaisesNoBox`, `TestStatusStream_PlanTailRaisesNoBox`).
   Before the box is due the view carries the plan's fact and cap but no
-  variant — no box. For a download and for a player buffering or playing a
+  variant — no box. These are the server's view; what the page draws of the
+  box once it has been up is the page's (the box stays, below). For a download and for a player buffering or playing a
   file over the cap no line stands in its place either (`present` draws
   nothing under the bar, so the block grows once, by the box); a player
   playing a file of unknown bitrate gets the fact line and one playing a
@@ -977,7 +981,7 @@ under the piece bar.
   The ETA prices the file the page is on at the cap's own megabit (2^20
   bits, like thp's limiter; `offer.transferSeconds`); picking another file
   swaps only `#content`, so the page reopens the stream with the new `file=`
-  (`#file[data-status-file]`). No button on pause, no or few seeders (a few
+  (`#file[data-status-file]`). No box comes up on pause, no or few seeders (a few
   seeders slower than the cap win over the viewer being at the cap: they read
   what is cached, the rest waits for the swarm with or without a plan),
   pieces nobody has, a stall, a Vault failure, or while another offer is on screen
@@ -988,9 +992,39 @@ under the piece bar.
   more later, none while the tab is hidden; `playerActivity.graceOfferDue`):
   on two clocks a render in between drew the box and the popup folded it
   into a line; and once the viewer has answered the popup, for a file over
-  the cap, until their first real stall (above) — a held box included: the hold keeps it through a dip under the
-  cap, never over a stall, few seeders, a Vault failure or a viewer who left
-  (`statusview.capped`). Umami: docs/offers.md.
+  the cap, until their first real stall (above) — the server's held box
+  included: its hold keeps it through a dip under the cap, never over a
+  stall, few seeders, a Vault failure or a viewer who left
+  (`statusview.capped`). That is when a box comes up; one already up on the
+  page stays (next). Umami: docs/offers.md.
+- **The plan box stays** (owner, 2026-09-27: "the rest of the page keeps
+  jumping up and down" — the ~80 px box came and went with the cap, a pause,
+  a stall, the viewer leaving, the variant rules, and everything under the
+  card moved each time). `present()` still picks what this second calls for;
+  `keepBox` folds it into what the page view has drawn (its memory on the
+  `#torrent-status` container, so the status token's renewal keeps it; a
+  reload or another file starts over — the box goes with the swap of
+  `#content`, and no box is taken from the old stream's word, which priced
+  the old file, until the new stream says something other than a gap: the
+  ticker drawing that word before the new stream spoke put the old box back
+  as this page view's). Once up, the box stays with the last
+  words it was sent with — the server's box, while it sends one, updates it
+  in place (ETA, download or stream variant) — and the plan's fact and cap
+  lines are not drawn over it, nor the pause's and the data gap's hints
+  (`BOX_QUIET_HINTS`: they flipped with each burst of the player's buffer
+  and moved the page by a line). It goes only with no seeders (`noseed`) or a
+  Vault failure (`vault_failed`), where the offer would be false, and at the
+  viewer's ×: gone from the card and the sticky bar, none for 24 h in this
+  browser on any torrent (`localStorage["status-plan-box-dismissed"]`, a
+  timestamp; this page view remembers it where storage fails), Umami
+  `donate-status-bar-dismiss` with the box's props. The ×, like the rest of
+  the page's memory, touches only the box: the pink cap on the chain, the
+  grace popup and the player's lock stay. One offer at a time (the grace
+  popup or its way up, the cap modal, the download nudge): no box comes up
+  while another is on screen — and no line in its place; an up box keeps its
+  place with its button and trial note down (`data-quiet`, `visibility:
+  hidden`, no href: no click, no impression). Rules and markup:
+  docs/transfer_status.html "The box stays".
 - **Colour is cause.** A stalled viewer link (open requests, no bytes) is
   amber — the swarm — only while the content comes from the swarm; on cached
   or vaulted content it is drawn neutral with the same "waiting for data".

@@ -580,12 +580,15 @@ html {
 
 /* Plan box: bolt, title and ETA on the left; the button with the trial note
    under it on the right (action/download_file.html's pattern). */
+/* Right padding: room for the × in the corner (.tx-px), so the button beside
+   it never sits under it. */
 .tx-pbox {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 14px 44px 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   background: rgba(26, 34, 53, 0.35);
@@ -656,6 +659,43 @@ html {
   line-height: 13px;
   color: #64748b;
   text-align: center;
+}
+/* The viewer's × (owner, 2026-09-27): the box stays until they close it. A
+   44px target in the top-right corner -- a finger's size on a phone -- with
+   the glyph small in it. */
+.tx-px {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: #64748b;
+  cursor: pointer;
+}
+.tx-px:hover {
+  color: #f1f5f9;
+}
+.tx-px:focus-visible {
+  outline: 2px solid #fd79a8;
+  outline-offset: -8px;
+}
+.tx-px svg {
+  width: 14px;
+  height: 14px;
+}
+/* Another offer on screen (the grace popup, the cap modal, the download
+   nudge): the box stays, its button and the note under it go down in place
+   -- visibility, not display, so the box keeps its height and nothing under
+   the card moves (lib/transferStatus.js keepBox). */
+.tx-pbox[data-quiet] .tx-pr {
+  visibility: hidden;
 }
 
 /* "Where the bottleneck is": a popover (top layer -- the card's
@@ -764,6 +804,17 @@ html {
 .tx-dplan .tx-pr {
   width: 100%;
 }
+/* The details' copy of the box has no ×: the popover has its own close, and
+   the box is closed where it stands, under the bar. */
+.tx-dplan .tx-pbox {
+  padding-right: 16px;
+}
+.tx-dplan .tx-pl {
+  padding-right: 0;
+}
+.tx-dplan .tx-px {
+  display: none;
+}
 .tx-dplan .tx-sbtn {
   justify-content: center;
   width: 100%;
@@ -854,9 +905,15 @@ html {
     background: none;
     font-size: 11px;
   }
+  /* The button full width under the words; the × clear of the title,
+     beside it rather than beside the button. */
+  .tx-pbox {
+    padding-right: 16px;
+  }
   .tx-pl {
     min-width: 0;
     flex-basis: 100%;
+    padding-right: 28px;
   }
   .tx-pr {
     width: 100%;

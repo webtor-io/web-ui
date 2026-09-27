@@ -242,6 +242,7 @@ func TestTransferStatusSSR(t *testing.T) {
 				"data-tx-row":    4,
 				"data-tx-pbox":   2,
 				"data-tx-cta ":   2,
+				"data-tx-pclose": 2,
 				"data-tx-hint":   1,
 				"data-tx-vault":  1,
 				"data-tx-bar":    1,

@@ -76,6 +76,14 @@ const freshVideo = () => {
 // The player's buffer: its end, as hls.js leaves it; jsdom's own is always
 // empty.
 const buffered = (end) => setVideo({ buffered: { length: 1, end: () => end } });
+const DAY = 24 * 60 * 60 * 1000;
+// The plan box stays once up (lib/transferStatus.js keepBox), so a test about
+// when one comes starts from a page view that has none: no seeders is where
+// an up box goes.
+const forgetBox = () => {
+    source.message(S.noseed);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'fixture: no box up');
+};
 
 test('one stream, for the view and the viewer, on the file the page is on', () => {
     assert.equal(target.id, 'torrent-status');
@@ -142,6 +150,7 @@ test('a file over the cap playing: nothing inside the grace window, nothing past
         setVideo({ paused: true, currentTime: 0 });
         fire('pause');
     });
+    forgetBox();
     const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,9 Мбит/с';
     video.dataset.statusStallSub = stallSub;
     video.dataset.statusOverCap = '';
@@ -184,6 +193,7 @@ test('a file over the cap playing, no grace popup: the stream box once due', (t)
         setVideo({ paused: true, currentTime: 0 });
         fire('pause');
     });
+    forgetBox();
     const stallSub = 'До 10 Мбит/с, а файлу нужно 12 Мбит/с';
     video.dataset.statusStallSub = stallSub;
     video.dataset.statusOverCap = '';
@@ -199,7 +209,15 @@ test('a file over the cap playing, no grace popup: the stream box once due', (t)
         assert.equal(box.querySelector('[data-tx-cta]').getAttribute('data-umami-event-state'), 'stream_over');
         assert.equal(box.querySelector('[data-tx-cta]').getAttribute('data-umami-event-ctx'), 'stream');
     }
-    // Before the box is due: the pink link, nothing under the bar.
+    // The cap's first seconds again (the box not due by the server's
+    // count): the box up stays, and nothing else stands under the bar.
+    source.message(S.tier_fact);
+    assert.equal(card().getAttribute('data-key'), 'stream_over');
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'up: it stays');
+    assert.equal(card().querySelector('[data-tx-hint]').hidden, true);
+    // A page view that has had none: before the box is due, the pink link
+    // and nothing under the bar.
+    forgetBox();
     source.message(S.tier_fact);
     assert.equal(card().getAttribute('data-key'), 'stream_over');
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, true);
@@ -210,8 +228,10 @@ test('a file over the cap playing, no grace popup: the stream box once due', (t)
 // the status reads the element's on every render, the player puts its grace
 // popup up from a render effect a frame or more later (none while the tab
 // is hidden). Between the two the popup is on its way (playerActivity
-// graceOfferDue): the line, never a box the popup folds into a line a moment
-// later. While the popup is up it is the offer: the line. The viewer
+// graceOfferDue): no box -- one offer at a time -- and no line in its place
+// either (keepBox, 2026-09-27: the line came and went with the popup, and
+// the block grew and shrank twice). While the popup is up it is the offer:
+// nothing under the bar. The viewer
 // answers "continue at N Mbps", or closes it: they have just been told of
 // the cap, so no box -- and no line, "no stops" being false for this file --
 // until the player's first real stall; then the stream box, as at any
@@ -224,6 +244,7 @@ for (const [i, answer] of ['continue', 'dismiss'].entries()) {
         // stall below colours a minute, and the tests share one status view.
         t.mock.timers.enable({ apis: ['Date'], now: Date.now() - (2 - i) * 60 * 60 * 1000 });
         freshVideo();
+        forgetBox();
         const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,9 Мбит/с';
         const popup = document.getElementById('grace-cta');
         // The next tests share this player: put it back even if this one fails.
@@ -250,15 +271,14 @@ for (const [i, answer] of ['continue', 'dismiss'].entries()) {
         source.ping();
         for (const block of [card(), sticky()]) {
             assert.equal(box(block).hidden, true, 'no box while the popup is on its way');
-            assert.equal(hint(block).hidden, false);
-            assert.equal(block.querySelector('[data-tx-htext]').textContent, stallSub, 'the cap, as the line');
+            assert.equal(hint(block).hidden, true, 'and no line that would go again with the popup');
         }
-        // The popup up: it is the offer -- the same line, no box.
+        // The popup up: it is the offer -- nothing under the bar.
         video.dataset.graceCtaShown = '';
         popup.classList.remove('hidden');
         source.ping();
         assert.equal(box(card()).hidden, true, 'popup open: no box');
-        assert.equal(card().querySelector('[data-tx-htext]').textContent, stallSub);
+        assert.equal(hint(card()).hidden, true, 'no line');
         // Answered (Player.jsx marks the element, then hides the popup).
         video.dataset.graceCtaAnswered = answer;
         popup.classList.add('hidden');
@@ -310,6 +330,7 @@ for (const [i, answer] of ['continue', 'dismiss'].entries()) {
 // A file under the cap playing: no line at all (owner, 2026-09-26), where the
 // fact used to say "no stops".
 test('a file under the cap playing: no line, the link as it is', () => {
+    forgetBox();
     video.dataset.statusFitsCap = '';
     setVideo({ paused: false, ended: false, seeking: false, readyState: 4 });
     fire('loadstart');
@@ -326,10 +347,11 @@ test('a file under the cap playing: no line, the link as it is', () => {
 
 test('the page\'s player decides the variant the moment it changes, not at the next message', (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
-    source.message(S.tier_dl);
-    const button = card().querySelector('[data-tx-cta]');
+    forgetBox();
     setVideo({ paused: false, readyState: 4 });
     fire('playing');
+    source.message(S.tier_dl);
+    const button = card().querySelector('[data-tx-cta]');
     assert.equal(card().getAttribute('data-key'), 'stream_ok');
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'smooth playback: no button');
     // The stream job's line rides on the player.
@@ -344,20 +366,133 @@ test('the page\'s player decides the variant the moment it changes, not at the n
     assert.equal(box.hidden, false);
     assert.equal(box.querySelector('[data-tx-ps]').textContent, 'Без подписки — до 5 Мбит/с, а файлу нужно 8 Мбит/с');
     assert.equal(card().querySelector('[data-tx-cta]'), button, 'the same button all along');
+    // Playing on: the block says so at once; the box, once up, stays with
+    // the stall's words.
+    setVideo({ readyState: 4 });
+    fire('playing');
+    t.mock.timers.tick(61_000);
+    source.ping();
+    assert.equal(card().getAttribute('data-key'), 'stream_ok');
+    assert.equal(box.hidden, false, 'up: it stays');
+    assert.equal(box.querySelector('[data-tx-pt]').textContent, 'Видео подгружается медленнее, чем играет');
+    assert.equal(box.querySelector('[data-tx-cta]').getAttribute('data-umami-event-state'), 'stream_stall', 'the box it is');
+    assert.equal(card().querySelector('[data-tx-hint]').hidden, true, 'no "no stops" over it');
+    delete video.dataset.statusStallSub;
 });
 
-test('one offer at a time: the grace popup up, the status keeps its button down', () => {
+// One offer at a time (the grace popup, the cap modal, the download nudge),
+// without a jump: a box up keeps its place with its button down; none comes
+// up while another offer is on screen, and no line stands in for it.
+test('one offer at a time: the grace popup up, the status keeps its button down in place', () => {
+    const popup = document.getElementById('grace-cta');
+    const box = () => card().querySelector('[data-tx-pbox]');
     source.message(S.tier_dl);
-    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false);
-    document.getElementById('grace-cta').classList.remove('hidden');
+    assert.equal(box().hidden, false);
+    popup.classList.remove('hidden');
     source.ping();
-    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true);
-    assert.equal(card().querySelector('[data-tx-hint]').hidden, false, 'the cap is still said');
-    document.getElementById('grace-cta').classList.add('hidden');
+    for (const block of [card(), sticky()]) {
+        const b = block.querySelector('[data-tx-pbox]');
+        assert.equal(b.hidden, false, 'the box stays');
+        assert.ok(b.hasAttribute('data-quiet'), 'its button down');
+        assert.equal(b.querySelector('[data-tx-cta]').hasAttribute('href'), false);
+        assert.equal(block.querySelector('[data-tx-hint]').hidden, true, 'no line');
+    }
+    popup.classList.add('hidden');
     source.ping();
-    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false);
+    assert.equal(box().hidden, false);
+    assert.equal(box().hasAttribute('data-quiet'), false, 'the popup gone: the button back');
+    assert.equal(box().querySelector('[data-tx-cta]').getAttribute('href'), '/ru/trial?from=status-bar');
+    // None up: while the popup is on screen none comes, and nothing in its
+    // place; it comes once the popup has gone.
+    forgetBox();
+    popup.classList.remove('hidden');
+    source.message(S.tier_dl);
+    assert.equal(box().hidden, true, 'another offer on screen: no box comes up');
+    assert.equal(card().querySelector('[data-tx-hint]').hidden, true, 'and no line');
+    popup.classList.add('hidden');
+    source.ping();
+    assert.equal(box().hidden, false, 'the popup gone: the box');
+    assert.equal(box().hasAttribute('data-quiet'), false);
     setVideo({ paused: true, ended: true });
     fire('ended');
+});
+
+// The owner's rule (2026-09-27): once up, the box stays -- the cap over (the
+// server sends no box any more), a pause, the download done, a gap in the
+// data -- with its last words, in both blocks, the same nodes, never hidden.
+// It goes where the offer would be false: no seeders, Vault failing.
+test('the box stays once up: past the cap, in both blocks, with its last words; no seeders or a Vault failure take it', async () => {
+    forgetBox();
+    source.message(S.tier_dl);
+    const blocks = [card(), sticky()];
+    const boxes = blocks.map((b) => b.querySelector('[data-tx-pbox]'));
+    const words = (b) => ['[data-tx-pt]', '[data-tx-ps]', '[data-tx-cta-label]', '[data-tx-pn]'].map((q) => b.querySelector(q).textContent)
+        .concat(b.querySelector('[data-tx-cta]').getAttribute('href'), b.querySelector('[data-tx-cta]').getAttribute('data-umami-event-state'));
+    const was = boxes.map(words);
+    assert.ok(boxes.every((b) => !b.hidden), 'fixture: up');
+    const records = [];
+    const mo = new window.MutationObserver((r) => records.push(...r));
+    for (const b of blocks) mo.observe(b, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    for (const d of ['active', 'cached_flow', 'paused', 'cached', 'idle_torrent', 'status_unknown', 'vault_waiting', 'tier_fact', 'active']) {
+        source.message(S[d]);
+        boxes.forEach((b, i) => {
+            assert.equal(b.hidden, false, `${d}: stays`);
+            assert.deepEqual(words(b), was[i], `${d}: its words`);
+        });
+    }
+    await Promise.resolve();
+    mo.disconnect();
+    const removed = records.filter((r) => r.type === 'childList').flatMap((r) => [...r.removedNodes]).filter((n) => n.nodeType === 1);
+    assert.deepEqual(removed, [], 'nothing removed');
+    const around = (el) => boxes.some((b) => b === el || b.contains(el) || el.contains(b));
+    assert.deepEqual(records.filter((r) => r.type === 'attributes' && around(r.target)), [], 'the box and what holds it: never hidden');
+    assert.equal(card().getAttribute('data-key'), 'active', 'the block says where it is');
+    source.message(S.vault_failed);
+    assert.ok(boxes.every((b) => b.hidden), 'Vault failing: gone');
+    source.message(S.tier_dl);
+    assert.ok(boxes.every((b) => !b.hidden), 'due again: up again');
+    source.message(S.noseed);
+    assert.ok(boxes.every((b) => b.hidden), 'no seeders: gone');
+    source.message(S.active);
+    assert.ok(boxes.every((b) => b.hidden), 'and not back with the next second');
+});
+
+// The viewer's ×, here in the sticky bar: the box goes from both blocks and
+// none comes for a day in this browser. Only the box: the pink cap on the
+// chain and the player's lock stay.
+test('the ×: gone from both blocks, none for a day; the pink cap and the player\'s lock stay', (t) => {
+    // A month back: run out for the tests after this one (their clocks
+    // start at most three days back), in storage and in the page's memory.
+    const t0 = Date.now() - 30 * DAY;
+    t.mock.timers.enable({ apis: ['Date'], now: t0 });
+    t.after(() => window.localStorage.removeItem('status-plan-box-dismissed'));
+    forgetBox();
+    source.message(S.tier_dl);
+    const x = sticky().querySelector('[data-tx-pclose]');
+    assert.equal(x.getAttribute('data-umami-event'), 'donate-status-bar-dismiss', 'the click is Umami\'s');
+    const props = Object.fromEntries(['ctx', 'location', 'auth', 'state', 'tier', 'target'].map((k) => [k, x.getAttribute(`data-umami-event-${k}`)]));
+    assert.deepEqual(props, { ctx: 'download', location: 'sticky', auth: 'anon', state: 'tier_dl', tier: 'free', target: 'trial' });
+    x.focus();
+    x.click();
+    for (const block of [card(), sticky()]) {
+        assert.ok(Array.from(block.querySelectorAll('[data-tx-pbox]')).every((b) => b.hidden), 'both copies, both blocks');
+        assert.equal(block.querySelector('[data-tx-dplan]').hidden, true);
+        assert.equal(block.querySelector('[data-tx-hint]').hidden, true, 'no line in its place');
+        const seg = block.querySelectorAll('[data-tx-seg]')[1];
+        assert.equal(seg.getAttribute('data-tone'), 'plan', 'the pink cap stays');
+        assert.equal(seg.querySelector('.tx-note').textContent, '· потолок');
+    }
+    assert.equal(window.localStorage.getItem('status-plan-box-dismissed'), String(t0), 'a timestamp in this browser');
+    assert.equal(document.activeElement, sticky().querySelector('[data-tx-toggle]'), 'focus to what stays of its block');
+    assert.ok(window._txPlayerLabel, 'the player\'s lock is not the box');
+    source.message(S.tier_dl);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'the next box: not today');
+    t.mock.timers.tick(DAY - 1000);
+    source.message(S.tier_dl);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'a second short of a day: still not');
+    t.mock.timers.tick(1000);
+    source.message(S.tier_dl);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'a day on: the box again');
 });
 
 test('a one-second gap: the card says it, the sticky bar keeps its picture', () => {
@@ -472,13 +607,13 @@ test('the sticky bar\'s Vault link presses the card\'s', () => {
 test('a file marked "fits": nothing while it plays, the stream box at a real stall', (t) => {
     // Past the minute an earlier test's stall counts for (STALL_WINDOW_MS).
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 5 * 60 * 1000 });
+    forgetBox();
     video.dataset.statusFitsCap = '';
     video.dataset.statusStallSub = 'Без подписки — до 5 Мбит/с';
-    source.message(S.tier_dl);
     setVideo({ paused: false, ended: false, readyState: 4 });
     fire('loadstart');
     fire('playing');
-    source.ping();
+    source.message(S.tier_dl);
     assert.equal(card().getAttribute('data-key'), 'stream_ok');
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'playing: no box');
     assert.equal(card().querySelector('[data-tx-hint]').hidden, true, 'and no line');
@@ -522,6 +657,7 @@ test('the player\'s label: the lock whenever the cap holds with the box due, pla
     setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 300 });
     fire('loadstart');
     fire('playing');
+    forgetBox();
     source.message(S.active);
     assert.equal(window._txPlayerLabel || null, null, 'under the cap: plain');
     labels.length = 0; // what the tests before left published
@@ -633,11 +769,16 @@ test('the player\'s cause: the other cause the view names, published with the la
 // Engines without scroll anchoring move everything under the card when its
 // block changes height, even with the card scrolled away: the page scrolls
 // by the difference itself there -- and leaves it to the engine elsewhere.
-test('scrolled away on an engine without anchoring: the page makes up for the block\'s height', () => {
+test('scrolled away on an engine without anchoring: the page makes up for the block\'s height', (t) => {
+    // The × below is remembered for a day: stamped three days back, it has
+    // run out for the tests after this one.
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() - 3 * DAY });
     const box = () => card().querySelector('[data-tx-pbox]');
+    forgetBox();
     source.message(S.active); // a known start: no box
     const realRect = container.getBoundingClientRect;
-    container.getBoundingClientRect = () => ({ top: -400, bottom: -10, height: box().hidden ? 150 : 278 });
+    const away = () => ({ top: -400, bottom: -10, height: box().hidden ? 150 : 278 });
+    container.getBoundingClientRect = away;
     const scrolls = [];
     const realScrollBy = window.scrollBy;
     window.scrollBy = (x, y) => scrolls.push(y);
@@ -646,14 +787,21 @@ test('scrolled away on an engine without anchoring: the page makes up for the bl
     source.message(S.tier_dl);
     assert.deepEqual(scrolls, [128], 'the plan box came in: scrolled by its height');
     source.message(S.active);
-    assert.deepEqual(scrolls, [128, -128]);
+    assert.deepEqual(scrolls, [128], 'the cap over: the box stays, nothing to make up');
     global.CSS = { supports: (p) => p === 'overflow-anchor' };
+    forgetBox();
     source.message(S.tier_dl);
-    assert.deepEqual(scrolls, [128, -128], 'the engine anchors: left to it');
+    assert.deepEqual(scrolls, [128], 'the engine anchors: left to it');
     global.CSS = { supports: () => false };
     container.getBoundingClientRect = () => ({ top: 100, bottom: 400, height: box().hidden ? 150 : 278 });
-    source.message(S.active);
-    assert.deepEqual(scrolls, [128, -128], 'on screen: the block is where the eye is, nothing to make up');
+    forgetBox();
+    assert.deepEqual(scrolls, [128], 'on screen: the block is where the eye is, nothing to make up');
+    container.getBoundingClientRect = away;
+    source.message(S.tier_dl);
+    assert.deepEqual(scrolls, [128, 128]);
+    // The viewer closes it -- from the sticky bar, the card's block far above.
+    sticky().querySelector('[data-tx-pclose]').click();
+    assert.deepEqual(scrolls, [128, 128, -128], 'closed: made up for too');
     container.getBoundingClientRect = realRect;
     window.scrollBy = realScrollBy;
     global.CSS = realCSS;
@@ -668,6 +816,8 @@ test('the plan boxes\' buttons are watched for their impression', () => {
 // Picking a file swaps #content only: the stream would keep pricing the
 // file the page opened on. Another file reopens it on that file -- once.
 test('picking another file reopens the stream on it, once', () => {
+    source.message(S.tier_dl);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'fixture: a box up');
     const first = source;
     const file = document.getElementById('file');
     const swap = () => window.dispatchEvent(new window.CustomEvent('async', { detail: { target: document.getElementById('content') } }));
@@ -688,6 +838,83 @@ test('picking another file reopens the stream on it, once', () => {
     assert.equal(sources.length, 2, 'only a swap of #content');
     source.message(S.active);
     assert.equal(card().getAttribute('data-key'), 'active', 'the new stream draws');
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'the new file: a new page view for the box, as after a reload');
+});
+
+// The same switch as a real page has it (review 2026-09-27): the new
+// stream's first word comes a second or more after the swap (the server
+// waits for the seeder's stats), and in between the page draws again -- the
+// one-second ticker, a keep-alive -- and that word may be a gap in the data.
+// The old stream's last word priced the old file: drawn again, it brought
+// the old box back ("1.2 GB — около 33 мин") as this page view's, kept then
+// until the × or a reload. The box goes with the swap itself, the page's own
+// update, not with the new stream's first word a second later.
+test('another file picked at the cap: the old box goes with the swap, and nothing before the new stream\'s word brings it back', async () => {
+    source.message(S.tier_dl);
+    const boxes = () => [card(), sticky()].flatMap((b) => [b.querySelector('[data-tx-pbox]'), b.querySelector('[data-tx-dplan]')]);
+    assert.ok(boxes().every((b) => !b.hidden), 'fixture: the box up, in both blocks and their details');
+    // Scrolled away, on an engine without anchoring: the swap makes up for
+    // the box's height as a message would.
+    const box = () => card().querySelector('[data-tx-pbox]');
+    const realRect = container.getBoundingClientRect;
+    container.getBoundingClientRect = () => ({ top: -400, bottom: -10, height: box().hidden ? 150 : 278 });
+    const scrolls = [];
+    const realScrollBy = window.scrollBy;
+    window.scrollBy = (x, y) => scrolls.push(y);
+    const realCSS = global.CSS;
+    global.CSS = { supports: () => false };
+    try {
+        const n = sources.length;
+        document.getElementById('file').dataset.statusFile = '/Sintel/Extras/Trailer.mkv';
+        window.dispatchEvent(new window.CustomEvent('async', { detail: { target: document.getElementById('content') } }));
+        assert.equal(sources.length, n + 1, 'fixture: the stream reopened on the new file');
+        source = sources[n];
+        assert.ok(boxes().every((b) => b.hidden), 'gone with the swap');
+        assert.deepEqual(scrolls, [-128], 'made up for, as a message would');
+        await new Promise((r) => setTimeout(r, 1100));
+        assert.ok(boxes().every((b) => b.hidden), 'the ticker: not back');
+        source.ping();
+        assert.ok(boxes().every((b) => b.hidden), 'a keep-alive: not back');
+        source.message(S.status_unknown);
+        assert.ok(boxes().every((b) => b.hidden), 'a gap first: the sticky bar holds nothing of the old stream');
+        source.message(S.active);
+        assert.ok(boxes().every((b) => b.hidden), 'the new stream: no box of its own yet');
+        assert.deepEqual(scrolls, [-128], 'and nothing more moved');
+    } finally {
+        container.getBoundingClientRect = realRect;
+        window.scrollBy = realScrollBy;
+        global.CSS = realCSS;
+    }
+});
+
+// Only the box is kept from the old stream's word: the rest of the block
+// and the player's label are still worked out from it with this second's
+// player until the new stream speaks, as before. So the new file's player,
+// inside its free grace window, gets the plain pill -- not the lock as it
+// stood at the moment of the switch.
+test('another file picked: the player\'s label keeps following the page\'s player until the new stream speaks', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 60 * 60 * 1000 });
+    t.after(() => {
+        for (const k of GRACE_KEYS) delete video.dataset[k];
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel, 'fixture: the lock');
+    const n = sources.length;
+    document.getElementById('file').dataset.statusFile = '/Sintel/Extras/Deleted-scenes.mkv';
+    window.dispatchEvent(new window.CustomEvent('async', { detail: { target: document.getElementById('content') } }));
+    assert.equal(sources.length, n + 1, 'fixture: the stream reopened on the new file');
+    source = sources[n];
+    // The new file's player, over the cap, five seconds into its window.
+    freshVideo();
+    video.dataset.graceDurationSec = '1200';
+    video.dataset.runOffset = '0';
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 5 });
+    fire('loadstart');
+    fire('playing');
+    source.ping();
+    assert.equal(window._txPlayerLabel, null, 'inside the new file\'s grace window: plain');
 });
 
 // The server's last word (a vaulted torrent whose viewer's link cannot be
@@ -696,9 +923,10 @@ test('a final message closes the stream for good', () => {
     source.message({ ...S.vaulted, final: true });
     assert.equal(source.closed, true);
     assert.equal(card().getAttribute('data-key'), 'vaulted', 'drawn first');
+    const n = sources.length;
     document.getElementById('file').dataset.statusFile = '/Sintel/Sintel.mkv';
     window.dispatchEvent(new window.CustomEvent('async', { detail: { target: document.getElementById('content') } }));
-    assert.equal(sources.length, 2, 'nothing reopens after the final word');
+    assert.equal(sources.length, n, 'nothing reopens after the final word');
 });
 
 test('leaving the page closes the stream and stops listening to the player', () => {

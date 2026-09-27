@@ -18,6 +18,7 @@ global.document = dom.window.document;
 const {
     present, applyView, bindBlock, paintBar, mirrorBlock, initDetails, upsellElsewhere, createCtaWatch, safeHref, ctaProps,
     playing, holesMask, NAVBAR_H, playerLabel, playerCause,
+    keepBox, newBoxMemory, applyKeptBox, boxDismissed, dismissBox, dismissedAt, BOX_GOES, BOX_QUIET_HINTS, DISMISS_KEY, DISMISS_MS,
 } = await import('./transferStatus.js');
 
 function page() {
@@ -357,15 +358,13 @@ test('the cap before the box is due: the pink link, no box and no line in its pl
     assert.ok(now.length === before.length && now.every((el, i) => el === before[i]), 'the same nodes');
 });
 
-test('one offer at a time: with another on screen the box gives way to its line', () => {
+// One offer at a time is the page view's to weigh (keepBox), not this
+// second's: present() picks the box whatever else is on screen.
+test('present() does not weigh another offer on screen: keepBox does', () => {
     const view = byDesign.tier_dl.status.view;
-    let p = present(view, { upsellElsewhere: true });
-    assert.equal(p.box, null);
-    assert.equal(p.hint, 'Скорость скачивания ограничена: 5 Мбит/с');
-    assert.equal(p.hintTone, 'plan');
-    p = present(view, { upsellElsewhere: true, player: 'buffering', stallSub: 'X, а файлу нужно 8' });
-    assert.equal(p.box, null);
-    assert.equal(p.hint, 'X, а файлу нужно 8');
+    for (const env of [{}, { player: 'buffering', stallSub: 'X, а файлу нужно 8' }, { player: 'playing', overCap: true }]) {
+        assert.deepEqual(present(view, { ...env, upsellElsewhere: true }), present(view, env), JSON.stringify(env));
+    }
 });
 
 test('nothing to sell: the server sends the fact alone and no button is drawn', () => {
@@ -628,11 +627,11 @@ test('a file marked "fits" stalling at the cap: the stream box, like any stall',
     const ok = present(view, { player: 'playing', fitsCap: true, stallSub: capOnly });
     assert.equal(ok.box, null);
     assert.equal(ok.hint, '');
-    // Another offer on screen: the box gives way to its line.
-    const other = present(view, { player: 'buffering', fitsCap: true, stallSub: capOnly, upsellElsewhere: true });
+    // Another offer on screen: no box comes up, and no line in its place
+    // (keepBox; the box up already stays with its button down).
+    const other = keepBox(newBoxMemory(), present(view, { player: 'buffering', fitsCap: true, stallSub: capOnly }), view, { elsewhere: true });
     assert.equal(other.box, null);
-    assert.equal(other.hint, capOnly);
-    assert.equal(other.hintTone, 'plan');
+    assert.equal(other.hint, '');
     // Inside the grace window nothing is sold, "fits" or not.
     const grace = present(view, { player: 'buffering', fitsCap: true, stallSub: capOnly, inGrace: true });
     assert.equal(grace.box, null);
@@ -679,11 +678,11 @@ test('a player playing: the box for a file over the cap, nothing for one under i
     assert.equal(p.box, null);
     assert.equal(p.hint, '');
     assert.equal(p.viewerTone, '');
-    // Another offer on screen (the grace popup): the box gives way to its line.
-    p = present(view, { player: 'playing', overCap: true, stallSub, upsellElsewhere: true });
+    // Another offer on screen (the grace popup): no box comes up, and no
+    // line stands in for it (keepBox).
+    p = keepBox(newBoxMemory(), present(view, { player: 'playing', overCap: true, stallSub }), view, { elsewhere: true });
     assert.equal(p.box, null);
-    assert.equal(p.hint, stallSub);
-    assert.equal(p.hintTone, 'plan');
+    assert.equal(p.hint, '');
     // No player: the download box, whatever the job said of the file.
     assert.equal(present(view, { overCap: true }).key, 'tier_dl');
 });
@@ -1043,4 +1042,360 @@ test('player cause: the other cause the view names for a wait, none for the cap 
     for (const design of Object.keys(expected).filter((d) => expected[d])) {
         assert.equal(byDesign[design].status.view.plan, undefined, `${design}: no plan`);
     }
+});
+
+// ---- the plan box stays (keepBox; owner, 2026-09-27) ------------------------
+//
+// "The rest of the page keeps jumping up and down": the ~80px box came after
+// 8 s of a steady cap and went 10 s after it, on a pause, a stall, the viewer
+// leaving, a variant rule -- and moved everything under the card each time.
+// Once up on a page view it stays now, with the last words it was sent with,
+// until the viewer's × (24 h in this browser) or an offer that turned false
+// (no seeders, Vault failing).
+
+// What present() and keepBox make of a design state, as the page draws it.
+function keep(mem, st, env = {}, opts = {}) {
+    const view = st.status.view;
+    return keepBox(mem, present(view, { player: st.player, stallSub: st.stallSub, overCap: !!st.overCap, ...env }), view, opts);
+}
+
+test('the box stays: once up it outlives the cap, the viewer and the transfer, with its last words', () => {
+    const mem = newBoxMemory();
+    const up = keep(mem, byDesign.tier_dl);
+    assert.ok(up.box, 'fixture: the download box is due');
+    assert.equal(up.boxKey, 'tier_dl');
+    assert.equal(up.boxCtx, 'download');
+    assert.equal(up.quiet, false);
+    const words = JSON.stringify(up.box);
+    // The server sends no box any more: the cap ended (their bytes flow under
+    // it), they paused, left, the download ended, a stall, a slow swarm, a
+    // gap in the data, Vault taking the torrent...
+    for (const d of ['active', 'cached_flow', 'caching_only', 'caching_idle', 'paused', 'cached', 'idle_torrent', 'stalled', 'swarm',
+        'missing', 'missing_idle', 'checking', 'status_unknown', 'vaulting', 'vaulting_only', 'vaulted', 'vaulted_idle', 'vault_waiting',
+        'vault_missing', 'vaulting_idle', 'hls_gap']) {
+        const st = byDesign[d];
+        const alone = present(st.status.view, { player: st.player });
+        assert.equal(alone.box, null, `fixture: ${d} sends no box`);
+        const p = keep(mem, st);
+        assert.ok(p.box, `${d}: the box stays`);
+        assert.equal(JSON.stringify(p.box), words, `${d}: with its last words`);
+        assert.equal(p.boxKey, 'tier_dl', `${d}: its props say which box it is`);
+        assert.equal(p.boxCtx, 'download');
+        assert.equal(p.key, alone.key, `${d}: the block says the state it is in`);
+        if (BOX_QUIET_HINTS.has(d)) assert.equal(p.hint, '', `${d}: no quiet line above it -- it flips with the buffer and moves the page`);
+        else assert.equal(p.hint, alone.hint, `${d}: another cause's line stands above it, as without it`);
+    }
+});
+
+// The plan's own rules dropped the box as soon as they no longer called for
+// it -- the player playing, a file that fits, the grace window, an answered
+// popup, a cap not yet due again. An up box stays over all of them; and the
+// plan's line (the fact, the cap) is not drawn over it: the box is the plan's
+// line.
+test('the box stays over the plan\'s own rules, and no line of the plan stands over it', () => {
+    const view = byDesign.tier_dl.status.view;
+    const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8 Мбит/с';
+    for (const env of [
+        { player: 'playing' },
+        { player: 'playing', fitsCap: true },
+        { player: 'buffering', inGrace: true },
+        { player: 'playing', inGrace: true },
+        { player: 'playing', overCap: true, stallSub, offerAnswered: true },
+    ]) {
+        const mem = newBoxMemory();
+        const up = keepBox(mem, present(view, {}), view);
+        const alone = present(view, env);
+        assert.equal(alone.box, null, `fixture: ${JSON.stringify(env)} drops the box by itself`);
+        const p = keepBox(mem, alone, view);
+        assert.deepEqual(p.box, up.box, JSON.stringify(env));
+        assert.equal(p.hint, '', `${JSON.stringify(env)}: no fact or cap line over it`);
+        assert.equal(p.hintTone, '');
+        assert.equal(p.viewerTone, alone.viewerTone, 'the chain as present() draws it');
+    }
+    const mem = newBoxMemory();
+    keep(mem, byDesign.tier_dl);
+    const again = keep(mem, byDesign.tier_fact);
+    assert.ok(again.box, 'the cap\'s first seconds again: it stays');
+});
+
+test('while the server sends a box, its words follow it in place', () => {
+    const mem = newBoxMemory();
+    const dl = keep(mem, byDesign.tier_dl);
+    const stall = keep(mem, byDesign.stream_stall);
+    assert.notDeepEqual(stall.box, dl.box, 'fixture: another variant');
+    assert.equal(stall.box.title, 'Видео подгружается медленнее, чем играет');
+    assert.equal(stall.box.sub, byDesign.stream_stall.stallSub);
+    assert.equal(stall.boxKey, 'stream_stall');
+    assert.equal(stall.boxCtx, 'stream');
+    // Playing on: the server still sends the box, the player's rules drop
+    // it -- the last words drawn stay, those of the stall.
+    const ok = keep(mem, byDesign.stream_ok);
+    assert.equal(ok.key, 'stream_ok', 'the block says the player plays');
+    assert.deepEqual(ok.box, stall.box);
+    assert.equal(ok.boxKey, 'stream_stall');
+    // Cached now: the download box's words for a whole file.
+    const cached = keep(mem, byDesign.cached_tier);
+    assert.deepEqual(cached.box, present(byDesign.cached_tier.status.view, {}).box);
+    assert.equal(cached.boxKey, 'cached_tier');
+    // The server stops: those.
+    assert.deepEqual(keep(mem, byDesign.cached).box, cached.box);
+});
+
+test('the box goes only where the offer would be false: no seeders, Vault failing', () => {
+    assert.deepEqual([...BOX_GOES].sort(), ['noseed', 'vault_failed']);
+    for (const d of ['noseed', 'vault_failed']) {
+        const mem = newBoxMemory();
+        keep(mem, byDesign.tier_dl);
+        const p = keep(mem, byDesign[d]);
+        assert.equal(p.box, null, d);
+        assert.equal(p.hint, byDesign[d].status.view.hint, `${d}: its own line`);
+        assert.equal(mem.box, null, `${d}: forgotten`);
+        assert.equal(keep(mem, byDesign.active).box, null, `${d}: gone for good, not back the next second`);
+        assert.equal(keep(mem, byDesign.tier_fact).box, null, `${d}: the cap again -- nothing before the box is due`);
+        assert.ok(keep(mem, byDesign.tier_dl).box, `${d}: due again, a box again`);
+    }
+    for (const st of STATES) {
+        if (BOX_GOES.has(st.status.view.key)) continue;
+        const mem = newBoxMemory();
+        keep(mem, byDesign.tier_dl);
+        assert.ok(keep(mem, st).box, `${st.design}: stays`);
+    }
+});
+
+// One offer at a time (the grace popup, the cap modal, the download nudge):
+// no box comes up while another is on screen -- and no line in its place, the
+// block would grow twice -- and an up box keeps its place with its button and
+// its trial note down, hidden by visibility: nothing under the card moves.
+test('one offer at a time: no box comes up while another is on screen; an up one keeps its place, its button down', () => {
+    const mem = newBoxMemory();
+    const other = keep(mem, byDesign.tier_dl, {}, { elsewhere: true });
+    assert.equal(other.box, null);
+    assert.equal(other.hint, '', 'no line in its place');
+    assert.equal(mem.box, null, 'nothing was up');
+    const up = keep(mem, byDesign.tier_dl);
+    assert.ok(up.box, 'the other offer gone: the box');
+    const quiet = keep(mem, byDesign.tier_dl, {}, { elsewhere: true });
+    assert.deepEqual(quiet.box, up.box, 'another offer again: the box stays');
+    assert.equal(quiet.quiet, true, 'its button down');
+    assert.equal(keep(mem, byDesign.active, {}, { elsewhere: true }).quiet, true, 'kept past the cap: the same');
+    assert.equal(keep(mem, byDesign.active).quiet, false, 'the other offer gone: the button back');
+
+    const { block, refs } = page();
+    const view = byDesign.tier_dl.status.view;
+    applyView(refs, view, up, 'card');
+    const box = block.querySelector('[data-tx-pbox]');
+    const a = box.querySelector('[data-tx-cta]');
+    const before = Array.from(block.querySelectorAll('*'));
+    applyView(refs, view, quiet, 'card');
+    assert.equal(box.hidden, false, 'the box stays');
+    assert.ok(box.hasAttribute('data-quiet'));
+    assert.equal(a.hasAttribute('href'), false, 'no href: no click, no impression');
+    assert.equal(box.querySelector('[data-tx-pt]').textContent, up.box.title, 'its words stay');
+    assert.equal(box.querySelector('[data-tx-pclose]').closest('[hidden]'), null, 'the × stays');
+    applyView(refs, view, up, 'card');
+    assert.equal(box.hasAttribute('data-quiet'), false);
+    assert.equal(a.getAttribute('href'), '/ru/trial?from=status-bar');
+    const now = Array.from(block.querySelectorAll('*'));
+    assert.ok(now.length === before.length && now.every((el, i) => el === before[i]), 'the same nodes');
+    // "Down in place": the button's column keeps its room (visibility, never
+    // display) -- the box as tall with it down as up.
+    const css = readFileSync(new URL('../../styles/style.css', import.meta.url), 'utf8');
+    const rule = css.match(/\.tx-pbox\[data-quiet\] \.tx-pr \{([^}]*)\}/);
+    assert.ok(rule, 'the quiet rule');
+    assert.match(rule[1], /visibility:\s*hidden/);
+    assert.doesNotMatch(rule[1], /display/);
+});
+
+// A box drawn and then outlived by the cap: the same nodes, nothing added or
+// removed, the box -- and everything around it -- never hidden. What moved
+// the page was exactly that `hidden`.
+test('drawn: past the cap the box is the same nodes -- nothing removed, never hidden', async () => {
+    const { block, refs } = page();
+    const mem = newBoxMemory();
+    const draw = (st, opts = {}) => {
+        const view = st.status.view;
+        applyView(refs, view, keep(mem, st, {}, opts), 'card');
+        paintBar(refs, view, st.status);
+    };
+    draw(byDesign.tier_dl);
+    const box = block.querySelector('[data-tx-pbox]');
+    const inDetails = block.querySelector('[data-tx-dplan]');
+    const words = () => ({
+        title: box.querySelector('[data-tx-pt]').textContent,
+        sub: box.querySelector('[data-tx-ps]').textContent,
+        label: box.querySelector('[data-tx-cta-label]').textContent,
+        note: box.querySelector('[data-tx-pn]').textContent,
+        href: box.querySelector('[data-tx-cta]').getAttribute('href'),
+        state: box.querySelector('[data-tx-cta]').getAttribute('data-umami-event-state'),
+    });
+    const was = words();
+    assert.equal(was.href, '/ru/trial?from=status-bar');
+    const before = Array.from(block.querySelectorAll('*'));
+    const records = [];
+    const mo = new dom.window.MutationObserver((r) => records.push(...r));
+    mo.observe(block, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    for (const d of ['active', 'cached_flow', 'paused', 'cached', 'stalled', 'swarm', 'idle_torrent', 'checking', 'status_unknown', 'tier_fact', 'active']) {
+        draw(byDesign[d]);
+        assert.equal(box.hidden, false, d);
+        assert.equal(inDetails.hidden, false, `${d}: in the details too`);
+        assert.deepEqual(words(), was, `${d}: its words`);
+        assert.equal(block.getAttribute('data-key'), byDesign[d].status.view.key === 'tier' ? 'tier_dl' : byDesign[d].status.view.key);
+    }
+    await Promise.resolve();
+    mo.disconnect();
+    assert.deepEqual(records.filter((r) => r.type === 'childList').flatMap((r) => [...r.removedNodes]), [], 'nothing removed');
+    const around = (el) => el === box || box.contains(el) || el.contains(box) || el === inDetails || inDetails.contains(el);
+    assert.deepEqual(records.filter((r) => r.type === 'attributes' && around(r.target)).map((r) => r.target.className), [],
+        'the box, what is in it and what holds it: never hidden');
+    const now = Array.from(block.querySelectorAll('*'));
+    assert.ok(now.length === before.length && now.every((el, i) => el === before[i]), 'the same nodes');
+    // No seeders: it goes.
+    draw(byDesign.noseed);
+    assert.equal(box.hidden, true);
+    assert.equal(inDetails.hidden, true);
+});
+
+test('the ×: in the box, named, carrying the box\'s props for its dismiss event', () => {
+    const { block, refs } = page();
+    assert.ok(refs.boxes.length === 2 && refs.boxes.every((b) => b.close), 'in both copies of the box (the details\' one hidden by CSS)');
+    const mem = newBoxMemory();
+    applyView(refs, byDesign.stream_stall.status.view, keep(mem, byDesign.stream_stall), 'sticky');
+    const [under] = block.querySelectorAll('[data-tx-pbox]');
+    const x = under.querySelector('[data-tx-pclose]');
+    assert.equal(x.tagName, 'BUTTON');
+    assert.equal(x.getAttribute('type'), 'button');
+    assert.equal(x.getAttribute('aria-label'), 'Закрыть', 'the locale\'s close');
+    assert.equal(x.querySelector('use').getAttribute('href'), '#tx-i-close');
+    assert.equal(x.getAttribute('data-umami-event'), 'donate-status-bar-dismiss');
+    assert.deepEqual(ctaProps(x), ctaProps(under.querySelector('[data-tx-cta]')));
+    assert.deepEqual(ctaProps(x), { ctx: 'stream', location: 'sticky', auth: 'anon', state: 'stream_stall', tier: 'free', target: 'trial' });
+    // A kept box's × says the box's state, not the block's.
+    applyView(refs, byDesign.active.status.view, keep(mem, byDesign.active), 'sticky');
+    assert.equal(block.getAttribute('data-key'), 'active');
+    assert.equal(x.getAttribute('data-umami-event-state'), 'stream_stall');
+    assert.equal(x.getAttribute('data-umami-event-ctx'), 'stream');
+    // Its place: the corner, a 44px target; the details' copy shows none.
+    const css = readFileSync(new URL('../../styles/style.css', import.meta.url), 'utf8');
+    const rule = css.match(/\n\.tx-px \{([^}]*)\}/);
+    assert.ok(rule);
+    assert.match(rule[1], /position:\s*absolute/);
+    assert.match(rule[1], /width:\s*44px/);
+    assert.match(rule[1], /height:\s*44px/);
+    assert.match(css, /\.tx-dplan \.tx-px \{\s*display:\s*none;/);
+});
+
+test('the ×: none for 24 h in this browser, on any torrent -- a timestamp in localStorage', () => {
+    const store = new Map();
+    const win = { localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) } };
+    const t0 = Date.UTC(2026, 8, 27, 12);
+    assert.equal(DISMISS_MS, 24 * 60 * 60 * 1000);
+    const mem = newBoxMemory();
+    keep(mem, byDesign.tier_dl);
+    assert.equal(boxDismissed(mem, t0, win), false);
+    dismissBox(mem, t0, win);
+    assert.equal(mem.box, null, 'gone from this page view');
+    assert.equal(store.get(DISMISS_KEY), String(t0));
+    assert.equal(keep(mem, byDesign.tier_dl, {}, { dismissed: boxDismissed(mem, t0 + 1000, win) }).box, null, 'not back with the next box');
+    // Another page view -- another torrent, a reload: a fresh memory, the
+    // same browser.
+    for (const [dt, want] of [[0, true], [60_000, true], [DISMISS_MS - 1, true], [DISMISS_MS, false], [DISMISS_MS + 60_000, false]]) {
+        const dismissed = boxDismissed(newBoxMemory(), t0 + dt, win);
+        assert.equal(dismissed, want, `${dt} ms after`);
+        const p = keep(newBoxMemory(), byDesign.tier_dl, {}, { dismissed });
+        assert.equal(!!p.box, !want, `${dt} ms after: the box`);
+        assert.equal(p.hint, '', 'and no line in its place');
+    }
+    // A close stamped in the future (the clock set back since) is not one.
+    assert.equal(boxDismissed(newBoxMemory(), t0 - 1000, win), false);
+    // A box up on a page view is not taken by a close in another tab: only
+    // its own ×.
+    const other = newBoxMemory();
+    keep(other, byDesign.tier_dl);
+    assert.ok(keep(other, byDesign.active, {}, { dismissed: true }).box);
+    // Nothing but the box: the pink cap on the chain and the player's lock
+    // are the view's, whatever was closed.
+    const view = byDesign.tier_dl.status.view;
+    assert.equal(view.segs[1].tone, 'plan');
+    assert.ok(playerLabel(view, { player: 'buffering' }), 'the lock stays');
+});
+
+test('the ×: storage that throws, is missing or holds junk -- the page still remembers its own close', () => {
+    const throwing = { get localStorage() { throw new Error('SecurityError'); } };
+    const broken = { localStorage: { getItem() { throw new Error('denied'); }, setItem() { throw new Error('quota'); } } };
+    for (const [name, win] of Object.entries({ throwing, broken, none: {} })) {
+        const mem = newBoxMemory();
+        assert.equal(dismissedAt(win), 0, name);
+        assert.equal(boxDismissed(mem, 1000, win), false, name);
+        dismissBox(mem, 1000, win);
+        assert.equal(boxDismissed(mem, 6000, win), true, `${name}: this page view`);
+        assert.equal(boxDismissed(mem, 1000 + DISMISS_MS, win), false, `${name}: for a day too`);
+    }
+    assert.equal(dismissedAt({ localStorage: { getItem: () => 'soon' } }), 0, 'junk is not a close');
+});
+
+// The status token's renewal re-renders the block (the page's render knows no
+// viewer: no box) and runs the view again -- the memory lives on the
+// container, and the kept box goes into the fresh block before its first
+// message, so it is never gone for that second.
+test('a renewed block gets the kept box at once', () => {
+    const mem = newBoxMemory();
+    keep(mem, byDesign.stream_stall);
+    const { block, refs } = page();
+    assert.ok(Array.from(block.querySelectorAll('[data-tx-pbox]')).every((b) => b.hidden), 'fixture: the page\'s render has no box');
+    applyKeptBox(refs, mem, 'card');
+    const box = block.querySelector('[data-tx-pbox]');
+    assert.equal(box.hidden, false);
+    assert.equal(box.querySelector('[data-tx-pt]').textContent, 'Видео подгружается медленнее, чем играет');
+    assert.equal(box.querySelector('[data-tx-cta]').getAttribute('href'), '/ru/trial?from=status-bar');
+    assert.deepEqual(ctaProps(box.querySelector('[data-tx-cta]')), { ctx: 'stream', location: 'card', auth: 'anon', state: 'stream_stall', tier: 'free', target: 'trial' });
+    assert.equal(block.querySelector('[data-tx-dplan]').hidden, false);
+    const none = page();
+    applyKeptBox(none.refs, newBoxMemory(), 'card');
+    assert.ok(Array.from(none.block.querySelectorAll('[data-tx-pbox]')).every((b) => b.hidden), 'nothing kept: nothing drawn');
+});
+
+// The impression stays one per offer: a kept box whose props do not change is
+// the same offer; a box with its button down or closed is not seen.
+test('impression: a kept box counts no new one; one with its button down or closed counts none', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { block, refs } = page();
+    const tracked = [];
+    let io;
+    class IO {
+        constructor(cb) { this.cb = cb; io = this; }
+        observe() {}
+        disconnect() {}
+        fire(el, ratio) { this.cb([{ target: el, isIntersecting: ratio > 0, intersectionRatio: ratio }]); }
+    }
+    const watch = createCtaWatch({ umami: { track: (n, p) => tracked.push([n, p]) }, IO, registry: new Set() });
+    const a = block.querySelector('[data-tx-cta]');
+    watch.watch(a);
+    const mem = newBoxMemory();
+    const draw = (st, opts = {}) => {
+        applyView(refs, st.status.view, keep(mem, st, {}, opts), 'card');
+        watch.refresh();
+    };
+    // Up while nothing else is on screen, then kept with its button down
+    // before it had its second: not seen.
+    draw(byDesign.tier_dl);
+    io.fire(a, 1);
+    draw(byDesign.tier_dl, { elsewhere: true });
+    t.mock.timers.tick(2000);
+    assert.deepEqual(tracked, [], 'its button down: not an impression');
+    draw(byDesign.active);
+    t.mock.timers.tick(1000);
+    assert.equal(tracked.length, 1, 'the button back, a second on screen: one');
+    assert.equal(tracked[0][1].state, 'tier_dl', 'the box\'s own state');
+    for (const d of ['cached_flow', 'paused', 'active']) draw(byDesign[d]);
+    io.fire(a, 0);
+    io.fire(a, 1);
+    t.mock.timers.tick(3000);
+    assert.equal(tracked.length, 1, 'kept past the cap, seen again: the same offer');
+    // Closed: hidden, nothing more.
+    dismissBox(mem, 1, {});
+    draw(byDesign.stream_stall, { dismissed: true });
+    assert.equal(block.querySelector('[data-tx-pbox]').hidden, true);
+    t.mock.timers.tick(3000);
+    assert.equal(tracked.length, 1, 'closed: none');
+    watch.stop();
 });
