@@ -364,6 +364,10 @@ who watch could play HEVC or AV1 as it is, if content-transcoder passed it throu
 `-c:v copy`) instead of re-encoding it to H.264. About a quarter of fresh sources are HEVC 1080p+
 or AV1; their re-encode is slower than realtime and most of the transcoder's CPU.
 
+Since stage 0 of the HEVC passthrough plan the event also carries the **declaration** — the `decode`
+tokens this browser will send the transcoder (below), computed by the very function the declaration
+will use — and a second event, `playback-quality`, measures what software decoding costs.
+
 **When.** After the first `playing` of a `<video>` the player renders (`whenPlaying`; an element
 already playing when the player mounts counts at once), so the count is of viewers, not visitors.
 Never for the audio player. The probe and the send wait for an idle callback (10 s deadline; 2 s
@@ -390,6 +394,10 @@ one answers `false`):
 | `mc` | `navigator.mediaCapabilities.decodingInfo` exists |
 | `mc_hvc`, `mc_hvc_sm`, `mc_hvc_pe` | its answer for HEVC Main 1080p over MSE: supported, smooth, powerEfficient |
 | `mc_av1`, `mc_av1_sm`, `mc_av1_pe` | the same for AV1 8-bit 1080p (3 s timeout → `false`) |
+| `hevc8`, `hevc10`, `hevc8-2160`, `hevc10-2160`, `hevc-high`, `hdr-pq` | this browser declares the token (see "The declaration") |
+| `decode` | string: the declared tokens joined with `,` — the exact `decode=` value; `''` for none |
+| `decode_path` | string: the path they were asked on — `mse` (hls.js), `native` (the element's HLS), `none` |
+| `dynamic-range` | string: `high` / `standard` (`matchMedia('(dynamic-range: …)')`), `unknown` where the feature is missing |
 | `src` | the source's video codec: `h264` / `hevc` / `av1` / `other` / `unknown` (no probe on the page) |
 | `tc` | a transcoder session serves this stream (`data-session-id`) |
 | `pl` | how the player plays it: `hlsjs`, `native` (the element's own HLS — iOS always), `direct` |
@@ -397,9 +405,11 @@ one answers `false`):
 
 For example: `{mse: 'mse', hvc: true, hev: true, hvc10: true, hvc4k: true, av1: true,
 av1_10: true, av1_4k: true, n_hls: false, n_hvc: true, n_av1: true, mc: true, mc_hvc: true, mc_hvc_sm: true,
-mc_hvc_pe: true, mc_av1: true, mc_av1_sm: true, mc_av1_pe: false, src: 'hevc', tc: true,
-pl: 'hlsjs', emb: false}` plus the usual `tier`, `is_authed`, `user_id`, `lang`, `is_referral` on
-the site (`docs/analytics.md`).
+mc_hvc_pe: true, mc_av1: true, mc_av1_sm: true, mc_av1_pe: false, hevc8: true, hevc10: true,
+'hevc8-2160': true, 'hevc10-2160': true, 'hevc-high': false, 'hdr-pq': true,
+decode: 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq', decode_path: 'mse', 'dynamic-range': 'standard',
+src: 'hevc', tc: true, pl: 'hlsjs', emb: false}` plus the usual `tier`, `is_authed`, `user_id`,
+`lang`, `is_referral` on the site (`docs/analytics.md`) — 36 properties.
 
 `src` comes from `data-video-codecs` on the `<video>` (`stream_video.html`): every video stream of
 the job's media probe, cover pictures included (`mjpeg`/`png`… are skipped client-side). ffprobe
@@ -415,6 +425,80 @@ hls.js the MSE keys decide, through native HLS `n_hvc` / `n_av1` (iOS always pla
 even where it has a ManagedMediaSource). `src`/`tc`/`pl` describe the stream of the
 browser's first play *that week*, so the split by source is a sample of browsers, not of plays; the
 capability keys do not depend on it.
+
+### The declaration — `decodeTokens`
+
+What the page will send content-transcoder as `decode=<tokens>` on POST `/session` (stage 3 of the
+plan; nothing sends it yet). The transcoder alone picks the route; the browser only says what it
+decodes. `decodeTokens(env)` → the tokens in this order (unknown ones are ignored by the transcoder,
+so renaming one is a protocol change):
+
+| token | codec string asked | means |
+|---|---|---|
+| `hevc8` | `hvc1.1.6.L123.90` | HEVC Main 8-bit up to 1920×1080, level ≤ 4.1 |
+| `hevc10` | `hvc1.2.4.L123.90` | Main10 up to 1920×1080, level ≤ 4.1 |
+| `hevc8-2160` | `hvc1.1.6.L153.90` | Main up to 3840×2160, level ≤ 5.1 |
+| `hevc10-2160` | `hvc1.2.4.L153.90` | Main10 up to 3840×2160, level ≤ 5.1 |
+| `hevc-high` | `hvc1.2.4.H153.90` | tier High (UHD Blu-ray remuxes) |
+| `hdr-pq` | `decodingInfo` Main10 3840×2160, `transferFunction: 'pq'`, `colorGamut: 'rec2020'` | decodes PQ (HDR10) |
+
+Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
+
+- **Any support counts.** An HEVC token is declared when the path the player would take says yes to
+  its string: `MediaSource.isTypeSupported` on the MSE path, `video.canPlayType` (`probably` or
+  `maybe`) on the native one. No `decodingInfo`, no `powerEfficient`: a software decoder counts, and
+  its cost is what `playback-quality` measures.
+- **The path is the player's** (`decodePath`, pinned by tests to `hls-manager.js` and the installed
+  hls.js): native on iOS/iPadOS (an iPad in desktop mode included) or where `Hls.isSupported()` is
+  false and the element plays HLS; hls.js otherwise; `none` without either — nothing is declared. On
+  the MSE path the `MediaSource` asked is the one hls.js uses (`ManagedMediaSource` first), in its
+  spelling `video/mp4;codecs=…`.
+- **Firefox on Windows declares nothing** — the UA rule hls.js applies to that browser's HEVC answers
+  (`userAgentHevcSupportIsInaccurate`, `/\(Windows.+Firefox\//i`): the player itself does not believe
+  them. It covers `hdr-pq` too (the PQ question names an HEVC codec).
+- **`hdr-pq`** is the one asynchronous token: `decodingInfo` as `media-source` on the MSE path, `file`
+  on the native one, without `hdrMetadataType`; `supported` is enough. Missing API, a rejection or no
+  answer in 3 s → not declared. Asked at 4K, where ~89% of PQ sessions are: a browser that decodes
+  1080p PQ but not 4K PQ is under-declared, and its 1080p PQ sources stay re-encoded, as today. The
+  screen is not consulted (variant A); `dynamic-range` is only reported.
+- `hevcDecodeTokens(env)` is the synchronous part (the five HEVC tokens), for a submit hook that
+  cannot wait. What the declaration adds on top — `unknown` before the probe finishes, the cache
+  for the first submit, the hidden field — is stage 3.
+
+Reading the tokens: the share that matters for 4K is `hevc10-2160` (93% of >1080p HEVC sources are
+Main10), and `hevc10-2160` with `hdr-pq` for PQ (52.5% of them); split by `decode_path` and by
+browser. Note that hls.js 1.6.14 itself asks `decodingInfo` for every HEVC level and drops a level it
+calls unsupported — but only when the master has more than one level
+(`abr-controller.ts`, `removeLevel` guarded by `levels.length > 1`).
+
+### `playback-quality`
+
+The declaration counts software decoding, so its risk — a slow machine dropping frames of a 4K HEVC
+film without any decoder error — is measured. One event per page load, when the first `<video>` on it
+has played **60 s of media** (the sum of the forward `timeupdate` steps of at most 2 s: seeks, skipped
+gaps and steps back do not count); never for audio. Not tied to `codec-support`'s weekly sample: this
+is about a play, not a browser. A separate event because `codec-support` goes out at the first frame
+and counts viewers; holding it a minute would drop everyone who stops sooner. Cost: one listener doing
+arithmetic on `timeupdate`, one `getVideoPlaybackQuality()` at the mark, the send in an idle callback;
+nothing touches the element. No API, or no `window.umami` at the mark: nothing is sent and the page is
+not marked (`window.__wtPlaybackQuality`).
+
+| key | what |
+|---|---|
+| `dropped`, `total` | `droppedVideoFrames` / `totalVideoFrames` since the element's last load |
+| `drop_pct` | `dropped / total` in percent, 2 decimals; absent when `total` is 0 (no frames after a minute is a reading too) |
+| `played` | seconds counted, rounded (≈60) |
+| `height` | `videoHeight` (0 unknown) |
+| `rate` | `playbackRate` |
+| `hidden` | some counted step happened in a hidden tab: a background tab may stop rendering, read those apart |
+| `decode` | the declaration at that moment, as in `codec-support` |
+| `src`, `tc`, `pl`, `emb` | the same stream facts as `codec-support`, read at the mark |
+
+For example: `{dropped: 30, total: 1500, drop_pct: 2, played: 60, height: 2160, rate: 1, hidden: false,
+decode: 'hevc8,hevc10', src: 'hevc', tc: false, pl: 'hlsjs', emb: false}`. Today the transcoder
+passes no HEVC through, so this is the baseline: re-encoded H.264 where `tc` is true, while
+`src: 'hevc'` with `tc: false` — HEVC in MP4, repackaged as it is without a transcoder session — is
+where software HEVC decoding already happens (plan §6: ~35% of HEVC starts).
 
 ## Next episode / next track — `next-item.js`, `next-item-go.js`
 

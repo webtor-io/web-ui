@@ -17,7 +17,7 @@ import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
 import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
-import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath } from './codec-support';
+import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -782,15 +782,22 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // report itself waits for an idle moment and goes once a week per
     // browser. What the stream is travels with it: the source's codec from
     // the job's media probe, whether a transcoder session serves it, and
-    // which path plays it.
+    // which path plays it. The same stream facts go with playback-quality,
+    // the dropped/total frames after a minute of playback (once per page).
     useEffect(() => {
         if (!isVideo) return;
-        return whenPlaying(videoEl, () => reportCodecSupport({
+        const stream = () => ({
             src: sourceCodec(videoEl.dataset.videoCodecs),
             tc: isSession,
             pl: playbackPath(hlsRef.current, sourceUrl),
             emb: !!window._embedSettings,
-        }));
+        });
+        const stopCodec = whenPlaying(videoEl, () => reportCodecSupport(stream()));
+        const stopQuality = watchPlaybackQuality(videoEl, stream);
+        return () => {
+            stopCodec();
+            stopQuality();
+        };
     }, []);
 
     // Dispatch player_ready on canplay + set aspect-ratio from video

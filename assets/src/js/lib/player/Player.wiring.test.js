@@ -961,6 +961,54 @@ test('codec-support: the audio player does not report', async (t) => {
     assert.equal(codecEvents(p).length, 0);
 });
 
+// playback-quality: the element's frame counters after a minute of
+// playback. jsdom has no getVideoPlaybackQuality and plays nothing, so the
+// test gives the element both: the counters, and time that moves.
+const qualityEvents = (p) => p.events.filter((e) => e.name === 'playback-quality');
+const playSeconds = async (p, seconds) => {
+    for (let i = 0; i < seconds; i++) {
+        p.video.currentTime += 1;
+        p.video.dispatchEvent(new dom.window.Event('timeupdate'));
+    }
+    await settle();
+};
+
+test('playback-quality goes out after a minute of playback, with the stream facts', async (t) => {
+    t.after(() => destroyPlayer());
+    delete window.__wtPlaybackQuality;
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('data-video-codecs', 'hevc ');
+    });
+    p.video.getVideoPlaybackQuality = () => ({ droppedVideoFrames: 30, totalVideoFrames: 1500 });
+    p.video.paused = false;
+    p.video.dispatchEvent(new dom.window.Event('timeupdate'));
+    await playSeconds(p, 59);
+    assert.equal(qualityEvents(p).length, 0, 'not before a minute');
+    await playSeconds(p, 1);
+    const got = qualityEvents(p);
+    assert.equal(got.length, 1);
+    assert.equal(got[0].data.dropped, 30);
+    assert.equal(got[0].data.total, 1500);
+    assert.equal(got[0].data.drop_pct, 2);
+    assert.equal(got[0].data.played, 60);
+    assert.equal(got[0].data.src, 'hevc');
+    assert.equal(got[0].data.pl, 'direct');
+    assert.equal(got[0].data.decode, '', 'jsdom has neither MSE nor native HLS: nothing to declare');
+
+    await playSeconds(p, 120);
+    assert.equal(qualityEvents(p).length, 1, 'once per page');
+});
+
+test('playback-quality: the audio player does not report', async (t) => {
+    t.after(() => destroyPlayer());
+    delete window.__wtPlaybackQuality;
+    const p = await mountPlayer(null, { tag: 'audio' });
+    p.video.getVideoPlaybackQuality = () => ({ droppedVideoFrames: 0, totalVideoFrames: 0 });
+    p.video.dispatchEvent(new dom.window.Event('timeupdate'));
+    await playSeconds(p, 61);
+    assert.equal(qualityEvents(p).length, 0);
+});
+
 test('a stopped run keeps its count, loses its spinner, and is reported', async (t) => {
     t.after(() => destroyPlayer());
     const p = await mountPlayer();

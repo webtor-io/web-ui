@@ -1,5 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import Hls from 'hls.js';
 import {
     EVENT,
     STORAGE_KEY,
@@ -13,6 +18,24 @@ import {
     playbackPath,
     reportCodecSupport,
     whenPlaying,
+    DECODE_HEVC,
+    DECODE_TOKENS,
+    PQ_CODEC,
+    HEVC_ANSWER_INACCURATE,
+    mseType,
+    fileType,
+    isIOSLike,
+    hlsJsSupported,
+    decodePath,
+    hevcDecodeTokens,
+    decodeTokens,
+    dynamicRange,
+    QUALITY_EVENT,
+    QUALITY_PAGE_FLAG,
+    QUALITY_AFTER_S,
+    playbackQuality,
+    afterPlayed,
+    watchPlaybackQuality,
 } from './codec-support.js';
 
 // ---- fakes ---------------------------------------------------------------
@@ -45,6 +68,15 @@ const ALL_FALSE_MC = {
     mc_av1: false, mc_av1_sm: false, mc_av1_pe: false,
 };
 
+// The declaration's fields where nothing is declared: these fakes answer
+// the existing questions but are no browser hls.js would run in (no basic
+// H.264) and have no native HLS, so the declaration's path is 'none'.
+const NO_DECLARATION = {
+    hevc8: false, hevc10: false, 'hevc8-2160': false, 'hevc10-2160': false, 'hevc-high': false,
+    'hdr-pq': false,
+    decode: '', decode_path: 'none', 'dynamic-range': 'unknown',
+};
+
 // ---- the probe -----------------------------------------------------------
 
 test('Chrome-like: MSE says HEVC and AV1, the hardware answers per codec', async () => {
@@ -65,6 +97,7 @@ test('Chrome-like: MSE says HEVC and AV1, the hardware answers per codec', async
         mc: true,
         mc_hvc: true, mc_hvc_sm: true, mc_hvc_pe: true,
         mc_av1: true, mc_av1_sm: true, mc_av1_pe: false,
+        ...NO_DECLARATION,
     });
     // Asked about a 1080p stream through MSE, with every field Firefox
     // insists on.
@@ -94,6 +127,7 @@ test('Firefox-like: AV1 only, no native HLS, HEVC decodingInfo says no', async (
         mc: true,
         mc_hvc: false, mc_hvc_sm: false, mc_hvc_pe: false,
         mc_av1: true, mc_av1_sm: true, mc_av1_pe: true,
+        ...NO_DECLARATION,
     });
 });
 
@@ -134,6 +168,7 @@ test('no MSE, no mediaCapabilities: every answer is false', async () => {
         n_hls: false, n_hvc: false, n_av1: false,
         mc: false,
         ...ALL_FALSE_MC,
+        ...NO_DECLARATION,
     });
     // And with nothing at all.
     const empty = await probeCodecSupport();
@@ -495,4 +530,545 @@ test('gate and reporter together: no event until playing, then one', async () =>
     await p.run();
     assert.equal(p.events.length, 1);
     assert.equal(p.events[0].data.src, 'av1');
+});
+
+// ---- the declaration: `decode` tokens -------------------------------------
+
+const UA = {
+    chromeWin: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+    edgeWin: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
+    firefoxWin: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0',
+    firefoxMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0',
+    firefoxLinux: 'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0',
+    firefoxAndroid: 'Mozilla/5.0 (Android 14; Mobile; rv:143.0) Gecko/143.0 Firefox/143.0',
+    safariMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+    iPhone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+};
+
+// What hls.js asks before it agrees to run (Hls.isSupported).
+const H264 = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2';
+const hevcCodec = Object.fromEntries(DECODE_HEVC);
+const mseYes = (...tokens) => [H264, ...tokens.map((t) => mseType(hevcCodec[t]))];
+const nativeYes = (...tokens) => Object.fromEntries([
+    [HLS, 'maybe'],
+    ...tokens.map((t) => [fileType(hevcCodec[t]), 'probably']),
+]);
+const ALL_HEVC = DECODE_HEVC.map(([t]) => t);
+
+// pqCapabilities answers decodingInfo: `pq` for a PQ question, a plain
+// "yes, in hardware" for anything else, and records every question.
+function pqCapabilities(pq) {
+    return {
+        calls: [],
+        decodingInfo(config) {
+            this.calls.push(config);
+            if (config.video && config.video.transferFunction === 'pq') {
+                return typeof pq === 'function' ? pq(config) : Promise.resolve(pq);
+            }
+            return Promise.resolve({ supported: true, smooth: true, powerEfficient: true });
+        },
+    };
+}
+const PQ_YES = { supported: true, smooth: true, powerEfficient: true };
+const PQ_SOFTWARE = { supported: true, smooth: false, powerEfficient: false };
+const PQ_NO = { supported: false, smooth: false, powerEfficient: false };
+
+test('the tokens and their codec strings are the protocol', () => {
+    // The transcoder parses these by allowlist (plan §2.2): a rename here
+    // is a silent "declares nothing" there.
+    assert.deepEqual(DECODE_TOKENS, ['hevc8', 'hevc10', 'hevc8-2160', 'hevc10-2160', 'hevc-high', 'hdr-pq']);
+    assert.deepEqual(DECODE_HEVC, [
+        ['hevc8', 'hvc1.1.6.L123.90'],
+        ['hevc10', 'hvc1.2.4.L123.90'],
+        ['hevc8-2160', 'hvc1.1.6.L153.90'],
+        ['hevc10-2160', 'hvc1.2.4.L153.90'],
+        ['hevc-high', 'hvc1.2.4.H153.90'],
+    ]);
+    assert.equal(PQ_CODEC, 'hvc1.2.4.L153.90');
+    assert.equal(mseType('hvc1.1.6.L123.90'), 'video/mp4;codecs=hvc1.1.6.L123.90');
+    assert.equal(fileType('hvc1.1.6.L123.90'), 'video/mp4; codecs="hvc1.1.6.L123.90"');
+});
+
+test('Chrome on Windows, HEVC to 1080p only: the MSE answers decide, in token order', async () => {
+    const mc = pqCapabilities(PQ_NO);
+    const env = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource(mseYes('hevc10', 'hevc8')),
+        canPlayType: canPlay({}),
+        mediaCapabilities: mc,
+    };
+    assert.equal(decodePath(env), 'mse');
+    assert.deepEqual(hevcDecodeTokens(env), ['hevc8', 'hevc10']);
+    assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10']);
+    // Only the PQ question goes to mediaCapabilities.
+    assert.equal(mc.calls.length, 1);
+});
+
+test('any support counts: software HEVC declares, and PQ without powerEfficient declares', async () => {
+    // The owner's decision of 2026-09-27: no powerEfficient anywhere, and
+    // no decodingInfo for the HEVC tokens at all. This mediaCapabilities
+    // says HEVC is not supported — it must not be asked.
+    const mc = {
+        calls: [],
+        decodingInfo(config) {
+            this.calls.push(config);
+            if (config.video.transferFunction === 'pq') return Promise.resolve(PQ_SOFTWARE);
+            return Promise.resolve(PQ_NO);
+        },
+    };
+    const env = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource(mseYes(...ALL_HEVC)),
+        mediaCapabilities: mc,
+    };
+    assert.deepEqual(await decodeTokens(env), DECODE_TOKENS);
+    assert.equal(mc.calls.length, 1, 'decodingInfo is asked the PQ question and nothing else');
+});
+
+test('hdr-pq is asked as Main10 4K PQ in rec2020, through MSE, without hdrMetadataType', async () => {
+    const mc = pqCapabilities(PQ_YES);
+    const env = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource(mseYes('hevc10-2160')),
+        mediaCapabilities: mc,
+    };
+    assert.deepEqual(await decodeTokens(env), ['hevc10-2160', 'hdr-pq']);
+    assert.equal(mc.calls.length, 1);
+    const c = mc.calls[0];
+    assert.equal(c.type, 'media-source');
+    assert.equal(c.video.contentType, 'video/mp4;codecs=hvc1.2.4.L153.90');
+    assert.equal(c.video.width, 3840);
+    assert.equal(c.video.height, 2160);
+    assert.equal(c.video.transferFunction, 'pq');
+    assert.equal(c.video.colorGamut, 'rec2020');
+    assert.ok(!('hdrMetadataType' in c.video), 'the question is decoding PQ, not its metadata');
+    assert.ok(c.video.bitrate > 0 && c.video.framerate > 0, 'Firefox rejects a configuration without them');
+});
+
+test('hdr-pq: no decodingInfo, a rejection, a throw, garbage or a timeout is no token — the HEVC ones stay', { timeout: 2000 }, async () => {
+    const base = { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes('hevc8')) };
+    assert.deepEqual(await decodeTokens(base), ['hevc8'], 'no mediaCapabilities');
+    assert.deepEqual(await decodeTokens({ ...base, mediaCapabilities: {} }), ['hevc8']);
+    for (const pq of [
+        () => Promise.reject(new Error('nope')),
+        () => { throw new TypeError('bad config'); },
+        () => Promise.resolve('yes'),
+        () => Promise.resolve({ supported: 'true' }),
+        () => new Promise(() => {}),
+    ]) {
+        assert.deepEqual(await decodeTokens({ ...base, mediaCapabilities: pqCapabilities(pq) }, { timeoutMs: 5 }), ['hevc8']);
+    }
+});
+
+test('Firefox on Windows declares nothing, whatever it answers; Firefox elsewhere does', async () => {
+    // hls.js overrides this browser's HEVC answers (issue 7046): a player
+    // that does not believe the answer must not have it declared.
+    const everything = (ua) => ({
+        userAgent: ua,
+        MediaSource: mediaSource(mseYes(...ALL_HEVC)),
+        mediaCapabilities: pqCapabilities(PQ_YES),
+    });
+    const ffWin = everything(UA.firefoxWin);
+    assert.equal(decodePath(ffWin), 'mse', 'it still plays through hls.js');
+    assert.deepEqual(hevcDecodeTokens(ffWin), []);
+    assert.deepEqual(await decodeTokens(ffWin), []);
+    assert.equal(ffWin.mediaCapabilities.calls.length, 0, 'hdr-pq is an HEVC question too: not asked');
+
+    for (const ua of [UA.firefoxMac, UA.firefoxLinux, UA.firefoxAndroid, UA.chromeWin, UA.edgeWin]) {
+        assert.deepEqual(await decodeTokens(everything(ua)), DECODE_TOKENS, ua);
+    }
+});
+
+test('iPhone: native HLS even with a ManagedMediaSource; canPlayType decides; PQ asked as a file', async () => {
+    const mc = pqCapabilities(PQ_YES);
+    const env = {
+        userAgent: UA.iPhone,
+        // The MSE would say yes to everything; the player never uses it
+        // on iOS (hls-manager.js), so it must not be the one asked.
+        ManagedMediaSource: mediaSource(mseYes(...ALL_HEVC)),
+        canPlayType: canPlay(nativeYes('hevc8', 'hevc10', 'hevc10-2160')),
+        mediaCapabilities: mc,
+    };
+    assert.equal(decodePath(env), 'native');
+    assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10', 'hevc10-2160', 'hdr-pq']);
+    assert.equal(mc.calls[0].type, 'file');
+    assert.equal(mc.calls[0].video.contentType, 'video/mp4; codecs="hvc1.2.4.L153.90"');
+
+    // A "maybe" is a yes too: any support counts.
+    const maybe = { ...env, canPlayType: canPlay({ [HLS]: 'maybe', [fileType(hevcCodec['hevc-high'])]: 'maybe' }) };
+    assert.deepEqual(hevcDecodeTokens(maybe), ['hevc-high']);
+});
+
+test('an iPad in desktop mode is iOS; a Mac is not', () => {
+    const ipad = { userAgent: UA.safariMac, platform: 'MacIntel', maxTouchPoints: 5 };
+    const mac = { userAgent: UA.safariMac, platform: 'MacIntel', maxTouchPoints: 0 };
+    assert.equal(isIOSLike(ipad), true);
+    assert.equal(isIOSLike(mac), false);
+    assert.equal(isIOSLike({ userAgent: UA.iPhone }), true);
+    assert.equal(isIOSLike({}), false);
+
+    const withMse = (e) => ({
+        ...e,
+        MediaSource: mediaSource(mseYes('hevc8')),
+        canPlayType: canPlay(nativeYes('hevc10')),
+    });
+    assert.deepEqual(hevcDecodeTokens(withMse(ipad)), ['hevc10'], 'the iPad asks its element');
+    assert.deepEqual(hevcDecodeTokens(withMse(mac)), ['hevc8'], 'the Mac asks hls.js\'s MediaSource');
+});
+
+test('Safari on a Mac: hls.js prefers the ManagedMediaSource, so it is the one asked', () => {
+    const env = {
+        userAgent: UA.safariMac,
+        platform: 'MacIntel',
+        maxTouchPoints: 0,
+        MediaSource: mediaSource([H264]),
+        ManagedMediaSource: mediaSource(mseYes('hevc8', 'hevc-high')),
+    };
+    assert.equal(decodePath(env), 'mse');
+    assert.deepEqual(hevcDecodeTokens(env), ['hevc8', 'hevc-high']);
+});
+
+test('where hls.js will not run: native HLS if the element has it, else nothing', async () => {
+    // An MSE that cannot play even H.264 is one hls.js refuses.
+    const refused = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource(mseYes('hevc8').slice(1)),
+        canPlayType: canPlay(nativeYes('hevc8')),
+    };
+    assert.equal(hlsJsSupported(refused), false);
+    assert.equal(decodePath(refused), 'native');
+    assert.deepEqual(hevcDecodeTokens(refused), ['hevc8']);
+
+    const mc = pqCapabilities(PQ_YES);
+    const nothing = { userAgent: UA.chromeWin, canPlayType: canPlay({ [fileType(hevcCodec.hevc8)]: 'probably' }), mediaCapabilities: mc };
+    assert.equal(decodePath(nothing), 'none');
+    assert.deepEqual(await decodeTokens(nothing), [], 'no HLS here: nothing to declare');
+    assert.equal(mc.calls.length, 0);
+});
+
+test('the declaration never throws, whatever the browser does', async () => {
+    const hostile = {};
+    for (const k of ['MediaSource', 'ManagedMediaSource', 'WebKitMediaSource', 'SourceBuffer', 'WebKitSourceBuffer',
+        'canPlayType', 'mediaCapabilities', 'userAgent', 'platform', 'maxTouchPoints', 'matchMedia']) {
+        Object.defineProperty(hostile, k, { get() { throw new Error('denied'); } });
+    }
+    assert.equal(decodePath(hostile), 'none');
+    assert.deepEqual(await decodeTokens(hostile), []);
+    assert.equal(dynamicRange(hostile), 'unknown');
+
+    const MS = function () {};
+    MS.isTypeSupported = (t) => { if (t === H264) return true; throw new Error('boom'); };
+    const throwing = { userAgent: UA.chromeWin, MediaSource: MS };
+    assert.equal(decodePath(throwing), 'mse');
+    assert.deepEqual(await decodeTokens(throwing), []);
+    assert.deepEqual(await decodeTokens(), []);
+});
+
+test('the event carries the declaration exactly as decodeTokens computes it', async () => {
+    const envs = [
+        { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes('hevc8', 'hevc10')), mediaCapabilities: pqCapabilities(PQ_NO) },
+        { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes(...ALL_HEVC)), mediaCapabilities: pqCapabilities(PQ_SOFTWARE) },
+        { userAgent: UA.iPhone, canPlayType: canPlay(nativeYes('hevc10-2160')), mediaCapabilities: pqCapabilities(PQ_YES) },
+        { userAgent: UA.firefoxWin, MediaSource: mediaSource(mseYes(...ALL_HEVC)) },
+        {},
+    ];
+    for (const env of envs) {
+        const tokens = await decodeTokens(env);
+        const got = await probeCodecSupport(env);
+        assert.equal(got.decode, tokens.join(','));
+        assert.equal(got.decode_path, decodePath(env));
+        for (const t of DECODE_TOKENS) assert.equal(got[t], tokens.includes(t), t);
+    }
+    const full = await probeCodecSupport(envs[1]);
+    assert.equal(full.decode, 'hevc8,hevc10,hevc8-2160,hevc10-2160,hevc-high,hdr-pq');
+    assert.equal(full.decode_path, 'mse');
+    // The existing keys keep their meaning next to the new ones: hvc is
+    // still the L120 question in its own spelling.
+    assert.equal(full.hvc, false);
+});
+
+test('dynamic-range: high, standard, or unknown where the feature is missing', async () => {
+    const mm = (matching) => (q) => ({ matches: q === matching });
+    assert.equal(dynamicRange({ matchMedia: mm('(dynamic-range: high)') }), 'high');
+    assert.equal(dynamicRange({ matchMedia: mm('(dynamic-range: standard)') }), 'standard');
+    assert.equal(dynamicRange({ matchMedia: mm('nothing') }), 'unknown', 'an unknown media feature matches neither');
+    assert.equal(dynamicRange({ matchMedia: () => { throw new Error('x'); } }), 'unknown');
+    assert.equal(dynamicRange({}), 'unknown');
+    assert.equal((await probeCodecSupport({ matchMedia: mm('(dynamic-range: high)') }))['dynamic-range'], 'high');
+});
+
+test('envFromWindow: navigator facts, and matchMedia called on the window', () => {
+    const win = {
+        navigator: { userAgent: UA.iPhone, platform: 'iPhone', maxTouchPoints: 5, mediaCapabilities: { decodingInfo() {} } },
+        matchMedia(q) {
+            assert.equal(this, win, 'an unbound matchMedia throws Illegal invocation');
+            return { matches: q === '(dynamic-range: high)' };
+        },
+        document: { createElement: () => ({ canPlayType: () => '' }) },
+    };
+    const env = envFromWindow(win);
+    assert.equal(env.userAgent, UA.iPhone);
+    assert.equal(env.maxTouchPoints, 5);
+    assert.equal(isIOSLike(env), true);
+    assert.equal(dynamicRange(env), 'high');
+});
+
+// ---- pinned to the player: the path is the one it will take ----------------
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+test('hlsJsSupported agrees with the installed Hls.isSupported()', (t) => {
+    // Our copy against the real thing over the same fakes; hls.js reads
+    // them off `self`. The two ManagedMediaSource cases are the ones that
+    // tell "prefers the managed one" from "prefers MediaSource".
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'self');
+    const before = globalThis.self;
+    t.after(() => { if (had) globalThis.self = before; else delete globalThis.self; });
+
+    const goodSB = function () {};
+    goodSB.prototype = { appendBuffer() {}, remove() {} };
+    const cases = {
+        nothing: {},
+        'MediaSource with H.264': { MediaSource: mediaSource([H264]) },
+        'MediaSource, nothing it can play': { MediaSource: mediaSource([]) },
+        'MediaSource, audio only': { MediaSource: mediaSource(['audio/mp4;codecs=mp4a.40.2']) },
+        'MediaSource, AV1 only': { MediaSource: mediaSource(['video/mp4;codecs=av01.0.01M.08']) },
+        'managed yes, plain no': { ManagedMediaSource: mediaSource([H264]), MediaSource: mediaSource([]) },
+        'managed no, plain yes': { ManagedMediaSource: mediaSource([]), MediaSource: mediaSource([H264]) },
+        'WebKitMediaSource': { WebKitMediaSource: mediaSource([H264]) },
+        'a broken SourceBuffer': { MediaSource: mediaSource([H264]), SourceBuffer: { prototype: {} } },
+        'a good SourceBuffer': { MediaSource: mediaSource([H264]), SourceBuffer: goodSB },
+        'a WebKitSourceBuffer without remove': { MediaSource: mediaSource([H264]), WebKitSourceBuffer: { prototype: { appendBuffer() {} } } },
+        'isTypeSupported not a function': { MediaSource: Object.assign(function () {}, { isTypeSupported: 'yes' }) },
+    };
+    for (const [name, env] of Object.entries(cases)) {
+        globalThis.self = env;
+        assert.equal(hlsJsSupported(env), Hls.isSupported(), name);
+    }
+});
+
+test('the Firefox-on-Windows rule is the one the installed hls.js applies', () => {
+    const dist = readFileSync(createRequire(import.meta.url).resolve('hls.js/dist/hls.mjs'), 'utf8');
+    assert.ok(dist.includes(`${HEVC_ANSWER_INACCURATE.source}/i.test(navigator.userAgent)`),
+        'hls.js changed its rule for HEVC answers it does not trust; follow it here');
+    assert.equal(HEVC_ANSWER_INACCURATE.test(UA.firefoxWin), true);
+    assert.equal(HEVC_ANSWER_INACCURATE.test(UA.firefoxMac), false);
+    assert.equal(HEVC_ANSWER_INACCURATE.test(UA.chromeWin), false);
+});
+
+test('isIOSLike is hls-manager.js\'s own iOS rule', () => {
+    const src = readFileSync(path.join(HERE, 'hls-manager.js'), 'utf8');
+    assert.ok(src.includes('/iPad|iPhone|iPod/.test(navigator.userAgent) ||\n    (navigator.platform === \'MacIntel\' && navigator.maxTouchPoints > 1)'),
+        'the player changed when it plays HLS natively; change isIOSLike with it');
+    assert.ok(src.includes('if (!Hls || !Hls.isSupported() || isIOS) {'),
+        'the player changed how it picks hls.js over native HLS; change decodePath with it');
+});
+
+// ---- playback-quality ------------------------------------------------------
+
+class PlayingVideo extends EventTarget {
+    constructor({ quality = { droppedVideoFrames: 12, totalVideoFrames: 1440 }, height = 2160 } = {}) {
+        super();
+        this.currentTime = 0;
+        this.videoHeight = height;
+        this.playbackRate = 1;
+        if (quality !== null) this.getVideoPlaybackQuality = () => quality;
+    }
+
+    // play advances the media by `seconds` in timeupdate steps of `step`.
+    play(seconds, step = 0.25) {
+        for (let t = 0; t < seconds - 1e-9; t += step) {
+            this.currentTime += step;
+            this.dispatchEvent(new Event('timeupdate'));
+        }
+    }
+
+    seek(to) {
+        this.dispatchEvent(new Event('seeking'));
+        this.currentTime = to;
+        this.dispatchEvent(new Event('timeupdate'));
+    }
+}
+
+test('afterPlayed: once, at a minute of media played; not before', () => {
+    const v = new PlayingVideo();
+    const fired = [];
+    afterPlayed(v, QUALITY_AFTER_S, (played, hidden) => fired.push({ played, hidden }));
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(59.5);
+    assert.equal(fired.length, 0);
+    v.play(1);
+    assert.equal(fired.length, 1);
+    assert.ok(fired[0].played >= 60 && fired[0].played < 60.5);
+    assert.equal(fired[0].hidden, false);
+    v.play(120);
+    assert.equal(fired.length, 1, 'once');
+    assert.equal(QUALITY_AFTER_S, 60);
+});
+
+test('afterPlayed: seeks and jumps are not playback', () => {
+    const v = new PlayingVideo();
+    let n = 0;
+    afterPlayed(v, 60, () => { n += 1; });
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(30);
+    // A seek forward by twenty minutes.
+    v.seek(1230);
+    // A jump of 2.5 s (a gap hls.js skipped).
+    v.currentTime += 2.5;
+    v.dispatchEvent(new Event('timeupdate'));
+    // A seek back by a second, and a new source from 0.
+    v.seek(v.currentTime - 1);
+    v.seek(0);
+    // Paused: time does not move, timeupdate may still fire.
+    for (let i = 0; i < 10; i++) v.dispatchEvent(new Event('timeupdate'));
+    v.play(29.5);
+    assert.equal(n, 0, '59.5 s actually played');
+    v.play(0.5);
+    assert.equal(n, 1);
+});
+
+test('afterPlayed: a step taken while hidden marks the reading', () => {
+    const v = new PlayingVideo();
+    let hiddenNow = false;
+    let got = null;
+    afterPlayed(v, 60, (played, hidden) => { got = hidden; }, () => hiddenNow);
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(20);
+    hiddenNow = true;
+    v.play(5);
+    hiddenNow = false;
+    v.play(40);
+    assert.equal(got, true);
+});
+
+test('afterPlayed: the cleanup before the mark means never', () => {
+    const v = new PlayingVideo();
+    let n = 0;
+    const stop = afterPlayed(v, 60, () => { n += 1; });
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(30);
+    stop();
+    v.play(60);
+    assert.equal(n, 0);
+});
+
+test('playbackQuality: a pair of counts or null', () => {
+    assert.deepEqual(playbackQuality(new PlayingVideo()), { dropped: 12, total: 1440 });
+    assert.equal(playbackQuality(new PlayingVideo({ quality: null })), null, 'no API');
+    assert.equal(playbackQuality({ getVideoPlaybackQuality() { throw new Error('x'); } }), null);
+    assert.equal(playbackQuality({ getVideoPlaybackQuality: () => ({ droppedVideoFrames: -1, totalVideoFrames: 3 }) }), null);
+    assert.equal(playbackQuality({ getVideoPlaybackQuality: () => ({ totalVideoFrames: 3 }) }), null);
+    assert.equal(playbackQuality({ getVideoPlaybackQuality: () => null }), null);
+    assert.equal(playbackQuality(null), null);
+});
+
+// qualityPage is one page load for the playback-quality event.
+function qualityPage({ umami = true } = {}) {
+    const events = [];
+    const win = umami ? { umami: { track: (name, data) => events.push({ name, data }) } } : {};
+    const queue = [];
+    const deps = {
+        win,
+        schedule: (fn) => queue.push(fn),
+        tokens: async () => ['hevc8', 'hevc10'],
+        hidden: () => false,
+    };
+    return {
+        win, events, deps,
+        run: async () => { while (queue.length) await queue.shift()(); },
+    };
+}
+
+test('playback-quality: one event after a minute, with the counts, the stream and the declaration', async () => {
+    const p = qualityPage();
+    const v = new PlayingVideo();
+    let asked = 0;
+    watchPlaybackQuality(v, () => { asked += 1; return { src: 'hevc', tc: false, pl: 'direct', emb: false }; }, p.deps);
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(30);
+    await p.run();
+    assert.equal(p.events.length, 0);
+    assert.equal(asked, 0, 'the stream is read at the mark, when the player has settled');
+    v.play(30);
+    assert.equal(p.events.length, 0, 'deferred: nothing on the timeupdate path');
+    await p.run();
+    assert.deepEqual(p.events, [{
+        name: QUALITY_EVENT,
+        data: {
+            dropped: 12, total: 1440, drop_pct: 0.83, played: 60, height: 2160, rate: 1, hidden: false,
+            src: 'hevc', tc: false, pl: 'direct', emb: false,
+            decode: 'hevc8,hevc10',
+        },
+    }]);
+    assert.equal(p.win[QUALITY_PAGE_FLAG], true);
+});
+
+test('playback-quality: once per page — the next episode on it does not report', async () => {
+    const p = qualityPage();
+    const first = new PlayingVideo();
+    const second = new PlayingVideo();
+    watchPlaybackQuality(first, {}, p.deps);
+    first.dispatchEvent(new Event('timeupdate'));
+    first.play(61);
+    watchPlaybackQuality(second, {}, p.deps);
+    second.dispatchEvent(new Event('timeupdate'));
+    second.play(61);
+    await p.run();
+    assert.equal(p.events.length, 1);
+});
+
+test('playback-quality: no frames at all is reported, without a share', async () => {
+    const p = qualityPage();
+    const v = new PlayingVideo({ quality: { droppedVideoFrames: 0, totalVideoFrames: 0 } });
+    watchPlaybackQuality(v, {}, p.deps);
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(61);
+    await p.run();
+    assert.equal(p.events.length, 1);
+    assert.equal(p.events[0].data.total, 0);
+    assert.ok(!('drop_pct' in p.events[0].data));
+});
+
+test('playback-quality: no API, no umami, or a failing declaration', async () => {
+    // No getVideoPlaybackQuality: nothing, and the page stays unmarked.
+    const a = qualityPage();
+    const bare = new PlayingVideo({ quality: null });
+    watchPlaybackQuality(bare, {}, a.deps);
+    bare.dispatchEvent(new Event('timeupdate'));
+    bare.play(61);
+    await a.run();
+    assert.equal(a.events.length, 0);
+    assert.notEqual(a.win[QUALITY_PAGE_FLAG], true);
+
+    // No umami at the mark: nothing sent, nothing marked.
+    const b = qualityPage({ umami: false });
+    const v = new PlayingVideo();
+    watchPlaybackQuality(v, {}, b.deps);
+    v.dispatchEvent(new Event('timeupdate'));
+    v.play(61);
+    await b.run();
+    assert.notEqual(b.win[QUALITY_PAGE_FLAG], true);
+
+    // The declaration throws: the frames still go, with decode ''.
+    const c = qualityPage();
+    c.deps.tokens = async () => { throw new Error('boom'); };
+    const w = new PlayingVideo();
+    watchPlaybackQuality(w, { src: 'h264' }, c.deps);
+    w.dispatchEvent(new Event('timeupdate'));
+    w.play(61);
+    await c.run();
+    assert.equal(c.events.length, 1);
+    assert.equal(c.events[0].data.decode, '');
+    assert.equal(c.events[0].data.src, 'h264');
+});
+
+test('playback-quality never throws', () => {
+    assert.doesNotThrow(() => watchPlaybackQuality(null, {}, { win: {} })());
+    assert.doesNotThrow(() => watchPlaybackQuality({}, {}, { win: {} })(), 'an element without listeners');
+    const p = qualityPage();
+    const v = new PlayingVideo();
+    watchPlaybackQuality(v, () => { throw new Error('extra'); }, { ...p.deps, schedule: () => { throw new Error('schedule'); } });
+    v.dispatchEvent(new Event('timeupdate'));
+    assert.doesNotThrow(() => v.play(61));
 });

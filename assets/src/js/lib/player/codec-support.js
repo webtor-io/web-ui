@@ -13,6 +13,15 @@
 // (idle callback), at most once per browser per week (localStorage; once per
 // page where storage is unavailable).
 //
+// The same module holds what the page will declare to the transcoder as
+// `decode=` (decodeTokens, the HEVC passthrough plan): the event carries
+// those tokens as computed by that one function, so the share it measures is
+// the share that will declare. And a second, later event,
+// `playback-quality`, reads the element's dropped/total frames after a minute
+// of playback: a browser that decodes HEVC in software says "yes" to every
+// question above and can still drop half the frames of a 4K film without an
+// error.
+//
 // Every browser API is reached through `env` (envFromWindow builds it from the
 // page), so the probe is testable with fakes, and every access is wrapped: an
 // old browser or a throwing API answers `false`, never an exception.
@@ -50,6 +59,13 @@ const safe = (fn) => {
 };
 const isFn = (v) => typeof v === 'function';
 
+// canPlay: the element answers "probably" or "maybe" — a yes of any
+// strength. hls-manager.js takes the same truthiness for native HLS.
+const canPlay = (env, type) => {
+    const r = safe(() => env.canPlayType(type));
+    return r === 'probably' || r === 'maybe';
+};
+
 // probeStatic answers everything that has a synchronous API.
 //   mse    'mse' (MediaSource), 'mms' (ManagedMediaSource only: iPhone,
 //          iOS 17.1+), 'none'. Where both exist the MediaSource answers.
@@ -69,26 +85,22 @@ export function probeStatic(env = {}) {
     for (const [key, type] of Object.entries(MSE_TYPES)) {
         out[key] = safe(() => source !== null && source.isTypeSupported(type) === true) === true;
     }
-    const canPlay = (type) => {
-        const r = safe(() => env.canPlayType(type));
-        return r === 'probably' || r === 'maybe';
-    };
-    out.n_hls = canPlay(HLS_TYPE);
-    out.n_hvc = canPlay(MSE_TYPES.hvc);
-    out.n_av1 = canPlay(MSE_TYPES.av1);
+    out.n_hls = canPlay(env, HLS_TYPE);
+    out.n_hvc = canPlay(env, MSE_TYPES.hvc);
+    out.n_av1 = canPlay(env, MSE_TYPES.av1);
     return out;
 }
 
-// decoding asks mediaCapabilities about one 1080p stream through MSE.
-// isTypeSupported can say yes to a codec the machine decodes in software at a
-// fraction of realtime; `smooth` and above all `powerEfficient` (a hardware
-// decoder) are the better hint. A rejection, a throw, a malformed answer or no
-// answer within the timeout is "no".
-async function decoding(mc, contentType, { timeoutMs, setTimer, clearTimer }) {
+// decoding asks mediaCapabilities about one stream (`config`, a
+// MediaDecodingConfiguration). isTypeSupported can say yes to a codec the
+// machine decodes in software at a fraction of realtime; `smooth` and above
+// all `powerEfficient` (a hardware decoder) are the better hint. A rejection,
+// a throw, a malformed answer or no answer within the timeout is "no".
+async function decoding(mc, config, { timeoutMs, setTimer, clearTimer }) {
     let timer;
     try {
         const info = await Promise.race([
-            mc.decodingInfo({ type: 'media-source', video: { contentType, ...MC_VIDEO } }),
+            mc.decodingInfo(config),
             new Promise((resolve) => { timer = setTimer(() => resolve(null), timeoutMs); }),
         ]);
         if (!info || typeof info !== 'object') return NO_DECODING;
@@ -100,44 +112,219 @@ async function decoding(mc, contentType, { timeoutMs, setTimer, clearTimer }) {
     }
 }
 
+// ---- the declaration: `decode` tokens --------------------------------------
+//
+// What this browser decodes, as the list of tokens the page will send the
+// transcoder in `decode=` (HEVC passthrough plan §2.2, with the owner's
+// decisions of 2026-09-27): any support counts, not only a hardware decoder.
+// A token is declared when the path this player would play an HLS stream on
+// says yes to the token's codec string — MSE `isTypeSupported` where hls.js
+// plays, the element's `canPlayType` where the element plays HLS itself. No
+// mediaCapabilities and no `powerEfficient` for these: software decoding
+// counts, and its cost (dropped frames) is measured separately
+// (playback-quality below). The codec strings are the ones the declaration
+// uses, so the event and the declaration ask the same questions.
+//
+// The transcoder reads these tokens; renaming one is a protocol change.
+export const DECODE_HEVC = [
+    ['hevc8', 'hvc1.1.6.L123.90'], // Main 8-bit, up to 1920×1080, level ≤ 4.1
+    ['hevc10', 'hvc1.2.4.L123.90'], // Main10, up to 1920×1080, level ≤ 4.1
+    ['hevc8-2160', 'hvc1.1.6.L153.90'], // Main 8-bit, up to 3840×2160, level ≤ 5.1
+    ['hevc10-2160', 'hvc1.2.4.L153.90'], // Main10, up to 3840×2160, level ≤ 5.1
+    ['hevc-high', 'hvc1.2.4.H153.90'], // tier High (UHD Blu-ray remuxes)
+];
+export const DECODE_TOKENS = [...DECODE_HEVC.map(([token]) => token), 'hdr-pq'];
+
+// `hdr-pq`: the browser decodes PQ (HDR10). Asked of mediaCapabilities, the
+// only API that takes a transfer function, as Main10 4K — where ~89% of the
+// PQ sessions are (≈330 of ≈372 HEVC PQ sessions in a week) — and without
+// hdrMetadataType (the question is decoding, not the metadata). A browser
+// that decodes 1080p PQ but not 4K PQ is under-declared: its 1080p PQ
+// sources are re-encoded, as they are today. The screen is not asked
+// (owner's decision: variant A); `dynamic-range` reports it separately.
+// `supported` is enough, as for the HEVC tokens. Where decodingInfo is
+// missing the token is not declared.
+export const PQ_CODEC = 'hvc1.2.4.L153.90';
+const PQ_VIDEO = {
+    width: 3840, height: 2160, bitrate: 25000000, framerate: 24,
+    transferFunction: 'pq', colorGamut: 'rec2020',
+};
+
+// The form hls.js asks MediaSource in (mimeTypeForCodec,
+// hls.js src/utils/codecs.ts), so the MSE answer is the one hls.js gets.
+export const mseType = (codec) => `video/mp4;codecs=${codec}`;
+// The RFC 6381 form, for the element's canPlayType and a 'file' decodingInfo.
+export const fileType = (codec) => `video/mp4; codecs="${codec}"`;
+
+// hls.js does not trust the HEVC answers of Firefox on Windows and ignores
+// them (userAgentHevcSupportIsInaccurate, hls.js src/utils/codecs.ts; the
+// test pins this to the installed hls.js). A browser whose answer the player
+// itself does not believe declares no HEVC — a question of the answer's
+// accuracy, not of hardware.
+export const HEVC_ANSWER_INACCURATE = /\(Windows.+Firefox\//i;
+const hevcAnswerInaccurate = (env) => HEVC_ANSWER_INACCURATE.test(String(safe(() => env.userAgent) || ''));
+
+// isIOSLike is hls-manager.js's rule for "play HLS natively even where MSE
+// exists" (iPhone, iPod, iPad — and an iPad that says it is a Mac). The test
+// pins the two to the same expression.
+export function isIOSLike(env = {}) {
+    const ua = String(safe(() => env.userAgent) || '');
+    return /iPad|iPhone|iPod/.test(ua)
+        || (safe(() => env.platform) === 'MacIntel' && safe(() => env.maxTouchPoints) > 1);
+}
+
+// hlsMediaSource is the MediaSource hls.js uses with its default
+// preferManagedMediaSource: the managed one first (hls.js
+// src/utils/mediasource-helper.ts, getMediaSource).
+function hlsMediaSource(env) {
+    return safe(() => env.ManagedMediaSource) || safe(() => env.MediaSource) || safe(() => env.WebKitMediaSource) || null;
+}
+
+// hlsJsSupported is Hls.isSupported() (hls.js src/is-supported.ts) over
+// `env` instead of `self`: a MediaSource, a usable SourceBuffer where one is
+// exposed, and one of the basic codecs. A copy rather than an import so the
+// declaration does not pull hls.js into pages without a player; the test
+// runs both against the same fakes.
+export function hlsJsSupported(env = {}) {
+    const ms = hlsMediaSource(env);
+    if (!ms) return false;
+    const sb = safe(() => env.SourceBuffer) || safe(() => env.WebKitSourceBuffer);
+    if (sb && !safe(() => sb.prototype && isFn(sb.prototype.appendBuffer) && isFn(sb.prototype.remove))) return false;
+    if (!isFn(safe(() => ms.isTypeSupported))) return false;
+    const yes = (type) => safe(() => ms.isTypeSupported(type)) === true;
+    return ['avc1.42E01E,mp4a.40.2', 'av01.0.01M.08', 'vp09.00.50.08'].some((c) => yes(`video/mp4;codecs=${c}`))
+        || ['mp4a.40.2', 'fLaC'].some((c) => yes(`audio/mp4;codecs=${c}`));
+}
+
+// decodePath is how this browser's player would play an HLS stream, by
+// hls-manager.js createHls: 'mse' (hls.js), 'native' (the element's own HLS:
+// iOS always, or where hls.js cannot run), 'none' (neither — no HLS here).
+export function decodePath(env = {}) {
+    if (!isIOSLike(env) && hlsJsSupported(env)) return 'mse';
+    return canPlay(env, HLS_TYPE) ? 'native' : 'none';
+}
+
+// hevcDecodeTokens is the synchronous part of the declaration: the HEVC
+// tokens, in DECODE_HEVC order.
+export function hevcDecodeTokens(env = {}, path = decodePath(env)) {
+    if (path === 'none' || hevcAnswerInaccurate(env)) return [];
+    let yes;
+    if (path === 'mse') {
+        const ms = hlsMediaSource(env);
+        yes = (codec) => safe(() => ms.isTypeSupported(mseType(codec))) === true;
+    } else {
+        yes = (codec) => canPlay(env, fileType(codec));
+    }
+    return DECODE_HEVC.filter(([, codec]) => yes(codec)).map(([token]) => token);
+}
+
+// decodesPQ answers `hdr-pq`: 'media-source' on the MSE path, 'file' on the
+// native one (the plan's choice; native HLS is neither, and 'file' is what
+// Safari answers for). The same Firefox-on-Windows rule: the question is
+// asked of an HEVC codec.
+async function decodesPQ(env, path, opts) {
+    if (path === 'none' || hevcAnswerInaccurate(env)) return false;
+    const mc = safe(() => env.mediaCapabilities);
+    if (safe(() => isFn(mc.decodingInfo)) !== true) return false;
+    const mse = path === 'mse';
+    const info = await decoding(mc, {
+        type: mse ? 'media-source' : 'file',
+        video: { contentType: mse ? mseType(PQ_CODEC) : fileType(PQ_CODEC), ...PQ_VIDEO },
+    }, opts);
+    return info.ok;
+}
+
+const timing = ({ timeoutMs = MC_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) => (
+    { timeoutMs, setTimer, clearTimer });
+
+async function decodeSupport(env, opts) {
+    const path = decodePath(env);
+    const tokens = hevcDecodeTokens(env, path);
+    if (await decodesPQ(env, path, timing(opts))) tokens.push('hdr-pq');
+    return { path, tokens };
+}
+
+// decodeTokens is the declaration: the tokens this browser declares, in
+// DECODE_TOKENS order ([] for none). The HEVC ones are known at once; `hdr-pq`
+// waits for decodingInfo (at most `timeoutMs`, 3 s; a timeout is "no").
+// Never rejects. The declaration (stage 3) and every event here use this one
+// function.
+export async function decodeTokens(env = {}, opts = {}) {
+    try {
+        return (await decodeSupport(env, opts)).tokens;
+    } catch (e) {
+        return [];
+    }
+}
+
+// dynamicRange: what the screen says it shows — 'high', 'standard', or
+// 'unknown' where the media feature (or matchMedia) is missing. Reported,
+// never declared.
+export function dynamicRange(env = {}) {
+    const mm = safe(() => env.matchMedia);
+    if (!isFn(mm)) return 'unknown';
+    if (safe(() => mm('(dynamic-range: high)').matches) === true) return 'high';
+    if (safe(() => mm('(dynamic-range: standard)').matches) === true) return 'standard';
+    return 'unknown';
+}
+
 // probeCodecSupport is probeStatic plus the mediaCapabilities answers:
 //   mc                   decodingInfo exists at all;
 //   mc_hvc, mc_hvc_sm, mc_hvc_pe   HEVC Main 1080p: supported, smooth,
 //                                  powerEfficient;
-//   mc_av1, mc_av1_sm, mc_av1_pe   the same for AV1 8-bit 1080p.
+//   mc_av1, mc_av1_sm, mc_av1_pe   the same for AV1 8-bit 1080p;
+// plus the declaration:
+//   hevc8 … hdr-pq       one boolean per DECODE_TOKENS entry;
+//   decode               the tokens joined with ',' — the `decode=` value
+//                        this browser would send ('' for none);
+//   decode_path          the path they were asked on: mse / native / none;
+//   dynamic-range        high / standard / unknown.
 // Never rejects.
-export async function probeCodecSupport(env = {}, {
-    timeoutMs = MC_TIMEOUT_MS,
-    setTimer = setTimeout,
-    clearTimer = clearTimeout,
-} = {}) {
+export async function probeCodecSupport(env = {}, opts = {}) {
     const out = probeStatic(env);
     const mc = safe(() => env.mediaCapabilities);
     out.mc = safe(() => isFn(mc.decodingInfo)) === true;
-    const opts = { timeoutMs, setTimer, clearTimer };
-    const [h, a] = out.mc
-        ? await Promise.all([decoding(mc, MSE_TYPES.hvc, opts), decoding(mc, MSE_TYPES.av1, opts)])
-        : [NO_DECODING, NO_DECODING];
+    const t = timing(opts);
+    const mse = (contentType) => ({ type: 'media-source', video: { contentType, ...MC_VIDEO } });
+    const [h, a, decl] = await Promise.all([
+        out.mc ? decoding(mc, mse(MSE_TYPES.hvc), t) : NO_DECODING,
+        out.mc ? decoding(mc, mse(MSE_TYPES.av1), t) : NO_DECODING,
+        decodeSupport(env, t).catch(() => ({ path: 'none', tokens: [] })),
+    ]);
     out.mc_hvc = h.ok;
     out.mc_hvc_sm = h.sm;
     out.mc_hvc_pe = h.pe;
     out.mc_av1 = a.ok;
     out.mc_av1_sm = a.sm;
     out.mc_av1_pe = a.pe;
+    for (const token of DECODE_TOKENS) out[token] = decl.tokens.includes(token);
+    out.decode = decl.tokens.join(',');
+    out.decode_path = decl.path;
+    out['dynamic-range'] = dynamicRange(env);
     return out;
 }
 
 // envFromWindow collects the probe's inputs from a page. `video` is any media
 // element to ask canPlayType of (the answer does not depend on its state); a
-// detached one is made when none is given.
+// detached one is made when none is given. matchMedia is bound to the
+// window: called bare it throws Illegal invocation.
 export function envFromWindow(win, video) {
     const el = video || safe(() => win.document.createElement('video'));
     const canPlayType = el && isFn(safe(() => el.canPlayType)) ? (type) => el.canPlayType(type) : undefined;
+    const matchMedia = isFn(safe(() => win.matchMedia)) ? (q) => win.matchMedia(q) : undefined;
+    const nav = safe(() => win.navigator);
     return {
         MediaSource: safe(() => win.MediaSource),
         ManagedMediaSource: safe(() => win.ManagedMediaSource),
+        WebKitMediaSource: safe(() => win.WebKitMediaSource),
+        SourceBuffer: safe(() => win.SourceBuffer),
+        WebKitSourceBuffer: safe(() => win.WebKitSourceBuffer),
         canPlayType,
-        mediaCapabilities: safe(() => win.navigator.mediaCapabilities),
+        mediaCapabilities: safe(() => nav.mediaCapabilities),
+        userAgent: safe(() => nav.userAgent),
+        platform: safe(() => nav.platform),
+        maxTouchPoints: safe(() => nav.maxTouchPoints),
+        matchMedia,
     };
 }
 
@@ -273,4 +460,134 @@ export function whenPlaying(video, fn) {
         done = true;
         video.removeEventListener('playing', fire);
     };
+}
+
+// ---- playback-quality --------------------------------------------------------
+//
+// The declaration counts software decoding as support (owner's decision), so
+// its risk — a slow machine decoding 4K HEVC drops frames without a decoder
+// error — is measured here: the element's own frame counters after a minute
+// of playback. Today (no passthrough yet) this is the baseline, and it
+// already sees software HEVC: MP4 HEVC sources go to the player as they are.
+//
+// One `playback-quality` event per page load, when the first video on it has
+// played QUALITY_AFTER_S seconds of media; not tied to codec-support's
+// weekly sample, because this is a fact about a play, not about a browser.
+// A separate event rather than a field of codec-support: that one goes out at
+// the first frame and counts viewers; holding it for a minute would drop
+// everyone who stops earlier and break the series.
+//
+// Cheap by construction: one listener doing arithmetic on `timeupdate`, one
+// getVideoPlaybackQuality() call at the mark, the send in an idle callback.
+// Nothing here touches the element's state.
+
+export const QUALITY_EVENT = 'playback-quality';
+export const QUALITY_PAGE_FLAG = '__wtPlaybackQuality';
+export const QUALITY_AFTER_S = 60;
+// A timeupdate step longer than this is a jump (a seek, a gap hls.js
+// skipped), not playback: timeupdate fires every 15–250 ms while the media
+// plays, so a real step is a fraction of a second even at the fastest rate
+// the player offers. A step back (a seek back, a new source from 0) is no
+// playback either. The two bounds are the whole rule: listening to
+// `seeking` as well would only drop the rare forward seek under 2 s.
+const MAX_STEP_S = 2;
+
+const count = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+
+// playbackQuality reads the element's frame counters since its last load:
+// {dropped, total}, or null where the API is missing, throws, or answers
+// something that is not a pair of counts.
+export function playbackQuality(video) {
+    const q = safe(() => (isFn(video.getVideoPlaybackQuality) ? video.getVideoPlaybackQuality() : null));
+    if (!q || typeof q !== 'object') return null;
+    const dropped = safe(() => q.droppedVideoFrames);
+    const total = safe(() => q.totalVideoFrames);
+    if (!count(dropped) || !count(total)) return null;
+    return { dropped, total };
+}
+
+// afterPlayed calls `fn(played, hidden)` once, when `seconds` of media have
+// played on the element: the sum of the small forward steps between
+// timeupdates (MAX_STEP_S). `hidden` is whether any counted step happened
+// while isHidden() said so — a background tab may stop rendering video, and
+// its frame counts read differently. Returns the cleanup.
+export function afterPlayed(video, seconds, fn, isHidden = () => false) {
+    let played = 0;
+    let last = null;
+    let hidden = false;
+    let done = false;
+    const onTime = () => {
+        if (done) return;
+        const t = safe(() => video.currentTime);
+        if (typeof t !== 'number' || !Number.isFinite(t)) return;
+        if (last !== null) {
+            const step = t - last;
+            if (step > 0 && step <= MAX_STEP_S) {
+                played += step;
+                if (safe(isHidden) === true) hidden = true;
+            }
+        }
+        last = t;
+        if (played >= seconds) {
+            stop();
+            safe(() => fn(played, hidden));
+        }
+    };
+    const stop = () => {
+        done = true;
+        video.removeEventListener('timeupdate', onTime);
+    };
+    video.addEventListener('timeupdate', onTime);
+    return stop;
+}
+
+// watchPlaybackQuality sends `playback-quality` for `video` once it has
+// played a minute, unless this page already has: the frame counters, what was
+// played, the declaration (`decode`) and `extra` — what the player knows
+// about the stream, the same src/tc/pl/emb as codec-support; a function is
+// called at the mark, when the player has settled on a path. Without
+// window.umami at the mark nothing is sent and the page is not marked.
+// Returns the cleanup; never throws.
+export function watchPlaybackQuality(video, extra = {}, deps = {}) {
+    try {
+        const win = deps.win || (typeof window !== 'undefined' ? window : null);
+        if (!win || !video) return () => {};
+        const schedule = deps.schedule || defaultSchedule(win);
+        const tokens = deps.tokens || (() => decodeTokens(envFromWindow(win)));
+        const isHidden = deps.hidden || (() => safe(() => win.document.hidden) === true);
+        return afterPlayed(video, QUALITY_AFTER_S, (played, hidden) => {
+            const q = playbackQuality(video);
+            if (!q) return;
+            if (safe(() => win[QUALITY_PAGE_FLAG]) === true) return;
+            if (!umamiOf(win)) return;
+            safe(() => { win[QUALITY_PAGE_FLAG] = true; });
+            const height = safe(() => video.videoHeight);
+            const rate = safe(() => video.playbackRate);
+            const data = {
+                dropped: q.dropped,
+                total: q.total,
+                played: Math.round(played),
+                height: count(height) ? height : 0,
+                rate: typeof rate === 'number' && Number.isFinite(rate) ? rate : 1,
+                hidden,
+                ...((isFn(extra) ? safe(extra) : extra) || {}),
+            };
+            // No frames at all is a reading too (a decoder that never
+            // started); it has no share.
+            if (q.total > 0) data.drop_pct = Math.round((q.dropped / q.total) * 10000) / 100;
+            schedule(async () => {
+                let decode = '';
+                try {
+                    decode = (await tokens()).join(',');
+                } catch (e) {
+                    // The frames are the point; a failed declaration is ''.
+                }
+                const umami = umamiOf(win);
+                if (!umami) return;
+                safe(() => umami.track(QUALITY_EVENT, { ...data, decode }));
+            });
+        }, isHidden);
+    } catch (e) {
+        return () => {};
+    }
 }
