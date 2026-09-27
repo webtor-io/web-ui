@@ -497,10 +497,12 @@ test('a file marked "fits": nothing while it plays, the stream box at a real sta
 });
 
 // The player's buffering label (lib/playerLabel.js): the status tells the
-// player's bundle, through window, whether a stall now is the plan's cap --
-// only where the card's own block sells the stream box at the stall, and only
-// when that changes.
-test('the player\'s label: the lock at a real stall at the cap, plain otherwise', (t) => {
+// player's bundle, through window, whether the viewer is held at the plan's
+// cap -- whenever the server says so with the stream box due, not only at a
+// stall of the player's (a seek's wait at the cap is the cap too: owner,
+// 2026-09-26) -- and only when that changes. The player picks the waits it
+// draws the lock at.
+test('the player\'s label: the lock whenever the cap holds with the box due, plain otherwise', (t) => {
     // Clear of every other test's stall minute (STALL_WINDOW_MS).
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 20 * 60 * 1000 });
     freshVideo();
@@ -520,22 +522,36 @@ test('the player\'s label: the lock at a real stall at the cap, plain otherwise'
     setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 300 });
     fire('loadstart');
     fire('playing');
+    source.message(S.active);
+    assert.equal(window._txPlayerLabel || null, null, 'under the cap: plain');
+    labels.length = 0; // what the tests before left published
     source.message(S.tier_dl);
-    assert.equal(window._txPlayerLabel || null, null, 'playing: plain');
-    // A wait that has not lasted is not a stall.
-    setVideo({ readyState: 1 });
+    assert.equal(card().getAttribute('data-key'), 'stream_ok', 'fixture: the block sees a film that plays');
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'fixture: and sells nothing');
+    assert.ok(window._txPlayerLabel, 'the cap holds, the box due: the label, for whatever wait comes (a seek)');
+    // A seek: the player's verdict stays 'playing' (a wait while seeking is
+    // not a stall to it) -- the label with it.
+    setVideo({ seeking: true, readyState: 1 });
+    fire('seeking');
     fire('waiting');
     source.ping();
-    assert.equal(window._txPlayerLabel || null, null, 'a hiccup: plain');
+    assert.equal(card().getAttribute('data-key'), 'stream_ok', 'fixture: not a stall to the player');
+    assert.ok(window._txPlayerLabel, 'a seek at the cap: the lock');
+    setVideo({ seeking: false, readyState: 4 });
+    fire('playing');
+    // A stall that lasts: the same label, not told again.
+    setVideo({ readyState: 1 });
+    fire('waiting');
     t.mock.timers.tick(1500);
     source.ping();
+    assert.equal(card().getAttribute('data-key'), 'stream_stall', 'fixture: a real stall');
     const label = window._txPlayerLabel;
     assert.ok(label, 'a real stall at the cap: the lock');
     assert.equal(label.rate.replaceAll('\u00a0', ' '), '5 Мбит/с');
     assert.equal(label.sub, stallSub, 'the player\'s own line');
     assert.equal(label.cta.url, '/ru/trial?from=player-label');
     assert.equal(card().querySelector('[data-tx-cta]').getAttribute('href'), '/ru/trial?from=status-bar', 'the block keeps its own link');
-    assert.equal(labels.filter(Boolean).length, 1, 'told once');
+    assert.equal(labels.filter(Boolean).length, 1, 'told once: the playing film, the seek and the stall are one label');
     source.ping();
     source.message(S.tier_dl);
     assert.equal(labels.filter(Boolean).length, 1, 'the same label is not told again');

@@ -4046,9 +4046,10 @@ test('cues a reload puts back are shifted by the run that is playing now', async
 // Owner, 2026-09-26: the spinner is a pill that says "Buffering". At the
 // plan's cap -- the transfer status's word, published on window by
 // lib/playerLabel.js -- it is the lock, a button with the viewer's cap that
-// opens the status's own stream plan card over the video. The label here is
-// the one the status builds from the server's own message (the Go-generated
-// fixture the status tests run on), not a hand-written look-alike.
+// opens the status's own stream plan card in a modal dialog. The label here
+// is the one the status builds from the server's own message (the
+// Go-generated fixture the status tests run on), not a hand-written
+// look-alike.
 
 const { publishPlayerLabel } = await import('../playerLabel.js');
 const { playerLabel } = await import('../transferStatus.js');
@@ -4061,7 +4062,45 @@ const CAP_LABEL = playerLabel(
 
 const bufferingPill = (p) => p.container.querySelector('.wt-buffering-pill');
 const lockButton = (p) => p.container.querySelector('button.wt-buffering-pill--cap');
-const capCard = (p) => p.container.querySelector('.wt-cap-card');
+// The card is the page's, not the player's (it outlives a move to the next
+// file): looked for in the document.
+const capDialog = () => document.querySelector('dialog.wt-cap-dialog');
+const capCard = () => document.querySelector('.wt-cap-card');
+const lockSeen = (p) => p.events.filter((e) => e.name === 'player-label-lock-shown');
+
+// jsdom has <dialog> but neither showModal() nor close(). stubDialog teaches
+// them to its prototype for one test, as a browser does them: showModal()
+// opens it (the top layer is the browser's), close() closes it and fires
+// `close` a task later. Without the stub the card takes its fallback, the
+// class.
+function stubDialog(t) {
+    const proto = dom.window.HTMLDialogElement.prototype;
+    const calls = [];
+    proto.showModal = function showModal() {
+        calls.push('showModal');
+        this.setAttribute('open', '');
+    };
+    proto.close = function close() {
+        calls.push('close');
+        if (!this.hasAttribute('open')) return;
+        this.removeAttribute('open');
+        setTimeout(() => this.dispatchEvent(new dom.window.Event('close')), 0);
+    };
+    t.after(() => {
+        delete proto.showModal;
+        delete proto.close;
+    });
+    return calls;
+}
+// The film at the cap, stalled, the card opened from its lock.
+async function openCard(p, clock) {
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    click(lockButton(p));
+    await settle();
+    assert.ok(capCard(p), 'fixture: the card is open');
+}
 
 // filmClock moves the element's clock while the film plays -- what the
 // player's stall watchdog (stall-watch.js) reads as playback -- and stands
@@ -4129,7 +4168,7 @@ test('the spinner is a pill that says Buffering, with the spinner\'s visibility'
     assert.equal(bufferingPill(p), null, 'playing again: gone');
 });
 
-test('the lock only with the status\'s word on the cap, and only while the film stalls', async (t) => {
+test('the lock only with the status\'s word on the cap, and only where the pill is', async (t) => {
     const { p, clock, log } = await mountLabelled(t);
     await filmPlays(p, clock);
     publishPlayerLabel(CAP_LABEL);
@@ -4152,6 +4191,11 @@ test('the lock only with the status\'s word on the cap, and only while the film 
     await settle();
     assert.ok(lockButton(p));
     assert.equal(p.events.filter((e) => e.name === 'player-label-lock-shown').length, 1, 'one lock seen is one lock seen');
+    // A label without the card's data (no link): the plain pill.
+    publishPlayerLabel({ ...CAP_LABEL, cta: { ...CAP_LABEL.cta, url: '' } });
+    await settle();
+    assert.equal(lockButton(p), null, 'no card to open: no lock');
+    assert.equal(bufferingPill(p).tagName, 'SPAN');
     assert.equal(log.play + log.pause, 0, 'nothing played or paused the film');
 });
 
@@ -4184,17 +4228,25 @@ test('a word published while the player mounts is not lost', async (t) => {
     assert.ok(lockButton(p));
 });
 
-test('the lock opens the status\'s stream plan card over the video, with the player\'s own link', async (t) => {
+// A native <dialog class="modal"> opened with showModal(), like the grace
+// popup and #subtitles: the top layer -- nothing in the player clips it, and
+// it shows over a fullscreen player (owner, 2026-09-26: the card inside the
+// player's frame was cut off).
+test('the lock opens the status\'s stream plan card in a modal dialog, with the player\'s own link', async (t) => {
+    const calls = stubDialog(t);
     const { p, clock, log } = await mountLabelled(t);
-    publishPlayerLabel(CAP_LABEL);
-    await filmPlays(p, clock);
-    await filmStalls(p, clock);
-    click(lockButton(p));
-    await settle();
+    await openCard(p, clock);
+    const dialog = capDialog(p);
+    assert.ok(dialog, 'a <dialog>');
+    assert.ok(dialog.classList.contains('modal'), 'DaisyUI\'s modal, as the other popups');
+    assert.deepEqual(calls, ['showModal'], 'opened with showModal(): the top layer');
+    assert.equal(dialog.open, true);
+    assert.equal(dialog.classList.contains('modal-open'), false, 'not the fallback');
+    assert.equal(dialog.getAttribute('aria-label'), CAP_LABEL.title);
     const card = capCard(p);
-    assert.ok(card, 'the card');
-    assert.ok(card.classList.contains('tx-pbox'), 'the status\'s own box');
-    assert.ok(p.container.querySelector('.wt-player').contains(card), 'inside the player: a fullscreen player keeps it');
+    assert.equal(card.parentElement, dialog);
+    assert.ok(card.classList.contains('modal-box') && card.classList.contains('tx-pbox'), 'the status\'s own box, as the modal\'s box');
+    assert.equal(document.activeElement, card, 'focus on the box itself: no ring on a button nobody tabbed to');
     assert.equal(card.querySelector('.tx-pt').textContent, 'Видео подгружается медленнее, чем играет');
     assert.equal(card.querySelector('.tx-ps').textContent, STALL_SUB, 'the stream job\'s line');
     const a = card.querySelector('a.tx-sbtn');
@@ -4204,60 +4256,307 @@ test('the lock opens the status\'s stream plan card over the video, with the pla
     assert.equal(card.querySelector('.tx-pn').textContent, CAP_LABEL.cta.note);
     assert.equal(a.getAttribute('data-umami-event'), 'donate-player-label');
     assert.equal(a.getAttribute('data-umami-event-location'), 'player');
+    assert.equal(a.getAttribute('data-umami-event-state'), 'stream_stall');
     assert.equal(a.getAttribute('data-umami-event-target'), 'trial');
+    assert.ok(dialog.querySelector('form[method="dialog"].modal-backdrop button'), 'the backdrop, as #subtitles has');
     assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true');
     assert.equal(lockButton(p).querySelector('.wt-buffering-chev'), null, 'open: the chevron goes');
     assert.deepEqual(p.events.filter((e) => e.name === 'donate-player-label-shown').map((e) => e.data), [CAP_LABEL.props]);
-    // The clicks are the card's: the film is neither toggled nor sought.
-    a.addEventListener('click', (e) => e.preventDefault());
-    click(a);
+    // The clicks and keys are the card's: the film is neither toggled, nor
+    // sought, nor made fullscreen -- the player's keys are on the document,
+    // where the card's would bubble to.
+    const stage = p.container.querySelector('.wt-player-stage');
+    let fullscreens = 0;
+    stage.requestFullscreen = () => { fullscreens++; return Promise.resolve(); };
     click(card);
+    click(card.querySelector('.tx-pt'));
+    card.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+    card.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    card.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     await settle();
     assert.equal(log.play + log.pause, 0, 'nothing played or paused the film');
-    // The lock again closes it; the close button too.
-    click(lockButton(p));
+    assert.equal(fullscreens, 0, 'nor made it fullscreen');
+    assert.ok(capCard(p), 'still open');
+    p.container.querySelector('.wt-player').dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+    assert.equal(fullscreens, 1, 'fixture: the player\'s own double-click is fullscreen');
+    // Its X closes it; the lock stays while the film stalls.
+    click(card.querySelector('.wt-cap-card-x'));
     await settle();
-    assert.equal(capCard(p), null);
-    click(lockButton(p));
-    await settle();
-    click(capCard(p).querySelector('.wt-cap-card-x'));
-    await settle();
-    assert.equal(capCard(p), null, 'closed');
+    assert.equal(capDialog(p), null, 'closed');
+    assert.deepEqual(calls, ['showModal', 'close'], 'closed as a dialog: out of the top layer');
     assert.ok(lockButton(p), 'the lock stays while the film stalls');
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'false');
     assert.equal(log.play + log.pause, 0);
 });
 
-test('the card closes when the film plays again, and does not come back by itself', async (t) => {
+for (const [how, act] of [
+    ['Esc', (dialog) => dialog.dispatchEvent(new dom.window.Event('cancel', { cancelable: true }))],
+    ['a click beside it', (dialog) => click(dialog.querySelector('.modal-backdrop button'))],
+    ['its button', (dialog) => {
+        const a = dialog.querySelector('a.tx-sbtn');
+        a.addEventListener('click', (e) => e.preventDefault()); // jsdom does not open tabs
+        click(a);
+    }],
+]) {
+    test(`the card closes on ${how}`, async (t) => {
+        const calls = stubDialog(t);
+        const { p, clock, log } = await mountLabelled(t);
+        await openCard(p, clock);
+        act(capDialog(p));
+        await settle();
+        assert.equal(capDialog(p), null, 'closed');
+        assert.deepEqual(calls, ['showModal', 'close']);
+        assert.ok(lockButton(p), 'the lock stays');
+        assert.equal(log.play + log.pause, 0, 'the film untouched');
+    });
+}
+
+// The browser closes a modal dialog itself as well: Chrome's close watcher
+// does not let every Esc be cancelled, and closes it then without asking.
+// The player follows -- the lock says closed, and one press opens it again.
+test('a card the browser closed itself is closed for the player too', async (t) => {
+    stubDialog(t);
     const { p, clock } = await mountLabelled(t);
-    publishPlayerLabel(CAP_LABEL);
-    await filmPlays(p, clock);
-    await filmStalls(p, clock);
+    await openCard(p, clock);
+    capDialog(p).close();
+    await settle();
+    assert.equal(capDialog(p), null, 'gone');
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'false');
     click(lockButton(p));
     await settle();
-    assert.ok(capCard(p), 'fixture: open');
-    await filmResumes(p, clock);
-    assert.equal(capCard(p), null, 'playing: closed');
-    assert.equal(bufferingPill(p), null);
-    await filmStalls(p, clock);
-    assert.ok(lockButton(p), 'the next stall: the lock');
-    assert.equal(capCard(p), null, 'and only the lock');
+    assert.ok(capCard(p), 'one press opens it again');
 });
 
-test('the card closes when the status takes its word back', async (t) => {
-    const { p, clock } = await mountLabelled(t);
-    publishPlayerLabel(CAP_LABEL);
-    await filmPlays(p, clock);
-    await filmStalls(p, clock);
+// A browser without showModal (and jsdom): DaisyUI's .modal-open shows it,
+// and the lock -- not made inert by a modal -- closes it as it opened it.
+test('without showModal the card is shown by its class, and closes the same ways', async (t) => {
+    assert.equal(typeof dom.window.HTMLDialogElement.prototype.showModal, 'undefined', 'fixture: jsdom has none');
+    const { p, clock, log } = await mountLabelled(t);
+    await openCard(p, clock);
+    const dialog = capDialog(p);
+    assert.ok(dialog.classList.contains('modal-open'), 'shown by its class');
+    assert.equal(document.activeElement, capCard(p), 'focus on the box');
     click(lockButton(p));
     await settle();
-    assert.ok(capCard(p), 'fixture: open');
+    assert.equal(capDialog(p), null, 'the lock closes it');
+    click(lockButton(p));
+    await settle();
+    capDialog(p).dispatchEvent(new dom.window.Event('cancel', { cancelable: true }));
+    await settle();
+    assert.equal(capDialog(p), null, 'Esc');
+    click(lockButton(p));
+    await settle();
+    click(capDialog(p).querySelector('.modal-backdrop button'));
+    await settle();
+    assert.equal(capDialog(p), null, 'the backdrop');
+    click(lockButton(p));
+    await settle();
+    click(capDialog(p).querySelector('.wt-cap-card-x'));
+    await settle();
+    assert.equal(capDialog(p), null, 'the X');
+    assert.equal(log.play + log.pause, 0);
+});
+
+// Owner, 2026-09-26: only the viewer closes the card -- not the film playing
+// again, not the status taking its word back.
+test('the card stays open when the film plays again', async (t) => {
+    const calls = stubDialog(t);
+    const { p, clock } = await mountLabelled(t);
+    await openCard(p, clock);
+    await filmResumes(p, clock);
+    assert.equal(bufferingPill(p), null, 'playing: the pill goes');
+    assert.ok(capCard(p), 'the card stays');
+    assert.equal(capDialog(p).open, true);
+    assert.deepEqual(calls, ['showModal'], 'nobody closed it');
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'the next stall: the lock');
+    assert.equal(document.querySelectorAll('.wt-cap-card').length, 1, 'and the one card');
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true');
+});
+
+test('the card stays open, saying what it said, when the status takes its word back', async (t) => {
+    const calls = stubDialog(t);
+    const { p, clock } = await mountLabelled(t);
+    await openCard(p, clock);
+    const before = capCard(p).innerHTML;
     publishPlayerLabel(null);
     await settle();
-    assert.equal(capCard(p), null);
-    assert.equal(bufferingPill(p).tagName, 'SPAN');
-    publishPlayerLabel(CAP_LABEL);
+    assert.ok(capCard(p), 'the card stays');
+    assert.equal(capCard(p).innerHTML, before, 'with its words and its link');
+    assert.equal(bufferingPill(p).tagName, 'SPAN', 'the pill: plain');
+    publishPlayerLabel({ ...CAP_LABEL, sub: 'другая строка' });
     await settle();
-    assert.equal(capCard(p), null, 'the word back: the lock, closed');
+    assert.equal(capCard(p).innerHTML, before, 'another word meanwhile: the card as it was opened');
+    assert.deepEqual(calls, ['showModal']);
+    click(capCard(p).querySelector('.wt-cap-card-x'));
+    await settle();
+    assert.equal(capDialog(p), null, 'the viewer closes it');
+});
+
+// Nor the move to the next file (next-item-go.js): the player the card was
+// opened from is destroyed (destroyPlayer({ keepStage: true })) and another
+// mounted on the same stage, and the lock is drawn while the next file
+// loads -- a card opened there, or at a stall near the end before autoplay
+// moves on, is the viewer's to close. The card is the page's, not the
+// player's.
+async function mountWithNext(t) {
+    const saved = { DOMParser: globalThis.DOMParser, FormData: globalThis.FormData };
+    globalThis.DOMParser = dom.window.DOMParser;
+    globalThis.FormData = dom.window.FormData;
+    window._userId = 'u1'; // signed in: no Turnstile token to get
+    const streams = [];
+    window.EventSource = class { constructor(url) { this.url = url; streams.push(this); } close() {} };
+    t.after(() => {
+        globalThis.DOMParser = saved.DOMParser;
+        globalThis.FormData = saved.FormData;
+        delete window._userId;
+        delete window.EventSource;
+        window.sessionStorage.clear();
+    });
+    const { p, clock } = await mountLabelled(t, (page) => {
+        Object.assign(page.video.dataset, { nextItemId: 'i2', nextPath: 'ep2.mkv', nextKind: 'episode' });
+        // What canMoveOn looks for: the start form and #content.
+        const form = document.createElement('form');
+        form.setAttribute('action', '/stream-video');
+        form.setAttribute('data-async-target', '#content');
+        form.innerHTML = '<input name="item-id" value="i1">';
+        document.body.appendChild(form);
+        const content = document.createElement('div');
+        content.id = 'content';
+        document.body.appendChild(content);
+    });
+    // The start's POST answers with its job log. Its body is FormData, which
+    // the harness's fetch (it records JSON bodies) cannot read: answered
+    // before it.
+    const harnessFetch = globalThis.fetch;
+    globalThis.fetch = (url, params) => {
+        if (params && params.method === 'POST' && String(url).endsWith('/stream-video')) {
+            return Promise.resolve({ ok: true, status: 200, text: async () => '<div data-async-progress-log="/log/1"></div>' });
+        }
+        return harnessFetch(url, params);
+    };
+    window.fetch = globalThis.fetch;
+    // The job's last message: the next file's player.
+    const deliver = async () => {
+        streams[streams.length - 1].onmessage({ data: JSON.stringify({
+            level: 'rendertemplate',
+            body: `<div class="relative"><video class="player" data-resource-id="res" data-path="ep2.mkv" controls></video>${DIALOG}</div>`,
+        }) });
+        await settle();
+        await settle();
+    };
+    return { p, clock, streams, deliver };
+}
+
+test('the card outlives the move to the next file: only the viewer closes it', async (t) => {
+    const calls = stubDialog(t);
+    const { p, clock, streams, deliver } = await mountWithNext(t);
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock, 1200);
+    keydown('n');
+    await settle();
+    assert.equal(streams.length, 1, 'fixture: the next file\'s start is under way');
+    assert.ok(lockButton(p), 'the next file loads at the cap: the lock');
+    click(lockButton(p));
+    await settle();
+    assert.ok(capCard(p), 'fixture: the card is open');
+    const before = capCard(p).innerHTML;
+    await deliver();
+    assert.equal(document.querySelector('video.player').getAttribute('data-path'), 'ep2.mkv', 'fixture: the next file\'s player is up');
+    assert.ok(capDialog(p), 'the card is still there');
+    assert.equal(capDialog(p).open, true, 'and open');
+    assert.deepEqual(calls, ['showModal'], 'nobody closed it');
+    assert.equal(capCard(p).innerHTML, before, 'saying what it said');
+    assert.equal(document.querySelectorAll('.wt-cap-card').length, 1, 'the one card');
+    // The new player's lock (its start waits at the cap) knows the card is open.
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true', 'the new player\'s lock: open');
+    click(capCard(p).querySelector('.wt-cap-card-x'));
+    await settle();
+    assert.equal(capDialog(p), null, 'the viewer closes it');
+    assert.deepEqual(calls, ['showModal', 'close']);
+    assert.equal(lockButton(p).getAttribute('aria-expanded'), 'false', 'and the new player\'s lock says so');
+});
+
+// The fallback (no showModal) the same way: the class, across the move.
+test('without showModal the card outlives the move to the next file too', async (t) => {
+    const { p, clock, deliver } = await mountWithNext(t);
+    publishPlayerLabel(CAP_LABEL);
+    await filmPlays(p, clock, 1200);
+    keydown('n');
+    await settle();
+    click(lockButton(p));
+    await settle();
+    await deliver();
+    assert.equal(document.querySelector('video.player').getAttribute('data-path'), 'ep2.mkv', 'fixture: the next file\'s player is up');
+    assert.ok(capDialog(p) && capDialog(p).classList.contains('modal-open'), 'still shown');
+    click(lockButton(p));
+    await settle();
+    assert.equal(capDialog(p), null, 'the new player\'s lock closes it, as the old one would have');
+});
+
+// In fullscreen: the modal card is over the fullscreen stage (the top
+// layer), and the viewer stays there; the fallback, a plain element on the
+// page outside the stage, would be hidden by it -- so it leaves fullscreen
+// first, as the grace popup's fallback does.
+for (const [how, modal, exits] of [['a modal card keeps', true, 0], ['the fallback leaves', false, 1]]) {
+    test(`in fullscreen ${how} it`, async (t) => {
+        if (modal) stubDialog(t);
+        let exited = 0;
+        Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => document.body });
+        document.exitFullscreen = () => { exited++; return Promise.resolve(); };
+        t.after(() => {
+            delete document.fullscreenElement;
+            delete document.exitFullscreen;
+        });
+        const { p, clock } = await mountLabelled(t);
+        await openCard(p, clock);
+        assert.equal(exited, exits);
+        assert.equal(modal ? capDialog(p).open : capDialog(p).classList.contains('modal-open'), true, 'shown');
+    });
+}
+
+// The player the next file brings up mounts under the open card, and its
+// lock says open from its first frame -- and when the card opened between
+// that frame and its subscription (the status draws every second), on
+// subscribing.
+const { openCapCard, closeCapCard } = await import('./BufferingLabel.jsx');
+for (const [when, before] of [['on its first frame', true], ['on subscribing', false]]) {
+    test(`a player mounted under an open card reads it ${when}`, async (t) => {
+        const p = mount();
+        p.video.setAttribute('controls', '');
+        t.after(() => {
+            publishPlayerLabel(null);
+            destroyPlayer();
+        });
+        publishPlayerLabel(CAP_LABEL);
+        if (before) openCapCard(CAP_LABEL);
+        await initPlayer(p.container, { awaitStart: true });
+        // Rendered; its effects (the subscription) wait for the next frame.
+        assert.ok(lockButton(p), 'fixture: the start waits under the lock');
+        if (before) {
+            assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true', 'the first frame: open');
+        } else {
+            openCapCard(CAP_LABEL);
+        }
+        await settle();
+        assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true', 'open');
+        closeCapCard();
+        await settle();
+        assert.equal(lockButton(p).getAttribute('aria-expanded'), 'false', 'and closed when it closes');
+    });
+}
+
+// Leaving the page (the view's destroy: destroyPlayer() without keepStage)
+// takes the card with it -- as a dialog, out of the top layer.
+test('leaving the page takes the card with it', async (t) => {
+    const calls = stubDialog(t);
+    const { p, clock } = await mountLabelled(t);
+    await openCard(p, clock);
+    destroyPlayer();
+    await settle();
+    assert.equal(capDialog(p), null, 'gone');
+    assert.deepEqual(calls, ['showModal', 'close'], 'closed as a dialog');
+    assert.equal(document.querySelector('.wt-cap-card-host'), null, 'nothing left on the page');
 });
 
 // The status takes its word back inside the grace window; a word a second
@@ -4293,8 +4592,10 @@ test('no lock while the grace popup holds the film; a stall at the cap after the
     assert.ok(lockButton(p), 'past the window, the popup answered: the lock');
 });
 
-// (The next file loading and the translation hold: buffering-label.test.js.)
-test('a session seek waits under the plain pill, even at the cap', async (t) => {
+// Owner, 2026-09-26: "after a seek at the cap the pill says just Buffering,
+// but the seek wait is limited by the plan too" -- the lock wherever the pill
+// is shown.
+test('a session seek at the cap waits under the lock', async (t) => {
     const { p, clock } = await mountLabelled(t, (page) => {
         page.video.dataset.sessionId = 's1';
         page.video.dataset.sessionSeekUrl = '/session/seek';
@@ -4312,12 +4613,65 @@ test('a session seek waits under the plain pill, even at the cap', async (t) => 
     p.video.load = () => {};
     publishPlayerLabel(CAP_LABEL);
     await filmPlays(p, clock);
-    await filmStalls(p, clock);
-    assert.ok(lockButton(p), 'fixture: the lock');
+    assert.equal(bufferingPill(p), null, 'fixture: playing, no pill');
     keydown('ArrowRight');
     await settle();
-    assert.ok(bufferingPill(p), 'the seek waits under the pill');
-    assert.equal(lockButton(p), null, 'a session seek is not the cap');
+    assert.ok(releasePost, 'fixture: the seek is under way');
+    assert.ok(lockButton(p), 'the seek waits under the lock');
+    assert.equal(lockSeen(p).length, 1);
+    releasePost();
+    await settle();
+});
+
+// A player moved to by "next" (next-item-go.js), before its first frame.
+test('the next file\'s start at the cap waits under the lock', async (t) => {
+    const p = mount();
+    p.video.setAttribute('controls', '');
+    t.after(() => {
+        publishPlayerLabel(null);
+        destroyPlayer();
+    });
+    publishPlayerLabel(CAP_LABEL);
+    await initPlayer(p.container, { awaitStart: true });
+    await settle();
+    assert.equal(p.video.paused, true, 'fixture: not playing yet');
+    assert.ok(lockButton(p), 'the start waits under the lock');
+});
+
+// A session seek past the window puts the popup up as the seek starts, and
+// the seek's wait is on screen behind it: no lock while the popup is up --
+// not even for the frame before its effect puts it up -- and the lock once
+// the viewer has answered it.
+test('no lock behind the grace popup a session seek brings up; the lock after the answer', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 10);
+        page.video.dataset.sessionId = 's1';
+        page.video.dataset.sessionSeekUrl = '/session/seek';
+        page.video.setAttribute('data-duration', '3600');
+    });
+    let releasePost = null;
+    p.setResponse((url, params) => {
+        if (params && params.method === 'POST' && String(url).startsWith('/session/seek')) {
+            return new Promise((resolve) => {
+                releasePost = () => resolve({ ok: true, status: 200, json: async () => ({ offset: 15 }) });
+            });
+        }
+        return { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ offset: 0 }) };
+    });
+    p.video.load = () => {};
+    publishPlayerLabel(CAP_LABEL); // a word the status has not taken back yet
+    await filmPlays(p, clock, 0);
+    keydown('ArrowRight'); // 0:00 -> 0:15, past the 10 s window
+    await settle();
+    assert.ok(popupUp(), 'fixture: the popup came up with the seek');
+    assert.ok(releasePost, 'fixture: the seek is under way');
+    assert.ok(bufferingPill(p), 'the seek waits');
+    assert.equal(lockButton(p), null, 'behind the popup: the plain pill');
+    assert.equal(lockSeen(p).length, 0, 'not even for a frame');
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(popupUp(), false, 'fixture: answered');
+    assert.ok(lockButton(p), 'the seek still waits, past the window, the popup answered: the lock');
     releasePost();
     await settle();
 });

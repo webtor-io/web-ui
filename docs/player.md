@@ -100,43 +100,82 @@ shows a compact pill: a small spinner and `player.buffering` ("Buffering"; 32 px
 clicks: they go through to the picture, as they went through the spinner.
 
 **At the plan's cap the pill is the lock**: a button "Buffering | [lock] 5 Mbps ›" with the viewer's
-own cap (a paying viewer's own, "20 Mbps"), 44 px on touch. It opens the transfer status's stream
-plan card over the video — `.tx-pbox`, the status's own box (bolt, "the video loads slower than it
-plays", the stream job's `data-status-stall-sub` line, the button `offer.watchUncapped` and the
-trial note) with a close ×, inside the player so a fullscreen player keeps it. Sized by the player
-(the overlay is a size container): side by side from 670 px of player width, the text over a
-full-width button below it, and in a player under 280 px tall (a phone's 16:9 is ~200 px) the card
-takes the pill's place and tightens. It closes on its ×, on the lock, when the film plays again
-(and does not come back by itself at the next stall — that is the lock's to say), and when the
-status takes its word back.
+own cap (a paying viewer's own, "20 Mbps"), 44 px on touch. **Wherever the pill is shown** — the film
+stalling, a seek (a session seek's new run or one inside the run), the next file starting, the hold
+after a seek — every one of those waits comes through the limiter that holds the viewer (owner,
+2026-09-26: "after a seek at the cap the pill says just Buffering, but the seek wait is limited by the
+plan too"). It is plain inside the free grace window by the player's own movie time, while the grace
+popup is up (or comes up this very render — a session seek past the window puts it up as the seek
+starts, and the seek's wait is on screen behind it), and whenever the status has no word on the cap.
 
-**Whether the stall is the cap is the transfer status's word, not the player's.** The status on
-the same page (`app/resource/status.js`) asks `lib/transferStatus.js` `playerLabel` on every draw:
-the label exists exactly where its own block sells the stream box at a stall — `present()` says
-`stream_stall` with a box (the server's verdict at the cap with the box due, something faster on
-sale, a real stall of at least 1.5 s, not inside the grace window, not while the grace popup is up
-or on its way, no answered offer standing) and the server sent the player's own link
-(`plan.player`, below). It publishes it on `window` with an event (`lib/playerLabel.js`: two bundles,
-two module copies — CLAUDE.md, shared JS state), only when it changes, from the view the sticky bar
-keeps through a one-second gap in the data (an open card does not close on a blip), and takes it back
-on teardown. No status on the page (an embed): no label, the plain pill always. A swarm or network
-stall has no plan: the plain pill.
+**Colours** (owner, 2026-09-26: on a white frame the lock's hover turned the pill into a light-pink
+blob, the white "Buffering" gone — 1.02:1). The pill is dark in every state, `rgba(10,14,26,.9)`;
+hovered or open only a white layer of 0.08 over the same base and a brighter edge, as the player's
+other buttons. No pink fill anywhere on it: the pink is the cap's number, lock and chevron alone. On a
+pure white frame the label reads 12.2:1 and the cap 6.1:1, hovered 9.6:1 and 4.8:1 —
+`buffering-label.test.js` computes these from `player.css` and fails below 4.5:1. The keyboard's
+ring is pink on a dark halo, seen on any frame.
+
+**The card** is the transfer status's stream plan box — `.tx-pbox`, the status's own box (bolt, "the
+video loads slower than it plays", the stream job's `data-status-stall-sub` line, the button
+`offer.watchUncapped` and the trial note) with a close × — in a native `<dialog class="modal">`
+opened with `showModal()`, like `#subtitles`, `#embed` and the grace popup. The top layer: centred on
+the screen over DaisyUI's dimmed backdrop, never cut by the player's rounded `overflow:hidden` frame
+(it was, inside the player — the owner's stage screenshot, 2026-09-26), and over a fullscreen player
+(the top layer is above the fullscreen element). The dialog is the box's size container: side by side
+from 670 px of screen, the text over a full-width 44 px button below that. **The card is the page's,
+not the player's**: a Preact root of its own on `<body>` (`BufferingLabel.jsx` `openCapCard`), its
+state the document's (open is "`.wt-cap-card-host` is on the page", a change is a `player_cap_card`
+event on `window`). Rendered inside the player it went with it: moving to the next file destroys the
+player it was opened from (`destroyPlayer({ keepStage: true })`) and a card opened while the next file
+loaded — or at a stall near the end, before autoplay moved on under it — vanished with nobody closing
+it (review, 2026-09-27). A top-layer dialog is on top wherever it sits in the document, over a
+fullscreen stage as the grace popup is. The player on screen, whichever one it is by then, reads it
+for its lock's open state (on its first frame and on subscribing). It stops its clicks,
+double-clicks and keys from reaching the player (the shortcuts are on the document, where its keys
+would bubble). Focus starts on the box itself (`tabindex="-1"`, no ring on a button the viewer did
+not reach by keyboard); Tab reaches the ×, the button and the backdrop's close.
+
+**Only the viewer closes it**: its ×, Esc (`cancel`), a click beside it (the backdrop form, as
+`#subtitles` has), its button (the trial opens in a new tab), or the lock again where the card is
+not modal. It stays open, saying what it said when opened, when the film plays again, the status
+takes its word back (owner, 2026-09-26) or the next file's player replaces the one it was opened from
+— the card is the label as it was, not the live one. Leaving the page (the view's `destroyPlayer()`,
+without `keepStage`) takes it. A close the browser makes itself (Chrome's close watcher does not let
+every Esc be cancelled) closes it for the player too. Without `showModal` (jsdom; a browser without
+`<dialog>`) it is shown by DaisyUI's `.modal-open` class, and closes the same ways; in fullscreen it
+leaves fullscreen first — a plain element on the page, outside the fullscreen stage, would be hidden
+by it — as the grace popup's fallback does.
+
+**Whether the viewer is held at the cap is the transfer status's word, not the player's.** The status
+on the same page (`app/resource/status.js`) asks `lib/transferStatus.js` `playerLabel` on every draw:
+the label stands whenever the view says the viewer is at the plan's cap (`view.plan`, the pink fact)
+**and** the card's data came with it — the stream box (the server sends the variants only once the
+cap has held for the box, `statusview.PlanBoxAfter`, and only with something faster on sale) and the
+player's own link (`plan.player`, below). Not the player's own stall verdict: a seek's wait is not a
+stall to `playerActivity`, and the lock was missing there. Taken back inside the free grace window
+and while another offer is on screen or on its way (the grace popup: one offer at a time).
+`present()`'s rules for the block's own box and line (the player's verdict, the file against the
+cap, an answered grace popup) stay the block's. It publishes the label on `window` with an event
+(`lib/playerLabel.js`: two bundles, two module copies — CLAUDE.md, shared JS state), only when it
+changes, from the view the sticky bar keeps through a one-second gap in the data, and takes it back on
+teardown. No status on the page (an embed): no label, the plain pill always. A swarm or network stall
+has no plan, and a cap before its box is due has no card: the plain pill.
 
 The player adds only what it knows at this very moment (`capLock`, the label can be a second old):
-the wait on screen is the playing film stalling — not a start, a session seek, the translation hold
-or the next file — and by its own clock the film is past its free grace window. The grace popup has
-no clause of its own: it holds the film paused, and a paused film shows no pill.
+by its own clock (a session seek's target included) the film is past its free grace window, and its
+grace popup is not up or coming up.
 
 **One source of truth.** The card has no copy of its own: its title, line, button label and note are
-the stream box's as `present()` made them, and its link is the server's `plan.player.url` — the
-stream box's destination through the player's own `/trial` surface, `offer.FromPlayerLabel`
-(`/trial?from=player-label`; a checkout or `/donate` link is the box's own), built in
-`services/statusview` next to the box's `status-bar` link, so the two count apart in
-`webui_trial_shortlink_total{from}`. `plan.player.rate` is the lock's number (`speed()`, a no-break
-space before the unit). Events: `player-label-lock-shown` (the lock drawn, once per player and set
-of props), `donate-player-label-shown` (the card opened: on screen because the viewer asked),
-`donate-player-label` (its button, Umami's own click), with the status box's props and `location`
-`player`.
+the stream box's, and its link is the server's `plan.player.url` — the stream box's destination
+through the player's own `/trial` surface, `offer.FromPlayerLabel` (`/trial?from=player-label`; a
+checkout or `/donate` link is the box's own), built in `services/statusview` next to the box's
+`status-bar` link, so the two count apart in `webui_trial_shortlink_total{from}`. `plan.player.rate`
+is the lock's number (`speed()`, a no-break space before the unit). Events: `player-label-lock-shown`
+(the lock drawn, once per player and set of props), `donate-player-label-shown` (the card opened: on
+screen because the viewer asked), `donate-player-label` (its button, Umami's own click), with the
+status box's props, `location` `player` and `state` `stream_stall` (the stream box at a wait, whatever
+the block shows at the time).
 
 ## Loader restart on a stall — `loader-restart.js`
 

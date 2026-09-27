@@ -114,12 +114,13 @@ av(async function() {
             if (d) window.scrollBy(0, d);
         }
         ctaWatch.refresh();
-        // The player's buffering label: the lock and its card only where
-        // the block sells the stream box at a stall (the same env). From the
-        // view the sticky bar keeps through a one-second gap in the data:
-        // the lock would blink off there, and a card the viewer opened would
-        // close under them. Carried over to the player's bundle on window
-        // (lib/playerLabel.js); published only when it changes.
+        // The player's buffering label: the lock and its card whenever the
+        // view says the viewer is held at the cap with the stream box due,
+        // outside the grace window and with no other offer up (the same env;
+        // the player picks the waits to draw it at). From the view the
+        // sticky bar keeps through a one-second gap in the data: the lock
+        // would blink off there. Carried over to the player's bundle on
+        // window (lib/playerLabel.js); published only when it changes.
         publishPlayerLabel(playerLabel(shown(held ? steady : last), env));
         // Broadcast rather than reach into the sticky bar from here: this
         // view owns the stream, not the page furniture that shows it.

@@ -38,7 +38,7 @@ import {
 } from './track-dialog.js';
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
-import { BufferingPill, CapCard } from './BufferingLabel';
+import { BufferingPill, capCardOpen, closeCapCard, onCapCard, openCapCard } from './BufferingLabel';
 import { capLock } from './buffering-label';
 import { currentPlayerLabel, onPlayerLabel } from '../playerLabel';
 import { init as initI18n, t, tf } from './i18n';
@@ -108,6 +108,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const graceHoldRef = useRef(null);
     if (!graceHoldRef.current) graceHoldRef.current = createGraceHold(videoEl);
     const graceAnswerRef = useRef(null);
+    // The popup on screen, for the render: no lock on the buffering label
+    // while it is (buffering-label.js capLock).
+    const [graceOpen, setGraceOpen] = useState(false);
     useEffect(() => () => graceHoldRef.current.dispose(), []);
     // streamStarted is tracked via a ref, not state — the value is only
     // read to gate the one-shot Umami event below, never to drive UI, so
@@ -629,6 +632,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             }
             el.classList.remove('hidden');
         }
+        setGraceOpen(true);
         // `paused`: the popup stopped a playing film. A seek's run held
         // behind it is known only at the answer (its `paused` below).
         if (window.umami) window.umami.track('grace-soft-cta-shown', { paused: hold.held() });
@@ -650,6 +654,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             } else {
                 el.classList.add('hidden');
             }
+            setGraceOpen(false);
             const paused = hold.held();
             hold.release({ play: via === 'play' });
             if (window.umami) window.umami.track('grace-soft-cta-click', { action, via, paused });
@@ -1322,7 +1327,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     //
     // Where the spinner was, with its visibility: "Buffering". At the plan's
     // cap it is the lock, the button that opens the status's stream plan
-    // card over the video. Whether the cap is why is the transfer status's
+    // card. Whether the viewer is held at the cap is the transfer status's
     // word (lib/transferStatus.js playerLabel), carried here from the
     // status's bundle by lib/playerLabel.js -- none in an embed; capLock adds
     // what only the player knows at this very moment.
@@ -1333,16 +1338,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setCapLabel(currentPlayerLabel());
         return onPlayerLabel(setCapLabel);
     }, []);
-    const [capCardOpen, setCapCardOpen] = useState(false);
+    // Whether the card the lock opens is open. The card is the page's, not
+    // this player's (BufferingLabel.jsx openCapCard): only the viewer closes
+    // it -- not the film playing again, not the status taking its word back
+    // (owner, 2026-09-26), not the next file's player replacing this one. A
+    // player mounted under an open card reads it on mounting.
+    const [capCardUp, setCapCardUp] = useState(() => capCardOpen());
+    useEffect(() => {
+        setCapCardUp(capCardOpen());
+        return onCapCard(setCapCardUp);
+    }, []);
     const bufferingShown = showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading));
+    // The grace popup is up, or comes up in this very render's effect (the
+    // clock, a session seek's target included, has just crossed the window):
+    // the frame before it must not draw the lock, nor count it seen.
+    const graceUp = graceOpen || (!!graceDurationSec && !graceShownRef.current
+        && state.currentTime >= graceDurationSec && !!document.querySelector('#grace-cta'));
     const lock = bufferingShown ? capLock({
-        label: capLabel, playing: state.playing, loading: state.loading, seeking: sessionSeeking, preHolding, nextLoading,
-        awaitingStart, graceSec: graceDurationSec, movieTime: state.currentTime,
+        label: capLabel, graceSec: graceDurationSec, movieTime: state.currentTime, graceUp,
     }) : null;
-    // The card goes with the lock -- playback resumed (or paused, sought,
-    // left for the next file), the cap's verdict gone -- and does not come
-    // back by itself with the next stall: that is the lock's to say.
-    useEffect(() => { if (!lock && capCardOpen) setCapCardOpen(false); }, [!!lock, capCardOpen]);
     // The lock's impression, once per player and set of props: a film at
     // the cap stalls again and again, and one lock seen is one lock seen.
     const lockSeenRef = useRef(new Set());
@@ -1355,12 +1369,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     }, [lock]);
     // Opening the card is its button's impression: on screen because the
     // viewer asked for it (the status box's counts half on screen for 1 s).
+    // A modal card makes the lock unreachable while it is open; without
+    // showModal (the class fallback) the lock toggles it.
     const toggleCapCard = useCallback(() => {
+        if (capCardOpen()) {
+            closeCapCard();
+            return;
+        }
         if (!lock) return;
-        if (!capCardOpen) track('donate-player-label-shown', lock.props);
-        setCapCardOpen(!capCardOpen);
-    }, [lock, capCardOpen]);
-    const closeCapCard = useCallback(() => setCapCardOpen(false), []);
+        track('donate-player-label-shown', lock.props);
+        openCapCard(lock);
+    }, [lock]);
 
     const handleVideoClick = useCallback((e) => {
         if (!isVideo || sessionSeekingRef.current || showResumePromptRef.current) return;
@@ -1505,11 +1524,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
             {/* The buffering label, where the spinner was (a stall of the
                 playing film, a start, a seek, a hold); at the plan's cap the
-                lock and the card it opens (capLock above). */}
+                lock (capLock above). */}
             {bufferingShown && (
-                <div class={`wt-player-overlay wt-buffering${lock ? ' wt-buffering--cap' : ''}${lock && capCardOpen ? ' wt-buffering--open' : ''}`}>
-                    <BufferingPill label={lock} open={!!lock && capCardOpen} onToggle={toggleCapCard} />
-                    {lock && capCardOpen && <CapCard label={lock} onClose={closeCapCard} />}
+                <div class={`wt-player-overlay wt-buffering${lock ? ' wt-buffering--cap' : ''}`}>
+                    <BufferingPill label={lock} open={!!lock && capCardUp} onToggle={toggleCapCard} />
                 </div>
             )}
 
@@ -1830,6 +1848,10 @@ export function destroyPlayer({ keepStage = false } = {}) {
     // listener, which is wired by wireTrackHandlers rather than by the
     // mount and so outlives it.
     releaseTrackDialog();
+    // The card the lock opened is the viewer's to close, not the player's
+    // (BufferingLabel.jsx openCapCard): a move to the next file (keepStage)
+    // leaves it open; leaving the page takes it.
+    if (!keepStage) closeCapCard();
     if (!_currentPlayer) return;
     const { stage, mountEl, playerContainer, videoEl } = _currentPlayer;
 

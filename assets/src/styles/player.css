@@ -677,17 +677,9 @@ video::cue {
    "Buffering". At the plan's cap (the transfer status's word, lib/
    transferStatus.js playerLabel) it is the lock -- a button with the
    viewer's cap -- that opens the status's own stream plan box (.tx-pbox,
-   style.css, docs/uikit.html §21) over the video: inside the player, so a
-   fullscreen player keeps it. Owner's mockups, variant A (2026-09-26).
-
-   The overlay is the card's size container: .tx-pbox's own @container
-   rules lay the card out by the player's width (below 670 px the compact
-   box: the text over a full-width 44 px button), the ones below by its
-   height. */
+   style.css, docs/uikit.html §21) in a modal dialog (.wt-cap-dialog below).
+   Owner's mockups, variant A (2026-09-26). */
 .wt-buffering {
-    container-type: size;
-    flex-direction: column;
-    gap: 10px;
     padding: 8px;
     box-sizing: border-box;
 }
@@ -696,6 +688,12 @@ video::cue {
 .wt-buffering--cap {
     z-index: 35;
 }
+/* Dark in every state, whatever the frame behind it (owner, 2026-09-26: on a
+   white frame the lock's pink hover fill turned the pill into a light-pink
+   blob with the white "Buffering" gone: 1.02:1). On a pure white frame now:
+   the label 12.2:1, the pink cap 6.1:1; hovered or open 9.6:1 and 4.8:1
+   (buffering-label.test.js computes them from this file). No pink fill in
+   any state: the pink is the cap's number and lock alone. */
 .wt-buffering-pill {
     flex: none;
     display: inline-flex;
@@ -706,7 +704,7 @@ video::cue {
     box-sizing: border-box;
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 999px;
-    background: rgba(10, 14, 26, 0.72);
+    background: rgba(10, 14, 26, 0.9);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     color: #e2e8f0;
@@ -723,14 +721,19 @@ button.wt-buffering-pill {
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
+/* Hovered or open: a touch lighter and a brighter edge, as the player's
+   other buttons (.wt-player-btn: a white layer of 0.1) -- a white layer of
+   0.08 over the same dark base, never a colour of its own. */
 button.wt-buffering-pill:hover,
 button.wt-buffering-pill[aria-expanded="true"] {
-    border-color: rgba(232, 67, 147, 0.55);
-    background: rgba(232, 67, 147, 0.18);
+    border-color: rgba(255, 255, 255, 0.32);
+    background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)), rgba(10, 14, 26, 0.9);
 }
+/* The keyboard's ring, seen on any frame: pink on a dark halo. */
 button.wt-buffering-pill:focus-visible {
     outline: 2px solid #fd79a8;
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgba(10, 14, 26, 0.9);
 }
 .wt-buffering-spin {
     flex: none;
@@ -797,29 +800,40 @@ button.wt-buffering-pill:focus-visible {
     }
 }
 
-/* The card: the stream box as the status draws it, over the video. */
+/* The card: a native <dialog class="modal"> opened with showModal()
+   (BufferingLabel.jsx CapCard), like the grace popup and #subtitles -- the
+   top layer, centred on the screen over DaisyUI's dimmed backdrop, never cut
+   by .wt-player's overflow:hidden, over a fullscreen player. It is the
+   page's, not the player's (BufferingLabel.jsx openCapCard: a root of its
+   own on <body>, so the next file's player does not take it away), and
+   inherits the page's font and pointer as the status box does. The dialog
+   is the card's size container: .tx-pbox's own @container rules
+   (style.css) lay the box out by the screen's width -- below 670 px the
+   compact box, the text over a full-width 44 px button. */
+.wt-cap-dialog {
+    container-type: inline-size;
+}
+/* The stream box as the status draws it, on the card's own ground. Over
+   DaisyUI's .modal-box (layered: these win). */
 .wt-cap-card.tx-pbox {
     position: relative;
-    flex: 0 1 auto;
-    width: min(500px, 100%);
-    max-height: 100%;
+    width: min(640px, calc(100% - 32px));
+    max-width: none;
+    max-height: calc(100% - 32px);
     overflow-y: auto;
     box-sizing: border-box;
     padding: 16px 48px 16px 16px;
-    border-color: rgba(232, 67, 147, 0.32);
-    background: rgba(12, 17, 30, 0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(232, 67, 147, 0.32);
+    border-radius: 16px;
+    background: #0c111e;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
     text-align: left;
-    cursor: default;
-    pointer-events: auto;
+    outline: none;
 }
 .wt-cap-card-text {
     min-width: 0;
 }
-/* Wraps rather than runs out of the card in a narrow player or a long
-   language. */
+/* Wraps rather than runs out of the card in a long language. */
 .wt-cap-card .tx-sbtn {
     justify-content: center;
     white-space: normal;
@@ -845,6 +859,11 @@ button.wt-buffering-pill:focus-visible {
     color: #f1f5f9;
     background: rgba(255, 255, 255, 0.06);
 }
+.wt-cap-card-x:focus-visible,
+.wt-cap-card .tx-sbtn:focus-visible {
+    outline: 2px solid #fd79a8;
+    outline-offset: 2px;
+}
 .wt-cap-card-x svg {
     width: 16px;
     height: 16px;
@@ -857,13 +876,6 @@ button.wt-buffering-pill:focus-visible {
         height: 44px;
     }
 }
-/* Wide (desktop, fullscreen, a phone turned sideways): text and button side
-   by side. */
-@container (min-width: 670px) {
-    .wt-cap-card.tx-pbox {
-        width: min(640px, 100%);
-    }
-}
 /* Narrow: the button full width, under the close button's column as well
    (the text keeps clear of the close button; the button, below it, need
    not). */
@@ -874,29 +886,6 @@ button.wt-buffering-pill:focus-visible {
     .wt-cap-card .tx-pr {
         width: calc(100% + 34px);
         margin-right: -34px;
-    }
-}
-/* A short player (a phone's 16:9 is ~200 px tall): the card takes the
-   pill's place while it is open, and tightens. */
-@container (max-height: 280px) {
-    .wt-buffering--open .wt-buffering-pill {
-        display: none;
-    }
-    .wt-cap-card.tx-pbox {
-        gap: 8px;
-        padding: 10px 44px 10px 12px;
-    }
-    .wt-cap-card .tx-pr {
-        width: calc(100% + 32px);
-        margin-right: -32px;
-    }
-    .wt-cap-card .tx-pt {
-        font-size: 13px;
-        line-height: 17px;
-    }
-    .wt-cap-card .tx-ps {
-        font-size: 11.5px;
-        line-height: 15px;
     }
 }
 @media (prefers-reduced-motion: reduce) {

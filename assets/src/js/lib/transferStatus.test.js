@@ -898,11 +898,13 @@ test('impression: the two boxes of one block (under the bar, in the details) see
 
 // ---- the player's buffering label (playerLabel) ----------------------------
 //
-// The lock on the player's "Buffering" says the stall is the plan's cap. It
-// is drawn exactly where the card's block sells the stream box at a stall,
-// and the card behind it is that box with the player's own link.
+// The lock on the player's "Buffering" says the wait is the plan's cap. It
+// stands whenever the server says the viewer is held at the cap with the
+// stream box due -- whatever the player is doing: a stall, a seek, the next
+// file (owner, 2026-09-26) -- and the card behind it is that box with the
+// player's own link.
 
-test('player label: the lock and the card at a real stall at the cap, the box\'s words, the player\'s own link', () => {
+test('player label: the lock and the card at the cap, the box\'s words, the player\'s own link', () => {
     const view = byDesign.tier_dl.status.view;
     const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
     const label = playerLabel(view, { player: 'buffering', stallSub });
@@ -926,32 +928,58 @@ test('player label: the lock and the card at a real stall at the cap, the box\'s
     assert.ok(playerLabel(byDesign.vaulted_tier.status.view, { player: 'buffering' }));
 });
 
-test('player label: plain wherever the status does not sell the stream box at a stall', () => {
+// A seek at the cap, the next file starting: the player's verdict is
+// 'playing' (a seek's wait is not a stall to it) or the minute has run out --
+// the limiter holds the wait all the same. The label is the server's verdict,
+// and the same label whatever the block shows.
+test('player label: whenever the server says the cap holds with the box due, not only at a stall', () => {
+    const view = byDesign.tier_dl.status.view;
+    const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+    const atStall = playerLabel(view, { player: 'buffering', stallSub });
+    const cases = {
+        'playing (a seek\'s wait: not a stall to the player)': { player: 'playing', stallSub },
+        'playing a file that fits the cap': { player: 'playing', fitsCap: true, stallSub },
+        'playing a file over the cap': { player: 'playing', overCap: true, stallSub },
+        'no verdict yet': { stallSub },
+        'no player reading (paused for a minute, then a start)': { player: 'none', stallSub },
+        'an answered grace popup: the block keeps quiet, the wait is still the cap': { player: 'playing', overCap: true, offerAnswered: true, stallSub },
+    };
+    for (const [name, env] of Object.entries(cases)) {
+        assert.deepEqual(playerLabel(view, env), atStall, name);
+    }
+    // ...while the block itself keeps its own rules: no box while it plays.
+    assert.equal(present(view, { player: 'playing', stallSub }).box, null, 'the block: the fact, no box');
+});
+
+test('player label: plain where the cap is not the wait, or nothing is to be sold', () => {
     const view = byDesign.tier_dl.status.view;
     const stallSub = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
     const cases = {
-        // Not a real stall (yet): the verdict is the player's, not the label's.
-        'playing, the box due for a file over the cap': [view, { player: 'playing', overCap: true, stallSub }],
-        'playing': [view, { player: 'playing' }],
-        'no player': [view, { player: 'none' }],
-        'no verdict': [view, {}],
         // The grace window is not the cap.
         'inside the grace window': [view, { player: 'buffering', inGrace: true, stallSub }],
+        'inside the grace window, a seek': [view, { player: 'playing', inGrace: true, stallSub }],
         // One offer at a time: the grace popup up or on its way.
         'another offer on screen': [view, { player: 'buffering', upsellElsewhere: true, stallSub }],
-        // The popup's answer stands for a file over the cap until a real stall spends it.
-        'an answered offer, not spent': [view, { player: 'buffering', overCap: true, offerAnswered: true, stallSub }],
-        // The cap's first seconds: the pink link, no box -- no card.
+        'another offer on screen, a seek': [view, { player: 'playing', upsellElsewhere: true, stallSub }],
+        // The cap's first seconds: the pink link, no box -- no card data yet.
         'the box not due yet': [byDesign.tier_fact.status.view, { player: 'buffering', stallSub }],
+        'the box not due yet, a seek': [byDesign.tier_fact.status.view, { player: 'playing', stallSub }],
         // Not the cap at all: the swarm, a wait, a cache that answers.
         'the swarm': [byDesign.swarm.status.view, { player: 'buffering' }],
         'waiting for data': [byDesign.stalled.status.view, { player: 'buffering' }],
         'flowing under the cap': [byDesign.active.status.view, { player: 'buffering' }],
         'cached, not capped': [byDesign.cached_flow.status.view, { player: 'buffering' }],
+        'no view': [null, { player: 'buffering' }],
     };
     for (const [name, [v, env]] of Object.entries(cases)) {
         assert.equal(playerLabel(v, env), null, name);
     }
+    assert.ok(byDesign.tier_fact.status.view.plan, 'fixture: the fact is the cap\'s verdict');
+    // The card's words are the stream box's: a link without the box is no card.
+    const nobox = structuredClone(view);
+    nobox.plan.stream = {};
+    assert.ok(nobox.plan.player.url, 'fixture: the player\'s link is there');
+    assert.equal(playerLabel(nobox, { player: 'playing' }), null, 'no stream box: no card');
     // Nothing faster on sale: the server sends no box and no link.
     const top = structuredClone(view);
     top.plan.stream = { hint: 'Ваша подписка — до 100 Мбит/с' };

@@ -153,32 +153,44 @@ export function present(view, env = {}) {
 // playerLabel is what the page's player says on its buffering label
 // (lib/player/BufferingLabel.jsx; carried there by lib/playerLabel.js): null
 // -- the plain "Buffering" -- or the lock with the viewer's cap and the card
-// behind it. The lock says "this stall is the plan's cap", so it is drawn
-// exactly where the status itself sells the stream box at a stall: the
-// player stalled for real (the verdict 'buffering'), the server's verdict at
-// the cap with the box due and something faster on sale, no other offer on
-// screen or on its way (the grace popup), outside the free grace window, no
-// answered offer standing -- present() decides all of it, and this only
-// asks it (its stream_stall is the player's 'buffering' and nothing else).
+// behind it. The lock says "this wait is the plan's cap", and every wait the
+// player shows its label for -- the film stalling, a seek, the next file
+// starting -- comes through the limiter that holds the viewer (owner,
+// 2026-09-26: "after a seek at the cap the pill says just Buffering, but the
+// seek wait is limited by the plan too"). So it is the server's verdict and
+// not the player's stall: the label stands whenever the view says the viewer
+// is held at the plan's cap (view.plan, the pink fact) and the card's data
+// came with it -- the stream box (the server sends the variants only once
+// the cap has held long enough for the box, statusview.PlanBoxAfter, and
+// only with something faster on sale) and the player's own link -- and the
+// player decides when to draw it (lib/player/buffering-label.js capLock).
+// Taken back where nothing is to be sold at all: inside the free grace window
+// by movie time (the window is not the cap), and while another offer is on
+// screen or on its way (the grace popup: one offer at a time). present()'s
+// rules for the block's own box and line -- the player's verdict, the file
+// against the cap, an answered offer -- are the block's, not the label's.
 // A swarm or network stall has no plan, and a cap that has not held long
 // enough for the box has no card: the plain label either way. The card is
 // that very box -- its words, the player's own "…and this file needs N" --
 // with the link of the player's own surface (plan.player.url, built by the
 // server: /trial?from=player-label).
 export function playerLabel(view, env = {}) {
-    const own = view && view.plan && view.plan.player;
+    const plan = view && view.plan;
+    const own = plan && plan.player;
     if (!own || !own.rate) return null;
-    const pres = present(view, env);
     const url = safeHref(own.url);
-    if (pres.key !== 'stream_stall' || !pres.box || !url) return null;
-    const cta = pres.box.cta || {};
+    const box = plan.stream && plan.stream.box;
+    if (!url || !box) return null;
+    if (env.inGrace || env.upsellElsewhere) return null;
+    const cta = box.cta || {};
     return {
         rate: own.rate,
-        title: pres.box.title || '',
-        sub: pres.box.sub || '',
+        title: box.title || '',
+        sub: env.stallSub || box.sub || '',
         cta: { label: cta.label || '', note: cta.note || '', url },
-        // The status box's props, for the card's own events.
-        props: { ctx: pres.ctx, location: 'player', auth: view.auth || '', state: pres.key, tier: view.tier || '', target: cta.target || '' },
+        // The status box's props, for the card's own events: the stream box
+        // at a wait, whatever the block itself shows right now.
+        props: { ctx: 'stream', location: 'player', auth: view.auth || '', state: 'stream_stall', tier: view.tier || '', target: cta.target || '' },
     };
 }
 
