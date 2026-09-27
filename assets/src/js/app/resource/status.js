@@ -1,6 +1,6 @@
 import av from '../../lib/av';
 import {
-    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playerLabel, playing, present, upsellElsewhere,
+    NAVBAR_H, applyView, bindBlock, createCtaWatch, initDetails, mirrorBlock, paintBar, playerCause, playerLabel, playing, present, upsellElsewhere,
 } from '../../lib/transferStatus';
 import { createPlayerActivity } from '../../lib/playerActivity';
 import { publishPlayerLabel } from '../../lib/playerLabel';
@@ -120,8 +120,13 @@ av(async function() {
         // the player picks the waits to draw it at). From the view the
         // sticky bar keeps through a one-second gap in the data: the lock
         // would blink off there. Carried over to the player's bundle on
-        // window (lib/playerLabel.js); published only when it changes.
-        publishPlayerLabel(playerLabel(shown(held ? steady : last), env));
+        // window (lib/playerLabel.js); published only when it changes. With
+        // it the cause the view names when the wait is not the cap's
+        // (playerCause: the swarm, no seeders, pieces nobody has, nothing
+        // flowing): the lock the player draws by itself after its grace
+        // answer gives way to that word.
+        const told = shown(held ? steady : last);
+        publishPlayerLabel(playerLabel(told, env), window, playerCause(told));
         // Broadcast rather than reach into the sticky bar from here: this
         // view owns the stream, not the page furniture that shows it.
         // `moving`: the chain is up -- something moves, or the viewer waits

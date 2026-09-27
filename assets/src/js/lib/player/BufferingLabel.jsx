@@ -6,8 +6,11 @@ import { t, tf } from './i18n';
 // "Buffering label"; buffering-label.js says when it is the lock). Design:
 // the canvas "Плеер: буферизация вместо спиннера", variant A (owner,
 // 2026-09-26). Both components take the label the transfer status published
-// (lib/transferStatus.js playerLabel): { rate, title, sub, cta: { label,
-// note, url }, props } -- they have no text, number or URL of their own.
+// (lib/transferStatus.js playerLabel) or, once the viewer has answered the
+// grace popup and before the status has spoken, the one the stream job
+// rendered on the player (buffering-label.js answerLabel) -- the same shape,
+// { rate, title, sub, cta: { label, note, url }, props }, and the same words.
+// They have no text, number or URL of their own.
 
 function Spinner() {
     return (
@@ -171,7 +174,7 @@ export function CapCard({ label, onClose }) {
                         data-umami-event="donate-player-label" data-umami-event-ctx={p.ctx || ''}
                         data-umami-event-location={p.location || ''} data-umami-event-auth={p.auth || ''}
                         data-umami-event-state={p.state || ''} data-umami-event-tier={p.tier || ''}
-                        data-umami-event-target={p.target || ''}
+                        data-umami-event-target={p.target || ''} data-umami-event-source={p.source || ''}
                         onClick={() => close()}>
                         <BoltIcon />
                         <span>{label.cta.label}</span>

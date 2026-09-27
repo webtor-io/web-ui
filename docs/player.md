@@ -106,7 +106,9 @@ after a seek — every one of those waits comes through the limiter that holds t
 2026-09-26: "after a seek at the cap the pill says just Buffering, but the seek wait is limited by the
 plan too"). It is plain inside the free grace window by the player's own movie time, while the grace
 popup is up (or comes up this very render — a session seek past the window puts it up as the seek
-starts, and the seek's wait is on screen behind it), and whenever the status has no word on the cap.
+starts, and the seek's wait is on screen behind it), and whenever the status has no word on the cap —
+**unless the viewer has answered the grace popup** (below): from the answer on it is the lock at once,
+until the status has a word of its own.
 
 **Colours** (owner, 2026-09-26: on a white frame the lock's hover turned the pill into a light-pink
 blob, the white "Buffering" gone — 1.02:1). The pill is dark in every state, `rgba(10,14,26,.9)`;
@@ -160,11 +162,82 @@ cap, an answered grace popup) stay the block's. It publishes the label on `windo
 (`lib/playerLabel.js`: two bundles, two module copies — CLAUDE.md, shared JS state), only when it
 changes, from the view the sticky bar keeps through a one-second gap in the data, and takes it back on
 teardown. No status on the page (an embed): no label, the plain pill always. A swarm or network stall
-has no plan, and a cap before its box is due has no card: the plain pill.
+has no plan, and a cap before its box is due has no card: the plain pill. With the label goes **the
+cause** the view names when a wait is *not* the cap's (`playerCause`, `''` for none): `swarm` (a few
+seeders slower than the cap — statusview refuses to sell there, "selling one there quotes a wait it
+cannot keep"), `noseed`, `missing` / `missing_idle` / `vault_missing` (pieces nobody connected has), `stalled` (a request of
+the viewer's open 5 s without a byte) and `checking`. `stalled` is never the limiter: thp throttles
+only the viewer's own responses (`External`, torrent-http-proxy `web.go`), and a bucket lets the cap
+through; content-transcoder reads its source through thp's internal URL, uncapped, so a session
+seek's playlist held while FFmpeg makes the first segment (`WaitForPlaylist`) is the transcoder's or
+the swarm's wait — once the segment is there its bytes come at the cap, and the lock comes back. Not
+a cause: the cap itself (box or not), the viewer's bytes flowing with no verdict on what binds them
+(`active`, `cached_flow` — right after the grace answer, exactly the gap before thp's verdict), no
+viewer on the chain, a gap. A null label alone cannot tell "no verdict yet" from "not the
+cap"; the cause says the second out loud, for the answer's lock below.
 
 The player adds only what it knows at this very moment (`capLock`, the label can be a second old):
 by its own clock (a session seek's target included) the film is past its free grace window, and its
 grace popup is not up or coming up.
+
+**After the grace answer the player draws the lock itself** (owner, 2026-09-27: "after a seek the
+20-minute popup appeared; after I answered that I want slow, a plain Buffering hung with no lock").
+The viewer's answer — "continue at 5 Mbps", the close, or Play while the popup is up
+(`data-grace-cta-answered` on the element) — says the rest of the film is at the cap, but the status's
+word on it comes 8–15 s later (thp's verdict after ~3 events, the box 8 s after that), and the popup
+kept the lock down while it was up. So once answered, **every wait the pill shows** (a stall, a seek,
+the hold after one) is the lock at once, with the card the stream job rendered on the `<video>`
+(`buffering-label.js` `answerLabel`, below). The status's label, the moment it is there, is the lock
+instead (one source of truth).
+
+**The answer covers only the gap before the status's word, never a word that says no** (review,
+2026-09-27: a swarm-bound torrent kept the answer's lock and its trial pitch for the rest of the film,
+while the block under the player blamed the swarm). Two words end it:
+
+- the status names another cause for the wait (`playerCause` above: the swarm, no seeders, pieces
+  nobody has, nothing flowing) — the plain pill, for as long as it names it; with the cause gone and
+  no label yet (the bytes flow again, no verdict) the answer's lock stands in again;
+- the status's own label has been up on this stretch of the film past the window (`statusSpoke`):
+  from then on the lock is the status's alone, and its label taken back means the plain pill, not the
+  answer's lock again. It takes it back only on a word: a stall or another cause at once, 10 s of the
+  viewer under the cap (`statusview.PlanBoxHold`: the cap no longer binds), or no word at all any more
+  (a gap in the data past 8 s, the status torn down). A seek back
+  inside the window starts a new stretch: the status takes its label back there for the window, not
+  for the cap, and past the window again the 8–15 s before its verdict are the answer's again.
+
+Not covered: a swarm slower than the cap with more than three seeders (`fewSeeders`) — statusview
+names no cause there (`active`: the viewer's bytes flow, not at the cap), so until the status's label
+has come on that stretch the answer's lock stands for its waits. The status block says nothing there
+either; a cause for it would be statusview's to add, not the player's to guess.
+
+Plain all the same:
+
+- back inside the grace window by movie time (a seek back before 20:00 plays at the grace rate again);
+- the stream job says the file fits under the cap with room to spare (`data-status-fits-cap`) — a wait
+  there is not the cap's as far as anyone knows before the server says so (the status's own word
+  still makes it the lock);
+- nothing faster on sale (no catalog, a promo plan no faster than the cap): the job renders no card;
+- the next file loading (that wait is the next file's start, inside its own grace window), and the
+  next file itself — a new element, without the answer — until the status says so;
+- an embed: the job renders no card there (the lock has never been drawn in an embed; a new upsell on
+  someone else's site is not this change's to add).
+
+The status block's own rules for its box after the answer (`present()`: no box until the player's
+first real stall) do not change — they are the block's, not the label's.
+
+**The card for the answer** is rendered once into the page by the stream job, on the player's
+`<video>` (`templates/views/action/stream_video.html`, `jobs/scripts/cap_card.go` `CapCard`, only
+where there is a grace window, outside an embed, with a cap in the claims and something faster on
+sale): `data-cap-card-rate` (the cap as the lock says it, `statusview.RateLabel` — the status's own
+function), `-title` (`resource.status.streamStallTitle`), `-cta` (`offer.watchUncapped`), `-url` (the
+promo plan through `trialURL … "player-label"`, else its checkout, else `/donate` — as the status's
+`plan.player.url`), `-target`, `-note` (`offer.trialNote`, with a trial only), `-sub` (the cap alone,
+`statusview.CapLine`) and the props `-auth`/`-tier`. Its line is the element's `data-status-stall-sub`
+when the job knows what the file needs — the very line the status's label takes — and `-sub`
+otherwise. Everything goes through `html/template`'s attribute escaping; the player takes the link
+only as a path of ours or an https URL. `services/template/cap_card_render_test.go` renders it for
+every language and offer state and compares it with the status's own stream box for the same viewer
+(`statusview.Build`); it also writes the `__fixtures__/cap-card-video.html` the wiring tests run on.
 
 **One source of truth.** The card has no copy of its own: its title, line, button label and note are
 the stream box's, and its link is the server's `plan.player.url` — the stream box's destination
@@ -175,7 +248,10 @@ is the lock's number (`speed()`, a no-break space before the unit). Events: `pla
 (the lock drawn, once per player and set of props), `donate-player-label-shown` (the card opened: on
 screen because the viewer asked), `donate-player-label` (its button, Umami's own click), with the
 status box's props, `location` `player` and `state` `stream_stall` (the stream box at a wait, whatever
-the block shows at the time).
+the block shows at the time), and `source` — who raised the lock: `status` (the status's label) or
+`grace-answer` (the stream job's card after the answer). One lock seen is one lock seen: the answer's
+lock the status then takes over is counted once, with the source that raised it first (`lockKey`: the
+props but for `source`); the card's opening and its button carry the source of the card opened.
 
 ## Loader restart on a stall — `loader-restart.js`
 
@@ -275,7 +351,7 @@ presses stop and is flushed on teardown):
 | `player-tap-seek` | `dir: forward\|back`, `seconds` | a streak of double taps ended (900 ms) |
 | `subtitle-delay` | `delay`, `source: dialog\|key` | the delay settled (2 s) |
 | `player-media-session` | `action: play\|pause\|seek` | first use of each action per player |
-| `player-label-lock-shown` | the status box's props, `location: player` | the buffering label's lock drawn, once per player (see "Buffering label") |
+| `player-label-lock-shown` | the status box's props, `location: player`, `source: status\|grace-answer` | the buffering label's lock drawn, once per player (see "Buffering label") |
 | `donate-player-label-shown` | the same | the lock opened the plan card |
 | `stream-start` | + `rate`, `subtitleDelay` | what the stream started with (remembered settings make no change event) |
 

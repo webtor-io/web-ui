@@ -17,7 +17,7 @@ global.document = dom.window.document;
 
 const {
     present, applyView, bindBlock, paintBar, mirrorBlock, initDetails, upsellElsewhere, createCtaWatch, safeHref, ctaProps,
-    playing, holesMask, NAVBAR_H, playerLabel,
+    playing, holesMask, NAVBAR_H, playerLabel, playerCause,
 } = await import('./transferStatus.js');
 
 function page() {
@@ -919,7 +919,9 @@ test('player label: the lock and the card at the cap, the box\'s words, the play
     assert.equal(label.cta.note, '7 дней бесплатно · отмена в любой момент');
     assert.equal(label.cta.url, '/ru/trial?from=player-label', 'its own surface, not the status bar\'s');
     assert.equal(box.cta.url, '/ru/trial?from=status-bar');
-    assert.deepEqual(label.props, { ctx: 'stream', location: 'player', auth: view.auth, state: 'stream_stall', tier: 'free', target: 'trial' });
+    // `source`: the status raised this lock (the player raises the same one
+    // by itself after the grace answer: 'grace-answer').
+    assert.deepEqual(label.props, { ctx: 'stream', location: 'player', auth: view.auth, state: 'stream_stall', tier: 'free', target: 'trial', source: 'status' });
     // The status's own line when the stream job had none.
     assert.equal(playerLabel(view, { player: 'buffering' }).sub, view.plan.stream.box.sub);
     assert.equal(view.plan.stream.box.sub.replaceAll('\u00a0', ' '), 'Без подписки — до 5 Мбит/с');
@@ -1006,4 +1008,39 @@ test('player label: plain where the cap is not the wait, or nothing is to be sol
     assert.equal(l.rate, '20\u00a0Мбит/с');
     assert.equal(l.cta.url, '/ru/donate');
     assert.equal(l.props.tier, 'bronze');
+});
+
+// The status's word that a wait is NOT the cap's (playerCause): the cause the
+// view names instead, where statusview refuses to sell on purpose. The
+// player's own lock after the grace answer gives way to it; a null label
+// alone cannot tell it from "no verdict yet". Every state of the design,
+// classified: a new one fails here until it is.
+test('player cause: the other cause the view names for a wait, none for the cap or no verdict', () => {
+    const expected = {
+        // Someone else's wait: a trial would not end it.
+        swarm: 'swarm', noseed: 'noseed', missing: 'missing',
+        missing_idle: 'missing_idle', vault_missing: 'vault_missing', checking: 'checking',
+        // A request held open 5 s with no bytes: never the limiter (thp
+        // throttles only the viewer's responses, and lets the cap through) --
+        // the transcoder's first segment or the swarm.
+        stalled: 'stalled',
+        // The cap itself, box or not: the label's to say.
+        tier_dl: '', stream_ok: '', stream_stall: '', stream_over: '', tier_fact: '', cached_tier: '', vaulted_tier: '',
+        // The viewer's bytes flow with no verdict on what binds them -- right
+        // after the answer, exactly the gap before thp's verdict.
+        active: '', cached_flow: '', vaulting: '', vaulted: '', hls_gap: '',
+        // No viewer on the chain, or no word at all.
+        caching_only: '', caching_idle: '', paused: '', idle_torrent: '', cached: '', status_unknown: '',
+        vaulting_only: '', vaulting_idle: '', vaulted_idle: '', vault_waiting: '', vault_failed: '',
+    };
+    assert.deepEqual(Object.keys(expected).sort(), Object.keys(byDesign).sort(), 'every design classified');
+    for (const [design, cause] of Object.entries(expected)) {
+        assert.equal(playerCause(byDesign[design].status.view), cause, design);
+    }
+    assert.equal(playerCause(null), '');
+    assert.equal(playerCause({}), '');
+    // Mutually exclusive with the label: a cause never comes with a plan.
+    for (const design of Object.keys(expected).filter((d) => expected[d])) {
+        assert.equal(byDesign[design].status.view.plan, undefined, `${design}: no plan`);
+    }
 });

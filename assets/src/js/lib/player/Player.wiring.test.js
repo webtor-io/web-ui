@@ -4399,7 +4399,9 @@ test('the card stays open, saying what it said, when the status takes its word b
 // loads -- a card opened there, or at a stall near the end before autoplay
 // moves on, is the viewer's to close. The card is the page's, not the
 // player's.
-async function mountWithNext(t) {
+// `prepare`: more for the first player's page (a grace popup, the stream
+// job's card); deliver(attrs): more attributes on the next file's <video>.
+async function mountWithNext(t, prepare) {
     const saved = { DOMParser: globalThis.DOMParser, FormData: globalThis.FormData };
     globalThis.DOMParser = dom.window.DOMParser;
     globalThis.FormData = dom.window.FormData;
@@ -4424,6 +4426,7 @@ async function mountWithNext(t) {
         const content = document.createElement('div');
         content.id = 'content';
         document.body.appendChild(content);
+        if (prepare) prepare(page);
     });
     // The start's POST answers with its job log. Its body is FormData, which
     // the harness's fetch (it records JSON bodies) cannot read: answered
@@ -4437,10 +4440,10 @@ async function mountWithNext(t) {
     };
     window.fetch = globalThis.fetch;
     // The job's last message: the next file's player.
-    const deliver = async () => {
+    const deliver = async (attrs = '') => {
         streams[streams.length - 1].onmessage({ data: JSON.stringify({
             level: 'rendertemplate',
-            body: `<div class="relative"><video class="player" data-resource-id="res" data-path="ep2.mkv" controls></video>${DIALOG}</div>`,
+            body: `<div class="relative"><video class="player" data-resource-id="res" data-path="ep2.mkv" controls${attrs}></video>${DIALOG}</div>`,
         }) });
         await settle();
         await settle();
@@ -4674,4 +4677,301 @@ test('no lock behind the grace popup a session seek brings up; the lock after th
     assert.ok(lockButton(p), 'the seek still waits, past the window, the popup answered: the lock');
     releasePost();
     await settle();
+});
+
+// ---- the lock by the viewer's answer to the grace popup -------------------
+//
+// Owner, 2026-09-27: "after a seek the 20-minute popup appeared; after I
+// answered that I want slow, a plain Buffering hung with no lock." The answer
+// says the rest of the film is at the cap; the status's word on it comes 8-15 s
+// later (thp's verdict, then the box). From the answer on every wait is the
+// lock at once, with the card the stream job rendered on the element -- the
+// <video> as stream_video.html renders it (the Go-generated fixture,
+// services/template/cap_card_render_test.go), not a look-alike -- and the
+// status's label takes over the moment it is there.
+
+const CARD_VIDEO = readFileSync(path.join(HERE, '__fixtures__/cap-card-video.html'), 'utf8');
+// The card's attributes and the file's line (data-status-stall-sub), as the
+// element's dataset has them.
+const JOB_CARD = (() => {
+    const holder = document.createElement('div');
+    holder.innerHTML = `${CARD_VIDEO}</video>`;
+    const { dataset } = holder.querySelector('video');
+    return Object.fromEntries(Object.entries(dataset).filter(([k]) => k.startsWith('capCard') || k === 'statusStallSub'));
+})();
+// The same as markup, for a <video> the next file's job renders.
+const JOB_CARD_ATTRS = Object.entries(JOB_CARD)
+    .map(([k, v]) => ` data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`)
+    .join('');
+const jobCard = (page) => Object.assign(page.video.dataset, JOB_CARD);
+const ANSWER_PROPS = { ctx: 'stream', location: 'player', auth: 'anon', state: 'stream_stall', tier: 'free', target: 'trial', source: 'grace-answer' };
+const shownCards = (p) => p.events.filter((e) => e.name === 'donate-player-label-shown').map((e) => e.data);
+
+// The film past a 30 s window, the popup up and holding it, a stall behind it.
+async function popupAt31(p, clock) {
+    await filmPlays(p, clock, 31);
+    assert.ok(popupUp(), 'fixture: the popup is up');
+    await filmStalls(p, clock);
+    assert.equal(lockButton(p), null, 'not before the answer');
+}
+
+test('fixture: the stream job\'s card says what the status\'s label says', () => {
+    assert.ok(JOB_CARD.capCardUrl && JOB_CARD.statusStallSub, 'the card and the file\'s line on the element');
+    const job = { rate: JOB_CARD.capCardRate, title: JOB_CARD.capCardTitle, cta: JOB_CARD.capCardCta, note: JOB_CARD.capCardNote, url: JOB_CARD.capCardUrl, sub: JOB_CARD.statusStallSub };
+    const status = { rate: CAP_LABEL.rate, title: CAP_LABEL.title, cta: CAP_LABEL.cta.label, note: CAP_LABEL.cta.note, url: CAP_LABEL.cta.url, sub: STALL_SUB };
+    // The status's line here is the harness's STALL_SUB (the stream job's
+    // line is on the element either way): compared by its words.
+    const words = (o) => ({ ...o, sub: o.sub.replaceAll(' ', ' ') });
+    assert.deepEqual(words(job), words(status), 'two Go renders, one set of words');
+});
+
+for (const [how, answer, act] of [
+    ['"continue at 5 Mbps"', 'continue', () => graceCta().querySelector('.grace-cta-continue').click()],
+    ['its close', 'dismiss', () => graceCta().querySelector('.grace-cta-close').click()],
+    ['Play', 'continue', () => keydown(' ')],
+]) {
+    test(`answered by ${how}: the next wait is the lock at once, with the stream job's card`, async (t) => {
+        const { p, clock } = await mountLabelled(t, (page) => {
+            gracePopup(page, 30);
+            jobCard(page);
+        });
+        await popupAt31(p, clock);
+        act();
+        await settle();
+        assert.equal(popupUp(), false, 'fixture: answered');
+        assert.equal(p.video.dataset.graceCtaAnswered, answer);
+        await filmStalls(p, clock);
+        const lock = lockButton(p);
+        assert.ok(lock, 'the lock, with no word from the status yet');
+        assert.equal(lock.querySelector('.wt-buffering-cap').textContent, JOB_CARD.capCardRate);
+        assert.deepEqual(lockSeen(p).map((e) => e.data), [ANSWER_PROPS], 'seen, raised by the answer');
+        click(lock);
+        await settle();
+        const card = capCard(p);
+        assert.ok(card, 'the card opens');
+        assert.equal(card.querySelector('.tx-pt').textContent, 'Видео подгружается медленнее, чем играет');
+        assert.equal(card.querySelector('.tx-ps').textContent.replaceAll(' ', ' '), 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с', 'the stream job\'s line');
+        const a = card.querySelector('a.tx-sbtn');
+        assert.equal(a.getAttribute('href'), '/ru/trial?from=player-label', 'the player\'s own surface');
+        assert.equal(a.textContent, 'Смотреть без ограничения скорости');
+        assert.equal(card.querySelector('.tx-pn').textContent, '7 дней бесплатно · отмена в любой момент');
+        assert.equal(a.getAttribute('data-umami-event'), 'donate-player-label');
+        assert.equal(a.getAttribute('data-umami-event-source'), 'grace-answer');
+        assert.equal(a.getAttribute('data-umami-event-target'), 'trial');
+        assert.equal(a.getAttribute('data-umami-event-state'), 'stream_stall');
+        assert.deepEqual(shownCards(p), [ANSWER_PROPS]);
+    });
+}
+
+// The owner's own case: a session seek past the window puts the popup up as it
+// starts, and after the answer the seek still waits -- under the lock, now.
+test('a session seek past the window, the popup answered "slow": the seek waits under the lock at once', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 10);
+        jobCard(page);
+        page.video.dataset.sessionId = 's1';
+        page.video.dataset.sessionSeekUrl = '/session/seek';
+        page.video.setAttribute('data-duration', '3600');
+    });
+    let releasePost = null;
+    p.setResponse((url, params) => {
+        if (params && params.method === 'POST' && String(url).startsWith('/session/seek')) {
+            return new Promise((resolve) => {
+                releasePost = () => resolve({ ok: true, status: 200, json: async () => ({ offset: 15 }) });
+            });
+        }
+        return { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ offset: 0 }) };
+    });
+    p.video.load = () => {};
+    await filmPlays(p, clock, 0);
+    keydown('ArrowRight'); // 0:00 -> 0:15, past the 10 s window
+    await settle();
+    assert.ok(popupUp(), 'fixture: the popup came up with the seek');
+    assert.ok(releasePost, 'fixture: the seek is under way');
+    assert.equal(lockButton(p), null, 'behind the popup: the plain pill');
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(popupUp(), false, 'fixture: answered');
+    assert.ok(lockButton(p), 'the seek still waits: the lock, before the status has a word');
+    assert.deepEqual(lockSeen(p).map((e) => e.data), [ANSWER_PROPS]);
+    releasePost();
+    await settle();
+});
+
+// No answer, no lock of the player's own: a film past its window whose popup
+// never came (none on this page) waits under the plain pill as before.
+test('the stream job\'s card alone, not answered: the plain pill', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        page.video.dataset.graceDurationSec = '30';
+        jobCard(page);
+    });
+    await filmPlays(p, clock, 31);
+    await filmStalls(p, clock);
+    assert.ok(bufferingPill(p), 'fixture: a wait');
+    assert.equal(lockButton(p), null);
+    assert.equal(lockSeen(p).length, 0);
+});
+
+// The stream job says the file fits under the cap with room to spare: a wait
+// there is not the cap's as far as the player knows -- the status's word
+// alone makes it the lock (its own rules for such a file stand).
+test('answered, a file that fits the cap: the plain pill until the status says so', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 30);
+        jobCard(page);
+        page.video.dataset.statusFitsCap = '';
+    });
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(bufferingPill(p), 'fixture: a wait');
+    assert.equal(lockButton(p), null, 'fits: no lock of the player\'s own');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p), 'the status\'s word: the lock');
+    assert.equal(lockSeen(p)[0].data.source, 'status');
+});
+
+// Nothing faster on sale (no catalog, a promo plan no faster than the cap):
+// the job renders no card, and there is nothing for the lock to open.
+test('answered, nothing on sale: the plain pill', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => gracePopup(page, 30));
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(bufferingPill(p), 'fixture: a wait');
+    assert.equal(lockButton(p), null);
+});
+
+// A seek back before the window's end plays at the grace rate again: not the
+// cap, whatever was answered. Past it again: the lock.
+test('answered, back inside the grace window: the plain pill; past it again, the lock', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 30);
+        jobCard(page);
+    });
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmPlays(p, clock, 10);
+    await filmStalls(p, clock);
+    assert.ok(bufferingPill(p), 'fixture: a wait at 0:10');
+    assert.equal(lockButton(p), null, 'inside the window');
+    await filmPlays(p, clock, 40);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'past it: the lock');
+});
+
+// One source of truth: the status's label is the lock whenever it is there
+// -- over the answer's, and in its place once it comes. Taken back, it is
+// the status's word too (its box goes only after 10 s of the viewer under
+// the cap): the plain pill, not the answer's lock again -- until a seek back
+// inside the window starts a new stretch, whose gap before the verdict is
+// the answer's again.
+test('answered: the status\'s label is preferred when it is there', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 30);
+        jobCard(page);
+    });
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'fixture: the answer\'s lock');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p), 'the status\'s word: the lock still');
+    assert.equal(lockSeen(p).length, 1, 'one lock seen: the status took over the one the answer raised');
+    click(lockButton(p));
+    await settle();
+    const a = capCard(p).querySelector('a.tx-sbtn');
+    assert.equal(a.getAttribute('data-umami-event-source'), 'status', 'the card is the status\'s');
+    assert.equal(capCard(p).querySelector('.tx-ps').textContent, CAP_LABEL.sub);
+    assert.deepEqual(shownCards(p).map((d) => d.source), ['status']);
+    click(capCard(p).querySelector('.wt-cap-card-x'));
+    await settle();
+    publishPlayerLabel(null);
+    await settle();
+    assert.ok(bufferingPill(p), 'fixture: still a wait');
+    assert.equal(lockButton(p), null, 'the status takes its word back: the plain pill, not the answer\'s lock');
+    await filmResumes(p, clock);
+    await filmStalls(p, clock);
+    assert.equal(lockButton(p), null, 'the next stall on this stretch: the status\'s word alone');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p), 'its word again: the lock');
+    publishPlayerLabel(null);
+    // A seek back inside the window, and past it again: a new stretch.
+    await filmPlays(p, clock, 10);
+    await filmStalls(p, clock);
+    assert.equal(lockButton(p), null, 'fixture: inside the window');
+    await filmPlays(p, clock, 40);
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'past it again, before the status\'s verdict: the answer\'s lock');
+    click(lockButton(p));
+    await settle();
+    assert.equal(capCard(p).querySelector('a.tx-sbtn').getAttribute('data-umami-event-source'), 'grace-answer');
+});
+
+// The answer covers the gap before the status's word, not a word that says
+// no (review of 2026-09-27): a swarm-bound torrent -- a few seeders slower
+// than the cap -- no seeders, pieces nobody has, nothing flowing. The status
+// names the cause (lib/transferStatus.js playerCause), statusview refuses to
+// sell there on purpose, and a trial would not end the wait: the plain pill.
+// Before the status has spoken on this stretch its word follows the view:
+// the cause gone (the bytes flow again, no verdict yet), the answer's lock.
+test('answered, the status names another cause for the wait: the plain pill', async (t) => {
+    const { p, clock } = await mountLabelled(t, (page) => {
+        gracePopup(page, 30);
+        jobCard(page);
+    });
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'fixture: the answer\'s lock, no word yet');
+    for (const cause of ['swarm', 'noseed', 'missing', 'stalled']) {
+        publishPlayerLabel(null, window, cause);
+        await settle();
+        assert.ok(bufferingPill(p), `fixture: a wait (${cause})`);
+        assert.equal(lockButton(p), null, `the status says ${cause}: no lock, no trial pitch`);
+    }
+    await filmResumes(p, clock);
+    await filmStalls(p, clock);
+    assert.equal(lockButton(p), null, 'the next stall with the cause still named: plain');
+    publishPlayerLabel(null, window, '');
+    await settle();
+    assert.ok(lockButton(p), 'the cause gone, no verdict yet: the answer\'s lock');
+    assert.equal(lockSeen(p).length, 1, 'one lock seen');
+});
+
+// The next file is a new element, and a new grace window: it starts without
+// the answer -- and so does the wait while it loads, drawn by the player
+// being left. Plain until the status says so.
+test('the next file starts without the answer: plain until the status says so', async (t) => {
+    const { p, clock, deliver } = await mountWithNext(t, (page) => {
+        gracePopup(page, 30);
+        jobCard(page);
+    });
+    await popupAt31(p, clock);
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    await filmStalls(p, clock);
+    assert.ok(lockButton(p), 'fixture: answered, the lock');
+    keydown('n');
+    await settle();
+    assert.ok(bufferingPill(p), 'the next file loads');
+    assert.equal(lockButton(p), null, 'its start is not this film\'s cap');
+    await deliver(JOB_CARD_ATTRS);
+    const next = document.querySelector('video.player');
+    assert.equal(next.getAttribute('data-path'), 'ep2.mkv', 'fixture: the next file\'s player is up');
+    assert.ok(next.dataset.capCardUrl, 'fixture: with its own card');
+    assert.equal('graceCtaAnswered' in next.dataset, false, 'and no answer');
+    assert.ok(bufferingPill(p), 'its start waits');
+    assert.equal(lockButton(p), null, 'plain');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p), 'the status says so: the lock');
 });

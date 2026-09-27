@@ -34,3 +34,22 @@ test('two copies of the module, one label: the player reads what the status publ
     assert.equal(seen.length, 2, 'unsubscribed');
     status.publishPlayerLabel(null);
 });
+
+// With the label, the cause the status names when a wait is not the cap's:
+// the same channel, told when either changes -- a swarm that becomes pieces
+// nobody has is news with no label either side.
+test('the cause travels with the label, and alone is news', () => {
+    const seen = [];
+    const stop = player.onPlayerLabel((l, cause) => seen.push([l, cause]));
+    assert.equal(player.currentPlayerCause(), '', 'none to start with');
+    assert.equal(status.publishPlayerLabel(null, window, 'swarm'), true);
+    assert.equal(player.currentPlayerCause(), 'swarm', 'a player mounted later reads it as it stands');
+    assert.equal(status.publishPlayerLabel(null, window, 'swarm'), false, 'the same word: not told again');
+    assert.equal(status.publishPlayerLabel(null, window, 'missing'), true, 'another cause, no label either side: told');
+    const label = { rate: '5 Мбит/с', cta: { url: '/trial?from=player-label' } };
+    assert.equal(status.publishPlayerLabel(label), true);
+    assert.equal(player.currentPlayerCause(), '', 'the cap: no other cause');
+    assert.equal(status.publishPlayerLabel(null), true);
+    assert.deepEqual(seen, [[null, 'swarm'], [null, 'missing'], [label, ''], [null, '']]);
+    stop();
+});

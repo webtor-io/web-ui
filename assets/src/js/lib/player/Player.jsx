@@ -39,8 +39,8 @@ import {
 import { Controls } from './Controls';
 import { LoadingSpinner, ShareIcon } from './icons';
 import { BufferingPill, capCardOpen, closeCapCard, onCapCard, openCapCard } from './BufferingLabel';
-import { capLock } from './buffering-label';
-import { currentPlayerLabel, onPlayerLabel } from '../playerLabel';
+import { answerLabel, capLock, lockKey, statusSpoke } from './buffering-label';
+import { currentPlayerCause, currentPlayerLabel, onPlayerLabel } from '../playerLabel';
 import { init as initI18n, t, tf } from './i18n';
 import { getLang } from '../i18n';
 import { shareResource } from '../share/share';
@@ -647,7 +647,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // (lib/playerActivity.js offerAnswered), not the moment the
             // popup closes. On the element, so the next file, a reload or
             // another grace window starts without it. Before the film goes
-            // on: its first events are read against it.
+            // on: its first events are read against it. The buffering label
+            // reads it too, in the render setGraceOpen(false) brings: from
+            // here on every wait is the lock (buffering-label.js capLock).
             videoEl.dataset.graceCtaAnswered = action;
             if (modal) {
                 if (el.open) el.close();
@@ -1330,13 +1332,28 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // card. Whether the viewer is held at the cap is the transfer status's
     // word (lib/transferStatus.js playerLabel), carried here from the
     // status's bundle by lib/playerLabel.js -- none in an embed; capLock adds
-    // what only the player knows at this very moment.
+    // what only the player knows at this very moment, and one word of its
+    // own that comes before the status's: the viewer's answer to its grace
+    // popup, with the card the stream job rendered for it (answerLabel).
     const [capLabel, setCapLabel] = useState(() => currentPlayerLabel());
+    // With it the cause the status names when a wait is not the cap's (the
+    // swarm, no seeders, pieces nobody has, nothing flowing): the answer's
+    // lock below gives way to it.
+    const [capCause, setCapCause] = useState(() => currentPlayerCause());
+    // The same lock by this player's own word once the viewer has answered
+    // its grace popup (buffering-label.js answerLabel): the card the stream
+    // job rendered on the element, read once -- the element's for its life.
+    const answerRef = useRef(undefined);
+    if (answerRef.current === undefined) answerRef.current = answerLabel(videoEl);
     // Read again on subscribing: a label published between the first render
     // and this effect would otherwise wait for the next change.
     useEffect(() => {
         setCapLabel(currentPlayerLabel());
-        return onPlayerLabel(setCapLabel);
+        setCapCause(currentPlayerCause());
+        return onPlayerLabel((label, cause) => {
+            setCapLabel(label);
+            setCapCause(cause);
+        });
     }, []);
     // Whether the card the lock opens is open. The card is the page's, not
     // this player's (BufferingLabel.jsx openCapCard): only the viewer closes
@@ -1354,15 +1371,35 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // the frame before it must not draw the lock, nor count it seen.
     const graceUp = graceOpen || (!!graceDurationSec && !graceShownRef.current
         && state.currentTime >= graceDurationSec && !!document.querySelector('#grace-cta'));
+    // The viewer's answer to this player's grace popup, on its element
+    // (data-grace-cta-answered, set with the popup's close, which re-renders):
+    // the rest of this film is at the cap, the lock at once. Not while the
+    // next file loads: that wait is the next file's start, inside its own
+    // grace window, and the next element starts without the mark. Not for a
+    // file the stream job says fits under the cap (data-status-fits-cap),
+    // and not where the status names another cause for the wait (capCause).
+    const answered = 'graceCtaAnswered' in videoEl.dataset && !nextLoading;
+    // The answer's lock covers only the gap before the status's word: once
+    // the status's own label has been up on this stretch past the window,
+    // its taking it back is its word too (buffering-label.js statusSpoke).
+    // Every render, the pill shown or not: the label comes and goes while
+    // the film plays as well.
+    const spokeRef = useRef(false);
+    spokeRef.current = statusSpoke(spokeRef.current, {
+        label: capLabel, answered, graceSec: graceDurationSec, movieTime: state.currentTime,
+    });
     const lock = bufferingShown ? capLock({
-        label: capLabel, graceSec: graceDurationSec, movieTime: state.currentTime, graceUp,
+        label: capLabel, answer: answerRef.current, answered, fitsCap: 'statusFitsCap' in videoEl.dataset,
+        cause: capCause, spoke: spokeRef.current, graceSec: graceDurationSec, movieTime: state.currentTime, graceUp,
     }) : null;
     // The lock's impression, once per player and set of props: a film at
-    // the cap stalls again and again, and one lock seen is one lock seen.
+    // the cap stalls again and again, and one lock seen is one lock seen --
+    // the answer's lock the status then takes over too (lockKey: all but
+    // `source`, which says who raised it first).
     const lockSeenRef = useRef(new Set());
     useEffect(() => {
         if (!lock) return;
-        const key = JSON.stringify(lock.props || {});
+        const key = lockKey(lock);
         if (lockSeenRef.current.has(key)) return;
         lockSeenRef.current.add(key);
         track('player-label-lock-shown', lock.props);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { capLock } from './buffering-label.js';
+import { answerLabel, capLock, lockKey, statusSpoke } from './buffering-label.js';
 
 // The label the transfer status publishes while the viewer is held at the
 // cap (lib/transferStatus.js playerLabel), in the shape the lock needs.
@@ -38,6 +38,114 @@ test('inside the free grace window by movie time: the plain pill, whatever the w
 
 test('the grace popup up, or coming up this render: the plain pill', () => {
     assert.equal(capLock({ ...WAIT, graceUp: true }), null);
+});
+
+// ---- the lock by the viewer's answer to the grace popup (owner, 2026-09-27) ---
+//
+// "After a seek the 20-minute popup appeared; after I answered that I want
+// slow, a plain Buffering hung with no lock." The answer says the rest of the
+// film is at the cap before the status can: the player draws the lock at
+// once, with the card the stream job rendered on its element.
+
+// The element as stream_video.html renders it for a free viewer with a grace
+// window and the promo plan's trial on sale (the Go render test proves these
+// are the status box's own words: services/template/cap_card_render_test.go).
+const JOB = {
+    capCardRate: '5\u00a0Мбит/с',
+    capCardSub: 'Без подписки — до 5\u00a0Мбит/с',
+    capCardTitle: 'Видео подгружается медленнее, чем играет',
+    capCardCta: 'Смотреть без ограничения скорости',
+    capCardUrl: '/ru/trial?from=player-label',
+    capCardTarget: 'trial',
+    capCardNote: '7 дней бесплатно · отмена в любой момент',
+    capCardAuth: 'anon',
+    capCardTier: 'free',
+};
+const el = (dataset) => ({ dataset: { ...dataset } });
+const ANSWER = answerLabel(el(JOB));
+const ANSWERED = { ...WAIT, label: null, answer: ANSWER, answered: true };
+
+test('the stream job\'s card: the status label\'s shape, its line the element\'s own', () => {
+    assert.deepEqual(ANSWER, {
+        rate: JOB.capCardRate,
+        title: JOB.capCardTitle,
+        sub: JOB.capCardSub,
+        cta: { label: JOB.capCardCta, note: JOB.capCardNote, url: JOB.capCardUrl },
+        props: { ctx: 'stream', location: 'player', auth: 'anon', state: 'stream_stall', tier: 'free', target: 'trial', source: 'grace-answer' },
+    });
+    const needs = 'Без подписки — до 5 Мбит/с, а файлу нужно 8,7 Мбит/с';
+    assert.equal(answerLabel(el({ ...JOB, statusStallSub: needs })).sub, needs, 'what the file needs, as the status\'s label takes it');
+    assert.equal(answerLabel(el({ ...JOB, capCardNote: undefined })).cta.note, '', 'a checkout: no trial note');
+    assert.equal(answerLabel(el({ ...JOB, capCardUrl: 'https://pay.example/silver' })).cta.url, 'https://pay.example/silver');
+});
+
+test('no card, or not a whole one: none', () => {
+    assert.equal(answerLabel(el({})), null, 'no grace window, an embed, nothing on sale: the job rendered none');
+    for (const k of ['capCardRate', 'capCardTitle', 'capCardCta', 'capCardUrl']) {
+        assert.equal(answerLabel(el({ ...JOB, [k]: '' })), null, `no ${k}`);
+    }
+    for (const url of ['javascript:alert(1)', '//evil.example/x', 'http://pay.example/silver', 'data:text/html,x']) {
+        assert.equal(answerLabel(el({ ...JOB, capCardUrl: url })), null, `not our link: ${url}`);
+    }
+    assert.equal(answerLabel(null), null);
+});
+
+test('answered: the lock at once with the job\'s card, before the status has a word', () => {
+    assert.equal(capLock(ANSWERED), ANSWER);
+    assert.equal(capLock({ ...ANSWERED, answered: false }), null, 'not answered: the status\'s word or nothing');
+    assert.equal(capLock({ ...ANSWERED, answer: null }), null, 'no card rendered (nothing faster on sale): the plain pill');
+    assert.equal(capLock({ ...ANSWERED, answer: { ...ANSWER, cta: { ...ANSWER.cta, url: '' } } }), null, 'not a whole card');
+});
+
+test('the status\'s word, when there is one, is the lock: one source of truth', () => {
+    assert.equal(capLock({ ...ANSWERED, label: LABEL }), LABEL);
+    assert.equal(capLock({ ...ANSWERED, label: { ...LABEL, rate: '' } }), ANSWER, 'not a whole word: the answer\'s');
+});
+
+test('answered, but the file fits under the cap: the plain pill until the status says otherwise', () => {
+    assert.equal(capLock({ ...ANSWERED, fitsCap: true }), null);
+    assert.equal(capLock({ ...ANSWERED, fitsCap: true, label: LABEL }), LABEL, 'the status\'s rules for a fitting file stand');
+});
+
+test('answered, back inside the grace window or the popup up: the plain pill', () => {
+    assert.equal(capLock({ ...ANSWERED, movieTime: 599 }), null, 'a seek back before the window\'s end plays at the grace rate');
+    assert.equal(capLock({ ...ANSWERED, graceUp: true }), null);
+});
+
+// The answer covers the gap before the status's word, not a word that says
+// no: a swarm-bound torrent (a few seeders slower than the cap), no seeders,
+// pieces nobody has, nothing flowing -- a trial would not end those waits,
+// and statusview refuses to sell there on purpose.
+test('answered, but the status names another cause for the wait: the plain pill', () => {
+    for (const cause of ['swarm', 'noseed', 'missing', 'missing_idle', 'vault_missing', 'stalled', 'checking']) {
+        assert.equal(capLock({ ...ANSWERED, cause }), null, cause);
+    }
+    assert.equal(capLock({ ...ANSWERED, cause: '' }), ANSWER, 'no cause named: the gap before the verdict, the answer\'s');
+});
+
+test('answered, the status has spoken on this stretch: its word alone', () => {
+    assert.equal(capLock({ ...ANSWERED, spoke: true }), null, 'its label taken back: plain, not the answer\'s lock again');
+    assert.equal(capLock({ ...ANSWERED, spoke: true, label: LABEL }), LABEL, 'its label: the lock');
+});
+
+test('statusSpoke: the status\'s label since the answer on this stretch past the window', () => {
+    const past = { answered: true, graceSec: 600, movieTime: 700 };
+    assert.equal(statusSpoke(false, { ...past, label: null }), false, 'no label yet: the gap');
+    assert.equal(statusSpoke(false, { ...past, label: LABEL }), true, 'its label up');
+    assert.equal(statusSpoke(true, { ...past, label: null }), true, 'taken back: still its word');
+    assert.equal(statusSpoke(false, { ...past, label: { ...LABEL, cta: null } }), false, 'not a whole label: no word');
+    assert.equal(statusSpoke(false, { ...past, answered: false, label: LABEL }), false, 'not answered: nothing to end');
+    assert.equal(statusSpoke(true, { ...past, movieTime: 599, label: null }), false, 'back inside the window: a new stretch');
+    assert.equal(statusSpoke(false, { ...past, movieTime: 599, label: LABEL }), false, 'inside the window its label is not the stretch\'s');
+    assert.equal(statusSpoke(true, { ...past, graceSec: 0, movieTime: 5 }), true, 'no window at all: nothing resets it');
+});
+
+test('one lock seen is one lock seen, whichever of the two raised it', () => {
+    const status = { ...LABEL, props: { ...ANSWER.props, source: 'status' } };
+    assert.equal(lockKey(status), lockKey(ANSWER));
+    assert.notEqual(lockKey({ ...status, props: { ...status.props, tier: 'bronze' } }), lockKey(ANSWER), 'other props: another lock');
+    assert.equal(lockKey({ props: { b: 1, a: 2 } }), lockKey({ props: { a: 2, b: 1 } }), 'whatever the order');
+    assert.equal(lockKey(null), lockKey({}));
 });
 
 // ---- the pill's colours (player.css) ---------------------------------------

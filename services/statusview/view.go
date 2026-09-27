@@ -964,6 +964,29 @@ func CapLine(loc *goi18n.Localizer, lang string, paid bool, capMbps float64) str
 	return i18n.TranslateWithLocalizerData(loc, k, map[string]any{"Rate": FormatNumber(lang, Quantize(capMbps))})
 }
 
+// RateLabel is the viewer's cap as the player's lock says it: "5 Mbps",
+// "1,5 Мбит/с", a no-break space before the unit (PlayerLabel.Rate). The
+// stream job says it with the same function for the lock the player draws by
+// itself once the viewer has answered the grace popup (jobs/scripts
+// CapCard): one number, whichever of the two raised the lock. "" without a
+// cap.
+func RateLabel(loc *goi18n.Localizer, lang string, capMbps float64) string {
+	c := Quantize(capMbps)
+	if c == 0 {
+		return ""
+	}
+	return speedLabel(loc, lang, c)
+}
+
+// PromoFaster: the promo plan is on sale and faster than a cap of capMbps
+// (an unlimited plan is faster than any) -- what a free viewer's plan box
+// needs for a button (builder.cta), and the stream job's card behind the
+// player's lock too (jobs/scripts CapCard): a link that leads to nothing
+// faster sells nothing.
+func PromoFaster(promo *offer.Offer, capMbps float64) bool {
+	return promo != nil && (promo.RateMbps <= 0 || float64(promo.RateMbps) > capMbps)
+}
+
 // StallSub is the stream box's line while the player buffers: the cap, and
 // what the file needs when that is known — "Without a subscription — up to
 // 5 Mbps, and this file needs 8 Mbps". Only the stream job knows the file's
@@ -1041,7 +1064,7 @@ func (b *builder) cta() (CTA, bool) {
 		return CTA{URL: i18n.LangPath(b.in.Lang, "/donate"), Target: "donate"}, true
 	}
 	promo := b.promo
-	if promo == nil || (promo.RateMbps > 0 && float64(promo.RateMbps) <= b.cap) {
+	if !PromoFaster(promo, b.cap) {
 		return CTA{}, false
 	}
 	c := CTA{}
@@ -1065,9 +1088,7 @@ func (b *builder) plan() *Plan {
 	capN := FormatNumber(b.in.Lang, Quantize(b.cap))
 	capLine := CapLine(b.in.Loc, b.in.Lang, b.paid(), b.cap)
 	p := &Plan{Fact: b.td("resource.status.streamSmooth", map[string]any{"Cap": capLine}), Cap: capLine}
-	if c := Quantize(b.cap); c > 0 {
-		p.Player.Rate = b.speed(c)
-	}
+	p.Player.Rate = RateLabel(b.in.Loc, b.in.Lang, b.cap)
 	if !b.v.PlanBox {
 		return p
 	}

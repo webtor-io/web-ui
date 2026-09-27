@@ -572,10 +572,11 @@ test('the player\'s label: the lock whenever the cap holds with the box due, pla
     // A gap in the data (the seeder's stats a second away): the label holds
     // with the sticky bar's picture -- a card the viewer opened stays open --
     // for up to the sticky bar's hold, and goes after it.
+    const toldBefore = labels.length;
     source.message(S.status_unknown);
     assert.equal(card().getAttribute('data-key'), 'status_unknown', 'fixture: the card says the gap');
     assert.ok(window._txPlayerLabel, 'a gap: the lock holds');
-    assert.equal(labels.filter((l) => l === null).length, 2, 'and nobody was told otherwise');
+    assert.equal(labels.length, toldBefore, 'and nobody was told otherwise');
     t.mock.timers.tick(8000);
     source.ping();
     assert.equal(window._txPlayerLabel, null, 'a gap that lasts: plain');
@@ -586,6 +587,47 @@ test('the player\'s label: the lock whenever the cap holds with the box due, pla
     video.dataset.runOffset = '0';
     source.ping();
     assert.equal(window._txPlayerLabel, null, 'inside the grace window: plain');
+});
+
+// With the label, the cause the view names when a wait is not the cap's
+// (lib/transferStatus.js playerCause): the player's own lock after its grace
+// answer gives way to it (owner's review, 2026-09-27: a swarm-bound torrent
+// kept the answer's lock and its trial pitch for the rest of the film).
+test('the player\'s cause: the other cause the view names, published with the label', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 40 * 60 * 1000 });
+    freshVideo();
+    t.after(() => {
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 1, currentTime: 300 });
+    fire('loadstart');
+    fire('waiting');
+    const told = [];
+    const onLabel = () => told.push(window._txPlayerCause);
+    document.addEventListener('tx-player-label', onLabel);
+    t.after(() => document.removeEventListener('tx-player-label', onLabel));
+    source.message(S.swarm);
+    assert.equal(window._txPlayerLabel, null, 'fixture: no label');
+    assert.equal(window._txPlayerCause, 'swarm', 'a few seeders slower than the cap');
+    source.message(S.stalled);
+    assert.equal(window._txPlayerCause, 'stalled', 'nothing flowing to a viewer who waits: never the limiter');
+    source.message(S.noseed);
+    assert.equal(window._txPlayerCause, 'noseed');
+    source.message(S.missing);
+    assert.equal(window._txPlayerCause, 'missing');
+    source.message(S.active);
+    assert.equal(window._txPlayerCause, '', 'the bytes flow with no verdict: no cause, the gap before it');
+    source.message(S.tier_fact);
+    assert.equal(window._txPlayerCause, '', 'the cap before its box: no other cause');
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel, 'fixture: the label');
+    assert.equal(window._txPlayerCause, '');
+    // A one-second gap in the data keeps the last word, cause included.
+    source.message(S.swarm);
+    source.message(S.status_unknown);
+    assert.equal(window._txPlayerCause, 'swarm', 'a gap: the word it had');
+    assert.deepEqual(told, ['swarm', 'stalled', 'noseed', 'missing', '', '', 'swarm'], 'told when it changes (the fact after `active`: nothing new), not every draw');
 });
 
 // Engines without scroll anchoring move everything under the card when its
@@ -662,9 +704,11 @@ test('a final message closes the stream for good', () => {
 test('leaving the page closes the stream and stops listening to the player', () => {
     source.message(S.stream_stall);
     window._txPlayerLabel = { rate: '5 Мбит/с' };
+    window._txPlayerCause = 'swarm';
     destroy.call(target);
     assert.equal(source.closed, true);
     assert.equal(window._txPlayerLabel, null, 'no status, no word on the cap: the player\'s label goes plain');
+    assert.equal(window._txPlayerCause, '', 'and no word on another cause');
     const before = card().getAttribute('data-key');
     setVideo({ paused: false, ended: false, readyState: 1 });
     fire('waiting');

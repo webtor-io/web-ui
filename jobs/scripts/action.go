@@ -120,6 +120,11 @@ type StreamContent struct {
 	// over the cap is not sold again until the player really stalls
 	// (lib/playerActivity.js offerAnswered).
 	StatusAnswered bool
+	// CapCard is the lock and card the player's buffering label draws by
+	// itself once the viewer has answered the grace popup (cap_card.go),
+	// rendered on the <video> as data-cap-card-*. nil without a grace
+	// window, in an embed, or without a cap.
+	CapCard *CapCard
 }
 
 const (
@@ -546,6 +551,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	graceMode := s.grace.Enabled && isFreeTier(c)
 	if graceMode {
 		s.applyGraceRules(sc, resourceID, c)
+		s.setCapCard(sc, c, dsd != nil)
 	}
 	j.InProgress(s.t("job.retrievingData"))
 	resCtx, resCancel := context.WithTimeout(ctx, 30*time.Second)

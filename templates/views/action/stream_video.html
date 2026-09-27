@@ -46,6 +46,26 @@
                 nothing more until the player really stalls
                 (StreamContent.StatusAnswered). */}}
            {{- if .StatusAnswered }} data-offer-answered="continue-slow"{{ end }}
+           {{- /* The buffering label's lock and its card, drawn by the player
+                itself once the viewer has answered the grace popup (#grace-cta
+                below; lib/player/buffering-label.js answerLabel) -- the
+                transfer status's own label comes 8-15 s later, and is
+                preferred once it does. The status's stream box in its own
+                words: the same keys, the same number (StreamContent.CapCard),
+                the promo plan through the player's own /trial surface and
+                button as the grace popup reads it, only with something faster
+                on sale. Its line with what the file needs is
+                data-status-stall-sub above. Trimmed: absent, the tag is what
+                it was. */}}
+           {{- with .CapCard }}{{ $card := . }}{{ with promoOffer }}{{ if $card.Sells . }}
+           data-cap-card-rate="{{ $card.Rate }}" data-cap-card-sub="{{ $card.Line }}"
+           data-cap-card-title="{{ t $.Lang "resource.status.streamStallTitle" }}"
+           data-cap-card-cta="{{ t $.Lang "offer.watchUncapped" }}"
+           data-cap-card-url="{{ or (trialURL $.Lang "player-label" .) .URL (langPath $.Lang "/donate") }}"
+           data-cap-card-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}"
+           {{- if .TrialDays }} data-cap-card-note="{{ tn $.Lang "offer.trialNote" .TrialDays }}"{{ end }}
+           data-cap-card-auth="{{ $card.Auth }}" data-cap-card-tier="{{ $card.Tier }}"
+           {{- end }}{{ end }}{{ end }}
            {{ if .Settings | hasControls }}controls{{ end }}
            {{ if .Settings.Width }}width="{{ .Settings.Width }}"{{ end }}
            {{ if .Settings.Height }}height="{{ .Settings.Height }}"{{ end }}

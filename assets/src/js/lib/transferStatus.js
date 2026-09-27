@@ -189,9 +189,46 @@ export function playerLabel(view, env = {}) {
         sub: env.stallSub || box.sub || '',
         cta: { label: cta.label || '', note: cta.note || '', url },
         // The status box's props, for the card's own events: the stream box
-        // at a wait, whatever the block itself shows right now.
-        props: { ctx: 'stream', location: 'player', auth: view.auth || '', state: 'stream_stall', tier: view.tier || '', target: cta.target || '' },
+        // at a wait, whatever the block itself shows right now. `source`: the
+        // status raised this lock -- the player raises the same one by
+        // itself once the viewer has answered the grace popup
+        // ('grace-answer', lib/player/buffering-label.js answerLabel).
+        props: { ctx: 'stream', location: 'player', auth: view.auth || '', state: 'stream_stall', tier: view.tier || '', target: cta.target || '', source: 'status' },
     };
+}
+
+// playerCause is the status's word that a wait of the page's player is NOT
+// the plan's cap: the key of the cause the view names instead, or '' where it
+// names none. Published next to the label (lib/playerLabel.js), for the lock
+// the player draws by itself once the viewer has answered its grace popup
+// (lib/player/buffering-label.js capLock): the answer says the rest of the
+// film is at the cap before the status can, but a null label cannot tell
+// "the status has not spoken yet" (the 8-15 s the owner saw, 2026-09-27)
+// from "the status has ruled this wait is someone else's" -- and there
+// statusview refuses to sell on purpose (key: a few seeders slower than the
+// cap, "selling one there quotes a wait it cannot keep"). The causes:
+//   swarm          a few seeders slower than the cap -- a plan would not help
+//   noseed         no seeders
+//   missing        the viewer waits on a piece nobody connected has
+//   missing_idle   nothing moves, and pieces nobody has are why
+//   vault_missing  the same while Vault fetches the torrent
+//   stalled        a request of the viewer's open 5 s without a byte: the
+//                  limiter never does that -- thp throttles only the
+//                  viewer's own responses (External), and a bucket lets the
+//                  cap through; content-transcoder's source reads are
+//                  internal and uncapped, so a session seek's playlist held
+//                  while FFmpeg makes its first segment is the transcoder's
+//                  or the swarm's wait, not the plan's
+//   checking       the seeder checks the torrent (outranks the cap in key())
+// Not a cause: the cap itself (view.plan, box or not), the viewer's bytes
+// flowing with no verdict on what binds them (active, cached_flow -- right
+// after the answer that is exactly the gap before thp's verdict), no viewer
+// on the chain, a gap in the data, no view.
+const OTHER_CAUSES = new Set(['swarm', 'noseed', 'missing', 'missing_idle', 'vault_missing', 'stalled', 'checking']);
+
+export function playerCause(view) {
+    const k = view && view.key;
+    return OTHER_CAUSES.has(k) ? k : '';
 }
 
 // playing is a view as the page shows it while its own player streams
