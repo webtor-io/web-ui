@@ -932,6 +932,7 @@ test('codec-support goes out on the first frame, not on mount, with the source c
     assert.equal(got.length, 1);
     assert.equal(got[0].data.src, 'hevc');
     assert.equal(got[0].data.tc, false, 'no data-session-id: not a transcoder session');
+    assert.equal(got[0].data.route, '', 'no route on the element: empty, not missing');
     assert.equal(got[0].data.pl, 'direct', 'no HLS source in this harness');
     assert.equal(got[0].data.emb, false);
     assert.equal(got[0].data.mse, 'none', 'jsdom has no MSE; the probe ran against the page');
@@ -978,6 +979,7 @@ test('playback-quality goes out after a minute of playback, with the stream fact
     delete window.__wtPlaybackQuality;
     const p = await mountPlayer((page) => {
         page.video.setAttribute('data-video-codecs', 'hevc ');
+        page.video.setAttribute('data-video-route', 'reencode');
     });
     p.video.getVideoPlaybackQuality = () => ({ droppedVideoFrames: 30, totalVideoFrames: 1500 });
     p.video.paused = false;
@@ -992,6 +994,7 @@ test('playback-quality goes out after a minute of playback, with the stream fact
     assert.equal(got[0].data.drop_pct, 2);
     assert.equal(got[0].data.played, 60);
     assert.equal(got[0].data.src, 'hevc');
+    assert.equal(got[0].data.route, 'reencode', 'the session\'s route: tc alone cannot tell a passthrough from a re-encode');
     assert.equal(got[0].data.pl, 'direct');
     assert.equal(got[0].data.decode, '', 'jsdom has neither MSE nor native HLS: nothing to declare');
 

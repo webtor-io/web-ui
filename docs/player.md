@@ -401,6 +401,7 @@ one answers `false`):
 | `dynamic-range` | string: `high` / `standard` (`matchMedia('(dynamic-range: …)')`), `unknown` where the feature is missing |
 | `src` | the source's video codec: `h264` / `hevc` / `av1` / `other` / `unknown` (no probe on the page) |
 | `tc` | a transcoder session serves this stream (`data-session-id`) |
+| `route` | the session's route (`data-video-route`: `passthrough`, `copy`, `reencode`, `audio`; `''` without one) |
 | `pl` | how the player plays it: `hlsjs`, `native` (the element's own HLS — iOS always), `direct` |
 | `emb` | inside the embed |
 
@@ -626,7 +627,7 @@ not marked (`window.__wtPlaybackQuality`).
 | `rate` | `playbackRate` |
 | `hidden` | some counted step happened in a hidden tab: a background tab may stop rendering, read those apart |
 | `decode` | the declaration at that moment, as in `codec-support` |
-| `src`, `tc`, `pl`, `emb` | the same stream facts as `codec-support`, read at the mark |
+| `src`, `tc`, `route`, `pl`, `emb` | the same stream facts as `codec-support`, read at the mark; `route` is the session's (`data-video-route`, `''` without one) — once HEVC is passed through, `tc` is true for a passthrough and a re-encode alike, and the drops of a software decoder are the passthrough's |
 
 For example: `{dropped: 30, total: 1500, drop_pct: 2, played: 60, height: 2160, rate: 1, hidden: false,
 decode: 'hevc8,hevc10', src: 'hevc', tc: false, pl: 'hlsjs', emb: false}`. Today the transcoder

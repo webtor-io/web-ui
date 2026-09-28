@@ -820,6 +820,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         const stream = () => ({
             src: sourceCodec(videoEl.dataset.videoCodecs),
             tc: isSession,
+            // The session's route: once the transcoder passes HEVC through,
+            // `tc` is true for both it and a re-encode, and the dropped
+            // frames of a software decoder (owner, 2026-09-27: the risk
+            // this event measures) are the passthrough ones. '' without it.
+            route: videoEl.dataset.videoRoute || '',
             pl: playbackPath(hlsRef.current, sourceUrl),
             emb: !!window._embedSettings,
         });
