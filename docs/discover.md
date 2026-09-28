@@ -26,6 +26,7 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
 - `assets/src/js/lib/discover/release-video.js` — what a release's name says about its video (codec, HDR, Dolby Vision profile 5); see "Video switches"
 - `assets/src/js/lib/discover/playback.js` — the video switches' rules: defaults, the 4K gate, what each switch hides, the empty-state text
+- `assets/src/js/lib/discover/usePlaybackContext.js` — the switches' inputs as DiscoverApp gathers them: the browser's probe started on mount, the context gathered again when it answers (`DiscoverApp.playback.test.js` checks the wiring to the modal)
 - `assets/src/js/lib/discover/release-check.js` — the record a click on a release leaves for the player, and the player's `discover-release-check`
 - `assets/src/js/lib/discover/components/discoverReducer.js` — state reducer, initial state, helper functions
 - `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component orchestrating all sub-components

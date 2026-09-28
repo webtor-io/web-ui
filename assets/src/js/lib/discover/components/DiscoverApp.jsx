@@ -28,7 +28,12 @@ import { AISection } from './ai/AISection';
 import { t, langPath } from '../i18n';
 import { fetchTorznabStreams, hasIndexers, indexerLabel } from '../torznabClient';
 import { startProbe, decodedTokens, declaredTokens, takesPart } from '../../player/decode-declaration';
-import { playbackContext } from '../playback';
+import { usePlaybackContext } from '../usePlaybackContext';
+
+// The declaration module as the stream modal's switches ask it
+// (usePlaybackContext): one object, so the context is not gathered again on
+// every render of the page.
+const DECODE = { startProbe, decodedTokens, declaredTokens, takesPart };
 
 // episodesModalFromBack rebuilds the episodes-view modal from the
 // backToEpisodes snapshot carried by an episode-streams modal. Shared by
@@ -94,28 +99,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
     const url = useDiscoverUrl('/discover');
 
-    // What the stream modal's video switches go by (lib/discover/playback.js):
-    // the transcoder's answer on the page, and the browser's own, from the
-    // same probe the page declares with -- asked here of every browser, not
-    // only of those taking part, since the HEVC and HDR switches follow
-    // what the browser decodes. The probe runs in the background (its module
-    // is a lazy chunk); until it answers, and where it never does, the
-    // switches read "not answered", never "does not decode". A cached
-    // answer of this browser counts at once.
-    const [probeAnswers, setProbeAnswers] = useState(0);
-    useEffect(() => {
-        let live = true;
-        try {
-            Promise.resolve(startProbe(window)).then(() => { if (live) setProbeAnswers(n => n + 1); }, () => {});
-        } catch (e) {
-            // No probe: the switches stay as for an unanswered one.
-        }
-        return () => { live = false; };
-    }, []);
-    const playback = useMemo(
-        () => playbackContext(window, { decodedTokens, declaredTokens, takesPart }),
-        [probeAnswers],
-    );
+    // What the stream modal's video switches go by (lib/discover/playback.js),
+    // gathered from the page's first render, so the browser's probe has
+    // answered by the time a modal opens (usePlaybackContext).
+    const playback = usePlaybackContext(window, DECODE);
 
     // Create client once
     if (!clientRef.current) {
