@@ -175,6 +175,45 @@ The stream modal shows TMDB community reviews for the open title, when they exis
 - Stream filters (source, label, language) are reactive — `useMemo` recomputes the filtered list on every filter change
 - "Back to episodes" navigation available from streams view
 
+## Transcoder capability
+
+Whether content-transcoder hands HEVC to the player as it is (HEVC
+passthrough) decides what Discover may promise about 4K HEVC. The page gets
+the transcoder's own answer as `window._passthrough = {"hevc": "on"|"off"|"unknown"}`
+(`handlers/discover` `indexData.Passthrough`). Nothing on the page reads it
+yet; the Discover UI of the passthrough work will.
+
+- **Where it comes from.** `services/transcodercaps` asks
+  `GET http://$CONTENT_TRANSCODER_SERVICE_HOST:$CONTENT_TRANSCODER_SERVICE_PORT/capabilities`
+  in the background, every 30 s from the pod's start — whether or not anyone
+  opens Discover. A page never waits for it and never causes a question. The
+  answer is the capability exactly as a `POST /session` opened now would read
+  it (the transcoder's flag or capability file), not a copy of its
+  configuration.
+- **Three answers.** `on` / `off` are what the transcoder said, and the last
+  one stays until it says something else: the question is "is it configured",
+  not "does it answer this second" — a restarting transcoder or a network blip
+  does not turn a configured capability into an absent one. `unknown` is the
+  time before this pod heard any answer: its first seconds, no address
+  configured, or a transcoder that never answered (one without the endpoint
+  answers 404). `unknown` is never `off`; a page must not say "not available"
+  on it.
+- **What counts as an answer.** A 200 whose JSON has the key
+  `passthrough_video_codecs` (`[]` is `off`, a list with `hevc` is `on`).
+  A 404, 5xx, a 2 s timeout, a body that is not JSON, a JSON without the key
+  (or `null`) are no answer.
+- **Seen from outside.** `webui_transcoder_capability{answer}` (one-hot) and
+  `webui_transcoder_capability_checks_total{result}` (docs/metrics.md); a log
+  line on every change of answer (`transcoder capability: on|off`) and on
+  every new reason for not getting one (`no answer, keeping the last one`),
+  not on every poll. Without an address the start-up log says so once.
+- **Configuration.** `CONTENT_TRANSCODER_SERVICE_HOST` / `…_PORT` (default
+  80). Kubernetes injects both for the `content-transcoder` Service;
+  self-hosted sets them in its common environment. Nothing else to configure.
+- **The player does not read it.** A stream's route is decided per session
+  by the transcoder from what the browser declares; a failure to read the
+  capability cannot touch playback.
+
 ## Addon Wizard
 
 The AddonWizard component provides a guided two-step flow for discovering and installing Stremio addons.

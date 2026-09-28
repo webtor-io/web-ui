@@ -220,17 +220,21 @@ func TestMetricNames(t *testing.T) {
 	s.duration.WithLabelValues("/", "GET")
 	s.panics.WithLabelValues("/")
 	s.jobs.WithLabelValues("load", JobOK)
+	s.caps.WithLabelValues("unknown")
+	s.capChecks.WithLabelValues("failed")
 	families, err := reg.Gather()
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]dto.MetricType{
-		"webui_http_requests_total":           dto.MetricType_COUNTER,
-		"webui_http_request_duration_seconds": dto.MetricType_HISTOGRAM,
-		"webui_http_requests_in_flight":       dto.MetricType_GAUGE,
-		"webui_panics_total":                  dto.MetricType_COUNTER,
-		"webui_jobs_total":                    dto.MetricType_COUNTER,
-		"webui_jobs_in_flight":                dto.MetricType_GAUGE,
+		"webui_http_requests_total":                dto.MetricType_COUNTER,
+		"webui_http_request_duration_seconds":      dto.MetricType_HISTOGRAM,
+		"webui_http_requests_in_flight":            dto.MetricType_GAUGE,
+		"webui_panics_total":                       dto.MetricType_COUNTER,
+		"webui_jobs_total":                         dto.MetricType_COUNTER,
+		"webui_jobs_in_flight":                     dto.MetricType_GAUGE,
+		"webui_transcoder_capability":              dto.MetricType_GAUGE,
+		"webui_transcoder_capability_checks_total": dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -299,5 +303,42 @@ func TestPaywallAndTrialLabelsAreBounded(t *testing.T) {
 	}
 	if got, want := testutil.CollectAndCount(s.trial), len(offer.TrialFroms)+2; got != want {
 		t.Errorf("client-chosen from values made %d series, want %d", got, want)
+	}
+}
+
+// The capability gauge is one-hot over a closed set of answers, and the
+// checks counter over a closed set of results: a value from elsewhere cannot
+// make a series.
+func TestTranscoderCapabilityIsOneHotAndBounded(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	old := std
+	std = s
+	defer func() { std = old }()
+
+	TranscoderCapability("on")
+	for a, want := range map[string]float64{"on": 1, "off": 0, "unknown": 0} {
+		if got := testutil.ToFloat64(s.caps.WithLabelValues(a)); got != want {
+			t.Errorf("after on: %s = %v, want %v", a, got, want)
+		}
+	}
+	TranscoderCapability("off")
+	TranscoderCapability("maybe")
+	for a, want := range map[string]float64{"on": 0, "off": 0, "unknown": 1} {
+		if got := testutil.ToFloat64(s.caps.WithLabelValues(a)); got != want {
+			t.Errorf("after an unknown value: %s = %v, want %v", a, got, want)
+		}
+	}
+	if got := testutil.CollectAndCount(s.caps); got != 3 {
+		t.Errorf("%d gauge series, want 3", got)
+	}
+	for _, r := range []string{"on", "off", "failed", "timeout", "../x"} {
+		TranscoderCapabilityCheck(r)
+	}
+	if got := testutil.ToFloat64(s.capChecks.WithLabelValues("failed")); got != 3 {
+		t.Errorf("failed = %v, want 3 (every non-answer is failed)", got)
+	}
+	if got := testutil.CollectAndCount(s.capChecks); got != 3 {
+		t.Errorf("%d check series, want 3", got)
 	}
 }

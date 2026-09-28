@@ -22,6 +22,8 @@ The collectors live in `services/metrics`, on the default registry, namespace
 | `webui_jobs_in_flight` | gauge | — | Job scripts currently executing |
 | `webui_stremio_paywall_video_total` | counter | `lang`, `method` | Stremio playback clicks answered with the paywall clip (`lang` of the clip; `HEAD` is Stremio's pre-play probe, not a view) — docs/stremio.md |
 | `webui_trial_shortlink_total` | counter | `target`, `campaign`, `from` | Visits to `/trial`: `target` ∈ `checkout` / `donate` / `none` (nothing on sale), `campaign` ∈ `paywall` / `none` / `other` from `utm_campaign`, `from` ∈ the site surfaces of `offer.TrialFroms` / `none` / `other` from `?from` (docs/offers.md, "The trial link") |
+| `webui_transcoder_capability` | gauge | `answer` | One-hot: what content-transcoder last said about HEVC passthrough (`GET /capabilities`), `answer` ∈ `on` / `off` / `unknown` (nothing heard since this pod started) — docs/discover.md, "Transcoder capability" |
+| `webui_transcoder_capability_checks_total` | counter | `result` | The background questions behind it, every 30 s: `result` ∈ `on` / `off` / `failed` (no answer; the last answer stays) |
 
 ### Label rules
 

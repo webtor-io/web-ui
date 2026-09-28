@@ -73,6 +73,7 @@ import (
 	s3svc "github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
+	"github.com/webtor-io/web-ui/services/transcodercaps"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
@@ -149,6 +150,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = donate.RegisterFlags(c.Flags)
 	c.Flags = memwatch.RegisterFlags(c.Flags)
 	c.Flags = streamprefs.RegisterFlags(c.Flags)
+	c.Flags = transcodercaps.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -593,8 +595,12 @@ func serve(c *cli.Context) error {
 		discover_ai.RegisterHandler(r, recSvc)
 	}
 
-	// Setting Discover
-	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil, cacheIndex)
+	// Setting Discover. The transcoder's HEVC passthrough answer is read in
+	// the background (services/transcodercaps); a page never waits for it.
+	caps := transcodercaps.New(c)
+	caps.Start()
+	defer caps.Close()
+	discover.RegisterHandler(r, tm, pg, en, sb, recSvc != nil, cacheIndex, caps)
 
 	// Setting Discover Watchlist
 	discover_watchlist.RegisterHandler(r, pg, en)

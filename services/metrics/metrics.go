@@ -69,6 +69,8 @@ type set struct {
 	jobsInFly prometheus.Gauge
 	paywall   *prometheus.CounterVec
 	trial     *prometheus.CounterVec
+	caps      *prometheus.GaugeVec
+	capChecks *prometheus.CounterVec
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -107,6 +109,14 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "trial_shortlink_total",
 			Help: "Visits to the /trial short link, by where it sent them (checkout, donate, none = nothing on sale), campaign (paywall, none, other) and the site surface the link sat on (from: offer.TrialFroms, none, other).",
 		}, []string{"target", "campaign", "from"}),
+		caps: f.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace, Name: "transcoder_capability",
+			Help: "What content-transcoder last said about HEVC passthrough (GET /capabilities): 1 on the answer in effect (on, off, unknown = none heard since start), 0 on the others.",
+		}, []string{"answer"}),
+		capChecks: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Name: "transcoder_capability_checks_total",
+			Help: "Background questions to content-transcoder's GET /capabilities, by result (on, off, failed = no answer; the last answer stays).",
+		}, []string{"result"}),
 	}
 }
 
@@ -208,6 +218,45 @@ const (
 // site names (offer.TrialFroms), "none" without one, "other" for the rest.
 func TrialShortlink(target, utmCampaign, from string) {
 	std.trial.WithLabelValues(target, campaignLabel(utmCampaign), offer.TrialFromLabel(from)).Inc()
+}
+
+// Transcoder capability answers (services/transcodercaps). A closed set:
+// anything else is a bug and lands in "unknown" rather than in a new series.
+var capabilityAnswers = []string{"on", "off", "unknown"}
+
+// TranscoderCapability puts the gauge at 1 on answer and 0 on the others.
+func TranscoderCapability(answer string) {
+	std.transcoderCapability(answer)
+}
+
+func (s *set) transcoderCapability(answer string) {
+	known := false
+	for _, a := range capabilityAnswers {
+		if a == answer {
+			known = true
+		}
+	}
+	if !known {
+		answer = "unknown"
+	}
+	for _, a := range capabilityAnswers {
+		v := 0.0
+		if a == answer {
+			v = 1
+		}
+		s.caps.WithLabelValues(a).Set(v)
+	}
+}
+
+// TranscoderCapabilityCheck counts one background question: on, off, or
+// failed (no answer).
+func TranscoderCapabilityCheck(result string) {
+	switch result {
+	case "on", "off":
+	default:
+		result = "failed"
+	}
+	std.capChecks.WithLabelValues(result).Inc()
 }
 
 func campaignLabel(c string) string {

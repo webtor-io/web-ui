@@ -17,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/transcodercaps"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -63,6 +64,29 @@ type indexData struct {
 	// stream and lets the chips do the filtering, so without them it cannot
 	// tell an unwanted result from a missing one.
 	Prefs streamPrefsView
+	// Passthrough is what the transcoder last said about handing HEVC to
+	// the player as it is (window._passthrough). "unknown" is not "off":
+	// it is the time before this process heard an answer. Nothing on the
+	// page reads it yet; the Discover UI will, to promise 4K HEVC only
+	// where it can play.
+	Passthrough passthroughView
+}
+
+type passthroughView struct {
+	HEVC string `json:"hevc"`
+}
+
+// capabilityReader is the one question Discover asks of the transcoder
+// (transcodercaps.Service; nil answers Unknown).
+type capabilityReader interface {
+	HEVCPassthrough() transcodercaps.Answer
+}
+
+func passthroughFor(c capabilityReader) passthroughView {
+	if c == nil {
+		return passthroughView{HEVC: string(transcodercaps.Unknown)}
+	}
+	return passthroughView{HEVC: string(c.HEVCPassthrough())}
 }
 
 type streamPrefsView struct {
@@ -92,9 +116,12 @@ type Handler struct {
 	aiEnabled bool
 	// ci answers which streams are already cached -- see availability.go.
 	ci availabilityLookup
+	// caps answers whether the transcoder passes HEVC through; see
+	// indexData.Passthrough.
+	caps capabilityReader
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder, aiEnabled bool, index *cache_index.CacheIndex) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, en *enrich.Enricher, sb *stremio.Builder, aiEnabled bool, index *cache_index.CacheIndex, caps *transcodercaps.Service) {
 	h := &Handler{
 		tb:        tm.MustRegisterViews("discover/*").WithLayout("main"),
 		pg:        pg,
@@ -104,6 +131,9 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 	}
 	if index != nil {
 		h.ci = index
+	}
+	if caps != nil {
+		h.caps = caps
 	}
 	r.GET("/discover", h.index)
 	r.POST("/discover/localize", auth.HasAuth, h.localize)
@@ -160,10 +190,11 @@ func (h *Handler) index(c *gin.Context) {
 	}
 
 	h.tb.Build("discover/index").HTML(http.StatusOK, web.NewContext(c).WithData(&indexData{
-		Addons:    views,
-		Indexers:  indexerViews(c.Request.Context(), db, u),
-		Prefs:     streamPrefs(c.Request.Context(), db, u),
-		AIEnabled: h.aiEnabled,
+		Addons:      views,
+		Indexers:    indexerViews(c.Request.Context(), db, u),
+		Prefs:       streamPrefs(c.Request.Context(), db, u),
+		AIEnabled:   h.aiEnabled,
+		Passthrough: passthroughFor(h.caps),
 	}))
 }
 
