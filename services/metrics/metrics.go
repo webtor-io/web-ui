@@ -71,6 +71,7 @@ type set struct {
 	trial     *prometheus.CounterVec
 	caps      *prometheus.GaugeVec
 	capChecks *prometheus.CounterVec
+	fallback  *prometheus.CounterVec
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -117,6 +118,10 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "transcoder_capability_checks_total",
 			Help: "Background questions to content-transcoder's GET /capabilities, by result (on, off, failed = no answer; the last answer stays).",
 		}, []string{"result"}),
+		fallback: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Name: "passthrough_fallback_total",
+			Help: "Stream starts that restart a file whose HEVC passthrough failed in the browser, by reason (codecs_rejected, decode_error, media_error, src_unsupported, no_frames, user; other = anything else) and the decoder class the stream needed (hevc8, hevc10, hevc8-2160, hevc10-2160; unknown).",
+		}, []string{"reason", "class"}),
 	}
 }
 
@@ -257,6 +262,31 @@ func TranscoderCapabilityCheck(result string) {
 		result = "failed"
 	}
 	std.capChecks.WithLabelValues(result).Inc()
+}
+
+// Passthrough fallback reasons and decoder classes (docs/player.md,
+// "Passthrough: errors and fallback"). Closed sets: the values come from a
+// form field (models.ParseDecodeRequest allowlists them already; this keeps
+// the series bounded whoever calls).
+var (
+	fallbackReasons = map[string]bool{"codecs_rejected": true, "decode_error": true, "media_error": true, "src_unsupported": true, "no_frames": true, "user": true}
+	fallbackClasses = map[string]bool{"hevc8": true, "hevc10": true, "hevc8-2160": true, "hevc10-2160": true}
+)
+
+// PassthroughFallback counts one start that restarts a file whose
+// passthrough failed in the browser.
+func PassthroughFallback(reason, class string) {
+	std.passthroughFallback(reason, class)
+}
+
+func (s *set) passthroughFallback(reason, class string) {
+	if !fallbackReasons[reason] {
+		reason = "other"
+	}
+	if !fallbackClasses[class] {
+		class = "unknown"
+	}
+	s.fallback.WithLabelValues(reason, class).Inc()
 }
 
 func campaignLabel(c string) string {

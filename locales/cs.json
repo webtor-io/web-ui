@@ -740,6 +740,8 @@
     "player.playNow": "Přehrát hned",
     "player.nextCancel": "Zrušit",
     "player.autoplayNext": "Přehrávat další automaticky",
+    "player.compatMode": "Kompatibilní režim",
+    "player.compatModeHint": "Video se převede na naší straně. Použijte, pokud obraz vypadá špatně.",
     "player.stillWatching": "Pořád se díváte?",
     "player.continueWatching": "Pokračovat",
     "player.subtitleDelayValue": "%v s",

@@ -712,6 +712,8 @@
     "player.playNow": "Nu kijken",
     "player.nextCancel": "Annuleren",
     "player.autoplayNext": "Volgende automatisch afspelen",
+    "player.compatMode": "Compatibele modus",
+    "player.compatModeHint": "De video wordt aan onze kant omgezet. Gebruik dit als het beeld er verkeerd uitziet.",
     "player.stillWatching": "Kijk je nog?",
     "player.continueWatching": "Doorgaan",
     "player.subtitleDelayValue": "%v s",

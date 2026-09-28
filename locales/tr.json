@@ -712,6 +712,8 @@
     "player.playNow": "Şimdi izle",
     "player.nextCancel": "İptal",
     "player.autoplayNext": "Sonrakini otomatik oynat",
+    "player.compatMode": "Uyumlu mod",
+    "player.compatModeHint": "Video bizim tarafımızda dönüştürülür. Görüntü yanlış görünüyorsa kullanın.",
     "player.stillWatching": "Hâlâ izliyor musunuz?",
     "player.continueWatching": "Devam et",
     "player.subtitleDelayValue": "%v sn",

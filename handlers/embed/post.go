@@ -6,9 +6,11 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -80,6 +82,17 @@ func (s *Handler) post(c *gin.Context) {
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to set embed claims"))
 		return
+	}
+	if args.Decode.FallbackReason != "" {
+		// A restart after a passthrough failed in this embed
+		// (lib/player/passthrough.js restartEmbed): counted and logged as
+		// on the site (handlers/action notePassthroughFallback).
+		metrics.PassthroughFallback(args.Decode.FallbackReason, args.Decode.FallbackClass)
+		log.WithFields(log.Fields{
+			"reason": args.Decode.FallbackReason,
+			"class":  args.Decode.FallbackClass,
+			"embed":  domain,
+		}).Info("passthrough fallback")
 	}
 	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd, args.Decode)
 	if err != nil {

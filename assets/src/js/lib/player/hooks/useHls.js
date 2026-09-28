@@ -4,8 +4,13 @@ import { createHls, initDefaultTracks, Hls } from '../hls-manager';
 /**
  * Hook that manages HLS.js lifecycle.
  * Attaches to videoRef, returns hlsRef for external access (track control, etc.).
+ *
+ * passthrough: { fragLoadMs, guard } for a stream the transcoder passes
+ * through (Player.jsx; passthrough.js). The guard is told which path plays
+ * (setHls: the instance, or null for native HLS) and sees hls.js's errors
+ * first; it is disposed with the instance.
  */
-export function useHls(videoRef, sourceUrl, { onReady } = {}) {
+export function useHls(videoRef, sourceUrl, { onReady, passthrough = null } = {}) {
     const hlsRef = useRef(null);
     const tracksInitialized = useRef(false);
 
@@ -19,7 +24,8 @@ export function useHls(videoRef, sourceUrl, { onReady } = {}) {
         if (isHls) {
             const hls = createHls(video, sourceUrl, () => {
                 if (onReady) onReady(hls);
-            });
+            }, passthrough ? { passthrough: true, fragLoadMs: passthrough.fragLoadMs, guard: passthrough.guard } : {});
+            if (passthrough && passthrough.guard) passthrough.guard.setHls(hls);
 
             if (hls) {
                 hlsRef.current = hls;

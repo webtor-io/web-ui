@@ -41,6 +41,10 @@
            {{- with .TranscoderSession }}{{ if .VideoRoute }} data-video-route="{{ .VideoRoute }}"{{ end }}{{ if .RouteReason }} data-route-reason="{{ .RouteReason }}"{{ end }}{{ end }}
            {{- if .VideoClass }} data-video-class="{{ .VideoClass }}"{{ end }}
            {{- if .FragLoadMs }} data-frag-load-ms="{{ .FragLoadMs }}"{{ end }}
+           {{- /* The file, for a passthrough's fallback: the restart is this
+                file's, even where the page's start form has moved on to
+                another (lib/player/passthrough.js). */}}
+           {{- if .Passthrough }} data-item-id="{{ .VideoStreamUserData.ItemID }}"{{ end }}
            {{- with .VideoStreamUserData }}{{ if .Decode }} data-decode="{{ .Decode }}"{{ end }}{{ end }}
            {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
            {{- /* The resource status's plan-box line while this player buffers

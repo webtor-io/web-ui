@@ -5,11 +5,15 @@ import { t } from './i18n';
 
 /**
  * The "more" menu (three dots): settings that are about the player rather than about this moment
- * of the film. Today one -- autoplay of the next episode / track -- reachable
- * at any time, with its name next to it (owner, 2026-09-20: a bare switch in
- * the audio bar said nothing about what it switched).
+ * of the film. Autoplay of the next episode / track -- reachable at any time,
+ * with its name next to it (owner, 2026-09-20: a bare switch in the audio bar
+ * said nothing about what it switched) -- where there is a next file; and
+ * "Compatible mode" where the transcoder passes the video through as it is
+ * (passthrough.js): the viewer who sees a wrong picture no automatic check
+ * catches (Dolby Vision without its metadata, HDR on an SDR screen) restarts
+ * the file converted on our side. Each row only where it applies.
  */
-export function SettingsControl({ autoplayNext, onToggleAutoplayNext }) {
+export function SettingsControl({ autoplayNext, onToggleAutoplayNext, onCompatMode = null }) {
     const [open, setOpen] = useState(false);
     const rootRef = useRef(null);
     const btnRef = useRef(null);
@@ -24,10 +28,19 @@ export function SettingsControl({ autoplayNext, onToggleAutoplayNext }) {
             </button>
             <div ref={menuRef} popover={HAS_POPOVER ? 'manual' : undefined} role="menu" aria-label={t('player.settings')}
                 class={`wt-player-menu${open ? ' wt-player-menu--open' : ''}`}>
-                <label class="wt-player-menu-row">
-                    <span>{t('player.autoplayNext')}</span>
-                    <input type="checkbox" role="switch" class="toggle toggle-soft toggle-sm" checked={autoplayNext} onChange={onToggleAutoplayNext} />
-                </label>
+                {onToggleAutoplayNext && (
+                    <label class="wt-player-menu-row">
+                        <span>{t('player.autoplayNext')}</span>
+                        <input type="checkbox" role="switch" class="toggle toggle-soft toggle-sm" checked={autoplayNext} onChange={onToggleAutoplayNext} />
+                    </label>
+                )}
+                {onCompatMode && (
+                    <button type="button" role="menuitem" class="wt-player-menu-row wt-player-menu-row--compat"
+                        title={t('player.compatModeHint')} onClick={() => { setOpen(false); onCompatMode(); }}>
+                        <span>{t('player.compatMode')}</span>
+                        <span class="wt-player-menu-hint">{t('player.compatModeHint')}</span>
+                    </button>
+                )}
             </div>
         </div>
     );

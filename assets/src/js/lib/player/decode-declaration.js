@@ -68,7 +68,7 @@ export const STRUCK_BY_CLASS = {
 function state(win) {
     let s = win[STATE];
     if (!s) {
-        s = { optin: undefined, probe: null, fresh: null, ready: null, readyResolve: null, memory: null, hooked: false };
+        s = { optin: undefined, probe: null, fresh: null, ready: null, readyResolve: null, memory: null, hooked: false, pending: null };
         s.ready = new Promise((r) => { s.readyResolve = r; });
         win[STATE] = s;
     }
@@ -277,12 +277,47 @@ export function declarationFor(win, { resourceId, itemId } = {}, now = Date.now(
     if (!takesPart(win)) return null;
     const m = loadMemory(win, now);
     const src = sourceKey(resourceId, itemId);
-    if (src && m.sources[src]) return null;
+    if (src && (m.sources[src] || pendingFor(win, src, now))) return null;
     const toks = freshTokens(win) ?? cachedTokens(win, now);
     if (toks === null) return UNKNOWN;
     const struck = struckTokens(m);
     const out = toks.filter((t) => !struck.has(t));
     return out.length ? out.join(',') : null;
+}
+
+// ---- the restart after a failed passthrough ----------------------------------
+
+// A restart of the file whose passthrough just failed (Player.jsx, the
+// player's fallback) carries why -- decode-fallback and decode-class: the
+// server's counter and log, and the text of a 4K refusal
+// (docs/user_errors.md) -- and declares nothing for that file, whatever the
+// memory says: a browser without storage keeps no memory past this page,
+// and the restart may be a new page (a deep link). The note lives on the
+// page until the next player comes up (clearPendingFallback) or
+// PENDING_TTL_MS passes: both of Turnstile's passes carry it, and no later
+// start does -- a field left on the form would put `/fb=` in the key of a
+// start that restarted nothing and count a fallback that did not happen.
+export const PENDING_TTL_MS = 2 * 60 * 1000;
+
+export function setPendingFallback(win, { resourceId, itemId, reason, cls }, now = Date.now()) {
+    const src = sourceKey(resourceId, itemId);
+    if (!src || !reason) return;
+    state(win).pending = { src, reason: String(reason), cls: String(cls || 'unknown'), at: now };
+}
+
+export function clearPendingFallback(win) {
+    state(win).pending = null;
+}
+
+function pendingFor(win, src, now) {
+    const p = state(win).pending;
+    if (!p || p.src !== src || p.at > now || now - p.at >= PENDING_TTL_MS) return null;
+    return p;
+}
+
+// pendingFallbackFor: the restart note for this file, or null.
+export function pendingFallbackFor(win, { resourceId, itemId } = {}, now = Date.now()) {
+    return pendingFor(win, sourceKey(resourceId, itemId), now);
 }
 
 // ---- the forms -------------------------------------------------------------
@@ -303,23 +338,34 @@ const fieldValue = (form, name) => {
     return el ? el.value : '';
 };
 
-// applyDeclaration puts the declaration on the form, or takes a stale one
-// off. Idempotent: it runs on every pass of a submit.
-export function applyDeclaration(form, win) {
-    if (!isStreamVideoForm(form, win)) return;
-    const d = declarationFor(win, { resourceId: fieldValue(form, 'resource-id'), itemId: fieldValue(form, 'item-id') });
-    let input = form.querySelector('input[name="decode"]');
-    if (d === null) {
+// setHidden puts a hidden field with value on the form, or takes it off
+// for null.
+function setHidden(form, name, value) {
+    let input = form.querySelector(`input[name="${name}"]`);
+    if (value === null) {
         if (input) input.remove();
         return;
     }
     if (!input) {
         input = form.ownerDocument.createElement('input');
         input.type = 'hidden';
-        input.name = 'decode';
+        input.name = name;
         form.appendChild(input);
     }
-    input.value = d;
+    input.value = value;
+}
+
+// applyDeclaration puts the declaration on the form, or takes a stale one
+// off, and the same for a restart's fallback fields (only the restart of
+// the file that failed carries them). Idempotent: it runs on every pass of
+// a submit.
+export function applyDeclaration(form, win, now = Date.now()) {
+    if (!isStreamVideoForm(form, win)) return;
+    const file = { resourceId: fieldValue(form, 'resource-id'), itemId: fieldValue(form, 'item-id') };
+    setHidden(form, 'decode', declarationFor(win, file, now));
+    const p = pendingFallbackFor(win, file, now);
+    setHidden(form, 'decode-fallback', p ? p.reason : null);
+    setHidden(form, 'decode-class', p ? p.cls : null);
 }
 
 // installSubmitHook: a capture listener on the document that (re)writes the

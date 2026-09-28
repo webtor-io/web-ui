@@ -14,7 +14,7 @@ export function Controls({
     playing, currentTime, duration, volume, muted, rate, fullscreen, buffered, seeking,
     onTogglePlay, onSeek, onVolumeChange, onRateChange, onToggleMute, onToggleFullscreen,
     onCaptionsClick, onEmbedClick, onNext, nextLabel, nextBusy, autoplayNext, onToggleAutoplayNext,
-    isVideo, features,
+    onCompatMode, isVideo, features,
 }) {
     return (
         <div class="wt-player-controls" onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
@@ -87,11 +87,15 @@ export function Controls({
                     )}
 
                     {/* "More" (three dots): autoplay of the next file, at any time
-                        and with its name on it. Always the LAST thing on the
-                        right (owner) -- after fullscreen, where a menu is
-                        looked for. Only where there is a next file. */}
-                    {onNext && onToggleAutoplayNext && (
-                        <SettingsControl autoplayNext={autoplayNext} onToggleAutoplayNext={onToggleAutoplayNext} />
+                        and with its name on it; "Compatible mode" on a stream
+                        the transcoder passes through. Always the LAST thing on
+                        the right (owner) -- after fullscreen, where a menu is
+                        looked for. Only where it has something to hold. */}
+                    {((onNext && onToggleAutoplayNext) || onCompatMode) && (
+                        <SettingsControl
+                            autoplayNext={autoplayNext}
+                            onToggleAutoplayNext={onNext && onToggleAutoplayNext ? onToggleAutoplayNext : null}
+                            onCompatMode={onCompatMode || null} />
                     )}
                 </div>
             </div>

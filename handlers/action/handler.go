@@ -18,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/jobs/scripts"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/stremio"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -336,6 +337,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		)
 		return
 	}
+	notePassthroughFallback(action, args.VideoStreamUserData)
 	actionJob, err = s.jobs.Action(
 		web.NewContext(c),
 		args.ResourceID,
@@ -381,6 +383,25 @@ func (s *Handler) verifyAction(c *gin.Context) error {
 // never ran the widget; timeout-or-duplicate = a token used twice or too
 // late), the country Cloudflare saw, the User-Agent and the referer. No
 // token contents.
+// notePassthroughFallback counts and logs a video start that restarts a
+// file whose HEVC passthrough failed in the browser (decode-fallback;
+// docs/player.md "Passthrough: errors and fallback"), so the alerts see
+// fallbacks without Umami. Only past Turnstile: a refused start restarted
+// nothing. Reports whether it was one.
+func notePassthroughFallback(action string, vsud *models.VideoStreamUserData) bool {
+	if action != "stream-video" || vsud == nil || vsud.FallbackReason == "" {
+		return false
+	}
+	metrics.PassthroughFallback(vsud.FallbackReason, vsud.FallbackClass)
+	log.WithFields(log.Fields{
+		"reason":   vsud.FallbackReason,
+		"class":    vsud.FallbackClass,
+		"resource": vsud.ResourceID,
+		"item":     vsud.ItemID,
+	}).Info("passthrough fallback")
+	return true
+}
+
 func logRefusal(c *gin.Context, action string, err error) {
 	codes := "unknown"
 	var ve *turnstile.VerifyError

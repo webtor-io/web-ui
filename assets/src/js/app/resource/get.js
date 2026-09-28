@@ -4,7 +4,7 @@ import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
-import { takesPart, whenDeclared } from '../../lib/player/decode-declaration';
+import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
 // at the longest fitting prefix (shared findTextCut from lib/textClamp)
 // and append a clickable inline "\u2026" that expands the full plot; an
@@ -107,6 +107,17 @@ av( async function() {
         debugInput.setAttribute('name', 'debug');
         debugInput.setAttribute('value', debug);
         form.appendChild(debugInput);
+    }
+    // A restart after a passthrough failed, sent here because the page's
+    // start form was another file's (lib/player/passthrough.js
+    // fallbackToOldRoute): this start carries why and declares nothing for
+    // the file (decode-declaration.js setPendingFallback).
+    const fallback = urlParams.get('decode-fallback');
+    if (fallback) {
+        try {
+            const field = (n) => { const el = form.querySelector(`input[name="${n}"]`); return el ? el.value : ''; };
+            setPendingFallback(window, { resourceId: field('resource-id'), itemId: field('item-id'), reason: fallback, cls: urlParams.get('decode-class') || 'unknown' });
+        } catch (e) { /* start anyway */ }
     }
     // A deep link starts at once, possibly before the page's decoder probe
     // has answered; a browser that declares gets up to 300 ms for it, then

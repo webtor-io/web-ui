@@ -222,6 +222,7 @@ func TestMetricNames(t *testing.T) {
 	s.jobs.WithLabelValues("load", JobOK)
 	s.caps.WithLabelValues("unknown")
 	s.capChecks.WithLabelValues("failed")
+	s.fallback.WithLabelValues("user", "unknown")
 	families, err := reg.Gather()
 	if err != nil {
 		t.Fatal(err)
@@ -235,6 +236,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_jobs_in_flight":                     dto.MetricType_GAUGE,
 		"webui_transcoder_capability":              dto.MetricType_GAUGE,
 		"webui_transcoder_capability_checks_total": dto.MetricType_COUNTER,
+		"webui_passthrough_fallback_total":         dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -340,5 +342,30 @@ func TestTranscoderCapabilityIsOneHotAndBounded(t *testing.T) {
 	}
 	if got := testutil.CollectAndCount(s.capChecks); got != 3 {
 		t.Errorf("%d check series, want 3", got)
+	}
+}
+
+// The fallback counter's labels come from a form field: a reason or a class
+// outside the closed sets is one series, not one per value.
+func TestPassthroughFallbackIsBounded(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	old := std
+	std = s
+	defer func() { std = old }()
+
+	PassthroughFallback("decode_error", "hevc10-2160")
+	PassthroughFallback("decode_error", "hevc10-2160")
+	PassthroughFallback("user", "hevc8")
+	PassthroughFallback("<script>", "../x")
+	PassthroughFallback("", "")
+	if got := testutil.ToFloat64(s.fallback.WithLabelValues("decode_error", "hevc10-2160")); got != 2 {
+		t.Errorf("decode_error/hevc10-2160 = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(s.fallback.WithLabelValues("other", "unknown")); got != 2 {
+		t.Errorf("other/unknown = %v, want 2", got)
+	}
+	if got := testutil.CollectAndCount(s.fallback); got != 3 {
+		t.Errorf("%d series, want 3", got)
 	}
 }

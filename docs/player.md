@@ -353,7 +353,8 @@ presses stop and is flushed on teardown):
 | `player-media-session` | `action: play\|pause\|seek` | first use of each action per player |
 | `player-label-lock-shown` | the status box's props, `location: player`, `source: status\|grace-answer` | the buffering label's lock drawn, once per player (see "Buffering label") |
 | `donate-player-label-shown` | the same | the lock opened the plan card |
-| `stream-start` | + `rate`, `subtitleDelay` | what the stream started with (remembered settings make no change event) |
+| `stream-start` | + `rate`, `subtitleDelay`, `route`, `reason`, `decl` | what the stream started with (remembered settings make no change event); the transcoder session's route and reason and the declaration it was started with (`data-video-route`, `data-route-reason`, `data-decode`; `''` where the element has none) — the base the HEVC passthrough is measured against |
+| `hevc-fallback` | `reason`, `cls`, `path: mse\|native` | a passthrough given up to the old route (see "Passthrough: errors and fallback") |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
 
@@ -541,6 +542,68 @@ unknown; passed through it is pulled at the source's own rate (`playedBitrateRou
 so the cap card and "this file needs N" work as for H.264. Every other caller of `playedBitrate` is
 unchanged, and the cap gate before the session still falls back to the file's rate for HEVC —
 conservative, and right for a passthrough.
+
+#### Passthrough: errors and fallback — `passthrough.js`
+
+Only where the session's route is `passthrough` (`data-video-route`); every other stream's error
+handling is what it was (`hls-manager.js`: every fatal media error recovers, network errors restart
+loading). The player makes a guard (`createPassthroughGuard`) that sees hls.js's errors first and
+listens to the element, and gives the file up **at most once per player**:
+
+| signal | reason | strikes the class |
+|---|---|---|
+| hls.js `manifestIncompatibleCodecsError`, or a fatal `bufferAddCodecError` (the init's codec; with one level hls.js makes it fatal before any listener) | `codecs_rejected` | no — a build fault of ours; `webui_passthrough_fallback_total{reason="codecs_rejected"}` alerts |
+| a fatal media error (hls.js `MEDIA_ERROR`: `bufferAppendError`, `fragParsingError`, …) or, on the hls.js path, the element's own `error` with MediaError 3 — hls.js does not listen for it and learns of it only at its next append, which with a full buffer can be half a minute or never. The first is recovered (`recoverMediaError`); the next, for the rest of this playback, gives up. Two reports within 1 s are one incident | `decode_error` if the element said MediaError 3, else `media_error` | only `decode_error` |
+| native HLS (no hls.js: iOS, or no MSE): the element's `error` — 3 | `decode_error` | yes |
+| — 4 (Safari may say it for a master that failed to load too; not verified) | `src_unsupported` | no |
+| the watchdog, native and hls.js: 10 s after the first `playing`, in a tab that stayed visible, time ran on by more than 2 s and there is no picture — `videoWidth` 0, or 0 decoded frames where this page has seen the counter count (Android Chrome's native player reads 0 while it plays) | `no_frames` | yes |
+| "Compatible mode" (below) | `user` | no |
+
+Network errors are not a fallback. `fragLoadPolicy` for passthrough: `maxLoadTimeMs` from
+`data-frag-load-ms` (twice the segment's time at the viewer's cap, 2–15 min), a timed-out segment tried
+3 times in all (`timeoutRetry` 2, where today's legacy settings make it 100 refetches from zero), HTTP
+errors retried as today (`errorRetry` 100, 1–10 s; a test reads today's value off a real hls.js
+instance). After the tries hls.js raises a fatal network error and `hls-manager.js` restarts loading, as
+on every route — **without a limit**: hls.js counts fragment errors until the next successful load, so
+each further timeout is fatal at once. The loop costs one download attempt per `maxLoadTimeMs`; it is
+not a finite number of retries.
+
+The fallback (`fallbackToOldRoute`):
+
+1. the memory (`decode-declaration.js`): the file, and a strike against its class for the reasons above;
+2. Umami `hevc-fallback {reason, cls, path}`;
+3. a visible restart from the start (the position is v1.1), on the old route:
+   - **embed** (`window._embedSettings`): its POST again — settings, `decode-fallback`, `decode-class`,
+     no `decode` — not a reload, which would send the old body, `decode` included, again;
+   - **the page's start form is this file's**: the restart note on the page (`setPendingFallback`), the
+     fields put on the form, `requestSubmit()` — the button's path, Turnstile included. The note makes
+     the hook write `decode-fallback`/`decode-class` and no `decode` on each of Turnstile's passes, and
+     ends when the next player comes up (or after 2 min): a field left on the form would put `/fb=` in
+     the key of a start that restarted nothing and count a fallback that did not happen. Background
+     starts (`background-render.js`) never carry them;
+   - **the form is another file's** (the player moved on to the next episode quietly and the page is
+     not brought up to date yet — in fullscreen until it ends): this page for this file, started by its
+     deep link, `#action=stream&decode-fallback=…&decode-class=…` (`app/resource/get.js` sets the note).
+     Restarting the page's form would restart the previous episode;
+   - no form at all: a reload.
+4. The server (`handlers/action`, `handlers/embed`) counts `webui_passthrough_fallback_total{reason,
+   class}` and logs `passthrough fallback`. A file ≤1080 plays on the old route; over 1080 the
+   transcoder refuses it and the viewer reads `error.video_route.fallback_uhd`
+   (docs/user_errors.md, "Route refusals").
+
+The class is `data-video-class`, read by the job from the master's `CODECS` (see "The session's
+route"). Not verified in a real browser: which errors hls.js and each browser raise when HEVC decoding
+fails, the watchdog on iOS, `requestSubmit()` through a visible Turnstile checkbox mid-film — the
+stage 4 matrix.
+
+#### Compatible mode
+
+The "More" menu (`SettingsControl.jsx`) shows **Compatible mode** (`player.compatMode`, hint
+`player.compatModeHint`) only on a passthrough stream — the menu itself appears for it even without a
+next file. It is the fallback with reason `user`: the viewer who sees a wrong picture no check catches
+(Dolby Vision without its metadata, HDR on an SDR screen, green frames) restarts the file converted on
+our side, and the file is remembered; no class is struck — it is the viewer's judgement, not a decoder
+failure.
 
 ### `playback-quality`
 

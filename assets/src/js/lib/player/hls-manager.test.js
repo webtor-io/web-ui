@@ -99,3 +99,51 @@ test('counts differ: the exact match reads data-label, not the chip\'s decorated
     ]);
     assert.equal(el.mpId, '1');
 });
+
+// ---- a passthrough stream's errors -------------------------------------------
+
+import { setupHlsEvents } from './hls-manager.js';
+import Hls from 'hls.js';
+
+function busHls() {
+    const handlers = new Map();
+    return {
+        levels: [],
+        recovered: 0,
+        startLoads: 0,
+        media: null,
+        inFlightFragments: {},
+        on(ev, fn) { handlers.set(ev, [...(handlers.get(ev) || []), fn]); },
+        off() {},
+        trigger(ev, data) { for (const fn of handlers.get(ev) || []) fn(ev, data); },
+        recoverMediaError() { this.recovered++; },
+        startLoad() { this.startLoads++; },
+        destroy() {},
+    };
+}
+const fatalMedia = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPEND_ERROR, fatal: true };
+
+// The old route is exactly what it was: every fatal media error recovers,
+// however many (the passthrough's "once" is its own).
+test('old route: three fatal media errors, three recoveries, nothing else', () => {
+    const hls = busHls();
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} });
+    for (let i = 0; i < 3; i++) hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 3);
+    hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true });
+    assert.equal(hls.recovered, 4, 'an incompatible codec string recovers as ever');
+});
+
+// A passthrough's guard sees an error first; what it handles goes no
+// further, and what it does not (network) is handled as on every route.
+test('passthrough: the guard is first, and the rest is the old handling', () => {
+    const hls = busHls();
+    const seen = [];
+    const guard = { onHlsError: (h, data) => { seen.push(data.details); return data.type === Hls.ErrorTypes.MEDIA_ERROR; } };
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 0, 'the guard decides on media errors');
+    hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });
+    assert.equal(hls.startLoads, 1, 'a network error restarts loading as on every route');
+    assert.deepEqual(seen, [Hls.ErrorDetails.BUFFER_APPEND_ERROR, Hls.ErrorDetails.FRAG_LOAD_TIMEOUT]);
+});

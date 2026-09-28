@@ -716,6 +716,8 @@
     "player.playNow": "Assistir agora",
     "player.nextCancel": "Cancelar",
     "player.autoplayNext": "Reproduzir o próximo automaticamente",
+    "player.compatMode": "Modo compatível",
+    "player.compatModeHint": "O vídeo é convertido do nosso lado. Use se a imagem parecer errada.",
     "player.stillWatching": "Ainda está assistindo?",
     "player.continueWatching": "Continuar",
     "player.subtitleDelayValue": "%v s",

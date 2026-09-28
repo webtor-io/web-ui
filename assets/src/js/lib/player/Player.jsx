@@ -18,6 +18,8 @@ import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
+import { createPassthroughGuard, fallbackToOldRoute } from './passthrough.js';
+import { clearPendingFallback } from './decode-declaration.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -244,8 +246,31 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // Player state hook
     const state = usePlayerState(videoRef, containerRef, { duration, seekOffset, seeking: sessionSeeking });
 
+    // HEVC passthrough (passthrough.js, docs/player.md "Passthrough: errors
+    // and fallback"): only where the transcoder passes this stream's video
+    // through. A guard that watches hls.js, the element and the picture, and
+    // gives the file up to the old route at most once -- the same way the
+    // "Compatible mode" item does. Every other stream gets none of it.
+    const passthroughRoute = isVideo && videoEl.dataset.videoRoute === 'passthrough';
+    const passthroughGuardRef = useRef(null);
+    if (passthroughRoute && !passthroughGuardRef.current) {
+        passthroughGuardRef.current = createPassthroughGuard({
+            video: videoEl,
+            fallback: (reason, path) => fallbackToOldRoute({ video: videoEl, reason, path }),
+        });
+    }
+    useEffect(() => () => { if (passthroughGuardRef.current) passthroughGuardRef.current.dispose(); }, []);
+    // A player is up: a restart after a failed passthrough, if one was
+    // pending, has happened -- its fields must not ride on the next start
+    // (decode-declaration.js setPendingFallback).
+    useEffect(() => { clearPendingFallback(window); }, []);
+
     // HLS hook
-    const hlsRef = useHls(videoRef, sourceUrl);
+    const hlsRef = useHls(videoRef, sourceUrl, {
+        passthrough: passthroughRoute
+            ? { fragLoadMs: parseInt(videoEl.dataset.fragLoadMs || '0', 10) || 0, guard: passthroughGuardRef.current }
+            : null,
+    });
 
     // Re-assert the picker's answer on hls.js's own transitions.
     //
@@ -549,6 +574,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             isVideo,
             isSession,
             resourceID: resourceID || '',
+            // The transcoder session's route and its reason, and the
+            // declaration the start sent ('' where the element has none):
+            // the base the passthrough is measured against.
+            route: videoEl.dataset.videoRoute || '',
+            reason: videoEl.dataset.routeReason || '',
+            decl: videoEl.dataset.decode || '',
             // The remembered settings this stream started with: `player-speed`
             // counts changes, and a viewer who set 1.5x a week ago makes none.
             rate: videoRef.current ? videoRef.current.playbackRate : 1,
@@ -1654,6 +1685,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     nextBusy={nextLoading}
                     autoplayNext={autoplayNext}
                     onToggleAutoplayNext={next ? toggleAutoplayNext : null}
+                    onCompatMode={passthroughRoute ? () => passthroughGuardRef.current.fire('user') : null}
                     nextLabel={next ? next.label : ''}
                     isVideo={isVideo}
                     features={features}

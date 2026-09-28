@@ -5023,3 +5023,145 @@ test('the next file starts without the answer: plain until the status says so', 
     await settle();
     assert.ok(lockButton(p), 'the status says so: the lock');
 });
+
+// ---- HEVC passthrough: the route in stream-start, the fallback, "Compatible mode"
+
+const { setPendingFallback, pendingFallbackFor, loadMemory: loadDecodeMemory } = await import('./decode-declaration.js');
+
+// The page's start form for the file the harness plays, with its log target
+// (resource page markup: form.stream-video, resource-id, item-id).
+function pageStartForm(page, itemId = 'item1') {
+    const f = document.createElement('form');
+    f.setAttribute('action', '/stream-video');
+    f.setAttribute('method', 'post');
+    f.className = 'stream-video';
+    f.innerHTML = `<input type="hidden" name="resource-id" value="res"><input type="hidden" name="item-id" value="${itemId}">`;
+    page.container.appendChild(f);
+    return f;
+}
+// The submits a form on the page would send, read at submit time (the async
+// submit's FormData), and stopped there: jsdom does not navigate.
+function recordSubmits() {
+    const got = [];
+    const onSubmit = (e) => { e.preventDefault(); got.push(Object.fromEntries(new dom.window.FormData(e.target))); };
+    document.addEventListener('submit', onSubmit);
+    return { got, stop: () => document.removeEventListener('submit', onSubmit) };
+}
+const passthroughPlayer = (page, { itemId = 'item1' } = {}) => {
+    page.video.setAttribute('controls', '');
+    page.video.setAttribute('data-video-route', 'passthrough');
+    page.video.setAttribute('data-route-reason', 'ok');
+    page.video.setAttribute('data-video-class', 'hevc10-2160');
+    page.video.setAttribute('data-item-id', itemId);
+    page.video.setAttribute('data-decode', 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq');
+    page.video.setAttribute('data-frag-load-ms', '240000');
+};
+const compatItem = (p) => p.container.querySelector('.wt-player-menu-row--compat');
+const freshDecodeMemory = () => {
+    window.localStorage.removeItem('wt-decode-fallback');
+    if (window.__wtDecode) { window.__wtDecode.memory = null; window.__wtDecode.pending = null; }
+};
+
+test('stream-start carries the route, its reason and the declaration', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('data-video-route', 'reencode');
+        page.video.setAttribute('data-route-reason', 'no_declaration');
+    });
+    await playPast(p);
+    const ev = p.events.find((e) => e.name === 'stream-start');
+    assert.ok(ev, 'the engagement gate must emit stream-start');
+    assert.equal(ev.data.route, 'reencode');
+    assert.equal(ev.data.reason, 'no_declaration');
+    assert.equal(ev.data.decl, '', 'no declaration: an empty field, not a missing one');
+});
+
+test('stream-start without a transcoder session: empty route fields', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    await playPast(p);
+    const ev = p.events.find((e) => e.name === 'stream-start');
+    assert.deepEqual([ev.data.route, ev.data.reason, ev.data.decl], ['', '', '']);
+});
+
+test('"Compatible mode" is there only on a passthrough stream', async (t) => {
+    t.after(() => destroyPlayer());
+    let p = await mountPlayer((page) => {
+        page.video.setAttribute('controls', '');
+        page.video.setAttribute('data-video-route', 'reencode');
+    });
+    assert.equal(compatItem(p), null, 'the old route: no item');
+    assert.equal(p.container.querySelector('.wt-player-btn--more'), null, 'and no menu without a next file');
+    destroyPlayer();
+    p = await mountPlayer(passthroughPlayer);
+    assert.ok(p.container.querySelector('.wt-player-btn--more'), 'the menu, for the item');
+    assert.ok(compatItem(p), 'a passthrough: the item');
+    assert.equal(compatItem(p).textContent.includes('player.compatMode'), true);
+    assert.equal(p.container.querySelector('.wt-player-menu input[role="switch"]'), null, 'no autoplay switch without a next file');
+});
+
+test('"Compatible mode" restarts this file on the old route, with why, once', async (t) => {
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        pageStartForm(page);
+    });
+    compatItem(p).click();
+    await settle();
+    assert.equal(rec.got.length, 1, 'the start form, submitted');
+    assert.equal(rec.got[0]['decode-fallback'], 'user');
+    assert.equal(rec.got[0]['decode-class'], 'hevc10-2160');
+    assert.equal(rec.got[0].decode, undefined, 'no declaration for this file');
+    const ev = p.events.find((e) => e.name === 'hevc-fallback');
+    assert.deepEqual(ev && ev.data, { reason: 'user', cls: 'hevc10-2160', path: 'native' });
+    const m = loadDecodeMemory(window);
+    assert.ok(m.sources['res/item1'], 'the file is remembered');
+    assert.deepEqual(m.strikes, {}, 'the viewer\'s choice strikes no class');
+    // The element failing afterwards does not restart it again.
+    Object.defineProperty(p.video, 'error', { value: { code: 3 }, configurable: true });
+    p.video.dispatchEvent(new dom.window.Event('error'));
+    await settle();
+    assert.equal(rec.got.length, 1, 'one fallback per player');
+});
+
+test('a passthrough whose decoder fails restarts on the old route and strikes the class', async (t) => {
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        pageStartForm(page);
+    });
+    Object.defineProperty(p.video, 'error', { value: { code: 3 }, configurable: true });
+    p.video.dispatchEvent(new dom.window.Event('error'));
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(rec.got[0]['decode-fallback'], 'decode_error');
+    assert.deepEqual(loadDecodeMemory(window).strikes['hevc10-2160'].map((s) => s.src), ['res/item1']);
+});
+
+test('an old-route stream has no fallback: an element error restarts nothing', async (t) => {
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); });
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('data-video-route', 'reencode');
+        pageStartForm(page);
+    });
+    Object.defineProperty(p.video, 'error', { value: { code: 3 }, configurable: true });
+    p.video.dispatchEvent(new dom.window.Event('error'));
+    await settle();
+    assert.equal(rec.got.length, 0);
+    assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined);
+});
+
+test('a player coming up ends a pending restart: its fields ride on no later start', async (t) => {
+    freshDecodeMemory();
+    t.after(() => { destroyPlayer(); freshDecodeMemory(); });
+    setPendingFallback(window, { resourceId: 'res', itemId: 'item1', reason: 'decode_error', cls: 'hevc10' });
+    assert.ok(pendingFallbackFor(window, { resourceId: 'res', itemId: 'item1' }));
+    await mountPlayer();
+    assert.equal(pendingFallbackFor(window, { resourceId: 'res', itemId: 'item1' }), null);
+});

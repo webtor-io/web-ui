@@ -740,6 +740,8 @@
     "player.playNow": "Смотреть сейчас",
     "player.nextCancel": "Отмена",
     "player.autoplayNext": "Включать следующее автоматически",
+    "player.compatMode": "Совместимый режим",
+    "player.compatModeHint": "Видео будет конвертироваться на нашей стороне. Включите, если картинка выглядит неправильно.",
     "player.stillWatching": "Вы ещё смотрите?",
     "player.continueWatching": "Продолжить",
     "player.subtitleDelayValue": "%v с",

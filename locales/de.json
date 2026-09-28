@@ -712,6 +712,8 @@
     "player.playNow": "Jetzt ansehen",
     "player.nextCancel": "Abbrechen",
     "player.autoplayNext": "Nächstes automatisch abspielen",
+    "player.compatMode": "Kompatibilitätsmodus",
+    "player.compatModeHint": "Das Video wird bei uns umgewandelt. Nutze das, wenn das Bild falsch aussieht.",
     "player.stillWatching": "Schaust du noch?",
     "player.continueWatching": "Weiter",
     "player.subtitleDelayValue": "%v s",

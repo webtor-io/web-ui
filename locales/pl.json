@@ -740,6 +740,8 @@
     "player.playNow": "Oglądaj teraz",
     "player.nextCancel": "Anuluj",
     "player.autoplayNext": "Odtwarzaj następne automatycznie",
+    "player.compatMode": "Tryb zgodności",
+    "player.compatModeHint": "Wideo zostanie przekonwertowane po naszej stronie. Włącz, jeśli obraz wygląda nieprawidłowo.",
     "player.stillWatching": "Nadal oglądasz?",
     "player.continueWatching": "Kontynuuj",
     "player.subtitleDelayValue": "%v s",

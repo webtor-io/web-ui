@@ -6,6 +6,7 @@ import Hls from 'hls.js';
 import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
 import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
 import { createLoaderRestart } from './loader-restart.js';
+import { passthroughHlsConfig } from './passthrough.js';
 
 const HLS_CONFIG = {
     autoStartLoad: true,
@@ -31,7 +32,12 @@ export { Hls };
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-export function createHls(videoEl, sourceUrl, onReady) {
+// opts.passthrough: the session hands the browser the source's video as it
+// is (data-video-route="passthrough"): its own fragment policy
+// (passthroughHlsConfig, opts.fragLoadMs) and opts.guard, the fallback's
+// watch (passthrough.js), first to see every error. Without it the
+// instance is exactly what every stream has always had.
+export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     if (!Hls || !Hls.isSupported() || isIOS) {
         // Native HLS (Safari/iOS) — browser handles m3u8 natively
         if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
@@ -43,7 +49,7 @@ export function createHls(videoEl, sourceUrl, onReady) {
         return null;
     }
 
-    const hls = new Hls(HLS_CONFIG);
+    const hls = new Hls(opts.passthrough ? passthroughHlsConfig(HLS_CONFIG, opts.fragLoadMs) : HLS_CONFIG);
     // The initial loadSource wipes the cues of every <track> already on the
     // element, exactly as a seek's does (TimelineController._cleanTracks on
     // MANIFEST_LOADING) — and a saved side-loaded selection is restored
@@ -58,7 +64,7 @@ export function createHls(videoEl, sourceUrl, onReady) {
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
-    setupHlsEvents(hls);
+    setupHlsEvents(hls, undefined, opts.passthrough ? opts.guard : null);
 
     if (onReady) {
         hls.on(Hls.Events.MANIFEST_PARSED, onReady);
@@ -68,8 +74,12 @@ export function createHls(videoEl, sourceUrl, onReady) {
 }
 
 // Exported for the tests (loader-restart.test.js), with the loader restart's
-// options: the error handling every instance goes through.
-export function setupHlsEvents(hls, restartOpts) {
+// options: the error handling every instance goes through. guard is a
+// passthrough stream's (passthrough.js createPassthroughGuard): what it
+// handles -- a codec string the browser refused, a media error -- goes no
+// further; everything else, network errors included, is handled as on every
+// route.
+export function setupHlsEvents(hls, restartOpts, guard = null) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
             hls.startLevel = 1;
@@ -78,6 +88,7 @@ export function setupHlsEvents(hls, restartOpts) {
     });
 
     hls.on(Hls.Events.ERROR, (event, data) => {
+        if (guard && guard.onHlsError(hls, data)) return;
         if (data.fatal) {
             switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
