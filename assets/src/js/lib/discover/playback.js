@@ -21,10 +21,12 @@
 //
 // A check that has not answered is never read as a "no": a browser whose
 // probe has not answered yet keeps HEVC and HDR shown (today's list) and is
-// not warned, and a transcoder whose answer is unknown gets a 4K warning
-// that says the check did not happen, not that 4K is off. The viewer's own
-// choice (discover-prefs in localStorage, written only when they flip a
-// switch) is kept over any default.
+// not warned, and on a page that declares, a transcoder whose answer is
+// unknown gets a 4K warning that says the check did not happen, not that 4K
+// is off. A page that does not declare never asks: its sessions take the
+// old route whatever the transcoder answers. The viewer's own choice
+// (discover-prefs in localStorage, written only when they flip a switch) is
+// kept over any default.
 //
 // Pure: everything comes in as arguments. StreamModal renders it;
 // DiscoverApp gathers the inputs (playbackContext).
@@ -69,17 +71,21 @@ export function uhdPlaysHere(caps, declared) {
 }
 
 // uhdWarningKey: why 4K may not play here, for the 4K switch's warning.
-//   - the transcoder's answer is not known yet, or this page takes part
-//     but the browser has not answered: the check did not happen -- say
-//     so, not "switched off";
+//   - this page does not declare: its sessions take the old route whatever
+//     the transcoder answers, and there 4K is converted, which is off --
+//     the warning Discover has always shown, true there. The transcoder's
+//     answer is not asked: until it is known (every page, before the
+//     transcoder has GET /capabilities) nothing on this page changes;
+//   - the transcoder's answer is not known yet, or the browser has not
+//     answered: the check did not happen -- say so, not "switched off";
 //   - the transcoder passes HEVC through and this browser declared, without
 //     4K Main10: this browser is why;
-//   - otherwise (the transcoder converts, or this page does not declare, so
-//     its sessions take the old route): 4K is converted, which is off --
-//     the warning Discover has always shown.
+//   - the transcoder converts: the old warning, as for a page that does not
+//     declare.
 export function uhdWarningKey(caps, part, declared) {
+    if (!part) return 'discover.warning4kBody';
     if (caps === 'unknown') return 'discover.warning4kBodyUnchecked';
-    if (caps === 'on' && part) {
+    if (caps === 'on') {
         return Array.isArray(declared) ? 'discover.warning4kBodyNoHevc' : 'discover.warning4kBodyUnchecked';
     }
     return 'discover.warning4kBody';

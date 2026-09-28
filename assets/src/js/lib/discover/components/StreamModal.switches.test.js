@@ -229,6 +229,12 @@ test('the 4K warning says why, by the gate: off, unknown, a declaring browser wi
     assert.equal(await warning4k({ caps: 'on', decodes: ['hevc8'], part: true, declared: ['hevc8'] }), 'discover.warning4kBodyNoHevc',
         'HEVC 1080p only: not offered 4K HEVC as playable');
     assert.equal(await warning4k({ caps: 'on', decodes: EVERYTHING, part: false, declared: null }), 'discover.warning4kBody', 'not declaring');
+    // Production before the transcoder has GET /capabilities: nobody
+    // declares, and the answer is unknown everywhere. The text stays the one
+    // Discover has always shown.
+    assert.equal(await warning4k({ caps: 'unknown', decodes: EVERYTHING, part: false, declared: null }), 'discover.warning4kBody',
+        'not declaring, transcoder not answered');
+    assert.equal(await warning4k({ caps: 'unknown', decodes: null, part: false, declared: null }), 'discover.warning4kBody');
     // The 4K events keep their names and carry nothing new.
     assert.deepEqual(events.filter((e) => e.name.startsWith('discover-4k')),
         [{ name: 'discover-4k-toggle-attempt' }, { name: 'discover-4k-enabled' }]);
@@ -302,10 +308,10 @@ test('discover-streams-classified: once per list, what the names said and what t
     assert.equal(got().length, 1, 'a flipped switch is the same list');
 });
 
-test('a modal without a playback context behaves as one whose checks have not answered', async () => {
+test('a modal without a playback context behaves as one whose checks have not answered, on a page that does not declare', async () => {
     const { root } = await mount([S.hevc1080(), S.uhdAvc(), S.avc1080()], undefined);
     assert.equal(checked(root, 'hevc'), true);
     assert.ok(switchOf(root, 'uhd'));
     await flip(root, 'uhd');
-    assert.equal(warning(root).querySelectorAll('p')[1].textContent.trim(), 'discover.warning4kBodyUnchecked');
+    assert.equal(warning(root).querySelectorAll('p')[1].textContent.trim(), 'discover.warning4kBody');
 });

@@ -58,8 +58,12 @@ test('uhdPlaysHere: only the transcoder passing HEVC through AND a declaration w
 });
 
 test('uhdWarningKey: unknown says the check did not happen; a declaring browser without 4K says so; else the old text', () => {
-    assert.equal(uhdWarningKey('unknown', false, null), 'discover.warning4kBodyUnchecked');
+    // A page that does not declare takes the old route whatever the
+    // transcoder says: its text does not wait on the transcoder's answer
+    // (before the transcoder has GET /capabilities, every page reads unknown).
+    assert.equal(uhdWarningKey('unknown', false, null), 'discover.warning4kBody', 'not declaring: the answer is not asked');
     assert.equal(uhdWarningKey('unknown', true, EVERYTHING), 'discover.warning4kBodyUnchecked');
+    assert.equal(uhdWarningKey('unknown', true, null), 'discover.warning4kBodyUnchecked');
     assert.equal(uhdWarningKey('on', true, null), 'discover.warning4kBodyUnchecked', 'taking part, browser not answered');
     assert.equal(uhdWarningKey('on', true, ['hevc8', 'hevc8-2160']), 'discover.warning4kBodyNoHevc');
     assert.equal(uhdWarningKey('on', true, []), 'discover.warning4kBodyNoHevc');

@@ -272,16 +272,22 @@ names are read by `lib/discover/release-video.js`.
   transcoder's own rule; 9 in 10 HEVC sources over 1080p are Main10). There
   the 4K switch is gone and 4K is shown. Everywhere else it stays, off by
   default, and turning it on warns — with a text that says why:
-  - transcoder answer `unknown`, or this page takes part and the browser
-    has not answered: "we couldn't check" (`discover.warning4kBodyUnchecked`)
-    — a check that did not happen is not "4K is off";
+  - this page does not declare: its sessions take the old route whatever
+    the transcoder answers, so the warning Discover always had
+    (`discover.warning4kBody`), which is true there. The transcoder's
+    answer is not asked for it: an `unknown` (every page, until the
+    transcoder has `GET /capabilities`) changes nothing for a page that
+    does not declare, and the web-ui and content-transcoder rollouts need
+    no order for it;
+  - this page declares, and the transcoder's answer is `unknown` or the
+    browser has not answered: "we couldn't check"
+    (`discover.warning4kBodyUnchecked`) — a check that did not happen is
+    not "4K is off";
   - the transcoder passes HEVC through and this browser declared without
     4K Main10: "this browser doesn't decode 10-bit HEVC"
     (`discover.warning4kBodyNoHevc`) — a browser with 1080p HEVC or 4K
     Main only is not offered 4K HEVC as playable;
-  - otherwise (the transcoder converts, or this page does not declare, so
-    its sessions take the old route): the warning Discover always had
-    (`discover.warning4kBody`), which is true there.
+  - the transcoder converts: the old warning, as above.
   4K HEVC tier High (UHD Blu-ray remuxes) also needs `hevc-high`; a
   browser that declares 4K Main10 without it is not told (not handled).
 - **A check that has not answered is not a "no".** Until the browser's
