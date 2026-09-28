@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import {
     OPTIN_KEY, CACHE_KEY, MEMORY_KEY, MEMORY_TTL_MS, CACHE_TTL_MS, TOKENS,
-    applyUrlSwitch, takesPart, startProbe, whenDeclared, declaredTokens, declarationFor,
+    applyUrlSwitch, takesPart, startProbe, whenDeclared, declaredTokens, declarationFor, decodedTokens,
     rememberFallback, loadMemory, installSubmitHook, applyDeclaration, initDecodeDeclaration,
 } from './decode-declaration.js';
 import { DECODE_TOKENS } from './codec-support.js';
@@ -148,6 +148,49 @@ test('HEVC known, PQ not answered yet: the cache of this browser, else unknown -
     startProbe(win, fakeProbe({ pq: 'never' }));
     await tick();
     assert.equal(declarationFor(win, {}), 'hevc10,hdr-pq');
+});
+
+// Discover's switches ask what the browser decodes of every browser, not
+// only of those that declare: the same probe, cache and memory, without the
+// opt-in.
+test('decodedTokens: the browser\'s answer whether or not the page takes part; null until there is one', async () => {
+    let win = page();
+    assert.equal(decodedTokens(win), null, 'no probe, no cache: not answered');
+    await startProbe(win, fakeProbe({ pq: true }));
+    assert.equal(takesPart(win), false);
+    assert.deepEqual(decodedTokens(win), [...ALL, 'hdr-pq'], 'answered, though this page declares nothing');
+    assert.equal(declaredTokens(win), null, 'and the declaration still waits for the opt-in');
+
+    win = page();
+    await startProbe(win, fakeProbe({ hevc: [], pq: false }));
+    assert.deepEqual(decodedTokens(win), [], 'decodes none is an answer, not null');
+
+    win = page();
+    const p = fakeProbe({ pq: 'later' });
+    startProbe(win, p);
+    await tick();
+    assert.equal(decodedTokens(win), null, 'HEVC known but PQ not: not answered yet');
+    p.answerPQ(true);
+    await win.__wtDecode.probe;
+    assert.deepEqual(decodedTokens(win), [...ALL, 'hdr-pq']);
+
+    win = page();
+    win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, tokens: ['hevc8'], at: Date.now() - 1000 }));
+    assert.deepEqual(decodedTokens(win), ['hevc8'], 'this browser\'s cached answer counts at once');
+});
+
+test('decodedTokens: the memory of failures takes its classes out here too', async () => {
+    const win = page();
+    await startProbe(win, fakeProbe({ pq: true }));
+    const now = Date.now();
+    rememberFallback(win, { resourceId: 'r', itemId: 'a', cls: 'hevc10-2160', strike: true }, now - 200);
+    rememberFallback(win, { resourceId: 'r', itemId: 'b', cls: 'hevc10-2160', strike: true }, now - 100);
+    assert.deepEqual(decodedTokens(win, now), ['hevc8', 'hevc10', 'hevc8-2160', 'hdr-pq']);
+});
+
+test('decodedTokens: a throwing localStorage answers null, not an exception', () => {
+    const win = page({ storageThrows: true });
+    assert.equal(decodedTokens(win), null);
 });
 
 test('the cache of another browser, an old one or a future one is not used', async () => {

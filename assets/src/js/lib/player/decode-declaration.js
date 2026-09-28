@@ -9,8 +9,10 @@
 // Until the owner's stage 5 nobody else does: the transcoder is one for
 // production and stage, so "production does not declare yet" cannot be a
 // deployment -- it is this per-browser opt-in (stage 3 spec, D1). A page that
-// does not take part sends no `decode` field and runs no probe: it costs
-// nothing.
+// does not take part sends no `decode` field and, but for Discover, runs no
+// probe: it costs nothing. Discover asks every browser (decodedTokens): its
+// HEVC and HDR switches follow what the browser decodes, whether or not it
+// declares (lib/discover/playback.js).
 //
 // What it declares -- all or nothing (D4):
 //   1. not taking part                     -> no field;
@@ -260,15 +262,24 @@ export function rememberFallback(win, { resourceId, itemId, cls, strike = false 
     return m;
 }
 
+// decodedTokens: what this browser decodes as far as this site knows -- the
+// probe's answer on this page, else this browser's cached one, minus the
+// classes the memory of failures took away; null until there is an answer
+// ([] for a browser that decodes none). Whether the page takes part plays
+// no role: Discover's switches ask it of every browser.
+export function decodedTokens(win, now = Date.now()) {
+    const toks = freshTokens(win) ?? cachedTokens(win, now);
+    if (toks === null) return null;
+    const struck = struckTokens(loadMemory(win, now));
+    return toks.filter((t) => !struck.has(t));
+}
+
 // declaredTokens: what this page declares for a file with no failure of its
 // own -- null where it declares nothing (not taking part, or no answer and
 // no cache yet), else the tokens ([] for a browser that decodes none).
 export function declaredTokens(win, now = Date.now()) {
     if (!takesPart(win)) return null;
-    const toks = freshTokens(win) ?? cachedTokens(win, now);
-    if (toks === null) return null;
-    const struck = struckTokens(loadMemory(win, now));
-    return toks.filter((t) => !struck.has(t));
+    return decodedTokens(win, now);
 }
 
 // declarationFor is the `decode` value a start of this file sends, or null
